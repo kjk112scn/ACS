@@ -1,8 +1,13 @@
 <template>
   <div>
     <h1>실시간 센서 데이터</h1>
-    <p>타임스탬프: {{ timestamp }}</p>
-    <p>값: {{ value }}</p>
+    <p>mode bit : {{ modeStatusBits }}</p>
+    <p>azimuthAngle: {{ azimuthAngle }}</p>
+    <p>azimuthSpeed : {{ azimuthSpeed }}</p>
+    <p>azimuthAngle: {{ elevationAngle }}</p>
+    <p>elevationSpeed : {{ elevationSpeed }}</p>
+    <p>azimuthAngle: {{ tiltAngle }}</p>
+    <p>azimuthAngle: {{ tiltSpeed }}</p>
     <p v-if="error" style="color: red">오류 발생: {{ error }}</p>
     <p v-if="!isConnected">WebSocket 연결 중...</p>
     <q-btn label="Emergency Command 전송" @click="sendEmergency" />
@@ -12,8 +17,13 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { api } from 'boot/axios' // 또는 import axios from 'axios';
-const timestamp = ref('')
-const value = ref('')
+const modeStatusBits = ref('')
+const azimuthAngle = ref('')
+const azimuthSpeed = ref('')
+const elevationAngle = ref('')
+const elevationSpeed = ref('')
+const tiltAngle = ref('')
+const tiltSpeed = ref('')
 const error = ref('')
 const isConnected = ref(false)
 let websocket: WebSocket | undefined // 명시적인 타입 지정
@@ -41,8 +51,14 @@ const connectWebSocket = () => {
   websocket.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data)
-      timestamp.value = data.timestamp
-      value.value = data.value
+      modeStatusBits.value = data.modeStatusBits
+      azimuthAngle.value = data.azimuthAngle
+      azimuthSpeed.value = data.azimuthSpeed
+      elevationAngle.value = data.elevationAngle
+      elevationSpeed.value = data.elevationSpeed
+      tiltAngle.value = data.tiltAngle
+      tiltSpeed.value = data.tiltSpeed
+      console.log('WebSocket 메시지 수신:', data)
     } catch (e) {
       console.error('JSON 파싱 오류:', e)
       error.value = '데이터 파싱 오류 발생'
