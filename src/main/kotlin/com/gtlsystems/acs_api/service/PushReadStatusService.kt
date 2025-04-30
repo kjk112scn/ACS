@@ -12,18 +12,19 @@ import java.util.concurrent.atomic.AtomicInteger
 class PushReadStatusService (private val objectMapper: ObjectMapper) {
     private val sink = Sinks.many().multicast().onBackpressureBuffer<String>()
     private val counter = AtomicInteger(0)
+    private val icdService = ICDService.ReadStatus.GetDataFrame()
 
     // 시뮬레이션 센서 데이터 생성 (실제로는 센서로부터 데이터를 읽어오는 로직)
-    val sensorDataFlux: Flux<String> = Flux.interval(Duration.ofMillis(100))
-        .map { PushReadStatusData.ReadData(value = counter.incrementAndGet()) }
+    val readStatusDataFlux: Flux<String> = Flux.interval(Duration.ofMillis(100))
+        .map { PushReadStatusData.ReadData() } // 기본값으로 ReadData 객체 생성
         .map { objectMapper.writeValueAsString(it) }
-        .doOnCancel { println("No more subscribers for sensor data.") }
-
-    fun publish(sensorDataJson: String) {
-        sink.tryEmitNext(sensorDataJson).orThrow()
+        .doOnCancel { println("No more subscribers for simulated sensor data.")
+        }
+    fun publish(readStatusDataJson: String) {
+        sink.tryEmitNext(readStatusDataJson).orThrow()
     }
 
-    fun getSensorDataStream(): Flux<String> {
-        return sink.asFlux().mergeWith(sensorDataFlux)
+    fun getReadStatusDataStream(): Flux<String> {
+        return sink.asFlux().mergeWith(readStatusDataFlux)
     }
 }

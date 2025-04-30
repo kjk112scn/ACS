@@ -1,6 +1,7 @@
 package com.gtlsystems.acs_api.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.gtlsystems.acs_api.model.PushReadStatusData
 import com.gtlsystems.acs_api.util.JKUtil
 import com.gtlsystems.acs_api.util.JKUtil.JKConvert.Companion.byteArrayToHexString
 import jakarta.annotation.PostConstruct
@@ -28,7 +29,7 @@ class UdpFwICDService(
     @Value("\${server.udp.port}") private val serverPort: Int
 ) {
 
-    private val icdService = ICDService.Classify()
+    private val icdService = ICDService.Classify(objectMapper,pushReadStatusService)
     private lateinit var channel: DatagramChannel
     private val receiveBuffer = ByteBuffer.allocate(256)
     val firmwareAddress = InetSocketAddress(firmwareIp, firmwarePort)
@@ -46,7 +47,7 @@ class UdpFwICDService(
 
             // 주기적인 수신 및 송신 시작
             startReceivingDataPeriodically()
-            //startSendingCommandPeriodically()
+            startSendingCommandPeriodically()
         } catch (e: Exception) {
             println("UDP 초기화 실패: ${e.message}")
         }
@@ -102,7 +103,7 @@ class UdpFwICDService(
                         val dataString = String(receivedData)
                         println("UDP 데이터 수신: $dataString from $clientAddress")
                         processICDData(receivedData)
-                        processFirmwareDataAndPush(dataString)
+                       // processFirmwareDataAndPush(dataString)
                     }
                 },
                 { error ->
@@ -112,7 +113,7 @@ class UdpFwICDService(
             )
     }
 
-    // 수신 부 로직
+    // 수신 부 분류 로직
     private fun processICDData(receivedData: ByteArray) {
         try {
             icdService.receivedCmd(receivedData)
@@ -120,6 +121,7 @@ class UdpFwICDService(
             println("ICD 데이터 처리 오류: ${e.message}")
         }
     }
+/*
 
     // Front로 데이터 푸쉬 로직
     private fun processFirmwareDataAndPush(udpData: String) {
@@ -142,6 +144,61 @@ class UdpFwICDService(
             println("UDP 데이터 처리 오류: ${e.message}")
         }
     }
+*/
+/*private fun processFirmwareDataAndPush(udpData: String) {
+    try {
+        val parts = udpData.split(",")
+        if (parts.size >= 1) { // ReadData 클래스의 필드 수 + timestamp
+            val readData = PushReadStatusData.ReadData(
+                modeStatusBits = BitSet.valueOf(byteArrayOf(parts[1].toByte())),
+                azimuthAngle = parts[2].toFloatOrNull() ?: 0f,
+                elevationAngle = parts[3].toFloatOrNull() ?: 0f,
+                tiltAngle = parts[4].toFloatOrNull() ?: 0f,
+                azimuthSpeed = parts[5].toFloatOrNull() ?: 0f,
+                elevationSpeed = parts[6].toFloatOrNull() ?: 0f,
+                tiltSpeed = parts[7].toFloatOrNull() ?: 0f,
+                servoDriverAzimuthAngle = parts[8].toFloatOrNull() ?: 0f,
+                servoDriverElevationAngle = parts[9].toFloatOrNull() ?: 0f,
+                servoDriverTiltAngle = parts[10].toFloatOrNull() ?: 0f,
+                torqueAzimuth = parts[11].toFloatOrNull() ?: 0f,
+                torqueElevation = parts[12].toFloatOrNull() ?: 0f,
+                torqueTilt = parts[13].toFloatOrNull() ?: 0f,
+                windSpeed = parts[14].toFloatOrNull() ?: 0f,
+                windDirection = parts[15].toUShortOrNull() ?: 0u,
+                rtdOne = parts[16].toFloatOrNull() ?: 0f,
+                rtdTwo = parts[17].toFloatOrNull() ?: 0f,
+                mainBoardProtocolStatusBits = BitSet.valueOf(byteArrayOf(parts[18].toByte())),
+                mainBoardStatusBits = BitSet.valueOf(byteArrayOf(parts[19].toByte())),
+                mainBoardMCOnOffBits = BitSet.valueOf(byteArrayOf(parts[20].toByte())),
+                mainBoardReserveBits = BitSet.valueOf(byteArrayOf(parts[21].toByte())),
+                azimuthBoardServoStatusBits = BitSet.valueOf(byteArrayOf(parts[22].toByte())),
+                azimuthBoardStatusBits = BitSet.valueOf(byteArrayOf(parts[23].toByte())),
+                elevationBoardServoStatusBits = BitSet.valueOf(byteArrayOf(parts[24].toByte())),
+                elevationBoardStatusBits = BitSet.valueOf(byteArrayOf(parts[25].toByte())),
+                tiltBoardServoStatusBits = BitSet.valueOf(byteArrayOf(parts[26].toByte())),
+                tiltBoardStatusBits = BitSet.valueOf(byteArrayOf(parts[27].toByte())),
+                feedSBoardStatusBits = BitSet.valueOf(byteArrayOf(parts[28].toByte())),
+                feedXBoardStatusBits = BitSet.valueOf(byteArrayOf(parts[29].toByte())),
+                currentSBandLNA_LHCP = parts[30].toFloatOrNull() ?: 0f,
+                currentSBandLNA_RHCP = parts[31].toFloatOrNull() ?: 0f,
+                currentXBandLNA_LHCP = parts[32].toFloatOrNull() ?: 0f,
+                currentXBandLNA_RHCP = parts[33].toFloatOrNull() ?: 0f,
+                rssiSBandLNA_LHCP = parts[34].toFloatOrNull() ?: 0f,
+                rssiSBandLNA_RHCP = parts[35].toFloatOrNull() ?: 0f,
+                rssiXBandLNA_LHCP = parts[36].toFloatOrNull() ?: 0f,
+                rssiXBandLNA_RHCP = parts[37].toFloatOrNull() ?: 0f
+            )
+            val sensorDataJson = objectMapper.writeValueAsString(readData)
+            pushReadStatusService.publish(sensorDataJson)
+        } else {
+            println("UDP 데이터 형식 오류: 예상되는 데이터 필드 수(${PushReadStatusData.ReadData::class.java.declaredFields.size + 1})보다 적음 - $udpData")
+        }
+    } catch (e: NumberFormatException) {
+        println("UDP 데이터 파싱 오류: 숫자 형식 오류 - ${e.message} - $udpData")
+    } catch (e: Exception) {
+        println("UDP 데이터 처리 오류: ${e.message} - $udpData")
+    }
+}*/
 
     // Emergency Command 전송 함수
     fun onEmergencyCommand(commandChar: Char) {

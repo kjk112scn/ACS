@@ -1,5 +1,8 @@
 package com.gtlsystems.acs_api.service
 
+import com.fasterxml.jackson.databind.ObjectMapper // ObjectMapper import
+import com.gtlsystems.acs_api.model.PushReadStatusData
+import com.gtlsystems.acs_api.service.PushReadStatusService // PushReadStatusService import
 import com.gtlsystems.acs_api.util.Crc16
 import com.gtlsystems.acs_api.util.JKUtil.JKConvert
 import com.gtlsystems.acs_api.util.JKUtil
@@ -11,12 +14,93 @@ import kotlin.UShortArray
 
 @Service
 class ICDService {
+
     companion object {
         var stx: Byte = 0x02
         var etx: Byte = 0x03
+
     }
 
-    class Classify {
+    class parsingReadData {
+        object GetDataFrame {
+            fun fromByteArray(byteArray: ByteArray): PushReadStatusData.ReadData? {
+                // Check if the byte array is valid
+                if (byteArray.size < 3 || byteArray[2] != 'R'.code.toByte()) {
+                    return null
+                }
+
+                try {
+                    val buffer = ByteBuffer.wrap(byteArray)
+                    buffer.order(ByteOrder.BIG_ENDIAN)
+
+                    // Skip the header bytes (assuming first 3 bytes are header)
+                    buffer.position(3)
+
+                    val readData = PushReadStatusData.ReadData()
+
+                    // Parse mode status bits
+                    val modeStatusByte = buffer.get()
+                    readData.modeStatusBits = BitSet.valueOf(byteArrayOf(modeStatusByte))
+
+                    // Parse angles and speeds
+                    readData.azimuthAngle = buffer.float
+                    readData.elevationAngle = buffer.float
+                    readData.tiltAngle = buffer.float
+                    readData.azimuthSpeed = buffer.float
+                    readData.elevationSpeed = buffer.float
+                    readData.tiltSpeed = buffer.float
+
+                    // Parse servo driver angles
+                    readData.servoDriverAzimuthAngle = buffer.float
+                    readData.servoDriverElevationAngle = buffer.float
+                    readData.servoDriverTiltAngle = buffer.float
+
+                    // Parse torque values
+                    readData.torqueAzimuth = buffer.float
+                    readData.torqueElevation = buffer.float
+                    readData.torqueTilt = buffer.float
+
+                    // Parse wind data
+                    readData.windSpeed = buffer.float
+                    readData.windDirection = buffer.short.toUShort()
+
+                    // Parse RTD values
+                    readData.rtdOne = buffer.float
+                    readData.rtdTwo = buffer.float
+
+                    // Parse status bits
+                    readData.mainBoardProtocolStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
+                    readData.mainBoardStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
+                    readData.mainBoardMCOnOffBits = BitSet.valueOf(byteArrayOf(buffer.get()))
+                    readData.mainBoardReserveBits = BitSet.valueOf(byteArrayOf(buffer.get()))
+                    readData.azimuthBoardServoStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
+                    readData.azimuthBoardStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
+                    readData.elevationBoardServoStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
+                    readData.elevationBoardStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
+                    readData.tiltBoardServoStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
+                    readData.tiltBoardStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
+                    readData.feedSBoardStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
+                    readData.feedXBoardStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
+
+                    // Parse current and RSSI values
+                    readData.currentSBandLNA_LHCP = buffer.float
+                    readData.currentSBandLNA_RHCP = buffer.float
+                    readData.currentXBandLNA_LHCP = buffer.float
+                    readData.currentXBandLNA_RHCP = buffer.float
+                    readData.rssiSBandLNA_LHCP = buffer.float
+                    readData.rssiSBandLNA_RHCP = buffer.float
+                    readData.rssiXBandLNA_LHCP = buffer.float
+                    readData.rssiXBandLNA_RHCP = buffer.float
+                    return readData
+                } catch (e: Exception) {
+                    println("Error parsing data: ${e.message}")
+                    return null
+                }
+            }
+        }
+    }
+
+    class Classify(private val objectMapper: ObjectMapper, private val pushReadStatusService: PushReadStatusService) {
         fun receivedCmd(receiveData: ByteArray) {
             if (receiveData.size > 1 && receiveData[0] == 0x02.toByte()) {
                 if (receiveData[1] == 'R'.code.toByte()) {
@@ -25,6 +109,8 @@ class ICDService {
                         val parsedData = ReadStatus.GetDataFrame.fromByteArray(receiveData)
                         parsedData?.let {
                             println("파싱된 ICD 데이터: $it")
+                            val readDataJson = objectMapper.writeValueAsString(parsedData)
+                            pushReadStatusService.publish(readDataJson)
                         }
                     }
                     //2.3 Read Positioner Status

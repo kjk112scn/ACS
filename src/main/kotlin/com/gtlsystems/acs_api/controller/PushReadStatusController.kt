@@ -12,7 +12,7 @@ class PushReadStatusController (private val pushReadstatusService: PushReadStatu
     override fun handle(session: WebSocketSession): Mono<Void> {
         println("New client connected to WebSocket.")
         return session.send(
-            pushReadstatusService.getSensorDataStream()
+            pushReadstatusService.getReadStatusDataStream()
                 .map { message -> session.textMessage(message) }
         ).and(session.receive().then())
     }
