@@ -55,7 +55,7 @@ class UdpFwICDService(
 
     // 송신 부 반복 수행
     private fun startSendingCommandPeriodically() {
-        Flux.interval(Duration.ofMillis(100))
+        Flux.interval(Duration.ofMillis(50))
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe { sendReadStatusCommand() }
     }
@@ -75,7 +75,7 @@ class UdpFwICDService(
 
     // 수신 부 반복 수행
     private fun startReceivingDataPeriodically() {
-        Flux.interval(Duration.ofMillis(100))
+        Flux.interval(Duration.ofMillis(25))
             .subscribeOn(Schedulers.boundedElastic())
             .flatMap {
                 Mono.fromCallable {

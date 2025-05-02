@@ -2,10 +2,13 @@ package com.gtlsystems.acs_api.service
 
 import com.fasterxml.jackson.databind.ObjectMapper // ObjectMapper import
 import com.gtlsystems.acs_api.model.PushReadStatusData
-import com.gtlsystems.acs_api.service.PushReadStatusService // PushReadStatusService import
+import com.gtlsystems.acs_api.service.ICDService.Companion.etx
+import com.gtlsystems.acs_api.service.ICDService.Companion.stx
+
 import com.gtlsystems.acs_api.util.Crc16
 import com.gtlsystems.acs_api.util.JKUtil.JKConvert
 import com.gtlsystems.acs_api.util.JKUtil
+import com.gtlsystems.acs_api.util.JKUtil.JKConvert.Companion.byteToBinaryString
 import org.springframework.stereotype.Service
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -21,84 +24,6 @@ class ICDService {
 
     }
 
-    class parsingReadData {
-        object GetDataFrame {
-            fun fromByteArray(byteArray: ByteArray): PushReadStatusData.ReadData? {
-                // Check if the byte array is valid
-                if (byteArray.size < 3 || byteArray[2] != 'R'.code.toByte()) {
-                    return null
-                }
-
-                try {
-                    val buffer = ByteBuffer.wrap(byteArray)
-                    buffer.order(ByteOrder.BIG_ENDIAN)
-
-                    // Skip the header bytes (assuming first 3 bytes are header)
-                    buffer.position(3)
-
-                    val readData = PushReadStatusData.ReadData()
-
-                    // Parse mode status bits
-                    val modeStatusByte = buffer.get()
-                    readData.modeStatusBits = BitSet.valueOf(byteArrayOf(modeStatusByte))
-
-                    // Parse angles and speeds
-                    readData.azimuthAngle = buffer.float
-                    readData.elevationAngle = buffer.float
-                    readData.tiltAngle = buffer.float
-                    readData.azimuthSpeed = buffer.float
-                    readData.elevationSpeed = buffer.float
-                    readData.tiltSpeed = buffer.float
-
-                    // Parse servo driver angles
-                    readData.servoDriverAzimuthAngle = buffer.float
-                    readData.servoDriverElevationAngle = buffer.float
-                    readData.servoDriverTiltAngle = buffer.float
-
-                    // Parse torque values
-                    readData.torqueAzimuth = buffer.float
-                    readData.torqueElevation = buffer.float
-                    readData.torqueTilt = buffer.float
-
-                    // Parse wind data
-                    readData.windSpeed = buffer.float
-                    readData.windDirection = buffer.short.toUShort()
-
-                    // Parse RTD values
-                    readData.rtdOne = buffer.float
-                    readData.rtdTwo = buffer.float
-
-                    // Parse status bits
-                    readData.mainBoardProtocolStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
-                    readData.mainBoardStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
-                    readData.mainBoardMCOnOffBits = BitSet.valueOf(byteArrayOf(buffer.get()))
-                    readData.mainBoardReserveBits = BitSet.valueOf(byteArrayOf(buffer.get()))
-                    readData.azimuthBoardServoStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
-                    readData.azimuthBoardStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
-                    readData.elevationBoardServoStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
-                    readData.elevationBoardStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
-                    readData.tiltBoardServoStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
-                    readData.tiltBoardStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
-                    readData.feedSBoardStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
-                    readData.feedXBoardStatusBits = BitSet.valueOf(byteArrayOf(buffer.get()))
-
-                    // Parse current and RSSI values
-                    readData.currentSBandLNA_LHCP = buffer.float
-                    readData.currentSBandLNA_RHCP = buffer.float
-                    readData.currentXBandLNA_LHCP = buffer.float
-                    readData.currentXBandLNA_RHCP = buffer.float
-                    readData.rssiSBandLNA_LHCP = buffer.float
-                    readData.rssiSBandLNA_RHCP = buffer.float
-                    readData.rssiXBandLNA_LHCP = buffer.float
-                    readData.rssiXBandLNA_RHCP = buffer.float
-                    return readData
-                } catch (e: Exception) {
-                    println("Error parsing data: ${e.message}")
-                    return null
-                }
-            }
-        }
-    }
 
     class Classify(private val objectMapper: ObjectMapper, private val pushReadStatusService: PushReadStatusService) {
         fun receivedCmd(receiveData: ByteArray) {
@@ -108,9 +33,64 @@ class ICDService {
                     if (receiveData[2] == 'R'.code.toByte()) {
                         val parsedData = ReadStatus.GetDataFrame.fromByteArray(receiveData)
                         parsedData?.let {
-                            println("파싱된 ICD 데이터: $it")
-                            val readDataJson = objectMapper.writeValueAsString(parsedData)
-                            pushReadStatusService.publish(readDataJson)
+                            val newData = PushReadStatusData.ReadData(
+                                // Angle data
+                                azimuthAngle = it.azimuthAngle,
+                                elevationAngle = it.elevationAngle,
+                                tiltAngle = it.tiltAngle,
+
+                                // Speed data
+                                azimuthSpeed = it.azimuthSpeed,
+                                elevationSpeed = it.elevationSpeed,
+                                tiltSpeed = it.tiltSpeed,
+
+                                // Servo driver angle data
+                                servoDriverAzimuthAngle = it.servoDriverAzimuthAngle,
+                                servoDriverElevationAngle = it.servoDriverElevationAngle,
+                                servoDriverTiltAngle = it.servoDriverTiltAngle,
+
+                                // Torque data
+                                torqueAzimuth = it.torqueAzimuth,
+                                torqueElevation = it.torqueElevation,
+                                torqueTilt = it.torqueTilt,
+
+                                // Environmental data
+                                windSpeed = it.windSpeed,
+                                windDirection = it.windDirection,
+                                rtdOne = it.rtdOne,
+                                rtdTwo = it.rtdTwo,
+
+                                // Status bits
+                                modeStatusBits = it.modeStatusBits,
+                                mainBoardProtocolStatusBits = it.mainBoardProtocolStatusBits,
+                                mainBoardStatusBits = it.mainBoardStatusBits,
+                                mainBoardMCOnOffBits = it.mainBoardMCOnOffBits,
+                                mainBoardReserveBits = it.mainBoardReserveBits,
+                                azimuthBoardServoStatusBits = it.azimuthBoardServoStatusBits,
+                                azimuthBoardStatusBits = it.azimuthBoardStatusBits,
+                                elevationBoardServoStatusBits = it.elevationBoardServoStatusBits,
+                                elevationBoardStatusBits = it.elevationBoardStatusBits,
+                                tiltBoardServoStatusBits = it.tiltBoardServoStatusBits,
+                                tiltBoardStatusBits = it.tiltBoardStatusBits,
+                                feedSBoardStatusBits = it.feedSBoardStatusBits,
+                                feedXBoardStatusBits = it.feedXBoardStatusBits,
+
+                                // Current and RSSI data
+                                currentSBandLNA_LHCP = it.currentSBandLNA_LHCP,
+                                currentSBandLNA_RHCP = it.currentSBandLNA_RHCP,
+                                currentXBandLNA_LHCP = it.currentXBandLNA_LHCP,
+                                currentXBandLNA_RHCP = it.currentXBandLNA_RHCP,
+                                rssiSBandLNA_LHCP = it.rssiSBandLNA_LHCP,
+                                rssiSBandLNA_RHCP = it.rssiSBandLNA_RHCP,
+                                rssiXBandLNA_LHCP = it.rssiXBandLNA_LHCP,
+                                rssiXBandLNA_RHCP = it.rssiXBandLNA_RHCP
+                            )
+
+                            pushReadStatusService.updateData(newData)
+                            // println("1_파싱된 ICD 데이터: $it")
+                          //  val readDataJson = objectMapper.writeValueAsString(it)
+                         //   pushReadStatusService.publish(readDataJson)
+                            // println("2_파싱된 ICD 데이터: $readDataJson")
                         }
                     }
                     //2.3 Read Positioner Status
@@ -1019,7 +999,7 @@ class ICDService {
             var stx: Byte = 0x00,
             var cmdOne: Byte = 0x00,
             var cmdTwo: Byte = 0x00,
-            var modeStatusBits: BitSet = BitSet(8),
+            var modeStatusBits: String = "00000000",  // BitSet에서 String으로 변경
             var azimuthAngle: Float = 0f,
             var elevationAngle: Float = 0f,
             var tiltAngle: Float = 0f,
@@ -1036,18 +1016,18 @@ class ICDService {
             var windDirection: UShort = 0u,
             var rtdOne: Float = 0f,
             var rtdTwo: Float = 0f,
-            var mainBoardProtocolStatusBits: BitSet = BitSet(8),
-            var mainBoardStatusBits: BitSet = BitSet(8),
-            var mainBoardMCOnOffBits: BitSet = BitSet(8),
-            var mainBoardReserveBits: BitSet = BitSet(8),
-            var azimuthBoardServoStatusBits: BitSet = BitSet(8),
-            var azimuthBoardStatusBits: BitSet = BitSet(8),
-            var elevationBoardServoStatusBits: BitSet = BitSet(8),
-            var elevationBoardStatusBits: BitSet = BitSet(8),
-            var tiltBoardServoStatusBits: BitSet = BitSet(8),
-            var tiltBoardStatusBits: BitSet = BitSet(8),
-            var feedSBoardStatusBits: BitSet = BitSet(8),
-            var feedXBoardStatusBits: BitSet = BitSet(8),
+            var mainBoardProtocolStatusBits: String = "00000000",  // BitSet에서 String으로 변경
+            var mainBoardStatusBits: String = "00000000",  // BitSet에서 String으로 변경
+            var mainBoardMCOnOffBits: String = "00000000",  // BitSet에서 String으로 변경
+            var mainBoardReserveBits: String = "00000000",  // BitSet에서 String으로 변경
+            var azimuthBoardServoStatusBits: String = "00000000",  // BitSet에서 String으로 변경
+            var azimuthBoardStatusBits: String = "00000000",  // BitSet에서 String으로 변경
+            var elevationBoardServoStatusBits: String = "00000000",  // BitSet에서 String으로 변경
+            var elevationBoardStatusBits: String = "00000000",  // BitSet에서 String으로 변경
+            var tiltBoardServoStatusBits: String = "00000000",  // BitSet에서 String으로 변경
+            var tiltBoardStatusBits: String = "00000000",  // BitSet에서 String으로 변경
+            var feedSBoardStatusBits: String = "00000000",  // BitSet에서 String으로 변경
+            var feedXBoardStatusBits: String = "00000000",  // BitSet에서 String으로 변경
             var currentSBandLNA_LHCP: Float = 0f,
             var currentSBandLNA_RHCP: Float = 0f,
             var currentXBandLNA_LHCP: Float = 0f,
@@ -1222,10 +1202,8 @@ class ICDService {
                         frame.stx = buffer.get()
                         frame.cmdOne = buffer.get()
                         frame.cmdTwo = buffer.get()
-
                         val modeStatusByte = buffer.get()
-                        frame.modeStatusBits =
-                            BitSet.valueOf(byteArrayOf(modeStatusByte))
+                        frame.modeStatusBits = byteToBinaryString(modeStatusByte)
 
                         frame.azimuthAngle = buffer.float
                         frame.elevationAngle = buffer.float
@@ -1234,52 +1212,48 @@ class ICDService {
                         frame.elevationSpeed = buffer.float
                         frame.tiltSpeed = buffer.float
 
-                        // Main Board Status (4 bytes) - 순서 확인 필요
+                        // Main Board Status (4 bytes)
                         val mainBoardReserveByte = buffer.get()
-                        frame.mainBoardReserveBits =
-                            BitSet.valueOf(byteArrayOf(mainBoardReserveByte))
+                        frame.mainBoardReserveBits = byteToBinaryString(mainBoardReserveByte)
+
                         val mainBoardMCOnOffByte = buffer.get()
-                        frame.mainBoardMCOnOffBits =
-                            BitSet.valueOf(byteArrayOf(mainBoardMCOnOffByte))
+                        frame.mainBoardMCOnOffBits = byteToBinaryString(mainBoardMCOnOffByte)
+
                         val mainBoardStatusByte = buffer.get()
-                        frame.mainBoardStatusBits =
-                            BitSet.valueOf(byteArrayOf(mainBoardStatusByte))
+                        frame.mainBoardStatusBits = byteToBinaryString(mainBoardStatusByte)
+
                         val mainBoardProtocolStatusByte = buffer.get()
-                        frame.mainBoardProtocolStatusBits =
-                            BitSet.valueOf(byteArrayOf(mainBoardProtocolStatusByte))
+                        frame.mainBoardProtocolStatusBits = byteToBinaryString(mainBoardProtocolStatusByte)
 
                         // Azimuth Board Status (2 bytes)
                         val azimuthBoardStatusByte = buffer.get()
-                        frame.azimuthBoardStatusBits =
-                            BitSet.valueOf(byteArrayOf(azimuthBoardStatusByte))
+                        frame.azimuthBoardStatusBits = byteToBinaryString(azimuthBoardStatusByte)
+
                         val azimuthBoardServoStatusByte = buffer.get()
-                        frame.azimuthBoardServoStatusBits =
-                            BitSet.valueOf(byteArrayOf(azimuthBoardServoStatusByte))
+                        frame.azimuthBoardServoStatusBits = byteToBinaryString(azimuthBoardServoStatusByte)
 
                         // Elevation Board Status (2 bytes)
                         val elevationBoardStatusByte = buffer.get()
-                        frame.elevationBoardStatusBits =
-                            BitSet.valueOf(byteArrayOf(elevationBoardStatusByte))
+                        frame.elevationBoardStatusBits = byteToBinaryString(elevationBoardStatusByte)
+
                         val elevationBoardServoStatusByte = buffer.get()
-                        frame.elevationBoardServoStatusBits =
-                            BitSet.valueOf(byteArrayOf(elevationBoardServoStatusByte))
+                        frame.elevationBoardServoStatusBits = byteToBinaryString(elevationBoardServoStatusByte)
 
                         // Tilt Board Status (2 bytes)
                         val tiltBoardStatusByte = buffer.get()
-                        frame.tiltBoardStatusBits =
-                            BitSet.valueOf(byteArrayOf(tiltBoardStatusByte))
+                        frame.tiltBoardStatusBits = byteToBinaryString(tiltBoardStatusByte)
+
                         val tiltBoardServoStatusByte = buffer.get()
-                        frame.tiltBoardServoStatusBits =
-                            BitSet.valueOf(byteArrayOf(tiltBoardServoStatusByte))
+                        frame.tiltBoardServoStatusBits = byteToBinaryString(tiltBoardServoStatusByte)
 
-                        // Feed Board Status (2 bytes) - 순서 및 데이터 해석 방식 확인 필요
+                        // Feed Board Status (2 bytes)
                         val feedXBoardStatusByte = buffer.get()
-                        frame.feedXBoardStatusBits =
-                            BitSet.valueOf(byteArrayOf(feedXBoardStatusByte))
-                        val feedSBoardStatusByte = buffer.get()
-                        frame.feedSBoardStatusBits =
-                            BitSet.valueOf(byteArrayOf(feedSBoardStatusByte))
+                        frame.feedXBoardStatusBits = byteToBinaryString(feedXBoardStatusByte)
 
+                        val feedSBoardStatusByte = buffer.get()
+                        frame.feedSBoardStatusBits = byteToBinaryString(feedSBoardStatusByte)
+
+                        // 나머지 필드들 처리...
                         frame.currentSBandLNA_LHCP = buffer.float
                         frame.currentSBandLNA_RHCP = buffer.float
                         frame.currentXBandLNA_LHCP = buffer.float
@@ -1288,7 +1262,6 @@ class ICDService {
                         frame.rssiSBandLNA_RHCP = buffer.float
                         frame.rssiXBandLNA_LHCP = buffer.float
                         frame.rssiXBandLNA_RHCP = buffer.float
-
                         frame.servoDriverAzimuthAngle = buffer.float
                         frame.servoDriverElevationAngle = buffer.float
                         frame.servoDriverTiltAngle = buffer.float
@@ -1299,11 +1272,11 @@ class ICDService {
                         frame.windDirection = buffer.short.toUShort()
                         frame.rtdOne = buffer.float
                         frame.rtdTwo = buffer.float
-
                         frame.checkSum = rxChecksum
                         frame.etx = buffer.get()
 
                         return frame
+
                     } else {
                         println("CRC 체크 실패 또는 ETX 불일치")
                         return null

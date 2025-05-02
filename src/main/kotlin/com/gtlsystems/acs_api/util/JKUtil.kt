@@ -5,6 +5,7 @@ import java.nio.ByteBuffer
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
+import java.util.BitSet
 
 class JKUtil {
     class JKConvert {
@@ -77,7 +78,20 @@ class JKUtil {
             fun byteArrayToHexString(byteArray: ByteArray): String {
                 return byteArray.joinToString("") { "%02X".format(it) }
             }
-
+            private fun BitSet.toBinaryString(): String {
+                val length = this.length()
+                val sb = StringBuilder()
+                for (i in (length - 1) downTo 0) {
+                    sb.append(if (this[i]) '1' else '0')
+                }
+                return sb.toString().padStart(8, '0') // 최소 8자리로 패딩
+            }
+            fun byteToBinaryString(byte: Byte): String {
+                return byte.toInt().and(0xFF).toString(2).padStart(8, '0')
+            }
+            fun byteArrayToBinaryString(byteArray: ByteArray): String {
+                return byteArray.joinToString("") { byteToBinaryString(it) }
+            }
         }
     }
 
