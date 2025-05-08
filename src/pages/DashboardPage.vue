@@ -4,10 +4,14 @@
     <p>mode bit : {{ modeStatusBits }}</p>
     <p>azimuthAngle: {{ azimuthAngle }}</p>
     <p>azimuthSpeed : {{ azimuthSpeed }}</p>
-    <p>azimuthAngle: {{ elevationAngle }}</p>
+    <p>elevationAngle: {{ elevationAngle }}</p>
     <p>elevationSpeed : {{ elevationSpeed }}</p>
-    <p>azimuthAngle: {{ tiltAngle }}</p>
-    <p>azimuthAngle: {{ tiltSpeed }}</p>
+    <p>tiltAngle: {{ tiltAngle }}</p>
+    <p>tiltSpeed: {{ tiltSpeed }}</p>
+    <p>cmdAzimuthAngle: {{ cmdAzimuthAngle }}</p>
+    <p>cmdelevationAngle: {{ cmdElevationAngle }}</p>
+    <p>cmdtiltAngle: {{ cmdTiltAngle }}</p>
+    <p>cmdTime: {{ cmdTime }}</p>
     <p v-if="error" style="color: red">오류 발생: {{ error }}</p>
     <p v-if="!isConnected">WebSocket 연결 중...</p>
     <q-btn label="Emergency Command 전송" @click="sendEmergency" />
@@ -24,6 +28,10 @@ const elevationAngle = ref('')
 const elevationSpeed = ref('')
 const tiltAngle = ref('')
 const tiltSpeed = ref('')
+const cmdAzimuthAngle = ref('')
+const cmdElevationAngle = ref('')
+const cmdTiltAngle = ref('')
+const cmdTime = ref('')
 const error = ref('')
 const isConnected = ref(false)
 let websocket: WebSocket | undefined // 명시적인 타입 지정
@@ -40,7 +48,7 @@ const sendEmergency = async () => {
 }
 
 const connectWebSocket = () => {
-  websocket = new WebSocket('ws://localhost:8080/ws/sensor-data') // 백엔드 WebSocket 엔드포인트 주소
+  websocket = new WebSocket('ws://localhost:8080/ws/push-data') // 백엔드 WebSocket 엔드포인트 주소
 
   websocket.onopen = () => {
     console.log('WebSocket 연결 성공.')
@@ -50,15 +58,37 @@ const connectWebSocket = () => {
 
   websocket.onmessage = (event) => {
     try {
-      const data = JSON.parse(event.data)
-      modeStatusBits.value = data.modeStatusBits
-      azimuthAngle.value = data.azimuthAngle
-      azimuthSpeed.value = data.azimuthSpeed
-      elevationAngle.value = data.elevationAngle
-      elevationSpeed.value = data.elevationSpeed
-      tiltAngle.value = data.tiltAngle
-      tiltSpeed.value = data.tiltSpeed
-      console.log('WebSocket 메시지 수신:', data)
+      const message = JSON.parse(event.data)
+
+      if (message.topic === 'cmd') {
+        // cmd 데이터 처리
+        try {
+          const cmdData = JSON.parse(message.data)
+          cmdAzimuthAngle.value = cmdData.cmdAzimuthAngle
+          cmdElevationAngle.value = cmdData.cmdElevationAngle
+          cmdTiltAngle.value = cmdData.cmdTiltAngle
+          cmdTime.value = cmdData.cmdTime
+          //console.log('WebSocket 메시지 수신:', message)
+        } catch (e) {
+          console.error('CMD 데이터 파싱 오류:', e)
+        }
+      } else if (message.topic === 'read') {
+        // read 데이터 처리
+        try {
+          // 이중으로 JSON 문자열이 인코딩되어 있는 경우 처리
+          const readData = JSON.parse(message.data)
+          modeStatusBits.value = readData.modeStatusBits
+          azimuthAngle.value = readData.azimuthAngle
+          azimuthSpeed.value = readData.azimuthSpeed
+          elevationAngle.value = readData.elevationAngle
+          elevationSpeed.value = readData.elevationSpeed
+          tiltAngle.value = readData.tiltAngle
+          tiltSpeed.value = readData.tiltSpeed
+          //console.log('WebSocket 메시지 수신:', message)
+        } catch (e) {
+          console.error('READ 데이터 파싱 오류:', e)
+        }
+      }
     } catch (e) {
       console.error('JSON 파싱 오류:', e)
       error.value = '데이터 파싱 오류 발생'
