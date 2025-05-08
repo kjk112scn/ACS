@@ -31,6 +31,13 @@ dependencies {
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+	//Sun Track Algorithm
+	implementation("net.e175.klaus:solarpositioning:2.0.3")
+
+	//Orekit
+	implementation("org.orekit:orekit:13.0.2")
+
 }
 
 kotlin {

@@ -1,9 +1,7 @@
 package com.gtlsystems.acs_api.service
 
 import com.fasterxml.jackson.databind.ObjectMapper // ObjectMapper import
-import com.gtlsystems.acs_api.model.PushReadStatusData
-import com.gtlsystems.acs_api.service.ICDService.Companion.etx
-import com.gtlsystems.acs_api.service.ICDService.Companion.stx
+import com.gtlsystems.acs_api.model.PushData
 
 import com.gtlsystems.acs_api.util.Crc16
 import com.gtlsystems.acs_api.util.JKUtil.JKConvert
@@ -13,19 +11,16 @@ import org.springframework.stereotype.Service
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.BitSet
-import kotlin.UShortArray
 
 @Service
 class ICDService {
-
     companion object {
         var stx: Byte = 0x02
         var etx: Byte = 0x03
 
     }
 
-
-    class Classify(private val objectMapper: ObjectMapper, private val pushReadStatusService: PushReadStatusService) {
+    class Classify(private val objectMapper: ObjectMapper, private val pushService: PushService) {
         fun receivedCmd(receiveData: ByteArray) {
             if (receiveData.size > 1 && receiveData[0] == 0x02.toByte()) {
                 if (receiveData[1] == 'R'.code.toByte()) {
@@ -33,7 +28,7 @@ class ICDService {
                     if (receiveData[2] == 'R'.code.toByte()) {
                         val parsedData = ReadStatus.GetDataFrame.fromByteArray(receiveData)
                         parsedData?.let {
-                            val newData = PushReadStatusData.ReadData(
+                            val newData = PushData.ReadData(
                                 // Angle data
                                 azimuthAngle = it.azimuthAngle,
                                 elevationAngle = it.elevationAngle,
@@ -86,7 +81,7 @@ class ICDService {
                                 rssiXBandLNA_RHCP = it.rssiXBandLNA_RHCP
                             )
 
-                            pushReadStatusService.updateData(newData)
+                            pushService.updateData(newData)
                             // println("1_파싱된 ICD 데이터: $it")
                           //  val readDataJson = objectMapper.writeValueAsString(it)
                          //   pushReadStatusService.publish(readDataJson)
@@ -128,14 +123,14 @@ class ICDService {
                 else if (receiveData[1] == 'A'.code.toByte()) {
                     val parsedData = MultiManualControl.GetDataFrame.fromByteArray(receiveData)
                     parsedData?.let {
-                        println("파싱된 ICD 데이터: $it")
+                       // println("파싱된 ICD 데이터: $it")
                     }
                 }
                 //2.9 Stop Command
                 else if (receiveData[1] == 'S'.code.toByte()) {
                     val parsedData = Stop.GetDataFrame.fromByteArray(receiveData)
                     parsedData?.let {
-                        println("파싱된 ICD 데이터: $it")
+                      println("파싱된 ICD 데이터: $it")
                     }
                 }
                 //2.10 Standby Command
@@ -146,7 +141,7 @@ class ICDService {
                 else if (receiveData[1] == 'F'.code.toByte()) {
                     val parsedData = FeedOnOff.GetDataFrame.fromByteArray(receiveData)
                     parsedData?.let {
-                        println("파싱된 ICD 데이터: $it")
+                       println("파싱된 ICD 데이터: $it")
                     }
                 }
                 //2.12 Satellite Track Command

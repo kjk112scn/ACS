@@ -2,6 +2,7 @@ package com.gtlsystems.acs_api
 
 import com.gtlsystems.acs_api.service.ICDService
 import com.gtlsystems.acs_api.service.UdpFwICDService
+import org.hipparchus.geometry.euclidean.oned.Interval
 import org.springframework.web.bind.annotation.*
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
@@ -28,6 +29,29 @@ class APIController(private val udpFwICDService: UdpFwICDService) {
 }
 
 @RestController
+@RequestMapping("/api/sun-track") // 새로운 API 경로 설정 (선택 사항)
+@CrossOrigin(origins = ["http://localhost:9000"]) // 프론트엔드 도메인 허용
+class SunTracking(private val udpFwICDService: UdpFwICDService) {
+
+    // POST 요청 처리 (Emergency UDP 명령 전송) - APIController에서 이동
+    @PostMapping("/start-sun-track") // 경로 변수 제거
+    fun startSunTrack(@RequestParam interval: Long, cmdAzimuthSpeed: Float , cmdElevationSpeed: Float, cmdTiltSpeed: Float): Mono<String> { // 요청 파라미터 추가
+        return Mono.fromCallable {
+            udpFwICDService.startSunTrackCommandPeriodically(interval,cmdAzimuthSpeed, cmdElevationSpeed, cmdTiltSpeed) // 서비스 함수에 변수 전달
+            "UDP 명령어 전송 요청 완료 (Command: Sun Track)"
+        }.thenReturn("Sun Track UDP 명령어 전송 요청 완료 (Command:  $cmdAzimuthSpeed, $cmdElevationSpeed, $cmdTiltSpeed)")
+    }
+    // POST 요청 처리 (Emergency UDP 명령 전송) - APIController에서 이동
+    @PostMapping("/stop-sun-track") // 경로 변수 제거
+    fun stopSunTrack(): Mono<String> { // 요청 파라미터 추가
+        return Mono.fromCallable {
+            udpFwICDService.stopSunTrackCommandPeriodically() // 서비스 함수에 변수 전달
+            "UDP 명령어 전송 요청 완료 (Command: Sun Track)"
+        }.thenReturn("Sun Track UDP 명령어 전송 요청 완료 (Command:)")
+    }
+}
+
+@RestController
 @RequestMapping("/api/icd") // 새로운 API 경로 설정 (선택 사항)
 @CrossOrigin(origins = ["http://localhost:9000"]) // 프론트엔드 도메인 허용
 class ICD(private val udpFwICDService: UdpFwICDService) {
@@ -46,7 +70,7 @@ class ICD(private val udpFwICDService: UdpFwICDService) {
         return Mono.fromCallable {
             udpFwICDService.timeOffsetCommand(inputTimeOffset) // 서비스 함수에 변수 전달
             "UDP 명령어 전송 요청 완료 (Command: $inputTimeOffset)"
-        }.thenReturn("Emergency UDP 명령어 전송 요청 완료 (Command: $inputTimeOffset)")
+        }.thenReturn("timeOffsetCommand UDP 명령어 전송 요청 완료 (Command: $inputTimeOffset)")
     }
 
     @PostMapping("/multi-control-command") // 경로 변수 제거
@@ -81,9 +105,9 @@ class ICD(private val udpFwICDService: UdpFwICDService) {
                 tiAngle,
                 tiSpeed
             ) // 서비스 함수에 변수 전달
-            "UDP 명령어 전송 요청 완료 (Command: $axesStr, $multiAxis, $azAngle,$azSpeed,$elAngle,$elSpeed,$tiAngle,$tiSpeed)"
+            "UDP 명령어 전송 요청 완료 (multiManualControlCommand: $axesStr, $multiAxis, $azAngle,$azSpeed,$elAngle,$elSpeed,$tiAngle,$tiSpeed)"
         }
-            .thenReturn("Emergency UDP 명령어 전송 요청 완료 (Command: $multiAxis, $azAngle,$azSpeed,$elAngle,$elSpeed,$tiAngle,$tiSpeed)")
+            .thenReturn("multiManualControlCommand UDP 명령어 전송 요청 완료 (Command: $multiAxis, $azAngle,$azSpeed,$elAngle,$elSpeed,$tiAngle,$tiSpeed)")
     }
 
     @PostMapping("/feed-on-off-command") // 경로 변수 제거
@@ -119,7 +143,7 @@ class ICD(private val udpFwICDService: UdpFwICDService) {
                 ) // 서비스 함수에 변수 전달
             "UDP 명령어 전송 요청 완료 (Command: $bitStr, $sLHCP, $sRHCP,$sRFSwitch,$xLHCP,$xRHCP,$fan)"
         }
-            .thenReturn("Emergency UDP 명령어 전송 요청 완료 (Command: $bitStr, $sLHCP, $sRHCP,$sRFSwitch,$xLHCP,$xRHCP,$fan)")
+            .thenReturn("feedOnOffCommand UDP 명령어 전송 요청 완료 (Command: $bitStr, $sLHCP, $sRHCP,$sRFSwitch,$xLHCP,$xRHCP,$fan)")
     }
 
     @PostMapping("/position-offset-command") // 경로 변수 제거
@@ -132,7 +156,7 @@ class ICD(private val udpFwICDService: UdpFwICDService) {
             ) // 서비스 함수에 변수 전달
             "UDP 명령어 전송 요청 완료 (Command: $azOffset, $elOffset, $tiOffest)"
         }
-            .thenReturn("Emergency UDP 명령어 전송 요청 완료 (Command: $azOffset, $elOffset, $tiOffest)")
+            .thenReturn("positionOffsetCommand UDP 명령어 전송 요청 완료 (Command: $azOffset, $elOffset, $tiOffest)")
     }
 
     @PostMapping("/stop-command") // 경로 변수 제거
@@ -159,7 +183,7 @@ class ICD(private val udpFwICDService: UdpFwICDService) {
             ) // 서비스 함수에 변수 전달
             "UDP 명령어 전송 요청 완료 (Command: $bitStr, $azStop, $elStop,$tiStop)"
         }
-            .thenReturn("Emergency UDP 명령어 전송 요청 완료 (Command: $bitStr, $azStop, $elStop,$tiStop)")
+            .thenReturn("stopCommand UDP 명령어 전송 요청 완료 (Command: $bitStr, $azStop, $elStop,$tiStop)")
     }
     @PostMapping("/default-info-command") // 경로 변수 제거
     fun defaultOInfoCommand(
@@ -171,7 +195,7 @@ class ICD(private val udpFwICDService: UdpFwICDService) {
             ) // 서비스 함수에 변수 전달
             "UDP 명령어 전송 요청 완료 (Command: $timeOffset, $azOffset, $elOffset, $tiOffest)"
         }
-            .thenReturn("Emergency UDP 명령어 전송 요청 완료 (Command: $timeOffset, $azOffset, $elOffset, $tiOffest)")
+            .thenReturn("defaultOInfoCommand UDP 명령어 전송 요청 완료 (Command: $timeOffset, $azOffset, $elOffset, $tiOffest)")
     }
 
 }

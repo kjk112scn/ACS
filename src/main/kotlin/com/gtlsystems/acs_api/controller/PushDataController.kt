@@ -1,16 +1,15 @@
 package com.gtlsystems.acs_api.controller
 
-import com.gtlsystems.acs_api.service.PushReadStatusService
+import com.gtlsystems.acs_api.service.PushService
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.socket.WebSocketHandler
 import org.springframework.web.reactive.socket.WebSocketSession
 import reactor.core.publisher.Mono
-import java.time.Duration
 
 @Component
-class PushReadStatusController(private val pushReadStatusService: PushReadStatusService) : WebSocketHandler {
-    private val logger = LoggerFactory.getLogger(PushReadStatusController::class.java)
+class PushDataController(private val pushReadStatusService: PushService) : WebSocketHandler {
+    private val logger = LoggerFactory.getLogger(PushDataController::class.java)
 
     override fun handle(session: WebSocketSession): Mono<Void> {
         val sessionId = session.id

@@ -1,9 +1,15 @@
 package com.gtlsystems.acs_api.model
 
-import java.time.LocalDateTime
-import java.util.BitSet
+import java.time.ZonedDateTime
 
-class PushReadStatusData {
+object PushData {
+    data class CMDValue (
+        var cmdAzimuthAngle: Float? = null,
+        var cmdElevationAngle: Float? = null,
+        var cmdTiltAngle: Float? = null,
+        var cmdTime: ZonedDateTime? = null
+    )
+
     data class ReadData(
         val modeStatusBits: String? = null,
         val azimuthAngle: Float? = null,
@@ -43,4 +49,5 @@ class PushReadStatusData {
         val rssiXBandLNA_LHCP: Float? = null,
         val rssiXBandLNA_RHCP: Float? = null
     )
+    val CMD = CMDValue()
 }
