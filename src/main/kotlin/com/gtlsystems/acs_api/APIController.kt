@@ -33,7 +33,7 @@ class APIController(private val udpFwICDService: UdpFwICDService) {
 @CrossOrigin(origins = ["http://localhost:9000"]) // 프론트엔드 도메인 허용
 class SunTracking(private val udpFwICDService: UdpFwICDService) {
 
-    // POST 요청 처리 (Emergency UDP 명령 전송) - APIController에서 이동
+    // POST 요청 처리 (Sun Track Start UDP 명령 전송) - APIController에서 이동
     @PostMapping("/start-sun-track") // 경로 변수 제거
     fun startSunTrack(@RequestParam interval: Long, cmdAzimuthSpeed: Float , cmdElevationSpeed: Float, cmdTiltSpeed: Float): Mono<String> { // 요청 파라미터 추가
         return Mono.fromCallable {
@@ -41,7 +41,7 @@ class SunTracking(private val udpFwICDService: UdpFwICDService) {
             "UDP 명령어 전송 요청 완료 (Command: Sun Track)"
         }.thenReturn("Sun Track UDP 명령어 전송 요청 완료 (Command:  $cmdAzimuthSpeed, $cmdElevationSpeed, $cmdTiltSpeed)")
     }
-    // POST 요청 처리 (Emergency UDP 명령 전송) - APIController에서 이동
+    // POST 요청 처리 (Sun Track Stop UDP 명령 전송) - APIController에서 이동
     @PostMapping("/stop-sun-track") // 경로 변수 제거
     fun stopSunTrack(): Mono<String> { // 요청 파라미터 추가
         return Mono.fromCallable {
@@ -197,5 +197,13 @@ class ICD(private val udpFwICDService: UdpFwICDService) {
         }
             .thenReturn("defaultOInfoCommand UDP 명령어 전송 요청 완료 (Command: $timeOffset, $azOffset, $elOffset, $tiOffest)")
     }
-
+    // 새로운 StowCommand 엔드포인트
+    @PostMapping("/stow-command")
+    fun stowCommand(): Mono<String> {
+        return Mono.fromCallable {
+            udpFwICDService.StowCommand()
+            "Stow 명령 시작됨"
+        }
+            .thenReturn("StowCommand UDP 명령어 전송 요청 완료")
+    }
 }

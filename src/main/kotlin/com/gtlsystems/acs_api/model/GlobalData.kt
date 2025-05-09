@@ -44,6 +44,7 @@ object GlobalData {
         var azimuthPositionOffset: Float = 0.0f
         var elevationPositionOffset: Float = 0.0f
         var tiltPositionOffset: Float = 0.0f
+        var trueNorthOffset: Float = 0.0f
     }
 
     /*

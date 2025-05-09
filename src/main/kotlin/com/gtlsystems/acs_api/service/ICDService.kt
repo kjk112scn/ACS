@@ -15,14 +15,27 @@ import java.util.BitSet
 @Service
 class ICDService {
     companion object {
-        var stx: Byte = 0x02
-        var etx: Byte = 0x03
+        const val ICD_STX: Byte = 0x02
+        const val ICD_ETX: Byte = 0x03
 
     }
 
     class Classify(private val objectMapper: ObjectMapper, private val pushService: PushService) {
+        private var lastPacketTime = System.nanoTime()
+        private val logger = org.slf4j.LoggerFactory.getLogger(Classify::class.java)
+
+        // 패킷 타이밍 모니터링 메서드
+        private fun monitorPacketTiming(data: ByteArray) {
+            val now = System.nanoTime()
+            val interval = (now - lastPacketTime) / 1_000_000.0 // ms로 변환
+            if (interval > 60.0) { // 예상보다 지연된 경우
+                logger.warn("패킷 지연 감지: ${interval}ms")
+            }
+            lastPacketTime = now
+        }
         fun receivedCmd(receiveData: ByteArray) {
             if (receiveData.size > 1 && receiveData[0] == 0x02.toByte()) {
+                monitorPacketTiming(receiveData)
                 if (receiveData[1] == 'R'.code.toByte()) {
                     //2.2 Read Status
                     if (receiveData[2] == 'R'.code.toByte()) {
@@ -82,9 +95,10 @@ class ICDService {
                             )
 
                             pushService.updateData(newData)
-                            // println("1_파싱된 ICD 데이터: $it")
-                          //  val readDataJson = objectMapper.writeValueAsString(it)
-                         //   pushReadStatusService.publish(readDataJson)
+                            //println("1_파싱된 ICD 데이터: $it")
+                            //println("1_파싱된 ICD 데이터: ${it.azimuthAngle}, EL ${it.elevationAngle}, TL ${it.tiltAngle}")
+                            //  val readDataJson = objectMapper.writeValueAsString(it)
+                            //   pushReadStatusService.publish(readDataJson)
                             // println("2_파싱된 ICD 데이터: $readDataJson")
                         }
                     }
@@ -123,14 +137,14 @@ class ICDService {
                 else if (receiveData[1] == 'A'.code.toByte()) {
                     val parsedData = MultiManualControl.GetDataFrame.fromByteArray(receiveData)
                     parsedData?.let {
-                       // println("파싱된 ICD 데이터: $it")
+                        // println("파싱된 ICD 데이터: $it")
                     }
                 }
                 //2.9 Stop Command
                 else if (receiveData[1] == 'S'.code.toByte()) {
                     val parsedData = Stop.GetDataFrame.fromByteArray(receiveData)
                     parsedData?.let {
-                      println("파싱된 ICD 데이터: $it")
+                        println("파싱된 ICD 데이터: $it")
                     }
                 }
                 //2.10 Standby Command
@@ -141,7 +155,7 @@ class ICDService {
                 else if (receiveData[1] == 'F'.code.toByte()) {
                     val parsedData = FeedOnOff.GetDataFrame.fromByteArray(receiveData)
                     parsedData?.let {
-                       println("파싱된 ICD 데이터: $it")
+                        println("파싱된 ICD 데이터: $it")
                     }
                 }
                 //2.12 Satellite Track Command
@@ -205,7 +219,7 @@ class ICDService {
      */
     class TimeOffset {
         data class SetDataFrame(
-            var stx: Byte,
+            var stx: Byte = ICD_STX,
             var cmdOne: Char,
             var cmdTwo: Char,
             var year: UShort,
@@ -217,7 +231,7 @@ class ICDService {
             var ms: UShort,
             var timeOffset: Float,
             var crc16: UShort = 0u,
-            var etx: Byte
+            var etx: Byte = ICD_ETX
         ) {
             fun setDataFrame(): ByteArray {
                 val dataFrame = ByteArray(19)
@@ -228,7 +242,7 @@ class ICDService {
 
                 val byteCrc16Target = ByteArray(dataFrame.size - 4)
 
-                dataFrame[0] = stx
+                dataFrame[0] = ICD_STX
                 dataFrame[1] = cmdOne.code.toByte()
                 dataFrame[2] = cmdTwo.code.toByte()
                 dataFrame[3] = byteYear[0]
@@ -260,14 +274,14 @@ class ICDService {
                 // CRC16 값 설정
                 dataFrame[16] = crc16Check[0]
                 dataFrame[17] = crc16Check[1]
-                dataFrame[18] = etx
+                dataFrame[18] = ICD_ETX
 
                 return dataFrame
             }
         }
 
         data class GetDataFrame(
-            var stx: Byte = 0x00,
+            var stx: Byte = ICD_STX,
             var cmdOne: Byte = 0x00,
             var cmdTwo: Byte = 0x00,
             var year: UShort = 0u,
@@ -279,7 +293,7 @@ class ICDService {
             var ms: UShort = 0u,
             var timeOffset: Float = 0f,
             var checkSum: UShort = 0u,
-            var etx: Byte = 0x00
+            var etx:  Byte = ICD_ETX
         ) {
             companion object {
                 const val FRAME_LENGTH = 19
@@ -297,7 +311,7 @@ class ICDService {
                     val crc16Target = data.copyOfRange(1, FRAME_LENGTH - 3)
                     val crc16Check = Crc16.computeCrc(crc16Target).toUShort()
                     // CRC 검증 및 ETX 확인
-                    if (rxChecksum == crc16Check && data.last() == etx) {
+                    if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
                         return GetDataFrame(
                             stx = data[0],
                             cmdOne = data[1],
@@ -337,7 +351,7 @@ class ICDService {
      */
     class MultiManualControl {
         data class SetDataFrame(
-            var stx: Byte = ICDService.stx,
+            var stx: Byte = ICD_STX,
             var cmdOne: Char,
             var axis: BitSet,
             var azimuthAngle: Float,
@@ -347,7 +361,7 @@ class ICDService {
             var tiltAngle: Float,
             var tiltSpeed: Float,
             var crc16: UShort = 0u,
-            var etx: Byte = ICDService.etx
+            var etx: Byte = ICD_ETX
         ) {
             fun setDataFrame(): ByteArray {
                 val dataFrame = ByteArray(30)
@@ -364,7 +378,7 @@ class ICDService {
                 // BitSet을 바이트 배열로 변환
                 val byteAxis = axis.toByteArray()[0]
 
-                dataFrame[0] = stx
+                dataFrame[0] = ICD_STX
                 dataFrame[1] = cmdOne.code.toByte()
                 dataFrame[2] = byteAxis
 
@@ -415,18 +429,18 @@ class ICDService {
                 // CRC16 값 설정
                 dataFrame[27] = crc16Check[0]
                 dataFrame[28] = crc16Check[1]
-                dataFrame[29] = etx
+                dataFrame[29] = ICD_ETX
 
                 return dataFrame
             }
         }
 
         data class GetDataFrame(
-            var stx: Byte = 0x00,
+            var stx: Byte = ICD_STX,
             var cmdOne: Byte = 0x00,
             var ack: Byte = 0x00,
             var checkSum: UShort = 0u,
-            var etx: Byte = 0x00
+            var etx: Byte = ICD_ETX
         ) {
             companion object {
                 const val FRAME_LENGTH = 6
@@ -443,7 +457,7 @@ class ICDService {
                     val crc16Check = Crc16.computeCrc(crc16Target).toUShort()
 
                     // CRC 검증 및 ETX 확인
-                    if (rxChecksum == crc16Check && data.last() == ICDService.etx) {
+                    if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
                         return GetDataFrame(
                             stx = data[0],
                             cmdOne = data[1],
@@ -468,11 +482,11 @@ class ICDService {
      */
     class FeedOnOff {
         data class SetDataFrame(
-            var stx: Byte = ICDService.stx,
+            var stx: Byte = ICD_STX,
             var cmdOne: Char,
             var feedOnOff: BitSet,
             var crc16: UShort = 0u,
-            var etx: Byte = ICDService.etx
+            var etx: Byte = ICD_ETX
         ) {
             fun setDataFrame(): ByteArray {
                 val dataFrame = ByteArray(6)
@@ -481,7 +495,7 @@ class ICDService {
                 // BitSet을 바이트 배열로 변환
                 val byteAxis = feedOnOff.toByteArray()[0]
 
-                dataFrame[0] = stx
+                dataFrame[0] = ICD_STX
                 dataFrame[1] = cmdOne.code.toByte()
                 dataFrame[2] = byteAxis
 
@@ -496,7 +510,7 @@ class ICDService {
                 // CRC16 값 설정
                 dataFrame[3] = crc16Check[0]
                 dataFrame[4] = crc16Check[1]
-                dataFrame[5] = etx
+                dataFrame[5] = ICD_ETX
 
                 return dataFrame
             }
@@ -507,7 +521,7 @@ class ICDService {
             var cmdOne: Byte = 0x00,
             var ack: Byte = 0x00,
             var checkSum: UShort = 0u,
-            var etx: Byte = 0x00
+            var etx: Byte = ICD_ETX
         ) {
             companion object {
                 const val FRAME_LENGTH = 6
@@ -529,7 +543,7 @@ class ICDService {
                     val crc16Target = data.copyOfRange(1, FRAME_LENGTH - 3)
                     val crc16Check = Crc16.computeCrc(crc16Target).toUShort()
                     // CRC 검증 및 ETX 확인
-                    if (rxChecksum == crc16Check && data.last() == etx) {
+                    if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
                         return GetDataFrame(
                             stx = data[0],
                             cmdOne = data[1],
@@ -552,14 +566,14 @@ class ICDService {
      */
     class PositionOffset {
         data class SetDataFrame(
-            var stx: Byte,
+            var stx: Byte = ICD_STX,
             var cmdOne: Char,
             var cmdTwo: Char,
             var azimuthOffset: Float,
             var elevationOffset: Float,
             var tiltOffset: Float,
             var crc16: UShort,
-            var etx: Byte
+            var etx: Byte = ICD_ETX
         ) {
             fun setDataFrame(): ByteArray {
                 val dataFrame = ByteArray(18)
@@ -571,7 +585,7 @@ class ICDService {
 
                 val byteCrc16Target = ByteArray(dataFrame.size - 4)
 
-                dataFrame[0] = stx
+                dataFrame[0] = ICD_STX
                 dataFrame[1] = cmdOne.code.toByte()
                 dataFrame[2] = cmdTwo.code.toByte()
 
@@ -604,21 +618,21 @@ class ICDService {
                 // CRC16 값 설정
                 dataFrame[15] = crc16Check[0]
                 dataFrame[16] = crc16Check[1]
-                dataFrame[17] = etx
+                dataFrame[17] = ICD_ETX
 
                 return dataFrame
             }
         }
 
         data class GetDataFrame(
-            var stx: Byte,
+            var stx: Byte = ICD_STX,
             var cmdOne: Byte,
-            var cmdTwo: Byte = 0x00,
+            var cmdTwo: Byte,
             var azimuthOffset: Float,
             var elevationOffset: Float,
             var tiltOffset: Float,
             var checkSum: UShort,
-            var etx: Byte = 0x00
+            var etx: Byte = ICD_ETX
         ) {
             companion object {
                 const val FRAME_LENGTH = 18
@@ -633,7 +647,7 @@ class ICDService {
                     val crc16Target = data.copyOfRange(1, FRAME_LENGTH - 3)
                     val crc16Check = Crc16.computeCrc(crc16Target).toUShort()
                     // CRC 검증 및 ETX 확인
-                    if (rxChecksum == crc16Check && data.last() == etx) {
+                    if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
                         // Float 값 추출 (엔디안 변환 포함)
                         val azimuthOffset = JKUtil.JKConvert.byteArrayToFloat(
                             byteArrayOf(data[3], data[4], data[5], data[6])
@@ -673,11 +687,11 @@ class ICDService {
      */
     class Stop {
         data class SetDataFrame(
-            var stx: Byte,
+            var stx: Byte = ICD_STX,
             var cmdOne: Char,
             var axis: BitSet,
             var crc16: UShort,
-            var etx: Byte
+            var etx: Byte = ICD_ETX
         ) {
             fun setDataFrame(): ByteArray {
                 val dataFrame = ByteArray(6)
@@ -686,7 +700,7 @@ class ICDService {
                 // BitSet을 바이트 배열로 변환
                 val byteAxis = axis.toByteArray()[0]
 
-                dataFrame[0] = stx
+                dataFrame[0] = ICD_STX
                 dataFrame[1] = cmdOne.code.toByte()
                 dataFrame[2] = byteAxis
 
@@ -701,18 +715,18 @@ class ICDService {
                 // CRC16 값 설정
                 dataFrame[3] = crc16Check[0]
                 dataFrame[4] = crc16Check[1]
-                dataFrame[5] = etx
+                dataFrame[5] = ICD_ETX
 
                 return dataFrame
             }
         }
 
         data class GetDataFrame(
-            var stx: Byte = 0x00,
+            var stx: Byte = ICD_STX,
             var cmdOne: Byte = 0x00,
             var ack: Byte = 0x00,
             var checkSum: UShort = 0u,
-            var etx: Byte = 0x00
+            var etx: Byte = ICD_ETX
         ) {
             companion object {
                 const val FRAME_LENGTH = 6
@@ -728,14 +742,14 @@ class ICDService {
                         .short.toUShort()
                     val crc16Target = data.copyOfRange(1, FRAME_LENGTH - 3)
                     val crc16Check = Crc16.computeCrc(crc16Target).toUShort()
-                    if (rxChecksum == crc16Check && data.last() == etx) {
+                    if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
                         val buffer = ByteBuffer.wrap(data).order(ByteOrder.BIG_ENDIAN)
                         val frame = GetDataFrame()
                         frame.stx = buffer.get()
                         frame.cmdOne = buffer.get()
                         frame.ack = buffer.get()
                         frame.checkSum = rxChecksum
-                        etx = buffer.get()
+                        frame.etx = buffer.get()
                         return frame
                     } else {
                         println("CRC 체크 실패 또는 ETX 불일치")
@@ -754,17 +768,17 @@ class ICDService {
      */
     class Emergency {
         data class SetDataFrame(
-            var stx: Byte,
+            var stx: Byte = ICD_STX,
             var cmdOne: Char,
             var cmdOnOff: Boolean,
             var crc16: UShort,
-            var etx: Byte
+            var etx: Byte = ICD_ETX
         ) {
             fun setDataFrame(): ByteArray {
                 val dataFrame = ByteArray(6)
                 val byteCrc16Target = ByteArray(dataFrame.size - 4)
 
-                dataFrame[0] = stx
+                dataFrame[0] = ICD_STX
                 dataFrame[1] = cmdOne.code.toByte()
 
                 // cmdOnOff에 따라 'E' 또는 'S' 설정
@@ -782,17 +796,17 @@ class ICDService {
                 // CRC16 값 설정
                 dataFrame[3] = crc16Check[0]
                 dataFrame[4] = crc16Check[1]
-                dataFrame[5] = etx
+                dataFrame[5] = ICD_ETX
 
                 return dataFrame
             }
         }
 
         data class GetDataFrame(
-            var stx: Byte = 0x00,
+            var stx: Byte = ICD_STX,
             var cmdOne: Byte = 0x00,
             var checkSum: UShort = 0u,
-            var etx: Byte = 0x00,
+            var etx: Byte = ICD_ETX
         ) {
             companion object {
                 const val FRAME_LENGTH = 5
@@ -808,13 +822,13 @@ class ICDService {
                     val crc16Check = Crc16.computeCrc(crc16Target).toUShort()
                     // CRC 체크섬 추출 (리틀 엔디안)
                     // CRC 검증 및 ETX 확인
-                    if (rxChecksum == crc16Check && data.last() == etx) {
+                    if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
                         val buffer = ByteBuffer.wrap(data).order(ByteOrder.BIG_ENDIAN)
                         val frame = GetDataFrame()
                         frame.stx = buffer.get()
                         frame.cmdOne = buffer.get()
                         frame.checkSum = rxChecksum
-                        etx = buffer.get()
+                        frame.etx = buffer.get()
                         return frame
 
                     } else {
@@ -857,7 +871,7 @@ class ICDService {
                 val byteTiltOffset: ByteArray = JKUtil.JKConvert.floatToByteArray(tiltOffset, false);
                 val byteCrc16Target = ByteArray(dataFrame.size - 4)
 
-                dataFrame[0] = stx
+                dataFrame[0] = ICD_STX
                 dataFrame[1] = cmd.code.toByte()
                 dataFrame[2] = byteYear[0]
                 dataFrame[3] = byteYear[1]
@@ -903,7 +917,7 @@ class ICDService {
                 dataFrame[27] = crc16Check[0];
                 dataFrame[28] = crc16Check[1];
 
-                dataFrame[29] = etx;
+                dataFrame[29] = ICD_ETX;
 
                 return dataFrame;
             }
@@ -913,11 +927,11 @@ class ICDService {
         /// 수신 데이터 프레임 구조
         /// </summary>
         data class GetDataFrame(
-            var stx: Byte = 0x00,
+            var stx: Byte = ICD_STX,
             var cmdOne: Byte = 0x00,
             var ack: Byte = 0x00,
             var checkSum: UShort = 0u,
-            var etx: Byte = 0x00
+            var etx: Byte = ICD_ETX
         ) {
             /// <summary>
             /// 수신 데이터 값 데이터 프레임에 입력함.
@@ -937,14 +951,14 @@ class ICDService {
                         .short.toUShort()
                     val crc16Target = data.copyOfRange(1, FRAME_LENGTH - 3)
                     val crc16Check = Crc16.computeCrc(crc16Target).toUShort()
-                    if (rxChecksum == crc16Check && data.last() == etx) {
+                    if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
                         val buffer = ByteBuffer.wrap(data).order(ByteOrder.BIG_ENDIAN)
                         val frame = GetDataFrame()
                         frame.stx = buffer.get()
                         frame.cmdOne = buffer.get()
                         frame.ack = buffer.get()
                         frame.checkSum = rxChecksum;
-                        etx = buffer.get()
+                        frame.etx = buffer.get()
                         return frame
                     } else {
                         println("CRC 체크 실패 또는 ETX 불일치")
@@ -969,7 +983,7 @@ class ICDService {
                 val dataFrame = ByteArray(7)
                 val byteCrc16Target = ByteArray(dataFrame.size - 4)
 
-                dataFrame[0] = stx
+                dataFrame[0] = ICD_STX
                 dataFrame[1] = cmdOne.code.toByte()
                 dataFrame[2] = cmdTwo.code.toByte()
                 dataFrame[3] = mode
@@ -983,7 +997,7 @@ class ICDService {
                 dataFrame[4] = crc16Check[0]
                 dataFrame[5] = crc16Check[1]
 
-                dataFrame[6] = etx
+                dataFrame[6] = ICD_ETX
 
                 return dataFrame
             }
@@ -991,7 +1005,7 @@ class ICDService {
 
 
         data class GetDataFrame(
-            var stx: Byte = 0x00,
+            var stx: Byte = ICD_STX,
             var cmdOne: Byte = 0x00,
             var cmdTwo: Byte = 0x00,
             var modeStatusBits: String = "00000000",  // BitSet에서 String으로 변경
@@ -1032,7 +1046,7 @@ class ICDService {
             var rssiXBandLNA_LHCP: Float = 0f,
             var rssiXBandLNA_RHCP: Float = 0f,
             var checkSum: UShort = 0u,
-            var etx: Byte = 0x00
+            var etx: Byte = ICD_ETX
         ) {
             enum class Mode {
                 standby,
@@ -1190,7 +1204,7 @@ class ICDService {
                     val crc16Target = data.copyOfRange(1, FRAME_LENGTH - 2)
                     val crc16Check = Crc16.computeCrc(crc16Target).toUShort()
 
-                    if (rxChecksum == crc16Check && data.last() == etx) {
+                    if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
                         val buffer = ByteBuffer.wrap(data).order(ByteOrder.BIG_ENDIAN)
 
                         val frame = GetDataFrame()
@@ -1269,8 +1283,9 @@ class ICDService {
                         frame.rtdTwo = buffer.float
                         frame.checkSum = rxChecksum
                         frame.etx = buffer.get()
-
+                        println(" az :${frame.azimuthAngle}, el : ${frame.elevationAngle}, ti : ${frame.tiltAngle}")
                         return frame
+
 
                     } else {
                         println("CRC 체크 실패 또는 ETX 불일치")

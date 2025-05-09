@@ -18,7 +18,6 @@ import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
 import java.time.Duration
-import java.time.ZonedDateTime
 import java.util.BitSet
 
 @Service
@@ -36,11 +35,18 @@ class UdpFwICDService(
     private val receiveBuffer = ByteBuffer.allocate(512)
     val firmwareAddress = InetSocketAddress(firmwareIp, firmwarePort)
 
+    private var readData: PushData.ReadData = PushData.ReadData()
     // 주기적 작업을 관리하기 위한 Disposable 객체 저장 변수
     private var sunTrackCommandSubscription: Disposable? = null
-
+    // Stow Command 실행 중인지 추적하기 위한 변수
+    private var stowCommandDisposable: Disposable? = null
+    // 최신 데이터를 저장할 변수
     @PostConstruct
     fun init() {
+        initializeUdpChannel()
+    }
+
+    private fun initializeUdpChannel() {
         try {
             // 단일 채널 설정 (송수신 모두 사용)
             channel = DatagramChannel.open()
@@ -54,8 +60,18 @@ class UdpFwICDService(
             startReceivingDataPeriodically()
             startSendingCommandPeriodically()
         } catch (e: Exception) {
-            println("UDP 초기화 실패: ${e.message}")
+            println("UDP 초기화 실패: ${e.message}, 5초 후 재시도합니다.")
+            scheduleReconnection()
         }
+    }
+
+    private fun scheduleReconnection() {
+        Mono.delay(Duration.ofSeconds(5))
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe {
+                println("UDP 연결 재시도 중...")
+                initializeUdpChannel()
+            }
     }
 
     /**
@@ -97,7 +113,17 @@ class UdpFwICDService(
             if (sunTrackCommandSubscription != null && !sunTrackCommandSubscription!!.isDisposed) {
                 sunTrackCommandSubscription!!.dispose()
                 sunTrackCommandSubscription = null
-                println("태양 추적 명령 주기적 전송 중지됨")
+
+                // 모든 축(azimuth, elevation, tilt)을 정지시키는 BitSet 생성
+                val allAxes = BitSet()
+                allAxes.set(0)  // azimuth
+                allAxes.set(1)  // elevation
+                allAxes.set(2)  // tilt
+
+                // 모든 축을 정지시키는 stopCommand 호출
+                stopCommand(allAxes)
+
+                println("태양 추적 명령 주기적 전송 중지됨 (모든 축 정지)")
                 true
             } else {
                 println("태양 추적 명령 주기적 전송이 이미 중지되었거나 실행 중이 아님")
@@ -108,7 +134,6 @@ class UdpFwICDService(
             false
         }
     }
-
     /**
      * 현재 태양 추적 명령 주기적 전송 상태 확인
      *
@@ -120,7 +145,7 @@ class UdpFwICDService(
 
     // 송신 부 반복 수행
     private fun startSendingCommandPeriodically() {
-        Flux.interval(Duration.ofMillis(100))
+        Flux.interval(Duration.ofMillis(25))
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe { sendReadStatusCommand() }
     }
@@ -182,11 +207,15 @@ class UdpFwICDService(
     private fun processICDData(receivedData: ByteArray) {
         try {
             icdService.receivedCmd(receivedData)
+            // ICDService에서 처리한 최신 데이터를 가져와 readData 업데이트
+            val latestData = pushService.getLatestData()
+            if (latestData != null) {
+                readData = latestData
+            }
         } catch (e: Exception) {
             println("ICD 데이터 처리 오류: ${e.message}")
         }
     }
-
     fun sunTrackingStartCommand(
         cmdAzimuthSpeed: Float,
         cmdElevationSpeed: Float,
@@ -199,10 +228,10 @@ class UdpFwICDService(
                 GlobalData.Location.longitude
             )
             CMD.apply {
-                cmdAzimuthAngle = sunTrackData.azimuth
-                cmdElevationAngle = sunTrackData.elevation
-                cmdTiltAngle = 0.0f  // 기본값 또는 필요에 따라 설정
-                cmdTime = ZonedDateTime.now()
+                cmdAzimuthAngle = sunTrackData.azimuth + GlobalData.Offset.azimuthPositionOffset
+                cmdElevationAngle = sunTrackData.elevation + GlobalData.Offset.elevationPositionOffset
+                cmdTiltAngle = 0.0f  + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
+                cmdTime = GlobalData.Time.resultTimeOffsetCalTime
             }
             //val cmdAzimuth = CMD.cmdAzimuthAngle
             //val cmdElevationAngle = CMD.cmdElevationAngle
@@ -313,6 +342,145 @@ class UdpFwICDService(
             println("ICD 데이터 처리 오류 (Emergency): ${e.message}")
         }
     }
+
+
+    fun StowCommand() {
+        // 이미 실행 중인 Stow Command가 있다면 취소
+        stowCommandDisposable?.dispose()
+
+        // Stow 명령에 사용할 기본값 설정
+        val stowTiltAngle = 0.0f  // 틸트 각도 0도
+        val stowTiltSpeed = 5.0f  // 틸트 속도
+
+        val stowAzimuthAngle = 0.0f  // 방위각 0도
+        val stowAzimuthSpeed = 5.0f  // 방위각 속도
+
+        val stowElevationAngle = 90.0f  // 고도각 90도 (천정 방향)
+        val stowElevationSpeed = 5.0f  // 고도각 속도
+
+        // 먼저 틸트 축 제어 시작
+        val tiltAxis = BitSet()
+        tiltAxis.set(2)  // 틸트 축 설정
+        tiltAxis.set(7)  // STOW 비트 설정
+
+        stowTiltCommand(tiltAxis, stowTiltAngle, stowTiltSpeed)
+        println("Stow 명령 시작: 틸트 축 제어 중 (목표 각도: $stowTiltAngle)")
+
+        // 안정화 시간 추적을 위한 변수
+        val stableTimeTracker = StableTimeTracker()
+
+        stowCommandDisposable = Flux.interval(Duration.ofMillis(100))
+            .takeUntil {
+                // 현재 틸트 각도 확인
+                val currentTiltAngle = readData.tiltAngle ?: 0.0f
+                val isInTargetRange = Math.abs(currentTiltAngle - stowTiltAngle) <= 0.1f
+
+                val currentTime = System.currentTimeMillis()
+
+                if (isInTargetRange) {
+                    if (stableTimeTracker.startTime == null) {
+                        // 처음으로 목표 범위에 들어옴
+                        stableTimeTracker.startTime = currentTime
+                        println("틸트 축이 목표 범위에 진입 (현재 각도: $currentTiltAngle)")
+                        false
+                    } else {
+                        // 목표 범위에 1초 이상 머물렀는지 확인
+                        val stableTime = currentTime - stableTimeTracker.startTime!!
+                        if (stableTime >= 1000) {
+                            // 1초 이상 안정적으로 유지됨 - 방위각/고도각 제어 시작
+                            val azElAxis = BitSet()
+                            azElAxis.set(0)  // 방위각 축 설정
+                            azElAxis.set(1)  // 고도각 축 설정
+                            azElAxis.set(7)  // STOW 비트 설정
+
+                            stowAzElCommand(
+                                azElAxis,
+                                stowAzimuthAngle, stowAzimuthSpeed,
+                                stowElevationAngle, stowElevationSpeed
+                            )
+                            println("틸트 축이 목표 위치에 안정적으로 도달하여 방위각/고도각 제어를 시작합니다.")
+                            true  // 스트림 종료
+                        } else {
+                            false
+                        }
+                    }
+                } else {
+                    // 목표 범위를 벗어남 - 타이머 리셋
+                    if (stableTimeTracker.startTime != null) {
+                        println("틸트 축이 목표 범위를 벗어남 (현재 각도: $currentTiltAngle)")
+                        stableTimeTracker.startTime = null
+                    }
+                    false
+                }
+            }
+            .subscribe(
+                { /* 각 간격마다 실행되는 코드 */ },
+                { error -> println("Stow 명령 실행 중 오류 발생: ${error.message}") },
+                { println("Stow 명령 실행 완료") }
+            )
+    }
+
+    // 안정화 시간을 추적하기 위한 클래스
+    private class StableTimeTracker {
+        var startTime: Long? = null
+    }
+
+    private fun stowTiltCommand(
+        multiAxis: BitSet,
+        tiAngle: Float,
+        tiSpeed: Float
+    ) {
+        try {
+            val setDataFrameInstance = ICDService.MultiManualControl.SetDataFrame(
+                stx = 0x02,
+                cmdOne = 'A',
+                axis = multiAxis,
+                azimuthAngle = readData.azimuthAngle ?: 0.0f,
+                azimuthSpeed = 0.0f,  // 틸트만 제어하므로 다른 축 속도는 0
+                elevationAngle = readData.elevationAngle ?: 0.0f,
+                elevationSpeed = 0.0f,  // 틸트만 제어하므로 다른 축 속도는 0
+                tiltAngle = tiAngle,
+                tiltSpeed = tiSpeed,
+                crc16 = 0u,
+                etx = 0x03
+            )
+            val dataToSend = setDataFrameInstance.setDataFrame()
+            val firmwareAddress = InetSocketAddress(firmwareIp, firmwarePort)
+            channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
+        } catch (e: Exception) {
+            println("틸트 축 제어 명령 처리 오류: ${e.message}")
+        }
+    }
+
+    private fun stowAzElCommand(
+        multiAxis: BitSet,
+        azAngle: Float,
+        azSpeed: Float,
+        elAngle: Float,
+        elSpeed: Float
+    ) {
+        try {
+            val setDataFrameInstance = ICDService.MultiManualControl.SetDataFrame(
+                stx = 0x02,
+                cmdOne = 'A',
+                axis = multiAxis,
+                azimuthAngle = azAngle,
+                azimuthSpeed = azSpeed,
+                elevationAngle = elAngle,
+                elevationSpeed = elSpeed,
+                tiltAngle = readData.tiltAngle ?: 0.0f,
+                tiltSpeed = 0.0f,  // 방위각/고도각만 제어하므로 틸트 속도는 0
+                crc16 = 0u,
+                etx = 0x03
+            )
+            val dataToSend = setDataFrameInstance.setDataFrame()
+            val firmwareAddress = InetSocketAddress(firmwareIp, firmwarePort)
+            channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
+        } catch (e: Exception) {
+            println("방위각/고도각 제어 명령 처리 오류: ${e.message}")
+        }
+    }
+
 
     fun feedOnOffCommand(bitFeedOnOff: BitSet) {
         try {
