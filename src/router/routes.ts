@@ -9,7 +9,32 @@ const routes: RouteRecordRaw[] = [
     path: '/',
     component: () => import('layouts/MainLayout.vue'),
     children: [
-      { path: 'dashboard', component: () => import('pages/DashboardPage.vue') },
+      {
+        path: 'dashboard',
+        component: () => import('pages/DashboardPage.vue'),
+        children: [
+          {
+            path: '',
+            redirect: '/dashboard/ephemeris',
+          },
+          {
+            path: 'ephemeris',
+            component: () => import('pages/mode/EphemerisDesignation.vue'),
+          },
+          {
+            path: 'pedestal',
+            component: () => import('pages/mode/PedestalPosition.vue'),
+          },
+          {
+            path: 'suntrack',
+            component: () => import('pages/mode/SunTrack.vue'),
+          },
+          {
+            path: 'feed',
+            component: () => import('pages/mode/FeedControl.vue'),
+          },
+        ],
+      },
       { path: 'test', component: () => import('pages/DashboardPage_Test.vue') },
     ],
   },

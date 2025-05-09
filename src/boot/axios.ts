@@ -15,7 +15,15 @@ declare module 'vue' {
 // "export default () => {}" function below (which runs individually
 // for each client)
 //const api = axios.create({ baseURL: 'https://api.example.com' });
-const api = axios.create({ baseURL: 'http://localhost:8080/api' })
+const api = axios.create({
+  baseURL: 'http://localhost:8080/api',
+  // 타임아웃 설정 추가
+  timeout: 10000,
+  // 요청 헤더 추가
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
 
 export default defineBoot(({ app }) => {
   // for use inside Vue files (Options API) through this.$axios and this.$api

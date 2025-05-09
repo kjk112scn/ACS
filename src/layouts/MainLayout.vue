@@ -19,7 +19,7 @@
       </q-toolbar>
     </q-header>
 
-    <q-drawer v-model="leftDrawerOpen" show-if-above bordered>
+    <q-drawer v-model="leftDrawerOpen" bordered>
       <q-list>
         <q-item-label header> Essential Links </q-item-label>
 
@@ -34,10 +34,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import EssentialLink, { type EssentialLinkProps } from 'components/EssentialLink.vue'
-import { useQuasar } from 'quasar' // ✅ $q 가져오기
-const $q = useQuasar() // ✅ useQuasar로 인스턴스 생성
+import { useQuasar } from 'quasar'
+
+const $q = useQuasar()
 const linksList: EssentialLinkProps[] = [
   {
     title: 'Docs',
@@ -83,14 +84,23 @@ const linksList: EssentialLinkProps[] = [
   },
 ]
 
+// 명시적으로 false로 설정하고 show-if-above 속성 제거
 const leftDrawerOpen = ref(false)
+
+// 다크 모드 토글
 const toggleDarkMode = () => {
   const newState = !$q.dark.isActive
   $q.dark.set(newState)
   localStorage.setItem('isDarkMode', String(newState))
 }
 
+// 왼쪽 drawer 토글
 function toggleLeftDrawer() {
   leftDrawerOpen.value = !leftDrawerOpen.value
 }
+
+// 컴포넌트가 마운트될 때 drawer가 닫혀있도록 확실히 설정
+onMounted(() => {
+  leftDrawerOpen.value = false
+})
 </script>
