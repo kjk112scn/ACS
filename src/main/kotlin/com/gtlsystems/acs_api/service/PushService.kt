@@ -3,6 +3,7 @@ package com.gtlsystems.acs_api.service
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.gtlsystems.acs_api.model.GlobalData
+import com.gtlsystems.acs_api.model.GlobalData.CMD.azimuth
 import com.gtlsystems.acs_api.model.PushData
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -134,22 +135,13 @@ class PushService(private val objectMapper: ObjectMapper) {
             val dataWithTime = mapOf(
                 "data" to mergedData,
                 "serverTime" to GlobalData.Time.serverTime,
-                "resultTimeOffsetCalTime" to GlobalData.Time.resultTimeOffsetCalTime
+                "resultTimeOffsetCalTime" to GlobalData.Time.resultTimeOffsetCalTime,
+                "cmdAzimuthAngle" to PushData.CMD.cmdAzimuthAngle,
+                "cmdElevationAngle" to PushData.CMD.cmdElevationAngle,
+                "cmdTiltAngle" to PushData.CMD.cmdTiltAngle,
             )
             val readJsonWithTime = objectMapper.writeValueAsString(dataWithTime)
-
-            // 수정 후
-            val dataMap = objectMapper.convertValue(mergedData, Map::class.java) as Map<String, Any?>
-            val flatData = dataMap.toMutableMap().apply {
-                put("serverTime", GlobalData.Time.serverTime)
-                put("resultTimeOffsetCalTime", GlobalData.Time.resultTimeOffsetCalTime)
-            }
-            val readJsonFlat = objectMapper.writeValueAsString(flatData)
-
-            // 발행 시 수정된 JSON 사용
-            //sink.tryEmitNext(readJsonFlat)
-            // 또는
-            publish("read", readJsonFlat)
+            publish("read", readJsonWithTime)
 
             // 처리 시간 측정 종료
             val processingTime = System.currentTimeMillis() - startTime

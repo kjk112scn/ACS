@@ -1,7 +1,9 @@
 package com.gtlsystems.acs_api.service
 
 import com.fasterxml.jackson.databind.ObjectMapper // ObjectMapper import
+import com.gtlsystems.acs_api.model.GlobalData
 import com.gtlsystems.acs_api.model.PushData
+import com.gtlsystems.acs_api.model.PushData.CMD
 
 import com.gtlsystems.acs_api.util.Crc16
 import com.gtlsystems.acs_api.util.JKUtil.JKConvert
@@ -17,7 +19,6 @@ class ICDService {
     companion object {
         const val ICD_STX: Byte = 0x02
         const val ICD_ETX: Byte = 0x03
-
     }
 
     class Classify(private val objectMapper: ObjectMapper, private val pushService: PushService) {
@@ -430,7 +431,11 @@ class ICDService {
                 dataFrame[27] = crc16Check[0]
                 dataFrame[28] = crc16Check[1]
                 dataFrame[29] = ICD_ETX
-
+                CMD.apply {
+                    cmdAzimuthAngle = azimuthAngle + GlobalData.Offset.azimuthPositionOffset
+                    cmdElevationAngle = elevationAngle + GlobalData.Offset.elevationPositionOffset
+                    cmdTiltAngle = tiltAngle  + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
+                }
                 return dataFrame
             }
         }

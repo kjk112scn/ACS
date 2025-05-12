@@ -32,7 +32,7 @@ class UdpFwICDService(
     private val icdService = ICDService.Classify(objectMapper, pushService)
     private val sunTrackService = SunTrackService()
     private lateinit var channel: DatagramChannel
-    private val receiveBuffer = ByteBuffer.allocate(512)
+    private val receiveBuffer = ByteBuffer.allocate(4096)
     val firmwareAddress = InetSocketAddress(firmwareIp, firmwarePort)
 
     private var readData: PushData.ReadData = PushData.ReadData()
@@ -57,12 +57,27 @@ class UdpFwICDService(
             println("UDP 채널 시작: $serverIp:$serverPort (포트: ${channel.localAddress})")
 
             // 주기적인 수신 및 송신 시작
-            startReceivingDataPeriodically()
+            startReceivingDataThread()
             startSendingCommandPeriodically()
         } catch (e: Exception) {
             println("UDP 초기화 실패: ${e.message}, 5초 후 재시도합니다.")
             scheduleReconnection()
         }
+    }
+    private fun startReceivingDataThread() {
+        Thread {
+            while (true) {
+                receiveBuffer.clear()
+                val address = channel.receive(receiveBuffer)
+                if (address != null) {
+                    receiveBuffer.flip()
+                    val receivedData = ByteArray(receiveBuffer.remaining())
+                    receiveBuffer.get(receivedData)
+                    processICDData(receivedData)
+                }
+                // 필요시 Thread.sleep(1) 등으로 CPU 사용 조절
+            }
+        }.start()
     }
 
     private fun scheduleReconnection() {
@@ -176,6 +191,7 @@ class UdpFwICDService(
                             receiveBuffer.flip()
                             val receivedData = ByteArray(receiveBuffer.remaining())
                             receiveBuffer.get(receivedData)
+                            //icdService.receivedCmd(receivedData)
                             Pair(address as InetSocketAddress, receivedData)
                         } else {
                             null
@@ -223,21 +239,13 @@ class UdpFwICDService(
     ) {
         try {
             val sunTrackData = sunTrackService.getCurrentSunPositionAPI(
-                GlobalData.Time.resultTimeOffsetCalTime,
+                GlobalData.Time.resultSunTrackTimeOffsetCalTime,
                 GlobalData.Location.latitude,
-                GlobalData.Location.longitude
+                GlobalData.Location.longitude,
+                // 추가적인 위치 정보 필요한 경우 여기에 추가
+
             )
-            CMD.apply {
-                cmdAzimuthAngle = sunTrackData.azimuth + GlobalData.Offset.azimuthPositionOffset
-                cmdElevationAngle = sunTrackData.elevation + GlobalData.Offset.elevationPositionOffset
-                cmdTiltAngle = 0.0f  + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
-                cmdTime = GlobalData.Time.resultTimeOffsetCalTime
-            }
-            //val cmdAzimuth = CMD.cmdAzimuthAngle
-            //val cmdElevationAngle = CMD.cmdElevationAngle
             val cmdTiltAngle = CMD.cmdTiltAngle
-            //val cmdTime = CMD.cmdTime
-            //print("azimuthAngle: $cmdAzimuth, elevationAngle: $cmdElevationAngle, times: $cmdTime")
             val multiAxis = BitSet()
             multiAxis.set(0)
             multiAxis.set(1)
@@ -306,6 +314,7 @@ class UdpFwICDService(
             val dataToSend = setDataFrameInstance.setDataFrame()
             val firmwareAddress = InetSocketAddress(firmwareIp, firmwarePort)
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
+            GlobalData.Offset.TimeOffset = inputTimeOffset
             println("UDP TimeOffset 명령어 전송 (API): $firmwareIp:$firmwarePort")
             println("UDP Send Data (API - timeOffsetCommand): ${byteArrayToHexString(dataToSend)}")
         } catch (e: Exception) {
@@ -320,7 +329,6 @@ class UdpFwICDService(
         tiAngle: Float, tiSpeed: Float
     ) {
         try {
-
             val setDataFrameInstance = ICDService.MultiManualControl.SetDataFrame(
                 stx = 0x02,
                 cmdOne = 'A',
@@ -338,6 +346,7 @@ class UdpFwICDService(
             val dataToSend = setDataFrameInstance.setDataFrame()
             val firmwareAddress = InetSocketAddress(firmwareIp, firmwarePort)
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
+
         } catch (e: Exception) {
             println("ICD 데이터 처리 오류 (Emergency): ${e.message}")
         }
@@ -518,6 +527,9 @@ class UdpFwICDService(
             val dataToSend = setDataFrameInstance.setDataFrame()
             val firmwareAddress = InetSocketAddress(firmwareIp, firmwarePort)
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
+            GlobalData.Offset.azimuthPositionOffset = azOffset
+            GlobalData.Offset.elevationPositionOffset = elOffset
+            GlobalData.Offset.tiltPositionOffset = tiOffset
             println("UDP positionOffsetCommand 명령어 전송 (API): $firmwareIp:$firmwarePort")
             println("UDP Send Data (API - positionOffsetCommand): ${byteArrayToHexString(dataToSend)}")
         } catch (e: Exception) {
@@ -527,6 +539,13 @@ class UdpFwICDService(
 
     fun stopCommand(bitStop: BitSet) {
         try {
+            // 1. StowCommand가 실행 중이면 중단
+            if (stowCommandDisposable != null && !stowCommandDisposable!!.isDisposed) {
+                stowCommandDisposable!!.dispose()
+                stowCommandDisposable = null
+                // 필요하다면 로그 남기기
+                println("StowCommand 중단됨: stop 명령 실행")
+            }
             val setDataFrameInstance = ICDService.Stop.SetDataFrame(
                 stx = 0x02,
                 cmdOne = 'S',
@@ -538,10 +557,23 @@ class UdpFwICDService(
             val dataToSend = setDataFrameInstance.setDataFrame()
             val firmwareAddress = InetSocketAddress(firmwareIp, firmwarePort)
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
+            stopAllCommand()
             println("UDP stopCommand 명령어 전송 (API): $firmwareIp:$firmwarePort")
             println("UDP Send Data (API - stopCommand): ${byteArrayToHexString(dataToSend)}")
         } catch (e: Exception) {
             println("ICD 데이터 처리 오류 (stopCommand): ${e.message}")
+        }
+    }
+    /*
+    Sun Track, Ephemeris Designation, Pass Schedule을 Stop 버튼을 선택 시 정지하기 위해 작성.
+     */
+    fun stopAllCommand() {
+        try {
+            //태양 추적 중지.
+            stopSunTrackCommandPeriodically()
+        }
+        catch (e: Exception) {
+            println("ICD 데이터 처리 오류 (stopAllCommand): ${e.message}")
         }
     }
 

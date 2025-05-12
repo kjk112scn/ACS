@@ -30,13 +30,15 @@ object GlobalData {
          * utcNow + addLocalTime을 계산하여 반환
          */
         val serverTime: ZonedDateTime
-            get() = utcNow.plusSeconds(addLocalTime.toLong())
+            get() = utcNow.plusHours(addLocalTime.toLong())
 
         /**
          * 현재 서버 시간 + Offset.TimeOffset을 계산하여 반환
          */
         val resultTimeOffsetCalTime: ZonedDateTime
             get() = serverTime.plusSeconds(Offset.TimeOffset.toLong())
+        val resultSunTrackTimeOffsetCalTime: ZonedDateTime
+            get() = utcNow.plusSeconds(Offset.TimeOffset.toLong())
     }
 
     object Offset {
