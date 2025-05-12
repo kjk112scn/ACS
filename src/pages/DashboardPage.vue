@@ -132,7 +132,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useICDStore } from '../stores/ICD'
-import { date } from 'quasar' // Quasar의 date 유틸리티 가져오기
 import { useRouter, useRoute } from 'vue-router'
 
 // ICD 스토어 인스턴스 생성
@@ -155,26 +154,38 @@ const displayValue = (value: string | number | null | undefined) => {
   return value
 }
 
-// 서버 시간 포맷팅
+
+// 서버 시간 포맷팅 (기본 Date 메서드 사용)
 const formattedServerTime = computed(() => {
-  if (!icdStore.serverTime) return ''
+
+
+  if (!icdStore.serverTime) return '';
 
   try {
     // ISO 문자열을 Date 객체로 변환
-    const dateObj = new Date(icdStore.serverTime)
 
-    // 년-월-일 시:분:초.밀리초 형식으로 포맷팅
-    const formattedDate = date.formatDate(dateObj, 'YYYY-MM-DD HH:mm:ss')
 
-    // 밀리초 부분 추출 (마지막 3자리)
-    const milliseconds = dateObj.getMilliseconds().toString().padStart(3, '0')
 
-    return `${formattedDate}.${milliseconds}`
+
+
+
+
+
+
+    const dateObj = new Date(icdStore.serverTime);
+
+    // 시간 문자열 생성 (toISOString은 항상 UTC 시간을 반환)
+    // 예: "2023-05-12T16:49:59.928Z" -> "2023-05-12 16:49:59.928"
+    const isoString = dateObj.toISOString();
+    return isoString.replace('T', ' ').replace('Z', '');
   } catch (error) {
-    console.error('날짜 포맷팅 오류:', error)
-    return icdStore.serverTime // 오류 발생 시 원본 문자열 반환
+
+
+    console.error('날짜 포맷팅 오류:', error);
+    return icdStore.serverTime; // 오류 발생 시 원본 문자열 반환
   }
-})
+
+});
 
 // 현재 모드 상태
 const currentMode = ref('ephemeris')

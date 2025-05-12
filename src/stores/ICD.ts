@@ -133,17 +133,15 @@ export const useICDStore = defineStore('icd', {
       }
 
       this.websocket.onmessage = (event) => {
-        console.log('Raw WebSocket data:', event.data)
+        //console.log('Raw WebSocket data:', event.data)
 
         try {
           // 외부 JSON 파싱
           const message = JSON.parse(event.data) as MessageData
-          console.log('Parsed message:', message)
+          //console.log('Parsed message:', message)
 
           // 데이터 구조 확인
-          if (message.topic === 'cmd') {
-            this.processCmdData(message)
-          } else if (message.topic === 'read') {
+          if (message.topic === 'read') {
             this.processReadData(message)
           } else if (
             'azimuthAngle' in message ||
@@ -176,7 +174,7 @@ export const useICDStore = defineStore('icd', {
         }
 
         // 화살표 함수를 사용하여 this 컨텍스트 유지
-        setTimeout(() => this.connectWebSocket(), 3000)
+        //setTimeout(() => this.connectWebSocket(), 3000)
       }
 
       this.websocket.onerror = (err) => {
@@ -201,10 +199,23 @@ export const useICDStore = defineStore('icd', {
     // 직접 데이터 처리 메서드 (최상위 레벨 필드용)
     processDirectData(message: MessageData) {
       try {
-        console.log('직접 데이터 처리:', message)
+        //console.log('직접 데이터 처리:', message)
 
         // 명시적으로 상태 업데이트
         this.$patch({
+          cmdAzimuthAngle:
+            message.cmdAzimuthAngle !== undefined
+              ? safeToString(message.cmdAzimuthAngle)
+              : this.cmdAzimuthAngle,
+          cmdElevationAngle:
+            message.cmdElevationAngle !== undefined
+              ? safeToString(message.cmdElevationAngle)
+              : this.cmdElevationAngle,
+          cmdTiltAngle:
+            message.cmdTiltAngle !== undefined
+              ? safeToString(message.cmdTiltAngle)
+              : this.cmdTiltAngle,
+          cmdTime: message.cmdTime !== undefined ? safeToString(message.cmdTime) : this.cmdTime,
           modeStatusBits:
             message.modeStatusBits !== undefined
               ? safeToString(message.modeStatusBits)
@@ -230,7 +241,7 @@ export const useICDStore = defineStore('icd', {
           tiltSpeed:
             message.tiltSpeed !== undefined ? safeToString(message.tiltSpeed) : this.tiltSpeed,
         })
-
+        /*
         // 값 할당 후 확인 로깅
         console.log('Store 상태 업데이트 후:', {
           azimuthAngle: this.azimuthAngle,
@@ -238,47 +249,11 @@ export const useICDStore = defineStore('icd', {
           tiltAngle: this.tiltAngle,
           serverTime: this.serverTime,
         })
+ */
       } catch (e) {
         console.error('직접 데이터 처리 오류:', e)
       }
     },
-
-    // CMD 데이터 처리
-    processCmdData(message: MessageData) {
-      try {
-        let cmdData: MessageData
-        if (typeof message.data === 'string') {
-          const cmdDataObj = JSON.parse(message.data)
-          cmdData = cmdDataObj.data || cmdDataObj
-        } else if (message.data !== undefined) {
-          cmdData = message.data as MessageData
-        } else {
-          cmdData = { ...message } // message 자체를 복사하여 사용
-        }
-
-        console.log('CMD 데이터 처리:', cmdData)
-
-        // 명시적으로 상태 업데이트
-        this.$patch({
-          cmdAzimuthAngle:
-            cmdData.cmdAzimuthAngle !== undefined
-              ? safeToString(cmdData.cmdAzimuthAngle)
-              : this.cmdAzimuthAngle,
-          cmdElevationAngle:
-            cmdData.cmdElevationAngle !== undefined
-              ? safeToString(cmdData.cmdElevationAngle)
-              : this.cmdElevationAngle,
-          cmdTiltAngle:
-            cmdData.cmdTiltAngle !== undefined
-              ? safeToString(cmdData.cmdTiltAngle)
-              : this.cmdTiltAngle,
-          cmdTime: cmdData.cmdTime !== undefined ? safeToString(cmdData.cmdTime) : this.cmdTime,
-        })
-      } catch (e) {
-        console.error('CMD 데이터 처리 오류:', e)
-      }
-    },
-
     // READ 데이터 처리
     processReadData(message: MessageData) {
       try {
@@ -297,7 +272,7 @@ export const useICDStore = defineStore('icd', {
             ? (readDataObj.data as Record<string, unknown>)
             : readDataObj // data가 없으면 readDataObj 자체를 사용
 
-        console.log('READ 데이터 처리:', readData)
+        //console.log('READ 데이터 처리:', readData)
 
         // 서버 시간 정보 처리
         if (message.serverTime !== undefined) {
@@ -314,6 +289,19 @@ export const useICDStore = defineStore('icd', {
 
         // 명시적으로 상태 업데이트 (null 체크 포함)
         this.$patch({
+          cmdAzimuthAngle:
+            message.cmdAzimuthAngle !== undefined
+              ? safeToString(message.cmdAzimuthAngle)
+              : this.cmdAzimuthAngle,
+          cmdElevationAngle:
+            message.cmdElevationAngle !== undefined
+              ? safeToString(message.cmdElevationAngle)
+              : this.cmdElevationAngle,
+          cmdTiltAngle:
+            message.cmdTiltAngle !== undefined
+              ? safeToString(message.cmdTiltAngle)
+              : this.cmdTiltAngle,
+          cmdTime: message.cmdTime !== undefined ? safeToString(message.cmdTime) : this.cmdTime,
           modeStatusBits:
             readData.modeStatusBits !== undefined
               ? safeToString(readData.modeStatusBits)
@@ -339,7 +327,7 @@ export const useICDStore = defineStore('icd', {
           tiltSpeed:
             readData.tiltSpeed !== undefined ? safeToString(readData.tiltSpeed) : this.tiltSpeed,
         })
-
+        /*
         // 값 할당 후 확인 로깅
         console.log('Store 상태 업데이트 후:', {
           azimuthAngle: this.azimuthAngle,
@@ -347,6 +335,7 @@ export const useICDStore = defineStore('icd', {
           tiltAngle: this.tiltAngle,
           serverTime: this.serverTime,
         })
+         */
       } catch (e) {
         console.error('READ 데이터 처리 오류:', e)
       }
@@ -354,15 +343,12 @@ export const useICDStore = defineStore('icd', {
 
     // 알 수 없는 데이터 구조 처리
     processUnknownData(message: Record<string, unknown>) {
-      console.log('알 수 없는 데이터 구조:', message)
+      //console.log('알 수 없는 데이터 구조:', message)
 
       // 필요한 필드가 있는지 확인
       if ('azimuthAngle' in message || 'elevationAngle' in message || 'tiltAngle' in message) {
         // 필드가 최상위 레벨에 있는 경우
         this.processDirectData(message as MessageData)
-      } else if ('cmdAzimuthAngle' in message) {
-        // CMD 데이터로 처리
-        this.processCmdData(message as MessageData)
       } else if (message.data) {
         // data 필드가 있는 경우
         this.processReadData(message as MessageData)
@@ -422,10 +408,22 @@ export const useICDStore = defineStore('icd', {
         throw error
       }
     },
+    async stopAllCommand() {
+      await this.stopSunTrack()
+    },
 
     // Stop 명령 전송 함수
     async stopCommand(azStop: boolean, elStop: boolean, tiStop: boolean) {
       try {
+        // Sun Track 중지 먼저 시도
+        try {
+          await this.stopAllCommand()
+          console.log('Sun Track 중지 성공')
+        } catch (sunTrackError) {
+          console.warn('Sun Track 중지 실패, 계속 진행:', sunTrackError)
+          // Sun Track 중지 실패해도 계속 진행
+        }
+
         // API 호출 (쿼리 파라미터로 전송)
         const response = await api.post('/icd/stop-command', null, {
           params: {
@@ -434,6 +432,7 @@ export const useICDStore = defineStore('icd', {
             tiStop,
           },
         })
+
         // 응답 처리
         console.log('Stop command sent:', response.data)
         return response.data
@@ -510,21 +509,21 @@ export const useICDStore = defineStore('icd', {
         // 응답 처리
         console.log('Position offset command sent:', response.data)
         // 상태 업데이트
-        this.lastOffsetCommandStatus = {
+        /*     this.lastOffsetCommandStatus = {
           message: '오프셋 명령이 성공적으로 전송되었습니다.',
           success: true,
           timestamp: Date.now(),
-        }
+        } */
         return response.data
       } catch (error) {
         console.error('Position offset command failed:', error)
         // 오류 상태 업데이트
-        this.lastOffsetCommandStatus = {
+        /*         this.lastOffsetCommandStatus = {
           message: '오프셋 명령 전송 중 오류가 발생했습니다.',
           success: false,
           timestamp: Date.now(),
         }
-        throw error
+        throw error */
       }
     },
 
@@ -570,21 +569,21 @@ export const useICDStore = defineStore('icd', {
         // 응답 처리
         console.log('Time offset command sent:', response.data)
         // 상태 업데이트
-        this.lastTimeOffsetCommandStatus = {
+        /*        this.lastTimeOffsetCommandStatus = {
           message: '시간 오프셋 명령이 성공적으로 전송되었습니다.',
           success: true,
           timestamp: Date.now(),
-        }
+        } */
         return response.data
       } catch (error) {
         console.error('Time offset command failed:', error)
         // 오류 상태 업데이트
-        this.lastTimeOffsetCommandStatus = {
+        /*    this.lastTimeOffsetCommandStatus = {
           message: '시간 오프셋 명령 전송 중 오류가 발생했습니다.',
           success: false,
           timestamp: Date.now(),
         }
-        throw error
+        throw error */
       }
     },
     disconnectWebSocket() {
