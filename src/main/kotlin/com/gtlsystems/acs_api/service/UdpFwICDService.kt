@@ -1,14 +1,15 @@
 package com.gtlsystems.acs_api.service
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.gtlsystems.acs_api.event.ACSEvent
+import com.gtlsystems.acs_api.event.ACSEventBus
 import com.gtlsystems.acs_api.model.GlobalData
 import com.gtlsystems.acs_api.model.PushData
-import com.gtlsystems.acs_api.model.PushData.CMD
 import com.gtlsystems.acs_api.util.JKUtil
 import com.gtlsystems.acs_api.util.JKUtil.JKConvert.Companion.byteArrayToHexString
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.core.env.Environment
 import org.springframework.stereotype.Service
 import reactor.core.Disposable
 import reactor.core.publisher.Flux
@@ -22,32 +23,50 @@ import java.util.BitSet
 
 @Service
 class UdpFwICDService(
-    private val objectMapper: ObjectMapper,
     private val pushService: PushService,
-    @Value("\${firmware.udp.ip}") private val firmwareIp: String,
-    @Value("\${firmware.udp.port}") private val firmwarePort: Int,
-    @Value("\${server.udp.ip}") private val serverIp: String,
-    @Value("\${server.udp.port}") private val serverPort: Int
+    private val environment: Environment,
+    private val eventBus: ACSEventBus // 이벤트 버스 주입
 ) {
-    private val icdService = ICDService.Classify(objectMapper, pushService)
-    private val sunTrackService = SunTrackService()
+
+    private val icdService = ICDService.Classify(pushService)
+
     private lateinit var channel: DatagramChannel
-    private val receiveBuffer = ByteBuffer.allocate(4096)
-    val firmwareAddress = InetSocketAddress(firmwareIp, firmwarePort)
+    private val receiveBuffer = ByteBuffer.allocate(512)
 
     private var readData: PushData.ReadData = PushData.ReadData()
-    // 주기적 작업을 관리하기 위한 Disposable 객체 저장 변수
-    private var sunTrackCommandSubscription: Disposable? = null
+
     // Stow Command 실행 중인지 추적하기 위한 변수
     private var stowCommandDisposable: Disposable? = null
+
+    // 프로퍼티 값을 생성자에서 주입받는 대신 @Value 어노테이션 사용
+    @Value("\${firmware.udp.ip:127.0.0.1}")
+    private lateinit var firmwareIp: String
+
+    @Value("\${firmware.udp.port:8080}")
+    private var firmwarePort: Int = 0
+
+    @Value("\${server.udp.ip:127.0.0.1}")
+    private lateinit var serverIp: String
+
+    @Value("\${server.udp.port:8081}")
+    private var serverPort: Int = 0
+
+    // 초기화 전에는 임시 주소 사용
+    var firmwareAddress = InetSocketAddress("127.0.0.1", 8080)
+
     // 최신 데이터를 저장할 변수
     @PostConstruct
     fun init() {
         initializeUdpChannel()
     }
-
     private fun initializeUdpChannel() {
         try {
+            firmwareIp = environment.getProperty("firmware.udp.ip") ?: "127.0.0.1"
+            firmwarePort = environment.getProperty("firmware.udp.port")?.toInt() ?: 8080
+            serverIp = environment.getProperty("server.udp.ip") ?: "127.0.0.1"
+            serverPort = environment.getProperty("server.udp.port")?.toInt() ?: 8081
+            firmwareAddress = InetSocketAddress(firmwareIp, firmwarePort)
+
             // 단일 채널 설정 (송수신 모두 사용)
             channel = DatagramChannel.open()
             val serverAddress = InetSocketAddress(serverIp, serverPort)
@@ -64,6 +83,48 @@ class UdpFwICDService(
             scheduleReconnection()
         }
     }
+
+    /**
+     * 보드와 통신이 되지 않는다면 지정된 시간 후 재연결 시도
+     */
+    private fun scheduleReconnection() {
+        Mono.delay(Duration.ofSeconds(5))
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe {
+                println("UDP 연결 재시도 중...")
+                initializeUdpChannel()
+            }
+    }
+
+    /**
+     * 주기적으로 데이터를 송신하기 위한  설정 함수
+     */
+    private fun startSendingCommandPeriodically() {
+        Flux.interval(Duration.ofMillis(10))
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe { sendReadStatusCommand() }
+    }
+
+    /**
+     * Read Status 정보 요청을 위한 송신 부 로직
+     */
+    private fun sendReadStatusCommand() {
+        try {
+            val setDataFrameInstance = ICDService.ReadStatus.SetDataFrame()
+            val dataToSend = setDataFrameInstance.setDataFrame()
+            channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
+            //println("UDP ReadStatus 명령어 전송: $firmwareIp:$firmwarePort")
+            //println("UDP Send Data : ${byteArrayToHexString(dataToSend)}")
+        } catch (e: Exception) {
+            //println("send 에러 ${e.message}")
+        }
+    }
+
+    /**
+     * 실시간을 유지하기 위해 쓰레드 실행
+     * Thread.sleep(1)을 사용할 수도 있으나 제일 중요한 부분이라 우선 없음.
+     * 다른 부분에는 쓰레드 사용하지 않는 것을 원칙으로 함.
+     */
     private fun startReceivingDataThread() {
         Thread {
             while (true) {
@@ -80,146 +141,9 @@ class UdpFwICDService(
         }.start()
     }
 
-    private fun scheduleReconnection() {
-        Mono.delay(Duration.ofSeconds(5))
-            .subscribeOn(Schedulers.boundedElastic())
-            .subscribe {
-                println("UDP 연결 재시도 중...")
-                initializeUdpChannel()
-            }
-    }
-
     /**
-     * 송신 부 반복 수행 시작
-     *
-     * @param interval 명령 전송 간격 (밀리초)
-     * @param cmdAzimuthSpeed 방위각 속도
-     * @param cmdElevationSpeed 고도각 속도
-     * @param cmdTiltSpeed 틸트 속도
-     * @return 생성된 Disposable 객체 (중지 시 사용)
+     * 수신 데이터를 처리하는 부분
      */
-    fun startSunTrackCommandPeriodically(
-        interval: Long,
-        cmdAzimuthSpeed: Float,
-        cmdElevationSpeed: Float,
-        cmdTiltSpeed: Float
-    ): Disposable {
-        // 이미 실행 중인 경우 중지
-        stopSunTrackCommandPeriodically()
-
-        // 새로운 주기적 작업 시작
-        sunTrackCommandSubscription = Flux.interval(Duration.ofMillis(interval))
-            .subscribeOn(Schedulers.boundedElastic())
-            .subscribe {
-                sunTrackingStartCommand(cmdAzimuthSpeed, cmdElevationSpeed, cmdTiltSpeed)
-            }
-
-        println("태양 추적 명령 주기적 전송 시작 (간격: ${interval}ms)")
-        return sunTrackCommandSubscription!!
-    }
-
-    /**
-     * 송신 부 반복 수행 중지
-     *
-     * @return 중지 성공 여부
-     */
-    fun stopSunTrackCommandPeriodically(): Boolean {
-        return try {
-            if (sunTrackCommandSubscription != null && !sunTrackCommandSubscription!!.isDisposed) {
-                sunTrackCommandSubscription!!.dispose()
-                sunTrackCommandSubscription = null
-
-                // 모든 축(azimuth, elevation, tilt)을 정지시키는 BitSet 생성
-                val allAxes = BitSet()
-                allAxes.set(0)  // azimuth
-                allAxes.set(1)  // elevation
-                allAxes.set(2)  // tilt
-
-                // 모든 축을 정지시키는 stopCommand 호출
-                stopCommand(allAxes)
-
-                println("태양 추적 명령 주기적 전송 중지됨 (모든 축 정지)")
-                true
-            } else {
-                println("태양 추적 명령 주기적 전송이 이미 중지되었거나 실행 중이 아님")
-                false
-            }
-        } catch (e: Exception) {
-            println("태양 추적 명령 주기적 전송 중지 중 오류 발생: ${e.message}")
-            false
-        }
-    }
-    /**
-     * 현재 태양 추적 명령 주기적 전송 상태 확인
-     *
-     * @return 실행 중이면 true, 그렇지 않으면 false
-     */
-    fun isSunTrackCommandRunning(): Boolean {
-        return sunTrackCommandSubscription != null && !sunTrackCommandSubscription!!.isDisposed
-    }
-
-    // 송신 부 반복 수행
-    private fun startSendingCommandPeriodically() {
-        Flux.interval(Duration.ofMillis(25))
-            .subscribeOn(Schedulers.boundedElastic())
-            .subscribe { sendReadStatusCommand() }
-    }
-
-    // Read Status 송신 부 로직
-    private fun sendReadStatusCommand() {
-        try {
-            val setDataFrameInstance = ICDService.ReadStatus.SetDataFrame()
-            val dataToSend = setDataFrameInstance.setDataFrame()
-            channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
-            //println("UDP ReadStatus 명령어 전송: $firmwareIp:$firmwarePort")
-            //println("UDP Send Data : ${byteArrayToHexString(dataToSend)}")
-        } catch (e: Exception) {
-            //println("send 에러 ${e.message}")
-        }
-    }
-
-    // 수신 부 반복 수행
-    private fun startReceivingDataPeriodically() {
-        Flux.interval(Duration.ofMillis(50))
-            .subscribeOn(Schedulers.boundedElastic())
-            .flatMap {
-                Mono.fromCallable {
-                    receiveBuffer.clear() // 버퍼 초기화 필수
-                    try {
-                        val address = channel.receive(receiveBuffer)
-                        if (address != null) {
-                            receiveBuffer.flip()
-                            val receivedData = ByteArray(receiveBuffer.remaining())
-                            receiveBuffer.get(receivedData)
-                            //icdService.receivedCmd(receivedData)
-                            Pair(address as InetSocketAddress, receivedData)
-                        } else {
-                            null
-                        }
-                    } catch (e: Exception) {
-                        println("UDP 수신 중 오류: ${e.message}")
-                        null
-                    }
-                }
-            }
-            .filter { it != null }
-            .subscribe(
-                { pair ->
-                    pair?.let { (clientAddress, receivedData) ->
-                        val dataString = String(receivedData)
-                        //println("UDP 데이터 수신: $dataString from $clientAddress")
-                        processICDData(receivedData)
-                        // processFirmwareDataAndPush(dataString)
-                    }
-                },
-                { error ->
-                    println("UDP 데이터 수신 중 오류 발생: ${error.message}")
-                    error.printStackTrace()
-                }
-            )
-    }
-
-    // 수신 부 분류 로직
     private fun processICDData(receivedData: ByteArray) {
         try {
             icdService.receivedCmd(receivedData)
@@ -232,38 +156,7 @@ class UdpFwICDService(
             println("ICD 데이터 처리 오류: ${e.message}")
         }
     }
-    fun sunTrackingStartCommand(
-        cmdAzimuthSpeed: Float,
-        cmdElevationSpeed: Float,
-        cmdTiltSpeed: Float
-    ) {
-        try {
-            val sunTrackData = sunTrackService.getCurrentSunPositionAPI(
-                GlobalData.Time.resultSunTrackTimeOffsetCalTime,
-                GlobalData.Location.latitude,
-                GlobalData.Location.longitude,
-                // 추가적인 위치 정보 필요한 경우 여기에 추가
 
-            )
-            val cmdTiltAngle = CMD.cmdTiltAngle
-            val multiAxis = BitSet()
-            multiAxis.set(0)
-            multiAxis.set(1)
-            multiManualCommand(
-                multiAxis,
-                sunTrackData.azimuth,  // null이면 0.0f 사용
-                cmdAzimuthSpeed,
-                sunTrackData.elevation,
-                cmdElevationSpeed,
-                cmdTiltAngle ?: 0.0f,
-                cmdTiltSpeed
-            )
-
-        } catch (e: Exception) {
-            println("SunTracking 명령어 전송 오류: ${e.message}")
-        }
-
-    }
 
     // Emergency Command 전송 함수
     fun onEmergencyCommand(commandChar: Char) {
@@ -490,7 +383,6 @@ class UdpFwICDService(
         }
     }
 
-
     fun feedOnOffCommand(bitFeedOnOff: BitSet) {
         try {
             val setDataFrameInstance = ICDService.FeedOnOff.SetDataFrame(
@@ -564,19 +456,20 @@ class UdpFwICDService(
             println("ICD 데이터 처리 오류 (stopCommand): ${e.message}")
         }
     }
+
     /*
     Sun Track, Ephemeris Designation, Pass Schedule을 Stop 버튼을 선택 시 정지하기 위해 작성.
      */
     fun stopAllCommand() {
         try {
             //태양 추적 중지.
-            stopSunTrackCommandPeriodically()
-        }
-        catch (e: Exception) {
+            //sunTrackService.stopSunTrackCommandPeriodically()
+            eventBus.publish(ACSEvent.TrackingEvent.StopAllTracking)
+            println("모든 추적 중지 이벤트 발행됨")
+        } catch (e: Exception) {
             println("ICD 데이터 처리 오류 (stopAllCommand): ${e.message}")
         }
     }
-
     fun defaultInfoCommand(timeOffset: Float, azOffset: Float, elOffset: Float, tiOffset: Float) {
         try {
             var localTime = JKUtil.JKTime.calLocalTime

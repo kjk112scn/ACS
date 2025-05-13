@@ -1,360 +1,169 @@
 package com.gtlsystems.acs_api.service
 
+import com.gtlsystems.acs_api.algorithm.suntrack.interfaces.SunPositionCalculator
+import com.gtlsystems.acs_api.event.ACSEvent
+import com.gtlsystems.acs_api.event.ACSEventBus
 import com.gtlsystems.acs_api.model.GlobalData
-import com.gtlsystems.acs_api.model.SunTrackData
+import com.gtlsystems.acs_api.model.PushData.CMD
 import jakarta.annotation.PostConstruct
-import net.e175.klaus.solarpositioning.DeltaT
-import net.e175.klaus.solarpositioning.SPA
-import net.e175.klaus.solarpositioning.Grena3
+import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import java.time.ZonedDateTime
-import java.time.temporal.ChronoUnit
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.Executors
-import java.util.GregorianCalendar
+import reactor.core.Disposable
+import reactor.core.publisher.Flux
+import reactor.core.scheduler.Schedulers
+import java.time.Duration
+import java.util.BitSet
 
 @Service
-class SunTrackService {
+class SunTrackService(
+    private val udpFwICDService: UdpFwICDService,
+    private val sunPositionCalculator: SunPositionCalculator,
+    private val eventBus: ACSEventBus  // 이 부분이 올바르게 주입되는지 확인
+) {
     private val logger = LoggerFactory.getLogger(javaClass)
-    private val isTrackingActive = AtomicBoolean(false)
-    private val scheduler = Executors.newSingleThreadScheduledExecutor()
 
-    // 기본 관측 위치 (필요시 업데이트)
-    private var defaultLatitude: Double = GlobalData.Location.latitude // 서울 위도
-    private var defaultLongitude: Double = GlobalData.Location.longitude
-    private var defaultElevation: Double = GlobalData.Location.altitude
+    // 주기적 작업을 관리하기 위한 Disposable 객체 저장 변수
+    private var sunTrackCommandSubscription: Disposable? = null
+    private var eventSubscription: Disposable? = null
 
-    // 사용할 알고리즘 유형 (SPA, GRENA3)
-    enum class Algorithm { SPA, GRENA3 }
 
-    private var defaultAlgorithm = Algorithm.SPA
 
     @PostConstruct
     fun initialize() {
-        // 애플리케이션 시작 시 현재 태양 위치 계산 및 로깅
         try {
-            val currentPosition = getCurrentSunPosition()
-            logger.info("Initial sun position calculated - Azimuth: ${currentPosition.azimuth}°, Elevation: ${currentPosition.elevation}° Time: ${currentPosition.timestamp}")
+            // 모든 추적 중지 이벤트를 구독
+            eventSubscription = eventBus.subscribe(ACSEvent.TrackingEvent.StopAllTracking::class.java)
+                .subscribe(
+                    { event ->
+                        stopSunTrackCommandPeriodically()
+                        println("추적 중지 이벤트 수신: $event")
+                    },
+                    { error -> println("이벤트 구독 중 오류 발생: ${error.message}") }
+                )
 
-            // 여기서 계산된 데이터를 다른 서비스에 전달하거나 저장할 수 있습니다
-            // 예: pushReadStatusService.updateSolarPosition(currentPosition)
+            // 태양 추적 중지 이벤트도 구독
+            val sunTrackStopSubscription = eventBus.subscribe(ACSEvent.TrackingEvent.StopSunTracking::class.java)
+                .subscribe(
+                    { event ->
+                        stopSunTrackCommandPeriodically()
+                        println("태양 추적 중지 이벤트 수신: $event")
+                    },
+                    { error -> println("태양 추적 중지 이벤트 구독 중 오류 발생: ${error.message}") }
+                )
+
         } catch (e: Exception) {
-            logger.error("Failed to calculate initial sun position: ${e.message}", e)
+            println("이벤트 버스 구독 설정 중 오류 발생: ${e.message}")
+            e.printStackTrace() // 상세 오류 정보 출력
         }
-    }
-
-    /**
-     * 지정된 알고리즘을 사용하여 태양의 위치를 계산합니다
+    }    /**
+     * 송신 부 반복 수행 시작
      *
-     * @param dateTime 계산할 날짜와 시간
-     * @param latitude 관측자의 위도 (북쪽이 양수)
-     * @param longitude 관측자의 경도 (동쪽이 양수)
-     * @param elevation 관측자의 고도 (해수면 위 미터 단위)
-     * @param algorithm 사용할 알고리즘
-     * @return 방위각과 고도각을 포함하는 SolarPositionData 객체
+     * @param interval 명령 전송 간격 (밀리초)
+     * @param cmdAzimuthSpeed 방위각 속도
+     * @param cmdElevationSpeed 고도각 속도
+     * @param cmdTiltSpeed 틸트 속도
+     * @return 생성된 Disposable 객체 (중지 시 사용)
      */
-    fun calculateSunPosition(
-        dateTime: ZonedDateTime,
-        latitude: Double,
-        longitude: Double,
-        elevation: Double = 0.0,
-        algorithm: Algorithm = defaultAlgorithm
-    ): SunTrackData {
-        // GregorianCalendar 객체로 변환
-        val calendar = GregorianCalendar.from(dateTime)
+    fun startSunTrackCommandPeriodically(
+        interval: Long,
+        cmdAzimuthSpeed: Float,
+        cmdElevationSpeed: Float,
+        cmdTiltSpeed: Float
+    ): Disposable {
+        // 이미 실행 중인 경우 중지
+        stopSunTrackCommandPeriodically()
 
-        // 태양 위치 계산
-        val azimuth: Double
-        val zenithAngle: Double
-
-        when (algorithm) {
-            Algorithm.SPA -> {
-                // LocalDate 사용
-                val result = SPA.calculateSolarPosition(
-                    dateTime,  // ZonedDateTime 직접 사용
-                    latitude,
-                    longitude,
-                    elevation,
-                    DeltaT.estimate(dateTime.toLocalDate()),  // LocalDate 전달
-                    1013.25, // 표준 대기압 (hPa)
-                    15.0     // 표준 기온 (°C)
-                )
-                azimuth = result.azimuth
-                zenithAngle = result.zenithAngle
+        // 새로운 주기적 작업 시작
+        sunTrackCommandSubscription = Flux.interval(Duration.ofMillis(interval))
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe {
+                sunTrackingStartCommand(cmdAzimuthSpeed, cmdElevationSpeed, cmdTiltSpeed)
             }
 
-            Algorithm.GRENA3 -> {
-                val result = Grena3.calculateSolarPosition(
-                    dateTime,  // ZonedDateTime 직접 사용
-                    latitude,
-                    longitude,
-                    DeltaT.estimate(dateTime.toLocalDate())  // LocalDate 전달
-                )
-                azimuth = result.azimuth
-                zenithAngle = result.zenithAngle
+        println("태양 추적 명령 주기적 전송 시작 (간격: ${interval}ms)")
+        return sunTrackCommandSubscription!!
+    }
+
+    fun sunTrackingStartCommand(
+        cmdAzimuthSpeed: Float,
+        cmdElevationSpeed: Float,
+        cmdTiltSpeed: Float
+    ) {
+        try {
+            val sunTrackData = sunPositionCalculator.calculatePosition(
+                GlobalData.Time.resultSunTrackTimeOffsetCalTime,
+                GlobalData.Location.latitude,
+                GlobalData.Location.longitude,
+                GlobalData.Location.altitude
+            )
+            val cmdTiltAngle = CMD.cmdTiltAngle
+            val multiAxis = BitSet()
+            multiAxis.set(0)
+            multiAxis.set(1)
+            multiAxis.set(2)
+            udpFwICDService.multiManualCommand(
+                multiAxis,
+                sunTrackData.azimuth,  // null이면 0.0f 사용
+                cmdAzimuthSpeed,
+                sunTrackData.elevation,
+                cmdElevationSpeed,
+                cmdTiltAngle ?: 0.0f,
+                cmdTiltSpeed
+            )
+
+        } catch (e: Exception) {
+            println("SunTracking 명령어 전송 오류: ${e.message}")
+        }
+    }
+
+    /**
+     * 송신 부 반복 수행 중지
+     *
+     * @return 중지 성공 여부
+     */
+    fun stopSunTrackCommandPeriodically(): Boolean {
+        return try {
+            if (sunTrackCommandSubscription != null && !sunTrackCommandSubscription!!.isDisposed) {
+                sunTrackCommandSubscription!!.dispose()
+                sunTrackCommandSubscription = null
+
+                // 모든 축(azimuth, elevation, tilt)을 정지시키는 BitSet 생성
+                val allAxes = BitSet()
+                allAxes.set(0)  // azimuth
+                allAxes.set(1)  // elevation
+                allAxes.set(2)  // tilt
+
+                // 모든 축을 정지시키는 stopCommand 호출
+                udpFwICDService.stopCommand(allAxes)
+
+                println("태양 추적 명령 주기적 전송 중지됨 (모든 축 정지)")
+                true
+            } else {
+                println("태양 추적 명령 주기적 전송이 이미 중지되었거나 실행 중이 아님")
+                false
             }
-        }
-
-        // 천정각에서 고도각으로 변환 (고도각 = 90° - 천정각)
-        val elevation = 90.0 - zenithAngle
-
-        return SunTrackData(
-            azimuth = azimuth.toFloat(),
-            elevation = elevation.toFloat(),
-            timestamp = dateTime
-        )
-    }
-
-    /**
-     * 현재 시간의 태양 위치를 계산합니다
-     *
-     * @param latitude 관측자의 위도 (북쪽이 양수)
-     * @param longitude 관측자의 경도 (동쪽이 양수)
-     * @param elevation 관측자의 고도 (해수면 위 미터 단위)
-     * @param algorithm 사용할 알고리즘
-     * @return 방위각과 고도각을 포함하는 SolarPositionData 객체
-     */
-    fun getCurrentSunPositionAPI(
-        dateTime: ZonedDateTime,
-        latitude: Double = defaultLatitude,
-        longitude: Double = defaultLongitude,
-        elevation: Double = defaultElevation,
-        algorithm: Algorithm = defaultAlgorithm
-    ): SunTrackData {
-
-        return calculateSunPosition(dateTime, latitude, longitude, elevation, algorithm)
-    }
-
-    /**
-     * 현재 시간의 태양 위치를 계산합니다
-     *
-     * @param latitude 관측자의 위도 (북쪽이 양수)
-     * @param longitude 관측자의 경도 (동쪽이 양수)
-     * @param elevation 관측자의 고도 (해수면 위 미터 단위)
-     * @param algorithm 사용할 알고리즘
-     * @return 방위각과 고도각을 포함하는 SolarPositionData 객체
-     */
-    fun getCurrentSunPosition(
-        latitude: Double = defaultLatitude,
-        longitude: Double = defaultLongitude,
-        elevation: Double = defaultElevation,
-        algorithm: Algorithm = defaultAlgorithm
-    ): SunTrackData {
-        val now = ZonedDateTime.now()
-        return calculateSunPosition(now, latitude, longitude, elevation, algorithm)
-    }
-
-    /**
-     * 특정 시간 범위 동안의 태양 위치를 계산합니다
-     *
-     * @param startTime 시작 시간
-     * @param endTime 종료 시간
-     * @param interval 계산 간격 (분)
-     * @param latitude 관측자의 위도
-     * @param longitude 관측자의 경도
-     * @param elevation 관측자의 고도
-     * @param algorithm 사용할 알고리즘
-     * @return 시간별 태양 위치 목록을 포함한 SolarPositionData 객체
-     */
-    fun calculateSunTrackingPath(
-        startTime: ZonedDateTime,
-        endTime: ZonedDateTime,
-        interval: Int = 1, // 기본값 1분 간격
-        latitude: Double = defaultLatitude,
-        longitude: Double = defaultLongitude,
-        elevation: Double = defaultElevation,
-        algorithm: Algorithm = defaultAlgorithm
-    ): SunTrackData {
-        val positions = mutableListOf<Pair<ZonedDateTime, SunTrackData>>()
-
-        var currentTime = startTime
-        while (!currentTime.isAfter(endTime)) {
-            val position = calculateSunPosition(currentTime, latitude, longitude, elevation, algorithm)
-            positions.add(Pair(currentTime, position))
-            currentTime = currentTime.plusMinutes(interval.toLong())
-        }
-
-        // 첫 번째 위치의 방위각과 고도각을 사용
-        val firstPosition = positions.firstOrNull()?.second ?: SunTrackData(0.0f, 0.0f)
-
-        return SunTrackData(
-            azimuth = firstPosition.azimuth,
-            elevation = firstPosition.elevation,
-            startTime = startTime,
-            endTime = endTime,
-            interval = interval,
-            positions = positions
-        )
-    }
-
-    /**
-     * 태양 추적을 위한 방위각과 고도각 변화율을 계산합니다
-     *
-     * @param latitude 관측자의 위도
-     * @param longitude 관측자의 경도
-     * @param elevation 관측자의 고도
-     * @param lookAheadMinutes 미래 예측 시간 (분)
-     * @param algorithm 사용할 알고리즘
-     * @return 방위각과 고도각 변화율 (도/분)
-     */
-    fun calculateSunTrackingRates(
-        latitude: Double = defaultLatitude,
-        longitude: Double = defaultLongitude,
-        elevation: Double = defaultElevation,
-        lookAheadMinutes: Int = 1,
-        algorithm: Algorithm = defaultAlgorithm
-    ): Pair<Float, Float> {
-        val now = ZonedDateTime.now()
-        val future = now.plusMinutes(lookAheadMinutes.toLong())
-
-        val currentPosition = calculateSunPosition(now, latitude, longitude, elevation, algorithm)
-        val futurePosition = calculateSunPosition(future, latitude, longitude, elevation, algorithm)
-
-        // 방위각 변화율 계산 (도/분)
-        var azimuthDelta = futurePosition.azimuth - currentPosition.azimuth
-        // 방위각이 0/360 경계를 넘는 경우 처리
-        if (azimuthDelta > 180) {
-            azimuthDelta -= 360
-        } else if (azimuthDelta < -180) {
-            azimuthDelta += 360
-        }
-        val azimuthRate = azimuthDelta / lookAheadMinutes
-
-        // 고도각 변화율 계산 (도/분)
-        val elevationRate = (futurePosition.elevation - currentPosition.elevation) / lookAheadMinutes
-
-        return Pair(azimuthRate, elevationRate)
-    }
-
-    /**
-     * 태양 추적 명령을 생성합니다
-     *
-     * @param latitude 관측자의 위도
-     * @param longitude 관측자의 경도
-     * @param elevation 관측자의 고도
-     * @param trackingMode 추적 모드 (CURRENT: 현재 위치, RATE: 변화율 기반)
-     * @param algorithm 사용할 알고리즘
-     * @return 태양 추적 명령을 포함한 SolarPositionData 객체
-     */
-    fun generateSunTrackingCommand(
-        latitude: Double = defaultLatitude,
-        longitude: Double = defaultLongitude,
-        elevation: Double = defaultElevation,
-        trackingMode: String = "CURRENT",
-        algorithm: Algorithm = defaultAlgorithm
-    ): SunTrackData {
-        val currentPosition = getCurrentSunPosition(latitude, longitude, elevation, algorithm)
-
-        return when (trackingMode.uppercase()) {
-            "RATE" -> {
-                val (azimuthRate, elevationRate) = calculateSunTrackingRates(
-                    latitude, longitude, elevation, algorithm = algorithm
-                )
-                SunTrackData(
-                    azimuth = currentPosition.azimuth,
-                    elevation = currentPosition.elevation,
-                    timestamp = ZonedDateTime.now(),
-                    azimuthRate = azimuthRate,
-                    elevationRate = elevationRate,
-                    trackingMode = "RATE"
-                )
-            }
-
-            else -> { // "CURRENT" 또는 기본값
-                SunTrackData(
-                    azimuth = currentPosition.azimuth,
-                    elevation = currentPosition.elevation,
-                    timestamp = ZonedDateTime.now(),
-                    azimuthRate = 0.0f,
-                    elevationRate = 0.0f,
-                    trackingMode = "CURRENT"
-                )
-            }
+        } catch (e: Exception) {
+            println("태양 추적 명령 주기적 전송 중지 중 오류 발생: ${e.message}")
+            false
         }
     }
 
     /**
-     * 일출 시간을 계산합니다
+     * 현재 태양 추적 명령 주기적 전송 상태 확인
      *
-     * @param date 계산할 날짜
-     * @param latitude 관측자의 위도
-     * @param longitude 관측자의 경도
-     * @param algorithm 사용할 알고리즘
-     * @return 일출 시간
+     * @return 실행 중이면 true, 그렇지 않으면 false
      */
-    fun calculateSunrise(
-        date: ZonedDateTime,
-        latitude: Double = defaultLatitude,
-        longitude: Double = defaultLongitude,
-        algorithm: Algorithm = defaultAlgorithm
-    ): ZonedDateTime {
-        // 해당 날짜의 0시부터 시작
-        val startOfDay = date.truncatedTo(ChronoUnit.DAYS)
-
-        // 1분 간격으로 24시간 동안 태양 고도 검사
-        for (minute in 0 until 24 * 60) {
-            val time = startOfDay.plusMinutes(minute.toLong())
-            val position = calculateSunPosition(time, latitude, longitude, 0.0, algorithm)
-
-            // 태양 고도가 0도를 넘어가는 순간이 일출
-            if (position.elevation >= 0) {
-                return time
-            }
-        }
-
-        // 일출을 찾지 못한 경우 (극지방 등에서 발생 가능)
-        return startOfDay
+    fun isSunTrackCommandRunning(): Boolean {
+        return sunTrackCommandSubscription != null && !sunTrackCommandSubscription!!.isDisposed
     }
+    @PreDestroy
+    fun cleanup() {
+        // 이벤트 구독 해제
+        eventSubscription?.dispose()
 
-    /**
-     * 일몰 시간을 계산합니다
-     *
-     * @param date 계산할 날짜
-     * @param latitude 관측자의 위도
-     * @param longitude 관측자의 경도
-     * @param algorithm 사용할 알고리즘
-     * @return 일몰 시간
-     */
-    fun calculateSunset(
-        date: ZonedDateTime,
-        latitude: Double = defaultLatitude,
-        longitude: Double = defaultLongitude,
-        algorithm: Algorithm = defaultAlgorithm
-    ): ZonedDateTime {
-        // 해당 날짜의 정오부터 시작
-        val noon = date.truncatedTo(ChronoUnit.DAYS).plusHours(12)
-
-        // 1분 간격으로 12시간 동안 태양 고도 검사
-        for (minute in 0 until 12 * 60) {
-            val time = noon.plusMinutes(minute.toLong())
-            val position = calculateSunPosition(time, latitude, longitude, 0.0, algorithm)
-
-            // 태양 고도가 0도 아래로 내려가는 순간이 일몰
-            if (position.elevation < 0) {
-                return time
-            }
-        }
-
-        // 일몰을 찾지 못한 경우 (극지방 등에서 발생 가능)
-        return noon.plusHours(12)
-    }
-
-    /**
-     * 기본 관측 위치를 설정합니다
-     */
-    fun setDefaultLocation(latitude: Double, longitude: Double, elevation: Double = 0.0) {
-        this.defaultLatitude = latitude
-        this.defaultLongitude = longitude
-        this.defaultElevation = elevation
-        logger.info("Default location updated: lat=$latitude, lon=$longitude, elev=$elevation")
-    }
-
-    /**
-     * 기본 알고리즘을 설정합니다
-     */
-    fun setDefaultAlgorithm(algorithm: Algorithm) {
-        this.defaultAlgorithm = algorithm
-        logger.info("Default algorithm updated to: $algorithm")
+        // 태양 추적 중지
+        stopSunTrackCommandPeriodically()
     }
 }
+

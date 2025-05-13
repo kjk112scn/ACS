@@ -21,7 +21,7 @@ class ICDService {
         const val ICD_ETX: Byte = 0x03
     }
 
-    class Classify(private val objectMapper: ObjectMapper, private val pushService: PushService) {
+    class Classify(private val pushService: PushService) {
         private var lastPacketTime = System.nanoTime()
         private val logger = org.slf4j.LoggerFactory.getLogger(Classify::class.java)
 
