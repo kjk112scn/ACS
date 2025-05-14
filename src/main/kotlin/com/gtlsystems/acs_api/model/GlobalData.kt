@@ -1,6 +1,9 @@
 package com.gtlsystems.acs_api.model
 
+import com.gtlsystems.acs_api.service.ICDService
+import java.sql.Date
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 
@@ -37,7 +40,7 @@ object GlobalData {
          */
         val resultTimeOffsetCalTime: ZonedDateTime
             get() = serverTime.plusSeconds(Offset.TimeOffset.toLong())
-        val resultSunTrackTimeOffsetCalTime: ZonedDateTime
+        val calUtcTimeOffsetTime: ZonedDateTime
             get() = utcNow.plusSeconds(Offset.TimeOffset.toLong())
     }
 
@@ -80,5 +83,25 @@ object GlobalData {
         var azimuth: Float = 0.0f
         var elevation: Float = 0.0f
         var tilt: Float = 0.0f
+    }
+    object Tracking {
+        /**
+         * 추적 주기 100ms 단위로 스케줄 출력
+         */
+        var msIntervel: Int = 100
+
+        /**
+         * 몇일 단위로 스케줄 출력 기준 
+         * 1일치 단위 출력
+         */
+        var durationDays: Int = 1
+        // 특정 날짜/시간 설정 (14일 00시, UTC)
+        val utcZoneId = ZoneId.of("UTC")
+        val startDate = ZonedDateTime.of(
+            Time.utcNow.year, Time.utcNow.month.value, Time.utcNow.dayOfMonth,
+            0, 0, 0, 0,
+            utcZoneId
+        )
+        val minElevationAngle: Float = 0.0f
     }
 }

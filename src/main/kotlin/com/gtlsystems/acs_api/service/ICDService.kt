@@ -1288,7 +1288,7 @@ class ICDService {
                         frame.rtdTwo = buffer.float
                         frame.checkSum = rxChecksum
                         frame.etx = buffer.get()
-                        println(" az :${frame.azimuthAngle}, el : ${frame.elevationAngle}, ti : ${frame.tiltAngle}")
+                        //println(" az :${frame.azimuthAngle}, el : ${frame.elevationAngle}, ti : ${frame.tiltAngle}")
                         return frame
 
 

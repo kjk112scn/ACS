@@ -92,7 +92,7 @@ class SunTrackService(
     ) {
         try {
             val sunTrackData = sunPositionCalculator.calculatePosition(
-                GlobalData.Time.resultSunTrackTimeOffsetCalTime,
+                GlobalData.Time.calUtcTimeOffsetTime,
                 GlobalData.Location.latitude,
                 GlobalData.Location.longitude,
                 GlobalData.Location.altitude
