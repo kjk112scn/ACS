@@ -64,8 +64,8 @@ object GlobalData {
 * 위치 정보
 */
     object Location {
-        var latitude: Double = 0.0
-        var longitude: Double = 0.0
+        var latitude: Double = 35.317540
+        var longitude: Double = 128.608510
         var altitude: Double = 0.0
     }
 

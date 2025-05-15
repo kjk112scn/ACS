@@ -28,8 +28,8 @@ object SatelliteTrackingData {
         val msInterval: Int
             get() = GlobalData.Tracking.msIntervel
 
-        val durationDays: Int
-            get() = GlobalData.Tracking.durationDays
+        val durationDays: Long
+            get() = GlobalData.Tracking.durationDays.toLong()
 
         val startDate: ZonedDateTime
             get() = GlobalData.Tracking.startDate
