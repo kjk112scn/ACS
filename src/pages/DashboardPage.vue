@@ -128,8 +128,7 @@
       </q-card-section>
     </q-card>
   </q-page>
-</template>
-<script setup lang="ts">
+</template>p
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useICDStore } from '../stores/ICD'
 import { useRouter, useRoute } from 'vue-router'

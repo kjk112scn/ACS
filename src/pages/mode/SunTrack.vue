@@ -68,7 +68,7 @@
                   dense
                   flat
                   class="reset-button"
-                  @click="reset(0)"
+                  @click="reset(1)"
                 />
               </div>
             </div>
