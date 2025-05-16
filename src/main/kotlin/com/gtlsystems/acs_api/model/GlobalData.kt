@@ -1,7 +1,5 @@
 package com.gtlsystems.acs_api.model
 
-import com.gtlsystems.acs_api.service.ICDService
-import java.sql.Date
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset

@@ -40,10 +40,13 @@ class SatelliteTrackerController(private val orekitCalculator: OrekitCalculator)
         )
         return ResponseEntity.ok(position)
     }
+/*
 
-    /**
+    */
+/**
      * 시간 범위 동안의 위성 위치를 계산합니다.
-     */
+     *//*
+
     @PostMapping("/tracking/path")
     fun getTrackingPath(@RequestBody request: SatelliteTrackingPathRequest): ResponseEntity<SatelliteTrackData> {
         val trackingPath = orekitCalculator.calculateTrackingPath(
@@ -59,9 +62,11 @@ class SatelliteTrackerController(private val orekitCalculator: OrekitCalculator)
         return ResponseEntity.ok(trackingPath)
     }
 
-    /**
+    */
+/**
      * 위성의 가시 시간을 계산합니다.
-     */
+     *//*
+
     @PostMapping("/tracking/visibility")
     fun getVisibilityPeriods(@RequestBody request: SatelliteVisibilityRequest): ResponseEntity<List<VisibilityPeriod>> {
         val periods = orekitCalculator.calculateVisibilityPeriods(
@@ -82,6 +87,7 @@ class SatelliteTrackerController(private val orekitCalculator: OrekitCalculator)
 
         return ResponseEntity.ok(response)
     }
+*/
 
     /**
      * 위성 추적 스케줄을 생성합니다.

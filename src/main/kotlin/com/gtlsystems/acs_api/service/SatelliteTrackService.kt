@@ -1,23 +1,15 @@
 package com.gtlsystems.acs_api.service
 
 import com.gtlsystems.acs_api.algorithm.satellitetracker.impl.OrekitCalculator
+import com.gtlsystems.acs_api.algorithm.suntrack.impl.SPACalculator
 import com.gtlsystems.acs_api.model.GlobalData
 import com.gtlsystems.acs_api.model.SatelliteTrackingData
 import jakarta.annotation.PostConstruct
-import org.orekit.propagation.analytical.tle.TLE
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import reactor.core.publisher.Mono
-import java.time.Duration
-import java.time.ZoneOffset
-import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
-import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.Int
-import kotlin.collections.fold
-import kotlin.collections.forEachIndexed
-import kotlin.collections.isNotEmpty
+import com.gtlsystems.acs_api.algorithm.axistransformation.CoordinateTransformer
 
 /**
  * 위성 추적 서비스
@@ -44,92 +36,87 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator) {
 
     fun satelliteTest() {
         try {
-            val aquaId = "AQUA"
-            val aquaTleLine1 = "1 27424U 02022A   25134.85411318  .00000946  00000-0  20168-3 0  9990"
-            val aquaTleLine2 = "2 27424  98.3761  92.7913 0001892 100.4476 287.5765 14.61239902225127"
-            addSatelliteTle(aquaId, aquaTleLine1, aquaTleLine2)
-            // 위성 추적 스케줄 생성
-            val schedule = orekitCalculator.generateSatelliteTrackingSchedule(
-                tleLine1 = aquaTleLine1,
-                tleLine2 = aquaTleLine2,
-                startDate = trackingData.startDate,
-                durationDays = trackingData.durationDays.toInt(),
-                minElevation = trackingData.minElevationAngle,
-                latitude = locationData.latitude,
-                longitude = locationData.longitude,
-                altitude = locationData.altitude,
-                trackingIntervalMs = trackingData.msInterval
+            // 표준 좌표를 기울어진 좌표로 변환
+          /*
+            val standardAzimuth = 176.8559559 // 예: 남쪽 방향
+            val standardElevation = 14.01059854  // 예: 45도 고도
+            val tiltAngle = -7.0  // 왼쪽으로 7도 기울어짐
+            */
+
+        /*
+            val standardAzimuth = 289.9609137 // 예: 남쪽 방향
+            val standardElevation = 63.13829495  // 예: 45도 고도
+            val tiltAngle = -7.0  // 왼쪽으로 7도 기울어짐
+        */
+         /*
+            val standardAzimuth = 339.3539456 // 예: 남쪽 방향
+            val standardElevation = 15.53425038  // 예: 45도 고도
+            val tiltAngle = -7.0  // 왼쪽으로 7도 기울어짐
+            */
+           /* val standardAzimuth = 181.17661 // 예: 남쪽 방향
+            val standardElevation = 46.4621529680836  // 예: 45도 고도
+            val tiltAngle = -6.98  // 왼쪽으로 7도 기울어짐
+            val (tiltedAzimuth, tiltedElevation) = CoordinateTransformer.transformCoordinates(
+                standardAzimuth, standardElevation, tiltAngle
+            )*/
+
+           /*
+            calculateRotatorAngleTable(
+                standardAzimuth = 176.8559559,
+                standardElevation = 14.01059854,
+                tiltAngle = -7.0,
+                rotatorStepDegrees = 30.0
             )
-            logger.info("위성 추적 스케줄 생성 완료: 총 ${schedule.trackingPasses.size}개 패스")
-
-            // 3. 추적 데이터 파일로 저장
-            val outputDir = "tracking_data/aqua_test"
-            val filePrefix = "AQUA_20250514"
-
-            logger.info("추적 데이터 파일 저장 시작: 출력 디렉토리=${outputDir}")
-
-            val savedFiles = orekitCalculator.saveAllTrackingData(schedule, outputDir, filePrefix)
-
-            logger.info("추적 데이터 파일 저장 완료: 총 ${savedFiles.size}개 파일 생성")
-            logger.info("생성된 파일 목록:")
-            savedFiles.forEach { filePath ->
-                logger.info("- $filePath")
-            }/*
-
-            // 특정 패스의 세부 데이터 출력 (예: 첫 번째 패스)
-            orekitCalculator.printDetailedTrackingData(0, schedule)
-
-            // 모든 패스의 세부 데이터 출력
-            orekitCalculator.printAllDetailedTrackingData(schedule)
-
-            // 특정 패스의 세부 데이터를 CSV 파일로 저장
-            orekitCalculator.saveDetailedTrackingDataToCsv(0, schedule, "pass1_tracking_data.csv")
-            logger.info("종료")
-
-*/
-
-            // 예제 TLE 데이터 추가 (AQUA 위성의 TLE 예시)
-
-/*
-
-            logger.info("AQUA TLE 데이터:")
-            logger.info(aquaTleLine1)
-            logger.info(aquaTleLine2)
-
-            // TLE 데이터를 캐시에 추가
-            addSatelliteTle(aquaId, aquaTleLine1, aquaTleLine2)
-            logger.info("등록된 위성 : ${getAllSatelliteIds()}")
-            // 위성 추적 스케줄 출력
-             printSatelliteTrackingSchedule("AQUA", SatelliteTrackingData.Tracking.startDate, SatelliteTrackingData.Tracking.durationDays,
-                  SatelliteTrackingData.Tracking.minElevationAngle, SatelliteTrackingData.Tracking.msInterval,
-                  SatelliteTrackingData.Location.latitude, SatelliteTrackingData.Location.longitude, SatelliteTrackingData.Location.altitude)
-
-*/
-
-
-
+            */
+            calculateRotatorAngleTable(
+                standardAzimuth = 177.796609998884,
+                standardElevation = 46.4621529680836,
+                tiltAngle = -6.98,
+                rotatorStepDegrees = 356.62
+            )
         } catch (e: Exception) {
             logger.error("satellite_Test 실행 중 오류 발생: ${e.message}", e)
         }
     }
+    fun calculateRotatorAngleTable(
+        standardAzimuth: Double,
+        standardElevation: Double,
+        tiltAngle: Double,
+        rotatorStepDegrees: Double = 30.0
+    ) {
+        val table = CoordinateTransformer.generateRotatorAngleTable(
+            standardAzimuth, standardElevation, tiltAngle, rotatorStepDegrees
+        )
 
+        logger.info("회전체 각도에 따른 방위각/고도각 변화 테이블")
+        logger.info("표준 좌표: Az=${standardAzimuth}°, El=${standardElevation}°, 기울기=${tiltAngle}°")
+        logger.info("─────────────────────────────────────────────")
+        logger.info("│ 회전체 각도 │   방위각   │   고도각   │")
+        logger.info("─────────────────────────────────────────────")
+
+        table.forEach { (rotatorAngle, az, el) ->
+            logger.info("│ ${String.format("%20.8f", rotatorAngle)}° │ ${String.format("%20.8f", az)}° │ ${String.format("%20.8f", el)}° │")
+        }
+
+        logger.info("─────────────────────────────────────────────")
+    }
     fun PrintConsoleSatelliteTrackeing()
     {
         val aquaId = "AQUA"
-        val aquaTleLine1 = "1 27424U 02022A   25133.82570022  .00001016  00000-0  21586-3 0  9998"
-        val aquaTleLine2 = "2 27424  98.3761  91.7503 0001869 101.5252 279.7693 14.61237975224972"
+        val aquaTleLine1 = "1 27424U 02022A   25134.85411318  .00000946  00000-0  20168-3 0  9990"
+        val aquaTleLine2 = "2 27424  98.3761  92.7913 0001892 100.4476 287.5765 14.61239902225127"
         addSatelliteTle(aquaId, aquaTleLine1, aquaTleLine2)
         logger.info("등록된 위성 : ${getAllSatelliteIds()}")
         // 위성 추적 스케줄 출력
-        printSatelliteTrackingSchedule("AQUA", SatelliteTrackingData.Tracking.startDate, SatelliteTrackingData.Tracking.durationDays,
+        /*printSatelliteTrackingSchedule("AQUA", SatelliteTrackingData.Tracking.startDate, SatelliteTrackingData.Tracking.durationDays,
             SatelliteTrackingData.Tracking.minElevationAngle, SatelliteTrackingData.Tracking.msInterval,
-            SatelliteTrackingData.Location.latitude, SatelliteTrackingData.Location.longitude, SatelliteTrackingData.Location.altitude)
+            SatelliteTrackingData.Location.latitude, SatelliteTrackingData.Location.longitude, SatelliteTrackingData.Location.altitude)*/
     }
     fun SaveCSvFileSatelliteTrack()
     {
         val aquaId = "AQUA"
-        val aquaTleLine1 = "1 27424U 02022A   25133.82570022  .00001016  00000-0  21586-3 0  9998"
-        val aquaTleLine2 = "2 27424  98.3761  91.7503 0001869 101.5252 279.7693 14.61237975224972"
+        val aquaTleLine1 = "1 27424U 02022A   25134.85411318  .00000946  00000-0  20168-3 0  9990"
+        val aquaTleLine2 = "2 27424  98.3761  92.7913 0001892 100.4476 287.5765 14.61239902225127"
         addSatelliteTle(aquaId, aquaTleLine1, aquaTleLine2)
         // 위성 추적 스케줄 생성
         val schedule = orekitCalculator.generateSatelliteTrackingSchedule(
@@ -189,9 +176,12 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator) {
         return satelliteTleCache.keys.toList()
     }
 
-    /**
-     * 특정 위성의 추적 스케줄을 계산하고 로그로 출력합니다.
-     */
+}
+
+/*
+    *//**
+ * 특정 위성의 추적 스케줄을 계산하고 로그로 출력합니다.
+ *//*
     fun printSatelliteTrackingSchedule(
         satelliteId: String,
         startDate: ZonedDateTime = ZonedDateTime.now(),
@@ -416,9 +406,9 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator) {
             logger.info("오류 발생까지 소요 시간: ${totalEndTime - totalStartTime}ms")
         }
     }
-    /**
-     * 위성 궤도 요소를 계산합니다.
-     */
+    *//**
+ * 위성 궤도 요소를 계산합니다.
+ *//*
     fun calculateOrbitalElements(satelliteId: String): Mono<Map<String, Double>> {
         return Mono.fromCallable {
             val tle = getSatelliteTle(satelliteId)
@@ -469,9 +459,9 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator) {
         }
     }
 
-    /**
-     * 위성 고도를 계산합니다.
-     */
+    *//**
+ * 위성 고도를 계산합니다.
+ *//*
     fun calculateSatelliteAltitude(satelliteId: String): Mono<Double> {
         return Mono.fromCallable {
             val tle = getSatelliteTle(satelliteId)
@@ -516,9 +506,9 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator) {
             }
         }
     }
-    /**
-     * 위성 속도를 계산합니다.
-     */
+    *//**
+ * 위성 속도를 계산합니다.
+ *//*
     fun calculateSatelliteVelocity(satelliteId: String): Mono<Double> {
         return Mono.fromCallable {
             val tle = getSatelliteTle(satelliteId)
@@ -556,6 +546,4 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator) {
                 throw e
             }
         }
-    }
-}
-
+    }*/
