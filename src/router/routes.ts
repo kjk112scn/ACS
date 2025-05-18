@@ -15,16 +15,29 @@ const routes: RouteRecordRaw[] = [
         children: [
           {
             path: '',
-            redirect: '/dashboard/ephemeris',
+            redirect: '/dashboard/standby',
           },
           {
-            path: 'ephemeris',
-            component: () => import('pages/mode/EphemerisDesignation.vue'),
+            path: 'standby',
+            component: () => import('pages/mode/Standby.vue'),
+          },
+          {
+            path: 'step',
+            component: () => import('pages/mode/Step.vue'),
+          },
+          {
+            path: 'slew',
+            component: () => import('pages/mode/Slew.vue'),
           },
           {
             path: 'pedestal',
             component: () => import('pages/mode/PedestalPosition.vue'),
           },
+          {
+            path: 'ephemeris',
+            component: () => import('pages/mode/EphemerisDesignation.vue'),
+          },
+
           {
             path: 'suntrack',
             component: () => import('pages/mode/SunTrack.vue'),

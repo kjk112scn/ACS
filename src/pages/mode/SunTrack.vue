@@ -1,7 +1,9 @@
 <template>
-  <q-page class="dashboard-container q-pa-md">
-    <!-- Offset 타이틀 (네모난 칸 밖에 위치) -->
-    <div class="section-title text-h5 text-primary q-mb-sm">Offset</div>
+
+
+
+  <div class="sun-track-mode">
+    <div class="section-title text-h5 text-primary q-mb-sm">Sun Track Control</div>
 
     <!-- 입력-출력 박스 -->
     <q-card class="input-output-section q-mb-md">
@@ -276,7 +278,8 @@
         </q-card-section>
       </q-card>
     </div>
-  </q-page>
+
+  </div>
 </template>
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'

@@ -1,87 +1,118 @@
 <template>
   <div class="ephemeris-mode">
-    <h2 class="text-primary q-mb-md">Ephemeris Designation 모드</h2>
-
-    <div class="row q-col-gutter-md">
-      <!-- 1번 영역: 차트가 들어갈 네모난 칸 - 비율 증가 -->
-      <div class="col-12 col-md-6">
-        <div class="chart-container">
-          <div class="chart-area" ref="chartRef"></div>
+    <div class="section-title text-h5 text-primary q-mb-sm">Ephemeris Designation</div>
+    <div class="ephemeris-container">
+      <div class="row q-col-gutter-sm">
+        <!-- 1번 영역: 차트가 들어갈 네모난 칸 -->
+        <div class="col-12 col-md-4">
+          <q-card class="control-section">
+            <q-card-section>
+              <div class="text-subtitle1 text-weight-bold text-primary">Position View</div>
+              <div class="chart-area" ref="chartRef"></div>
+            </q-card-section>
+          </q-card>
         </div>
-      </div>
 
-      <!-- 2번 영역: 계산 정보 표시 영역 - 비율 감소 -->
-      <div class="col-12 col-md-3">
-        <div class="calculation-info">
-          <h3 class="q-mb-sm">계산 정보</h3>
-
-          <div class="ephemeris-form">
-            <div class="form-row">
-              <q-input
-                v-model.number="ephemerisData.azimuth"
-                label="방위각 (°)"
-                type="number"
-                outlined
-              />
-              <q-input
-                v-model.number="ephemerisData.elevation"
-                label="고도각 (°)"
-                type="number"
-                outlined
-              />
-              <q-input
-                v-model.number="ephemerisData.tilt"
-                label="틸트각 (°)"
-                type="number"
-                outlined
-              />
-            </div>
-            <div class="form-row">
-              <q-date v-model="ephemerisData.date" outlined />
-              <q-time v-model="ephemerisData.time" outlined />
-            </div>
-            <q-btn color="primary" label="위치 지정" @click="sendEphemerisCommand" />
-          </div>
-
-          <!-- 현재 ICD 값 표시 (스토어에서 가져옴) -->
-          <div class="current-values q-mt-lg q-pa-md">
-            <h3 class="q-mb-sm">현재 ICD 값</h3>
-            <p>방위각: {{ icdStore.azimuthAngle }}°</p>
-            <p>고도각: {{ icdStore.elevationAngle }}°</p>
-            <p>틸트각: {{ icdStore.tiltAngle }}°</p>
-          </div>
+        <!-- 2번 영역: 계산 정보 표시 영역 -->
+        <div class="col-12 col-md-4">
+          <q-card class="control-section">
+            <q-card-section>
+              <div class="text-subtitle1 text-weight-bold text-primary">Tracking Information</div>
+              <div class="ephemeris-form">
+                <div class="form-row">
+                  <q-input
+                    v-model.number="ephemerisData.azimuth"
+                    label="Azimuth (°)"
+                    type="number"
+                    outlined
+                  />
+                  <q-input
+                    v-model.number="ephemerisData.elevation"
+                    label="Elevation (°)"
+                    type="number"
+                    outlined
+                  />
+                  <q-input
+                    v-model.number="ephemerisData.tilt"
+                    label="Tilt (°)"
+                    type="number"
+                    outlined
+                  />
+                </div>
+              </div>
+            </q-card-section>
+          </q-card>
         </div>
-      </div>
 
-      <!-- 3번 영역: ACS TLE 입력 (우측) - 비율 감소 -->
-      <div class="col-12 col-md-3">
-        <div class="tle-input q-pa-md">
-          <h3 class="q-mb-sm">ACS TLE 입력</h3>
-          <q-input
-            v-model="tleData.line1"
-            label="TLE Line 1"
-            outlined
-            class="q-mb-sm full-width"
-            placeholder="1 XXXXX XXX XXXXX.XXXXX .XXXXXXXX XXXXX-X XXXXX-X X XXXXX"
-          />
-          <q-input
-            v-model="tleData.line2"
-            label="TLE Line 2"
-            outlined
-            class="q-mb-md full-width"
-            placeholder="2 XXXXX XXX.XXXX XXX.XXXX XXXXXXXX XXX.XXXX XXX.XXXX XX.XXXXXX XXXXX"
-          />
+        <!-- 3번 영역: TLE Data -->
+        <div class="col-12 col-md-4">
+          <q-card class="control-section">
+            <q-card-section>
+              <div class="text-subtitle1 text-weight-bold text-primary">TLE Data</div>
+              <q-editor
+                v-model="tleData.displayText"
+                readonly
+                flat
+                dense
+                class="tle-display q-mt-sm"
+                :toolbar="[]"
+                :definitions="{
+                  bold: undefined,
+                  italic: undefined,
+                  strike: undefined,
+                  underline: undefined,
+                }"
+                content-class="tle-content"
+              />
 
-          <!-- 버튼 그룹 추가 -->
-          <div class="button-group">
-            <q-btn color="primary" label="Cal" @click="calculateTLE" class="q-mr-sm" />
-            <q-btn color="positive" label="Go" @click="sendEphemerisCommand" class="q-mr-sm" />
-            <q-btn color="warning" label="Stop" @click="stopCommand" class="q-mr-sm" />
-            <q-btn color="negative" label="Stow" @click="stowCommand" />
-          </div>
+              <!-- 버튼 그룹 추가 -->
+              <div class="button-group q-mt-md">
+                <q-btn color="primary" label="Cal" @click="openTLEModal" class="q-mr-sm" />
+                <q-btn
+                  color="positive"
+                  label="Go"
+                  @click="handleEphemerisCommand"
+                  class="q-mr-sm"
+                />
+                <q-btn color="warning" label="Stop" @click="handleStopCommand" class="q-mr-sm" />
+                <q-btn color="negative" label="Stow" @click="handleStowCommand" />
+              </div>
+            </q-card-section>
+          </q-card>
         </div>
       </div>
     </div>
+
+    <!-- TLE 입력 모달 -->
+    <q-dialog v-model="showTLEModal" persistent>
+      <q-card style="width: 600px; max-width: 90vw">
+        <q-card-section class="bg-primary text-white">
+          <div class="text-h6">TLE Input</div>
+        </q-card-section>
+
+        <q-card-section class="q-pa-md">
+          <q-editor
+            v-model="tempTLEData.line1"
+            min-height="200px"
+            class="tle-editor"
+            :toolbar="[]"
+            :definitions="{
+              bold: undefined,
+              italic: undefined,
+              strike: undefined,
+              underline: undefined,
+            }"
+            content-class="tle-content"
+            placeholder="Enter TLE data here..."
+          />
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn flat label="Add" color="primary" @click="addTLEData" />
+          <q-btn flat label="Close" color="primary" v-close-popup class="q-ml-sm" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </div>
 </template>
 <script setup lang="ts">
@@ -101,8 +132,7 @@ const chartRef = ref<HTMLElement | null>(null)
 
 // TLE 데이터 추가
 const tleData = ref({
-  line1: '',
-  line2: '',
+  displayText: '',
 })
 
 // Ephemeris Designation 모드 데이터
@@ -150,16 +180,16 @@ const initChart = () => {
   const option = {
     backgroundColor: 'transparent',
     grid: {
-      containLabel: true
+      containLabel: true,
     },
     polar: {
-      radius: ['0%', '85%'], // 반지름 비율 증가
-      center: ['50%', '50%'] // 중앙 배치
+      radius: ['0%', '80%'],
+      center: ['50%', '50%'],
     },
     angleAxis: {
       type: 'value',
       startAngle: 90,
-      clockwise: false,
+      clockwise: true,
       min: 0,
       max: 360,
       axisLine: {
@@ -170,42 +200,35 @@ const initChart = () => {
       },
       axisTick: {
         show: true,
-        interval: 30, // 30도 간격으로 눈금 표시
+        interval: 30,
         lineStyle: {
           color: '#555',
         },
       },
       axisLabel: {
-        interval: 30, // 30도 간격으로 라벨 표시
+        interval: 30,
         formatter: function (value: number) {
-          // 주요 방위 표시
           if (value === 0) return 'N (0°)'
           if (value === 90) return 'E (90°)'
           if (value === 180) return 'S (180°)'
           if (value === 270) return 'W (270°)'
-
-          // 중간 방위 표시
           if (value === 45) return 'NE (45°)'
           if (value === 135) return 'SE (135°)'
           if (value === 225) return 'SW (225°)'
           if (value === 315) return 'NW (315°)'
-
-          // 그 외 각도는 숫자만 표시
           if (value % 30 === 0) return value + '°'
-
           return ''
         },
         color: '#999',
-        fontSize: 10, // 글자 크기 조정
-        distance: 10, // 라벨과 축 사이의 거리
+        fontSize: 10,
+        distance: 10,
       },
       splitLine: {
         show: true,
-        interval: 30, // 30도 간격으로 분할선 표시
+        interval: 30,
         lineStyle: {
           color: '#555',
           type: 'dashed',
-
           width: 1,
         },
       },
@@ -243,7 +266,7 @@ const initChart = () => {
         itemStyle: {
           color: '#ff5722',
         },
-        data: [[0, 0]], // 초기 데이터 (방위각, 고도각)
+        data: [[0, 0]],
         emphasis: {
           itemStyle: {
             color: '#ff9800',
@@ -253,12 +276,11 @@ const initChart = () => {
         },
         label: {
           show: true,
-
           formatter: function (params: EChartsScatterParam) {
-            return `Az: ${params.value[0].toFixed(1)}°\nEl: ${params.value[1].toFixed(1)}°`
+            return `Az: ${params.value[0].toFixed(2)}°\nEl: ${params.value[1].toFixed(2)}°`
           },
           position: 'top',
-          distance: 10,
+          distance: 5,
           color: '#fff',
           backgroundColor: 'rgba(0,0,0,0.5)',
           padding: [4, 8],
@@ -279,13 +301,14 @@ const initChart = () => {
         data: [
           [0, 0],
           [0, 0],
-        ], // 중심에서 현재 위치까지의 선
+        ],
         zlevel: 1,
       },
     ],
     animation: true,
-    animationDuration: 200,
-    animationEasing: 'cubicOut',
+    animationDuration: 150,
+    animationEasing: 'linear',
+    animationThreshold: 2000,
   }
 
   // 차트 옵션 적용
@@ -343,10 +366,10 @@ onMounted(() => {
       initChart()
       console.log('Chart initialization triggered')
 
-      // 실시간 데이터 업데이트 시작 (100ms 간격)
+      // 실시간 데이터 업데이트 시작 (150ms 간격)
       updateTimer = window.setInterval(() => {
         updateChart()
-      }, 100)
+      }, 150)
     } catch (error) {
       console.error('Error in onMounted:', error)
     }
@@ -375,19 +398,58 @@ onUnmounted(() => {
   }
 })
 
+// TLE 모달 관련 상태
+const showTLEModal = ref(false)
+const tempTLEData = ref({
+  line1: '',
+})
+
+// TLE 모달 열기
+const openTLEModal = () => {
+  showTLEModal.value = true
+  tempTLEData.value.line1 = ''
+}
+
+// TLE 데이터 추가
+const addTLEData = () => {
+  const inputText = tempTLEData.value.line1.trim()
+
+  // 입력된 텍스트가 있는 경우에만 처리
+  if (inputText) {
+    // displayText에 입력된 TLE 데이터를 직접 설정
+    tleData.value.displayText = inputText
+
+    // 모달 닫기
+    showTLEModal.value = false
+
+    // 바로 계산 실행
+    void calculateTLE().catch((error) => {
+      console.error('Failed to calculate TLE:', error)
+    })
+  } else {
+    console.error('TLE data is empty')
+  }
+}
+
 // TLE 계산 함수
 const calculateTLE = async () => {
   try {
     // TLE 데이터 유효성 검사
-    if (!tleData.value.line1 || !tleData.value.line2) {
-      console.error('TLE 데이터를 모두 입력해주세요.')
+    if (!tleData.value.displayText) {
+      console.error('TLE 데이터를 입력해주세요.')
+      return
+    }
+
+    const lines = tleData.value.displayText.split('\n')
+    if (lines.length < 2) {
+      console.error('Invalid TLE format: Need two lines')
       return
     }
 
     // TLE 계산 API 호출
     const response = await api.post('/tle/calculate', {
-      line1: tleData.value.line1,
-      line2: tleData.value.line2,
+      line1: lines[0],
+      line2: lines[1],
       timestamp: `${ephemerisData.value.date} ${ephemerisData.value.time}`,
     })
 
@@ -419,6 +481,7 @@ const sendEphemerisCommand = async () => {
     console.log('위치 지정 명령 전송 성공:', response.data)
   } catch (error) {
     console.error('위치 지정 명령 전송 실패:', error)
+    throw error // Re-throw to allow handling by caller
   }
 }
 
@@ -430,6 +493,7 @@ const stopCommand = async () => {
     console.log('정지 명령 전송 성공')
   } catch (error) {
     console.error('정지 명령 전송 실패:', error)
+    throw error
   }
 }
 
@@ -440,45 +504,59 @@ const stowCommand = async () => {
     console.log('Stow 명령 전송 성공')
   } catch (error) {
     console.error('Stow 명령 전송 실패:', error)
+    throw error
   }
+}
+
+// Command handlers with error handling
+const handleEphemerisCommand = () => {
+  void sendEphemerisCommand().catch((error) => {
+    console.error('Failed to send ephemeris command:', error)
+    // Here you could add user notification of the error
+  })
+}
+
+const handleStopCommand = () => {
+  void stopCommand().catch((error) => {
+    console.error('Failed to send stop command:', error)
+    // Here you could add user notification of the error
+  })
+}
+
+const handleStowCommand = () => {
+  void stowCommand().catch((error) => {
+    console.error('Failed to send stow command:', error)
+    // Here you could add user notification of the error
+  })
 }
 </script>
 <style scoped>
-.ephemeris-form {
-  margin-top: 1rem;
-}
-
-.form-row {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  flex-wrap: wrap;
-}
-
-.current-values {
-  margin-top: 2rem;
-  border-radius: 4px;
-  background-color: var(--q-secondary);
-  color: var(--q-secondary-text);
-  opacity: 0.8;
-}
-
-.tle-input,
-.chart-container,
-.calculation-info {
+.ephemeris-mode {
   height: 100%;
-  border-radius: 4px;
-  border: 1px solid var(--q-primary);
-  background-color: var(--q-card-background);
-}
-
-.button-group {
-  display: flex;
-  margin-bottom: 1rem;
-}
-
-.full-width {
   width: 100%;
+}
+
+.ephemeris-container {
+  padding: 1rem;
+  width: 100%;
+  height: 100%;
+}
+
+.section-title {
+  font-weight: 500;
+  padding-left: 0.5rem;
+}
+
+.row {
+  width: 100%;
+  margin: 0;
+}
+
+.control-section {
+  height: 100%;
+  width: 100%;
+  background-color: var(--q-dark);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .chart-area {
@@ -487,22 +565,91 @@ const stowCommand = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  padding: 0;
-  margin: 0;
+  margin-top: 0.5rem;
 }
 
-.chart-container {
-  height: 100%;
-  border-radius: 4px;
-  border: 1px solid var(--q-primary);
-  background-color: var(--q-card-background);
-  padding: 1rem;
+.ephemeris-form {
+  margin-top: 0.5rem;
+  width: 100%;
+}
+
+.form-row {
   display: flex;
   flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
 }
 
-.chart-container h3 {
-  margin-bottom: 0.5rem;
+.button-group {
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  width: 100%;
+  justify-content: space-between;
+}
+
+.full-width {
+  width: 100%;
+}
+
+:deep(.q-field__control) {
+  padding: 0 8px;
+}
+
+:deep(.q-card__section) {
+  padding: 16px;
+}
+
+:deep(.q-card) {
+  background: var(--q-dark);
+  box-shadow:
+    0 1px 5px rgb(0 0 0 / 20%),
+    0 2px 2px rgb(0 0 0 / 14%),
+    0 3px 1px -2px rgb(0 0 0 / 12%);
+}
+
+:deep(.col-md-4) {
+  width: 33.3333%;
+  padding: 4px;
+}
+
+:deep(.q-btn) {
+  flex: 1;
+}
+
+.tle-editor {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+:deep(.tle-editor .q-editor__content) {
+  font-family: monospace !important;
+  line-height: 1.5;
+  padding: 12px;
+}
+
+.tle-display {
+  font-family: monospace !important;
+  background-color: var(--q-dark);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  min-height: 80px;
+}
+
+:deep(.tle-display .q-editor__content) {
+  font-family: monospace !important;
+  color: #fff;
+  padding: 12px;
+  line-height: 1.5;
+}
+
+:deep(.tle-display.q-editor--readonly) {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+:deep(.tle-content) {
+  font-family: monospace !important;
+  font-size: 14px;
+  white-space: pre;
 }
 </style>

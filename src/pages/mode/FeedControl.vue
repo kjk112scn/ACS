@@ -1,113 +1,108 @@
 <template>
-  <q-page class="dashboard-container q-pa-md">
-    <!-- Feed Control 타이틀 -->
+  <div class="feed-mode">
     <div class="section-title text-h5 text-primary q-mb-sm">Feed Control</div>
-
-    <!-- Feed 제어 박스 -->
-    <q-card class="feed-control-section q-mb-md">
-      <q-card-section>
-        <div class="row q-col-gutter-md">
-          <!-- S-Band 섹션 -->
-          <div class="col-12 col-md-6">
-            <q-card class="s-band-section">
-              <q-card-section>
-                <div class="text-h6 text-primary">S-Band</div>
-                <div class="row q-col-gutter-md q-mt-sm">
-                  <!-- S-Band LHCP -->
-                  <div class="col-12 col-sm-4">
-                    <q-toggle
-                      v-model="feedControls.sLHCP"
-                      label="LHCP"
-                      color="primary"
-                      :disable="isLoading"
-                    />
-                  </div>
-                  <!-- S-Band RHCP -->
-                  <div class="col-12 col-sm-4">
-                    <q-toggle
-                      v-model="feedControls.sRHCP"
-                      label="RHCP"
-                      color="primary"
-                      :disable="isLoading"
-                    />
-                  </div>
-                  <!-- S-RF Switch -->
-                  <div class="col-12 col-sm-4">
-                    <q-toggle
-                      v-model="feedControls.sRFSwitch"
-                      label="RF Switch"
-                      color="primary"
-                      :disable="isLoading"
-                    />
-                  </div>
+    <div class="feed-container">
+      <div class="row q-col-gutter-md">
+        <!-- S-Band 섹션 -->
+        <div class="col-12 col-md-6">
+          <q-card class="control-section">
+            <q-card-section>
+              <div class="text-h6 text-primary">S-Band</div>
+              <div class="row q-col-gutter-md q-mt-sm">
+                <!-- S-Band LHCP -->
+                <div class="col-12 col-sm-4">
+                  <q-toggle
+                    v-model="feedControls.sLHCP"
+                    label="LHCP"
+                    color="primary"
+                    :disable="isLoading"
+                  />
                 </div>
-              </q-card-section>
-            </q-card>
-          </div>
-
-          <!-- X-Band 섹션 -->
-          <div class="col-12 col-md-6">
-            <q-card class="x-band-section">
-              <q-card-section>
-                <div class="text-h6 text-primary">X-Band</div>
-                <div class="row q-col-gutter-md q-mt-sm">
-                  <!-- X-Band LHCP -->
-                  <div class="col-12 col-sm-6">
-                    <q-toggle
-                      v-model="feedControls.xLHCP"
-                      label="LHCP"
-                      color="primary"
-                      :disable="isLoading"
-                    />
-                  </div>
-                  <!-- X-Band RHCP -->
-                  <div class="col-12 col-sm-6">
-                    <q-toggle
-                      v-model="feedControls.xRHCP"
-                      label="RHCP"
-                      color="primary"
-                      :disable="isLoading"
-                    />
-                  </div>
+                <!-- S-Band RHCP -->
+                <div class="col-12 col-sm-4">
+                  <q-toggle
+                    v-model="feedControls.sRHCP"
+                    label="RHCP"
+                    color="primary"
+                    :disable="isLoading"
+                  />
                 </div>
-              </q-card-section>
-            </q-card>
-          </div>
-
-          <!-- FAN 섹션 -->
-          <div class="col-12">
-            <q-card class="fan-section">
-              <q-card-section>
-                <div class="row items-center">
-                  <div class="text-h6 text-primary">Fan Control</div>
-                  <q-space />
-                  <q-toggle v-model="feedControls.fan" color="primary" :disable="isLoading" />
+                <!-- S-RF Switch -->
+                <div class="col-12 col-sm-4">
+                  <q-toggle
+                    v-model="feedControls.sRFSwitch"
+                    label="RF Switch"
+                    color="primary"
+                    :disable="isLoading"
+                  />
                 </div>
-              </q-card-section>
-            </q-card>
-          </div>
+              </div>
+            </q-card-section>
+          </q-card>
         </div>
 
-        <!-- 제어 버튼 -->
-        <div class="row justify-center q-mt-md">
-          <q-btn
-            label="Apply"
-            color="primary"
-            icon="send"
-            :loading="isLoading"
-            @click="applyFeedControls"
-          />
+        <!-- X-Band 섹션 -->
+        <div class="col-12 col-md-6">
+          <q-card class="control-section">
+            <q-card-section>
+              <div class="text-h6 text-primary">X-Band</div>
+              <div class="row q-col-gutter-md q-mt-sm">
+                <!-- X-Band LHCP -->
+                <div class="col-12 col-sm-6">
+                  <q-toggle
+                    v-model="feedControls.xLHCP"
+                    label="LHCP"
+                    color="primary"
+                    :disable="isLoading"
+                  />
+                </div>
+                <!-- X-Band RHCP -->
+                <div class="col-12 col-sm-6">
+                  <q-toggle
+                    v-model="feedControls.xRHCP"
+                    label="RHCP"
+                    color="primary"
+                    :disable="isLoading"
+                  />
+                </div>
+              </div>
+            </q-card-section>
+          </q-card>
         </div>
 
-        <!-- 상태 메시지 표시 -->
-        <div class="status-message q-mt-md" v-if="showStatusMessage">
-          <q-banner :class="statusSuccess ? 'bg-positive text-white' : 'bg-negative text-white'">
-            {{ statusMessage }}
-          </q-banner>
+        <!-- FAN 섹션 -->
+        <div class="col-12">
+          <q-card class="control-section">
+            <q-card-section>
+              <div class="row items-center">
+                <div class="text-h6 text-primary">Fan Control</div>
+                <q-space />
+                <q-toggle v-model="feedControls.fan" color="primary" :disable="isLoading" />
+              </div>
+            </q-card-section>
+          </q-card>
         </div>
-      </q-card-section>
-    </q-card>
-  </q-page>
+      </div>
+
+      <!-- 제어 버튼 -->
+      <div class="row justify-center q-mt-md">
+        <q-btn
+          label="Apply"
+          color="primary"
+          icon="send"
+          :loading="isLoading"
+          @click="applyFeedControls"
+        />
+      </div>
+
+      <!-- 상태 메시지 표시 -->
+      <div class="status-message q-mt-md" v-if="showStatusMessage">
+        <q-banner :class="statusSuccess ? 'bg-positive text-white' : 'bg-negative text-white'">
+          {{ statusMessage }}
+        </q-banner>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -191,7 +186,12 @@ const applyFeedControls = async () => {
 </script>
 
 <style scoped>
-.dashboard-container {
+.feed-mode {
+  height: 100%;
+}
+
+.feed-container {
+  padding: 1rem;
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -201,15 +201,12 @@ const applyFeedControls = async () => {
   padding-left: 0.5rem;
 }
 
+.control-section {
+  height: 100%;
+}
+
 /* 상태 메시지 스타일 */
 .status-message {
   transition: opacity 0.3s;
-}
-
-/* 카드 스타일 */
-.s-band-section,
-.x-band-section,
-.fan-section {
-  height: 100%;
 }
 </style>
