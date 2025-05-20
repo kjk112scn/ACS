@@ -92,47 +92,67 @@
 
     <!-- TLE 입력 모달 -->
     <q-dialog v-model="showTLEModal" persistent>
-      <q-card style="width: 600px; max-width: 90vw">
+      <q-card class="q-pa-md" style="width: 700px; max-width: 95vw">
         <q-card-section class="bg-primary text-white">
           <div class="text-h6">TLE 입력</div>
         </q-card-section>
 
         <q-card-section class="q-pa-md">
-          <div class="text-caption q-mb-sm">
-            2줄 또는 3줄 형식의 TLE 데이터를 입력하세요. 3줄 형식인 경우 첫 번째 줄은 위성 이름으로
-            처리됩니다.
+          <div class="text-body2 q-mb-md">
+            2줄 또는 3줄 형식의 TLE 데이터를 입력하세요. 3줄 형식인 경우 첫 번째 줄은 위성 이름으로 처리됩니다.
+            <br>예시:
+            <pre class="q-mt-sm q-pa-sm bg-grey-9 text-white rounded-borders" style="font-size: 0.8rem; white-space: pre-wrap;">ISS (ZARYA)
+1 25544U 98067A   24054.51736111  .00020125  00000+0  36182-3 0  9999
+2 25544  51.6416 142.1133 0003324 324.9821 218.2594 15.49780383446574</pre>
           </div>
-          <q-editor
-            v-model="tempTLEData.line1"
-            min-height="200px"
-            class="tle-editor"
-            :toolbar="[]"
-            :definitions="{
-              bold: undefined,
-              italic: undefined,
-              strike: undefined,
-              underline: undefined,
-            }"
-            content-class="tle-content"
-            placeholder="여기에 TLE 데이터를 입력하세요..."
-          />
+          <div class="tle-input-container q-mb-md">
+            <q-input
+              v-model="tempTLEData.line1"
+              type="textarea"
+              filled
+              autogrow
+              class="tle-textarea full-width"
+              style="min-height: 200px; font-family: monospace; font-size: 0.9rem;"
+              placeholder="TLE 데이터를 여기에 붙여넣으세요..."
+              :input-style="'white-space: pre;'"
+              spellcheck="false"
+              autofocus
+              :error="tleError !== null"
+              :error-message="tleError || undefined"
+              @keydown.ctrl.enter="addTLEData"
+            />
+          </div>
         </q-card-section>
 
-        <q-card-actions align="right">
-          <q-btn flat label="추가" color="primary" @click="addTLEData" />
-          <q-btn flat label="닫기" color="primary" v-close-popup class="q-ml-sm" />
+        <q-card-actions align="right" class="q-px-md q-pb-md">
+          <q-btn 
+            flat 
+            label="추가" 
+            color="primary" 
+            @click="addTLEData" 
+            :loading="isProcessingTLE"
+            :disable="!tempTLEData.line1.trim()"
+          />
+          <q-btn 
+            flat 
+            label="닫기" 
+            color="primary" 
+            v-close-popup 
+            class="q-ml-sm" 
+            :disable="isProcessingTLE"
+          />
         </q-card-actions>
       </q-card>
     </q-dialog>
 
     <!-- 스케줄 선택 모달 -->
-    <q-dialog v-model="showScheduleModal" persistent>
-      <q-card style="width: 900px; max-width: 95vw; max-height: 90vh">
+    <q-dialog v-model="showScheduleModal" persistent maximized>
+      <q-card class="q-pa-md" style="width: 1200px; max-width: 98vw; max-height: 70vh">
         <q-card-section class="bg-primary text-white">
           <div class="text-h6">Select Schedule</div>
         </q-card-section>
 
-        <q-card-section class="q-pa-md" style="max-height: 70vh; overflow: auto">
+        <q-card-section class="q-pa-md" style="max-height: 50vh; overflow: auto">
           <q-table
             :rows="scheduleData"
             :columns="scheduleColumns"
@@ -141,7 +161,10 @@
             :pagination="{ rowsPerPage: 10 }"
             selection="single"
             v-model:selected="selectedSchedule"
-            class="schedule-table"
+            class="bg-grey-9 text-white"
+            dark
+            flat
+            bordered
           >
             <template v-slot:loading>
               <q-inner-loading showing color="primary">
@@ -171,7 +194,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { api } from 'boot/axios'
 import { date } from 'quasar'
 import type { QTableProps } from 'quasar' // QTableProps 타입 임포트
-import { useICDStore } from '../../stores/ICD'
+import { useICDStore } from '../../stores/API/icdStore'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 
@@ -196,16 +219,17 @@ const icdStore = useICDStore()
 
 // TLE 데이터 인터페이스 정의
 interface TLEData {
-  tleLine1: string
-  tleLine2: string
-  satelliteName: string | null
+  displayText: string
+  tleLine1: string | undefined
+  tleLine2: string | undefined
+  satelliteName: string | null | undefined
 }
 
 // EphemerisTrackStore 임시 구현 (실제로는 별도 파일로 분리해야 함)
 const ephemerisTrackStore = {
   async fetchEphemerisMasterData() {
     try {
-      const response = await api.get('/ephemeris/master')
+      const response = await api.get('/satellite/ephemeris/master')
       return response.data || []
     } catch (error) {
       console.error('마스터 데이터 조회 실패:', error)
@@ -215,7 +239,7 @@ const ephemerisTrackStore = {
 
   async fetchEphemerisDetailData(mstId: number): Promise<ScheduleDetailItem[]> {
     try {
-      const response = await api.get(`/ephemeris/detail/${mstId}`)
+      const response = await api.get<ScheduleDetailItem[]>(`/satellite/ephemeris/detail/${mstId}`)
       return response.data || []
     } catch (error) {
       console.error('세부 데이터 조회 실패:', error)
@@ -224,7 +248,21 @@ const ephemerisTrackStore = {
   },
 
   parseTLEData(tleText: string) {
-    const lines = tleText.split('\n').filter((line) => line.trim() !== '')
+    // 디버깅 로그 추가
+    console.log('입력된 TLE 텍스트:', tleText)
+    console.log('텍스트 길이:', tleText.length)
+    
+    // 줄바꿈 문자 정규화
+    const normalizedText = tleText
+      .replace(/\r\n/g, '\n')  // Windows 줄바꿈을 \n으로 통일
+      .replace(/\r/g, '\n')    // Mac 이전 버전 줄바꿈 처리
+    
+    // 줄바꿈 문자로 분리하고 빈 줄 제거
+    const lines = normalizedText.split('\n').filter((line) => line.trim() !== '')
+    
+    // 디버깅 로그 추가
+    console.log('정규화 후 분리된 라인 수:', lines.length)
+    console.log('정규화 후 분리된 라인:', lines)
 
     if (lines.length < 2) {
       throw new Error('유효하지 않은 TLE 형식: 최소 2줄이 필요합니다')
@@ -255,13 +293,14 @@ const ephemerisTrackStore = {
 
   async generateEphemerisTrack(request: TLEData) {
     try {
-      console.error(
-        '위성 궤도 추적 데이터 생성 ',
+      console.log(
+        '위성 궤도 추적 데이터 생성 요청:',
         request.satelliteName,
         request.tleLine1,
         request.tleLine2,
       )
-      const response = await api.post('/ephemeris/generate', request)
+      // API_ENDPOINTS.EPHEMERIS.GENERATE 경로 사용
+      const response = await api.post('/satellite/ephemeris/generate', request)
       return response.data
     } catch (error) {
       console.error('위성 궤도 추적 데이터 생성 실패:', error)
@@ -281,7 +320,6 @@ interface ScheduleItem {
   MaxElevation: number
   CreationDate: string
   Creator: string
-  // any 대신 구체적인 타입 유니온 사용
   [key: string]: string | number | boolean | null | undefined
 }
 
@@ -289,7 +327,6 @@ interface ScheduleDetailItem {
   Time: string
   Azimuth: number
   Elevation: number
-  // any 대신 구체적인 타입 유니온 사용
   [key: string]: string | number | boolean | null | undefined
 }
 
@@ -298,9 +335,12 @@ const chartRef = ref<HTMLElement | null>(null)
 let chart: ECharts | null = null
 let updateTimer: number | null = null
 
-// TLE 데이터
-const tleData = ref({
-  displayText: '',
+// TLE 데이터 상태
+const tleData = ref<TLEData>({
+  displayText: 'No TLE data available',
+  tleLine1: undefined,
+  tleLine2: undefined,
+  satelliteName: undefined
 })
 
 // Ephemeris Designation 모드 데이터
@@ -640,10 +680,16 @@ const selectSchedule = async () => {
   }
 }
 
+// TLE 관련 상태
+const tleError = ref<string | null>(null)
+const isProcessingTLE = ref(false)
+
 // TLE 모달 열기
 const openTLEModal = () => {
   showTLEModal.value = true
-  tempTLEData.value.line1 = ''
+  // 이전 입력값을 유지하기 위해 초기화하지 않음
+  // tempTLEData.value = { line1: '' }
+  tleError.value = null
 }
 
 // TLE 데이터 형식화 함수
@@ -663,34 +709,59 @@ const formatTLEDisplay = (tleText: string): string => {
 
 // TLE 데이터 추가 함수
 const addTLEData = async () => {
-  const inputText = tempTLEData.value.line1.trim()
-
-  // 입력된 텍스트가 있는 경우에만 처리
-  if (inputText) {
-    try {
-      // displayText에 입력된 TLE 데이터를 직접 설정
-      tleData.value.displayText = formatTLEDisplay(inputText)
-
-      // TLE 데이터 파싱
-      const parsedTLE = ephemerisTrackStore.parseTLEData(inputText)
-
-      // 백엔드에 TLE 데이터 전송하여 궤도
-      // 백엔드에 TLE 데이터 전송하여 궤도 추적 데이터 생성
-      await ephemerisTrackStore.generateEphemerisTrack(parsedTLE)
-
-      // 모달 닫기
-      showTLEModal.value = false
-
-      // 스케줄 데이터 다시 로드
-      await loadScheduleData()
-
-      // 바로 계산 실행
-      await calculateTLE()
-    } catch (error) {
-      console.error('TLE 데이터 처리 중 오류 발생:', error)
+  if (!tempTLEData.value?.line1?.trim()) {
+    tleError.value = 'TLE 데이터를 입력해주세요.'
+    return
+  }
+  
+  isProcessingTLE.value = true
+  tleError.value = null
+  
+  try {
+    const inputText = tempTLEData.value.line1.trim()
+    console.log('Processing TLE data:', inputText)
+    
+    // TLE 데이터 파싱
+    const parsedTLE = ephemerisTrackStore.parseTLEData(inputText)
+    console.log('Parsed TLE data:', parsedTLE)
+    
+    // 유효성 검증
+    if (!parsedTLE.tleLine1 || !parsedTLE.tleLine2) {
+      throw new Error('유효하지 않은 TLE 형식입니다. 2줄 또는 3줄 형식의 TLE 데이터를 입력해주세요.')
     }
-  } else {
-    console.error('TLE 데이터가 비어 있습니다')
+    
+    // TLE 데이터 포맷팅 및 저장
+    tleData.value = {
+      displayText: formatTLEDisplay(inputText),
+      tleLine1: parsedTLE.tleLine1,
+      tleLine2: parsedTLE.tleLine2,
+      satelliteName: parsedTLE.satelliteName || 'Unknown Satellite'
+    }
+    
+    // 백엔드에 TLE 데이터 전송하여 궤도 추적 데이터 생성
+    await ephemerisTrackStore.generateEphemerisTrack({
+      displayText: formatTLEDisplay(inputText),
+      ...parsedTLE
+    })
+    
+    // 스케줄 데이터 다시 로드
+    await loadScheduleData()
+    
+    // 궤도 계산 실행
+    await calculateTLE()
+    
+    // 성공 시 모달 닫기
+    showTLEModal.value = false
+    
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'TLE 데이터 처리 중 오류가 발생했습니다.'
+    console.error('TLE 데이터 처리 오류:', error)
+    tleError.value = errorMessage
+    
+    // 오류 발생 시 사용자에게 알림
+    // 여기에 알림 컴포넌트나 대화상자를 표시할 수 있습니다.
+  } finally {
+    isProcessingTLE.value = false
   }
 }
 
@@ -737,7 +808,7 @@ const calculateTLE = async () => {
     }
 
     // TLE 계산 API 호출
-    const response = await api.post('/tle/calculate', {
+    const response = await api.post('/satellite/tle/calculate', {
       line1: line1,
       line2: line2,
       satelliteName: satelliteName, // 위성 이름이 있는 경우 전송
@@ -998,30 +1069,24 @@ onUnmounted(() => {
 
 /* 스케줄 테이블 스타일 */
 .schedule-table .q-table__top,
-.schedule-table .q-table__bottom,
-.schedule-table thead tr {
-  background-color: var(--q-dark-page);
+/* 테이블 스타일 */
+.schedule-table {
+  /* Quasar의 dark 테마와 통합 */
 }
 
-.schedule-table th {
-  font-weight: bold;
-  color: var(--q-primary);
+/* TLE 에디터 스타일 */
+.q-editor.bg-grey-9 {
+  border: 1px solid var(--q-dark);
+  border-radius: 4px;
 }
 
-.schedule-table tbody tr:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.schedule-table .q-table__grid-content {
-  background-color: var(--q-dark);
-}
-
-.schedule-table .q-table__card {
-  background-color: var(--q-dark);
+/* 다크 모드에서의 입력 필드 스타일 */
+.q-field--dark .q-field__control {
   color: white;
 }
 
-.schedule-table .q-table__selected {
-  background-color: rgba(var(--q-primary-rgb), 0.3) !important;
+/* 모달 내부 여백 조정 */
+.q-dialog__inner--minimized > div {
+  padding: 16px;
 }
 </style>

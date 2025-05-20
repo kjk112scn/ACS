@@ -1,4 +1,26 @@
 import { api } from 'boot/axios'
+import { API_ENDPOINTS } from '../config/apiEndpoints'
+
+export interface MessageData {
+  [key: string]: unknown
+  topic?: string
+  data?: string | Record<string, unknown> | MessageData
+  azimuthAngle?: number | string
+  elevationAngle?: number | string
+  tiltAngle?: number | string
+  azimuthSpeed?: number | string
+  elevationSpeed?: number | string
+  tiltSpeed?: number | string
+  modeStatusBits?: string
+  cmdAzimuthAngle?: number | string
+  cmdElevationAngle?: number | string
+  cmdTiltAngle?: number | string
+  cmdTime?: string
+  serverTime?: string
+  resultTimeOffsetCalTime?: string
+}
+
+type WebSocketMessageHandler = (message: MessageData) => void
 
 // 명령 상태를 위한 인터페이스 정의
 export interface CommandStatus {
@@ -41,14 +63,150 @@ export class CommandError extends Error {
   }
 }
 
+class WebSocketService {
+  private websocket: WebSocket | null = null
+  private messageHandler: WebSocketMessageHandler | null = null
+  private pingInterval: ReturnType<typeof setInterval> | null = null
+  private reconnectAttempts = 0
+  private maxReconnectAttempts = 5
+  private reconnectDelay = 3000
+
+  /**
+   * WebSocket 연결 설정
+   * @param url WebSocket 서버 URL
+   * @param onMessage 메시지 수신 핸들러
+   */
+  connect(url: string, onMessage: WebSocketMessageHandler): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        this.disconnect()
+        this.messageHandler = onMessage
+        
+        this.websocket = new WebSocket(url)
+
+        this.websocket.onopen = () => {
+          console.log('WebSocket 연결 성공')
+          this.reconnectAttempts = 0
+          this.setupPing()
+          resolve()
+        }
+
+        this.websocket.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data) as MessageData
+            this.messageHandler?.(message)
+          } catch (error) {
+            console.error('WebSocket 메시지 파싱 오류:', error)
+          }
+        }
+
+        this.websocket.onclose = () => {
+          console.log('WebSocket 연결 종료')
+          this.cleanup()
+          this.attemptReconnect()
+        }
+
+        this.websocket.onerror = (event) => {
+          const error = new Error(`WebSocket error: ${event.type}`)
+          console.error('WebSocket 오류:', error)
+          reject(error)
+        }
+      } catch (error) {
+        const wsError = error instanceof Error ? error : new Error(String(error))
+        console.error('WebSocket 연결 실패:', wsError)
+        reject(wsError)
+      }
+    })
+  }
+
+
+  /**
+   * WebSocket 연결 해제
+   */
+  disconnect(): void {
+    this.cleanup()
+    
+    if (this.websocket) {
+      this.websocket.close()
+      this.websocket = null
+    }
+  }
+
+  /**
+   * 재연결 시도
+   */
+  private attemptReconnect(): void {
+    if (this.reconnectAttempts < this.maxReconnectAttempts && this.messageHandler) {
+      this.reconnectAttempts++
+      console.log(`재연결 시도 중... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
+      
+      setTimeout(() => {
+        if (this.websocket?.url) {
+          this.connect(this.websocket.url, this.messageHandler!)
+            .catch((error: Error) => console.error('재연결 실패:', error))
+        }
+      }, this.reconnectDelay)
+    } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('최대 재연결 시도 횟수 초과')
+    }
+  }
+
+  /**
+   * 주기적인 핑 전송 설정
+   */
+  private setupPing(): void {
+    this.cleanupPing()
+    
+    this.pingInterval = setInterval(() => {
+      if (this.websocket?.readyState === WebSocket.OPEN) {
+        this.websocket.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }))
+      }
+    }, 30000) // 30초마다 핑 전송
+  }
+
+  /**
+   * 핑 인터벌 정리
+   */
+  private cleanupPing(): void {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval)
+      this.pingInterval = null
+    }
+  }
+
+  /**
+   * 리소스 정리
+   */
+  private cleanup(): void {
+    this.cleanupPing()
+  }
+}
+
 export const icdService = {
+  webSocketService: new WebSocketService(),
+  
+  /**
+   * WebSocket 연결 설정
+   * @param url WebSocket 서버 URL
+   * @param onMessage 메시지 수신 핸들러
+   */
+  async connectWebSocket(url: string, onMessage: WebSocketMessageHandler): Promise<void> {
+    return this.webSocketService.connect(url, onMessage)
+  },
+  
+  /**
+   * WebSocket 연결 해제
+   */
+  disconnectWebSocket(): void {
+    this.webSocketService.disconnect()
+  },
   /**
    * 비상 정지 명령 전송
    * @param commandType 'E' 또는 'S' 값
    */
   async sendEmergency(commandType: 'E' | 'S' = 'E') {
     try {
-      const response = await api.post('/icd/on-emergency-stop-command', null, {
+      const response = await api.post(API_ENDPOINTS.ICD.EMERGENCY_STOP, null, {
         params: {
           commandType
         }
@@ -75,7 +233,7 @@ export const icdService = {
     tiltSpeed: number,
   ) {
     try {
-      const response = await api.post('/sun-track/start-sun-track', null, {
+      const response = await api.post(API_ENDPOINTS.SUN_TRACK.START, null, {
         params: {
           interval,
           cmdAzimuthSpeed: azimuthSpeed,

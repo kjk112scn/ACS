@@ -224,7 +224,7 @@
 </template>
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useICDStore } from '../stores/ICD'
+import { useICDStore } from '../stores/API/icdStore'
 import { useRouter, useRoute } from 'vue-router'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'

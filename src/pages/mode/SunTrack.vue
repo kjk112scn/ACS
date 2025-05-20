@@ -283,7 +283,7 @@
 </template>
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { useICDStore } from '../../stores/ICD'
+import { useICDStore } from '../../stores/API/icdStore'
 
 // ICD 스토어 인스턴스 생성
 const icdStore = useICDStore()
@@ -425,9 +425,9 @@ const increment = async (index: number) => {
         // 백엔드 응답에 해당 값이 있다면 그 값을 사용
         // 예시: response.azimuthResult, response.elevationResult, response.tiltResult
         // 실제 백엔드 응답 구조에 맞게 수정 필요
-        outputs.value[0] = response.azimuthResult?.toFixed(2) || offsetCals.value[0]
-        outputs.value[1] = response.elevationResult?.toFixed(2) || offsetCals.value[1]
-        outputs.value[2] = response.tiltResult?.toFixed(2) || offsetCals.value[2]
+        outputs.value[0] = String(response.azimuthResult?.toFixed(2) || offsetCals.value[0] || '0.00')
+        outputs.value[1] = String(response.elevationResult?.toFixed(2) || offsetCals.value[1] || '0.00')
+        outputs.value[2] = String(response.tiltResult?.toFixed(2) || offsetCals.value[2] || '0.00')
       } else {
         // 응답이 없거나 예상 형식이 아닌 경우 입력값을 그대로 출력값으로 사용
         outputs.value[0] = offsetCals.value[0] || '0.00'
@@ -455,8 +455,8 @@ const increment = async (index: number) => {
       const response = await icdStore.sendTimeOffsetCommand(timeOffset)
 
       // 응답에서 출력값 업데이트
-      if (response && typeof response === 'object' && response.inputTimeoffset !== undefined) {
-        outputs.value[3] = response.inputTimeoffset.toFixed(2) || offsetCals.value[3]
+      if (response && typeof response === 'object' && typeof response.inputTimeoffset === 'number') {
+        outputs.value[3] = String(response.inputTimeoffset.toFixed(2) || offsetCals.value[3] || '0.00')
       } else {
         // 응답이 없거나 예상 형식이 아닌 경우 입력값을 그대로 출력값으로 사용
         outputs.value[3] = offsetCals.value[3] || '0.00'
@@ -495,9 +495,9 @@ const decrement = async (index: number) => {
         // 백엔드 응답에 해당 값이 있다면 그 값을 사용
         // 예시: response.azimuthResult, response.elevationResult, response.tiltResult
         // 실제 백엔드 응답 구조에 맞게 수정 필요
-        outputs.value[0] = response.azimuthResult?.toFixed(2) || offsetCals.value[0]
-        outputs.value[1] = response.elevationResult?.toFixed(2) || offsetCals.value[1]
-        outputs.value[2] = response.tiltResult?.toFixed(2) || offsetCals.value[2]
+        outputs.value[0] = String(response.azimuthResult?.toFixed(2) || offsetCals.value[0] || '0.00')
+        outputs.value[1] = String(response.elevationResult?.toFixed(2) || offsetCals.value[1] || '0.00')
+        outputs.value[2] = String(response.tiltResult?.toFixed(2) || offsetCals.value[2] || '0.00')
       } else {
         // 응답이 없거나 예상 형식이 아닌 경우 입력값을 그대로 출력값으로 사용
         outputs.value[0] = offsetCals.value[0] || '0.00'
@@ -525,8 +525,8 @@ const decrement = async (index: number) => {
       const response = await icdStore.sendTimeOffsetCommand(timeOffset)
 
       // 응답에서 출력값 업데이트
-      if (response && typeof response === 'object' && response.inputTimeoffset !== undefined) {
-        outputs.value[3] = response.inputTimeoffset.toFixed(2) || offsetCals.value[3]
+      if (response && typeof response === 'object' && typeof response.inputTimeoffset === 'number') {
+        outputs.value[3] = String(response.inputTimeoffset.toFixed(2) || offsetCals.value[3] || '0.00')
       } else {
         // 응답이 없거나 예상 형식이 아닌 경우 입력값을 그대로 출력값으로 사용
         outputs.value[3] = offsetCals.value[3] || '0.00'
@@ -552,17 +552,17 @@ const reset = async (index: number) => {
       const response = await icdStore.sendPositionOffsetCommand(0, elOffset, tiOffset)
       // azOffset 대신 azimuthResult 사용
       outputs.value[0] = response.azimuthResult?.toFixed(2) || '0.00'
-      offsetCals.value[0] = outputs.value[0] as string
+      offsetCals.value[0] = outputs.value[0]
     } else if (index === 1) {
       // 고도각 오프셋 초기화 - 다른 축은 현재 값 유지
       const response = await icdStore.sendPositionOffsetCommand(azOffset, 0, tiOffset)
       outputs.value[1] = response.elevationResult?.toFixed(2) || '0.00'
-      offsetCals.value[1] = outputs.value[1] as string
+      offsetCals.value[1] = outputs.value[1]
     } else if (index === 2) {
       // 틸트각 오프셋 초기화 - 다른 축은 현재 값 유지
       const response = await icdStore.sendPositionOffsetCommand(azOffset, elOffset, 0)
       outputs.value[2] = response.tiltResult?.toFixed(2) || '0.00'
-      offsetCals.value[2] = outputs.value[2] as string
+      offsetCals.value[2] = outputs.value[2]
     } else if (index === 3) {
       const response = await icdStore.sendTimeOffsetCommand(0)
       // 응답 객체와 속성이 존재하는지 확인 후 안전하게 처리

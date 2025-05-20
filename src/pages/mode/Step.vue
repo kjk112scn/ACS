@@ -183,7 +183,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useICDStore } from '../../stores/ICD'
+import { useICDStore } from '../../stores/API/icdStore'
 import { defineComponent } from 'vue'
 
 // 컴포넌트 이름 정의

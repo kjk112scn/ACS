@@ -208,7 +208,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { useICDStore } from '../../stores/ICD'
+import { useICDStore } from '../../stores/API/icdStore'
 import { useQuasar } from 'quasar'
 
 // 커맨드 파라미터 인터페이스 정의

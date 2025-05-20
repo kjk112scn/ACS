@@ -107,7 +107,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useICDStore } from '../../stores/ICD'
+import { useICDStore } from '../../stores/API/icdStore'
 import { useQuasar } from 'quasar'
 
 // Quasar 인스턴스 생성

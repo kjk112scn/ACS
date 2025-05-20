@@ -75,7 +75,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useQuasar } from 'quasar'
-import { useICDStore } from '../../../stores/ICD'
+import { useICDStore } from '../../../stores/API/icdStore'
 
 const $q = useQuasar()
 const icdStore = useICDStore() // ICD 스토어 사용
@@ -111,7 +111,11 @@ const confirmPreset = async () => {
     const tilt = presetToConfirm.value === 'tilt'
 
     // 서보 프리셋 명령 전송
-    const result = await icdStore.sendServoPresetCommand(azimuth, elevation, tilt)
+    // boolean을 number로 변환
+    const azimuthValue = azimuth ? 1 : 0
+    const elevationValue = elevation ? 1 : 0
+    const tiltValue = tilt ? 1 : 0
+    const result = await icdStore.sendServoPresetCommand(azimuthValue, elevationValue, tiltValue)
 
     if (result.success) {
       // 성공 알림
