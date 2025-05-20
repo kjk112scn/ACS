@@ -158,15 +158,21 @@ class UdpFwICDService(
     }
 
 
-    // Emergency Command 전송 함수
+    // Emergency Command 전송 함수 - 수정된 버전
     fun onEmergencyCommand(commandChar: Char) {
         var cmdOnOffValue = false
         try {
             if (commandChar == 'E') {
                 cmdOnOffValue = true
+                println("비상 모드 활성화됨")
             } else if (commandChar == 'S') {
                 cmdOnOffValue = false
+                println("비상 모드 비활성화됨")
+            } else {
+                println("유효하지 않은 명령 문자: $commandChar")
+                return
             }
+
             val setDataFrameInstance = ICDService.Emergency.SetDataFrame(
                 stx = 0x02,
                 cmdOne = 'E',
@@ -179,8 +185,12 @@ class UdpFwICDService(
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
             println("UDP Emergency 명령어 전송 (API): $firmwareIp:$firmwarePort")
             println("UDP Send Data (API - Emergency): ${byteArrayToHexString(dataToSend)}")
+
+            // 비상 상태 변경 이벤트 발행
+            //eventBus.publish(ACSEvent.EmergencyEvent(cmdOnOffValue))
         } catch (e: Exception) {
-            println("ICD 데이터 처리 오류 (Emergency): ${e.message}")
+            println("비상 명령 처리 오류: ${e.message}")
+            throw e  // 컨트롤러로 예외 전파
         }
     }
 
@@ -249,7 +259,7 @@ class UdpFwICDService(
     fun StowCommand() {
         // 이미 실행 중인 Stow Command가 있다면 취소
         stowCommandDisposable?.dispose()
-
+        stopAllCommand();
         // Stow 명령에 사용할 기본값 설정
         val stowTiltAngle = 0.0f  // 틸트 각도 0도
         val stowTiltSpeed = 5.0f  // 틸트 속도
@@ -456,7 +466,33 @@ class UdpFwICDService(
             println("ICD 데이터 처리 오류 (stopCommand): ${e.message}")
         }
     }
+    fun servoPresetCommand(bitStop: BitSet) {
+        try {
+            // 1. StowCommand가 실행 중이면 중단
+            if (stowCommandDisposable != null && !stowCommandDisposable!!.isDisposed) {
+                stowCommandDisposable!!.dispose()
+                stowCommandDisposable = null
+                // 필요하다면 로그 남기기
+                println("servoPresetCommand 중단됨: servoPresetCommand 명령 실행")
+            }
+            val setDataFrameInstance = ICDService.ServoEncoderPreset.SetDataFrame(
+                stx = 0x02,
+                cmdOne = 'P',
+                cmdTwo ='P',
+                axis = bitStop,
+                crc16 = 0u,
+                etx = 0x03
+            )
 
+            val dataToSend = setDataFrameInstance.setDataFrame()
+            val firmwareAddress = InetSocketAddress(firmwareIp, firmwarePort)
+            channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
+            println("UDP servoPresetCommand 명령어 전송 (API): $firmwareIp:$firmwarePort")
+            println("UDP Send Data (API - servoPresetCommand): ${byteArrayToHexString(dataToSend)}")
+        } catch (e: Exception) {
+            println("ICD 데이터 처리 오류 (servoPresetCommand): ${e.message}")
+        }
+    }
     /*
     Sun Track, Ephemeris Designation, Pass Schedule을 Stop 버튼을 선택 시 정지하기 위해 작성.
      */

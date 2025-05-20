@@ -95,7 +95,7 @@ class SunTrackService(
                 GlobalData.Time.calUtcTimeOffsetTime,
                 GlobalData.Location.latitude,
                 GlobalData.Location.longitude,
-                GlobalData.Location.altitude
+                GlobalData.Location.altitude,
             )
             val cmdTiltAngle = CMD.cmdTiltAngle
             val multiAxis = BitSet()

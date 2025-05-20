@@ -195,7 +195,7 @@ class ICDService {
                 else if (receiveData[1] == 'P'.code.toByte()) {
                     //2.15 Servo Encoder Preset
                     if (receiveData[2] == 'P'.code.toByte()) {
-
+                        val parsedData = ServoEncoderPreset.GetDataFrame.fromByteArray(receiveData)
                     }
                     //2.16 Servo Alarm Reset
                     else if (receiveData[2] == 'A'.code.toByte()) {
@@ -333,7 +333,7 @@ class ICDService {
                                 )
                             ),
                             checkSum = rxChecksum,
-                            etx = data[FRAME_LENGTH - 1]
+                            etx = data.last()
                         )
                     } else {
                         println("CRC 체크 실패 또는 ETX 불일치")
@@ -468,7 +468,7 @@ class ICDService {
                             cmdOne = data[1],
                             ack = data[2],
                             checkSum = rxChecksum,
-                            etx = data[FRAME_LENGTH - 1]
+                            etx = data.last()
                         )
                     } else {
                         println("CRC 체크 실패 또는 ETX 불일치")
@@ -554,7 +554,7 @@ class ICDService {
                             cmdOne = data[1],
                             ack = data[2],
                             checkSum = rxChecksum,
-                            etx = data[FRAME_LENGTH - 1]
+                            etx = data.last()
                         )
                     } else {
                         println("CRC 체크 실패 또는 ETX 불일치")
@@ -672,7 +672,7 @@ class ICDService {
                             elevationOffset = elevationOffset,
                             tiltOffset = tiltOffset,
                             checkSum = rxChecksum,
-                            etx = data[FRAME_LENGTH - 1]
+                            etx = data.last()
                         )
                     } else {
                         println("CRC 체크 실패 또는 ETX 불일치")
@@ -754,7 +754,7 @@ class ICDService {
                         frame.cmdOne = buffer.get()
                         frame.ack = buffer.get()
                         frame.checkSum = rxChecksum
-                        frame.etx = buffer.get()
+                        frame.etx = data.last()
                         return frame
                     } else {
                         println("CRC 체크 실패 또는 ETX 불일치")
@@ -833,7 +833,7 @@ class ICDService {
                         frame.stx = buffer.get()
                         frame.cmdOne = buffer.get()
                         frame.checkSum = rxChecksum
-                        frame.etx = buffer.get()
+                        frame.etx = data.last()
                         return frame
 
                     } else {
@@ -963,7 +963,7 @@ class ICDService {
                         frame.cmdOne = buffer.get()
                         frame.ack = buffer.get()
                         frame.checkSum = rxChecksum;
-                        frame.etx = buffer.get()
+                        frame.etx = data.last()
                         return frame
                     } else {
                         println("CRC 체크 실패 또는 ETX 불일치")
@@ -1287,11 +1287,97 @@ class ICDService {
                         frame.rtdOne = buffer.float
                         frame.rtdTwo = buffer.float
                         frame.checkSum = rxChecksum
-                        frame.etx = buffer.get()
+                        frame.etx = data.last()
                         //println(" az :${frame.azimuthAngle}, el : ${frame.elevationAngle}, ti : ${frame.tiltAngle}")
                         return frame
 
 
+                    } else {
+                        println("CRC 체크 실패 또는 ETX 불일치")
+                        return null
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 2.15 Servo Encoder Preset
+     * 서보 엔코더 프리셋 정보를 송신하기 위한 프로토콜
+     */
+    class ServoEncoderPreset {
+        data class SetDataFrame(
+            var stx: Byte = ICD_STX,
+            var cmdOne: Char,
+            var cmdTwo: Char,
+            var axis: BitSet,
+            var crc16: UShort = 0u,
+            var etx: Byte = ICD_ETX
+        ) {
+            fun setDataFrame(): ByteArray {
+                val dataFrame = ByteArray(7)
+                val byteCrc16Target = ByteArray(dataFrame.size - 4)
+
+                // BitSet을 바이트 배열로 변환
+                val byteAxis = axis.toByteArray()[0]
+
+                dataFrame[0] = ICD_STX
+                dataFrame[1] = cmdOne.code.toByte()
+                dataFrame[2] = cmdTwo.code.toByte()
+                dataFrame[3] = byteAxis
+
+                // CRC 대상 복사
+                dataFrame.copyInto(byteCrc16Target, 0, 1, 1 + byteCrc16Target.size)
+
+                // CRC16 계산 및 엔디안 변환
+                val crc16s = Crc16.computeCrc(byteCrc16Target)
+                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+                val crc16Check = crc16Buffer
+
+                // CRC16 값 설정
+                dataFrame[4] = crc16Check[0]
+                dataFrame[5] = crc16Check[1]
+                dataFrame[6] = ICD_ETX
+
+                return dataFrame
+            }
+        }
+
+        data class GetDataFrame(
+            var stx: Byte = ICD_STX,
+            var cmdOne: Byte = 0x00,
+            var cmdTwo: Byte = 0x00,
+            var axis: Byte = 0x00,
+            var ack: Byte = 0x00,
+            var checkSum: UShort = 0u,
+            var etx: Byte = ICD_ETX
+        ) {
+            companion object {
+                const val FRAME_LENGTH = 8
+
+                fun fromByteArray(data: ByteArray): GetDataFrame? {
+                    if (data.size < FRAME_LENGTH) {
+                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        return null
+                    }
+
+                    // CRC 체크섬 추출 (리틀 엔디안)
+                    val rxChecksum = ByteBuffer.wrap(byteArrayOf(data[FRAME_LENGTH - 3], data[FRAME_LENGTH - 2]))
+                        .short.toUShort()
+                    val crc16Target = data.copyOfRange(1, FRAME_LENGTH - 3)
+                    val crc16Check = Crc16.computeCrc(crc16Target).toUShort()
+
+                    // CRC 검증 및 ETX 확인
+                    if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
+                        return GetDataFrame(
+                            stx = data[0],
+                            cmdOne = data[1],
+                            cmdTwo = data[2],
+                            axis = data[3],
+                            ack = data[4],
+                            checkSum = rxChecksum,
+                            etx = data.last()
+                        )
                     } else {
                         println("CRC 체크 실패 또는 ETX 불일치")
                         return null

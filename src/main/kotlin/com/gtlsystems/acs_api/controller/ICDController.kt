@@ -1,6 +1,7 @@
 package com.gtlsystems.acs_api.controller
 
 import com.gtlsystems.acs_api.service.UdpFwICDService
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.CrossOrigin
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
@@ -14,13 +15,40 @@ import java.util.BitSet
 @CrossOrigin(origins = ["http://localhost:9000"]) // 프론트엔드 도메인 허용
 class ICDController(private val udpFwICDService: UdpFwICDService) {
 
-    // POST 요청 처리 (Emergency UDP 명령 전송)
-    @PostMapping("/on-emergency-stop-command")
-    fun onEmergencyStopCommand(@RequestParam commandChar: Char): Mono<String> {
+    @PostMapping("/servo-preset-command")
+    fun servoPresetCommand(
+        @RequestParam azimuth: Boolean = false,
+        @RequestParam elevation: Boolean = false,
+        @RequestParam tilt: Boolean = false
+    ): Mono<String> {
+        val bitAxis = BitSet()
+        if (azimuth) bitAxis.set(0)
+        if (elevation) bitAxis.set(1)
+        if (tilt) bitAxis.set(2)
+
+        val axesStr = listOfNotNull(
+            if (azimuth) "AZIMUTH" else null,
+            if (elevation) "ELEVATION" else null,
+            if (tilt) "TILT" else null
+        ).joinToString(",")
+
         return Mono.fromCallable {
-            udpFwICDService.onEmergencyCommand(commandChar)
-            "UDP 명령어 전송 요청 완료 (Command: $commandChar)"
-        }.thenReturn("Emergency UDP 명령어 전송 요청 완료 (Command: $commandChar)")
+            udpFwICDService.servoPresetCommand(bitAxis)
+            "UDP 명령어 전송 요청 완료 (Command: $axesStr)"
+        }.thenReturn("servoPresetCommand UDP 명령어 전송 요청 완료 (Command: $axesStr, $bitAxis)")
+    }
+    @PostMapping("/on-emergency-stop-command")
+    fun onEmergencyStopCommand(@RequestParam commandType: Char): ResponseEntity<Map<String, String>> {
+        // commandType이 'E' 또는 'S'인지 검증
+        if (commandType != 'E' && commandType != 'S') {
+            return ResponseEntity.badRequest().body(mapOf("error" to "명령 타입은 'E' 또는 'S'여야 합니다"))
+        }
+
+        // 서비스 메소드 호출
+        udpFwICDService.onEmergencyCommand(commandType)
+
+        val status = if (commandType == 'E') "활성화" else "비활성화"
+        return ResponseEntity.ok(mapOf("message" to "비상 명령이 성공적으로 $status 되었습니다"))
     }
 
     @PostMapping("/time-offset-command")
