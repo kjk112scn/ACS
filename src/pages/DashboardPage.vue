@@ -113,14 +113,45 @@
                 <div class="emergency-content">
                   <q-btn
                     class="full-width"
-                    color="negative"
-                    label="Emergency Stop"
-                    @click="icdStore.sendEmergency"
+                    :color="emergencyActive ? 'grey-8' : 'negative'"
+                    :label="emergencyActive ? 'Emergency Active' : 'Emergency Stop'"
+                    @click="handleEmergencyClick"
                     size="lg"
                   />
                 </div>
               </q-card-section>
             </q-card>
+
+            <!-- Emergency 해제 모달 -->
+            <q-dialog v-model="emergencyModal">
+              <q-card style="min-width: 350px">
+                <q-card-section class="row items-center">
+                  <div class="text-h6">비상 정지 해제</div>
+                  <q-space />
+                  <q-btn icon="close" flat round dense v-close-popup />
+                </q-card-section>
+
+                <q-card-section>
+                  <p>이 버튼을 선택하기 전 확인 후 해제 버튼을 선택해주세요.</p>
+                </q-card-section>
+
+                <q-card-actions align="right">
+                  <q-btn flat label="닫기" color="grey-7" v-close-popup />
+                  <q-btn
+                    flat
+                    label="해제"
+                    color="primary"
+                    @click="
+                      () => {
+                        releaseEmergency()
+                        emergencyModal = false
+                      }
+                    "
+                    v-close-popup
+                  />
+                </q-card-actions>
+              </q-card>
+            </q-dialog>
 
             <!-- Control 카드 -->
             <q-card class="control-card">
@@ -290,7 +321,7 @@ onMounted(() => {
       // 차트 업데이트 타이머 설정
       chartUpdateTimer = window.setInterval(() => {
         updateCharts()
-      }, 100)
+      }, 25)
     } catch (error) {
       console.error('차트 초기화 중 오류 발생:', error)
     }
@@ -362,13 +393,6 @@ watch(
 
 // 다른 값들도 감시
 watch(
-  () => icdStore.azimuthAngle,
-  (newValue) => {
-    console.log('DashboardPage에서 감지된 azimuthAngle 변경:', newValue)
-  },
-)
-
-watch(
   () => icdStore.elevationAngle,
   (newValue) => {
     console.log('DashboardPage에서 감지된 elevationAngle 변경:', newValue)
@@ -397,14 +421,18 @@ const updateCharts = () => {
   // 1. Azimuth 차트 업데이트
   if (azimuthChart) {
     try {
-      const azimuth = Number(icdStore.azimuthAngle)
-      const normalizedAzimuth = azimuth < 0 ? azimuth + 360 : azimuth
-      const azRadius = 0 // 고정된 반지름 값
+      const azimuth = parseFloat(icdStore.azimuthAngle || '0')
+      const normalizedAzimuth = azimuth < 0 ? azimuth + 360 : azimuth % 360
 
       azimuthChart.setOption({
         series: [
           {
-            data: [[normalizedAzimuth, azRadius]],
+            data: [[1, normalizedAzimuth]],
+            label: {
+              formatter: function () {
+                return `${azimuth.toFixed(2)}°`
+              },
+            },
           },
         ],
       })
@@ -413,18 +441,21 @@ const updateCharts = () => {
     }
   }
 
-  // 2. Elevation 차트 업데이트 - 완전히 독립적으로
+  // 2. Elevation 차트 업데이트
   if (elevationChart) {
     try {
-      const elevation = Number(icdStore.elevationAngle)
-      // 고도각을 0~180 범위로 제한
-      const normalizedElevation = Math.max(0, Math.min(180, elevation))
-      const elevationRadius = 0 // 고정된 반지름 값
+      const elevation = parseFloat(icdStore.elevationAngle || '0')
+      const normalizedElevation = elevation < 0 ? elevation + 360 : elevation % 360
 
       elevationChart.setOption({
         series: [
           {
-            data: [[normalizedElevation, elevationRadius]],
+            data: [[0, normalizedElevation]],
+            label: {
+              formatter: function () {
+                return `${elevation.toFixed(2)}°`
+              },
+            },
           },
         ],
       })
@@ -433,17 +464,21 @@ const updateCharts = () => {
     }
   }
 
-  // 3. Tilt 차트 업데이트 - 완전히 독립적으로
+  // 3. Tilt 차트 업데이트
   if (tiltChart) {
     try {
-      const tilt = Number(icdStore.tiltAngle)
-      const normalizedTilt = tilt < 0 ? tilt + 360 : tilt
-      const tiltRadius = 0 // 고정된 반지름 값
+      const tilt = parseFloat(icdStore.tiltAngle || '0')
+      const normalizedTilt = tilt < 0 ? tilt + 360 : tilt % 360
 
       tiltChart.setOption({
         series: [
           {
-            data: [[normalizedTilt, tiltRadius]],
+            data: [[1, normalizedTilt]],
+            label: {
+              formatter: function () {
+                return `${tilt.toFixed(2)}°`
+              },
+            },
           },
         ],
       })
@@ -486,13 +521,17 @@ const initCharts = () => {
     // 새 차트 인스턴스 생성
     azimuthChart = echarts.init(azimuthChartRef.value)
 
+    // 현재 Actual 값으로 초기 데이터 설정
+    const initialAzimuth = parseFloat(icdStore.azimuthAngle || '0')
+    console.log('Initial Azimuth value:', initialAzimuth)
+
     // Azimuth 차트만의 옵션 설정
     const azimuthOption = {
       backgroundColor: 'transparent',
       grid: { containLabel: true },
       polar: {
-        radius: ['0%', '80%'], // 차트 크기 조정
-        center: ['50%', '50%'], // 중심점을 약간 아래로 이동
+        radius: ['0%', '80%'],
+        center: ['50%', '50%'],
       },
       angleAxis: {
         type: 'value',
@@ -538,8 +577,8 @@ const initCharts = () => {
       radiusAxis: {
         type: 'value',
         min: 0,
-        max: 0,
-        inverse: true,
+        max: 1,
+        inverse: false,
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: { show: false },
@@ -556,32 +595,29 @@ const initCharts = () => {
           symbol: 'circle',
           symbolSize: 12,
           itemStyle: { color: '#ff5722' },
-          data: [[0, 0]],
+          data: [[1, initialAzimuth]], // [radius, angle] 형식으로 변경
           zlevel: 2,
           label: {
             show: true,
             formatter: function (params: EChartsScatterParam) {
               if (Array.isArray(params.value) && params.value.length > 0) {
-                const val = params.value[0]
-                if (typeof val === 'number' || (typeof val === 'string' && !isNaN(Number(val)))) {
-                  return `${Number(val).toFixed(2)}°`
-                }
+                const val = params.value[1] // angle은 두 번째 값
+                return `${Number(val).toFixed(2)}°`
               }
               return '0.00°'
             },
             position: 'top',
-            distance: -40,
+            distance: 0,
             color: '#ff5722',
             fontSize: 15,
             padding: [4, 8],
             backgroundColor: 'rgba(0,0,0,0.5)',
             borderRadius: 4,
+            align: 'center',
           },
         },
       ],
-      animation: true,
-      animationDuration: 200,
-      animationEasing: 'cubicOut',
+      animation: false,
     }
 
     // 옵션 적용
@@ -602,14 +638,17 @@ const initCharts = () => {
 
     // 새 차트 인스턴스 생성
     elevationChart = echarts.init(elevationChartRef.value)
-
+    // 초기 tilt 값 가져오기
+    const initialElevation = parseFloat(icdStore.elevationAngle || '0')
+    const normalizedInitialElevation =
+      initialElevation < 0 ? initialElevation + 360 : initialElevation % 360
     // Elevation 차트만의 옵션 설정
     const elevationOption = {
       backgroundColor: 'transparent',
       grid: { containLabel: true },
       polar: {
-        radius: ['0%', '80%'], // Elevation 차트 크기
-        center: ['50%', '50%'], // 중심점을 아래로 이동하여 상단 공간 확보
+        radius: ['0%', '80%'],
+        center: ['50%', '50%'],
       },
       angleAxis: {
         type: 'value',
@@ -640,7 +679,7 @@ const initCharts = () => {
           rich: {
             upLabel: {
               align: 'center',
-              padding: [0, 0, 10, 0], // 상단으로 25px 이동
+              padding: [0, 0, 10, 0],
               verticalAlign: 'bottom',
             },
           },
@@ -654,7 +693,7 @@ const initCharts = () => {
       radiusAxis: {
         type: 'value',
         min: 0,
-        max: 0,
+        max: 1,
         inverse: true,
         axisLine: { show: false },
         axisTick: { show: false },
@@ -672,21 +711,15 @@ const initCharts = () => {
           symbol: 'circle',
           symbolSize: 12,
           itemStyle: { color: '#2196f3' },
-          data: [[90, 0]],
+          data: [[0, normalizedInitialElevation]],
           zlevel: 2,
           label: {
             show: true,
-            formatter: function (params: EChartsScatterParam) {
-              if (Array.isArray(params.value) && params.value.length > 0) {
-                const val = params.value[0]
-                if (typeof val === 'number' || (typeof val === 'string' && !isNaN(Number(val)))) {
-                  return `${Number(val).toFixed(2)}°`
-                }
-              }
-              return '0.00°'
+            formatter: function () {
+              return `${initialElevation.toFixed(2)}°`
             },
             position: 'top',
-            distance: 5,
+            distance: 0,
             color: '#2196f3',
             fontSize: 15,
             padding: [4, 8],
@@ -695,9 +728,7 @@ const initCharts = () => {
           },
         },
       ],
-      animation: true,
-      animationDuration: 200,
-      animationEasing: 'cubicOut',
+      animation: false,
     }
 
     // 옵션 적용
@@ -707,19 +738,17 @@ const initCharts = () => {
     console.error('Elevation 차트 DOM 요소가 없음')
   }
 
-  // 3. Tilt 차트 초기화 - 완전히 독립적으로
+  // 3. Tilt 차트 초기화
   if (tiltChartRef.value) {
-    console.log('Tilt 차트 DOM 요소 존재함')
-
-    // 기존 차트가 있으면 제거
     if (tiltChart) {
       tiltChart.dispose()
     }
-
-    // 새 차트 인스턴스 생성
     tiltChart = echarts.init(tiltChartRef.value)
 
-    // Tilt 차트만의 옵션 설정
+    // 초기 tilt 값 가져오기
+    const initialTilt = parseFloat(icdStore.tiltAngle || '0')
+    const normalizedInitialTilt = initialTilt < 0 ? initialTilt + 360 : initialTilt % 360
+
     const tiltOption = {
       backgroundColor: 'transparent',
       grid: { containLabel: true },
@@ -770,8 +799,8 @@ const initCharts = () => {
       radiusAxis: {
         type: 'value',
         min: 0,
-        max: 0,
-        inverse: true,
+        max: 1,
+        inverse: false,
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: { show: false },
@@ -788,21 +817,15 @@ const initCharts = () => {
           symbol: 'circle',
           symbolSize: 12,
           itemStyle: { color: '#4caf50' },
-          data: [[0, 0]],
+          data: [[1, normalizedInitialTilt]], // 초기값을 현재 tilt 값으로 설정
           zlevel: 2,
           label: {
             show: true,
-            formatter: function (params: EChartsScatterParam) {
-              if (Array.isArray(params.value) && params.value.length > 0) {
-                const val = params.value[0]
-                if (typeof val === 'number' || (typeof val === 'string' && !isNaN(Number(val)))) {
-                  return `${Number(val).toFixed(2)}°`
-                }
-              }
-              return '0.00°'
+            formatter: function () {
+              return `${initialTilt.toFixed(2)}°`
             },
             position: 'top',
-            distance: -40,
+            distance: 0,
             color: '#4caf50',
             fontSize: 15,
             padding: [4, 8],
@@ -811,16 +834,10 @@ const initCharts = () => {
           },
         },
       ],
-      animation: true,
-      animationDuration: 200,
-      animationEasing: 'cubicOut',
+      animation: false,
     }
 
-    // 옵션 적용
     tiltChart.setOption(tiltOption)
-    console.log('Tilt 차트 초기화 완료')
-  } else {
-    console.error('Tilt 차트 DOM 요소가 없음')
   }
 
   // 모든 차트 초기화 후 명시적으로 리사이즈 호출
@@ -829,6 +846,41 @@ const initCharts = () => {
     if (elevationChart) elevationChart.resize()
     if (tiltChart) tiltChart.resize()
   }, 0)
+}
+
+// Emergency 상태 관리
+const emergencyActive = ref(false)
+const emergencyModal = ref(false)
+
+// Emergency 버튼 클릭 핸들러
+const handleEmergencyClick = async () => {
+  if (!emergencyActive.value) {
+    // 비상 정지 활성화 ('E' 명령 전송)
+    try {
+      await icdStore.sendEmergency('E')
+      emergencyActive.value = true
+      console.log('Emergency Stop 활성화됨')
+    } catch (error) {
+      console.error('Emergency Stop 활성화 실패:', error)
+    }
+  } else {
+    // 이미 활성화된 상태면 모달 표시
+    emergencyModal.value = true
+  }
+}
+
+// Emergency 해제 함수
+const releaseEmergency = async () => {
+  console.log('releaseEmergency 함수 호출됨') // 디버깅 로그 추가
+
+  try {
+    await icdStore.sendEmergency('S')
+
+    emergencyActive.value = false
+    console.log('Emergency Stop 해제됨')
+  } catch (error) {
+    console.error('Emergency Stop 해제 실패:', error)
+  }
 }
 </script>
 
@@ -1163,4 +1215,5 @@ const initCharts = () => {
   background: transparent;
   pointer-events: none;
 }
+
 </style>

@@ -40,7 +40,8 @@
                 type="number"
                 suffix="°"
                 :disable="!selectedAxes.azimuth"
-                min="0"
+                min="-360"
+                max="360"
                 step="0.01"
                 @update:model-value="formatTargetPosition('azimuth')"
                 class="q-mb-sm"
@@ -54,7 +55,8 @@
                 type="number"
                 suffix="°/s"
                 :disable="!selectedAxes.azimuth"
-                min="0"
+                min="7"
+                max="173"
                 step="0.01"
                 @update:model-value="formatTargetSpeed('azimuth')"
               />
@@ -88,12 +90,12 @@
                 type="number"
                 suffix="°"
                 :disable="!selectedAxes.elevation"
-                min="0"
+                min="-360"
+                max="360"
                 step="0.01"
                 @update:model-value="formatTargetPosition('elevation')"
                 class="q-mb-sm"
               />
-
               <div class="text-subtitle2">Target Speed</div>
               <q-input
                 v-model="targetSpeeds.elevation"
@@ -136,7 +138,8 @@
                 type="number"
                 suffix="°"
                 :disable="!selectedAxes.tilt"
-                min="0"
+                min="-360"
+                max="360"
                 step="0.01"
                 @update:model-value="formatTargetPosition('tilt')"
                 class="q-mb-sm"
@@ -148,11 +151,13 @@
                 outlined
                 dense
                 type="number"
-                suffix="°/s"
+                suffix="°"
                 :disable="!selectedAxes.tilt"
-                min="0"
+                min="-360"
+                max="360"
                 step="0.01"
-                @update:model-value="formatTargetSpeed('tilt')"
+                @update:model-value="formatTargetPosition('tilt')"
+                class="q-mb-sm"
               />
             </div>
           </q-card-section>
@@ -262,15 +267,21 @@ const isAnyAxisSelected = computed(() => {
   return selectedAxes.value.azimuth || selectedAxes.value.elevation || selectedAxes.value.tilt
 })
 
-// 목표 위치 값 포맷팅 (소수점 2자리까지, 양수만)
+// 목표 위치 값 포맷팅 (소수점 2자리까지)
 const formatTargetPosition = (axis: 'azimuth' | 'elevation' | 'tilt') => {
   let value = parseFloat(targetPositions.value[axis])
-  if (isNaN(value) || value < 0) {
+
+  if (isNaN(value)) {
     value = 0
   }
+
+  // Elevation은 음수 값을 0으로 변환
+  if (axis === 'elevation' && value < 0) {
+    value = 0
+  }
+
   targetPositions.value[axis] = value.toFixed(2)
 }
-
 // 목표 속도 값 포맷팅 (소수점 2자리까지, 양수만)
 const formatTargetSpeed = (axis: 'azimuth' | 'elevation' | 'tilt') => {
   let value = parseFloat(targetSpeeds.value[axis])

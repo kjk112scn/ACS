@@ -356,9 +356,13 @@ export const useICDStore = defineStore('icd', {
         console.warn('처리할 수 없는 데이터 형식:', message)
       }
     },
-    async sendEmergency() {
+    async sendEmergency(commandType: 'E' | 'S' = 'E') {
       try {
-        const response = await api.post('/icd/on-emergency-stop-command')
+        const response = await api.post('/icd/on-emergency-stop-command', null, {
+          params: {
+            commandType // 'E' 또는 'S' 값을 파라미터로 전송
+          }
+        })
         console.log('비상 정지 명령 전송 성공:', response.data)
         return response.data
       } catch (error) {
@@ -605,5 +609,38 @@ export const useICDStore = defineStore('icd', {
     cleanup() {
       this.disconnectWebSocket()
     },
+
+    // 서보 프리셋 명령 전송 함수
+    async sendServoPresetCommand(azimuth: boolean = false, elevation: boolean = false, tilt: boolean = false) {
+      try {
+        // API 호출 (쿼리 파라미터로 전송)
+        const response = await api.post('/icd/servo-preset-command', null, {
+          params: {
+            azimuth,
+            elevation,
+            tilt,
+          },
+        })
+
+        // 응답 처리
+        console.log('Servo preset command sent:', response.data)
+
+        // 성공 메시지 반환
+        return {
+          success: true,
+          message: response.data,
+          data: response.data
+        }
+      } catch (error) {
+        console.error('Servo preset command failed:', error)
+
+        // 오류 메시지 반환
+        return {
+          success: false,
+          message: '서보 프리셋 명령 전송 중 오류가 발생했습니다.',
+          error
+        }
+      }
+    }
   },
 })

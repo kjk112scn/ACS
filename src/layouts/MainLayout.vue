@@ -6,7 +6,15 @@
 
         <q-toolbar-title> GTL ACS </q-toolbar-title>
 
-        <div>Quasar v{{ $q.version }}</div>
+        <!-- 설정 버튼 추가 -->
+        <q-btn
+          flat
+          dense
+          round
+          icon="settings"
+          aria-label="Settings"
+          @click="settingsModal = true"
+        />
         <!-- Dark Mode Toggle -->
         <q-btn
           flat
@@ -30,12 +38,22 @@
     <q-page-container>
       <router-view />
     </q-page-container>
+
+    <!-- 설정 모달 컴포넌트 사용 -->
+    <SettingsModal
+      v-model="settingsModal"
+      :dark-mode="isDarkMode"
+      :server-address="serverAddress"
+      @save="handleSettingsSave"
+    />
   </q-layout>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import EssentialLink, { type EssentialLinkProps } from 'components/EssentialLink.vue'
+import SettingsModal from 'components/modal//Settings/SettingsModal.vue'
+
 import { useQuasar } from 'quasar'
 
 const $q = useQuasar()
@@ -87,6 +105,15 @@ const linksList: EssentialLinkProps[] = [
 // 명시적으로 false로 설정하고 show-if-above 속성 제거
 const leftDrawerOpen = ref(false)
 
+// 설정 모달 상태
+const settingsModal = ref(false)
+
+// 다크 모드 상태
+const isDarkMode = ref(false)
+
+// 서버 주소 설정
+const serverAddress = ref('ws://localhost:8080/ws/push-data')
+
 // 다크 모드 토글
 const toggleDarkMode = () => {
   const newState = !$q.dark.isActive
@@ -94,13 +121,36 @@ const toggleDarkMode = () => {
   localStorage.setItem('isDarkMode', String(newState))
 }
 
+// 설정 저장 핸들러
+const handleSettingsSave = (settings: { darkMode: boolean; serverAddress: string }) => {
+  // 다크 모드 설정 적용
+  if (settings.darkMode !== isDarkMode.value) {
+    $q.dark.set(settings.darkMode)
+    isDarkMode.value = settings.darkMode
+    localStorage.setItem('isDarkMode', String(settings.darkMode))
+  }
+
+  // 서버 주소 설정 적용
+  serverAddress.value = settings.serverAddress
+  localStorage.setItem('serverAddress', settings.serverAddress)
+
+  // 여기에 필요한 경우 서버 연결 재설정 로직 추가
+}
+
 // 왼쪽 drawer 토글
 function toggleLeftDrawer() {
   leftDrawerOpen.value = !leftDrawerOpen.value
 }
 
-// 컴포넌트가 마운트될 때 drawer가 닫혀있도록 확실히 설정
+// 컴포넌트가 마운트될 때 로컬 스토리지에서 다크 모드 설정 불러오기
 onMounted(() => {
   leftDrawerOpen.value = false
+
+  // 로컬 스토리지에서 다크 모드 설정 불러오기
+  const savedDarkMode = localStorage.getItem('isDarkMode')
+  if (savedDarkMode !== null) {
+    const isDarkMode = savedDarkMode === 'true'
+    $q.dark.set(isDarkMode)
+  }
 })
 </script>
