@@ -64,10 +64,17 @@
                 }"
                 content-class="tle-content"
               />
-
+              <div class="button-group q-mt-md">
+                <q-btn color="primary" label="Text" @click="openTLEModal" class="q-mr-sm" />
+                <q-btn
+                  color="primary"
+                  label="Select Schedule"
+                  @click="openScheduleModal"
+                  class="q-mr-sm"
+                />
+              </div>
               <!-- 버튼 그룹 추가 -->
               <div class="button-group q-mt-md">
-                <q-btn color="primary" label="Cal" @click="openTLEModal" class="q-mr-sm" />
                 <q-btn
                   color="positive"
                   label="Go"
@@ -87,10 +94,14 @@
     <q-dialog v-model="showTLEModal" persistent>
       <q-card style="width: 600px; max-width: 90vw">
         <q-card-section class="bg-primary text-white">
-          <div class="text-h6">TLE Input</div>
+          <div class="text-h6">TLE 입력</div>
         </q-card-section>
 
         <q-card-section class="q-pa-md">
+          <div class="text-caption q-mb-sm">
+            2줄 또는 3줄 형식의 TLE 데이터를 입력하세요. 3줄 형식인 경우 첫 번째 줄은 위성 이름으로
+            처리됩니다.
+          </div>
           <q-editor
             v-model="tempTLEData.line1"
             min-height="200px"
@@ -103,46 +114,67 @@
               underline: undefined,
             }"
             content-class="tle-content"
-            placeholder="Enter TLE data here..."
+            placeholder="여기에 TLE 데이터를 입력하세요..."
           />
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn flat label="Add" color="primary" @click="addTLEData" />
+          <q-btn flat label="추가" color="primary" @click="addTLEData" />
+          <q-btn flat label="닫기" color="primary" v-close-popup class="q-ml-sm" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <!-- 스케줄 선택 모달 -->
+    <q-dialog v-model="showScheduleModal" persistent>
+      <q-card style="width: 900px; max-width: 95vw; max-height: 90vh">
+        <q-card-section class="bg-primary text-white">
+          <div class="text-h6">Select Schedule</div>
+        </q-card-section>
+
+        <q-card-section class="q-pa-md" style="max-height: 70vh; overflow: auto">
+          <q-table
+            :rows="scheduleData"
+            :columns="scheduleColumns"
+            row-key="No"
+            :loading="loadingSchedule"
+            :pagination="{ rowsPerPage: 10 }"
+            selection="single"
+            v-model:selected="selectedSchedule"
+            class="schedule-table"
+          >
+            <template v-slot:loading>
+              <q-inner-loading showing color="primary">
+                <q-spinner size="50px" color="primary" />
+              </q-inner-loading>
+            </template>
+          </q-table>
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn
+            flat
+            label="Select"
+            color="primary"
+            @click="selectSchedule"
+            :disable="selectedSchedule.length === 0"
+          />
           <q-btn flat label="Close" color="primary" v-close-popup class="q-ml-sm" />
         </q-card-actions>
       </q-card>
     </q-dialog>
   </div>
 </template>
+
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { api } from 'boot/axios'
 import { date } from 'quasar'
+import type { QTableProps } from 'quasar' // QTableProps 타입 임포트
 import { useICDStore } from '../../stores/ICD'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 
-// 임포트 확인
-console.log('ECharts imported:', echarts)
-
-// ICD 스토어 인스턴스 생성
-const icdStore = useICDStore()
-const chartRef = ref<HTMLElement | null>(null)
-
-// TLE 데이터 추가
-const tleData = ref({
-  displayText: '',
-})
-
-// Ephemeris Designation 모드 데이터
-const ephemerisData = ref({
-  azimuth: 0,
-  elevation: 0,
-  tilt: 0,
-  date: date.formatDate(new Date(), 'YYYY/MM/DD'),
-  time: date.formatDate(new Date(), 'HH:mm'),
-})
 // ECharts 데이터 포인트 타입 정의
 interface EChartsScatterParam {
   value: [number, number]
@@ -159,10 +191,164 @@ interface EChartsScatterParam {
   dimensionIndex: number
 }
 
-// 차트 관련 변수
-let chart: ECharts | null = null
+// 스토어 인스턴스 생성
+const icdStore = useICDStore()
 
+// TLE 데이터 인터페이스 정의
+interface TLEData {
+  tleLine1: string
+  tleLine2: string
+  satelliteName: string | null
+}
+
+// EphemerisTrackStore 임시 구현 (실제로는 별도 파일로 분리해야 함)
+const ephemerisTrackStore = {
+  async fetchEphemerisMasterData() {
+    try {
+      const response = await api.get('/ephemeris/master')
+      return response.data || []
+    } catch (error) {
+      console.error('마스터 데이터 조회 실패:', error)
+      return []
+    }
+  },
+
+  async fetchEphemerisDetailData(mstId: number): Promise<ScheduleDetailItem[]> {
+    try {
+      const response = await api.get(`/ephemeris/detail/${mstId}`)
+      return response.data || []
+    } catch (error) {
+      console.error('세부 데이터 조회 실패:', error)
+      return []
+    }
+  },
+
+  parseTLEData(tleText: string) {
+    const lines = tleText.split('\n').filter((line) => line.trim() !== '')
+
+    if (lines.length < 2) {
+      throw new Error('유효하지 않은 TLE 형식: 최소 2줄이 필요합니다')
+    }
+
+    let tleLine1 = ''
+    let tleLine2 = ''
+    let satelliteName = null
+
+    if (lines.length >= 3) {
+      satelliteName = lines[0]?.trim() || ''
+      tleLine1 = lines[1]?.trim() || ''
+      tleLine2 = lines[2]?.trim() || ''
+    } else if (lines.length >= 2) {
+      tleLine1 = lines[0]?.trim() || ''
+      tleLine2 = lines[1]?.trim() || ''
+    } else if (lines.length === 1) {
+      tleLine1 = lines[0]?.trim() || ''
+      tleLine2 = ''
+    } else {
+      // 라인이 없는 경우
+      tleLine1 = ''
+      tleLine2 = ''
+    }
+
+    return { tleLine1, tleLine2, satelliteName }
+  },
+
+  async generateEphemerisTrack(request: TLEData) {
+    try {
+      console.error(
+        '위성 궤도 추적 데이터 생성 ',
+        request.satelliteName,
+        request.tleLine1,
+        request.tleLine2,
+      )
+      const response = await api.post('/ephemeris/generate', request)
+      return response.data
+    } catch (error) {
+      console.error('위성 궤도 추적 데이터 생성 실패:', error)
+      throw error
+    }
+  },
+}
+
+// 인터페이스 정의
+interface ScheduleItem {
+  No: number
+  SatelliteID: string
+  SatelliteName: string
+  StartTime: string
+  EndTime: string
+  Duration: string
+  MaxElevation: number
+  CreationDate: string
+  Creator: string
+  // any 대신 구체적인 타입 유니온 사용
+  [key: string]: string | number | boolean | null | undefined
+}
+
+interface ScheduleDetailItem {
+  Time: string
+  Azimuth: number
+  Elevation: number
+  // any 대신 구체적인 타입 유니온 사용
+  [key: string]: string | number | boolean | null | undefined
+}
+
+// 차트 관련 변수
+const chartRef = ref<HTMLElement | null>(null)
+let chart: ECharts | null = null
 let updateTimer: number | null = null
+
+// TLE 데이터
+const tleData = ref({
+  displayText: '',
+})
+
+// Ephemeris Designation 모드 데이터
+const ephemerisData = ref({
+  azimuth: 0,
+  elevation: 0,
+  tilt: 0,
+  date: date.formatDate(new Date(), 'YYYY/MM/DD'),
+  time: date.formatDate(new Date(), 'HH:mm'),
+})
+
+// 스케줄 관련 상태
+const showScheduleModal = ref(false)
+const scheduleData = ref<ScheduleItem[]>([])
+const selectedSchedule = ref<ScheduleItem[]>([])
+const loadingSchedule = ref(false)
+
+// TLE 모달 관련 상태
+const showTLEModal = ref(false)
+const tempTLEData = ref({
+  line1: '',
+})
+
+// QTable 컬럼 타입 정의
+type QTableColumn = NonNullable<QTableProps['columns']>[0]
+
+// 스케줄 테이블 컬럼 정의
+
+const scheduleColumns: QTableColumn[] = [
+  { name: 'No', label: 'No', field: 'No', align: 'left', sortable: true },
+  {
+    name: 'SatelliteName',
+    label: '위성 이름',
+    field: 'SatelliteName',
+    align: 'left',
+    sortable: true,
+  },
+  { name: 'StartTime', label: '시작 시간', field: 'StartTime', align: 'left', sortable: true },
+  { name: 'EndTime', label: '종료 시간', field: 'EndTime', align: 'left', sortable: true },
+  { name: 'Duration', label: '지속 시간', field: 'Duration', align: 'left', sortable: true },
+  {
+    name: 'MaxElevation',
+    label: '최대 고도 (°)',
+    field: 'MaxElevation',
+    align: 'left',
+    sortable: true,
+  },
+]
 
 // 차트 초기화 함수
 const initChart = () => {
@@ -276,6 +462,7 @@ const initChart = () => {
         },
         label: {
           show: true,
+
           formatter: function (params: EChartsScatterParam) {
             return `Az: ${params.value[0].toFixed(2)}°\nEl: ${params.value[1].toFixed(2)}°`
           },
@@ -304,6 +491,18 @@ const initChart = () => {
         ],
         zlevel: 1,
       },
+      {
+        name: '위성 궤적',
+        type: 'line',
+        coordinateSystem: 'polar',
+        symbol: 'none',
+        lineStyle: {
+          color: '#2196f3',
+          width: 2,
+        },
+        data: [],
+        zlevel: 0,
+      },
     ],
     animation: true,
     animationDuration: 150,
@@ -324,6 +523,7 @@ const initChart = () => {
     chart?.resize()
   })
 }
+
 // 차트 업데이트 함수
 const updateChart = () => {
   if (!chart) return
@@ -352,57 +552,93 @@ const updateChart = () => {
           [normalizedAzimuth, normalizedElevation],
         ],
       },
+      // 궤적 라인은 그대로 유지
     ],
   })
 }
 
-// 컴포넌트 마운트 시 차트 초기화
-onMounted(() => {
-  console.log('Component mounted, echarts:', echarts)
+// 궤적 라인을 차트에 추가하는 함수
+const updateChartWithTrajectory = (detailData: ScheduleDetailItem[]) => {
+  if (!chart) return
 
-  // DOM이 완전히 렌더링된 후 차트 초기화
-  setTimeout(() => {
-    try {
-      initChart()
-      console.log('Chart initialization triggered')
+  // 궤적 데이터 포인트 생성 (방위각, 고도각만 사용)
+  const trajectoryPoints = detailData.map((point) => [point.Azimuth, point.Elevation])
 
-      // 실시간 데이터 업데이트 시작 (150ms 간격)
-      updateTimer = window.setInterval(() => {
-        updateChart()
-      }, 150)
-    } catch (error) {
-      console.error('Error in onMounted:', error)
+  // 차트 옵션 업데이트 (궤적 라인만 업데이트)
+  chart.setOption({
+    series: [
+      {}, // 기존 포인트 시리즈는 그대로 유지
+      {}, // 기존 라인 시리즈는 그대로 유지
+      {
+        // 궤적 라인 업데이트
+        data: trajectoryPoints,
+      },
+    ],
+  })
+}
+
+// 스케줄 모달 열기 및 데이터 로드
+const openScheduleModal = async () => {
+  showScheduleModal.value = true
+  await loadScheduleData()
+}
+
+// 스케줄 데이터 로드 함수
+const loadScheduleData = async () => {
+  loadingSchedule.value = true
+  try {
+    // 스토어에서 마스터 데이터 로드
+    const data = await ephemerisTrackStore.fetchEphemerisMasterData()
+    scheduleData.value = data
+  } catch (error) {
+    console.error('스케줄 데이터 로드 실패:', error)
+  } finally {
+    loadingSchedule.value = false
+  }
+}
+
+// 스케줄 선택 함수
+const selectSchedule = async () => {
+  if (selectedSchedule.value.length === 0) return
+
+  try {
+    // selectedSchedule.value가 비어있지 않다는 것을 확인했으므로 첫 번째 항목은 존재함
+    // 하지만 TypeScript는 이를 인식하지 못하므로 타입 가드 추가
+    if (!selectedSchedule.value[0]) {
+      console.error('선택된 항목이 없습니다.')
+      return
     }
-  }, 100)
-})
 
-// ICD 스토어의 값이 변경될 때마다 차트 업데이트
-watch(
-  () => [icdStore.azimuthAngle, icdStore.elevationAngle],
-  () => {
-    updateChart()
-  },
-)
+    const selectedItem = selectedSchedule.value[0]
 
-// 컴포넌트 언마운트 시 정리
-onUnmounted(() => {
-  // 타이머 정리
-  if (updateTimer !== null) {
-    clearInterval(updateTimer)
+    // 선택한 스케줄의 세부 데이터 로드
+    const detailData = await ephemerisTrackStore.fetchEphemerisDetailData(selectedItem.No)
+
+    // 세부 데이터가 있으면 첫 번째 항목의 방위각, 고도각, 틸트각 설정
+    if (detailData.length > 0) {
+      // detailData가 비어있지 않다는 것을 확인했으므로 첫 번째 항목은 존재함
+      // 하지만 TypeScript는 이를 인식하지 못하므로 타입 가드 추가
+      if (!detailData[0]) {
+        console.error('세부 데이터의 첫 번째 항목이 없습니다.')
+        return
+      }
+
+      const firstPoint = detailData[0]
+
+      ephemerisData.value.azimuth = firstPoint.Azimuth
+      ephemerisData.value.elevation = firstPoint.Elevation
+      ephemerisData.value.tilt = 0 // 틸트각은 기본값 0으로 설정
+
+      // 차트에 궤적 표시
+      updateChartWithTrajectory(detailData)
+    }
+
+    // 모달 닫기
+    showScheduleModal.value = false
+  } catch (error) {
+    console.error('스케줄 세부 데이터 로드 실패:', error)
   }
-
-  // 차트 인스턴스 정리
-  if (chart) {
-    chart.dispose()
-    chart = null
-  }
-})
-
-// TLE 모달 관련 상태
-const showTLEModal = ref(false)
-const tempTLEData = ref({
-  line1: '',
-})
+}
 
 // TLE 모달 열기
 const openTLEModal = () => {
@@ -410,24 +646,51 @@ const openTLEModal = () => {
   tempTLEData.value.line1 = ''
 }
 
-// TLE 데이터 추가
-const addTLEData = () => {
+// TLE 데이터 형식화 함수
+const formatTLEDisplay = (tleText: string): string => {
+  const lines = tleText.split('\n').filter((line) => line.trim() !== '')
+
+  if (lines.length >= 3) {
+    // 3줄 형식: 첫 번째 줄은 위성 이름으로 강조
+    return `<strong>위성 이름: ${lines[0]}</strong>\n${lines[1] || ''}\n${lines[2] || ''}`
+  } else if (lines.length === 2) {
+    // 2줄 형식
+    return `${lines[0] || ''}\n${lines[1] || ''}`
+  }
+
+  return tleText
+}
+
+// TLE 데이터 추가 함수
+const addTLEData = async () => {
   const inputText = tempTLEData.value.line1.trim()
 
   // 입력된 텍스트가 있는 경우에만 처리
   if (inputText) {
-    // displayText에 입력된 TLE 데이터를 직접 설정
-    tleData.value.displayText = inputText
+    try {
+      // displayText에 입력된 TLE 데이터를 직접 설정
+      tleData.value.displayText = formatTLEDisplay(inputText)
 
-    // 모달 닫기
-    showTLEModal.value = false
+      // TLE 데이터 파싱
+      const parsedTLE = ephemerisTrackStore.parseTLEData(inputText)
 
-    // 바로 계산 실행
-    void calculateTLE().catch((error) => {
-      console.error('Failed to calculate TLE:', error)
-    })
+      // 백엔드에 TLE 데이터 전송하여 궤도
+      // 백엔드에 TLE 데이터 전송하여 궤도 추적 데이터 생성
+      await ephemerisTrackStore.generateEphemerisTrack(parsedTLE)
+
+      // 모달 닫기
+      showTLEModal.value = false
+
+      // 스케줄 데이터 다시 로드
+      await loadScheduleData()
+
+      // 바로 계산 실행
+      await calculateTLE()
+    } catch (error) {
+      console.error('TLE 데이터 처리 중 오류 발생:', error)
+    }
   } else {
-    console.error('TLE data is empty')
+    console.error('TLE 데이터가 비어 있습니다')
   }
 }
 
@@ -440,16 +703,44 @@ const calculateTLE = async () => {
       return
     }
 
-    const lines = tleData.value.displayText.split('\n')
+    // 줄 단위로 분리
+    const lines = tleData.value.displayText.split('\n').filter((line) => line.trim() !== '')
+
     if (lines.length < 2) {
-      console.error('Invalid TLE format: Need two lines')
+      console.error('유효하지 않은 TLE 형식: 최소 2줄이 필요합니다')
+      return
+    }
+
+    let line1 = ''
+    let line2 = ''
+    let satelliteName: string | null = null
+
+    // 2줄 또는 3줄 형식 처리
+    if (lines.length >= 3 && lines[0] && lines[1] && lines[2]) {
+      // 3줄 형식: 첫 번째 줄은 위성 이름
+      satelliteName = lines[0]
+      line1 = lines[1]
+      line2 = lines[2]
+    } else if (lines.length >= 2 && lines[0] && lines[1]) {
+      // 2줄 형식
+      line1 = lines[0]
+      line2 = lines[1]
+    } else {
+      console.error('유효하지 않은 TLE 형식')
+      return
+    }
+
+    // TLE 라인 유효성 검사 (간단한 검사)
+    if (!line1.startsWith('1 ') || !line2.startsWith('2 ')) {
+      console.error('유효하지 않은 TLE 형식: 라인 1은 "1 "로, 라인 2는 "2 "로 시작해야 합니다')
       return
     }
 
     // TLE 계산 API 호출
     const response = await api.post('/tle/calculate', {
-      line1: lines[0],
-      line2: lines[1],
+      line1: line1,
+      line2: line2,
+      satelliteName: satelliteName, // 위성 이름이 있는 경우 전송
       timestamp: `${ephemerisData.value.date} ${ephemerisData.value.time}`,
     })
 
@@ -529,7 +820,50 @@ const handleStowCommand = () => {
     // Here you could add user notification of the error
   })
 }
+
+// 컴포넌트 마운트 시 차트 초기화
+onMounted(() => {
+  console.log('Component mounted, echarts:', echarts)
+
+  // DOM이 완전히 렌더링된 후 차트 초기화
+  setTimeout(() => {
+    try {
+      initChart()
+      console.log('Chart initialization triggered')
+
+      // 실시간 데이터 업데이트 시작 (150ms 간격)
+      updateTimer = window.setInterval(() => {
+        updateChart()
+      }, 150)
+    } catch (error) {
+      console.error('Error in onMounted:', error)
+    }
+  }, 100)
+})
+
+// ICD 스토어의 값이 변경될 때마다 차트 업데이트
+watch(
+  () => [icdStore.azimuthAngle, icdStore.elevationAngle],
+  () => {
+    updateChart()
+  },
+)
+
+// 컴포넌트 언마운트 시 정리
+onUnmounted(() => {
+  // 타이머 정리
+  if (updateTimer !== null) {
+    clearInterval(updateTimer)
+  }
+
+  // 차트 인스턴스 정리
+  if (chart) {
+    chart.dispose()
+    chart = null
+  }
+})
 </script>
+
 <style scoped>
 .ephemeris-mode {
   height: 100%;
@@ -592,40 +926,9 @@ const handleStowCommand = () => {
   width: 100%;
 }
 
-:deep(.q-field__control) {
-  padding: 0 8px;
-}
-
-:deep(.q-card__section) {
-  padding: 16px;
-}
-
-:deep(.q-card) {
-  background: var(--q-dark);
-  box-shadow:
-    0 1px 5px rgb(0 0 0 / 20%),
-    0 2px 2px rgb(0 0 0 / 14%),
-    0 3px 1px -2px rgb(0 0 0 / 12%);
-}
-
-:deep(.col-md-4) {
-  width: 33.3333%;
-  padding: 4px;
-}
-
-:deep(.q-btn) {
-  flex: 1;
-}
-
 .tle-editor {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 4px;
-}
-
-:deep(.tle-editor .q-editor__content) {
-  font-family: monospace !important;
-  line-height: 1.5;
-  padding: 12px;
 }
 
 .tle-display {
@@ -636,20 +939,89 @@ const handleStowCommand = () => {
   min-height: 80px;
 }
 
-:deep(.tle-display .q-editor__content) {
+/* 스케줄 테이블 스타일 */
+.schedule-table {
+  background-color: var(--q-dark);
+  color: white;
+}
+</style>
+
+<style>
+/* 전역 스타일 - 깊은 선택자가 필요한 경우 */
+.q-field__control {
+  padding: 0 8px;
+}
+
+.q-card__section {
+  padding: 16px;
+}
+
+.q-card {
+  background: var(--q-dark);
+  box-shadow:
+    0 1px 5px rgb(0 0 0 / 20%),
+    0 2px 2px rgb(0 0 0 / 14%),
+    0 3px 1px -2px rgb(0 0 0 / 12%);
+}
+
+.col-md-4 {
+  width: 33.3333%;
+  padding: 4px;
+}
+
+.q-btn {
+  flex: 1;
+}
+
+.tle-editor .q-editor__content {
+  font-family: monospace !important;
+  line-height: 1.5;
+  padding: 12px;
+}
+
+.tle-display .q-editor__content {
   font-family: monospace !important;
   color: #fff;
   padding: 12px;
   line-height: 1.5;
 }
 
-:deep(.tle-display.q-editor--readonly) {
+.tle-display.q-editor--readonly {
   border-color: rgba(255, 255, 255, 0.12);
 }
 
-:deep(.tle-content) {
+.tle-content {
   font-family: monospace !important;
   font-size: 14px;
   white-space: pre;
+}
+
+/* 스케줄 테이블 스타일 */
+.schedule-table .q-table__top,
+.schedule-table .q-table__bottom,
+.schedule-table thead tr {
+  background-color: var(--q-dark-page);
+}
+
+.schedule-table th {
+  font-weight: bold;
+  color: var(--q-primary);
+}
+
+.schedule-table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.schedule-table .q-table__grid-content {
+  background-color: var(--q-dark);
+}
+
+.schedule-table .q-table__card {
+  background-color: var(--q-dark);
+  color: white;
+}
+
+.schedule-table .q-table__selected {
+  background-color: rgba(var(--q-primary-rgb), 0.3) !important;
 }
 </style>

@@ -76,6 +76,7 @@ function safeToString(value: unknown): string {
   // (위에서 모든 JavaScript 타입을 처리했기 때문)
   return `[알 수 없는 타입: ${typeof value}]`
 }
+
 export const useICDStore = defineStore('icd', {
   state: () => ({
     serverTime: '',
@@ -241,19 +242,11 @@ export const useICDStore = defineStore('icd', {
           tiltSpeed:
             message.tiltSpeed !== undefined ? safeToString(message.tiltSpeed) : this.tiltSpeed,
         })
-        /*
-        // 값 할당 후 확인 로깅
-        console.log('Store 상태 업데이트 후:', {
-          azimuthAngle: this.azimuthAngle,
-          elevationAngle: this.elevationAngle,
-          tiltAngle: this.tiltAngle,
-          serverTime: this.serverTime,
-        })
- */
       } catch (e) {
         console.error('직접 데이터 처리 오류:', e)
       }
     },
+
     // READ 데이터 처리
     processReadData(message: MessageData) {
       try {
@@ -327,15 +320,6 @@ export const useICDStore = defineStore('icd', {
           tiltSpeed:
             readData.tiltSpeed !== undefined ? safeToString(readData.tiltSpeed) : this.tiltSpeed,
         })
-        /*
-        // 값 할당 후 확인 로깅
-        console.log('Store 상태 업데이트 후:', {
-          azimuthAngle: this.azimuthAngle,
-          elevationAngle: this.elevationAngle,
-          tiltAngle: this.tiltAngle,
-          serverTime: this.serverTime,
-        })
-         */
       } catch (e) {
         console.error('READ 데이터 처리 오류:', e)
       }
@@ -356,12 +340,13 @@ export const useICDStore = defineStore('icd', {
         console.warn('처리할 수 없는 데이터 형식:', message)
       }
     },
+
     async sendEmergency(commandType: 'E' | 'S' = 'E') {
       try {
         const response = await api.post('/icd/on-emergency-stop-command', null, {
           params: {
-            commandType // 'E' 또는 'S' 값을 파라미터로 전송
-          }
+            commandType, // 'E' 또는 'S' 값을 파라미터로 전송
+          },
         })
         console.log('비상 정지 명령 전송 성공:', response.data)
         return response.data
@@ -412,97 +397,16 @@ export const useICDStore = defineStore('icd', {
         throw error
       }
     },
+
     async stopAllCommand() {
       await this.stopSunTrack()
-    },
-
-    // Stop 명령 전송 함수
-    async stopCommand(azStop: boolean, elStop: boolean, tiStop: boolean) {
-      try {
-        // Sun Track 중지 먼저 시도
-        try {
-          await this.stopAllCommand()
-          console.log('Sun Track 중지 성공')
-        } catch (sunTrackError) {
-          console.warn('Sun Track 중지 실패, 계속 진행:', sunTrackError)
-          // Sun Track 중지 실패해도 계속 진행
-        }
-
-        // API 호출 (쿼리 파라미터로 전송)
-        const response = await api.post('/icd/stop-command', null, {
-          params: {
-            azStop,
-            elStop,
-            tiStop,
-          },
-        })
-
-        // 응답 처리
-        console.log('Stop command sent:', response.data)
-        return response.data
-      } catch (error) {
-        console.error('Stop command failed:', error)
-        throw error
-      }
-    },
-
-    // Stow 명령 전송 함수
-    async stowCommand() {
-      try {
-        // API 호출
-        const response = await api.post('/icd/stow-command')
-        // 응답 처리
-        console.log('Stow command sent:', response.data)
-        return response.data
-      } catch (error) {
-        console.error('Stow command failed:', error)
-        throw error
-      }
-    },
-
-    // 멀티 컨트롤 명령 전송 함수
-    async sendMultiControlCommand(command: MultiControlCommand) {
-      try {
-        // API 호출 (쿼리 파라미터로 전송)
-        const response = await api.post('/icd/multi-control-command', null, {
-          params: {
-            azimuth: command.azimuth || false,
-            elevation: command.elevation || false,
-            tilt: command.tilt || false,
-            stow: command.stow || false,
-            azAngle: command.azAngle || 0,
-            azSpeed: command.azSpeed || 0,
-            elAngle: command.elAngle || 0,
-            elSpeed: command.elSpeed || 0,
-            tiAngle: command.tiAngle || 0,
-            tiSpeed: command.tiSpeed || 0,
-          },
-        })
-        // 응답 처리
-        console.log('Multi control command sent:', response.data)
-        // 상태 업데이트
-        this.lastMultiControlCommandStatus = {
-          message: '멀티 컨트롤 명령이 성공적으로 전송되었습니다.',
-          success: true,
-          timestamp: Date.now(),
-        }
-        return response.data
-      } catch (error) {
-        console.error('Multi control command failed:', error)
-        // 오류 상태 업데이트
-        this.lastMultiControlCommandStatus = {
-          message: '멀티 컨트롤 명령 전송 중 오류가 발생했습니다.',
-          success: false,
-          timestamp: Date.now(),
-        }
-        throw error
-      }
     },
 
     // 위치 오프셋 명령 전송 함수
     async sendPositionOffsetCommand(azOffset: number, elOffset: number, tiOffset: number) {
       try {
         // API 호출 (쿼리 파라미터로 전송)
+
         const response = await api.post('/icd/position-offset-command', null, {
           params: {
             azOffset,
@@ -510,24 +414,26 @@ export const useICDStore = defineStore('icd', {
             tiOffest: tiOffset, // 백엔드 파라미터 이름에 맞춤 (tiOffest)
           },
         })
+
         // 응답 처리
+
         console.log('Position offset command sent:', response.data)
         // 상태 업데이트
-        /*     this.lastOffsetCommandStatus = {
+        this.lastOffsetCommandStatus = {
           message: '오프셋 명령이 성공적으로 전송되었습니다.',
           success: true,
           timestamp: Date.now(),
-        } */
+        }
         return response.data
       } catch (error) {
         console.error('Position offset command failed:', error)
         // 오류 상태 업데이트
-        /*         this.lastOffsetCommandStatus = {
+        this.lastOffsetCommandStatus = {
           message: '오프셋 명령 전송 중 오류가 발생했습니다.',
           success: false,
           timestamp: Date.now(),
         }
-        throw error */
+        throw error
       }
     },
 
@@ -542,6 +448,7 @@ export const useICDStore = defineStore('icd', {
     ) {
       try {
         // API 호출 (쿼리 파라미터로 전송)
+
         const response = await api.post('/icd/feed-on-off-command', null, {
           params: {
             sLHCP,
@@ -553,6 +460,7 @@ export const useICDStore = defineStore('icd', {
           },
         })
         // 응답 처리
+
         console.log('Feed On/Off command sent:', response.data)
         return response.data
       } catch (error) {
@@ -573,23 +481,24 @@ export const useICDStore = defineStore('icd', {
         // 응답 처리
         console.log('Time offset command sent:', response.data)
         // 상태 업데이트
-        /*        this.lastTimeOffsetCommandStatus = {
+        this.lastTimeOffsetCommandStatus = {
           message: '시간 오프셋 명령이 성공적으로 전송되었습니다.',
           success: true,
           timestamp: Date.now(),
-        } */
+        }
         return response.data
       } catch (error) {
         console.error('Time offset command failed:', error)
         // 오류 상태 업데이트
-        /*    this.lastTimeOffsetCommandStatus = {
+        this.lastTimeOffsetCommandStatus = {
           message: '시간 오프셋 명령 전송 중 오류가 발생했습니다.',
           success: false,
           timestamp: Date.now(),
         }
-        throw error */
+        throw error
       }
     },
+
     disconnectWebSocket() {
       if (this.websocket) {
         this.websocket.close()
@@ -611,7 +520,11 @@ export const useICDStore = defineStore('icd', {
     },
 
     // 서보 프리셋 명령 전송 함수
-    async sendServoPresetCommand(azimuth: boolean = false, elevation: boolean = false, tilt: boolean = false) {
+    async sendServoPresetCommand(
+      azimuth: boolean = false,
+      elevation: boolean = false,
+      tilt: boolean = false,
+    ) {
       try {
         // API 호출 (쿼리 파라미터로 전송)
         const response = await api.post('/icd/servo-preset-command', null, {
@@ -629,7 +542,7 @@ export const useICDStore = defineStore('icd', {
         return {
           success: true,
           message: response.data,
-          data: response.data
+          data: response.data,
         }
       } catch (error) {
         console.error('Servo preset command failed:', error)
@@ -638,9 +551,49 @@ export const useICDStore = defineStore('icd', {
         return {
           success: false,
           message: '서보 프리셋 명령 전송 중 오류가 발생했습니다.',
-          error
+          error,
         }
       }
-    }
+    },
+
+    // 멀티 컨트롤 명령 전송 함수
+    async sendMultiControlCommand(command: MultiControlCommand) {
+      try {
+        // API 호출 (쿼리 파라미터로 전송)
+        const response = await api.post('/icd/multi-control-command', null, {
+          params: {
+            azimuth: command.azimuth || false,
+            elevation: command.elevation || false,
+            tilt: command.tilt || false,
+            stow: command.stow || false,
+            azAngle: command.azAngle || 0,
+            azSpeed: command.azSpeed || 0,
+            elAngle: command.elAngle || 0,
+            elSpeed: command.elSpeed || 0,
+            tiAngle: command.tiAngle || 0,
+            tiSpeed: command.tiSpeed || 0,
+          },
+        })
+
+        // 응답 처리
+        console.log('Multi Control command sent:', response.data)
+
+        // 성공 메시지 반환
+        return {
+          success: true,
+          message: response.data,
+          data: response.data,
+        }
+      } catch (error) {
+        console.error('Multi Control command failed:', error)
+
+        // 오류 메시지 반환
+        return {
+          success: false,
+          message: '멀티 컨트롤 명령 전송 중 오류가 발생했습니다.',
+          error,
+        }
+      }
+    },
   },
 })
