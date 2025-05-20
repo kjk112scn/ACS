@@ -2,43 +2,49 @@ package com.gtlsystems.acs_api.controller
 
 import com.gtlsystems.acs_api.algorithm.satellitetracker.impl.OrekitCalculator
 import com.gtlsystems.acs_api.algorithm.satellitetracker.model.SatelliteTrackData
-import org.springframework.http.ResponseEntity
+import com.gtlsystems.acs_api.service.SatelliteTrackService
 import org.springframework.web.bind.annotation.*
+import reactor.core.publisher.Mono
 import java.time.ZonedDateTime
 
 @RestController
 @RequestMapping("/api/satellite")
-class SatelliteTrackerController(private val orekitCalculator: OrekitCalculator) {
+class SatelliteTrackerController(
+    private val orekitCalculator: OrekitCalculator,
+    private val satelliteTrackService: SatelliteTrackService
+) {
 
     /**
      * 현재 시간의 위성 위치를 계산합니다.
      */
     @PostMapping("/position/current")
-    fun getCurrentPosition(@RequestBody request: SatellitePositionRequest): ResponseEntity<SatelliteTrackData> {
-        val position = orekitCalculator.getCurrentPosition(
-            request.tleLine1,
-            request.tleLine2,
-            request.latitude,
-            request.longitude,
-            request.altitude
-        )
-        return ResponseEntity.ok(position)
+    fun getCurrentPosition(@RequestBody request: SatellitePositionRequest): Mono<SatelliteTrackData> {
+        return Mono.fromCallable {
+            orekitCalculator.getCurrentPosition(
+                request.tleLine1,
+                request.tleLine2,
+                request.latitude,
+                request.longitude,
+                request.altitude
+            )
+        }
     }
 
     /**
      * 지정된 시간의 위성 위치를 계산합니다.
      */
     @PostMapping("/position/at-time")
-    fun getPositionAtTime(@RequestBody request: SatellitePositionTimeRequest): ResponseEntity<SatelliteTrackData> {
-        val position = orekitCalculator.calculatePosition(
-            request.tleLine1,
-            request.tleLine2,
-            request.dateTime,
-            request.latitude,
-            request.longitude,
-            request.altitude
-        )
-        return ResponseEntity.ok(position)
+    fun getPositionAtTime(@RequestBody request: SatellitePositionTimeRequest): Mono<SatelliteTrackData> {
+        return Mono.fromCallable {
+            orekitCalculator.calculatePosition(
+                request.tleLine1,
+                request.tleLine2,
+                request.dateTime,
+                request.latitude,
+                request.longitude,
+                request.altitude
+            )
+        }
     }
 /*
 
@@ -93,19 +99,60 @@ class SatelliteTrackerController(private val orekitCalculator: OrekitCalculator)
      * 위성 추적 스케줄을 생성합니다.
      */
     @PostMapping("/tracking/schedule")
-    fun generateTrackingSchedule(@RequestBody request: SatelliteTrackingScheduleRequest): ResponseEntity<OrekitCalculator.SatelliteTrackingSchedule> {
-        val schedule = orekitCalculator.generateSatelliteTrackingSchedule(
-            request.tleLine1,
-            request.tleLine2,
-            request.startDate,
-            request.durationDays,
-            request.minElevation,
-            request.latitude,
-            request.longitude,
-            request.altitude,
-            request.trackingIntervalMs
-        )
-        return ResponseEntity.ok(schedule)
+    fun generateTrackingSchedule(@RequestBody request: SatelliteTrackingScheduleRequest): Mono<OrekitCalculator.SatelliteTrackingSchedule> {
+        return Mono.fromCallable {
+            orekitCalculator.generateSatelliteTrackingSchedule(
+                request.tleLine1,
+                request.tleLine2,
+                request.startDate,
+                request.durationDays,
+                request.minElevation,
+                request.latitude,
+                request.longitude,
+                request.altitude,
+                request.trackingIntervalMs
+            )
+        }
+    }
+
+    /**
+     * TLE 데이터로 위성 궤도 추적 데이터를 생성합니다.
+     */
+    @PostMapping("/ephemeris/generate")
+    fun generateEphemerisTrack(@RequestBody request: EphemerisTrackRequest): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            val (mstData, dtlData) = satelliteTrackService.EphemerisDesignationTrack(
+                request.tleLine1,
+                request.tleLine2,
+                request.satelliteName
+            )
+
+            mapOf(
+                "message" to "위성 궤도 추적 데이터 생성 완료",
+                "mstCount" to mstData.size,
+                "dtlCount" to dtlData.size
+            )
+        }
+    }
+
+    /**
+     * 모든 위성 추적 마스터 데이터를 조회합니다.
+     */
+    @GetMapping("/ephemeris/master")
+    fun getAllEphemerisTrackMst(): Mono<List<Map<String, Any?>>> {
+        return Mono.fromCallable {
+            satelliteTrackService.getAllEphemerisTrackMst()
+        }
+    }
+
+    /**
+     * 특정 마스터 ID에 해당하는 세부 추적 데이터를 조회합니다.
+     */
+    @GetMapping("/ephemeris/detail/{mstId}")
+    fun getEphemerisTrackDtlByMstId(@PathVariable mstId: Int): Mono<List<Map<String, Any?>>> {
+        return Mono.fromCallable {
+            satelliteTrackService.getEphemerisTrackDtlByMstId(mstId)
+        }
     }
 }
 
@@ -182,4 +229,13 @@ data class SatelliteTrackingScheduleRequest(
     val longitude: Double,
     val altitude: Double = 0.0,
     val trackingIntervalMs: Int = 100 // 기본값 100ms
+)
+
+/**
+ * 위성 궤도 추적 요청 모델
+ */
+data class EphemerisTrackRequest(
+    val tleLine1: String,
+    val tleLine2: String,
+    val satelliteName: String? = null
 )
