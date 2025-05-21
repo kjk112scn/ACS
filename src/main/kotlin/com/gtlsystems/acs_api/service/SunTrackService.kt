@@ -27,8 +27,6 @@ class SunTrackService(
     private var sunTrackCommandSubscription: Disposable? = null
     private var eventSubscription: Disposable? = null
 
-
-
     @PostConstruct
     fun initialize() {
         try {

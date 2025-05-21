@@ -117,7 +117,98 @@ class JKUtil {
             val localNow: LocalDateTime = LocalDateTime.now()
             val addLocalTime: Int = 0
             val calLocalTime = utcNow.plusHours(addLocalTime.toLong())
+            /**
+             * UTC 시간에 지정된 시간(시간 단위)을 더한 결과를 반환합니다.
+             *
+             * @param utcTime UTC 기준 시간
+             * @param hoursToAdd 더할 시간 (시간 단위)
+             * @return 계산된 시간
+             */
+            fun addHoursToUtc(utcTime: ZonedDateTime, hoursToAdd: Int): ZonedDateTime {
+                // 입력 시간이 UTC가 아니면 UTC로 변환
+                val normalizedUtc = if (utcTime.zone != ZoneOffset.UTC) {
+                    utcTime.withZoneSameInstant(ZoneOffset.UTC)
+                } else {
+                    utcTime
+                }
 
+                // 시간 더하기
+                return normalizedUtc.plusHours(hoursToAdd.toLong())
+            }
+
+            /**
+             * UTC 시간에 지정된 시간(초 단위)을 더한 결과를 반환합니다.
+             *
+             * @param utcTime UTC 기준 시간
+             * @param secondsToAdd 더할 시간 (초 단위)
+             * @return 계산된 시간
+             */
+            fun addSecondsToUtc(utcTime: ZonedDateTime, secondsToAdd: Int): ZonedDateTime {
+                // 입력 시간이 UTC가 아니면 UTC로 변환
+                val normalizedUtc = if (utcTime.zone != ZoneOffset.UTC) {
+                    utcTime.withZoneSameInstant(ZoneOffset.UTC)
+                } else {
+                    utcTime
+                }
+
+                // 초 더하기
+                return normalizedUtc.plusSeconds(secondsToAdd.toLong())
+            }
+
+            /**
+             * UTC 시간에 지정된 시간(시간, 분, 초)을 더한 결과를 반환합니다.
+             *
+             * @param utcTime UTC 기준 시간
+             * @param hours 더할 시간
+             * @param minutes 더할 분
+             * @param seconds 더할 초
+             * @return 계산된 시간
+             */
+            fun addTimeToUtc(
+                utcTime: ZonedDateTime,
+                hours: Int = 0,
+                minutes: Int = 0,
+                seconds: Int = 0
+            ): ZonedDateTime {
+                // 입력 시간이 UTC가 아니면 UTC로 변환
+                val normalizedUtc = if (utcTime.zone != ZoneOffset.UTC) {
+                    utcTime.withZoneSameInstant(ZoneOffset.UTC)
+                } else {
+                    utcTime
+                }
+
+                // 시간, 분, 초 더하기
+                return normalizedUtc
+                    .plusHours(hours.toLong())
+                    .plusMinutes(minutes.toLong())
+                    .plusSeconds(seconds.toLong())
+            }
+
+            /**
+             * 현재 UTC 시간에 지정된 시간을 더한 결과를 반환합니다.
+             *
+             * @param hoursToAdd 더할 시간 (시간 단위)
+             * @return 계산된 시간
+             */
+            fun getCurrentTimeWithOffset(hoursToAdd: Int): ZonedDateTime {
+                val currentUtc = ZonedDateTime.now(ZoneOffset.UTC)
+                return currentUtc.plusHours(hoursToAdd.toLong())
+            }
+
+            /**
+             * 시간 문자열을 지정된 오프셋이 적용된 ZonedDateTime으로 변환합니다.
+             *
+             * @param timeString ISO 형식의 시간 문자열 (예: "2025-05-21T03:42:42.4Z")
+             * @param hoursToAdd 더할 시간 (시간 단위)
+             * @return 계산된 ZonedDateTime
+             */
+            fun parseTimeWithOffset(timeString: String, hoursToAdd: Int): ZonedDateTime {
+                // ISO 문자열을 UTC ZonedDateTime으로 파싱
+                val utcTime = ZonedDateTime.parse(timeString)
+
+                // 시간 더하기
+                return utcTime.plusHours(hoursToAdd.toLong())
+            }
         }
     }
 }

@@ -12,6 +12,7 @@ import com.gtlsystems.acs_api.algorithm.axistransformation.CoordinateTransformer
 import com.gtlsystems.acs_api.event.ACSEvent
 import com.gtlsystems.acs_api.event.ACSEventBus
 import com.gtlsystems.acs_api.event.subscribeToType
+import com.gtlsystems.acs_api.util.JKUtil
 import reactor.core.Disposable
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
@@ -54,6 +55,7 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator, priv
         val tle1 = "1 27424U 02022A   25140.87892865  .00001007  00000+0  21407-3 0  9994"
         val tle2 = "2 27424  98.3765  98.8898 0002026  95.1111 287.6547 14.61253205226005"
         generateEphemerisDesignationTrack(tle1,tle2,satelliteName)
+        //compareTrackingPerformance(tle1,tle2)
         //satelliteTest()
     }fun eventBus()
     {
@@ -100,6 +102,7 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator, priv
             logger.error("satellite_Test 실행 중 오류 발생: ${e.message}", e)
         }
     }
+
     fun calculateRotatorAngleTable(
         standardAzimuth: Double,
         standardElevation: Double,
@@ -122,41 +125,144 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator, priv
 
         logger.info("─────────────────────────────────────────────")
     }
-    fun SaveCSvFileSatelliteTrack()
-    {
-        val aquaId = "AQUA"
-        val aquaTleLine1 = "1 27424U 02022A   25134.85411318  .00000946  00000-0  20168-3 0  9990"
-        val aquaTleLine2 = "2 27424  98.3761  92.7913 0001892 100.4476 287.5765 14.61239902225127"
-        addSatelliteTle(aquaId, aquaTleLine1, aquaTleLine2)
-        // 위성 추적 스케줄 생성
-        val schedule = orekitCalculator.generateSatelliteTrackingSchedule(
-            tleLine1 = aquaTleLine1,
-            tleLine2 = aquaTleLine2,
-            startDate = trackingData.startDate,
-            durationDays = trackingData.durationDays.toInt(),
+    /*
+     * 위성 추적 성능 비교 메서드 (3가지 방식)
+     * 1. 기존 방식 (100ms 고정 간격)
+     * 2. 가변 간격 방식 (필요 시 100ms, 일반적으로 1000ms)
+     * 3. 최적화된 새로운 방식 (병렬 처리 + 적응형 간격 + 데이터 압축)
+     */
+    /**
+     * 위성 추적 성능 비교 메서드 (2가지 방식)
+     * 1. 기존 방식 (100ms 고정 간격)
+     * 2. 가변 간격 방식 (필요 시 100ms, 일반적으로 1000ms)
+     */
+    fun compareTrackingPerformance(tleLine1: String, tleLine2: String) {
+        logger.info("위성 추적 성능 비교 시작 (2가지 방식)")
+
+        // 오늘 날짜 기준
+        val today = ZonedDateTime.now().truncatedTo(ChronoUnit.DAYS)
+
+        // 1. 기존 방식 (100ms 고정 간격)
+        logger.info("1. 기존 방식 (100ms 고정 간격) 실행 중...")
+        val startTime1 = System.currentTimeMillis()
+        val schedule1 = orekitCalculator.generateSatelliteTrackingSchedule(
+            tleLine1 = tleLine1,
+            tleLine2 = tleLine2,
+            startDate = today,
+            durationDays = 2,
             minElevation = trackingData.minElevationAngle,
             latitude = locationData.latitude,
             longitude = locationData.longitude,
             altitude = locationData.altitude,
-            trackingIntervalMs = trackingData.msInterval
+            trackingIntervalMs = 100  // 고정 간격 100ms
         )
-        logger.info("위성 추적 스케줄 생성 완료: 총 ${schedule.trackingPasses.size}개 패스")
+        val endTime1 = System.currentTimeMillis()
+        val duration1 = endTime1 - startTime1
+        val points1 = schedule1.trackingPasses.sumOf { pass -> pass.trackingData.size }
+        val passes1 = schedule1.trackingPasses.size
 
-        // 3. 추적 데이터 파일로 저장
-        val outputDir = "tracking_data/aqua_test"
-        val filePrefix = "AQUA_20250514"
+        // 2. 가변 간격 방식 (필요 시 100ms, 일반적으로 1000ms)
+        logger.info("2. 가변 간격 방식 (100ms/1000ms) 실행 중...")
+        val startTime2 = System.currentTimeMillis()
+        val schedule2 = orekitCalculator.generateSatelliteTrackingScheduleWithVariableInterval(
+            tleLine1 = tleLine1,
+            tleLine2 = tleLine2,
+            startDate = today,
+            durationDays = 2,
+            minElevation = trackingData.minElevationAngle,
+            latitude = locationData.latitude,
+            longitude = locationData.longitude,
+            altitude = locationData.altitude,
+            fineIntervalMs = 100,    // 정밀 계산 간격 100ms
+            coarseIntervalMs = 1000,  // 일반 계산 간격 1000ms
+            1
+        )
+        val endTime2 = System.currentTimeMillis()
+        val duration2 = endTime2 - startTime2
+        val points2 = schedule2.trackingPasses.sumOf { pass -> pass.trackingData.size }
+        val passes2 = schedule2.trackingPasses.size
 
-        logger.info("추적 데이터 파일 저장 시작: 출력 디렉토리=${outputDir}")
+        // 결과 출력
+        logger.info("성능 비교 결과:")
+        logger.info("1. 기존 방식 (100ms 고정 간격)")
+        logger.info("   - 실행 시간: ${duration1}ms")
+        logger.info("   - 패스 수: ${passes1}개")
+        logger.info("   - 데이터 포인트: ${points1}개")
+        logger.info("   - 패스당 평균 포인트: ${if (passes1 > 0) points1 / passes1 else 0}개")
 
-        val savedFiles = orekitCalculator.saveAllTrackingData(schedule, outputDir, filePrefix)
+        logger.info("2. 가변 간격 방식 (100ms/1000ms)")
+        logger.info("   - 실행 시간: ${duration2}ms")
+        logger.info("   - 패스 수: ${passes2}개")
+        logger.info("   - 데이터 포인트: ${points2}개")
+        logger.info("   - 패스당 평균 포인트: ${if (passes2 > 0) points2 / passes2 else 0}개")
+        logger.info("   - 기존 대비 속도: ${String.format("%.2f", duration1.toDouble() / duration2.toDouble())}배")
+        logger.info("   - 기존 대비 데이터 감소율: ${String.format("%.2f", (1 - points2.toDouble() / points1.toDouble()) * 100)}%")
 
-        logger.info("추적 데이터 파일 저장 완료: 총 ${savedFiles.size}개 파일 생성")
-        logger.info("생성된 파일 목록:")
-        savedFiles.forEach { filePath ->
-            logger.info("- $filePath")
+        // 패스별 세부 비교 (첫 번째 패스만)
+        if (passes1 > 0 && passes2 > 0) {
+            logger.info("첫 번째 패스 세부 비교:")
+
+            val pass1 = schedule1.trackingPasses[0]
+            val pass2 = schedule2.trackingPasses[0]
+
+            logger.info("   - 기존 방식: ${pass1.trackingData.size}개 포인트, 최대 고도각: ${String.format("%.2f", pass1.maxElevation)}°")
+            logger.info("   - 가변 간격 방식: ${pass2.trackingData.size}개 포인트, 최대 고도각: ${String.format("%.2f", pass2.maxElevation)}°")
+
+            // 각속도 및 각가속도 비교
+            logger.info("각속도 및 각가속도 비교:")
+            logger.info("   - 기존 방식: 최대 Az속도=${String.format("%.2f", pass1.maxAzimuthRate)}°/s, 최대 El속도=${String.format("%.2f", pass1.maxElevationRate)}°/s")
+            logger.info("   - 가변 간격 방식: 최대 Az속도=${String.format("%.2f", pass2.maxAzimuthRate)}°/s, 최대 El속도=${String.format("%.2f", pass2.maxElevationRate)}°/s")
+
+            logger.info("   - 기존 방식: 최대 Az가속도=${String.format("%.2f", pass1.maxAzimuthAccel)}°/s², 최대 El가속도=${String.format("%.2f", pass1.maxElevationAccel)}°/s²")
+            logger.info("   - 가변 간격 방식: 최대 Az가속도=${String.format("%.2f", pass2.maxAzimuthAccel)}°/s², 최대 El가속도=${String.format("%.2f", pass2.maxElevationAccel)}°/s²")
         }
-    }
 
+        // 정확도 검증 (첫 번째 패스의 시작, 중간, 끝 지점 비교)
+        if (passes1 > 0 && passes2 > 0) {
+            val pass1 = schedule1.trackingPasses[0]
+            val pass2 = schedule2.trackingPasses[0]
+
+            if (pass1.trackingData.isNotEmpty() && pass2.trackingData.isNotEmpty()) {
+                logger.info("정확도 검증 (첫 번째 패스):")
+
+                // 시작 지점 비교
+                val start1 = pass1.trackingData.first()
+                val start2 = pass2.trackingData.first()
+
+                logger.info("시작 지점:")
+                logger.info("   - 기존 방식: Az=${String.format("%.2f", start1.azimuth)}°, El=${String.format("%.2f", start1.elevation)}°")
+                logger.info("   - 가변 간격 방식: Az=${String.format("%.2f", start2.azimuth)}°, El=${String.format("%.2f", start2.elevation)}°")
+
+                // 끝 지점 비교
+                val end1 = pass1.trackingData.last()
+                val end2 = pass2.trackingData.last()
+
+                logger.info("끝 지점:")
+                logger.info("   - 기존 방식: Az=${String.format("%.2f", end1.azimuth)}°, El=${String.format("%.2f", end1.elevation)}°")
+                logger.info("   - 가변 간격 방식: Az=${String.format("%.2f", end2.azimuth)}°, El=${String.format("%.2f", end2.elevation)}°")
+
+                // 최대 고도각 시간 비교
+                logger.info("최대 고도각 시간:")
+                logger.info("   - 기존 방식: ${pass1.maxElevationTime?.format(DateTimeFormatter.ISO_LOCAL_TIME) ?: "N/A"}")
+                logger.info("   - 가변 간격 방식: ${pass2.maxElevationTime?.format(DateTimeFormatter.ISO_LOCAL_TIME) ?: "N/A"}")
+            }
+        }
+
+        // 메모리 사용량 비교 (대략적인 추정)
+        val memory1 = points1 * 40 // 각 데이터 포인트는 약 40바이트로 가정
+        val memory2 = points2 * 40
+
+        logger.info("메모리 사용량 추정:")
+        logger.info("   - 기존 방식: ${memory1 / 1024} KB")
+        logger.info("   - 가변 간격 방식: ${memory2 / 1024} KB (${String.format("%.2f", memory2 * 100.0 / memory1)}%)")
+
+        logger.info("위성 추적 성능 비교 완료")
+
+        // 결과 요약
+        logger.info("성능 비교 요약:")
+        logger.info("1. 기존 방식 (100ms 고정 간격): ${duration1}ms, ${points1}개 포인트")
+        logger.info("2. 가변 간격 방식: ${duration2}ms (${String.format("%.2f", duration1.toDouble() / duration2.toDouble())}배 빠름), ${points2}개 포인트 (${String.format("%.2f", points2 * 100.0 / points1)}%)")
+    }
 
     /**
      * TLE 데이터로 위성 궤도 추적
@@ -176,11 +282,8 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator, priv
 
             logger.info("$actualSatelliteName 위성의 궤도 추적 시작")
 
-            // 추적 기간 설정 (오늘 00시부터 2일 후까지)
+            // 추적 기간 설정 (오늘 00시부터 내일 00시까지)
             val today = ZonedDateTime.now().truncatedTo(ChronoUnit.DAYS)
-            val endDate = today.plusDays(2)
-
-            logger.info("추적 기간: ${today.format(DateTimeFormatter.ISO_LOCAL_DATE)} ~ ${endDate.format(DateTimeFormatter.ISO_LOCAL_DATE)}")
 
             // 추적 스케줄을 위한 마스터 리스트 생성
             val ephemerisTrackMst = mutableListOf<Map<String, Any?>>()
@@ -189,39 +292,27 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator, priv
             val ephemerisTrackDtl = mutableListOf<Map<String, Any?>>()
 
             // 위성 추적 스케줄 생성
-            val schedule = orekitCalculator.generateSatelliteTrackingSchedule(
+            val schedule = orekitCalculator.generateSatelliteTrackingScheduleWithVariableInterval(
                 tleLine1 = tleLine1,
                 tleLine2 = tleLine2,
                 startDate = today,
-                durationDays = 2,  // 명확하게 2일로 설정
+                durationDays = 2,
                 minElevation = trackingData.minElevationAngle,
                 latitude = locationData.latitude,
                 longitude = locationData.longitude,
                 altitude = locationData.altitude,
-                trackingIntervalMs = trackingData.msInterval
+                fineIntervalMs = 100,    // 정밀 계산 간격 100ms
+                coarseIntervalMs = 1000,  // 일반 계산 간격 1000ms
+                transitionSeconds = 1
             )
 
             logger.info("위성 추적 스케줄 생성 완료: ${schedule.trackingPasses.size}개 패스")
-
-            if (schedule.trackingPasses.isNotEmpty()) {
-                logger.info("첫 번째 패스 시작: ${schedule.trackingPasses.first().startTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}")
-                logger.info("마지막 패스 종료: ${schedule.trackingPasses.last().endTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}")
-
-                // 날짜별 패스 수 계산
-                val passesByDate = schedule.trackingPasses.groupBy { it.startTime.toLocalDate() }
-                passesByDate.forEach { (date, passes) ->
-                    logger.info("${date} 날짜의 패스 수: ${passes.size}개")
-                }
-            } else {
-                logger.warn("생성된 패스가 없습니다!")
-            }
 
             // 생성 메타데이터를 위한 현재 날짜와 사용자 정보
             val creationDate = ZonedDateTime.now()
             val creator = "System"
 
             // 스케줄 정보로 마스터 리스트 채우기
-            var totalDataPoints = 0
             schedule.trackingPasses.forEachIndexed { index, pass ->
                 val mstId = index + 1
 
@@ -229,12 +320,12 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator, priv
                 val startTimeWithMs = pass.startTime
                 val endTimeWithMs = pass.endTime
 
-                // 시작 시간과 종료 시간을 문자열로 변환 (밀리초 포함)
-                val startTimeStr = startTimeWithMs.format(timeFormatterWithMillis)
-                val endTimeStr = endTimeWithMs.format(timeFormatterWithMillis)
 
-                logger.info("패스 #$mstId: 시작=$startTimeStr, 종료=$endTimeStr, 데이터 포인트 수=${pass.trackingData.size}")
-                totalDataPoints += pass.trackingData.size
+                // 시작 시간과 종료 시간을 문자열로 변환 (밀리초 포함)
+                val startTimeStr = JKUtil.JKTime.addHoursToUtc(startTimeWithMs, GlobalData.Time.addLocalTime)
+                val endTimeStr = JKUtil.JKTime.addHoursToUtc(endTimeWithMs, GlobalData.Time.addLocalTime)
+
+                logger.info("패스 #$mstId: 시작=$startTimeStr, 종료=$endTimeStr")
 
                 ephemerisTrackMst.add(mapOf(
                     "No" to mstId,
@@ -242,8 +333,8 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator, priv
                     "SatelliteName" to actualSatelliteName,
                     "StartTime" to startTimeWithMs,
                     "EndTime" to endTimeWithMs,
-                    "StartTimeStr" to startTimeStr,
-                    "EndTimeStr" to endTimeStr,
+                    "StartTimeStr" to startTimeStr,  // 문자열 형식의 시간도 추가
+                    "EndTimeStr" to endTimeStr,      // 문자열 형식의 시간도 추가
                     "Duration" to pass.getDurationString(),
                     "MaxElevation" to pass.maxElevation,
                     "MaxElevationTime" to pass.maxElevationTime,
@@ -256,19 +347,14 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator, priv
                     "MaxAzAccel" to pass.maxAzimuthAccel,
                     "MaxElAccel" to pass.maxElevationAccel,
                     "CreationDate" to creationDate,
-                    "Creator" to creator,
-                    "DataPointCount" to pass.trackingData.size  // 데이터 포인트 수 추가
+                    "Creator" to creator
                 ))
 
                 // 추적 좌표로 세부 리스트 채우기
-                if (pass.trackingData.isEmpty()) {
-                    logger.warn("패스 #$mstId 에 데이터 포인트가 없습니다!")
-                }
-
                 pass.trackingData.forEachIndexed { dtlIndex, data ->
                     ephemerisTrackDtl.add(mapOf(
                         "No" to (dtlIndex + 1),
-                        "MstId" to mstId,
+                        "MstId" to mstId,  // 마스터 리스트의 No 값을 MstId로 사용
                         "Time" to data.timestamp,
                         "Azimuth" to data.azimuth,
                         "Elevation" to data.elevation,
@@ -279,7 +365,6 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator, priv
             }
 
             logger.info("위성 궤도 추적 데이터 생성 완료: ${ephemerisTrackMst.size}개 스케줄 항목과 ${ephemerisTrackDtl.size}개 좌표 포인트")
-            logger.info("총 데이터 포인트 수: $totalDataPoints")
 
             // 저장소에 데이터 저장
             ephemerisTrackMstStorage.clear()
@@ -291,10 +376,10 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator, priv
 
         } catch (e: Exception) {
             logger.error("위성 궤도 추적 중 오류 발생: ${e.message}", e)
-            e.printStackTrace()  // 스택 트레이스 출력
             throw e
         }
     }
+
     fun startEphemerisTracking(passId: Int)
     {
         startSatelliteTracking(passId)
@@ -319,13 +404,10 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator, priv
             currentTrackingPass = selectedPass
 
             // 패스 시작 및 종료 시간 가져오기
-            val startTime = selectedPass["StartTime"] as ZonedDateTime
-            val endTime = selectedPass["EndTime"] as ZonedDateTime
+            val startTime = (selectedPass["StartTime"] as ZonedDateTime).plus(GlobalData.Time.addLocalTime.toLong(), ChronoUnit.SECONDS)
+            val endTime = (selectedPass["EndTime"] as ZonedDateTime).plus(GlobalData.Time.addLocalTime.toLong(), ChronoUnit.SECONDS)
 
             // 시작 시간과 종료 시간을 문자열로 변환 (밀리초 포함)
-            val startTimeStr = startTime.format(timeFormatterWithMillis)
-            val endTimeStr = endTime.format(timeFormatterWithMillis)
-
             logger.info("위성 추적 시작: ${selectedPass["SatelliteName"]} (패스 ID: $passId)")
             logger.info("시작 시간: $startTime, 종료 시간: $endTime")
 

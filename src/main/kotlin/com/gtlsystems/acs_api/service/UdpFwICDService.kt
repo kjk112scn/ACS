@@ -3,6 +3,7 @@ package com.gtlsystems.acs_api.service
 import com.gtlsystems.acs_api.event.ACSEvent
 import com.gtlsystems.acs_api.event.ACSEventBus
 import com.gtlsystems.acs_api.model.GlobalData
+import com.gtlsystems.acs_api.model.GlobalData.Time.calUtcTimeOffsetTime
 import com.gtlsystems.acs_api.model.PushData
 import com.gtlsystems.acs_api.util.JKUtil
 import com.gtlsystems.acs_api.util.JKUtil.JKConvert.Companion.byteArrayToHexString
@@ -241,7 +242,7 @@ class UdpFwICDService(
     // TimeOffsetCommand 전송 함수
     fun timeOffsetCommand(inputTimeOffset: Float) {
         try {
-            var localTime = JKUtil.JKTime.calLocalTime
+            var localTime = calUtcTimeOffsetTime
             val setDataFrameInstance = ICDService.TimeOffset.SetDataFrame(
                 stx = 0x02,
                 cmdOne = 'O',

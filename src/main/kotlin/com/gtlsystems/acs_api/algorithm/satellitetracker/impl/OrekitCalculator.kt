@@ -1,7 +1,9 @@
 package com.gtlsystems.acs_api.algorithm.satellitetracker.impl
 
-import com.gtlsystems.acs_api.algorithm.satellitetracker.impl.OrekitCalculator.VisibilityPeriod
-import java.util.concurrent.Future
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import com.gtlsystems.acs_api.algorithm.satellitetracker.interfaces.SatellitePositionCalculator
 import com.gtlsystems.acs_api.algorithm.satellitetracker.model.SatelliteTrackData
 import org.hipparchus.ode.events.Action
@@ -431,20 +433,8 @@ class OrekitCalculator : SatellitePositionCalculator {
             throw e
         }
     }
-
     /**
      * 지정된 기간 동안 위성 추적 스케줄을 생성합니다.
-     *
-     * @param tleLine1 TLE 첫 번째 줄
-     * @param tleLine2 TLE 두 번째 줄
-     * @param startDate 시작 날짜
-     * @param durationDays 계산할 기간(일)
-     * @param minElevation 최소 고도각(도)
-     * @param latitude 지상국 위도
-     * @param longitude 지상국 경도
-     * @param altitude 지상국 고도
-     * @param trackingIntervalMs 추적 데이터 간격(밀리초)
-     * @return 위성 추적 스케줄 (가시성 기간 및 상세 추적 데이터)
      */
     fun generateSatelliteTrackingSchedule(
         tleLine1: String,
@@ -542,7 +532,7 @@ class OrekitCalculator : SatellitePositionCalculator {
     }
     /**
      * 지정된 시간 범위 내에서 상세 추적 데이터를 생성합니다.
-     * 최소 고도각 이상인 데이터만 포함합니다.
+     * 시작과 종료 부근에서는 작은 간격으로, 그 사이에는 큰 간격으로 계산합니다.
      */
     fun generateDetailedTrackingData(
         tleLine1: String,
@@ -677,6 +667,267 @@ class OrekitCalculator : SatellitePositionCalculator {
         }
     }
 
+    fun generateDetailedTrackingDataWithVariableInterval(
+        tleLine1: String,
+        tleLine2: String,
+        startTime: ZonedDateTime,
+        endTime: ZonedDateTime,
+        fineIntervalMs: Int = 100,     // 정밀 계산 간격 (ms)
+        coarseIntervalMs: Int = 1000,  // 일반 계산 간격 (ms)
+        transitionSeconds: Int = 30,   // 시작/종료 부근 정밀 계산 구간 (초)
+        latitude: Double,
+        longitude: Double,
+        altitude: Double = 0.0,
+        minElevation: Float = 0.0f
+    ): List<SatelliteTrackData> {
+        val trackingData = mutableListOf<SatelliteTrackData>()
+
+        logger.info("상세 추적 데이터 생성 시작: ${startTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)} ~ ${endTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}")
+        logger.info("정밀 간격: ${fineIntervalMs}ms, 일반 간격: ${coarseIntervalMs}ms, 전환 구간: ${transitionSeconds}초")
+
+        try {
+            // TLE 객체 생성
+            val tle = TLE(tleLine1, tleLine2)
+            val propagator = TLEPropagator.selectExtrapolator(tle)
+
+            // 지상국 위치 설정
+            val stationPosition = GeodeticPoint(
+                FastMath.toRadians(latitude),
+                FastMath.toRadians(longitude),
+                altitude
+            )
+            val stationFrame = TopocentricFrame(earth, stationPosition, "GroundStation")
+
+            // 시간 간격으로 위성 위치 계산
+            var currentTime = startTime
+            val utcScale = TimeScalesFactory.getUTC()
+            var pointsCalculated = 0
+            var pointsAdded = 0
+
+            // 전환 시간 계산
+            val startTransitionEnd = startTime.plusSeconds(transitionSeconds.toLong())
+            val endTransitionStart = endTime.minusSeconds(transitionSeconds.toLong())
+
+            // 패스 총 시간 계산
+            val totalDurationSeconds = Duration.between(startTime, endTime).seconds
+            logger.info("패스 총 시간: ${totalDurationSeconds}초")
+
+            while (!currentTime.isAfter(endTime)) {
+                // 현재 시간에 따라 간격 결정
+                val currentInterval = when {
+                    currentTime.isBefore(startTransitionEnd) -> fineIntervalMs  // 시작 부근
+                    currentTime.isAfter(endTransitionStart) -> fineIntervalMs   // 종료 부근
+                    else -> coarseIntervalMs                                    // 중간 부분
+                }
+
+                pointsCalculated++
+
+                val date = AbsoluteDate(
+                    currentTime.year, currentTime.monthValue, currentTime.dayOfMonth,
+                    currentTime.hour, currentTime.minute, currentTime.second + currentTime.nano / 1e9,
+                    utcScale
+                )
+
+                val state = propagator.propagate(date)
+                val pvInStation = state.getPVCoordinates(stationFrame)
+                val posInStation = pvInStation.position
+
+                // 직교 좌표를 구면 좌표로 변환
+                val x = posInStation.x
+                val y = posInStation.y
+                val z = posInStation.z
+                val distance = posInStation.norm
+
+                // 고도각 계산
+                val elevation = FastMath.toDegrees(FastMath.asin(z / distance))
+
+                // 최소 고도각 이상인 경우에만 데이터 추가
+                if (elevation >= minElevation) {
+                    // 방위각 계산
+                    val azimuth = FastMath.toDegrees(FastMath.atan2(x, y))
+                    val normalizedAzimuth = if (azimuth < 0) azimuth + 360.0 else azimuth
+
+                    // 위성의 지구 중심 좌표에서 고도 계산
+                    val satellitePosition = state.getPVCoordinates(earthFrame).position
+                    val satelliteRadius = satellitePosition.norm
+                    val satelliteAltitude = (satelliteRadius - Constants.WGS84_EARTH_EQUATORIAL_RADIUS) / 1000.0 // km
+
+                    trackingData.add(
+                        SatelliteTrackData(
+                            azimuth = normalizedAzimuth,
+                            elevation = elevation,
+                            timestamp = currentTime,
+                            range = distance / 1000.0, // 미터에서 킬로미터로 변환
+                            altitude = satelliteAltitude
+                        )
+                    )
+                    pointsAdded++
+                }
+
+                // 다음 시간으로 이동 (현재 간격 사용)
+                currentTime = currentTime.plus(currentInterval.toLong(), ChronoUnit.MILLIS)
+            }
+
+            logger.info("상세 추적 데이터 생성 완료: 계산된 포인트 ${pointsCalculated}개, 추가된 포인트 ${pointsAdded}개")
+
+            // 데이터가 없는 경우 로그 출력
+            if (trackingData.isEmpty()) {
+                logger.warn("생성된 추적 데이터가 없습니다! 시간 범위나 최소 고도각 설정을 확인하세요.")
+            }
+
+            return trackingData
+        } catch (e: Exception) {
+            logger.error("상세 추적 데이터 생성 중 오류 발생: ${e.message}", e)
+            e.printStackTrace()
+            throw e
+        }
+    }
+    fun generateSatelliteTrackingScheduleWithVariableInterval(
+        tleLine1: String,
+        tleLine2: String,
+        startDate: ZonedDateTime,
+        durationDays: Int = 1,
+        minElevation: Float = 0.0f,
+        latitude: Double,
+        longitude: Double,
+        altitude: Double = 0.0,
+        fineIntervalMs: Int = 100,     // 정밀 계산 간격 (ms)
+        coarseIntervalMs: Int = 1000,  // 일반 계산 간격 (ms)
+        transitionSeconds: Int = 30,   // 시작/종료 부근 정밀 계산 구간 (초)
+        parallelProcessing: Boolean = true  // 병렬 처리 활성화 여부
+    ): SatelliteTrackingSchedule {
+        logger.info("위성 추적 스케줄 생성 시작 (가변 간격${if(parallelProcessing) ", 병렬 처리" else ""}): ${startDate}, 기간: ${durationDays}일")
+        logger.info("정밀 간격: ${fineIntervalMs}ms, 일반 간격: ${coarseIntervalMs}ms, 전환 구간: ${transitionSeconds}초")
+
+        val endDate = startDate.plusDays(durationDays.toLong())
+        logger.info("스케줄 기간: ${startDate.format(DateTimeFormatter.ISO_LOCAL_DATE)} ~ ${endDate.format(DateTimeFormatter.ISO_LOCAL_DATE)}")
+
+        try {
+            // 1. 먼저 가시성 기간을 계산 (두 단계 간격 사용)
+            logger.info("가시성 기간 계산 시작...")
+            val visibilityStartTime = System.currentTimeMillis()
+            val visibilityPeriods = calculateVisibilityPeriodsWithMaxElevation(
+                tleLine1, tleLine2, startDate, durationDays, minElevation,
+                latitude, longitude, altitude,
+                fineTimeStepMs = fineIntervalMs,     // 정밀 계산 간격
+                coarseTimeStepMs = coarseIntervalMs  // 일반 계산 간격
+            )
+            val visibilityEndTime = System.currentTimeMillis()
+            val visibilityDuration = visibilityEndTime - visibilityStartTime
+            logger.info("가시성 기간 계산 완료: ${visibilityPeriods.size}개 기간 발견 (소요 시간: ${visibilityDuration}ms)")
+
+            // 2. 각 가시성 기간에 대해 상세 추적 데이터 생성 (병렬 처리 적용)
+            logger.info("상세 추적 데이터 생성 시작${if(parallelProcessing) " (병렬 처리)" else ""}...")
+            val detailStartTime = System.currentTimeMillis()
+
+            val trackingPasses = if (parallelProcessing) {
+                // 병렬 처리 방식 (코루틴 사용)
+                runBlocking {
+                    visibilityPeriods.mapIndexed { index, period ->
+                        async(Dispatchers.Default) {
+                            logger.info("패스 ${index + 1}/${visibilityPeriods.size} 병렬 처리 시작: ${period.startTime} ~ ${period.endTime}")
+
+                            // 각 가시성 기간에 대한 상세 추적 데이터 생성
+                            val detailedTrackingData = generateDetailedTrackingDataWithVariableInterval(
+                                tleLine1, tleLine2, period.startTime, period.endTime,
+                                fineIntervalMs, coarseIntervalMs, transitionSeconds,
+                                latitude, longitude, altitude, minElevation
+                            )
+
+                            logger.info("패스 ${index + 1} 병렬 처리 완료: ${detailedTrackingData.size}개 포인트")
+
+                            // 시작 및 종료 각도 추출 (안전하게 처리)
+                            val startAzimuth = detailedTrackingData.firstOrNull()?.azimuth ?: 0.0
+                            val startElevation = detailedTrackingData.firstOrNull()?.elevation ?: 0.0
+                            val endAzimuth = detailedTrackingData.lastOrNull()?.azimuth ?: 0.0
+                            val endElevation = detailedTrackingData.lastOrNull()?.elevation ?: 0.0
+                            val startTime = period.startTime.plus(GlobalData.Time.addLocalTime.toLong(), ChronoUnit.MILLIS)
+                            val endTime = period.endTime.plus(GlobalData.Time.addLocalTime.toLong(), ChronoUnit.MILLIS)
+                            SatelliteTrackingPass(
+                                startTime = startTime,
+                                endTime = endTime,
+                                maxElevation = period.maxElevation,
+                                maxElevationTime = period.maxElevationTime,
+                                duration = period.duration,
+                                trackingData = detailedTrackingData,
+                                maxAzimuthRate = period.maxAzimuthRate,
+                                maxElevationRate = period.maxElevationRate,
+                                maxAzimuthAccel = period.maxAzimuthAccel,
+                                maxElevationAccel = period.maxElevationAccel,
+                                startAzimuth = startAzimuth,
+                                startElevation = startElevation,
+                                endAzimuth = endAzimuth,
+                                endElevation = endElevation
+                            )
+                        }
+                    }.awaitAll()  // 모든 비동기 작업이 완료될 때까지 대기
+                }
+            } else {
+                // 순차 처리 방식 (기존 방식)
+                visibilityPeriods.mapIndexed { index, period ->
+                    logger.info("패스 ${index + 1}/${visibilityPeriods.size} 순차 처리 중: ${period.startTime} ~ ${period.endTime}")
+
+                    val detailedTrackingData = generateDetailedTrackingDataWithVariableInterval(
+                        tleLine1, tleLine2, period.startTime, period.endTime,
+                        fineIntervalMs, coarseIntervalMs, transitionSeconds,
+                        latitude, longitude, altitude, minElevation
+                    )
+
+                    logger.info("패스 ${index + 1} 데이터 생성 완료: ${detailedTrackingData.size}개 포인트")
+
+                    val startAzimuth = detailedTrackingData.firstOrNull()?.azimuth ?: 0.0
+                    val startElevation = detailedTrackingData.firstOrNull()?.elevation ?: 0.0
+                    val endAzimuth = detailedTrackingData.lastOrNull()?.azimuth ?: 0.0
+                    val endElevation = detailedTrackingData.lastOrNull()?.elevation ?: 0.0
+                    val startTime = period.startTime.plus(GlobalData.Time.addLocalTime.toLong(), ChronoUnit.MILLIS)
+                    val endTime = period.endTime.plus(GlobalData.Time.addLocalTime.toLong(), ChronoUnit.MILLIS)
+                    SatelliteTrackingPass(
+                        startTime = startTime,
+                        endTime = endTime,
+                        maxElevation = period.maxElevation,
+                        maxElevationTime = period.maxElevationTime,
+                        duration = period.duration,
+                        trackingData = detailedTrackingData,
+                        maxAzimuthRate = period.maxAzimuthRate,
+                        maxElevationRate = period.maxElevationRate,
+                        maxAzimuthAccel = period.maxAzimuthAccel,
+                        maxElevationAccel = period.maxElevationAccel,
+                        startAzimuth = startAzimuth,
+                        startElevation = startElevation,
+                        endAzimuth = endAzimuth,
+                        endElevation = endElevation
+                    )
+                }
+            }
+
+            val detailEndTime = System.currentTimeMillis()
+            val detailDuration = detailEndTime - detailStartTime
+            val totalPoints = trackingPasses.sumOf { it.trackingData.size }
+            logger.info("상세 추적 데이터 생성 완료: 총 ${totalPoints}개 데이터 포인트 (소요 시간: ${detailDuration}ms)")
+
+            // 처리 속도 계산 (초당 포인트 수)
+            val pointsPerSecond = if (detailDuration > 0) (totalPoints * 1000.0 / detailDuration).toInt() else 0
+            logger.info("처리 속도: 초당 약 ${pointsPerSecond}개 포인트")
+
+            return SatelliteTrackingSchedule(
+                satelliteTle1 = tleLine1,
+                satelliteTle2 = tleLine2,
+                startDate = startDate,
+                endDate = endDate,
+                stationLatitude = latitude,
+                stationLongitude = longitude,
+                stationAltitude = altitude,
+                minElevation = minElevation,
+                trackingIntervalMs = fineIntervalMs,  // 정밀 간격을 기준 간격으로 사용
+                trackingPasses = trackingPasses
+            )
+        } catch (e: Exception) {
+            logger.error("위성 추적 스케줄 생성 중 오류 발생 (가변 간격): ${e.message}", e)
+            e.printStackTrace()
+            throw e
+        }
+    }
+
     /**
      * 위성 추적 스케줄 데이터 클래스
      */
@@ -797,6 +1048,7 @@ class OrekitCalculator : SatellitePositionCalculator {
      */
     /**
      * 특정 기간 동안 최소 고도각 이상인 위성 가시성 기간을 계산합니다.
+     * 가시성 시작과 종료 부근에서는 작은 간격으로, 그 사이에는 큰 간격으로 계산합니다.
      */
     fun calculateVisibilityPeriodsWithMaxElevation(
         tleLine1: String,
@@ -807,10 +1059,12 @@ class OrekitCalculator : SatellitePositionCalculator {
         latitude: Double,
         longitude: Double,
         altitude: Double = 0.0,
-        timeStepMs: Int = 100
+        fineTimeStepMs: Int = 100,    // 정밀 계산 간격 (ms)
+        coarseTimeStepMs: Int = 1000  // 일반 계산 간격 (ms)
     ): List<VisibilityPeriod> {
         val endTime = startTime.plusDays(durationDays.toLong())
         logger.info("가시성 기간 계산: ${startTime.format(DateTimeFormatter.ISO_LOCAL_DATE)} ~ ${endTime.format(DateTimeFormatter.ISO_LOCAL_DATE)}")
+        logger.info("정밀 계산 간격: ${fineTimeStepMs}ms, 일반 계산 간격: ${coarseTimeStepMs}ms")
 
         val visibilityPeriods = mutableListOf<VisibilityPeriod>()
         var visibilityStart: ZonedDateTime? = null
@@ -829,6 +1083,12 @@ class OrekitCalculator : SatellitePositionCalculator {
         var prevAzimuthRate: Double? = null
         var prevElevationRate: Double? = null
         var prevTime: ZonedDateTime? = null
+
+        // 가시성 상태 변화 감지를 위한 변수
+        var isVisible = false
+        var wasVisible = false
+        var transitionDetected = false
+        var currentTimeStep = coarseTimeStepMs // 기본적으로 큰 간격 사용
 
         try {
             // TLE 객체 생성
@@ -849,18 +1109,14 @@ class OrekitCalculator : SatellitePositionCalculator {
             val startDate = toAbsoluteDate(startTime)
             val endDate = toAbsoluteDate(endTime)
 
-            // 시간 간격 설정 (밀리초 단위)
-            val timeStep = timeStepMs / 1000.0  // 초 단위로 변환
-
             // 시간 범위 설정
             var currentDate = startDate
             var currentTime = startTime
             var pointsCalculated = 0
-            var pointsAboveMinElevation = 0
 
-            logger.info("가시성 계산 시작: 시간 간격=${timeStepMs}ms, 최소 고도각=${minElevation}°")
+            logger.info("가시성 계산 시작...")
 
-            while (currentDate.compareTo(endDate) < 0) {
+            while (currentTime.isBefore(endTime)) {
                 pointsCalculated++
 
                 // 위성 위치 계산
@@ -870,6 +1126,99 @@ class OrekitCalculator : SatellitePositionCalculator {
                 // 방위각과 고도각 계산
                 val azimuth = Math.toDegrees(Math.atan2(position.y, position.x))
                 val elevation = Math.toDegrees(Math.atan2(position.z, Math.sqrt(position.x * position.x + position.y * position.y)))
+
+                // 현재 가시성 상태 확인
+                wasVisible = isVisible
+                isVisible = elevation >= minElevation
+
+                // 가시성 상태 변화 감지
+                transitionDetected = wasVisible != isVisible
+
+                // 상태 변화가 감지되면 정밀 간격으로 전환
+                if (transitionDetected) {
+                    // 상태 변화가 감지되면 이전 시점으로 돌아가서 정밀 간격으로 다시 계산
+                    if (currentTimeStep == coarseTimeStepMs) {
+                        logger.debug("가시성 상태 변화 감지: ${if (isVisible) "보이기 시작" else "보이지 않기 시작"} - 정밀 계산으로 전환")
+
+                        // 이전 시점으로 돌아가기 (최대 coarseTimeStepMs만큼)
+                        val backtrackTime = currentTime.minus(coarseTimeStepMs.toLong(), ChronoUnit.MILLIS)
+                        if (backtrackTime.isAfter(startTime)) {
+                            currentTime = backtrackTime
+                            currentDate = toAbsoluteDate(currentTime)
+                            currentTimeStep = fineTimeStepMs
+
+                            // 이전 상태 초기화 (다시 계산하기 위해)
+                            isVisible = false
+                            wasVisible = false
+                            transitionDetected = false
+                            continue
+                        }
+                    }
+                }
+
+                // 가시성 상태에 따른 처리
+                if (isVisible) {
+                    // 가시성 시작
+                    if (!wasVisible) {
+                        visibilityStart = currentTime
+                        maxElevationInPass = elevation
+                        maxElevationTime = currentTime
+
+                        // 새로운 가시성 기간이 시작될 때 최대값 초기화
+                        maxAzimuthRate = 0.0
+                        maxElevationRate = 0.0
+                        maxAzimuthAccel = 0.0
+                        maxElevationAccel = 0.0
+
+                        logger.debug("가시성 기간 시작: ${currentTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}, 고도각: ${elevation}°")
+
+                        // 정밀 간격 유지 (시작 부근)
+                        currentTimeStep = fineTimeStepMs
+                    }
+
+                    // 최대 고도각 업데이트
+                    if (elevation > maxElevationInPass) {
+                        maxElevationInPass = elevation
+                        maxElevationTime = currentTime
+                    }
+
+                    // 가시성 중간 부분에서는 큰 간격으로 전환
+                    if (wasVisible && maxElevationInPass - elevation > 5.0) {
+                        // 최대 고도각을 지나 하강 중이면 다시 정밀 간격으로
+                        currentTimeStep = fineTimeStepMs
+                    } else if (wasVisible && currentTimeStep == fineTimeStepMs && elevation > minElevation + 5.0) {
+                        // 충분히 고도각이 높아지면 큰 간격으로 전환
+                        currentTimeStep = coarseTimeStepMs
+                    }
+                } else {
+                    // 가시성 종료
+                    if (wasVisible) {
+                        logger.debug("가시성 기간 종료: ${currentTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}")
+                        logger.debug("패스 정보: 시작=${visibilityStart?.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}, 종료=${currentTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}, 최대고도각=${maxElevationInPass}°")
+
+                        if (visibilityStart != null) {
+                            visibilityPeriods.add(
+                                VisibilityPeriod(
+                                    visibilityStart,
+                                    currentTime,
+                                    maxElevationInPass,
+                                    maxElevationTime,
+                                    maxAzimuthRate,
+                                    maxElevationRate,
+                                    maxAzimuthAccel,
+                                    maxElevationAccel
+                                )
+                            )
+                        }
+
+                        visibilityStart = null
+                        maxElevationInPass = -90.0
+                        maxElevationTime = null
+
+                        // 가시성 종료 후에는 큰 간격으로 전환
+                        currentTimeStep = coarseTimeStepMs
+                    }
+                }
 
                 // 속도 계산 (이전 값이 있는 경우)
                 if (prevAzimuth != null && prevElevation != null && prevTime != null) {
@@ -892,14 +1241,14 @@ class OrekitCalculator : SatellitePositionCalculator {
                         val elevationAccel = (elevationRate - prevElevationRate) / timeDiff
 
                         // 현재 가시성 기간 내에서만 최대값 업데이트
-                        if (visibilityStart != null && elevation >= minElevation) {
+                        if (visibilityStart != null && isVisible) {
                             maxAzimuthAccel = Math.max(maxAzimuthAccel, Math.abs(azimuthAccel))
                             maxElevationAccel = Math.max(maxElevationAccel, Math.abs(elevationAccel))
                         }
                     }
 
                     // 현재 가시성 기간 내에서만 최대 속도 업데이트
-                    if (visibilityStart != null && elevation >= minElevation) {
+                    if (visibilityStart != null && isVisible) {
                         maxAzimuthRate = Math.max(maxAzimuthRate, Math.abs(azimuthRate))
                         maxElevationRate = Math.max(maxElevationRate, Math.abs(elevationRate))
                     }
@@ -914,68 +1263,15 @@ class OrekitCalculator : SatellitePositionCalculator {
                 prevElevation = elevation
                 prevTime = currentTime
 
-                // 가시성 상태 변경 처리
-                if (elevation >= minElevation) {
-                    pointsAboveMinElevation++
-
-                    // 가시성 시작
-                    if (visibilityStart == null) {
-                        visibilityStart = currentTime
-                        maxElevationInPass = elevation
-                        maxElevationTime = currentTime
-
-                        // 새로운 가시성 기간이 시작될 때 최대값 초기화
-                        maxAzimuthRate = 0.0
-                        maxElevationRate = 0.0
-                        maxAzimuthAccel = 0.0
-                        maxElevationAccel = 0.0
-
-                        logger.debug("가시성 기간 시작: ${currentTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}, 고도각: ${elevation}°")
-                    }
-
-                    // 최대 고도각 업데이트
-                    if (elevation > maxElevationInPass) {
-                        maxElevationInPass = elevation
-                        maxElevationTime = currentTime
-                    }
-                } else {
-                    // 가시성 종료
-                    if (visibilityStart != null) {
-                        // 로그 추가 - 각속도 및 각가속도 정보 출력
-                        logger.debug("가시성 기간 종료: ${currentTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}")
-                        logger.debug("패스 정보: 시작=${visibilityStart.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}, 종료=${currentTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}, 최대고도각=${maxElevationInPass}°")
-                        logger.debug("최대 각속도: 방위각=${maxAzimuthRate}°/s, 고도각=${maxElevationRate}°/s")
-                        logger.debug("최대 각가속도: 방위각=${maxAzimuthAccel}°/s², 고도각=${maxElevationAccel}°/s²")
-
-                        visibilityPeriods.add(
-                            VisibilityPeriod(
-                                visibilityStart,
-                                currentTime,
-                                maxElevationInPass,
-                                maxElevationTime,
-                                maxAzimuthRate,
-                                maxElevationRate,
-                                maxAzimuthAccel,
-                                maxElevationAccel
-                            )
-                        )
-                        visibilityStart = null
-                        maxElevationInPass = -90.0
-                        maxElevationTime = null
-                    }
-                }
-
-                // 다음 시간으로 이동
-                currentDate = currentDate.shiftedBy(timeStep)
-                currentTime = currentTime.plus((timeStep * 1000).toLong(), ChronoUnit.MILLIS)
+                // 다음 시간으로 이동 (현재 시간 간격 사용)
+                val timeStepSeconds = currentTimeStep / 1000.0
+                currentDate = currentDate.shiftedBy(timeStepSeconds)
+                currentTime = currentTime.plus(currentTimeStep.toLong(), ChronoUnit.MILLIS)
             }
 
             // 마지막 가시성 기간이 종료되지 않은 경우 처리
-            if (visibilityStart != null) {
-                // 로그 추가 - 마지막 패스의 각속도 및 각가속도 정보 출력
+            if (visibilityStart != null && isVisible) {
                 logger.debug("마지막 패스 정보: 시작=${visibilityStart.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}, 종료=${currentTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}, 최대고도각=${maxElevationInPass}°")
-                logger.debug("최대 각속도: 방위각=${maxAzimuthRate}°/s, 고도각=${maxElevationRate}°/s")
-                logger.debug("최대 각가속도: 방위각=${maxAzimuthAccel}°/s², 고도각=${maxElevationAccel}°/s²")
 
                 visibilityPeriods.add(
                     VisibilityPeriod(
@@ -992,10 +1288,7 @@ class OrekitCalculator : SatellitePositionCalculator {
             }
 
             // 계산된 모든 패스에 대한 요약 정보 로깅
-            logger.info("가시성 계산 완료:")
-            logger.info("- 계산된 포인트: $pointsCalculated")
-            logger.info("- 최소 고도각 이상 포인트: $pointsAboveMinElevation")
-            logger.info("- 총 ${visibilityPeriods.size}개의 패스가 계산되었습니다.")
+            logger.info("가시성 계산 완료: 총 ${visibilityPeriods.size}개의 패스가 계산되었습니다. (계산된 포인트: $pointsCalculated)")
 
             // 날짜별 패스 수 계산
             val passesByDate = visibilityPeriods.groupBy { it.startTime.toLocalDate() }
@@ -1003,20 +1296,10 @@ class OrekitCalculator : SatellitePositionCalculator {
                 logger.info("${date} 날짜의 패스 수: ${passes.size}개")
             }
 
-            if (visibilityPeriods.isNotEmpty()) {
-                val maxAzRate = visibilityPeriods.maxOf { it.maxAzimuthRate }
-                val maxElRate = visibilityPeriods.maxOf { it.maxElevationRate }
-                val maxAzAccel = visibilityPeriods.maxOf { it.maxAzimuthAccel }
-                val maxElAccel = visibilityPeriods.maxOf { it.maxElevationAccel }
-
-                logger.info("전체 패스 중 최대 각속도: 방위각=${maxAzRate}°/s, 고도각=${maxElRate}°/s")
-                logger.info("전체 패스 중 최대 각가속도: 방위각=${maxAzAccel}°/s², 고도각=${maxElAccel}°/s²")
-            }
-
             return visibilityPeriods
         } catch (e: Exception) {
             logger.error("위성 가시성 기간 계산 중 오류 발생: ${e.message}", e)
-            e.printStackTrace()  // 스택 트레이스 출력
+            e.printStackTrace()
             throw e
         }
     }
@@ -1128,529 +1411,4 @@ class OrekitCalculator : SatellitePositionCalculator {
         }
     }
 }
-/*
 
-
-    /**
-     * 특정 시간 범위 동안의 위성 위치를 계산합니다
-     */
-    fun calculateTrackingPath(
-        tleLine1: String,
-        tleLine2: String,
-        startTime: ZonedDateTime,
-        endTime: ZonedDateTime,
-        interval: Int = 1, // 기본값 분 간격
-        latitude: Double,
-        longitude: Double,
-        altitude: Double = 0.0
-    ): SatelliteTrackData {
-        val positions = mutableListOf<Pair<ZonedDateTime, SatelliteTrackData>>()
-
-        var currentTime = startTime
-        while (!currentTime.isAfter(endTime)) {
-            val position = calculatePosition(tleLine1, tleLine2, currentTime, latitude, longitude, altitude)
-            positions.add(Pair(currentTime, position))
-            currentTime = currentTime.plusMinutes(interval.toLong())
-        }
-
-        // 첫 번째 위치의 방위각과 고도각을 사용
-        val firstPosition = positions.firstOrNull()?.second ?: SatelliteTrackData(0.0f, 0.0f)
-
-        return SatelliteTrackData(
-            azimuth = firstPosition.azimuth,
-            elevation = firstPosition.elevation,
-            startTime = startTime,
-            endTime = endTime,
-            interval = interval,
-            positions = positions
-        )
-    }
-
-    /**
-     * 위성이 지평선 위에 있는 시간(가시 시간)을 계산합니다
-     */
-    fun calculateVisibilityPeriods(
-        tleLine1: String,
-        tleLine2: String,
-        startTime: ZonedDateTime,
-        endTime: ZonedDateTime,
-        interval: Int = 100, // 기본값 간격
-        latitude: Double,
-        longitude: Double,
-        altitude: Double = 0.0,
-        minElevation: Float = 0.0f // 최소 고도각 (기본값 0도)
-    ): List<Pair<ZonedDateTime, ZonedDateTime>> {
-        val visibilityPeriods = mutableListOf<Pair<ZonedDateTime, ZonedDateTime>>()
-        var visibilityStart: ZonedDateTime? = null
-
-        var currentTime = startTime
-        while (!currentTime.isAfter(endTime)) {
-            val position = calculatePosition(tleLine1, tleLine2, currentTime, latitude, longitude, altitude)
-
-            // 위성이 지평선 위에 있고 가시성 시작 시간이 없는 경우
-            if (position.elevation >= minElevation && visibilityStart == null) {
-                visibilityStart = currentTime
-            }
-            // 위성이 지평선 아래로 내려가고 가시성 시작 시간이 있는 경우
-            else if (position.elevation < minElevation && visibilityStart != null) {
-                visibilityPeriods.add(Pair(visibilityStart, currentTime))
-                visibilityStart = null
-            }
-
-            currentTime = currentTime.plus(interval.toLong(), ChronoUnit.MILLIS)
-        }
-
-        // 마지막 가시성 기간이 endTime까지 계속되는 경우
-        if (visibilityStart != null) {
-            visibilityPeriods.add(Pair(visibilityStart, endTime))
-        }
-
-        return visibilityPeriods
-    }
-    /**
-     * EventDetector를 사용하여 위성 가시성 기간을 빠르게 계산합니다.
-     */
-fun calculateVisibilityPeriodsWithEventDetector(
-    tle: TLE,
-    startTime: ZonedDateTime,
-    durationDays: Long = 1,
-    minElevation: Float = 0.0f,
-    latitude: Double,
-    longitude: Double,
-    altitude: Double = 0.0
-): List<VisibilityPeriod> {
-    val visibilityPeriods = mutableListOf<VisibilityPeriod>()
-
-    try {
-        // 시작 및 종료 시간 설정
-        val startDate = toAbsoluteDate(startTime)
-        val endDate = toAbsoluteDate(startTime.plusDays(durationDays.toLong()))
-
-        // 지상국 위치 설정
-        val stationPosition = GeodeticPoint(
-            FastMath.toRadians(latitude),
-            FastMath.toRadians(longitude),
-            altitude
-        )
-        val stationFrame = TopocentricFrame(earth, stationPosition, "GroundStation")
-
-        // TLE 전파기 생성
-        val propagator = TLEPropagator.selectExtrapolator(tle)
-
-        // 가시성 이벤트 감지기 생성 (최소 고도각 기준)
-        val minElevationRad = FastMath.toRadians(minElevation.toDouble())
-        val elevationDetector = ElevationDetector(stationFrame)
-            .withConstantElevation(minElevationRad)
-            .withHandler(VisibilityHandler(visibilityPeriods, stationFrame, tle))
-
-        // 이벤트 감지기 등록
-        propagator.addEventDetector(elevationDetector)
-
-        // 전체 기간에 대해 한 번에 전파 (이벤트 감지)
-        propagator.propagate(startDate, endDate)
-
-        return visibilityPeriods
-    } catch (e: Exception) {
-        logger.error("위성 가시성 기간 계산 중 오류 발생: ${e.message}", e)
-        throw e
-    }
-}
-
-    /**
-     * 가시성 이벤트 처리를 위한 핸들러
-     */
-    private inner class VisibilityHandler(
-        private val visibilityPeriods: MutableList<VisibilityPeriod>,
-        private val stationFrame: TopocentricFrame,
-        private val tle: TLE
-    ) : EventHandler {
-        private var visibilityStart: AbsoluteDate? = null
-        private var maxElevation: Double = -90.0
-        private var maxElevationTime: AbsoluteDate? = null
-
-        override fun init(initialState: SpacecraftState, target: AbsoluteDate, detector: EventDetector) {
-            // 초기화 코드
-        }
-
-        override fun eventOccurred(s: SpacecraftState, detector: EventDetector, increasing: Boolean): Action {
-            val currentDate = s.date
-
-            if (increasing) {
-                // 위성이 지평선 위로 올라옴 (가시성 시작)
-                visibilityStart = currentDate
-                maxElevation = -90.0
-                maxElevationTime = null
-            } else {
-                // 위성이 지평선 아래로 내려감 (가시성 종료)
-                val startTime = visibilityStart
-                if (startTime != null) {
-                    // findMaxElevation 함수를 사용하여 최대 고도각과 그 시간 찾기
-
-                    val result = findMaxElevation(
-                        TLEPropagator.selectExtrapolator(tle),
-                        stationFrame,
-                        startTime,
-                        currentDate
-                    )
-                    // 최대 고도각 및 시간 업데이트
-                    maxElevation = result.first
-                    maxElevationTime = result.second
-                    // 가시성 기간 정보 생성
-                    val zonedStartTime = toZonedDateTime(startTime)
-                    logger.info("zonedStartTime: ${zonedStartTime}")
-                    val zonedEndTime = toZonedDateTime(currentDate)
-                    logger.info("zonedEndTime: ${zonedEndTime}")
-                    // 최대 고도각 시간이 없는 경우 (드문 경우) 중간 시간으로 설정
-                    val maxElTime = maxElevationTime ?: startTime.shiftedBy((currentDate.durationFrom(startTime)) / 2)
-
-                    visibilityPeriods.add(
-                        VisibilityPeriod(
-                            startTime = zonedStartTime,
-                            endTime = zonedEndTime,
-                            maxElevation = maxElevation,
-                            maxElevationTime = toZonedDateTime(maxElTime)
-                        )
-                    )
-
-                    visibilityStart = null
-                }
-            }
-
-            return Action.CONTINUE
-        }
-
-        override fun resetState(detector: EventDetector, oldState: SpacecraftState): SpacecraftState {
-            return oldState
-        }
-    }
-
-
-    /**
-     * 이분 탐색을 활용하여 위성 가시성 기간을 빠르게 계산합니다.
-     */
-    fun calculateVisibilityPeriodsWithBinarySearch(
-        tle: TLE,
-        startTime: ZonedDateTime,
-        durationDays: Long = 1,
-        minElevation: Float = 0.0f,
-        latitude: Double,
-        longitude: Double,
-        altitude: Double = 0.0
-    ): List<VisibilityPeriod> {
-        val visibilityPeriods = mutableListOf<VisibilityPeriod>()
-
-        try {
-            // 시작 및 종료 시간 설정
-            val startDate = toAbsoluteDate(startTime)
-            val endDate = toAbsoluteDate(startTime.plusDays(durationDays.toLong()))
-
-            // 지상국 위치 설정
-            val stationPosition = GeodeticPoint(
-                FastMath.toRadians(latitude),
-                FastMath.toRadians(longitude),
-                altitude
-            )
-            val stationFrame = TopocentricFrame(earth, stationPosition, "GroundStation")
-
-            // TLE 전파기 생성
-            val propagator = TLEPropagator.selectExtrapolator(tle)
-
-            // 1. 먼저 큰 간격으로 샘플링하여 대략적인 가시성 영역 찾기
-            val coarseSamplingStep = 5 * 60.0 // 5분 간격
-            var currentDate = startDate
-            var isVisible = false
-            var visibilityStart: AbsoluteDate? = null
-
-            val coarseVisibilityRanges = mutableListOf<Pair<AbsoluteDate, AbsoluteDate>>()
-
-            while (currentDate.compareTo(endDate) < 0) {
-                val state = propagator.propagate(currentDate)
-                val pv = state.getPVCoordinates(stationFrame)
-
-                val elevation = FastMath.toDegrees(
-                    FastMath.atan2(
-                        pv.position.z,
-                        FastMath.sqrt(pv.position.x * pv.position.x + pv.position.y * pv.position.y)
-                    )
-                )
-
-                if (elevation >= minElevation && !isVisible) {
-                    // 가시성 시작 (대략적인 시간)
-                    isVisible = true
-                    visibilityStart = currentDate
-                } else if (elevation < minElevation && isVisible) {
-                    // 가시성 종료 (대략적인 시간)
-                    isVisible = false
-                    coarseVisibilityRanges.add(Pair(visibilityStart!!, currentDate))
-                    visibilityStart = null
-                }
-
-                currentDate = currentDate.shiftedBy(coarseSamplingStep)
-            }
-
-            // 마지막 가시성 기간 처리
-            if (isVisible && visibilityStart != null) {
-                coarseVisibilityRanges.add(Pair(visibilityStart, endDate))
-            }
-
-            // 2. 각 대략적인 가시성 범위에 대해 이분 탐색으로 정확한 시작/종료 시간 찾기
-            for (range in coarseVisibilityRanges) {
-                // 정확한 시작 시간 찾기 (이분 탐색)
-                val exactStartTime = findExactTransitionTime(
-                    propagator, stationFrame, range.first.shiftedBy(-coarseSamplingStep),
-                    range.first, minElevation.toDouble(), true
-                )
-
-                // 정확한 종료 시간 찾기 (이분 탐색)
-                val exactEndTime = findExactTransitionTime(
-                    propagator, stationFrame, range.second,
-                    range.second.shiftedBy(coarseSamplingStep), minElevation.toDouble(), false
-                )
-
-                // 최대 고도각 계산
-                val (maxElevation, maxElevationTime) = findMaxElevation(
-                    propagator, stationFrame, exactStartTime, exactEndTime
-                )
-
-                visibilityPeriods.add(
-                    VisibilityPeriod(
-                        startTime = toZonedDateTime(exactStartTime),
-                        endTime = toZonedDateTime(exactEndTime),
-                        maxElevation = maxElevation,
-                        maxElevationTime = toZonedDateTime(maxElevationTime)
-                    )
-                )
-            }
-
-            return visibilityPeriods
-        } catch (e: Exception) {
-            logger.error("위성 가시성 기간 계산 중 오류 발생: ${e.message}", e)
-            throw e
-        }
-    }
-
-
-
-    /**
-     * 이분 탐색을 사용하여 정확한 전환 시간(가시성 시작/종료)을 찾습니다.
-     */
-    private fun findExactTransitionTime(
-        propagator: TLEPropagator,
-        stationFrame: TopocentricFrame,
-        lowerBound: AbsoluteDate,
-        upperBound: AbsoluteDate,
-        minElevation: Double,
-        findingStart: Boolean,
-
-        ): AbsoluteDate {
-        var low = lowerBound
-        var high = upperBound
-        val tolerance = 1 // 0.1초 정밀도
-
-        while (high.durationFrom(low) > tolerance) {
-            val mid = low.shiftedBy(high.durationFrom(low) / 2)
-            val state = propagator.propagate(mid)
-            val pv = state.getPVCoordinates(stationFrame)
-
-            val elevation = FastMath.toDegrees(
-                FastMath.atan2(
-                    pv.position.z,
-                    FastMath.sqrt(pv.position.x * pv.position.x + pv.position.y * pv.position.y)
-                )
-            )
-
-            if ((elevation >= minElevation) == findingStart) {
-                high = mid
-            } else {
-                low = mid
-            }
-        }
-
-        return high
-    }
-
-    /**
-     * 가시성 기간 동안 최대 고도각과 그 시간을 찾습니다.
-     */
-    private fun findMaxElevation(
-        propagator: TLEPropagator,
-        stationFrame: TopocentricFrame,
-        startTime: AbsoluteDate,
-        endTime: AbsoluteDate
-    ): Pair<Double, AbsoluteDate> {
-        // 골든 섹션 서치 알고리즘 사용
-        val goldenRatio = (1 + Math.sqrt(5.0)) / 2
-        val tolerance = 1.0 // 1초 정밀도
-
-        var a = startTime
-        var b = endTime
-        var c = b.shiftedBy(-(b.durationFrom(a) / goldenRatio))
-        var d = a.shiftedBy(b.durationFrom(a) / goldenRatio)
-
-        // 고도각 계산 함수
-        fun calculateElevation(time: AbsoluteDate): Double {
-            val state = propagator.propagate(time)
-            val pv = state.getPVCoordinates(stationFrame)
-            return FastMath.toDegrees(
-                FastMath.atan2(
-                    pv.position.z,
-                    FastMath.sqrt(pv.position.x * pv.position.x + pv.position.y * pv.position.y)
-                )
-            )
-        }
-
-        var fc = calculateElevation(c)
-        var fd = calculateElevation(d)
-
-        while (b.durationFrom(a) > tolerance) {
-            if (fc < fd) {
-                a = c
-                c = d
-                d = a.shiftedBy(b.durationFrom(a) / goldenRatio)
-                fc = fd
-                fd = calculateElevation(d)
-            } else {
-                b = d
-                d = c
-                c = b.shiftedBy(-(b.durationFrom(a) / goldenRatio))
-                fd = fc
-                fc = calculateElevation(c)
-            }
-        }
-
-        // 최종 구간에서 가장 높은 고도각 찾기
-        val midTime = a.shiftedBy(b.durationFrom(a) / 2)
-        val midElevation = calculateElevation(midTime)
-
-        return Pair(midElevation, midTime)
-    }
-
-    /**
-     * AbsoluteDate를 ZonedDateTime으로 변환합니다.
-     */
-    private fun toZonedDateTime(date: AbsoluteDate): ZonedDateTime {
-        val utcScale = TimeScalesFactory.getUTC()
-        val components = date.getComponents(utcScale)
-        return ZonedDateTime.of(
-            components.date.year,
-            components.date.month,
-            components.date.day,
-            components.time.hour,
-            components.time.minute,
-            components.time.second.toInt(),
-            (components.time.second * 1_000_000_000 % 1_000_000_000).toInt(),
-            ZoneOffset.UTC
-        )
-    }
-
-    /**
-     * 위성 가시성 기간을 빠르게 계산하는 최적화된 함수
-     * (Orekit의 내장 기능과 이분 탐색을 결합한 방식)
-     */
-    fun calculateVisibilityPeriodsOptimized(
-        tle: TLE,
-        startTime: ZonedDateTime,
-        durationDays: Long = 1,
-        minElevation: Float = 0.0f,
-        latitude: Double,
-        longitude: Double,
-        altitude: Double = 0.0
-    ): List<VisibilityPeriod> {
-        // 기간이 짧은 경우 이벤트 감지기 사용
-        if (durationDays <= 3) {
-            return calculateVisibilityPeriodsWithEventDetector(
-                tle, startTime, durationDays, minElevation, latitude, longitude, altitude
-            )
-        }
-
-        // 기간이 긴 경우 이분 탐색 방식 사용
-        return calculateVisibilityPeriodsWithBinarySearch(
-            tle, startTime, durationDays, minElevation, latitude, longitude, altitude
-        )
-    }
-
- */
-
- /*
- /**
-     * 특정 패스의 세부 추적 데이터를 출력합니다.
-     *
-     * @param passIndex 출력할 패스의 인덱스 (0부터 시작)
-     * @param schedule 위성 추적 스케줄
-     */
-    fun printDetailedTrackingData(passIndex: Int, schedule: SatelliteTrackingSchedule) {
-        if (passIndex < 0 || passIndex >= schedule.trackingPasses.size) {
-            println("유효하지 않은 패스 인덱스입니다. 0부터 ${schedule.trackingPasses.size - 1}까지의 값을 입력하세요.")
-            return
-        }
-
-        val pass = schedule.trackingPasses[passIndex]
-        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
-
-        println("패스 ${passIndex + 1} 세부 추적 데이터 (${pass.startTime.format(formatter)} ~ ${pass.endTime.format(formatter)}):")
-        println("─────────────────────────────────────────────────────────────────────")
-        println("│ 시간                    │ 방위각(°)  │ 고도각(°)  │ 거리(km)   │ 고도(km)   │")
-        println("─────────────────────────────────────────────────────────────────────")
-
-        pass.trackingData.forEach { data ->
-            println(data.timestamp?.let { "│ ${it.format(formatter)} │ ${String.format("%9.2f", data.azimuth)} │ ${String.format("%9.2f", data.elevation)} │ ${String.format("%9.2f", data.range)} │ ${String.format("%9.2f", data.altitude)} │" })
-        }
-
-        println("─────────────────────────────────────────────────────────────────────")
-        println("총 데이터 포인트: ${pass.trackingData.size}")
-    }
-    /**
-     * 모든 패스의 세부 추적 데이터를 출력합니다.
-     *
-     * @param schedule 위성 추적 스케줄
-     */
-    fun printAllDetailedTrackingData(schedule: SatelliteTrackingSchedule) {
-        println("위성 추적 세부 데이터 출력")
-        println("위성 TLE: ${schedule.satelliteTle1.substring(0, 30)}...")
-        println("기간: ${schedule.startDate.format(DateTimeFormatter.ISO_LOCAL_DATE)} ~ ${schedule.endDate.format(DateTimeFormatter.ISO_LOCAL_DATE)}")
-        println("지상국 위치: 위도 ${schedule.stationLatitude}°, 경도 ${schedule.stationLongitude}°, 고도 ${schedule.stationAltitude}m")
-        println("최소 고도각: ${schedule.minElevation}°")
-        println("추적 간격: ${schedule.trackingIntervalMs}ms")
-        println("총 패스 수: ${schedule.totalPasses}")
-        println()
-
-        for (i in 0 until schedule.trackingPasses.size) {
-            printDetailedTrackingData(i, schedule)
-            println()
-        }
-    }
-    /**
-     * 특정 패스의 세부 추적 데이터를 CSV 파일로 저장합니다.
-     *
-     * @param passIndex 저장할 패스의 인덱스 (0부터 시작)
-     * @param schedule 위성 추적 스케줄
-     * @param filePath 저장할 파일 경로
-     */
-    fun saveDetailedTrackingDataToCsv(passIndex: Int, schedule: SatelliteTrackingSchedule, filePath: String) {
-        if (passIndex < 0 || passIndex >= schedule.trackingPasses.size) {
-            logger.error("유효하지 않은 패스 인덱스입니다. 0부터 ${schedule.trackingPasses.size - 1}까지의 값을 입력하세요.")
-            return
-        }
-
-        try {
-            val pass = schedule.trackingPasses[passIndex]
-            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
-
-            File(filePath).bufferedWriter().use { writer ->
-                // CSV 헤더
-                writer.write("시간,방위각(°),고도각(°),거리(km),고도(km)\n")
-
-                // 데이터 행
-                pass.trackingData.forEach { data ->
-                    data.timestamp?.let { writer.write("${it.format(formatter)},${data.azimuth},${data.elevation},${data.range},${data.altitude}\n") }
-                }
-            }
-
-            logger.info("패스 ${passIndex + 1}의 세부 추적 데이터가 ${filePath}에 저장되었습니다.")
-        } catch (e: Exception) {
-            logger.error("파일 저장 중 오류 발생: ${e.message}", e)
-        }
-    }
-
-
- */
