@@ -74,6 +74,22 @@ class JKUtil {
                 buffer.putShort(value)
                 return buffer.array()
             }
+            // JKUtil.JKConvert 클래스에 다음 메서드 추가
+            fun intToByteArray(value: Int, bigEndian: Boolean): ByteArray {
+                val buffer = ByteBuffer.allocate(4)
+                if (bigEndian) {
+                    buffer.order(ByteOrder.BIG_ENDIAN)
+                } else {
+                    buffer.order(ByteOrder.LITTLE_ENDIAN)
+                }
+                buffer.putInt(value)
+                return buffer.array()
+            }
+            fun uintEndianConvert(dataOne: Byte, dataTwo: Byte, dataThree: Byte, dataFour: Byte): UInt {
+                val arr = byteArrayOf(dataOne, dataTwo, dataThree, dataFour)
+                arr.reverse() // 배열 순서를 뒤집습니다
+                return ByteBuffer.wrap(arr).order(ByteOrder.BIG_ENDIAN).int.toUInt()
+            }
             // Hex 형태로 값 변경
             fun byteArrayToHexString(byteArray: ByteArray): String {
                 return byteArray.joinToString("") { "%02X".format(it) }

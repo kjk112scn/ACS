@@ -1,6 +1,8 @@
 package com.gtlsystems.acs_api.service
 
-import com.fasterxml.jackson.databind.ObjectMapper // ObjectMapper import
+
+import com.gtlsystems.acs_api.event.ACSEvent
+import com.gtlsystems.acs_api.event.ACSEventBus
 import com.gtlsystems.acs_api.model.GlobalData
 import com.gtlsystems.acs_api.model.PushData
 import com.gtlsystems.acs_api.model.PushData.CMD
@@ -21,7 +23,7 @@ class ICDService {
         const val ICD_ETX: Byte = 0x03
     }
 
-    class Classify(private val pushService: PushService) {
+    class Classify(private val pushService: PushService,private val acsEventBus: ACSEventBus) {
         private var lastPacketTime = System.nanoTime()
         private val logger = org.slf4j.LoggerFactory.getLogger(Classify::class.java)
 
@@ -98,9 +100,7 @@ class ICDService {
                             pushService.updateData(newData)
                             //println("1_파싱된 ICD 데이터: $it")
                             //println("1_파싱된 ICD 데이터: ${it.azimuthAngle}, EL ${it.elevationAngle}, TL ${it.tiltAngle}")
-                            //  val readDataJson = objectMapper.writeValueAsString(it)
-                            //   pushReadStatusService.publish(readDataJson)
-                            // println("2_파싱된 ICD 데이터: $readDataJson")
+
                         }
                     }
                     //2.3 Read Positioner Status
@@ -163,15 +163,29 @@ class ICDService {
                 else if (receiveData[1] == 'T'.code.toByte()) {
                     //2.12.1 위성 추적 해더 정보 송신
                     if (receiveData[2] == 'T'.code.toByte()) {
+                        val parsedData = SatelliteTrackOne.GetDataFrame.fromByteArray(receiveData)
+                        parsedData?.let {
+                            println("파싱된 ICD 데이터: $it")
+                            // 이벤트 발행
+                            acsEventBus.publish(ACSEvent.ICDEvent.SatelliteTrackHeaderReceived(it))
+                        }
 
                     }
                     //2.12.2 위성 추적 초기 제어 명령
                     else if (receiveData[2] == 'M'.code.toByte()) {
-
+                        val parsedData = SatelliteTrackTwo.GetDataFrame.fromByteArray(receiveData)
+                        parsedData?.let {
+                            println("파싱된 ICD 데이터: $it")
+                        }
                     }
                     //2.12.3 위성 추적 추가 데이터 요청
                     else if (receiveData[2] == 'R'.code.toByte()) {
-
+                        val parsedData = SatelliteTrackThree.GetDataFrame.fromByteArray(receiveData)
+                        parsedData?.let {
+                            println("파싱된 ICD 데이터: $it")
+                            // 데이터 요청 이벤트 발행
+                            acsEventBus.publish(ACSEvent.ICDEvent.SatelliteTrackDataRequested(it))
+                        }
                     }
                 }
                 //Offset Command
@@ -205,6 +219,411 @@ class ICDService {
                 //2.17 M/C On/Off
                 else if (receiveData[1] == 'C'.code.toByte()) {
 
+                }
+            }
+        }
+    }
+    /**
+     * 2.12 Satellite Track Command
+     * 위성 추적 정보를 송신하기 위한 프로토콜
+     * 2.12.1 위성 추적 해더 정보 송신
+     * 위성 추적 시 필요한 기본 정보를 송신하기 위한 프로토콜이다
+     * 주요 정보 : 전체 데이터 길이, AOS 시간 정보, LOS 시간 정보
+     */
+    class SatelliteTrackOne {
+        data class SetDataFrame(
+            var stx: Byte = ICD_STX,
+            var cmdOne: Char,
+            var cmdTwo: Char,
+            var dataLen: UShort,
+            var aosYear: UShort,
+            var aosMonth: Byte,
+            var aosDay: Byte,
+            var aosHour: Byte,
+            var aosMinute: Byte,
+            var aosSecond: Byte,
+            var aosMs: UShort,
+            var losYear: UShort,
+            var losMonth: Byte,
+            var losDay: Byte,
+            var losHour: Byte,
+            var losMinute: Byte,
+            var losSecond: Byte,
+            var losMs: UShort,
+            var crc16: UShort = 0u,
+            var etx: Byte = ICD_ETX
+        ) {
+            fun setDataFrame(): ByteArray {
+                val dataFrame = ByteArray(26)
+
+                // 바이트 변환 (엔디안 변환 포함)
+                val byteDataLength = JKConvert.ushortToByteArray(dataLen, false)
+                val byteAosYear = JKConvert.ushortToByteArray(aosYear, false)
+                val byteAosMs = JKConvert.ushortToByteArray(aosMs, false)
+                val byteLosYear = JKConvert.ushortToByteArray(losYear, false)
+                val byteLosMs = JKConvert.ushortToByteArray(losMs, false)
+
+                // CRC 대상 복사를 위한 배열
+                val byteCrc16Target = ByteArray(dataFrame.size - 4)
+
+                dataFrame[0] = ICD_STX
+                dataFrame[1] = cmdOne.code.toByte()
+                dataFrame[2] = cmdTwo.code.toByte()
+
+                // AOS 시간 정보
+                dataFrame[3] = byteDataLength[0]
+                dataFrame[4] = byteDataLength[1]
+                dataFrame[5] = byteAosYear[0]
+                dataFrame[6] = byteAosYear[1]
+                dataFrame[7] = aosMonth
+                dataFrame[8] = aosDay
+                dataFrame[9] = aosHour
+                dataFrame[10] = aosMinute
+                dataFrame[11] = aosSecond
+                dataFrame[12] = byteAosMs[0]
+                dataFrame[13] = byteAosMs[1]
+
+                // LOS 시간 정보
+                dataFrame[14] = byteLosYear[0]
+                dataFrame[15] = byteLosYear[1]
+                dataFrame[16] = losMonth
+                dataFrame[17] = losDay
+                dataFrame[18] = losHour
+                dataFrame[19] = losMinute
+                dataFrame[20] = losSecond
+                dataFrame[21] = byteLosMs[0]
+                dataFrame[22] = byteLosMs[1]
+
+                // CRC 대상 복사
+                dataFrame.copyInto(byteCrc16Target, 0, 1, 1 + byteCrc16Target.size)
+
+                // CRC16 계산 및 엔디안 변환
+                val crc16s = Crc16.computeCrc(byteCrc16Target)
+                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+
+                // CRC16 값 설정
+                dataFrame[23] = crc16Buffer[0]
+                dataFrame[24] = crc16Buffer[1]
+                dataFrame[25] = ICD_ETX
+
+                return dataFrame
+            }
+        }
+
+        data class GetDataFrame(
+            var stx: Byte = ICD_STX,
+            var cmdOne: Byte = 0x00,
+            var cmdTwo: Byte = 0x00,
+            var ack: Byte = 0x00,
+            var checkSum: UShort = 0u,
+            var etx: Byte = ICD_ETX
+        ) {
+            companion object {
+                const val FRAME_LENGTH = 7
+
+                fun fromByteArray(data: ByteArray): GetDataFrame? {
+                    if (data.size < FRAME_LENGTH) {
+                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        return null
+                    }
+
+                    // CRC 체크섬 추출 (리틀 엔디안)
+                    val rxChecksum = ByteBuffer.wrap(byteArrayOf(data[FRAME_LENGTH - 3], data[FRAME_LENGTH - 2]))
+                        .short.toUShort()
+                    val crc16Target = data.copyOfRange(1, FRAME_LENGTH - 3)
+                    val crc16Check = Crc16.computeCrc(crc16Target).toUShort()
+
+                    // CRC 검증 및 ETX 확인
+                    if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
+                        println("one: ${data[1].toInt().toChar()}")
+                        println("two: ${data[2].toInt().toChar()}")
+
+                        return GetDataFrame(
+                            stx = data[0],
+                            cmdOne = data[1],
+                            cmdTwo = data[2],
+                            ack = data[3],
+                            checkSum = crc16Check,
+                            etx = data.last()
+                        )
+                    } else {
+                        println("CRC 체크 실패 또는 ETX 불일치")
+                        return null
+                    }
+                }
+            }
+        }
+    }
+    /**
+     * 2.12.2 위성 추적 초기 제어 명령
+     * 위성 추적 시 필요한 초기 제어 정보를 송신하기 위한 프로토콜이다.
+     * 주요 정보: 전송 데이터 길이, NTP 시간 정보, Time Offset 정보
+     * 설명: 위성 추적을 시작할 때 또는 TimeOffset이 발생했을 경우 1회만 전송한다.
+     * ※ Time Offset이 발생하면 ACU S/W가 '2.12.2 위성 추적 기본 제어 명령'을 ACU F/W에 전달하고,
+     *   ACU F/W가 반복해서 '2.12.3 위성 추적 데이터 요청'을 실시함
+     */
+    class SatelliteTrackTwo {
+        data class SetDataFrame(
+            var stx: Byte = ICD_STX,
+            var cmdOne: Char,
+            var cmdTwo: Char,
+            var dataLen: UShort,
+            var aosYear: UShort,
+            var aosMonth: Byte,
+            var aosDay: Byte,
+            var aosHour: Byte,
+            var aosMinute: Byte,
+            var aosSecond: Byte,
+            var aosMs: UShort,
+            var timeOffset: Int,
+            var satelliteTrackData: List<Triple<Int, Float, Float>>, // Triple<count, elevationAngle, azimuthAngle>
+            var crc16: UShort = 0u,
+            var etx: Byte = ICD_ETX
+        ) {
+            fun setDataFrame(): ByteArray {
+                // 위성 추적 정보를 제외한 순수 데이터 프레임 21
+                // 위성 추적 데이터 satelliteTrackData.size에서 데이터 바이트 12를 곱함
+                val dataFrame = ByteArray(21 + (satelliteTrackData.size * 12))
+
+                // 바이트 변환 (엔디안 변환 포함)
+                val byteDataLength = JKConvert.ushortToByteArray(dataLen, false)
+                val byteAosYear = JKConvert.ushortToByteArray(aosYear, false)
+                val byteAosMs = JKConvert.ushortToByteArray(aosMs, false)
+                val byteTimeOffset = JKConvert.intToByteArray(timeOffset, false)
+
+                // CRC 대상 복사를 위한 배열
+                val byteCrc16Target = ByteArray(dataFrame.size - 4)
+
+                dataFrame[0] = ICD_STX
+                dataFrame[1] = cmdOne.code.toByte()
+                dataFrame[2] = cmdTwo.code.toByte()
+
+                // AOS 시간 정보
+                dataFrame[3] = byteDataLength[0]
+                dataFrame[4] = byteDataLength[1]
+                dataFrame[5] = byteAosYear[0]
+                dataFrame[6] = byteAosYear[1]
+                dataFrame[7] = aosMonth
+                dataFrame[8] = aosDay
+                dataFrame[9] = aosHour
+                dataFrame[10] = aosMinute
+                dataFrame[11] = aosSecond
+                dataFrame[12] = byteAosMs[0]
+                dataFrame[13] = byteAosMs[1]
+
+                // Time Offset
+                dataFrame[14] = byteTimeOffset[0]
+                dataFrame[15] = byteTimeOffset[1]
+                dataFrame[16] = byteTimeOffset[2]
+                dataFrame[17] = byteTimeOffset[3]
+
+                // 위성 추적 데이터 추가
+                var i = 18
+                for (data in satelliteTrackData) {
+                    val byteCountArray = JKConvert.floatToByteArray(data.first * 50.00f, false)
+                    val byteAzimuthAngle = JKConvert.floatToByteArray(data.third, false)
+                    val byteElevationAngle = JKConvert.floatToByteArray(data.second, false)
+
+                    dataFrame[i++] = byteCountArray[0]
+                    dataFrame[i++] = byteCountArray[1]
+                    dataFrame[i++] = byteCountArray[2]
+                    dataFrame[i++] = byteCountArray[3]
+
+                    dataFrame[i++] = byteAzimuthAngle[0]
+                    dataFrame[i++] = byteAzimuthAngle[1]
+                    dataFrame[i++] = byteAzimuthAngle[2]
+                    dataFrame[i++] = byteAzimuthAngle[3]
+
+                    dataFrame[i++] = byteElevationAngle[0]
+                    dataFrame[i++] = byteElevationAngle[1]
+                    dataFrame[i++] = byteElevationAngle[2]
+                    dataFrame[i++] = byteElevationAngle[3]
+                }
+
+                // CRC 대상 복사
+                dataFrame.copyInto(byteCrc16Target, 0, 1, 1 + byteCrc16Target.size)
+
+                // CRC16 계산 및 엔디안 변환
+                val crc16s = Crc16.computeCrc(byteCrc16Target)
+                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+
+                // CRC16 값 설정
+                dataFrame[i++] = crc16Buffer[0]
+                dataFrame[i++] = crc16Buffer[1]
+                dataFrame[i] = ICD_ETX
+
+                return dataFrame
+            }
+        }
+
+        data class GetDataFrame(
+            var stx: Byte = ICD_STX,
+            var cmdOne: Byte = 0x00,
+            var cmdTwo: Byte = 0x00,
+            var ack: Byte = 0x00,
+            var checkSum: UShort = 0u,
+            var etx: Byte = ICD_ETX
+        ) {
+            companion object {
+                const val FRAME_LENGTH = 7
+
+                fun fromByteArray(data: ByteArray): GetDataFrame? {
+                    if (data.size < FRAME_LENGTH) {
+                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        return null
+                    }
+
+                    // CRC 체크섬 추출 (리틀 엔디안)
+                    val rxChecksum = ByteBuffer.wrap(byteArrayOf(data[FRAME_LENGTH - 3], data[FRAME_LENGTH - 2]))
+                        .short.toUShort()
+                    val crc16Target = data.copyOfRange(1, FRAME_LENGTH - 3)
+                    val crc16Check = Crc16.computeCrc(crc16Target).toUShort()
+
+                    // CRC 검증 및 ETX 확인
+                    if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
+                        println("Two: ${data[1].toInt().toChar()}")
+                        println("${data[2].toInt().toChar()}")
+
+                        return GetDataFrame(
+                            stx = data[0],
+                            cmdOne = data[1],
+                            cmdTwo = data[2],
+                            ack = data[3],
+                            checkSum = crc16Check,
+                            etx = data.last()
+                        )
+                    } else {
+                        println("CRC 체크 실패 또는 ETX 불일치")
+                        return null
+                    }
+                }
+            }
+        }
+    }
+    /**
+     * 2.12.3 위성 추적 추가 데이터 요청
+     * ACU F/W가 ACU S/W로 추가 위성 추적 데이터 요청을 하기 위한 프로토콜이다.
+     * 주요 정보: 전송 Data 길이, 위성 추적 정보
+     * 설명: 초기 정보 수신 후 전체 위성 추적 데이터를 수신할 때 까지 반복해서 데이터를 요청함.
+     * ※ '2.12.1 위성 추적 헤더 정보 송신' → '2.12.2 위성 추적 기본 제어 명령' 이후 전체 데이터를 수신할 때 까지
+     *    ACU F/W가 '2.12.3 위성 추적 데이터 요청'을 통해 데이터를 요청함.
+     */
+    class SatelliteTrackThree {
+        data class SetDataFrame(
+            var stx: Byte = ICD_STX,
+            var cmdOne: Char,
+            var cmdTwo: Char,
+            var dataLength: UShort,
+            var satelliteTrackData: List<Triple<Int, Float, Float>>, // Triple<count, elevationAngle, azimuthAngle>
+            var crc16: UShort = 0u,
+            var etx: Byte = ICD_ETX
+        ) {
+            fun setDataFrame(): ByteArray {
+                // 위성 추적 정보를 제외한 순수 데이터 프레임
+                // 위성 추적 데이터 satelliteTrackData.size에서 데이터 바이트 12를 곱함
+                val dataFrame = ByteArray(8 + (satelliteTrackData.size * 12))
+
+                // 바이트 변환 (엔디안 변환 포함)
+                val byteDataLength = JKConvert.ushortToByteArray(dataLength, false)
+
+                // CRC 대상 복사를 위한 배열
+                val byteCrc16Target = ByteArray(dataFrame.size - 4)
+
+                dataFrame[0] = ICD_STX
+                dataFrame[1] = cmdOne.code.toByte()
+                dataFrame[2] = cmdTwo.code.toByte()
+
+                // 데이터 길이 정보
+                dataFrame[3] = byteDataLength[0]
+                dataFrame[4] = byteDataLength[1]
+
+                // 위성 추적 데이터 추가
+                var i = 5
+                for (data in satelliteTrackData) {
+                    val byteCountArray = JKConvert.intToByteArray(data.first * 25, false)
+                    println("송신 시간 누적치: ${data.first * 25}")
+
+                    val byteAzimuthAngle = JKConvert.floatToByteArray(data.third, false)
+                    val byteElevationAngle = JKConvert.floatToByteArray(data.second, false)
+
+                    dataFrame[i++] = byteCountArray[0]
+                    dataFrame[i++] = byteCountArray[1]
+                    dataFrame[i++] = byteCountArray[2]
+                    dataFrame[i++] = byteCountArray[3]
+
+                    dataFrame[i++] = byteAzimuthAngle[0]
+                    dataFrame[i++] = byteAzimuthAngle[1]
+                    dataFrame[i++] = byteAzimuthAngle[2]
+                    dataFrame[i++] = byteAzimuthAngle[3]
+
+                    dataFrame[i++] = byteElevationAngle[0]
+                    dataFrame[i++] = byteElevationAngle[1]
+                    dataFrame[i++] = byteElevationAngle[2]
+                    dataFrame[i++] = byteElevationAngle[3]
+                }
+
+                // CRC 대상 복사
+                dataFrame.copyInto(byteCrc16Target, 0, 1, 1 + byteCrc16Target.size)
+
+                // CRC16 계산 및 엔디안 변환
+                val crc16s = Crc16.computeCrc(byteCrc16Target)
+                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+
+                // CRC16 값 설정
+                dataFrame[i++] = crc16Buffer[0]
+                dataFrame[i++] = crc16Buffer[1]
+                dataFrame[i] = ICD_ETX
+
+                return dataFrame
+            }
+        }
+
+        data class GetDataFrame(
+            var stx: Byte = ICD_STX,
+            var cmdOne: Byte = 0x00,
+            var cmdTwo: Byte = 0x00,
+            var requestDataLength: UShort = 0u,
+            var timeAcc: UInt = 0u,
+            var checkSum: UShort = 0u,
+            var etx: Byte = ICD_ETX
+        ) {
+            companion object {
+                const val FRAME_LENGTH = 12
+
+                fun fromByteArray(data: ByteArray): GetDataFrame? {
+                    if (data.size < FRAME_LENGTH) {
+                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        return null
+                    }
+
+                    // CRC 체크섬 추출 (리틀 엔디안)
+                    val rxChecksum = ByteBuffer.wrap(byteArrayOf(data[FRAME_LENGTH - 3], data[FRAME_LENGTH - 2]))
+                        .short.toUShort()
+                    val crc16Target = data.copyOfRange(1, FRAME_LENGTH - 3)
+                    val crc16Check = Crc16.computeCrc(crc16Target).toUShort()
+
+                    // CRC 검증 및 ETX 확인
+                    if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
+                        // 데이터 길이 추출
+                        val requestDataLength = JKConvert.byteArrayToUShort(byteArrayOf(data[3], data[4]))
+
+                        // 시간 누적치 추출
+                        val timeAcc = JKConvert.uintEndianConvert(data[5], data[6], data[7], data[8])
+                        println("Main Board의 요청 시간 누적치: $timeAcc")
+
+                        return GetDataFrame(
+                            stx = data[0],
+                            cmdOne = data[1],
+                            cmdTwo = data[2],
+                            requestDataLength = requestDataLength,
+                            timeAcc = timeAcc,
+                            checkSum = crc16Check,
+                            etx = data.last()
+                        )
+                    } else {
+                        println("CRC 체크 실패 또는 ETX 불일치")
+                        return null
+                    }
                 }
             }
         }

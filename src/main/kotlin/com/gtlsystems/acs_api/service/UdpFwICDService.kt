@@ -28,7 +28,7 @@ class UdpFwICDService(
     private val eventBus: ACSEventBus // 이벤트 버스 주입
 ) {
 
-    private val icdService = ICDService.Classify(pushService)
+    private val icdService = ICDService.Classify(pushService,eventBus)
 
     private lateinit var channel: DatagramChannel
     private val receiveBuffer = ByteBuffer.allocate(512)
@@ -83,7 +83,6 @@ class UdpFwICDService(
             scheduleReconnection()
         }
     }
-
     /**
      * 보드와 통신이 되지 않는다면 지정된 시간 후 재연결 시도
      */
@@ -157,6 +156,51 @@ class UdpFwICDService(
         }
     }
 
+
+    /**
+     * 12.1 위성 추적 헤더 정보 전송
+     */
+    fun sendSatelliteTrackHeader(headerFrame: ICDService.SatelliteTrackOne.SetDataFrame) {
+        try {
+            val dataToSend = headerFrame.setDataFrame()
+            channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
+            println("UDP 위성 추적 헤더 정보 전송: $firmwareIp:$firmwarePort")
+            println("UDP Send Data: ${byteArrayToHexString(dataToSend)}")
+        } catch (e: Exception) {
+            println("위성 추적 헤더 정보 전송 오류: ${e.message}")
+            throw e
+        }
+    }
+
+    /**
+     * 12.2 위성 추적 초기 제어 명령 전송
+     */
+    fun sendSatelliteTrackInitialControl(controlFrame: ICDService.SatelliteTrackTwo.SetDataFrame) {
+        try {
+            val dataToSend = controlFrame.setDataFrame()
+            channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
+            println("UDP 위성 추적 초기 제어 명령 전송: $firmwareIp:$firmwarePort")
+            println("UDP Send Data: ${byteArrayToHexString(dataToSend)}")
+        } catch (e: Exception) {
+            println("위성 추적 초기 제어 명령 전송 오류: ${e.message}")
+            throw e
+        }
+    }
+
+    /**
+     * 12.3 위성 추적 추가 데이터 전송
+     */
+    fun sendSatelliteTrackAdditionalData(dataFrame: ICDService.SatelliteTrackThree.SetDataFrame) {
+        try {
+            val dataToSend = dataFrame.setDataFrame()
+            channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
+            println("UDP 위성 추적 추가 데이터 전송: $firmwareIp:$firmwarePort")
+            println("UDP Send Data: ${byteArrayToHexString(dataToSend)}")
+        } catch (e: Exception) {
+            println("위성 추적 추가 데이터 전송 오류: ${e.message}")
+            throw e
+        }
+    }
 
     // Emergency Command 전송 함수 - 수정된 버전
     fun onEmergencyCommand(commandChar: Char) {

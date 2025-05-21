@@ -23,7 +23,15 @@ sealed class ACSEvent {
         // 모든 추적 중지
         object StopAllTracking : TrackingEvent()
     }
+    sealed class ICDEvent : ACSEvent() {
+        // 위성 추적 헤더 수신 이벤트
+        data class SatelliteTrackHeaderReceived(val headerData: Any) : ICDEvent()
 
+        // 위성 추적 데이터 요청 이벤트
+        data class SatelliteTrackDataRequested(val requestData: Any) : ICDEvent()
+
+        // 필요한 다른 ICD 이벤트들 추가...
+    }
     /**
      * 시스템 상태 관련 이벤트
      */

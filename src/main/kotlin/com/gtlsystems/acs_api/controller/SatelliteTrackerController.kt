@@ -46,55 +46,6 @@ class SatelliteTrackerController(
             )
         }
     }
-/*
-
-    */
-/**
-     * 시간 범위 동안의 위성 위치를 계산합니다.
-     *//*
-
-    @PostMapping("/tracking/path")
-    fun getTrackingPath(@RequestBody request: SatelliteTrackingPathRequest): ResponseEntity<SatelliteTrackData> {
-        val trackingPath = orekitCalculator.calculateTrackingPath(
-            request.tleLine1,
-            request.tleLine2,
-            request.startTime,
-            request.endTime,
-            request.interval,
-            request.latitude,
-            request.longitude,
-            request.altitude
-        )
-        return ResponseEntity.ok(trackingPath)
-    }
-
-    */
-/**
-     * 위성의 가시 시간을 계산합니다.
-     *//*
-
-    @PostMapping("/tracking/visibility")
-    fun getVisibilityPeriods(@RequestBody request: SatelliteVisibilityRequest): ResponseEntity<List<VisibilityPeriod>> {
-        val periods = orekitCalculator.calculateVisibilityPeriods(
-            request.tleLine1,
-            request.tleLine2,
-            request.startTime,
-            request.endTime,
-            request.interval,
-            request.latitude,
-            request.longitude,
-            request.altitude,
-            request.minElevation
-        )
-
-        val response = periods.map {
-            VisibilityPeriod(it.first, it.second)
-        }
-
-        return ResponseEntity.ok(response)
-    }
-*/
-
     /**
      * 위성 추적 스케줄을 생성합니다.
      */
@@ -114,14 +65,13 @@ class SatelliteTrackerController(
             )
         }
     }
-
     /**
      * TLE 데이터로 위성 궤도 추적 데이터를 생성합니다.
      */
     @PostMapping("/ephemeris/generate")
     fun generateEphemerisTrack(@RequestBody request: EphemerisTrackRequest): Mono<Map<String, Any>> {
         return Mono.fromCallable {
-            val (mstData, dtlData) = satelliteTrackService.EphemerisDesignationTrack(
+            val (mstData, dtlData) = satelliteTrackService.generateEphemerisDesignationTrack(
                 request.tleLine1,
                 request.tleLine2,
                 request.satelliteName
@@ -152,6 +102,65 @@ class SatelliteTrackerController(
     fun getEphemerisTrackDtlByMstId(@PathVariable mstId: Int): Mono<List<Map<String, Any?>>> {
         return Mono.fromCallable {
             satelliteTrackService.getEphemerisTrackDtlByMstId(mstId)
+        }
+    }
+    /**
+     * 위성 추적을 시작합니다.
+     * 헤더 정보 전송 및 초기 추적 데이터 전송을 수행합니다.
+     */
+    @PostMapping("/ephemeris/start/{passId}")
+    fun startEphemerisTracking(@PathVariable passId: Int): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            // 위성 추적 시작 (헤더 정보 전송)
+            satelliteTrackService.startSatelliteTracking(passId)
+            // 초기 추적 데이터 전송
+            satelliteTrackService.sendInitialTrackingData(passId)
+
+            mapOf(
+                "message" to "위성 추적이 시작되었습니다.",
+                "passId" to passId,
+                "status" to "tracking"
+            )
+        }
+    }
+
+    /**
+     * 위성 추적을 중지합니다.
+     */
+    @PostMapping("/tracking/stop")
+    fun stopEphemerisTracking(): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            satelliteTrackService.stopEphemerisTracking()
+
+            mapOf(
+                "message" to "위성 추적이 중지되었습니다.",
+                "status" to "stopped"
+            )
+        }
+    }
+
+    /**
+     * 위성 추적 상태를 확인합니다.
+     */
+    @GetMapping("/tracking/status")
+    fun getTrackingStatus(): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            val isTracking = satelliteTrackService.isTracking()
+            val currentPass = satelliteTrackService.getCurrentTrackingPass()
+
+            if (isTracking && currentPass != null) {
+                mapOf(
+                    "status" to "tracking",
+                    "passId" to (currentPass["No"] ?: "unknown"),
+                    "satelliteName" to (currentPass["SatelliteName"] ?: "unknown"),
+                    "startTime" to (currentPass["StartTime"] ?: "unknown"),
+                    "endTime" to (currentPass["EndTime"] ?: "unknown")
+                )
+            } else {
+                mapOf(
+                    "status" to "idle"
+                )
+            }
         }
     }
 }
