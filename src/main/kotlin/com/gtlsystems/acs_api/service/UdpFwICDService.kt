@@ -553,7 +553,7 @@ class UdpFwICDService(
     }
     fun defaultInfoCommand(timeOffset: Float, azOffset: Float, elOffset: Float, tiOffset: Float) {
         try {
-            var localTime = JKUtil.JKTime.calLocalTime
+            var localTime = GlobalData.Time.serverTime
             val setDataFrameInstance = ICDService.DefaultInfo.SetDataFrame(
                 cmd = 'W',
                 year = localTime.year.toUShort(),

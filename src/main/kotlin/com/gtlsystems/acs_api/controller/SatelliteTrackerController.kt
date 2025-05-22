@@ -112,10 +112,7 @@ class SatelliteTrackerController(
     fun startEphemerisTracking(@PathVariable passId: Int): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             // 위성 추적 시작 (헤더 정보 전송)
-            satelliteTrackService.startSatelliteTracking(passId)
-            // 초기 추적 데이터 전송
-            satelliteTrackService.sendInitialTrackingData(passId)
-
+            satelliteTrackService.startEphemerisTracking(passId)
             mapOf(
                 "message" to "위성 추적이 시작되었습니다.",
                 "passId" to passId,

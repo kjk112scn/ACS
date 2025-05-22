@@ -1,10 +1,13 @@
 package com.gtlsystems.acs_api.util
 
+import com.gtlsystems.acs_api.model.GlobalData.Time.addLocalTime
 import java.nio.ByteOrder
 import java.nio.ByteBuffer
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.BitSet
 
 class JKUtil {
@@ -113,28 +116,26 @@ class JKUtil {
 
     class JKTime {
         companion object {
-            val utcNow: ZonedDateTime = ZonedDateTime.now(ZoneOffset.UTC)
-            val localNow: LocalDateTime = LocalDateTime.now()
-            val addLocalTime: Int = 0
-            val calLocalTime = utcNow.plusHours(addLocalTime.toLong())
             /**
-             * UTC 시간에 지정된 시간(시간 단위)을 더한 결과를 반환합니다.
+             * 주어진 시간에 지정된 시간(초)을 더하고 문자열로 변환합니다.
              *
-             * @param utcTime UTC 기준 시간
-             * @param hoursToAdd 더할 시간 (시간 단위)
-             * @return 계산된 시간
+             * @param time 대상 시간 (ZonedDateTime)
+             * @param secondsToAdd 더할 시간 (초 단위)
+             * @param pattern 출력할 시간 형식 (기본값: "yyyy-MM-dd HH:mm:ss.SSS")
+             * @return 변환된 시간 문자열, 입력이 null인 경우 빈 문자열 반환
              */
-            fun addHoursToUtc(utcTime: ZonedDateTime, hoursToAdd: Int): ZonedDateTime {
-                // 입력 시간이 UTC가 아니면 UTC로 변환
-                val normalizedUtc = if (utcTime.zone != ZoneOffset.UTC) {
-                    utcTime.withZoneSameInstant(ZoneOffset.UTC)
-                } else {
-                    utcTime
-                }
+            fun addTimeAndFormat(
+                time: ZonedDateTime?,
+                HourToAdd: Long,
+                pattern: String = "yyyy-MM-dd HH:mm:ss.SSS"
+            ): String {
+                if (time == null) return ""
 
-                // 시간 더하기
-                return normalizedUtc.plusHours(hoursToAdd.toLong())
+                val adjustedTime = time.plus(HourToAdd, ChronoUnit.HOURS)
+                val formatter = DateTimeFormatter.ofPattern(pattern)
+                return adjustedTime.format(formatter)
             }
+
 
             /**
              * UTC 시간에 지정된 시간(초 단위)을 더한 결과를 반환합니다.

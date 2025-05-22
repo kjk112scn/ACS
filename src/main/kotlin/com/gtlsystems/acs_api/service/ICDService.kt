@@ -11,6 +11,7 @@ import com.gtlsystems.acs_api.util.Crc16
 import com.gtlsystems.acs_api.util.JKUtil.JKConvert
 import com.gtlsystems.acs_api.util.JKUtil
 import com.gtlsystems.acs_api.util.JKUtil.JKConvert.Companion.byteToBinaryString
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -384,6 +385,7 @@ class ICDService {
                 // 위성 추적 정보를 제외한 순수 데이터 프레임 21
                 // 위성 추적 데이터 satelliteTrackData.size에서 데이터 바이트 12를 곱함
                 val dataFrame = ByteArray(21 + (satelliteTrackData.size * 12))
+                println("초기 dataFrame 길이 : ${dataFrame.size}")
 
                 // 바이트 변환 (엔디안 변환 포함)
                 val byteDataLength = JKConvert.ushortToByteArray(dataLen, false)
@@ -420,7 +422,7 @@ class ICDService {
                 // 위성 추적 데이터 추가
                 var i = 18
                 for (data in satelliteTrackData) {
-                    val byteCountArray = JKConvert.floatToByteArray(data.first * 50.00f, false)
+                    val byteCountArray = JKConvert.floatToByteArray(data.first.toFloat(), false)
                     val byteAzimuthAngle = JKConvert.floatToByteArray(data.third, false)
                     val byteElevationAngle = JKConvert.floatToByteArray(data.second, false)
 
@@ -451,7 +453,7 @@ class ICDService {
                 dataFrame[i++] = crc16Buffer[0]
                 dataFrame[i++] = crc16Buffer[1]
                 dataFrame[i] = ICD_ETX
-
+                println("최종 dataFrame 길이 : ${dataFrame.size}")
                 return dataFrame
             }
         }
