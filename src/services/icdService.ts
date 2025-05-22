@@ -44,21 +44,21 @@ export interface MultiControlCommand {
 }
 
 export class CommandError extends Error {
-  status: CommandStatus;
-  originalError?: unknown;
+  status: CommandStatus
+  originalError?: unknown
 
   constructor(message: string, status: CommandStatus, originalError?: unknown) {
-    super(message);
-    this.name = 'CommandError';
-    this.status = status;
-    this.originalError = originalError;
+    super(message)
+    this.name = 'CommandError'
+    this.status = status
+    this.originalError = originalError
 
     // Error 객체의 프로토타입 체인 유지를 위한 설정
-    Object.setPrototypeOf(this, CommandError.prototype);
+    Object.setPrototypeOf(this, CommandError.prototype)
 
     // 스택 트레이스 보존
     if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, CommandError);
+      Error.captureStackTrace(this, CommandError)
     }
   }
 }
@@ -81,7 +81,7 @@ class WebSocketService {
       try {
         this.disconnect()
         this.messageHandler = onMessage
-        
+
         this.websocket = new WebSocket(url)
 
         this.websocket.onopen = () => {
@@ -119,13 +119,12 @@ class WebSocketService {
     })
   }
 
-
   /**
    * WebSocket 연결 해제
    */
   disconnect(): void {
     this.cleanup()
-    
+
     if (this.websocket) {
       this.websocket.close()
       this.websocket = null
@@ -139,11 +138,12 @@ class WebSocketService {
     if (this.reconnectAttempts < this.maxReconnectAttempts && this.messageHandler) {
       this.reconnectAttempts++
       console.log(`재연결 시도 중... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
-      
+
       setTimeout(() => {
         if (this.websocket?.url) {
-          this.connect(this.websocket.url, this.messageHandler!)
-            .catch((error: Error) => console.error('재연결 실패:', error))
+          this.connect(this.websocket.url, this.messageHandler!).catch((error: Error) =>
+            console.error('재연결 실패:', error),
+          )
         }
       }, this.reconnectDelay)
     } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
@@ -156,7 +156,7 @@ class WebSocketService {
    */
   private setupPing(): void {
     this.cleanupPing()
-    
+
     this.pingInterval = setInterval(() => {
       if (this.websocket?.readyState === WebSocket.OPEN) {
         this.websocket.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }))
@@ -184,7 +184,7 @@ class WebSocketService {
 
 export const icdService = {
   webSocketService: new WebSocketService(),
-  
+
   /**
    * WebSocket 연결 설정
    * @param url WebSocket 서버 URL
@@ -193,7 +193,7 @@ export const icdService = {
   async connectWebSocket(url: string, onMessage: WebSocketMessageHandler): Promise<void> {
     return this.webSocketService.connect(url, onMessage)
   },
-  
+
   /**
    * WebSocket 연결 해제
    */
@@ -208,8 +208,8 @@ export const icdService = {
     try {
       const response = await api.post(API_ENDPOINTS.ICD.EMERGENCY_STOP, null, {
         params: {
-          commandType
-        }
+          commandType,
+        },
       })
       console.log('비상 정지 명령 전송 성공:', response.data)
       return response.data
@@ -343,7 +343,7 @@ export const icdService = {
           message: '멀티 컨트롤 명령이 성공적으로 전송되었습니다.',
           success: true,
           timestamp: Date.now(),
-        }
+        },
       }
     } catch (error) {
       console.error('Multi control command failed:', error)
@@ -373,7 +373,7 @@ export const icdService = {
           message: '오프셋 명령이 성공적으로 전송되었습니다.',
           success: true,
           timestamp: Date.now(),
-        } as CommandStatus
+        } as CommandStatus,
       }
     } catch (error) {
       console.error('Position offset command failed:', error)
@@ -383,7 +383,7 @@ export const icdService = {
         timestamp: Date.now(),
       } as CommandStatus
 
-      throw new CommandError('오프셋 명령 전송 실패', errorStatus, error);
+      throw new CommandError('오프셋 명령 전송 실패', errorStatus, error)
     }
   },
 
@@ -441,7 +441,7 @@ export const icdService = {
           message: '시간 오프셋 명령이 성공적으로 전송되었습니다.',
           success: true,
           timestamp: Date.now(),
-        } as CommandStatus
+        } as CommandStatus,
       }
     } catch (error) {
       console.error('Time offset command failed:', error)
@@ -451,7 +451,7 @@ export const icdService = {
         timestamp: Date.now(),
       } as CommandStatus
 
-      throw new CommandError('시간 오프셋 명령 전송 실패', errorStatus, error);
+      throw new CommandError('시간 오프셋 명령 전송 실패', errorStatus, error)
     }
   },
 
@@ -461,7 +461,11 @@ export const icdService = {
    * @param elevation 고도각 프리셋 여부
    * @param tilt 틸트각 프리셋 여부
    */
-  async sendServoPresetCommand(azimuth: boolean = false, elevation: boolean = false, tilt: boolean = false) {
+  async sendServoPresetCommand(
+    azimuth: boolean = false,
+    elevation: boolean = false,
+    tilt: boolean = false,
+  ) {
     try {
       const response = await api.post('/icd/servo-preset-command', null, {
         params: {
@@ -474,14 +478,14 @@ export const icdService = {
       return {
         success: true,
         message: response.data,
-        data: response.data
+        data: response.data,
       }
     } catch (error) {
       console.error('Servo preset command failed:', error)
       return {
         success: false,
         message: '서보 프리셋 명령 전송 중 오류가 발생했습니다.',
-        error
+        error,
       }
     }
   },
@@ -491,10 +495,10 @@ export const icdService = {
    * @param command 위치 설정 명령 객체
    */
   async setPosition(command: {
-    azimuthAngle: number;
-    elevationAngle: number;
-    tiltAngle: number;
-    timestamp: string;
+    azimuthAngle: number
+    elevationAngle: number
+    tiltAngle: number
+    timestamp: string
   }) {
     try {
       const response = await api.post('/icd/set-position', command)
@@ -504,5 +508,5 @@ export const icdService = {
       console.error('위치 지정 명령 전송 실패:', error)
       throw error
     }
-  }
+  },
 }

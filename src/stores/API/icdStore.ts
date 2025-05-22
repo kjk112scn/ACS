@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed, onScopeDispose } from 'vue'
-import { icdService, type MessageData, type CommandStatus, type MultiControlCommand } from '../../services/icdService'
+import {
+  icdService,
+  type MessageData,
+  type CommandStatus,
+  type MultiControlCommand,
+} from '../../services/icdService'
 
 // 값을 안전하게 문자열로 변환하는 헬퍼 함수
 const safeToString = (value: unknown): string => {
@@ -80,18 +85,26 @@ export const useICDStore = defineStore('icd', () => {
       const now = Date.now()
       lastMessageTime.value = now
       messageDelay.value = now - (message.timestamp ? Number(message.timestamp) : now)
-      
+
       // 메시지에서 데이터 추출하여 상태 업데이트
-      if (message.azimuthAngle !== undefined) azimuthAngle.value = safeToString(message.azimuthAngle)
-      if (message.elevationAngle !== undefined) elevationAngle.value = safeToString(message.elevationAngle)
+      if (message.azimuthAngle !== undefined)
+        azimuthAngle.value = safeToString(message.azimuthAngle)
+      if (message.elevationAngle !== undefined)
+        elevationAngle.value = safeToString(message.elevationAngle)
       if (message.tiltAngle !== undefined) tiltAngle.value = safeToString(message.tiltAngle)
-      if (message.azimuthSpeed !== undefined) azimuthSpeed.value = safeToString(message.azimuthSpeed)
-      if (message.elevationSpeed !== undefined) elevationSpeed.value = safeToString(message.elevationSpeed)
+      if (message.azimuthSpeed !== undefined)
+        azimuthSpeed.value = safeToString(message.azimuthSpeed)
+      if (message.elevationSpeed !== undefined)
+        elevationSpeed.value = safeToString(message.elevationSpeed)
       if (message.tiltSpeed !== undefined) tiltSpeed.value = safeToString(message.tiltSpeed)
-      if (message.modeStatusBits !== undefined) modeStatusBits.value = safeToString(message.modeStatusBits)
-      if (message.cmdAzimuthAngle !== undefined) cmdAzimuthAngle.value = safeToString(message.cmdAzimuthAngle)
-      if (message.cmdElevationAngle !== undefined) cmdElevationAngle.value = safeToString(message.cmdElevationAngle)
-      if (message.cmdTiltAngle !== undefined) cmdTiltAngle.value = safeToString(message.cmdTiltAngle)
+      if (message.modeStatusBits !== undefined)
+        modeStatusBits.value = safeToString(message.modeStatusBits)
+      if (message.cmdAzimuthAngle !== undefined)
+        cmdAzimuthAngle.value = safeToString(message.cmdAzimuthAngle)
+      if (message.cmdElevationAngle !== undefined)
+        cmdElevationAngle.value = safeToString(message.cmdElevationAngle)
+      if (message.cmdTiltAngle !== undefined)
+        cmdTiltAngle.value = safeToString(message.cmdTiltAngle)
       if (message.cmdTime !== undefined) cmdTime.value = safeToString(message.cmdTime)
       if (message.serverTime !== undefined) serverTime.value = safeToString(message.serverTime)
       if (message.resultTimeOffsetCalTime !== undefined) {
@@ -106,24 +119,40 @@ export const useICDStore = defineStore('icd', () => {
   // WebSocket 메시지 핸들러
   const handleWebSocketMessage = (message: MessageData) => {
     try {
-      // 데이터 구조 확인 및 적절한 처리 함수 호출
-      if (message.topic === 'read') {
-        processDirectData(message)
+      // 토픽과 상관없이 최상위 레벨의 중요 필드들을 항상 처리
+      if (message.serverTime !== undefined) {
+        serverTime.value = safeToString(message.serverTime)
+        console.log('서버 시간 업데이트:', serverTime.value)
+      }
+
+      if (message.resultTimeOffsetCalTime !== undefined)
+        resultTimeOffsetCalTime.value = safeToString(message.resultTimeOffsetCalTime)
+
+      if (message.cmdAzimuthAngle !== undefined)
+        cmdAzimuthAngle.value = safeToString(message.cmdAzimuthAngle)
+      if (message.cmdElevationAngle !== undefined)
+        cmdElevationAngle.value = safeToString(message.cmdElevationAngle)
+      if (message.cmdTiltAngle !== undefined)
+        cmdTiltAngle.value = safeToString(message.cmdTiltAngle)
+
+      // 이후 메시지 구조에 따라 데이터 처리
+      if (message.data) {
+        // data 필드가 있는 경우 처리 (토픽 상관없이)
+        if (typeof message.data === 'object' && message.data !== null) {
+          processDirectData(message.data as MessageData)
+        } else {
+          console.warn('지원하지 않는 data 필드 형식:', message.data)
+        }
       } else if (
         'azimuthAngle' in message ||
         'elevationAngle' in message ||
         'tiltAngle' in message
       ) {
+        // 직접 데이터 필드가 있는 경우 처리
         processDirectData(message)
-      } else if (message.data) {
-        // data 필드가 있는 경우 처리
-        if (typeof message.data === 'object' && message.data !== null) {
-          processDirectData(message.data as MessageData)
-        } else {
-          console.warn('지원하지 않는 메시지 형식:', message)
-        }
-      } else {
-        console.warn('알 수 없는 메시지 형식:', message)
+      } else if (!message.data && message.topic !== 'read') {
+        // data 필드가 없고 read 토픽이 아닌 경우 경고
+        console.warn('데이터 필드가 없는 메시지:', message)
       }
     } catch (e) {
       console.error('메시지 처리 중 오류 발생:', e, message)
@@ -213,7 +242,11 @@ export const useICDStore = defineStore('icd', () => {
       return { success: true, data: response, message: '서보 프리셋 명령이 전송되었습니다.' }
     } catch (error) {
       console.error('서보 프리셋 명령 전송 실패:', error)
-      return { success: false, error: String(error), message: '서보 프리셋 명령 전송에 실패했습니다.' }
+      return {
+        success: false,
+        error: String(error),
+        message: '서보 프리셋 명령 전송에 실패했습니다.',
+      }
     }
   }
 
@@ -240,18 +273,41 @@ export const useICDStore = defineStore('icd', () => {
   }
 
   // Feed On/Off 명령 전송
-  const sendFeedOnOffCommand = async (sLHCP: boolean, sRHCP: boolean, sRFSwitch: boolean, xLHCP = false, xRHCP = false, fan = false) => {
+  const sendFeedOnOffCommand = async (
+    sLHCP: boolean,
+    sRHCP: boolean,
+    sRFSwitch: boolean,
+    xLHCP = false,
+    xRHCP = false,
+    fan = false,
+  ) => {
     try {
-      const response = await icdService.sendFeedOnOffCommand(sLHCP, sRHCP, sRFSwitch, xLHCP, xRHCP, fan)
+      const response = await icdService.sendFeedOnOffCommand(
+        sLHCP,
+        sRHCP,
+        sRFSwitch,
+        xLHCP,
+        xRHCP,
+        fan,
+      )
       return { success: true, data: response, message: 'Feed On/Off 명령이 전송되었습니다.' }
     } catch (error) {
       console.error('Feed On/Off 명령 전송 실패:', error)
-      return { success: false, error: String(error), message: 'Feed On/Off 명령 전송에 실패했습니다.' }
+      return {
+        success: false,
+        error: String(error),
+        message: 'Feed On/Off 명령 전송에 실패했습니다.',
+      }
     }
   }
 
   // Sun Track 시작
-  const startSunTrack = async (interval: number, azSpeed: number, elSpeed: number, tiltSpeed: number) => {
+  const startSunTrack = async (
+    interval: number,
+    azSpeed: number,
+    elSpeed: number,
+    tiltSpeed: number,
+  ) => {
     try {
       const response = await icdService.startSunTrack(interval, azSpeed, elSpeed, tiltSpeed)
       return { success: true, data: response, message: 'Sun Track이 시작되었습니다.' }
@@ -262,26 +318,30 @@ export const useICDStore = defineStore('icd', () => {
   }
 
   // 위치 오프셋 명령 전송
-  const sendPositionOffsetCommand = async (azOffset: number, elOffset: number, tiOffset: number) => {
+  const sendPositionOffsetCommand = async (
+    azOffset: number,
+    elOffset: number,
+    tiOffset: number,
+  ) => {
     try {
       const response = await icdService.sendPositionOffsetCommand(azOffset, elOffset, tiOffset)
-      return { 
-        success: true, 
+      return {
+        success: true,
         data: response,
         message: '위치 오프셋 명령이 전송되었습니다.',
         azimuthResult: 0, // 실제 응답 구조에 맞게 수정 필요
         elevationResult: 0, // 실제 응답 구조에 맞게 수정 필요
-        tiltResult: 0 // 실제 응답 구조에 맞게 수정 필요
+        tiltResult: 0, // 실제 응답 구조에 맞게 수정 필요
       }
     } catch (error) {
       console.error('위치 오프셋 명령 전송 실패:', error)
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: String(error),
         message: '위치 오프셋 명령 전송에 실패했습니다.',
         azimuthResult: 0,
         elevationResult: 0,
-        tiltResult: 0
+        tiltResult: 0,
       }
     }
   }
@@ -290,21 +350,21 @@ export const useICDStore = defineStore('icd', () => {
   const sendTimeOffsetCommand = async (timeOffset: number) => {
     try {
       const response = await icdService.sendTimeOffsetCommand(timeOffset)
-      return { 
-        success: true, 
+      return {
+        success: true,
         data: response,
         message: '시간 오프셋 명령이 전송되었습니다.',
         inputTimeoffset: 0, // 실제 응답 구조에 맞게 수정 필요
-        resultTimeOffset: 0 // 실제 응답 구조에 맞게 수정 필요
+        resultTimeOffset: 0, // 실제 응답 구조에 맞게 수정 필요
       }
     } catch (error) {
       console.error('시간 오프셋 명령 전송 실패:', error)
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: String(error),
         message: '시간 오프셋 명령 전송에 실패했습니다.',
         inputTimeoffset: 0,
-        resultTimeOffset: 0
+        resultTimeOffset: 0,
       }
     }
   }
@@ -332,12 +392,12 @@ export const useICDStore = defineStore('icd', () => {
     lastOffsetCommandStatus,
     lastTimeOffsetCommandStatus,
     lastMultiControlCommandStatus,
-    
+
     // 계산된 속성
     hasActiveConnection,
     lastUpdateTime,
     connectionStatus,
-    
+
     // 메서드
     connectWebSocket,
     disconnectWebSocket,
@@ -351,6 +411,6 @@ export const useICDStore = defineStore('icd', () => {
     sendFeedOnOffCommand,
     startSunTrack,
     sendPositionOffsetCommand,
-    sendTimeOffsetCommand
+    sendTimeOffsetCommand,
   }
 })

@@ -6,7 +6,7 @@
         <div class="header-section">
           <!-- 명령 시간 (좌측 최상단으로 이동) -->
           <div class="cmd-time">
-            <span class="adaptive-text time-value">{{ formattedServerTime }}</span>
+            <span class="adaptive-text time-value">{{ displayServerTime }}</span>
           </div>
         </div>
 
@@ -247,6 +247,46 @@ let tiltChart: ECharts | undefined = undefined
 // 차트 업데이트 타이머 - 하나만 사용
 let chartUpdateTimer: number | null = null
 
+// 서버 시간 관련 상태 추가
+const currentServerTime = ref('')
+
+// 'let' 대신 'const'를 사용하고, 초기값은 null로 설정
+const serverTimeUpdateInterval = ref<number | null>(null)
+
+// 서버 시간 업데이트 함수 - 밀리초 포함
+const updateServerTime = () => {
+  if (icdStore.serverTime) {
+    try {
+      const serverTime = new Date(icdStore.serverTime)
+
+      // 커스텀 형식으로 날짜 포맷팅 (밀리초 포함)
+      const year = serverTime.getFullYear()
+      const month = String(serverTime.getMonth() + 1).padStart(2, '0')
+      const day = String(serverTime.getDate()).padStart(2, '0')
+      const hours = String(serverTime.getHours()).padStart(2, '0')
+      const minutes = String(serverTime.getMinutes()).padStart(2, '0')
+      const seconds = String(serverTime.getSeconds()).padStart(2, '0')
+
+      const milliseconds = String(serverTime.getMilliseconds()).padStart(3, '0')
+
+      // YYYY-MM-DD HH:MM:SS.mmm 형식
+      currentServerTime.value = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`
+
+      console.info('서버 시간:', currentServerTime.value)
+    } catch (error) {
+      console.error('서버 시간 파싱 오류:', error)
+      currentServerTime.value = icdStore.serverTime || ''
+    }
+  } else {
+    currentServerTime.value = ''
+  }
+}
+
+// 서버 시간 표시용 computed 속성 수정
+const displayServerTime = computed(() => {
+  return currentServerTime.value || '서버 시간 대기 중...'
+})
+
 // 값 표시 헬퍼 함수
 const displayValue = (value: string | number | null | undefined) => {
   if (value === null || value === undefined || value === '') {
@@ -262,24 +302,14 @@ const displayValue = (value: string | number | null | undefined) => {
   return value
 }
 
-// 서버 시간 포맷팅 (기본 Date 메서드 사용)
-const formattedServerTime = computed(() => {
-  if (!icdStore.serverTime) return ''
-
-  try {
-    // ISO 문자열을 Date 객체로 변환
-    const dateObj = new Date(icdStore.serverTime)
-
-    // 시간 문자열 생성 (toISOString은 항상 UTC 시간을 반환)
-    // 예: "2023-05-12T16:49:59.928Z" -> "2023-05-12 16:49:59.928"
-
-    const isoString = dateObj.toISOString()
-    return isoString.replace('T', ' ').replace('Z', '')
-  } catch (error) {
-    console.error('날짜 포맷팅 오류:', error)
-    return icdStore.serverTime // 오류 발생 시 원본 문자열 반환
-  }
-})
+// WebSocket 연결 상태 확인을 위한 watch 추가
+watch(
+  () => icdStore.isConnected,
+  (newValue) => {
+    console.log('WebSocket 연결 상태:', newValue)
+  },
+  { immediate: true }, // 컴포넌트 마운트 시 즉시 실행
+)
 
 // 현재 모드 상태
 const currentMode = ref('ephemeris')
@@ -292,9 +322,26 @@ const navigateToMode = (mode: string) => {
 
 // 컴포넌트 마운트 시 차트 초기화 및 업데이트 타이머 설정
 onMounted(() => {
+  console.log('DashboardPage 컴포넌트 마운트됨')
+  updateServerTime()
+
+  // 100ms 주기로 서버 시간 업데이트 - 로그 추가
+  console.log('서버 시간 업데이트 타이머 설정 시작')
+  serverTimeUpdateInterval.value = window.setInterval(() => {
+    console.log('타이머 호출됨') // 타이머가 실행되는지 확인
+    updateServerTime()
+  }, 100)
+  console.log('서버 시간 업데이트 타이머 설정 완료:', serverTimeUpdateInterval.value)
+  // 현재 서버 시간 상태 로그 출력
+  console.log('[마운트 시] 현재 서버 시간 상태:', {
+    serverTime: icdStore.serverTime,
+    isConnected: icdStore.isConnected,
+  })
+
   // 현재 라우트 경로에서 모드 추출
   const pathParts = route.path.split('/')
   const currentPathMode = pathParts[pathParts.length - 1]
+  console.log('현재 모드:', currentPathMode)
 
   // 유효한 모드인 경우 currentMode 업데이트
   if (
@@ -309,8 +356,25 @@ onMounted(() => {
     void router.push('/dashboard/standby')
   }
 
-  // WebSocket 연결 초기화
+  // WebSocket 연결 초기화 전 로그
+  console.log('WebSocket 연결 초기화 시작')
   icdStore.initialize()
+  console.log('WebSocket 연결 초기화 요청 완료')
+
+  // 초기 스토어 상태 로깅
+  console.log('초기 icdStore 상태:', {
+    isConnected: icdStore.isConnected,
+    serverTime: icdStore.serverTime,
+    error: icdStore.error,
+  })
+
+  // 초기 서버 시간 설정
+  updateServerTime()
+
+  // 100ms 주기로 서버 시간 업데이트
+  serverTimeUpdateInterval.value = window.setInterval(() => {
+    updateServerTime()
+  }, 10)
 
   // DOM이 완전히 렌더링된 후 차트 초기화를 위해 setTimeout 사용
   setTimeout(() => {
@@ -361,6 +425,11 @@ onUnmounted(() => {
   if (chartUpdateTimer !== null) {
     clearInterval(chartUpdateTimer)
     chartUpdateTimer = null
+  }
+  // 서버 시간 업데이트 타이머 정리
+  if (serverTimeUpdateInterval.value !== null) {
+    clearInterval(serverTimeUpdateInterval.value)
+    serverTimeUpdateInterval.value = null
   }
 
   // 차트 인스턴스 정리
@@ -1215,5 +1284,4 @@ const releaseEmergency = async () => {
   background: transparent;
   pointer-events: none;
 }
-
 </style>

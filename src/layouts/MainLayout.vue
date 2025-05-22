@@ -2,28 +2,46 @@
   <q-layout view="lHh Lpr lFf">
     <q-header elevated>
       <q-toolbar>
-        <q-btn flat dense round icon="menu" aria-label="Menu" @click="toggleLeftDrawer" />
+        <!-- 좌측 섹션: 메뉴 버튼과 GTL ACS 로고 -->
 
-        <q-toolbar-title> GTL ACS </q-toolbar-title>
+        <div class="row items-center no-wrap">
+          <q-btn
+            flat
+            dense
+            round
+            icon="menu"
+            aria-label="Menu"
+            @click="toggleLeftDrawer"
+            class="q-mr-sm"
+          />
+          <div class="text-h6 no-ellipsis">GTL ACS</div>
+        </div>
 
-        <!-- 설정 버튼 추가 -->
-        <q-btn
-          flat
-          dense
-          round
-          icon="settings"
-          aria-label="Settings"
-          @click="settingsModal = true"
-        />
-        <!-- Dark Mode Toggle -->
-        <q-btn
-          flat
-          dense
-          round
-          icon="brightness_4"
-          aria-label="Toggle Dark Mode"
-          @click="toggleDarkMode"
-        />
+        <!-- 우측으로 밀어내기 위한 공간 -->
+        <q-space />
+
+        ㅉㅉ
+
+        <!-- 우측 섹션: 설정 버튼과 테마 변경 버튼 -->
+        <div class="row items-center">
+          <q-btn
+            flat
+            dense
+            round
+            icon="settings"
+            aria-label="Settings"
+            @click="settingsModal = true"
+            class="q-mr-sm"
+          />
+          <q-btn
+            flat
+            dense
+            round
+            icon="brightness_4"
+            aria-label="Toggle Dark Mode"
+            @click="toggleDarkMode"
+          />
+        </div>
       </q-toolbar>
     </q-header>
 
