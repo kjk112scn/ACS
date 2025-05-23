@@ -29,8 +29,7 @@ const safeToString = (value: unknown): string => {
 }
 
 // WebSocket 서버 URL
-const WEBSOCKET_URL = 'ws://localhost:8080/ws/push-data'
-
+const WEBSOCKET_URL = 'ws://localhost:8080/ws'
 export const useICDStore = defineStore('icd', () => {
   // 상태 정의
   const serverTime = ref('')

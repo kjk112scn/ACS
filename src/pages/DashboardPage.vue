@@ -266,7 +266,6 @@ const updateServerTime = () => {
       const hours = String(serverTime.getHours()).padStart(2, '0')
       const minutes = String(serverTime.getMinutes()).padStart(2, '0')
       const seconds = String(serverTime.getSeconds()).padStart(2, '0')
-
       const milliseconds = String(serverTime.getMilliseconds()).padStart(3, '0')
 
       // YYYY-MM-DD HH:MM:SS.mmm 형식
@@ -328,7 +327,7 @@ onMounted(() => {
   // 100ms 주기로 서버 시간 업데이트 - 로그 추가
   console.log('서버 시간 업데이트 타이머 설정 시작')
   serverTimeUpdateInterval.value = window.setInterval(() => {
-    console.log('타이머 호출됨') // 타이머가 실행되는지 확인
+    //console.log('타이머 호출됨') // 타이머가 실행되는지 확인
     updateServerTime()
   }, 100)
   console.log('서버 시간 업데이트 타이머 설정 완료:', serverTimeUpdateInterval.value)
@@ -367,14 +366,6 @@ onMounted(() => {
     serverTime: icdStore.serverTime,
     error: icdStore.error,
   })
-
-  // 초기 서버 시간 설정
-  updateServerTime()
-
-  // 100ms 주기로 서버 시간 업데이트
-  serverTimeUpdateInterval.value = window.setInterval(() => {
-    updateServerTime()
-  }, 10)
 
   // DOM이 완전히 렌더링된 후 차트 초기화를 위해 setTimeout 사용
   setTimeout(() => {

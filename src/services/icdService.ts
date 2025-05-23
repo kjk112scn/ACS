@@ -70,6 +70,7 @@ class WebSocketService {
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
   private reconnectDelay = 3000
+  private currentUrl: string = '' // 현재 연결된 WebSocket URL 저장
 
   /**
    * WebSocket 연결 설정
@@ -81,8 +82,21 @@ class WebSocketService {
       try {
         this.disconnect()
         this.messageHandler = onMessage
+        this.currentUrl = url // 현재 URL 저장
 
+        console.log(`[WebSocket] 새로운 연결 시도: ${url}`)
         this.websocket = new WebSocket(url)
+
+        // WebSocket 버퍼링 상태 로깅
+        console.log(`[WebSocket] 버퍼링 상태: ${this.websocket.bufferedAmount} bytes`)
+
+        // WebSocket 이벤트 리스너 추가
+        this.websocket.onopen = () => {
+          console.log(`[WebSocket] 연결 열림 - readyState: ${this.getReadyStateString(this.websocket!.readyState)}`)
+          this.reconnectAttempts = 0
+          this.setupPing()
+          resolve()
+        }
 
         this.websocket.onopen = () => {
           console.log('WebSocket 연결 성공')
@@ -100,10 +114,75 @@ class WebSocketService {
           }
         }
 
-        this.websocket.onclose = () => {
-          console.log('WebSocket 연결 종료')
+        this.websocket.onclose = (event) => {
+          const closeInfo = {
+            code: event.code,
+            reason: event.reason || '알 수 없음',
+            wasClean: event.wasClean,
+
+            readyState: this.websocket?.readyState,
+            timestamp: new Date().toISOString(),
+
+            stack: new Error().stack
+          }
+
+          console.log('[WebSocket] 연결 종료 - 상세 정보:', JSON.stringify(closeInfo, null, 2))
+
+
+
+
+          // 종료 코드에 따른 처리
+          switch (event.code) {
+            case 1000:
+              console.log('정상 종료')
+              break
+            case 1001:
+              console.log('서버 종료 또는 브라우저 탭 닫힘')
+              break
+            case 1005:
+              console.warn('상태 코드 없이 연결 종료됨 (코드 1005) - 네트워크 문제 가능성 높음')
+              // 네트워크 상태 확인
+              if (navigator.onLine) {
+                console.log('브라우저는 온라인 상태입니다. 서버 문제일 가능성이 있습니다.')
+              } else {
+                console.warn('브라우저가 오프라인 상태입니다. 네트워크 연결을 확인하세요.')
+              }
+              break
+            case 1006:
+              console.error('비정상 종료 (서버 응답 없음)')
+              break
+            // 기타 코드 처리...
+          }
+
           this.cleanup()
-          this.attemptReconnect()
+
+
+
+
+
+
+
+          // 정상 종료가 아닌 경우에만 재연결 시도
+          if (event.code !== 1000 && event.code !== 1001) {
+            // 코드 1005의 경우 네트워크 상태 확인 후 재연결
+            if (event.code === 1005) {
+              // 네트워크 상태 확인 후 재연결
+              if (navigator.onLine) {
+                console.log('네트워크 연결 확인됨, 재연결 시도...')
+                this.attemptReconnect()
+              } else {
+                // 네트워크 연결이 복구되면 재연결 시도
+                const onlineHandler = () => {
+                  console.log('네트워크 연결 복구됨, 재연결 시도...')
+                  window.removeEventListener('online', onlineHandler)
+                  this.attemptReconnect()
+                }
+                window.addEventListener('online', onlineHandler)
+              }
+            } else {
+              this.attemptReconnect()
+            }
+          }
         }
 
         this.websocket.onerror = (event) => {
@@ -135,22 +214,27 @@ class WebSocketService {
    * 재연결 시도
    */
   private attemptReconnect(): void {
-    if (this.reconnectAttempts < this.maxReconnectAttempts && this.messageHandler) {
+    if (
+      this.reconnectAttempts < this.maxReconnectAttempts &&
+      this.messageHandler &&
+      this.currentUrl
+    ) {
       this.reconnectAttempts++
       console.log(`재연결 시도 중... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
 
       setTimeout(() => {
-        if (this.websocket?.url) {
-          this.connect(this.websocket.url, this.messageHandler!).catch((error: Error) =>
-            console.error('재연결 실패:', error),
-          )
-        }
+        this.connect(this.currentUrl, this.messageHandler!).catch((error) =>
+          console.error('재연결 실패:', error),
+        )
       }, this.reconnectDelay)
     } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.error('최대 재연결 시도 횟수 초과')
+      // 일정 시간 후 재시도 카운터 초기화
+      setTimeout(() => {
+        this.reconnectAttempts = 0
+      }, 60000) // 1분 후 재시도
     }
   }
-
   /**
    * 주기적인 핑 전송 설정
    */
@@ -177,8 +261,75 @@ class WebSocketService {
   /**
    * 리소스 정리
    */
+  /**
+   * WebSocket readyState를 문자열로 변환
+   */
+  private getReadyStateString(state: number): string {
+    const states = {
+      0: 'CONNECTING',
+      1: 'OPEN',
+      2: 'CLOSING',
+      3: 'CLOSED'
+    }
+    return states[state as keyof typeof states] || `UNKNOWN(${state})`
+  }
+
+  /**
+   * WebSocket 종료 코드를 메시지로 변환
+   */
+  private getCloseStatusMessage(code: number): string {
+    const statusMessages: {[key: number]: string} = {
+      1000: '정상 종료',
+      1001: '서버가 사라짐 또는 브라우저가 페이지를 벗어남',
+      1002: '프로토콜 오류',
+      1003: '지원하지 않는 데이터 유형',
+      1005: '상태 코드 없음',
+      1006: '비정상 종료',
+      1007: '일관성 없는 데이터',
+      1008: '정책 위반',
+      1009: '메시지가 너무 큼',
+      1010: '클라이언트가 확장을 요구함',
+      1011: '예기치 않은 조건',
+      1012: '서비스 재시작 중',
+      1013: '일시적인 서버 상태',
+      1015: 'TLS 핸드셰이크 실패'
+    }
+    return statusMessages[code] || `알 수 없는 상태 코드 (${code})`
+  }
+
   private cleanup(): void {
-    this.cleanupPing()
+    console.log('[WebSocket] 리소스 정리 시작')
+
+    // 핑 인터벌 정리
+    if (this.pingInterval) {
+      console.log('[WebSocket] 핑 인터벌 정리')
+      clearInterval(this.pingInterval)
+      this.pingInterval = null
+    }
+
+    // WebSocket 정리
+    if (this.websocket) {
+      const state = this.getReadyStateString(this.websocket.readyState)
+      console.log(`[WebSocket] WebSocket 정리 (현재 상태: ${state})`)
+
+      // 이벤트 리스너 제거
+      this.websocket.onopen = null
+      this.websocket.onclose = null
+      this.websocket.onerror = null
+      this.websocket.onmessage = null
+
+      // 연결이 열려있으면 닫기
+      if (this.websocket.readyState === WebSocket.OPEN) {
+        console.log('[WebSocket] WebSocket 연결 닫는 중...')
+        this.websocket.close(1000, '클라이언트에서 연결 종료')
+      }
+
+      // WebSocket 객체는 유지하되 참조는 유지 (재연결을 위해)
+    } else {
+      console.log('[WebSocket] 정리할 WebSocket 인스턴스가 없음')
+    }
+
+    console.log('[WebSocket] 리소스 정리 완료')
   }
 }
 
