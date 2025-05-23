@@ -24,12 +24,12 @@ import java.util.BitSet
 
 @Service
 class UdpFwICDService(
-    private val pushService: PushService,
+    private val dataStoreService: DataStoreService,
     private val environment: Environment,
     private val eventBus: ACSEventBus // 이벤트 버스 주입
 ) {
 
-    private val icdService = ICDService.Classify(pushService,eventBus)
+    private val icdService = ICDService.Classify(dataStoreService,eventBus)
 
     private lateinit var channel: DatagramChannel
     private val receiveBuffer = ByteBuffer.allocate(512)
@@ -148,15 +148,10 @@ class UdpFwICDService(
         try {
             icdService.receivedCmd(receivedData)
             // ICDService에서 처리한 최신 데이터를 가져와 readData 업데이트
-            val latestData = pushService.getLatestData()
-            if (latestData != null) {
-                readData = latestData
-            }
         } catch (e: Exception) {
             println("ICD 데이터 처리 오류: ${e.message}")
         }
     }
-
 
     /**
      * 12.1 위성 추적 헤더 정보 전송
@@ -553,7 +548,7 @@ class UdpFwICDService(
     }
     fun defaultInfoCommand(timeOffset: Float, azOffset: Float, elOffset: Float, tiOffset: Float) {
         try {
-            var localTime = GlobalData.Time.serverTime
+            var localTime = JKUtil.JKTime.calLocalTime
             val setDataFrameInstance = ICDService.DefaultInfo.SetDataFrame(
                 cmd = 'W',
                 year = localTime.year.toUShort(),

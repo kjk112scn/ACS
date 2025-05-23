@@ -11,7 +11,6 @@ import com.gtlsystems.acs_api.util.Crc16
 import com.gtlsystems.acs_api.util.JKUtil.JKConvert
 import com.gtlsystems.acs_api.util.JKUtil
 import com.gtlsystems.acs_api.util.JKUtil.JKConvert.Companion.byteToBinaryString
-import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -24,7 +23,7 @@ class ICDService {
         const val ICD_ETX: Byte = 0x03
     }
 
-    class Classify(private val pushService: PushService,private val acsEventBus: ACSEventBus) {
+    class Classify(private val dataStoreService: DataStoreService, private val acsEventBus: ACSEventBus) {
         private var lastPacketTime = System.nanoTime()
         private val logger = org.slf4j.LoggerFactory.getLogger(Classify::class.java)
 
@@ -37,73 +36,71 @@ class ICDService {
             }
             lastPacketTime = now
         }
-        fun receivedCmd(receiveData: ByteArray) {
-            if (receiveData.size > 1 && receiveData[0] == 0x02.toByte()) {
-                monitorPacketTiming(receiveData)
-                if (receiveData[1] == 'R'.code.toByte()) {
-                    //2.2 Read Status
-                    if (receiveData[2] == 'R'.code.toByte()) {
-                        val parsedData = ReadStatus.GetDataFrame.fromByteArray(receiveData)
-                        parsedData?.let {
-                            val newData = PushData.ReadData(
-                                // Angle data
-                                azimuthAngle = it.azimuthAngle,
-                                elevationAngle = it.elevationAngle,
-                                tiltAngle = it.tiltAngle,
+       fun receivedCmd(receiveData: ByteArray) {
+    if (receiveData.size > 1 && receiveData[0] == 0x02.toByte()) {
+        monitorPacketTiming(receiveData)
+        if (receiveData[1] == 'R'.code.toByte()) {
+            //2.2 Read Status
+            if (receiveData[2] == 'R'.code.toByte()) {
+                val parsedData = ReadStatus.GetDataFrame.fromByteArray(receiveData)
+                parsedData?.let {
+                    val newData = PushData.ReadData(
+                        // Angle data
+                        azimuthAngle = it.azimuthAngle,
+                        elevationAngle = it.elevationAngle,
+                        tiltAngle = it.tiltAngle,
 
-                                // Speed data
-                                azimuthSpeed = it.azimuthSpeed,
-                                elevationSpeed = it.elevationSpeed,
-                                tiltSpeed = it.tiltSpeed,
+                        // Speed data
+                        azimuthSpeed = it.azimuthSpeed,
+                        elevationSpeed = it.elevationSpeed,
+                        tiltSpeed = it.tiltSpeed,
 
-                                // Servo driver angle data
-                                servoDriverAzimuthAngle = it.servoDriverAzimuthAngle,
-                                servoDriverElevationAngle = it.servoDriverElevationAngle,
-                                servoDriverTiltAngle = it.servoDriverTiltAngle,
+                        // Servo driver angle data
+                        servoDriverAzimuthAngle = it.servoDriverAzimuthAngle,
+                        servoDriverElevationAngle = it.servoDriverElevationAngle,
+                        servoDriverTiltAngle = it.servoDriverTiltAngle,
 
-                                // Torque data
-                                torqueAzimuth = it.torqueAzimuth,
-                                torqueElevation = it.torqueElevation,
-                                torqueTilt = it.torqueTilt,
+                        // Torque data
+                        torqueAzimuth = it.torqueAzimuth,
+                        torqueElevation = it.torqueElevation,
+                        torqueTilt = it.torqueTilt,
 
-                                // Environmental data
-                                windSpeed = it.windSpeed,
-                                windDirection = it.windDirection,
-                                rtdOne = it.rtdOne,
-                                rtdTwo = it.rtdTwo,
+                        // Environmental data
+                        windSpeed = it.windSpeed,
+                        windDirection = it.windDirection,
+                        rtdOne = it.rtdOne,
+                        rtdTwo = it.rtdTwo,
 
-                                // Status bits
-                                modeStatusBits = it.modeStatusBits,
-                                mainBoardProtocolStatusBits = it.mainBoardProtocolStatusBits,
-                                mainBoardStatusBits = it.mainBoardStatusBits,
-                                mainBoardMCOnOffBits = it.mainBoardMCOnOffBits,
-                                mainBoardReserveBits = it.mainBoardReserveBits,
-                                azimuthBoardServoStatusBits = it.azimuthBoardServoStatusBits,
-                                azimuthBoardStatusBits = it.azimuthBoardStatusBits,
-                                elevationBoardServoStatusBits = it.elevationBoardServoStatusBits,
-                                elevationBoardStatusBits = it.elevationBoardStatusBits,
-                                tiltBoardServoStatusBits = it.tiltBoardServoStatusBits,
-                                tiltBoardStatusBits = it.tiltBoardStatusBits,
-                                feedSBoardStatusBits = it.feedSBoardStatusBits,
-                                feedXBoardStatusBits = it.feedXBoardStatusBits,
+                        // Status bits
+                        modeStatusBits = it.modeStatusBits,
+                        mainBoardProtocolStatusBits = it.mainBoardProtocolStatusBits,
+                        mainBoardStatusBits = it.mainBoardStatusBits,
+                        mainBoardMCOnOffBits = it.mainBoardMCOnOffBits,
+                        mainBoardReserveBits = it.mainBoardReserveBits,
+                        azimuthBoardServoStatusBits = it.azimuthBoardServoStatusBits,
+                        azimuthBoardStatusBits = it.azimuthBoardStatusBits,
+                        elevationBoardServoStatusBits = it.elevationBoardServoStatusBits,
+                        elevationBoardStatusBits = it.elevationBoardStatusBits,
+                        tiltBoardServoStatusBits = it.tiltBoardServoStatusBits,
+                        tiltBoardStatusBits = it.tiltBoardStatusBits,
+                        feedSBoardStatusBits = it.feedSBoardStatusBits,
+                        feedXBoardStatusBits = it.feedXBoardStatusBits,
 
-                                // Current and RSSI data
-                                currentSBandLNA_LHCP = it.currentSBandLNA_LHCP,
-                                currentSBandLNA_RHCP = it.currentSBandLNA_RHCP,
-                                currentXBandLNA_LHCP = it.currentXBandLNA_LHCP,
-                                currentXBandLNA_RHCP = it.currentXBandLNA_RHCP,
-                                rssiSBandLNA_LHCP = it.rssiSBandLNA_LHCP,
-                                rssiSBandLNA_RHCP = it.rssiSBandLNA_RHCP,
-                                rssiXBandLNA_LHCP = it.rssiXBandLNA_LHCP,
-                                rssiXBandLNA_RHCP = it.rssiXBandLNA_RHCP
-                            )
+                        // Current and RSSI data
+                        currentSBandLNA_LHCP = it.currentSBandLNA_LHCP,
+                        currentSBandLNA_RHCP = it.currentSBandLNA_RHCP,
+                        currentXBandLNA_LHCP = it.currentXBandLNA_LHCP,
+                        currentXBandLNA_RHCP = it.currentXBandLNA_RHCP,
+                        rssiSBandLNA_LHCP = it.rssiSBandLNA_LHCP,
+                        rssiSBandLNA_RHCP = it.rssiSBandLNA_RHCP,
+                        rssiXBandLNA_LHCP = it.rssiXBandLNA_LHCP,
+                        rssiXBandLNA_RHCP = it.rssiXBandLNA_RHCP
+                    )
 
-                            pushService.updateData(newData)
-                            //println("1_파싱된 ICD 데이터: $it")
-                            //println("1_파싱된 ICD 데이터: ${it.azimuthAngle}, EL ${it.elevationAngle}, TL ${it.tiltAngle}")
-
-                        }
-                    }
+                    // PushService 대신 DataStoreService 사용
+                    dataStoreService.updateDataFromUdp(newData)
+                }
+            }
                     //2.3 Read Positioner Status
                     else if (receiveData[2] == 'P'.code.toByte()) {
 
@@ -385,7 +382,6 @@ class ICDService {
                 // 위성 추적 정보를 제외한 순수 데이터 프레임 21
                 // 위성 추적 데이터 satelliteTrackData.size에서 데이터 바이트 12를 곱함
                 val dataFrame = ByteArray(21 + (satelliteTrackData.size * 12))
-                println("초기 dataFrame 길이 : ${dataFrame.size}")
 
                 // 바이트 변환 (엔디안 변환 포함)
                 val byteDataLength = JKConvert.ushortToByteArray(dataLen, false)
@@ -422,7 +418,7 @@ class ICDService {
                 // 위성 추적 데이터 추가
                 var i = 18
                 for (data in satelliteTrackData) {
-                    val byteCountArray = JKConvert.floatToByteArray(data.first.toFloat(), false)
+                    val byteCountArray = JKConvert.floatToByteArray(data.first * 50.00f, false)
                     val byteAzimuthAngle = JKConvert.floatToByteArray(data.third, false)
                     val byteElevationAngle = JKConvert.floatToByteArray(data.second, false)
 
@@ -453,7 +449,7 @@ class ICDService {
                 dataFrame[i++] = crc16Buffer[0]
                 dataFrame[i++] = crc16Buffer[1]
                 dataFrame[i] = ICD_ETX
-                println("최종 dataFrame 길이 : ${dataFrame.size}")
+
                 return dataFrame
             }
         }

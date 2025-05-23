@@ -843,9 +843,6 @@ class OrekitCalculator : SatellitePositionCalculator {
                             val endElevation = detailedTrackingData.lastOrNull()?.elevation ?: 0.0
                             val startTime = period.startTime.plus(GlobalData.Time.addLocalTime.toLong(), ChronoUnit.MILLIS)
                             val endTime = period.endTime.plus(GlobalData.Time.addLocalTime.toLong(), ChronoUnit.MILLIS)
-
-                            logger.info("startTime ${startTime}")
-                            logger.info("endTime ${endTime}")
                             SatelliteTrackingPass(
                                 startTime = startTime,
                                 endTime = endTime,

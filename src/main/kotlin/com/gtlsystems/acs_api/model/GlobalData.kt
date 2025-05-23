@@ -1,9 +1,11 @@
 package com.gtlsystems.acs_api.model
 
+import com.gtlsystems.acs_api.model.PushData.ReadData
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * 전역 데이터 클래스
@@ -101,5 +103,62 @@ object GlobalData {
             utcZoneId
         )
         val minElevationAngle: Float = 0.0f
+    }
+
+    /**
+     * 수신 데이터 저장소
+     */
+    object ReceivedData {
+        // 원자적 참조로 스레드 안전성 보장
+        private val latestData = AtomicReference<ReadData>(ReadData())
+
+        // 데이터 업데이트 함수
+        fun updateData(newData: ReadData) {
+            latestData.set(newData)
+        }
+
+        // 데이터 조회 함수
+        fun getData(): ReadData {
+            return latestData.get()
+        }
+
+        // 마지막 업데이트 시간
+        var lastUpdateTime: Long = System.currentTimeMillis()
+    }
+
+    /**
+     * 데이터 전송 관련 설정
+     */
+    object DataTransmission {
+        /**
+         * 웹소켓을 통한 데이터 전송 간격 (밀리초)
+         */
+        var transmissionInterval: Long = 100
+
+        /**
+         * UDP 연결 타임아웃 (초)
+         * 이 시간 동안 UDP 패킷이 수신되지 않으면 연결이 끊긴 것으로 간주
+         */
+        var udpTimeoutSeconds: Long = 5
+
+        /**
+         * UDP 재연결 시도 간격 (밀리초)
+         */
+        var udpReconnectInterval: Long = 1000
+
+        /**
+         * 웹소켓 연결 타임아웃 (밀리초)
+         */
+        var webSocketTimeoutMillis: Long = 30000
+
+        /**
+         * 데이터 전송 최대 버퍼 크기
+         */
+        var maxBufferSize: Int = 1024
+
+        /**
+         * UDP 연결이 끊겼을 때 더미 데이터 사용 여부
+         */
+        var useDummyDataWhenDisconnected: Boolean = true
     }
 }

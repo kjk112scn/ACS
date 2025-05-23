@@ -1,167 +1,145 @@
 package com.gtlsystems.acs_api.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.node.ObjectNode
 import com.gtlsystems.acs_api.model.GlobalData
-import com.gtlsystems.acs_api.model.GlobalData.CMD.azimuth
 import com.gtlsystems.acs_api.model.PushData
-import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import reactor.core.publisher.DirectProcessor
 import reactor.core.publisher.Flux
-import reactor.core.publisher.FluxSink
-import reactor.core.scheduler.Schedulers
+import reactor.core.publisher.Sinks
 import java.time.Duration
+import org.slf4j.LoggerFactory
+import jakarta.annotation.PostConstruct
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 @Service
-class PushService(private val objectMapper: ObjectMapper) {
+class PushService(
+    private val objectMapper: ObjectMapper,
+    private val dataStoreService: DataStoreService
+) {
     private val logger = LoggerFactory.getLogger(PushService::class.java)
 
-    // 데이터 처리를 위한 프로세서 (더 효율적인 방식)
-    private val readStatusDataProcessor = DirectProcessor.create<String>()
-    private val readStatusDataSink = readStatusDataProcessor.sink()
+    // 싱크 생성 (WebSocket으로 데이터 전송)
+    private val sink = Sinks.many().multicast().onBackpressureBuffer<String>()
 
-    // 최신 데이터 저장
-    private val latestData = AtomicReference(PushData.ReadData())
-    private val latestJsonData = AtomicReference<String>()
+    // 활성 클라이언트 수
+    private val activeClients = AtomicInteger(0)
 
-    // 시뮬레이션 데이터 스트림
-    private val readStatusDataFlux = Flux.interval(Duration.ofMillis(50))
-        .map {
-            try {
-                val currentData = latestData.get()
-                val jsonData = objectMapper.writeValueAsString(currentData)
-                latestJsonData.set(jsonData)
-                jsonData
-            } catch (e: Exception) {
-                logger.error("Error serializing data: ${e.message}", e)
-                latestJsonData.get()
-            }
-        }
-        .publishOn(Schedulers.parallel()) // 병렬 처리
-    // 데이터 스트림 제공 (최적화)
-    fun getReadStatusDataStream(): Flux<String> {
-        logger.debug("Creating read status data stream")
+    // 마지막으로 전송된 JSON 데이터
+    private val latestJsonData = AtomicReference<String>("")
 
-        // 구독 시 항상 최신 데이터로 시작하고, 이후 실시간 업데이트
-        return Flux.defer {
-            // 최신 데이터가 있으면 먼저 전송
-            val latest = latestJsonData.get()
-            if (latest != null) {
-                Flux.just(latest)
-            } else {
-                Flux.empty()
-            }
-        }
-            .concatWith(readStatusDataProcessor) // 실시간 업데이트 스트림과 연결
-            .publishOn(Schedulers.parallel()) // 병렬 처리로 성능 향상
-            .map { data ->
+    @PostConstruct
+    fun init() {
+        startPeriodicDataTransmission()
+        logger.info("푸시 서비스 초기화 완료")
+    }
+
+    // 주기적 데이터 전송 시작
+    private fun startPeriodicDataTransmission() {
+        // 전송 간격 설정 (기본값: 100ms)
+        val interval = 100L // 필요에 따라 조정 가능
+
+        Flux.interval(Duration.ofMillis(interval))
+            .subscribe {
                 try {
-                    // 타임스탬프 추가
-                    val jsonNode = objectMapper.readTree(data)
-                    val objectNode = jsonNode as ObjectNode
-                    objectNode.put("_receivedAt", System.currentTimeMillis())
-                    objectMapper.writeValueAsString(objectNode)
+                    // 활성 클라이언트가 있을 때만 데이터 전송
+                    if (activeClients.get() > 0) {
+                        sendLatestData()
+                    }
                 } catch (e: Exception) {
-                    data // 오류 시 원본 데이터 반환
+                    logger.error("주기적 데이터 전송 중 오류 발생: ${e.message}", e)
                 }
             }
-            .doOnSubscribe {
-                logger.info("New subscriber to read status data stream")
-            }
-            .doOnCancel {
-                logger.info("Subscriber cancelled read status data stream")
-            }
     }
 
-    // 일반 토픽 발행 (최적화)
-    fun publish(topic: String, message: String) {
+    // 최신 데이터 전송
+    private fun sendLatestData() {
         try {
-            if (topic == "read") {
-                // read 토픽인 경우 직접 프로세서로 전송
-                readStatusDataSink.next(message)
-            }
-            // 다른 토픽 처리는 필요에 따라 추가
-        } catch (e: Exception) {
-            logger.error("Error publishing to topic $topic: ${e.message}", e)
-        }
-    }
-    // 데이터 업데이트 (최적화)
-    fun updateData(newData: PushData.ReadData) {
-        // 처리 시간 측정 시작
-        val startTime = System.currentTimeMillis()
+            // DataStoreService에서 최신 데이터 가져오기
+            val currentData = dataStoreService.getLatestData()
 
-        // 기존 데이터와 새 데이터를 병합하여 null 값 방지
-        val currentData = latestData.get()
+            // UDP 연결 상태 확인
+            val isUdpConnected = dataStoreService.isUdpConnected()
 
-        // 새 데이터의 null이 아닌 필드만 업데이트
-        val mergedData = PushData.ReadData(
-            modeStatusBits = newData.modeStatusBits ?: currentData.modeStatusBits,
-            azimuthAngle = newData.azimuthAngle ?: currentData.azimuthAngle,
-            elevationAngle = newData.elevationAngle ?: currentData.elevationAngle,
-            tiltAngle = newData.tiltAngle ?: currentData.tiltAngle,
-            azimuthSpeed = newData.azimuthSpeed ?: currentData.azimuthSpeed,
-            elevationSpeed = newData.elevationSpeed ?: currentData.elevationSpeed,
-            tiltSpeed = newData.tiltSpeed ?: currentData.tiltSpeed,
-            servoDriverAzimuthAngle = newData.servoDriverAzimuthAngle ?: currentData.servoDriverAzimuthAngle,
-            servoDriverElevationAngle = newData.servoDriverElevationAngle ?: currentData.servoDriverElevationAngle,
-            servoDriverTiltAngle = newData.servoDriverTiltAngle ?: currentData.servoDriverTiltAngle,
-            torqueAzimuth = newData.torqueAzimuth ?: currentData.torqueAzimuth,
-            torqueElevation = newData.torqueElevation ?: currentData.torqueElevation,
-            torqueTilt = newData.torqueTilt ?: currentData.torqueTilt,
-            windSpeed = newData.windSpeed ?: currentData.windSpeed,
-            windDirection = newData.windDirection ?: currentData.windDirection,
-            currentSBandLNA_LHCP = newData.currentSBandLNA_LHCP ?: currentData.currentSBandLNA_LHCP,
-            currentSBandLNA_RHCP = newData.currentSBandLNA_RHCP ?: currentData.currentSBandLNA_RHCP,
-            currentXBandLNA_LHCP = newData.currentXBandLNA_LHCP ?: currentData.currentXBandLNA_LHCP,
-            currentXBandLNA_RHCP = newData.currentXBandLNA_RHCP ?: currentData.currentXBandLNA_RHCP,
-            rssiSBandLNA_LHCP = newData.rssiSBandLNA_LHCP ?: currentData.rssiSBandLNA_LHCP,
-            rssiSBandLNA_RHCP = newData.rssiSBandLNA_RHCP ?: currentData.rssiSBandLNA_RHCP,
-            rssiXBandLNA_LHCP = newData.rssiXBandLNA_LHCP ?: currentData.rssiXBandLNA_LHCP,
-            rssiXBandLNA_RHCP = newData.rssiXBandLNA_RHCP ?: currentData.rssiXBandLNA_RHCP,
-            // 타임스탬프 추가
-           // timestamp = System.currentTimeMillis()
-        )
-        // 병합된 데이터로 업데이트
-        latestData.set(mergedData)
-
-        try {
-            // 새 JSON 생성 및 발행
-            val readJsonData = objectMapper.writeValueAsString(mergedData)
-            latestJsonData.set(readJsonData)
-
-            // 수정 전
-            val dataWithTime = mapOf(
-                "data" to mergedData,
+            // 데이터와 상태 정보를 포함한 맵 생성
+            val dataWithInfo = mapOf(
+                "data" to currentData,
                 "serverTime" to GlobalData.Time.serverTime,
                 "resultTimeOffsetCalTime" to GlobalData.Time.resultTimeOffsetCalTime,
                 "cmdAzimuthAngle" to PushData.CMD.cmdAzimuthAngle,
                 "cmdElevationAngle" to PushData.CMD.cmdElevationAngle,
                 "cmdTiltAngle" to PushData.CMD.cmdTiltAngle,
+                "udpConnected" to isUdpConnected,
+                "lastUdpUpdateTime" to dataStoreService.getLastUdpUpdateTime().toString()
             )
-            val readJsonWithTime = objectMapper.writeValueAsString(dataWithTime)
-            publish("read", readJsonWithTime)
 
-            // 처리 시간 측정 종료
-            val processingTime = System.currentTimeMillis() - startTime
-            if (processingTime > 50) {
-                logger.warn("Data processing took too long: ${processingTime}ms")
-            }
+            // JSON으로 변환하여 발행
+            val jsonData = objectMapper.writeValueAsString(dataWithInfo)
+            latestJsonData.set(jsonData)
+            publish("read", jsonData)
+
         } catch (e: Exception) {
-            logger.error("Error updating data: ${e.message}", e)
+            logger.error("데이터 전송 중 오류: ${e.message}", e)
         }
     }
-    /**
-     * 최신 데이터를 반환하는 메서드
-     *
-     * @return 최신 ReadData 객체
-     */
-    fun getLatestData(): PushData.ReadData {
-        return latestData.get()
+
+    // 데이터 발행
+    fun publish(topic: String, message: String) {
+        try {
+            val fullMessage = """{"topic":"$topic","message":$message}"""
+            sink.tryEmitNext(fullMessage)
+        } catch (e: Exception) {
+            logger.error("데이터 발행 중 오류 발생: ${e.message}", e)
+        }
     }
-    // 시뮬레이션 시작 (필요한 경우)
+
+    // 데이터 스트림 가져오기 (WebSocketHandler에서 사용)
+    fun getDataStream(): Flux<String> {
+        return sink.asFlux()
+    }
+
+    // 클라이언트 연결 시 호출
+    fun clientConnected() {
+        activeClients.incrementAndGet()
+        logger.info("클라이언트 연결됨. 현재 활성 클라이언트: ${activeClients.get()}")
+
+        // 연결 즉시 최신 데이터 전송
+        val lastData = latestJsonData.get()
+        if (lastData.isNotEmpty()) {
+            publish("read", lastData)
+        }
+    }
+
+    // 클라이언트 연결 해제 시 호출
+    fun clientDisconnected() {
+        val count = activeClients.decrementAndGet()
+        logger.info("클라이언트 연결 해제됨. 현재 활성 클라이언트: $count")
+    }
+
+    // 전송 간격 설정
+    fun setTransmissionInterval(intervalMs: Long) {
+        if (intervalMs > 0) {
+            // GlobalData.DataTransmission.transmissionInterval = intervalMs
+            logger.info("데이터 전송 간격 설정: ${intervalMs}ms")
+        } else {
+            logger.warn("유효하지 않은 전송 주기: ${intervalMs}ms. 양수 값만 허용됩니다.")
+        }
+    }
+
+    // 시뮬레이션 시작 (기존 코드와의 호환성 유지)
     fun startSimulation() {
-        // 이미 구현되어 있는 경우 사용
+        // 클라이언트 연결 시 호출되는 메서드
+        clientConnected()
+    }
+
+    // 시뮬레이션 중지 (기존 코드와의 호환성 유지)
+    fun stopSimulation() {
+        // 클라이언트 연결 해제 시 호출되는 메서드
+        clientDisconnected()
+    }
+
+    // 기존 코드와의 호환성을 위한 메서드
+    fun getReadStatusDataStream(): Flux<String> {
+        return getDataStream()
     }
 }

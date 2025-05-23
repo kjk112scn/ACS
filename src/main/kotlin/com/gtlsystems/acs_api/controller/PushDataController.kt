@@ -10,7 +10,6 @@ import org.springframework.web.reactive.socket.WebSocketSession
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
-import java.time.Duration
 
 @Component
 class PushDataController(
@@ -23,13 +22,15 @@ class PushDataController(
         val sessionId = session.id
         logger.info("새 WebSocket 클라이언트 연결: $sessionId")
 
-        // 서비스에 시뮬레이션 시작 알림
-        pushService.startSimulation()
+        // 서비스에 클라이언트 연결 알림
+        pushService.clientConnected()
 
+        // 핑-퐁 처리를 위한 입력 스트림
         // 핑-퐁 처리를 위한 입력 스트림
         val input = session.receive()
             .doOnNext { message ->
                 try {
+                    logger.debug("클라이언트로부터 메시지 수신: ${message.payloadAsText}")
                     if (message.type == WebSocketMessage.Type.TEXT) {
                         val payload = message.payloadAsText
                         val jsonNode = objectMapper.readTree(payload)
@@ -49,12 +50,18 @@ class PushDataController(
                             // 비동기로 퐁 응답 전송
                             session.send(Mono.just(session.textMessage(
                                 objectMapper.writeValueAsString(pongMessage)
-                            ))).subscribe()
+                            ))).subscribe(
+                                { logger.debug("퐁 응답 전송 성공") },
+                                { error -> logger.error("퐁 응답 전송 실패: ${error.message}", error) }
+                            )
                         }
                     }
                 } catch (e: Exception) {
                     logger.error("메시지 처리 오류: ${e.message}", e)
                 }
+            }
+            .doOnError { error ->
+                logger.error("입력 스트림 오류: ${error.message}", error)
             }
             .then()
 
@@ -62,6 +69,9 @@ class PushDataController(
         val output = session.send(
             pushService.getReadStatusDataStream()
                 .publishOn(Schedulers.parallel())  // 병렬 처리
+                .doOnNext { message ->
+                    logger.debug("클라이언트로 메시지 전송: ${message.take(100)}...")
+                }
                 .map { message ->
                     session.textMessage(message)
                 }
@@ -73,7 +83,9 @@ class PushDataController(
                     logger.error("데이터 스트림 오류 복구: ${error.message}")
                     Flux.empty()
                 }
-        )
+        ).doOnError { error ->
+            logger.error("출력 스트림 오류: ${error.message}", error)
+        }
 
         // 연결 종료 시 로깅
         val close = session.closeStatus()
@@ -83,6 +95,10 @@ class PushDataController(
             .then()
 
         // 입력과 출력 스트림 결합
-        return Mono.zip(input, output, close).then()
+        return Mono.zip(input, output, close)
+            .doOnSubscribe { logger.info("WebSocket 세션 $sessionId 스트림 구독 시작") }
+            .doOnTerminate { logger.info("WebSocket 세션 $sessionId 종료") }
+            .doOnError { error -> logger.error("WebSocket 세션 $sessionId 오류: ${error.message}", error) }
+            .then()
     }
-}
+    }
