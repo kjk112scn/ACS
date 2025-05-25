@@ -30,6 +30,9 @@ const safeToString = (value: unknown): string => {
 
 // WebSocket 서버 URL
 const WEBSOCKET_URL = 'ws://localhost:8080/ws'
+
+const UPDATE_INTERVAL = 30 // 30ms 주기
+
 export const useICDStore = defineStore('icd', () => {
   // 상태 정의
   const serverTime = ref('')
@@ -48,7 +51,17 @@ export const useICDStore = defineStore('icd', () => {
   const error = ref('')
   const isConnected = ref(false)
   const messageDelay = ref(0)
-  const lastMessageTime = ref(0)
+
+  // 타이머 관련 상태
+
+  const updateTimer = ref<NodeJS.Timeout | null>(null)
+  const isUpdating = ref(false)
+  const updateCount = ref(0)
+  const lastUpdateTime = ref(0)
+
+  // 최신 데이터 버퍼 (WebSocket에서 받은 데이터 임시 저장)
+  const latestDataBuffer = ref<MessageData | null>(null)
+  const bufferUpdateTime = ref(0)
 
   // 명령 상태
   const lastOffsetCommandStatus = ref<CommandStatus>({
@@ -70,101 +83,175 @@ export const useICDStore = defineStore('icd', () => {
   })
 
   // 계산된 속성
-  const hasActiveConnection = computed(() => isConnected.value)
-  const lastUpdateTime = computed(() => new Date(lastMessageTime.value).toLocaleTimeString())
+
+  const hasActiveConnection = computed(() => isConnected.value && isUpdating.value)
+  const lastUpdateTimeFormatted = computed(() =>
+    new Date(lastUpdateTime.value).toLocaleTimeString(),
+  )
   const connectionStatus = computed(() => ({
     isConnected: isConnected.value,
-    lastUpdate: lastUpdateTime.value,
+
+    isUpdating: isUpdating.value,
+    lastUpdate: lastUpdateTimeFormatted.value,
+    updateCount: updateCount.value,
     messageDelay: messageDelay.value,
+    bufferAge: bufferUpdateTime.value ? Date.now() - bufferUpdateTime.value : 0,
   }))
 
-  // 메시지 처리 함수
-  const processDirectData = (message: MessageData) => {
+  // WebSocket 메시지 핸들러 - 데이터를 버퍼에만 저장
+  const handleWebSocketMessage = (message: MessageData) => {
     try {
-      const now = Date.now()
-      lastMessageTime.value = now
-      messageDelay.value = now - (message.timestamp ? Number(message.timestamp) : now)
+      // 받은 데이터를 버퍼에 저장만 하고 즉시 UI 업데이트하지 않음
+      latestDataBuffer.value = message
+      bufferUpdateTime.value = Date.now()
 
-      // 메시지에서 데이터 추출하여 상태 업데이트
-      if (message.azimuthAngle !== undefined)
-        azimuthAngle.value = safeToString(message.azimuthAngle)
-      if (message.elevationAngle !== undefined)
-        elevationAngle.value = safeToString(message.elevationAngle)
-      if (message.tiltAngle !== undefined) tiltAngle.value = safeToString(message.tiltAngle)
-      if (message.azimuthSpeed !== undefined)
-        azimuthSpeed.value = safeToString(message.azimuthSpeed)
-      if (message.elevationSpeed !== undefined)
-        elevationSpeed.value = safeToString(message.elevationSpeed)
-      if (message.tiltSpeed !== undefined) tiltSpeed.value = safeToString(message.tiltSpeed)
-      if (message.modeStatusBits !== undefined)
-        modeStatusBits.value = safeToString(message.modeStatusBits)
-      if (message.cmdAzimuthAngle !== undefined)
-        cmdAzimuthAngle.value = safeToString(message.cmdAzimuthAngle)
-      if (message.cmdElevationAngle !== undefined)
-        cmdElevationAngle.value = safeToString(message.cmdElevationAngle)
-      if (message.cmdTiltAngle !== undefined)
-        cmdTiltAngle.value = safeToString(message.cmdTiltAngle)
-      if (message.cmdTime !== undefined) cmdTime.value = safeToString(message.cmdTime)
-      if (message.serverTime !== undefined) serverTime.value = safeToString(message.serverTime)
-      if (message.resultTimeOffsetCalTime !== undefined) {
-        resultTimeOffsetCalTime.value = safeToString(message.resultTimeOffsetCalTime)
+      // 디버깅용 (가끔씩만 로그)
+      if (Math.random() < 0.01) {
+        // 1% 확률
+        console.log('📨 WebSocket 데이터 버퍼 업데이트:', new Date().toLocaleTimeString())
       }
     } catch (e) {
-      console.error('데이터 처리 중 오류 발생:', e)
-      error.value = '데이터 처리 중 오류가 발생했습니다.'
+      console.error('❌ WebSocket 메시지 처리 오류:', e)
     }
   }
 
-  // WebSocket 메시지 핸들러
-  const handleWebSocketMessage = (message: MessageData) => {
+  // 30ms 타이머로 실행되는 UI 업데이트 함수
+  const updateUIFromBuffer = () => {
     try {
-      // 토픽과 상관없이 최상위 레벨의 중요 필드들을 항상 처리
-      if (message.serverTime !== undefined) {
-        serverTime.value = safeToString(message.serverTime)
-        console.log('서버 시간 업데이트:', serverTime.value)
+      const startTime = performance.now()
+
+      // 버퍼에 새 데이터가 있는지 확인
+      if (!latestDataBuffer.value) {
+        return
       }
 
-      if (message.resultTimeOffsetCalTime !== undefined)
-        resultTimeOffsetCalTime.value = safeToString(message.resultTimeOffsetCalTime)
+      const message = latestDataBuffer.value
+      updateCount.value++
+      lastUpdateTime.value = Date.now()
 
-      if (message.cmdAzimuthAngle !== undefined)
-        cmdAzimuthAngle.value = safeToString(message.cmdAzimuthAngle)
-      if (message.cmdElevationAngle !== undefined)
-        cmdElevationAngle.value = safeToString(message.cmdElevationAngle)
-      if (message.cmdTiltAngle !== undefined)
-        cmdTiltAngle.value = safeToString(message.cmdTiltAngle)
+      // serverTime 업데이트 (최우선)
+      if (message.serverTime !== undefined) {
+        const oldTime = serverTime.value
 
-      // 이후 메시지 구조에 따라 데이터 처리
-      if (message.data) {
-        // data 필드가 있는 경우 처리 (토픽 상관없이)
-        if (typeof message.data === 'object' && message.data !== null) {
-          processDirectData(message.data as MessageData)
-        } else {
-          console.warn('지원하지 않는 data 필드 형식:', message.data)
+        serverTime.value = safeToString(message.serverTime)
+
+        // 100번마다 로그
+        if (updateCount.value % 100 === 0) {
+          console.log(`🕐 [${updateCount.value}] serverTime: ${oldTime} → ${serverTime.value}`)
         }
-      } else if (
-        'azimuthAngle' in message ||
-        'elevationAngle' in message ||
-        'tiltAngle' in message
-      ) {
-        // 직접 데이터 필드가 있는 경우 처리
-        processDirectData(message)
-      } else if (!message.data && message.topic !== 'read') {
-        // data 필드가 없고 read 토픽이 아닌 경우 경고
-        console.warn('데이터 필드가 없는 메시지:', message)
+      }
+
+      // resultTimeOffsetCalTime 업데이트
+
+      if (message.resultTimeOffsetCalTime !== undefined) {
+        resultTimeOffsetCalTime.value = safeToString(message.resultTimeOffsetCalTime)
+      }
+
+      // 명령 데이터 업데이트
+
+      if (message.cmdAzimuthAngle !== undefined) {
+        cmdAzimuthAngle.value = safeToString(message.cmdAzimuthAngle)
+      }
+
+      if (message.cmdElevationAngle !== undefined) {
+        cmdElevationAngle.value = safeToString(message.cmdElevationAngle)
+      }
+
+      if (message.cmdTiltAngle !== undefined) {
+        cmdTiltAngle.value = safeToString(message.cmdTiltAngle)
+      }
+
+      // 센서 데이터 업데이트
+
+      if (message.data && typeof message.data === 'object') {
+        updateSensorData(message.data)
+      }
+
+      // 성능 측정
+      const endTime = performance.now()
+      messageDelay.value = endTime - startTime
+
+      // 성능 통계 (1초마다)
+      if (updateCount.value % Math.floor(1000 / UPDATE_INTERVAL) === 0) {
+        console.log(
+          `📊 UI 업데이트 통계: ${updateCount.value}회, 처리시간: ${messageDelay.value.toFixed(2)}ms`,
+        )
       }
     } catch (e) {
-      console.error('메시지 처리 중 오류 발생:', e, message)
-      error.value = '메시지 처리 중 오류가 발생했습니다.'
+      console.error('❌ UI 업데이트 오류:', e)
     }
+  }
+
+  // 센서 데이터 업데이트 함수
+
+  const updateSensorData = (sensorData: Record<string, unknown>) => {
+    try {
+      if (sensorData.azimuthAngle !== undefined && sensorData.azimuthAngle !== null) {
+        azimuthAngle.value = safeToString(sensorData.azimuthAngle)
+      }
+      if (sensorData.elevationAngle !== undefined && sensorData.elevationAngle !== null) {
+        elevationAngle.value = safeToString(sensorData.elevationAngle)
+      }
+      if (sensorData.tiltAngle !== undefined && sensorData.tiltAngle !== null) {
+        tiltAngle.value = safeToString(sensorData.tiltAngle)
+      }
+      if (sensorData.azimuthSpeed !== undefined && sensorData.azimuthSpeed !== null) {
+        azimuthSpeed.value = safeToString(sensorData.azimuthSpeed)
+      }
+      if (sensorData.elevationSpeed !== undefined && sensorData.elevationSpeed !== null) {
+        elevationSpeed.value = safeToString(sensorData.elevationSpeed)
+      }
+      if (sensorData.tiltSpeed !== undefined && sensorData.tiltSpeed !== null) {
+        tiltSpeed.value = safeToString(sensorData.tiltSpeed)
+      }
+      if (sensorData.modeStatusBits !== undefined && sensorData.modeStatusBits !== null) {
+        modeStatusBits.value = safeToString(sensorData.modeStatusBits)
+      }
+    } catch (e) {
+      console.error('❌ 센서 데이터 업데이트 오류:', e)
+    }
+  }
+
+  // 30ms 타이머 시작
+  const startUIUpdates = () => {
+    if (updateTimer.value) {
+      clearInterval(updateTimer.value)
+    }
+
+    console.log(`🚀 UI 업데이트 타이머 시작 (${UPDATE_INTERVAL}ms 주기)`)
+    isUpdating.value = true
+    updateCount.value = 0
+
+    // 30ms마다 UI 업데이트
+    updateTimer.value = setInterval(() => {
+      updateUIFromBuffer()
+    }, UPDATE_INTERVAL)
+  }
+
+  // 타이머 중지
+
+  const stopUIUpdates = () => {
+    if (updateTimer.value) {
+      clearInterval(updateTimer.value)
+      updateTimer.value = null
+    }
+
+    isUpdating.value = false
+    console.log('⏹️ UI 업데이트 타이머 중지')
   }
 
   // WebSocket 연결 설정
   const connectWebSocket = async () => {
     try {
       error.value = ''
+
+      console.log('🔌 WebSocket 연결 시작')
+
+      // WebSocket 연결 (메시지는 버퍼에만 저장)
       await icdService.connectWebSocket(WEBSOCKET_URL, handleWebSocketMessage)
       isConnected.value = true
+
+      console.log('✅ WebSocket 연결 성공')
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : '알 수 없는 오류가 발생했습니다.'
       error.value = `WebSocket 연결 실패: ${errorMessage}`
@@ -178,17 +265,12 @@ export const useICDStore = defineStore('icd', () => {
     try {
       icdService.disconnectWebSocket()
       isConnected.value = false
-      error.value = ''
+      latestDataBuffer.value = null
+      bufferUpdateTime.value = 0
     } catch (e) {
       console.error('WebSocket 연결 해제 중 오류:', e)
-      error.value = 'WebSocket 연결 해제 중 오류가 발생했습니다.'
     }
   }
-
-  // 컴포넌트가 언마운트될 때 정리
-  onScopeDispose(() => {
-    disconnectWebSocket()
-  })
 
   // 명령 전송 메서드들
   const sendEmergency = async (commandType: 'E' | 'S' = 'E') => {
@@ -225,12 +307,25 @@ export const useICDStore = defineStore('icd', () => {
   }
 
   // 초기화
-  const initialize = () => {
-    connectWebSocket().catch(console.error)
+  const initialize = async () => {
+    try {
+      console.log('🎬 icdStore 초기화 (WebSocket + 30ms 타이머)')
+
+      // WebSocket 연결
+      await connectWebSocket()
+
+      // UI 업데이트 타이머 시작
+      startUIUpdates()
+
+      console.log('✅ 초기화 완료')
+    } catch (e) {
+      console.error('❌ 초기화 실패:', e)
+    }
   }
 
   // 정리
   const cleanup = () => {
+    stopUIUpdates()
     disconnectWebSocket()
   }
 
@@ -368,6 +463,24 @@ export const useICDStore = defineStore('icd', () => {
     }
   }
 
+  // 디버깅 함수
+  const getDebugInfo = () => {
+    return {
+      isConnected: isConnected.value,
+      isUpdating: isUpdating.value,
+      updateCount: updateCount.value,
+      bufferAge: bufferUpdateTime.value ? Date.now() - bufferUpdateTime.value : 0,
+      hasBufferData: !!latestDataBuffer.value,
+      lastServerTime: serverTime.value,
+      lastUpdateTime: lastUpdateTimeFormatted.value,
+    }
+  }
+
+  // 컴포넌트가 언마운트될 때 정리
+  onScopeDispose(() => {
+    cleanup()
+  })
+
   // 공개할 상태와 메서드 반환
   return {
     // 상태
@@ -386,24 +499,33 @@ export const useICDStore = defineStore('icd', () => {
     cmdTime,
     error,
     isConnected,
+
+    isUpdating,
+    updateCount,
     messageDelay,
-    lastMessageTime,
+
+    lastUpdateTime,
     lastOffsetCommandStatus,
     lastTimeOffsetCommandStatus,
     lastMultiControlCommandStatus,
 
     // 계산된 속성
     hasActiveConnection,
-    lastUpdateTime,
+
+    lastUpdateTimeFormatted,
     connectionStatus,
 
     // 메서드
-    connectWebSocket,
-    disconnectWebSocket,
-    sendEmergency,
-    sendMultiControlCommand,
     initialize,
     cleanup,
+
+    startUIUpdates,
+    stopUIUpdates,
+    connectWebSocket,
+    disconnectWebSocket,
+    getDebugInfo,
+    sendEmergency,
+    sendMultiControlCommand,
     sendServoPresetCommand,
     stopCommand,
     stowCommand,

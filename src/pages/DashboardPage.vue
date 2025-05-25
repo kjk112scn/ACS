@@ -223,76 +223,66 @@
   </q-page>
 </template>
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useICDStore } from '../stores/API/icdStore'
 import { useRouter, useRoute } from 'vue-router'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 
-// ICD 스토어 인스턴스 생성
 const icdStore = useICDStore()
 const router = useRouter()
 const route = useRoute()
 
-// 차트 참조 생성 - 명확하게 분리
+// 차트 관련
 const azimuthChartRef = ref<HTMLElement | null>(null)
 const elevationChartRef = ref<HTMLElement | null>(null)
 const tiltChartRef = ref<HTMLElement | null>(null)
 
-// 차트 인스턴스 저장 - 명확하게 분리 (여기서 ECharts 타입 사용)
 let azimuthChart: ECharts | undefined = undefined
 let elevationChart: ECharts | undefined = undefined
 let tiltChart: ECharts | undefined = undefined
 
-// 차트 업데이트 타이머 - 하나만 사용
-let chartUpdateTimer: number | null = null
+const chartsInitialized = ref(false)
 
-// 서버 시간 관련 상태 추가
-const currentServerTime = ref('')
+// ✅ 30ms UI 업데이트 타이머
+let uiUpdateTimer: number | null = null
+const uiUpdateCount = ref(0)
 
-// 'let' 대신 'const'를 사용하고, 초기값은 null로 설정
-const serverTimeUpdateInterval = ref<number | null>(null)
-
-// 서버 시간 업데이트 함수 - 밀리초 포함
-const updateServerTime = () => {
-  if (icdStore.serverTime) {
-    try {
-      const serverTime = new Date(icdStore.serverTime)
-
-      // 커스텀 형식으로 날짜 포맷팅 (밀리초 포함)
-      const year = serverTime.getFullYear()
-      const month = String(serverTime.getMonth() + 1).padStart(2, '0')
-      const day = String(serverTime.getDate()).padStart(2, '0')
-      const hours = String(serverTime.getHours()).padStart(2, '0')
-      const minutes = String(serverTime.getMinutes()).padStart(2, '0')
-      const seconds = String(serverTime.getSeconds()).padStart(2, '0')
-      const milliseconds = String(serverTime.getMilliseconds()).padStart(3, '0')
-
-      // YYYY-MM-DD HH:MM:SS.mmm 형식
-      currentServerTime.value = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`
-
-      console.info('서버 시간:', currentServerTime.value)
-    } catch (error) {
-      console.error('서버 시간 파싱 오류:', error)
-      currentServerTime.value = icdStore.serverTime || ''
-    }
-  } else {
-    currentServerTime.value = ''
-  }
-}
-
-// 서버 시간 표시용 computed 속성 수정
+// ✅ 서버 시간 표시용 computed 속성 (icdStore에서 직접)
 const displayServerTime = computed(() => {
-  return currentServerTime.value || '서버 시간 대기 중...'
+  if (!icdStore.serverTime) {
+    return '서버 시간 대기 중...'
+  }
+
+  try {
+    const serverTime = new Date(icdStore.serverTime)
+
+    if (isNaN(serverTime.getTime())) {
+      return `원시 데이터: ${icdStore.serverTime}`
+    }
+
+    const year = serverTime.getFullYear()
+    const month = String(serverTime.getMonth() + 1).padStart(2, '0')
+    const day = String(serverTime.getDate()).padStart(2, '0')
+    const hours = String(serverTime.getHours()).padStart(2, '0')
+    const minutes = String(serverTime.getMinutes()).padStart(2, '0')
+    const seconds = String(serverTime.getSeconds()).padStart(2, '0')
+    const milliseconds = String(serverTime.getMilliseconds()).padStart(3, '0')
+
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`
+  } catch (error) {
+    console.error('서버 시간 파싱 오류:', error)
+
+    return `파싱 오류: ${icdStore.serverTime}`
+  }
 })
 
-// 값 표시 헬퍼 함수
+// ✅ 값 표시 헬퍼 함수
 const displayValue = (value: string | number | null | undefined) => {
   if (value === null || value === undefined || value === '') {
     return '0.00'
   }
 
-  // 숫자로 변환 가능한지 확인
   const num = Number(value)
   if (!isNaN(num)) {
     return num.toFixed(2)
@@ -301,14 +291,183 @@ const displayValue = (value: string | number | null | undefined) => {
   return value
 }
 
-// WebSocket 연결 상태 확인을 위한 watch 추가
-watch(
-  () => icdStore.isConnected,
-  (newValue) => {
-    console.log('WebSocket 연결 상태:', newValue)
-  },
-  { immediate: true }, // 컴포넌트 마운트 시 즉시 실행
-)
+// ✅ 30ms마다 차트만 업데이트 (데이터는 icdStore에서 자동 업데이트)
+const updateCharts = () => {
+  if (!chartsInitialized.value || !icdStore.isConnected) {
+    return
+  }
+
+  try {
+    const updateOption = {
+      animation: false,
+      silent: true,
+    }
+
+    // 1. Azimuth 차트 업데이트
+    if (azimuthChart && icdStore.azimuthAngle !== undefined) {
+      const azimuth = Number(icdStore.azimuthAngle)
+      if (!isNaN(azimuth)) {
+        const normalizedAzimuth = azimuth < 0 ? azimuth + 360 : azimuth
+        azimuthChart.setOption(
+          {
+            series: [
+              {
+                data: [[1, normalizedAzimuth]],
+                label: {
+                  formatter: () => `${azimuth.toFixed(2)}°`,
+                },
+              },
+            ],
+          },
+          updateOption,
+        )
+      }
+    }
+
+    // 2. Elevation 차트 업데이트
+    if (elevationChart && icdStore.elevationAngle !== undefined) {
+      const elevation = Number(icdStore.elevationAngle)
+      if (!isNaN(elevation)) {
+        const normalizedElevation = elevation < 0 ? elevation + 360 : elevation % 360
+        elevationChart.setOption(
+          {
+            series: [
+              {
+                data: [[0, normalizedElevation]],
+                label: {
+                  formatter: () => `${elevation.toFixed(2)}°`,
+                },
+              },
+            ],
+          },
+          updateOption,
+        )
+      }
+    }
+
+    // 3. Tilt 차트 업데이트
+    if (tiltChart && icdStore.tiltAngle !== undefined) {
+      const tilt = Number(icdStore.tiltAngle)
+      if (!isNaN(tilt)) {
+        const normalizedTilt = tilt < 0 ? tilt + 360 : tilt
+        tiltChart.setOption(
+          {
+            series: [
+              {
+                data: [[1, normalizedTilt]],
+                label: {
+                  formatter: () => `${tilt.toFixed(2)}°`,
+                },
+              },
+            ],
+          },
+          updateOption,
+        )
+      }
+    }
+
+    uiUpdateCount.value++
+
+    // 100번마다 로그
+    if (uiUpdateCount.value % 100 === 0) {
+      console.log(`🔄 [${uiUpdateCount.value}] 차트 업데이트:`, {
+        azimuth: icdStore.azimuthAngle,
+        elevation: icdStore.elevationAngle,
+        tilt: icdStore.tiltAngle,
+        serverTime: icdStore.serverTime,
+        storeUpdateCount: icdStore.updateCount,
+      })
+    }
+  } catch (error) {
+    console.error('❌ 차트 업데이트 오류:', error)
+  }
+}
+
+// ✅ 30ms 차트 업데이트 타이머 시작
+const startChartUpdates = () => {
+  if (uiUpdateTimer) {
+    clearInterval(uiUpdateTimer)
+  }
+
+  console.log('🚀 차트 업데이트 타이머 시작 (30ms)')
+
+  uiUpdateTimer = window.setInterval(() => {
+    updateCharts()
+  }, 30)
+}
+
+// ✅ 차트 업데이트 타이머 중지
+const stopChartUpdates = () => {
+  if (uiUpdateTimer) {
+    clearInterval(uiUpdateTimer)
+    uiUpdateTimer = null
+
+    console.log('⏹️ 차트 업데이트 타이머 중지')
+  }
+}
+
+onMounted(async () => {
+  console.log('📱 DashboardPage 컴포넌트 마운트됨')
+
+  // 라우트 설정
+  const pathParts = route.path.split('/')
+  const currentPathMode = pathParts[pathParts.length - 1]
+
+  if (
+    currentPathMode &&
+    ['ephemeris', 'pedestal', 'suntrack', 'feed', 'standby', 'step', 'slew'].includes(
+      currentPathMode,
+    )
+  ) {
+    currentMode.value = currentPathMode
+  } else {
+    void router.push('/dashboard/standby')
+  }
+
+  // icdStore 초기화 (WebSocket + 30ms 데이터 업데이트)
+  try {
+    console.log('🚀 시스템 초기화 시작')
+    await icdStore.initialize()
+    console.log('✅ 시스템 초기화 완료')
+  } catch (error) {
+    console.error('❌ 시스템 초기화 실패:', error)
+  }
+
+  // 차트 초기화
+  setTimeout(() => {
+    try {
+      initCharts()
+      chartsInitialized.value = true
+      console.log('✅ 차트 초기화 완료')
+
+      // ✅ 차트 초기화 완료 후 차트 업데이트 시작
+      startChartUpdates()
+    } catch (error) {
+      console.error('❌ 차트 초기화 실패:', error)
+    }
+  }, 100)
+
+  // 리사이즈 핸들러
+  const handleResize = () => {
+    if (chartsInitialized.value) {
+      azimuthChart?.resize()
+      elevationChart?.resize()
+      tiltChart?.resize()
+    }
+  }
+  window.addEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+  console.log('🧹 DashboardPage 정리 시작')
+
+  stopChartUpdates()
+  window.removeEventListener('resize', () => {})
+
+  icdStore.cleanup()
+
+  console.log('✅ DashboardPage 정리 완료')
+})
 
 // 현재 모드 상태
 const currentMode = ref('ephemeris')
@@ -319,234 +478,38 @@ const navigateToMode = (mode: string) => {
   void router.push(`/dashboard/${mode}`)
 }
 
-// 컴포넌트 마운트 시 차트 초기화 및 업데이트 타이머 설정
-onMounted(() => {
-  console.log('DashboardPage 컴포넌트 마운트됨')
-  updateServerTime()
+// 새로운 컨트롤 관련 상태 변수들
+// 현재 사용하지 않는 변수들이지만 향후 사용 가능성이 있어 주석 처리
+// const manualControl = ref(false)
+// const manualSpeed = ref(50)
 
-  // 100ms 주기로 서버 시간 업데이트 - 로그 추가
-  console.log('서버 시간 업데이트 타이머 설정 시작')
-  serverTimeUpdateInterval.value = window.setInterval(() => {
-    //console.log('타이머 호출됨') // 타이머가 실행되는지 확인
-    updateServerTime()
-  }, 100)
-  console.log('서버 시간 업데이트 타이머 설정 완료:', serverTimeUpdateInterval.value)
-  // 현재 서버 시간 상태 로그 출력
-  console.log('[마운트 시] 현재 서버 시간 상태:', {
-    serverTime: icdStore.serverTime,
-    isConnected: icdStore.isConnected,
-  })
-
-  // 현재 라우트 경로에서 모드 추출
-  const pathParts = route.path.split('/')
-  const currentPathMode = pathParts[pathParts.length - 1]
-  console.log('현재 모드:', currentPathMode)
-
-  // 유효한 모드인 경우 currentMode 업데이트
-  if (
-    currentPathMode &&
-    ['ephemeris', 'pedestal', 'suntrack', 'feed', 'standby', 'step', 'slew'].includes(
-      currentPathMode,
-    )
-  ) {
-    currentMode.value = currentPathMode
-  } else {
-    // 기본 모드로 리다이렉트
-    void router.push('/dashboard/standby')
-  }
-
-  // WebSocket 연결 초기화 전 로그
-  console.log('WebSocket 연결 초기화 시작')
-  icdStore.initialize()
-  console.log('WebSocket 연결 초기화 요청 완료')
-
-  // 초기 스토어 상태 로깅
-  console.log('초기 icdStore 상태:', {
-    isConnected: icdStore.isConnected,
-    serverTime: icdStore.serverTime,
-    error: icdStore.error,
-  })
-
-  // DOM이 완전히 렌더링된 후 차트 초기화를 위해 setTimeout 사용
-  setTimeout(() => {
-    try {
-      initCharts()
-      console.log('모든 차트 초기화 완료')
-
-      // 차트 업데이트 타이머 설정
-      chartUpdateTimer = window.setInterval(() => {
-        updateCharts()
-      }, 25)
-    } catch (error) {
-      console.error('차트 초기화 중 오류 발생:', error)
-    }
-  }, 100)
-
-  // 디버깅용 타이머 - 스토어 값 주기적으로 로깅
-  const debugInterval = setInterval(() => {
-    console.log('현재 스토어 값:', {
-      azimuthAngle: icdStore.azimuthAngle,
-      elevationAngle: icdStore.elevationAngle,
-      tiltAngle: icdStore.tiltAngle,
-    })
-  }, 5000)
-
-  // 컴포넌트 언마운트 시 타이머 정리를 위한 변수 저장
-  onUnmounted(() => {
-    clearInterval(debugInterval)
-  })
-
-  // 윈도우 리사이즈 이벤트 리스너 등록
-  window.addEventListener('resize', handleResize)
+// 상태 정보 관련 computed 속성들 - 템플릿에서 사용되는 경우 주석 해제 필요
+// 현재 사용하지 않는 computed 속성들이지만 향후 사용 가능성이 있어 주석 처리
+/*
+const operationMode = computed(() => {
+  return icdStore.modeStatusBits ? `Mode ${icdStore.modeStatusBits}` : 'Unknown'
 })
 
-// 윈도우 리사이즈 핸들러 - 차트 크기 조정
-const handleResize = () => {
-  if (azimuthChart) azimuthChart.resize()
-  if (elevationChart) elevationChart.resize()
-  if (tiltChart) tiltChart.resize()
-}
-
-// 컴포넌트가 언마운트될 때 정리 작업
-onUnmounted(() => {
-  // WebSocket 연결 정리
-  icdStore.cleanup()
-
-  // 차트 업데이트 타이머 정리
-  if (chartUpdateTimer !== null) {
-    clearInterval(chartUpdateTimer)
-    chartUpdateTimer = null
-  }
-  // 서버 시간 업데이트 타이머 정리
-  if (serverTimeUpdateInterval.value !== null) {
-    clearInterval(serverTimeUpdateInterval.value)
-    serverTimeUpdateInterval.value = null
-  }
-
-  // 차트 인스턴스 정리
-  if (azimuthChart) {
-    azimuthChart.dispose()
-    azimuthChart = undefined
-  }
-
-  if (elevationChart) {
-    elevationChart.dispose()
-    elevationChart = undefined
-  }
-
-  if (tiltChart) {
-    tiltChart.dispose()
-    tiltChart = undefined
-  }
-
-  // 윈도우 리사이즈 이벤트 리스너 제거
-  window.removeEventListener('resize', handleResize)
+const systemStatus = computed(() => {
+  if (!icdStore.isConnected) return 'Disconnected'
+  if (icdStore.error) return 'Error'
+  return 'Normal Operation'
 })
 
-// 디버깅을 위한 watch 추가
-watch(
-  () => icdStore.tiltAngle,
-  (newValue) => {
-    console.log('DashboardPage에서 감지된 tiltAngle 변경:', newValue)
-  },
-)
+const errorCode = computed(() => {
+  return icdStore.error ? 'ERR-001' : null
+})
 
-// 다른 값들도 감시
-watch(
-  () => icdStore.elevationAngle,
-  (newValue) => {
-    console.log('DashboardPage에서 감지된 elevationAngle 변경:', newValue)
-  },
-)
-
-// 라우트 변경 감지
-watch(
-  () => route.path,
-  (newPath) => {
-    const pathParts = newPath.split('/')
-    // 배열의 마지막 요소가 존재하는지 확인 후 사용
-    const currentPathMode = pathParts.length > 0 ? pathParts[pathParts.length - 1] : ''
-
-    if (
-      currentPathMode &&
-      ['ephemeris', 'pedestal', 'suntrack', 'feed'].includes(currentPathMode)
-    ) {
-      currentMode.value = currentPathMode
-    }
-  },
-)
-
-// 차트 업데이트 함수 - 각 차트를 독립적으로 업데이트
-const updateCharts = () => {
-  // 1. Azimuth 차트 업데이트
-  if (azimuthChart) {
-    try {
-      const azimuth = parseFloat(icdStore.azimuthAngle || '0')
-      const normalizedAzimuth = azimuth < 0 ? azimuth + 360 : azimuth % 360
-
-      azimuthChart.setOption({
-        series: [
-          {
-            data: [[1, normalizedAzimuth]],
-            label: {
-              formatter: function () {
-                return `${azimuth.toFixed(2)}°`
-              },
-            },
-          },
-        ],
-      })
-    } catch (error) {
-      console.error('Azimuth 차트 업데이트 오류:', error)
-    }
+const formattedLastUpdate = computed(() => {
+  if (!icdStore.serverTime) return 'N/A'
+  try {
+    const date = new Date(icdStore.serverTime)
+    return date.toLocaleTimeString()
+  } catch (e) {
+    return 'Invalid Time'
   }
-
-  // 2. Elevation 차트 업데이트
-  if (elevationChart) {
-    try {
-      const elevation = parseFloat(icdStore.elevationAngle || '0')
-      const normalizedElevation = elevation < 0 ? elevation + 360 : elevation % 360
-
-      elevationChart.setOption({
-        series: [
-          {
-            data: [[0, normalizedElevation]],
-            label: {
-              formatter: function () {
-                return `${elevation.toFixed(2)}°`
-              },
-            },
-          },
-        ],
-      })
-    } catch (error) {
-      console.error('Elevation 차트 업데이트 오류:', error)
-    }
-  }
-
-  // 3. Tilt 차트 업데이트
-  if (tiltChart) {
-    try {
-      const tilt = parseFloat(icdStore.tiltAngle || '0')
-      const normalizedTilt = tilt < 0 ? tilt + 360 : tilt % 360
-
-      tiltChart.setOption({
-        series: [
-          {
-            data: [[1, normalizedTilt]],
-            label: {
-              formatter: function () {
-                return `${tilt.toFixed(2)}°`
-              },
-            },
-          },
-        ],
-      })
-    } catch (error) {
-      console.error('Tilt 차트 업데이트 오류:', error)
-    }
-  }
-}
+})
+*/
 
 // ECharts 데이터 포인트 타입 정의
 
@@ -582,7 +545,7 @@ const initCharts = () => {
     azimuthChart = echarts.init(azimuthChartRef.value)
 
     // 현재 Actual 값으로 초기 데이터 설정
-    const initialAzimuth = parseFloat(icdStore.azimuthAngle || '0')
+    const initialAzimuth = icdStore.azimuthAngle || 0
     console.log('Initial Azimuth value:', initialAzimuth)
 
     // Azimuth 차트만의 옵션 설정
@@ -699,7 +662,7 @@ const initCharts = () => {
     // 새 차트 인스턴스 생성
     elevationChart = echarts.init(elevationChartRef.value)
     // 초기 tilt 값 가져오기
-    const initialElevation = parseFloat(icdStore.elevationAngle || '0')
+    const initialElevation = Number(icdStore.elevationAngle) || 0
     const normalizedInitialElevation =
       initialElevation < 0 ? initialElevation + 360 : initialElevation % 360
     // Elevation 차트만의 옵션 설정
@@ -806,7 +769,7 @@ const initCharts = () => {
     tiltChart = echarts.init(tiltChartRef.value)
 
     // 초기 tilt 값 가져오기
-    const initialTilt = parseFloat(icdStore.tiltAngle || '0')
+    const initialTilt = Number(icdStore.tiltAngle) || 0
     const normalizedInitialTilt = initialTilt < 0 ? initialTilt + 360 : initialTilt % 360
 
     const tiltOption = {
@@ -908,12 +871,13 @@ const initCharts = () => {
   }, 0)
 }
 
-// Emergency 상태 관리
 const emergencyActive = ref(false)
 const emergencyModal = ref(false)
 
 // Emergency 버튼 클릭 핸들러
 const handleEmergencyClick = async () => {
+  console.log('Emergency 버튼 클릭됨')
+
   if (!emergencyActive.value) {
     // 비상 정지 활성화 ('E' 명령 전송)
     try {
@@ -924,7 +888,7 @@ const handleEmergencyClick = async () => {
       console.error('Emergency Stop 활성화 실패:', error)
     }
   } else {
-    // 이미 활성화된 상태면 모달 표시
+    // 이미 비상 정지 상태인 경우 해제 확인 모달 표시
     emergencyModal.value = true
   }
 }

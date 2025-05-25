@@ -7,6 +7,7 @@ export const API_ENDPOINTS = {
   // ICD 관련 엔드포인트
   ICD: {
     EMERGENCY_STOP: '/icd/on-emergency-stop-command',
+    REALTIME_DATA: '/icd/realtime-data',
     // 기타 ICD 관련 엔드포인트들...
   },
 

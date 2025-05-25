@@ -92,16 +92,16 @@ class WebSocketService {
 
         // WebSocket 이벤트 리스너 추가
         this.websocket.onopen = () => {
-          console.log(`[WebSocket] 연결 열림 - readyState: ${this.getReadyStateString(this.websocket!.readyState)}`)
+          console.log(
+            `[WebSocket] 연결 열림 - readyState: ${this.getReadyStateString(this.websocket!.readyState)}`,
+          )
           this.reconnectAttempts = 0
-          this.setupPing()
           resolve()
         }
 
         this.websocket.onopen = () => {
           console.log('WebSocket 연결 성공')
           this.reconnectAttempts = 0
-          this.setupPing()
           resolve()
         }
 
@@ -123,13 +123,10 @@ class WebSocketService {
             readyState: this.websocket?.readyState,
             timestamp: new Date().toISOString(),
 
-            stack: new Error().stack
+            stack: new Error().stack,
           }
 
           console.log('[WebSocket] 연결 종료 - 상세 정보:', JSON.stringify(closeInfo, null, 2))
-
-
-
 
           // 종료 코드에 따른 처리
           switch (event.code) {
@@ -155,12 +152,6 @@ class WebSocketService {
           }
 
           this.cleanup()
-
-
-
-
-
-
 
           // 정상 종료가 아닌 경우에만 재연결 시도
           if (event.code !== 1000 && event.code !== 1001) {
@@ -235,28 +226,6 @@ class WebSocketService {
       }, 60000) // 1분 후 재시도
     }
   }
-  /**
-   * 주기적인 핑 전송 설정
-   */
-  private setupPing(): void {
-    this.cleanupPing()
-
-    this.pingInterval = setInterval(() => {
-      if (this.websocket?.readyState === WebSocket.OPEN) {
-        this.websocket.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }))
-      }
-    }, 30000) // 30초마다 핑 전송
-  }
-
-  /**
-   * 핑 인터벌 정리
-   */
-  private cleanupPing(): void {
-    if (this.pingInterval) {
-      clearInterval(this.pingInterval)
-      this.pingInterval = null
-    }
-  }
 
   /**
    * 리소스 정리
@@ -269,7 +238,7 @@ class WebSocketService {
       0: 'CONNECTING',
       1: 'OPEN',
       2: 'CLOSING',
-      3: 'CLOSED'
+      3: 'CLOSED',
     }
     return states[state as keyof typeof states] || `UNKNOWN(${state})`
   }
@@ -278,7 +247,7 @@ class WebSocketService {
    * WebSocket 종료 코드를 메시지로 변환
    */
   private getCloseStatusMessage(code: number): string {
-    const statusMessages: {[key: number]: string} = {
+    const statusMessages: { [key: number]: string } = {
       1000: '정상 종료',
       1001: '서버가 사라짐 또는 브라우저가 페이지를 벗어남',
       1002: '프로토콜 오류',
@@ -292,7 +261,7 @@ class WebSocketService {
       1011: '예기치 않은 조건',
       1012: '서비스 재시작 중',
       1013: '일시적인 서버 상태',
-      1015: 'TLS 핸드셰이크 실패'
+      1015: 'TLS 핸드셰이크 실패',
     }
     return statusMessages[code] || `알 수 없는 상태 코드 (${code})`
   }
@@ -658,6 +627,27 @@ export const icdService = {
     } catch (error) {
       console.error('위치 지정 명령 전송 실패:', error)
       throw error
+    }
+  },
+
+  // 실시간 데이터 요청 메서드 추가
+  async getRealtimeData() {
+    try {
+      const response = await api.get('/icd/realtime-data', {
+        timeout: 25, // 30ms 주기보다 짧게 설정
+      })
+
+      return {
+        data: response.data,
+        timestamp: Date.now(),
+      }
+    } catch (error) {
+      // 타이머 방식에서는 에러를 던지지 않고 로그만
+      if (Math.random() < 0.01) {
+        // 1% 확률로만 로그 (너무 많은 로그 방지)
+        console.warn('실시간 데이터 요청 실패:', error)
+      }
+      return null
     }
   },
 }
