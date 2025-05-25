@@ -4,24 +4,28 @@ import com.gtlsystems.acs_api.model.PushData
 import org.springframework.stereotype.Service
 import java.util.concurrent.atomic.AtomicReference
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicLong
 
 @Service
 class DataStoreService {
-    // 최신 데이터 저장
+
+    // === 최적화된 데이터 저장 ===
     private val latestData = AtomicReference(PushData.ReadData())
+    private val dataVersion = AtomicLong(0) // 버전 기반 변경 감지
 
-    // 마지막 UDP 업데이트 시간
+    // === UDP 연결 상태 관리 ===
     private val lastUdpUpdateTime = AtomicReference(Instant.now())
-
-    // UDP 연결 상태
     private val udpConnected = AtomicReference(false)
 
-    // 데이터 업데이트 (UDP에서 호출)
+    /**
+     * ✅ UDP에서 데이터 업데이트 (mergedData 로직 복원)
+     * - 새 데이터의 null이 아닌 필드만 업데이트
+     * - 기존 데이터 보존 (null 필드는 덮어쓰지 않음)
+     */
     fun updateDataFromUdp(newData: PushData.ReadData) {
-        // 기존 데이터와 새 데이터를 병합
         val currentData = latestData.get()
 
-        // 새 데이터의 null이 아닌 필드만 업데이트
+        // 🔄 기존 mergedData 로직 복원 (null 안전 병합)
         val mergedData = PushData.ReadData(
             modeStatusBits = newData.modeStatusBits ?: currentData.modeStatusBits,
             azimuthAngle = newData.azimuthAngle ?: currentData.azimuthAngle,
@@ -62,24 +66,59 @@ class DataStoreService {
             rssiXBandLNA_RHCP = newData.rssiXBandLNA_RHCP ?: currentData.rssiXBandLNA_RHCP
         )
 
-        // 데이터 업데이트
-        latestData.set(mergedData)
+        // ⚡ 최적화: 실제로 변경된 경우에만 업데이트
+        if (!isDataEqual(currentData, mergedData)) {
+            latestData.set(mergedData)
+            dataVersion.incrementAndGet() // 버전 증가
 
-        // 마지막 업데이트 시간 갱신
-        lastUdpUpdateTime.set(Instant.now())
-
-        // UDP 연결 상태 업데이트
-        udpConnected.set(true)
+            // 연결 상태 업데이트
+            lastUdpUpdateTime.set(Instant.now())
+            udpConnected.set(true)
+        }
     }
 
-    // 최신 데이터 가져오기 (푸시 서비스에서 호출)
+    /**
+     * ✅ 데이터 동등성 체크 (성능 최적화)
+     * - 실제 변경이 있을 때만 업데이트
+     */
+    private fun isDataEqual(data1: PushData.ReadData, data2: PushData.ReadData): Boolean {
+        return data1.azimuthAngle == data2.azimuthAngle &&
+               data1.elevationAngle == data2.elevationAngle &&
+               data1.tiltAngle == data2.tiltAngle &&
+               data1.azimuthSpeed == data2.azimuthSpeed &&
+               data1.elevationSpeed == data2.elevationSpeed &&
+               data1.tiltSpeed == data2.tiltSpeed &&
+               data1.modeStatusBits == data2.modeStatusBits &&
+               data1.windSpeed == data2.windSpeed &&
+               data1.windDirection == data2.windDirection
+               // 주요 필드들만 체크 (성능 고려)
+    }
+
+    /**
+     * ✅ 최신 데이터 가져오기 (버전 정보 포함)
+     */
     fun getLatestData(): PushData.ReadData {
         return latestData.get()
     }
 
-    // UDP 연결 상태 확인
+    /**
+     * ✅ 데이터 버전 확인 (변경 감지용)
+     */
+    fun getDataVersion(): Long {
+        return dataVersion.get()
+    }
+
+    /**
+     * ✅ 데이터 변경 여부 체크 (PushService 최적화용)
+     */
+    fun hasDataChanged(lastKnownVersion: Long): Boolean {
+        return dataVersion.get() > lastKnownVersion
+    }
+
+    /**
+     * ✅ UDP 연결 상태 확인
+     */
     fun isUdpConnected(): Boolean {
-        // 마지막 업데이트 후 5초가 지나면 연결 끊김으로 간주
         val timeoutSeconds = 5L
         val now = Instant.now()
         val lastUpdate = lastUdpUpdateTime.get()
@@ -89,7 +128,9 @@ class DataStoreService {
         return connected
     }
 
-    // UDP 연결 상태 수동 설정
+    /**
+     * ✅ UDP 연결 상태 수동 설정
+     */
     fun setUdpConnectionStatus(connected: Boolean) {
         udpConnected.set(connected)
         if (connected) {
@@ -97,8 +138,48 @@ class DataStoreService {
         }
     }
 
-    // 마지막 UDP 업데이트 시간 가져오기
+    /**
+     * ✅ 마지막 UDP 업데이트 시간 가져오기
+     */
     fun getLastUdpUpdateTime(): Instant {
         return lastUdpUpdateTime.get()
+    }
+
+    /**
+     * ✅ 상태 정보 조회
+     */
+    fun getStatusInfo(): Map<String, Any> {
+        val currentData = latestData.get()
+        return mapOf(
+            "dataVersion" to dataVersion.get(),
+            "lastUpdateTime" to lastUdpUpdateTime.get(),
+            "isUdpConnected" to isUdpConnected(),
+            "hasValidData" to (currentData.azimuthAngle != null),
+            "nonNullFields" to countNonNullFields(currentData),
+            "architecture" to "Optimized with Null-Safe Merging"
+        )
+    }
+
+    /**
+     * ✅ null이 아닌 필드 개수 세기
+     */
+    private fun countNonNullFields(data: PushData.ReadData): Int {
+        return listOfNotNull(
+            data.modeStatusBits, data.azimuthAngle, data.elevationAngle, data.tiltAngle,
+            data.azimuthSpeed, data.elevationSpeed, data.tiltSpeed,
+            data.servoDriverAzimuthAngle, data.servoDriverElevationAngle, data.servoDriverTiltAngle,
+            data.torqueAzimuth, data.torqueElevation, data.torqueTilt,
+            data.windSpeed, data.windDirection, data.rtdOne, data.rtdTwo,
+            data.mainBoardProtocolStatusBits, data.mainBoardStatusBits,
+            data.mainBoardMCOnOffBits, data.mainBoardReserveBits,
+            data.azimuthBoardServoStatusBits, data.azimuthBoardStatusBits,
+            data.elevationBoardServoStatusBits, data.elevationBoardStatusBits,
+            data.tiltBoardServoStatusBits, data.tiltBoardStatusBits,
+            data.feedSBoardStatusBits, data.feedXBoardStatusBits,
+            data.currentSBandLNA_LHCP, data.currentSBandLNA_RHCP,
+            data.currentXBandLNA_LHCP, data.currentXBandLNA_RHCP,
+            data.rssiSBandLNA_LHCP, data.rssiSBandLNA_RHCP,
+            data.rssiXBandLNA_LHCP, data.rssiXBandLNA_RHCP
+        ).size
     }
 }
