@@ -9,6 +9,7 @@ import java.time.ZonedDateTime
 
 @RestController
 @RequestMapping("/api/satellite")
+@CrossOrigin(origins = ["http://localhost:9000"])
 class SatelliteTrackerController(
     private val orekitCalculator: OrekitCalculator,
     private val satelliteTrackService: SatelliteTrackService

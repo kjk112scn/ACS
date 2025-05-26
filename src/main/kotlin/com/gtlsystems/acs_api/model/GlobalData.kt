@@ -25,15 +25,17 @@ object GlobalData {
 
         val localNow: LocalDateTime
             get() = LocalDateTime.now()
-
-        var addLocalTime: Int = 0
-
+        val systemTimeZone: ZoneId = ZoneId.systemDefault()
+        @Volatile
+        var serverTimeZone: ZoneId  = systemTimeZone
+        @Volatile
+        var clientTimeZone: ZoneId = systemTimeZone
         /**
          * 현재 로컬 시간을 출력함.
          * utcNow + addLocalTime을 계산하여 반환
          */
         val serverTime: ZonedDateTime
-            get() = utcNow.plusHours(addLocalTime.toLong())
+            get() = ZonedDateTime.now(serverTimeZone)
 
         /**
          * 현재 서버 시간 + Offset.TimeOffset을 계산하여 반환

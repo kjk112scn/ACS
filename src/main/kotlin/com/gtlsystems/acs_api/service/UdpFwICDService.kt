@@ -268,7 +268,7 @@ class UdpFwICDService(
      */
     fun timeOffsetCommand(inputTimeOffset: Float) {
         Mono.fromCallable {
-            val localTime = calUtcTimeOffsetTime
+            val localTime = GlobalData.Time.serverTime
             val setDataFrameInstance = ICDService.TimeOffset.SetDataFrame(
                 stx = 0x02,
                 cmdOne = 'O',
@@ -485,7 +485,7 @@ class UdpFwICDService(
      */
     fun defaultInfoCommand(timeOffset: Float, azOffset: Float, elOffset: Float, tiOffset: Float) {
         Mono.fromCallable {
-            val localTime = JKUtil.JKTime.calLocalTime
+            val localTime = GlobalData.Time.serverTime
             val setDataFrameInstance = ICDService.DefaultInfo.SetDataFrame(
                 cmd = 'W',
                 year = localTime.year.toUShort(),

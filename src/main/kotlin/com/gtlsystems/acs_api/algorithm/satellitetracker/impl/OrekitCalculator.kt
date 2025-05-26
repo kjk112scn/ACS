@@ -6,12 +6,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import com.gtlsystems.acs_api.algorithm.satellitetracker.interfaces.SatellitePositionCalculator
 import com.gtlsystems.acs_api.algorithm.satellitetracker.model.SatelliteTrackData
-import org.hipparchus.ode.events.Action
-import org.orekit.propagation.SpacecraftState
-import org.orekit.propagation.events.EventDetector
-import org.orekit.propagation.events.handlers.EventHandler
 import org.orekit.time.AbsoluteDate
-import org.orekit.propagation.events.ElevationDetector
 import com.gtlsystems.acs_api.model.GlobalData
 import org.hipparchus.util.FastMath
 import org.orekit.bodies.GeodeticPoint
@@ -34,7 +29,6 @@ import java.io.FileOutputStream
 import java.net.JarURLConnection
 import java.nio.file.Files
 import java.time.Duration
-import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -841,8 +835,8 @@ class OrekitCalculator : SatellitePositionCalculator {
                             val startElevation = detailedTrackingData.firstOrNull()?.elevation ?: 0.0
                             val endAzimuth = detailedTrackingData.lastOrNull()?.azimuth ?: 0.0
                             val endElevation = detailedTrackingData.lastOrNull()?.elevation ?: 0.0
-                            val startTime = period.startTime.plus(GlobalData.Time.addLocalTime.toLong(), ChronoUnit.MILLIS)
-                            val endTime = period.endTime.plus(GlobalData.Time.addLocalTime.toLong(), ChronoUnit.MILLIS)
+                            val startTime = period.startTime.withZoneSameInstant(GlobalData.Time.serverTimeZone)
+                            val endTime = period.endTime.withZoneSameInstant(GlobalData.Time.serverTimeZone)
                             SatelliteTrackingPass(
                                 startTime = startTime,
                                 endTime = endTime,
@@ -879,8 +873,8 @@ class OrekitCalculator : SatellitePositionCalculator {
                     val startElevation = detailedTrackingData.firstOrNull()?.elevation ?: 0.0
                     val endAzimuth = detailedTrackingData.lastOrNull()?.azimuth ?: 0.0
                     val endElevation = detailedTrackingData.lastOrNull()?.elevation ?: 0.0
-                    val startTime = period.startTime.plus(GlobalData.Time.addLocalTime.toLong(), ChronoUnit.MILLIS)
-                    val endTime = period.endTime.plus(GlobalData.Time.addLocalTime.toLong(), ChronoUnit.MILLIS)
+                    val startTime = period.startTime.withZoneSameInstant(GlobalData.Time.serverTimeZone)
+                    val endTime = period.endTime.withZoneSameInstant(GlobalData.Time.serverTimeZone)
                     SatelliteTrackingPass(
                         startTime = startTime,
                         endTime = endTime,

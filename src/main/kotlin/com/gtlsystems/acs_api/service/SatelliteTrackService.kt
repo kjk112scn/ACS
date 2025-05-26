@@ -317,15 +317,10 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator, priv
                 val mstId = index + 1
 
                 // 시작 시간과 종료 시간에 밀리초 정보 추가
-                val startTimeWithMs = pass.startTime
-                val endTimeWithMs = pass.endTime
+                val startTimeWithMs = pass.startTime.withZoneSameInstant(GlobalData.Time.serverTimeZone)
+                val endTimeWithMs = pass.endTime.withZoneSameInstant(GlobalData.Time.serverTimeZone)
 
-
-                // 시작 시간과 종료 시간을 문자열로 변환 (밀리초 포함)
-                val startTimeStr = JKUtil.JKTime.addHoursToUtc(startTimeWithMs, GlobalData.Time.addLocalTime)
-                val endTimeStr = JKUtil.JKTime.addHoursToUtc(endTimeWithMs, GlobalData.Time.addLocalTime)
-
-                logger.info("패스 #$mstId: 시작=$startTimeStr, 종료=$endTimeStr")
+                logger.info("패스 #$mstId: 시작=$startTimeWithMs, 종료=$endTimeWithMs")
 
                 ephemerisTrackMst.add(mapOf(
                     "No" to mstId,
@@ -333,8 +328,8 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator, priv
                     "SatelliteName" to actualSatelliteName,
                     "StartTime" to startTimeWithMs,
                     "EndTime" to endTimeWithMs,
-                    "StartTimeStr" to startTimeStr,  // 문자열 형식의 시간도 추가
-                    "EndTimeStr" to endTimeStr,      // 문자열 형식의 시간도 추가
+                    "StartTimeStr" to startTimeWithMs,  // 문자열 형식의 시간도 추가
+                    "EndTimeStr" to endTimeWithMs,      // 문자열 형식의 시간도 추가
                     "Duration" to pass.getDurationString(),
                     "MaxElevation" to pass.maxElevation,
                     "MaxElevationTime" to pass.maxElevationTime,
@@ -404,8 +399,8 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator, priv
             currentTrackingPass = selectedPass
 
             // 패스 시작 및 종료 시간 가져오기
-            val startTime = (selectedPass["StartTime"] as ZonedDateTime).plus(GlobalData.Time.addLocalTime.toLong(), ChronoUnit.SECONDS)
-            val endTime = (selectedPass["EndTime"] as ZonedDateTime).plus(GlobalData.Time.addLocalTime.toLong(), ChronoUnit.SECONDS)
+            val startTime = (selectedPass["StartTime"] as ZonedDateTime).withZoneSameInstant(GlobalData.Time.serverTimeZone)
+            val endTime = (selectedPass["EndTime"] as ZonedDateTime).withZoneSameInstant(GlobalData.Time.serverTimeZone)
 
             // 시작 시간과 종료 시간을 문자열로 변환 (밀리초 포함)
             logger.info("위성 추적 시작: ${selectedPass["SatelliteName"]} (패스 ID: $passId)")
@@ -438,7 +433,7 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator, priv
 
             // UdpFwICDService를 통해 데이터 전송
             udpFwICDService.sendSatelliteTrackHeader(headerFrame)
-
+            logger.info("위성 추적 전체 길이 ${calculateDataLength(passId).toUShort()}")
             logger.info("위성 추적 헤더 정보 전송 완료")
             isTracking = true
 
@@ -482,14 +477,14 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator, priv
             val initialControlFrame = ICDService.SatelliteTrackTwo.SetDataFrame(
                 cmdOne = 'T',
                 cmdTwo = 'M',
-                dataLen = calculateInitialDataLength(initialTrackingData.size).toUShort(),
-                aosYear = currentTime.year.toUShort(),
-                aosMonth = currentTime.monthValue.toByte(),
-                aosDay = currentTime.dayOfMonth.toByte(),
-                aosHour = currentTime.hour.toByte(),
-                aosMinute = currentTime.minute.toByte(),
-                aosSecond = currentTime.second.toByte(),
-                aosMs = (currentTime.nano / 1_000_000).toUShort(),
+                dataLen = initialTrackingData.size.toUShort(),
+                ntpYear = currentTime.year.toUShort(),
+                ntpMonth = currentTime.monthValue.toByte(),
+                ntpDay = currentTime.dayOfMonth.toByte(),
+                ntpHour = currentTime.hour.toByte(),
+                ntpMinute = currentTime.minute.toByte(),
+                ntpSecond = currentTime.second.toByte(),
+                ntpMs = (currentTime.nano / 1_000_000).toUShort(),
                 timeOffset = GlobalData.Offset.TimeOffset.toInt(), // 전역 시간 오프셋 사용
                 satelliteTrackData = initialTrackingData
             )
@@ -497,6 +492,7 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator, priv
             // UdpFwICDService를 통해 데이터 전송
             udpFwICDService.sendSatelliteTrackInitialControl(initialControlFrame)
 
+            logger.info("위성 추적 초기 제어 길이 (${calculateInitialDataLength(initialTrackingData.size)} 길이)")
             logger.info("위성 추적 초기 제어 명령 전송 완료 (${initialTrackingData.size}개 데이터 포인트)")
 
         } catch (e: Exception) {
@@ -609,7 +605,7 @@ class SatelliteTrackService(private val orekitCalculator: OrekitCalculator, priv
      * 초기 데이터 길이 계산
      */
     private fun calculateInitialDataLength(dataPointCount: Int): Int {
-        return 18 + (dataPointCount * 12) // 헤더 18바이트 + 각 데이터 포인트 12바이트
+        return (dataPointCount * 12) + 18 + 3 // 헤더 18바이트 + 각 데이터 포인트 12바이트
     }
 
     /**

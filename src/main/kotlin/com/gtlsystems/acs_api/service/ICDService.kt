@@ -366,13 +366,13 @@ class ICDService {
             var cmdOne: Char,
             var cmdTwo: Char,
             var dataLen: UShort,
-            var aosYear: UShort,
-            var aosMonth: Byte,
-            var aosDay: Byte,
-            var aosHour: Byte,
-            var aosMinute: Byte,
-            var aosSecond: Byte,
-            var aosMs: UShort,
+            var ntpYear: UShort,
+            var ntpMonth: Byte,
+            var ntpDay: Byte,
+            var ntpHour: Byte,
+            var ntpMinute: Byte,
+            var ntpSecond: Byte,
+            var ntpMs: UShort,
             var timeOffset: Int,
             var satelliteTrackData: List<Triple<Int, Float, Float>>, // Triple<count, elevationAngle, azimuthAngle>
             var crc16: UShort = 0u,
@@ -385,8 +385,8 @@ class ICDService {
 
                 // 바이트 변환 (엔디안 변환 포함)
                 val byteDataLength = JKConvert.ushortToByteArray(dataLen, false)
-                val byteAosYear = JKConvert.ushortToByteArray(aosYear, false)
-                val byteAosMs = JKConvert.ushortToByteArray(aosMs, false)
+                val byteNtpYear = JKConvert.ushortToByteArray(ntpYear, false)
+                val byteNtpMs = JKConvert.ushortToByteArray(ntpMs, false)
                 val byteTimeOffset = JKConvert.intToByteArray(timeOffset, false)
 
                 // CRC 대상 복사를 위한 배열
@@ -399,15 +399,15 @@ class ICDService {
                 // AOS 시간 정보
                 dataFrame[3] = byteDataLength[0]
                 dataFrame[4] = byteDataLength[1]
-                dataFrame[5] = byteAosYear[0]
-                dataFrame[6] = byteAosYear[1]
-                dataFrame[7] = aosMonth
-                dataFrame[8] = aosDay
-                dataFrame[9] = aosHour
-                dataFrame[10] = aosMinute
-                dataFrame[11] = aosSecond
-                dataFrame[12] = byteAosMs[0]
-                dataFrame[13] = byteAosMs[1]
+                dataFrame[5] = byteNtpYear[0]
+                dataFrame[6] = byteNtpYear[1]
+                dataFrame[7] = ntpMonth
+                dataFrame[8] = ntpDay
+                dataFrame[9] = ntpHour
+                dataFrame[10] = ntpMinute
+                dataFrame[11] = ntpSecond
+                dataFrame[12] = byteNtpMs[0]
+                dataFrame[13] = byteNtpMs[1]
 
                 // Time Offset
                 dataFrame[14] = byteTimeOffset[0]

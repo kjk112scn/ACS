@@ -113,10 +113,6 @@ class JKUtil {
 
     class JKTime {
         companion object {
-            val utcNow: ZonedDateTime = ZonedDateTime.now(ZoneOffset.UTC)
-            val localNow: LocalDateTime = LocalDateTime.now()
-            val addLocalTime: Int = 0
-            val calLocalTime = utcNow.plusHours(addLocalTime.toLong())
             /**
              * UTC 시간에 지정된 시간(시간 단위)을 더한 결과를 반환합니다.
              *
