@@ -95,11 +95,6 @@ class WebSocketService {
           console.log(
             `[WebSocket] 연결 열림 - readyState: ${this.getReadyStateString(this.websocket!.readyState)}`,
           )
-          this.reconnectAttempts = 0
-          resolve()
-        }
-
-        this.websocket.onopen = () => {
           console.log('WebSocket 연결 성공')
           this.reconnectAttempts = 0
           resolve()
@@ -107,6 +102,7 @@ class WebSocketService {
 
         this.websocket.onmessage = (event) => {
           try {
+            //console.info('WebSocket 메시지:', event.data)
             const message = JSON.parse(event.data) as MessageData
             this.messageHandler?.(message)
           } catch (error) {

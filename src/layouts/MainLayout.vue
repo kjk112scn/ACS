@@ -20,8 +20,6 @@
         <!-- 우측으로 밀어내기 위한 공간 -->
         <q-space />
 
-        ㅉㅉ
-
         <!-- 우측 섹션: 설정 버튼과 테마 변경 버튼 -->
         <div class="row items-center">
           <q-btn

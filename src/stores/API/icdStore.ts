@@ -102,7 +102,7 @@ export const useICDStore = defineStore('icd', () => {
   const handleWebSocketMessage = (message: MessageData) => {
     try {
       // 받은 데이터를 버퍼에 저장만 하고 즉시 UI 업데이트하지 않음
-      latestDataBuffer.value = message
+      latestDataBuffer.value = message.data as MessageData
       bufferUpdateTime.value = Date.now()
 
       // 디버깅용 (가끔씩만 로그)
