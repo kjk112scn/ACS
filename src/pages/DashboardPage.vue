@@ -256,7 +256,7 @@ const displayServerTime = computed(() => {
 
   try {
     const serverTime = new Date(icdStore.serverTime)
-
+    //console.log('서버 시간:', icdStore.serverTime)
     if (isNaN(serverTime.getTime())) {
       return `원시 데이터: ${icdStore.serverTime}`
     }

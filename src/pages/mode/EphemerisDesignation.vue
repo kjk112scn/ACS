@@ -126,12 +126,12 @@
 
                     <div class="info-row">
                       <span class="info-label">시작 시간:</span>
-                      <span class="info-value">{{ selectedScheduleInfo.startTime }}</span>
+                      <span class="info-value">{{ formatToLocalTime(selectedScheduleInfo.startTime) }}</span>
                     </div>
 
                     <div class="info-row">
                       <span class="info-label">종료 시간:</span>
-                      <span class="info-value">{{ selectedScheduleInfo.endTime }}</span>
+                      <span class="info-value">{{ formatToLocalTime(selectedScheduleInfo.endTime) }}</span>
                     </div>
 
                     <div class="info-row">
@@ -167,6 +167,7 @@
                         :class="{
                           'text-negative': timeRemaining < 0,
                           'text-positive': timeRemaining > 0,
+                          'text-grey': timeRemaining === 0,
                         }"
                       >
                         {{ formatTimeRemaining(timeRemaining) }}
@@ -656,12 +657,6 @@ const updateChart = () => {
   if (!chart) return
 
   try {
-
-
-
-
-
-
     // ICD 스토어의 값으로 차트 업데이트
     const azimuth = Number(icdStore.azimuthAngle)
     const elevation = Number(icdStore.elevationAngle)
@@ -671,12 +666,6 @@ const updateChart = () => {
 
     // 고도각이 음수인 경우 0으로 처리 (차트에서는 0-90만 표시)
     const normalizedElevation = Math.max(0, Math.min(90, elevation))
-
-
-
-
-
-
 
     // 차트 데이터 업데이트 - 포인트와 선만 업데이트
     chart.setOption({
@@ -691,17 +680,10 @@ const updateChart = () => {
             [0, 0],
             [normalizedAzimuth, normalizedElevation],
           ],
-
-
-
-
-
-
-
-        }
+        },
         // 세 번째 시리즈(궤적 라인)는 생략하여 기존 데이터 유지
-      ]
-    });
+      ],
+    })
   } catch (error) {
     console.error('차트 업데이트 중 오류 발생:', error)
   }
@@ -723,87 +705,136 @@ const updateChartWithTrajectory = (data: TrajectoryPoint[]) => {
       const az = typeof point.Azimuth === 'number' ? point.Azimuth : 0
       const el = typeof point.Elevation === 'number' ? point.Elevation : 0
 
-
-
       // 방위각이 음수인 경우 0-360 범위로 변환
       const normalizedAz = az < 0 ? az + 360 : az % 360
 
-
-
       // 고도각이 음수인 경우 0으로 처리 (차트에서는 0-90만 표시)
       const normalizedEl = Math.max(0, Math.min(90, el))
-
-
 
       return [normalizedAz, normalizedEl]
     })
 
     console.log('생성된 궤적 포인트 샘플:', trajectoryPoints.slice(0, 5))
 
-
-
-
-
-
     // 차트 옵션 업데이트 - 세 번째 시리즈(궤적 라인)만 업데이트
     chart.setOption({
       series: [
-
-
-
-
-        {},  // 첫 번째 시리즈는 그대로 유지
-        {},  // 두 번째 시리즈는 그대로 유지
+        {}, // 첫 번째 시리즈는 그대로 유지
+        {}, // 두 번째 시리즈는 그대로 유지
         {
-
-
-
           // 세 번째 시리즈(궤적 라인) 업데이트
           type: 'line',
-
-
-
-
-
-
-
-
-          data: trajectoryPoints
-        }
-      ]
-    });
-
-
+          data: trajectoryPoints,
+        },
+      ],
+    })
 
     console.log('차트 옵션 업데이트 완료')
   } catch (error) {
     console.error('차트 옵션 업데이트 중 오류 발생:', error)
   }
 }
+const getCalTimeTimestamp = () => {
+  const calTime = icdStore.resultTimeOffsetCalTime
+  if (!calTime) return Date.now()
 
-// 시간 차이 포맷팅 함수
+  try {
+    // Cal Time이 시간만 있는 경우 (예: "13:00:00.000")
+    if (calTime.includes(':') && !calTime.includes('T') && !calTime.includes('-')) {
+      // 오늘 날짜와 결합하여 UTC 기준으로 생성 (9시간 추가 없이)
+      const today = new Date()
+      const year = today.getUTCFullYear()
+      const month = String(today.getUTCMonth() + 1).padStart(2, '0')
+      const day = String(today.getUTCDate()).padStart(2, '0')
+
+      // ✅ UTC 기준으로 그대로 생성 (9시간 추가 안함)
+      const fullDateTime = `${year}-${month}-${day}T${calTime}Z`
+      const dateObj = new Date(fullDateTime)
+
+      if (isNaN(dateObj.getTime())) {
+        console.warn('Cal Time 파싱 실패:', fullDateTime)
+        return Date.now()
+      }
+
+      // ✅ UTC 타임스탬프 그대로 반환 (9시간 추가 없이)
+      return dateObj.getTime()
+    } else {
+      // 완전한 날짜 문자열인 경우
+      const dateObj = new Date(calTime)
+      if (isNaN(dateObj.getTime())) {
+        console.warn('유효하지 않은 Cal Time:', calTime)
+        return Date.now()
+      }
+      // ✅ 원본 타임스탬프 그대로 반환
+      return dateObj.getTime()
+    }
+  } catch (e) {
+    console.error('Cal Time 변환 오류:', e)
+    return Date.now()
+  }
+}
+
+// ✅ 시간 포맷팅 함수 - 남은 시간 표시
 const formatTimeRemaining = (milliseconds: number): string => {
-  const isNegative = milliseconds < 0
   const absMs = Math.abs(milliseconds)
-
-  // 시, 분, 초 계산
   const seconds = Math.floor((absMs / 1000) % 60)
   const minutes = Math.floor((absMs / (1000 * 60)) % 60)
   const hours = Math.floor(absMs / (1000 * 60 * 60))
 
-  // 형식화된 문자열 반환
-  const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-  return isNegative ? `진행 중 (+${formattedTime})` : `${formattedTime} 후 시작`
+  const formattedTime = [
+    hours.toString().padStart(2, '0'),
+    minutes.toString().padStart(2, '0'),
+    seconds.toString().padStart(2, '0'),
+  ].join(':')
+
+  if (milliseconds <= 0) {
+    return `진행 중 (+${formattedTime})`
+  }
+  return `${formattedTime} 후 시작`
 }
 
-// 남은 시간 업데이트 함수
+// ✅ 개선된 시간 계산 함수
 const updateTimeRemaining = () => {
   if (selectedScheduleInfo.value.startTimeMs > 0) {
-    const now = Date.now()
-    timeRemaining.value = selectedScheduleInfo.value.startTimeMs - now
+    try {
+      // Cal Time을 KST 타임스탬프로 변환
+      const currentCalTime = getCalTimeTimestamp()
+
+      // 스케줄 시작 시간을 Date 객체로 변환 (KST)
+      const scheduleStartTime = new Date(selectedScheduleInfo.value.startTime)
+
+      // 디버깅을 위한 로그
+      console.log('시간 계산:', {
+        calTime: icdStore.resultTimeOffsetCalTime,
+        currentCalTime: new Date(currentCalTime).toISOString(),
+        scheduleStartTime: scheduleStartTime.toString(),
+        scheduleStartTimeMs: selectedScheduleInfo.value.startTimeMs,
+      })
+
+      // 남은 시간 계산 (밀리초 단위)
+      const remainingMs = selectedScheduleInfo.value.startTimeMs - currentCalTime
+      timeRemaining.value = remainingMs
+
+      // 1분마다 로그 출력 (디버깅용)
+      if (Date.now() % 60000 < 30) {
+        console.log('⏰ 남은 시간:', {
+          calTime: icdStore.resultTimeOffsetCalTime,
+          currentCalTime: new Date(currentCalTime).toISOString(),
+          scheduleStart: new Date(selectedScheduleInfo.value.startTimeMs).toISOString(),
+          remaining: formatTimeRemaining(remainingMs),
+          remainingMs,
+        })
+      }
+    } catch (error) {
+      console.error('시간 계산 오류:', error)
+      // 에러 발생 시 클라이언트 시간으로 대체
+      const clientTime = Date.now()
+      timeRemaining.value = Math.max(0, selectedScheduleInfo.value.startTimeMs - clientTime)
+    }
+  } else {
+    timeRemaining.value = 0
   }
 }
-
 // 스케줄 모달 열기 및 데이터 로드
 const openScheduleModal = async () => {
   showScheduleModal.value = true
@@ -823,7 +854,25 @@ const loadScheduleData = async () => {
     loadingSchedule.value = false
   }
 }
+// ✅ 로컬 타임으로 포맷팅하는 함수
+const formatToLocalTime = (dateString: string): string => {
+  try {
+    const date = new Date(dateString)
 
+    // 로컬 시간대 기준으로 포맷팅
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    const seconds = String(date.getSeconds()).padStart(2, '0')
+
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+  } catch (error) {
+    console.error('로컬 시간 포맷팅 오류:', error)
+    return dateString // 오류 시 원본 반환
+  }
+}
 // 스케줄 선택 함수 수정
 const selectSchedule = async () => {
   if (selectedSchedule.value.length === 0) return
@@ -842,15 +891,16 @@ const selectSchedule = async () => {
       passId: selectedItem.No,
       satelliteName: selectedItem.SatelliteName || selectedItem.SatelliteID || '알 수 없음',
       satelliteId: selectedItem.SatelliteID || 'N/A',
-      startTime: selectedItem.StartTime,
-      endTime: selectedItem.EndTime,
+      startTime: formatToLocalTime(selectedItem.StartTime),
+      endTime: formatToLocalTime(selectedItem.EndTime),
       duration: selectedItem.Duration,
       maxElevation: typeof selectedItem.MaxElevation === 'number' ? selectedItem.MaxElevation : 0,
       startTimeMs: new Date(selectedItem.StartTime).getTime(),
       timeRemaining: 0,
       startAzimuth: typeof selectedItem.StartAzimuth === 'number' ? selectedItem.StartAzimuth : 0,
       endAzimuth: typeof selectedItem.EndAzimuth === 'number' ? selectedItem.EndAzimuth : 0,
-      startElevation: typeof selectedItem.StartElevation === 'number' ? selectedItem.StartElevation : 0,
+      startElevation:
+        typeof selectedItem.StartElevation === 'number' ? selectedItem.StartElevation : 0,
       endElevation: typeof selectedItem.EndElevation === 'number' ? selectedItem.EndElevation : 0,
     }
 
@@ -1219,13 +1269,13 @@ const formattedCalTime = computed(() => {
     }
 
     // UTC 기준으로 시간 형식 지정
-    const utcYear = dateObj.getUTCFullYear()
-    const utcMonth = String(dateObj.getUTCMonth() + 1).padStart(2, '0')
-    const utcDay = String(dateObj.getUTCDate()).padStart(2, '0')
-    const utcHours = String(dateObj.getUTCHours()).padStart(2, '0')
-    const utcMinutes = String(dateObj.getUTCMinutes()).padStart(2, '0')
-    const utcSeconds = String(dateObj.getUTCSeconds()).padStart(2, '0')
-    const utcMilliseconds = String(dateObj.getUTCMilliseconds()).padStart(3, '0')
+    const utcYear = dateObj.getFullYear()
+    const utcMonth = String(dateObj.getMonth() + 1).padStart(2, '0')
+    const utcDay = String(dateObj.getDate()).padStart(2, '0')
+    const utcHours = String(dateObj.getHours()).padStart(2, '0')
+    const utcMinutes = String(dateObj.getMinutes()).padStart(2, '0')
+    const utcSeconds = String(dateObj.getSeconds()).padStart(2, '0')
+    const utcMilliseconds = String(dateObj.getMilliseconds()).padStart(3, '0')
 
     // YYYY-MM-DD HH:MM:SS.mmm (UTC) 형식
     return `${utcYear}-${utcMonth}-${utcDay} ${utcHours}:${utcMinutes}:${utcSeconds}.${utcMilliseconds} `
