@@ -2,18 +2,18 @@ package com.gtlsystems.acs_api.controller
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.gtlsystems.acs_api.service.PushDataService
+import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.socket.WebSocketHandler
-import org.springframework.web.reactive.socket.WebSocketMessage
 import org.springframework.web.reactive.socket.WebSocketSession
-import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.atomic.AtomicInteger
 import java.time.Duration
+import java.util.concurrent.*
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 @Component
 class PushDataController(
@@ -29,393 +29,366 @@ class PushDataController(
     private val activeConnections = AtomicInteger(0)
 
     // === 성능 모니터링 ===
-    private val messagesReceived = AtomicLong(0)
     private val messagesSent = AtomicLong(0)
-    private val smartPingCount = AtomicLong(0)
     private val errorCount = AtomicLong(0)
-    private val connectionErrors = AtomicLong(0)
+    private val transmissionCount = AtomicLong(0)
 
-    // === 핑-퐁 전략 상수 ===
+    // === 실시간 전송 설정 ===
     companion object {
-        const val REALTIME_DATA_INTERVAL_MS = 15L
-        const val DATA_TIMEOUT_THRESHOLD_MS = 5000L // 5초간 데이터 없으면 핑 시작
-        const val CLIENT_RESPONSE_TIMEOUT_MS = 30000L // 30초간 클라이언트 응답 없으면 문제
-        const val BACKGROUND_PING_INTERVAL_MS = 30000L // 백그라운드 모드시 30초마다 핑
-        const val HEARTBEAT_INTERVAL_MS = 30000L // 하트비트 간격
-        const val STREAM_RETRY_COUNT = 3 // 스트림 재시도 횟수
-        const val BACKPRESSURE_BUFFER_SIZE = 1000 // 백프레셔 버퍼 크기
+        const val REALTIME_TRANSMISSION_INTERVAL_MS = 30L  // 30ms 주기
+        const val MAX_PROCESSING_TIME_MS = 25L  // 25ms 이상이면 경고
+        const val SESSION_TIMEOUT_MS = 30000L  // 30초 타임아웃
     }
 
-
-    // === 세션 정보 클래스 (스마트 핑 전략 포함) ===
+    // === 세션 정보 클래스 (실시간 전송 전용) ===
     private data class SessionInfo(
         val sessionId: String,
+        val session: WebSocketSession,
         val connectedTime: Long = System.currentTimeMillis(),
         val messagesSent: AtomicLong = AtomicLong(0),
-        val messagesReceived: AtomicLong = AtomicLong(0),
-        val lastActivity: AtomicLong = AtomicLong(System.currentTimeMillis()),
-        val lastDataReceived: AtomicLong = AtomicLong(System.currentTimeMillis()),
-        val lastPingTime: AtomicLong = AtomicLong(0),
-        val clientInfo: MutableMap<String, Any> = mutableMapOf(),
-        var isActive: Boolean = true,
-
-        // === 스마트 핑 전략 필드 ===
-        var isClientBackground: Boolean = false,
-        var dataStreamActive: Boolean = true,
-        var lastClientResponse: AtomicLong = AtomicLong(System.currentTimeMillis()),
-        var networkLatency: Long = -1,
-        var streamErrorCount: AtomicInteger = AtomicInteger(0),
-        var lastHeartbeat: AtomicLong = AtomicLong(System.currentTimeMillis())
+        val lastDataSent: AtomicLong = AtomicLong(System.currentTimeMillis()),
+        val isActive: AtomicBoolean = AtomicBoolean(true),
+        val executor: ScheduledExecutorService,
+        val errorCount: AtomicLong = AtomicLong(0),
+        val threadName: String // ✅ 스레드 이름 추가
     )
 
     override fun handle(session: WebSocketSession): Mono<Void> {
         val sessionId = session.id
         val connectionNumber = totalConnections.incrementAndGet()
 
-        logger.info("🔗 새 WebSocket 연결 #{}: {} (스트림 안정성 강화 버전)", connectionNumber, sessionId)
+        logger.info("🔗 실시간 WebSocket 연결 #{}: {} (30ms 주기)", connectionNumber, sessionId)
 
-        // 세션 정보 등록
-        val sessionInfo = SessionInfo(sessionId)
+        // ✅ 세션별 고유한 스레드 팩토리 생성
+        val shortSessionId = sessionId.take(8) // 세션 ID 앞 8자리만 사용
+        val threadName = "websocket-$shortSessionId"
+
+        val sessionThreadFactory = ThreadFactory { runnable ->
+            Thread(runnable, threadName).apply {
+                isDaemon = true
+                priority = Thread.NORM_PRIORITY + 1  // UDP보다 낮지만 일반보다 높음
+
+                // ✅ 상세한 예외 처리기
+                uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { thread, ex ->
+                    logger.error("🚨 WebSocket 세션 [{}] 스레드 [{}] 예외 발생: {}",
+                        shortSessionId, thread.name, ex.message, ex)
+
+                    // 세션 정리 시도
+                    try {
+                        handleDisconnection(sessionId)
+                    } catch (cleanupEx: Exception) {
+                        logger.error("세션 정리 중 추가 오류: {}", cleanupEx.message, cleanupEx)
+                    }
+                }
+
+                logger.debug("🧵 세션 [{}] 전용 스레드 생성: {}", shortSessionId, threadName)
+            }
+        }
+
+        // ✅ 세션별 전용 스케줄러 생성
+        val sessionExecutor = Executors.newSingleThreadScheduledExecutor(sessionThreadFactory)
+
+        logger.info("🏗️ 세션 [{}] 전용 스케줄러 생성 완료 - 스레드: {}", shortSessionId, threadName)
+
+        // ✅ 세션 정보 등록 (스레드 이름 포함)
+        val sessionInfo = SessionInfo(
+            sessionId = sessionId,
+            session = session,
+            executor = sessionExecutor,
+            threadName = threadName
+        )
         connectedSessions[sessionId] = sessionInfo
         activeConnections.incrementAndGet()
 
-        // PushDataService에 클라이언트 연결 알림
-        val initialData = try {
-            pushDataService.clientConnected()
-        } catch (e: Exception) {
-            logger.warn("⚠️ 초기 데이터 가져오기 실패: {}", e.message)
-            ""
-        }
-
-        // 초기 데이터 전송
-        sendInitialDataSafely(session, initialData, sessionInfo)
-
-        // === 1️⃣ 입력 스트림 (완전 안전화) ===
-        val input = session.receive()
-            .doOnNext { message ->
-                try {
-                } catch (e: Exception) {
-                    errorCount.incrementAndGet()
-                    logger.error("❌ 메시지 처리 중 예외: {} - {}", sessionId, e.message, e)
-                }
-            }
-            .doOnError { error ->
-                errorCount.incrementAndGet()
-                sessionInfo.streamErrorCount.incrementAndGet()
-                logger.warn("⚠️ 입력 스트림 오류 (연결 유지): {} - {}", sessionId, error.message)
-            }
-            .onErrorResume { error ->
-                logger.info("🔄 입력 스트림 복구: {} - 빈 스트림으로 대체", sessionId)
-                Flux.empty<WebSocketMessage>()
-            }
-            .then()
-            .onErrorResume { error ->
-                logger.info("🔄 입력 스트림 최종 복구: {} - {}", sessionId, error.message)
-                Mono.empty()
-            }
-
-        // === 2️⃣ 실시간 데이터 스트림 (백프레셔 + 안정성 강화) ===
-        val realtimeData = createRealtimeDataStream(session, sessionInfo)
-
-        // === 4️⃣ 하트비트 스트림 (최후 연결 유지) ===
-        val heartbeat = createHeartbeatStream(session, sessionInfo)
-
-        // === 5️⃣ 출력 스트림 (완전 안전화) ===
-        val output = session.send(
-           // Flux.merge(realtimeData, smartPing, heartbeat)
-            Flux.merge(realtimeData)
-                .doOnNext { message ->
-                    sessionInfo.lastActivity.set(System.currentTimeMillis())
-                    //logger.debug("📤 메시지 전송: {} (타입: {})", sessionId, getMessageType(message))
-                }
-                .doOnError { error ->
-                    errorCount.incrementAndGet()
-                    sessionInfo.streamErrorCount.incrementAndGet()
-                    logger.warn("⚠️ 병합 스트림 오류 (연결 유지): {} - {}", sessionId, error.message)
-                }
-                .onErrorResume { error ->
-                    logger.info("🔄 병합 스트림 복구: {} - 연결 유지를 위해 빈 스트림 제공", sessionId)
-                    Flux.empty<WebSocketMessage>()
-                }
-                .switchIfEmpty(
-                    // 모든 스트림이 비어있을 때 응급 하트비트
-                    Flux.interval(Duration.ofMillis(HEARTBEAT_INTERVAL_MS))
-                        .map {
-                            session.textMessage(createEmergencyHeartbeat())
-                        }
-                        .doOnNext {
-                            logger.debug("🚨 응급 하트비트 전송: {}", sessionId)
-                            sessionInfo.lastHeartbeat.set(System.currentTimeMillis())
-                        }
-                )
-        )
-            .doOnError { error ->
-                errorCount.incrementAndGet()
-                sessionInfo.streamErrorCount.incrementAndGet()
-                logger.warn("⚠️ 출력 스트림 오류 (연결 유지 시도): {} - {}", sessionId, error.message)
-            }
-            .onErrorResume { error ->
-                logger.info("🔄 출력 스트림 최종 복구: {} - 연결 유지", sessionId)
-                Mono.empty()
-            }
-
-        // === 6️⃣ 연결 해제 처리 함수 ===
-        fun handleDisconnection() {
-            val removedSession = connectedSessions.remove(sessionId)
-            if (removedSession != null) {
-                removedSession.isActive = false
-                activeConnections.decrementAndGet()
-
-                try {
-                    pushDataService.clientDisconnected()
-                } catch (e: Exception) {
-                    logger.warn("⚠️ 클라이언트 해제 알림 실패: {}", e.message)
-                }
-
-                val connectionDuration = System.currentTimeMillis() - removedSession.connectedTime
-                val totalMessages = removedSession.messagesSent.get()
-                val errorCount = removedSession.streamErrorCount.get()
-                val avgLatency = if (removedSession.networkLatency > 0) "${removedSession.networkLatency}ms" else "측정안됨"
-
-                logger.info(
-                    "📊 세션 {} 해제 완료 - 지속: {}ms, 메시지: {}개, 오류: {}회, 지연: {}",
-                    sessionId, connectionDuration, totalMessages, errorCount, avgLatency
-                )
-            }
-        }
-
-        // === 7️⃣ 연결 종료 감지 (클라이언트 주도적 종료만) ===
-        val close = session.closeStatus()
-            .doOnNext { status ->
-                logger.info(
-                    "🔌 클라이언트 {} 정상 종료: {} - {}",
-                    sessionId, status.code, status.reason ?: "정상 종료"
-                )
-                handleDisconnection()
-            }
-            .doOnError { error ->
-                logger.debug("🔍 종료 상태 감지 중 오류 (정상): {} - {}", sessionId, error.message)
-            }
-            .onErrorResume { error ->
-                logger.debug("🔄 종료 상태 감지 복구: {} - {}", sessionId, error.message)
-                Mono.empty()
-            }
-            .then()
-
-        // === 8️⃣ 최종 스트림 결합 (완전 안전화) ===
-        return Mono.zip(input, output, close)
-            .doOnSubscribe {
-                logger.info("📡 WebSocket 세션 {} 안정화된 스트림 시작", sessionId)
-            }
-            .doOnTerminate {
-                logger.info("🔚 WebSocket 세션 {} 정상 종료", sessionId)
-                // handleDisconnection()은 close에서 이미 처리됨
-            }
-            .doOnError { error ->
-                connectionErrors.incrementAndGet()
-                logger.error("❌ WebSocket 세션 {} 예외적 오류: {}", sessionId, error.message, error)
-                handleDisconnection() // 예외적 상황에서만 강제 해제
-            }
-            .onErrorResume { error ->
-                logger.warn("🔄 WebSocket 세션 {} 최종 복구 완료", sessionId)
-                Mono.empty() // 최종 안전망
-            }
-            .then()
-    }
-
-    /**
-     * ✅ 실시간 데이터 스트림 생성 (안정성 강화)
-     */
-    private fun createRealtimeDataStream(session: WebSocketSession, sessionInfo: SessionInfo): Flux<WebSocketMessage> {
-        return try {
-            pushDataService.getReadStatusDataStream()
-                .onBackpressureBuffer(BACKPRESSURE_BUFFER_SIZE) // 백프레셔 버퍼
-                .publishOn(Schedulers.parallel())
-                .doOnNext { message ->
-                    sessionInfo.messagesSent.incrementAndGet()
-                    sessionInfo.lastActivity.set(System.currentTimeMillis())
-                    sessionInfo.lastDataReceived.set(System.currentTimeMillis())
-                    sessionInfo.dataStreamActive = true
-                    messagesSent.incrementAndGet()
-
-                    logger.debug("📤 실시간 데이터: {} ({}자)", session.id, message.length)
-                }
-                .map { message -> session.textMessage(message) }
-                .doOnError { error ->
-                    errorCount.incrementAndGet()
-                    sessionInfo.streamErrorCount.incrementAndGet()
-                    sessionInfo.dataStreamActive = false
-                    logger.warn("⚠️ 실시간 데이터 스트림 오류: {} - {}", session.id, error.message)
-                }
-                .onErrorResume { error ->
-                    logger.info("🔄 실시간 데이터 스트림 복구: {} - 빈 스트림으로 대체", session.id)
-                    sessionInfo.dataStreamActive = false
-                    Flux.empty<WebSocketMessage>()
-                }
-                .retry(STREAM_RETRY_COUNT.toLong()) // 재시도
-                .doOnComplete {
-                    logger.info("🔚 실시간 데이터 스트림 완료: {}", session.id)
-                    sessionInfo.dataStreamActive = false
-                }
-        } catch (e: Exception) {
-            logger.error("❌ 실시간 데이터 스트림 생성 실패: {} - {}", session.id, e.message, e)
-            sessionInfo.dataStreamActive = false
-            Flux.empty()
-        }
-    }
-
-    /**
-     * ✅ 하트비트 스트림 생성 (최후 연결 유지)
-     */
-    private fun createHeartbeatStream(session: WebSocketSession, sessionInfo: SessionInfo): Flux<WebSocketMessage> {
-        return Flux.interval(Duration.ofMillis(HEARTBEAT_INTERVAL_MS))
-            .filter { isHeartbeatNeeded(sessionInfo) }
-            .map {
-                session.textMessage(createHeartbeatMessage(sessionInfo))
-            }
-            .doOnNext {
-                sessionInfo.messagesSent.incrementAndGet()
-                sessionInfo.lastHeartbeat.set(System.currentTimeMillis())
-                messagesSent.incrementAndGet()
-
-                logger.debug("💓 하트비트 전송: {} (데이터 활성: {})", session.id, sessionInfo.dataStreamActive)
-            }
-            .doOnError { error ->
-                logger.warn("⚠️ 하트비트 스트림 오류: {} - {}", session.id, error.message)
-            }
-            .onErrorResume { error ->
-                logger.info("🔄 하트비트 스트림 복구: {} - 빈 스트림으로 대체", session.id)
-                Flux.empty<WebSocketMessage>()
-            }
-    }
-
-    /**
-     * ✅ 하트비트 필요성 판단
-     */
-    private fun isHeartbeatNeeded(sessionInfo: SessionInfo): Boolean {
-        val currentTime = System.currentTimeMillis()
-        val timeSinceLastData = currentTime - sessionInfo.lastDataReceived.get()
-        val timeSinceLastHeartbeat = currentTime - sessionInfo.lastHeartbeat.get()
-
-        // 데이터 스트림이 비활성이고 마지막 하트비트로부터 충분한 시간이 지났을 때
-        return !sessionInfo.dataStreamActive &&
-                timeSinceLastData > DATA_TIMEOUT_THRESHOLD_MS &&
-                timeSinceLastHeartbeat > HEARTBEAT_INTERVAL_MS
-    }
-    /**
-     * ✅ 하트비트 메시지 생성
-     */
-    private fun createHeartbeatMessage(sessionInfo: SessionInfo): String {
-        val currentTime = System.currentTimeMillis()
-        val heartbeatData = mapOf(
-            "type" to "heartbeat",
-            "timestamp" to currentTime,
-            "sessionId" to sessionInfo.sessionId,
-            "connectionDuration" to (currentTime - sessionInfo.connectedTime),
-            "dataStreamActive" to sessionInfo.dataStreamActive,
-            "messagesSent" to sessionInfo.messagesSent.get(),
-            "purpose" to "CONNECTION_MAINTENANCE"
-        )
-
-        return try {
-            objectMapper.writeValueAsString(heartbeatData)
-        } catch (e: Exception) {
-            logger.error("❌ 하트비트 메시지 생성 실패: {}", e.message, e)
-            """{"type":"heartbeat","timestamp":${currentTime},"error":"serialization_failed"}"""
-        }
-    }
-
-    /**
-     * ✅ 응급 하트비트 생성 (모든 스트림 실패 시)
-     */
-    private fun createEmergencyHeartbeat(): String {
-        val currentTime = System.currentTimeMillis()
-        return """{"type":"emergencyHeartbeat","timestamp":${currentTime},"purpose":"STREAM_RECOVERY"}"""
-    }
-
-    /**
-     * ✅ 메시지 타입 추출 (디버깅용)
-     */
-    private fun getMessageType(message: WebSocketMessage): String {
-        return try {
-            val payload = message.payloadAsText
-            val jsonNode = objectMapper.readTree(payload)
-            jsonNode.get("type")?.asText() ?: "unknown"
-        } catch (e: Exception) {
-            "data"
-        }
-    }
-
-    /**
-     * ✅ 클라이언트 정보 처리
-     */
-    private fun handleClientInfo(jsonNode: com.fasterxml.jackson.databind.JsonNode, sessionInfo: SessionInfo) {
+        // ✅ PushDataService에 클라이언트 연결 알림 및 초기 데이터 전송
         try {
-            jsonNode.fields().forEach { (key, value) ->
-                when (key) {
-                    "userAgent" -> sessionInfo.clientInfo["userAgent"] = value.asText()
-                    "browserType" -> sessionInfo.clientInfo["browserType"] = value.asText()
-                    "screenResolution" -> sessionInfo.clientInfo["screenResolution"] = value.asText()
-                    "timezone" -> sessionInfo.clientInfo["timezone"] = value.asText()
-                    "language" -> sessionInfo.clientInfo["language"] = value.asText()
-                    else -> sessionInfo.clientInfo[key] = value.asText()
-                }
-            }
-
-            logger.info("📋 클라이언트 정보 업데이트: {} - {}", sessionInfo.sessionId, sessionInfo.clientInfo)
-
+            val initialData = pushDataService.clientConnected()
+            sendInitialData(session, initialData, sessionInfo)
+            logger.info("📤 세션 [{}] 초기 데이터 전송 완료", shortSessionId)
         } catch (e: Exception) {
-            logger.error("❌ 클라이언트 정보 처리 오류: {} - {}", sessionInfo.sessionId, e.message, e)
+            logger.warn("⚠️ 세션 [{}] 클라이언트 연결 알림 실패: {}", shortSessionId, e.message)
         }
+
+        // ✅ 30ms 주기 실시간 데이터 전송 시작
+        startRealtimeTransmission(sessionInfo)
+
+        // ✅ 세션 종료 처리 (스레드 이름 포함 로깅)
+        return session.closeStatus()
+            .doOnNext { status ->
+                logger.info("🔌 실시간 세션 [{}] 스레드 [{}] 종료: {}",
+                    shortSessionId, threadName, status.code)
+                handleDisconnection(sessionId)
+            }
+            .doOnError { error ->
+                logger.debug("세션 [{}] 스레드 [{}] 종료 감지 오류: {}",
+                    shortSessionId, threadName, error.message)
+                handleDisconnection(sessionId)
+            }
+            .onErrorResume { error ->
+                logger.debug("세션 [{}] 스레드 [{}] 종료 복구", shortSessionId, threadName)
+                handleDisconnection(sessionId)
+                Mono.empty()
+            }
+            .then()
     }
 
     /**
-     * ✅ 초기 데이터 안전 전송
+     * ✅ 초기 데이터 전송 (스레드 정보 포함 로깅)
      */
-    private fun sendInitialDataSafely(session: WebSocketSession, initialData: String, sessionInfo: SessionInfo) {
+    private fun sendInitialData(session: WebSocketSession, initialData: String, sessionInfo: SessionInfo) {
+        val shortSessionId = sessionInfo.sessionId.take(8)
+
         if (initialData.isNotEmpty()) {
             try {
                 session.send(Mono.just(session.textMessage(initialData)))
+                    .subscribeOn(Schedulers.boundedElastic()) // ✅ 명시적 스케줄러 지정
                     .subscribe(
                         {
                             sessionInfo.messagesSent.incrementAndGet()
-                            sessionInfo.lastDataReceived.set(System.currentTimeMillis())
+                            sessionInfo.lastDataSent.set(System.currentTimeMillis())
                             messagesSent.incrementAndGet()
-                            logger.debug("📤 초기 데이터 전송 성공: {} ({}자)", session.id, initialData.length)
+                            logger.debug("📤 세션 [{}] 스레드 [{}] 초기 데이터 전송 성공 ({}자)",
+                                shortSessionId, sessionInfo.threadName, initialData.length)
                         },
                         { error ->
                             errorCount.incrementAndGet()
-                            logger.warn("⚠️ 초기 데이터 전송 실패 {}: {}", session.id, error.message)
+                            logger.warn("⚠️ 세션 [{}] 스레드 [{}] 초기 데이터 전송 실패: {}",
+                                shortSessionId, sessionInfo.threadName, error.message)
                         }
                     )
             } catch (e: Exception) {
                 errorCount.incrementAndGet()
-                logger.error("❌ 초기 데이터 전송 중 예외 {}: {}", session.id, e.message, e)
+                logger.error("❌ 세션 [{}] 스레드 [{}] 초기 데이터 전송 중 예외: {}",
+                    shortSessionId, sessionInfo.threadName, e.message, e)
             }
         }
     }
 
-    // === 📊 성능 모니터링 및 상태 확인 메서드들 ===
+    /**
+     * ✅ 30ms 주기 실시간 데이터 전송 시작 (상세 로깅)
+     */
+    private fun startRealtimeTransmission(sessionInfo: SessionInfo) {
+        val sessionId = sessionInfo.sessionId
+        val shortSessionId = sessionId.take(8)
+        val threadName = sessionInfo.threadName
+
+        logger.info("🚀 세션 [{}] 스레드 [{}] 실시간 전송 시작 ({}ms 주기)",
+            shortSessionId, threadName, REALTIME_TRANSMISSION_INTERVAL_MS)
+
+        // ✅ 스케줄러 상태 확인
+        logger.debug("🧵 세션 [{}] 스케줄러 상태 - isShutdown: {}, isTerminated: {}",
+            shortSessionId, sessionInfo.executor.isShutdown, sessionInfo.executor.isTerminated)
+
+        // ✅ 즉시 한 번 실행해보기 (연결 테스트)
+        try {
+            logger.debug("🔥 세션 [{}] 즉시 실행 테스트 시작", shortSessionId)
+            sendRealtimeData(sessionInfo)
+            logger.debug("🔥 세션 [{}] 즉시 실행 테스트 완료", shortSessionId)
+        } catch (e: Exception) {
+            logger.error("💥 세션 [{}] 즉시 실행 테스트 실패: {}", shortSessionId, e.message, e)
+        }
+
+        // ✅ 30ms 주기로 정확한 실시간 데이터 전송
+        sessionInfo.executor.scheduleAtFixedRate({
+            try {
+                // 스케줄러 실행 확인 (디버그 레벨)
+               /* logger.debug("⏰ 세션 [{}] 스레드 [{}] 스케줄러 실행 - 시간: {}",
+                    shortSessionId, threadName, System.currentTimeMillis())
+*/
+                if (sessionInfo.isActive.get() && sessionInfo.session.isOpen) {
+                    val startTime = System.nanoTime()
+
+                    sendRealtimeData(sessionInfo)
+
+                    // ✅ 성능 모니터링
+                    val processingTime = (System.nanoTime() - startTime) / 1_000_000
+                    if (processingTime > MAX_PROCESSING_TIME_MS) {
+                        logger.warn("🚨 세션 [{}] 스레드 [{}] 실시간 전송 지연: {}ms",
+                            shortSessionId, threadName, processingTime)
+                    }
+                } else {
+                    logger.debug("⚠️ 세션 [{}] 스레드 [{}] 비활성 상태 - isActive: {}, isOpen: {}",
+                        shortSessionId, threadName, sessionInfo.isActive.get(), sessionInfo.session.isOpen)
+                }
+            } catch (e: Exception) {
+                sessionInfo.errorCount.incrementAndGet()
+                errorCount.incrementAndGet()
+                logger.debug("세션 [{}] 스레드 [{}] 스케줄러 실행 중 오류: {}",
+                    shortSessionId, threadName, e.message)
+
+                // ✅ 연속 오류 시 세션 정리
+                if (sessionInfo.errorCount.get() > 20) {
+                    logger.warn("세션 [{}] 스레드 [{}] 연속 오류({}회)로 인한 정리",
+                        shortSessionId, threadName, sessionInfo.errorCount.get())
+                    handleDisconnection(sessionId)
+                }
+            }
+        }, 1000, REALTIME_TRANSMISSION_INTERVAL_MS, TimeUnit.MILLISECONDS) // 1초 후 시작
+
+        logger.info("✅ 세션 [{}] 스레드 [{}] 실시간 전송 스케줄링 완료", shortSessionId, threadName)
+    }
 
     /**
-     * ✅ 전체 연결 통계 반환
+     * ✅ 실시간 데이터 전송 (Reactor 스케줄러 문제 해결)
      */
-    fun getConnectionStats(): Map<String, Any> {
+    private fun sendRealtimeData(sessionInfo: SessionInfo) {
+        try {
+            val session = sessionInfo.session
+            val sessionId = sessionInfo.sessionId
+            val shortSessionId = sessionId.take(8)
+            val threadName = sessionInfo.threadName
+
+            // ✅ PushDataService에서 실시간 데이터 가져오기
+            val realtimeData = pushDataService.generateRealtimeData()
+
+            if (realtimeData.isNotEmpty()) {
+                // ✅ Reactor 스케줄러 문제 해결: subscribeOn 사용
+                session.send(Mono.just(session.textMessage(realtimeData)))
+                    .subscribeOn(Schedulers.boundedElastic()) // 명시적 스케줄러 지정
+                    .subscribe(
+                        //해당 쓰레드는 IDE랑 따로 돌아가므로 브레이크 포인트는 걸리지 않음. 로그 또한 확인 불가.
+                        {
+                            //logger.info("🔍 [DEBUG] 세션 [{}] 전송 성공 콜백 시작", shortSessionId)
+                            // ✅ 전송 성공
+                            val currentTime = System.currentTimeMillis()
+                            sessionInfo.messagesSent.incrementAndGet()
+                            sessionInfo.lastDataSent.set(currentTime)
+                            messagesSent.incrementAndGet()
+                            transmissionCount.incrementAndGet()
+                           // logger.info("🔍 [DEBUG] 세션 [{}] 통계 업데이트 완료 - 메시지: {}, 시간: {}",
+                            //    shortSessionId, sessionInfo.messagesSent.get(), currentTime)
+
+                            // ✅ 주기적 로깅 (5초마다 또는 100개 메시지마다)
+                            val messageCount = sessionInfo.messagesSent.get()
+                            if (messageCount % 100 == 0L) {
+                               // logger.info("📤 세션 [{}] 스레드 [{}] 실시간 전송 중 - 총 {}개 메시지",
+                                 //   shortSessionId, threadName, messageCount)
+                            }
+
+                            // 디버그 로깅
+                           // logger.debug("📤 세션 [{}] 스레드 [{}] 실시간 데이터 전송 성공 ({}자)",
+                            //    shortSessionId, threadName, realtimeData.length)
+                        },
+                        { error ->
+                            // ✅ 전송 실패
+                            sessionInfo.errorCount.incrementAndGet()
+                            errorCount.incrementAndGet()
+                            logger.warn("⚠️ 세션 [{}] 스레드 [{}] 실시간 전송 실패: {}",
+                                shortSessionId, threadName, error.message)
+
+                            // ✅ 장시간 전송 실패 시 세션 정리
+                            val timeSinceLastSuccess = System.currentTimeMillis() - sessionInfo.lastDataSent.get()
+                            if (timeSinceLastSuccess > SESSION_TIMEOUT_MS) {
+                                logger.warn("세션 [{}] 스레드 [{}] 장시간 실시간 전송 실패 ({}ms), 정리",
+                                    shortSessionId, threadName, timeSinceLastSuccess)
+                                handleDisconnection(sessionId)
+                            }
+                        }
+                    )
+            } else {
+                logger.debug("세션 [{}] 스레드 [{}] 실시간 데이터 없음", shortSessionId, threadName)
+            }
+
+        } catch (e: Exception) {
+            sessionInfo.errorCount.incrementAndGet()
+            errorCount.incrementAndGet()
+            val shortSessionId = sessionInfo.sessionId.take(8)
+            logger.error("💥 세션 [{}] 스레드 [{}] 실시간 데이터 전송 중 예외: {}",
+                shortSessionId, sessionInfo.threadName, e.message, e)
+        }
+    }
+
+    /**
+     * ✅ 연결 해제 처리 (상세 스레드 정리)
+     */
+    private fun handleDisconnection(sessionId: String) {
+        val removedSession = connectedSessions.remove(sessionId)
+        if (removedSession != null) {
+            val shortSessionId = sessionId.take(8)
+            val threadName = removedSession.threadName
+
+            removedSession.isActive.set(false)
+            activeConnections.decrementAndGet()
+
+            logger.info("🔄 세션 [{}] 스레드 [{}] 정리 시작", shortSessionId, threadName)
+
+            // ✅ 세션별 스케줄러 즉시 종료
+            removedSession.executor.shutdown()
+            try {
+                if (!removedSession.executor.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+                    logger.warn("⚠️ 세션 [{}] 스레드 [{}] 정상 종료 실패, 강제 종료", shortSessionId, threadName)
+                    removedSession.executor.shutdownNow()
+
+                    if (!removedSession.executor.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+                        logger.error("❌ 세션 [{}] 스레드 [{}] 강제 종료도 실패", shortSessionId, threadName)
+                    } else {
+                        logger.info("✅ 세션 [{}] 스레드 [{}] 강제 종료 완료", shortSessionId, threadName)
+                    }
+                } else {
+                    logger.info("✅ 세션 [{}] 스레드 [{}] 정상 종료 완료", shortSessionId, threadName)
+                }
+            } catch (e: InterruptedException) {
+                logger.warn("⚠️ 세션 [{}] 스레드 [{}] 종료 중 인터럽트", shortSessionId, threadName)
+                removedSession.executor.shutdownNow()
+                Thread.currentThread().interrupt()
+            }
+
+            // ✅ PushDataService에 클라이언트 해제 알림
+            try {
+                pushDataService.clientDisconnected()
+                logger.debug("📉 세션 [{}] 클라이언트 해제 알림 완료", shortSessionId)
+            } catch (e: Exception) {
+                logger.warn("⚠️ 세션 [{}] 클라이언트 해제 알림 실패: {}", shortSessionId, e.message)
+            }
+
+            // ✅ 상세 통계 로깅
+            val connectionDuration = System.currentTimeMillis() - removedSession.connectedTime
+            val totalMessages = removedSession.messagesSent.get()
+            val sessionErrors = removedSession.errorCount.get()
+            val avgMessagesPerSecond = if (connectionDuration > 0) {
+                (totalMessages * 1000.0 / connectionDuration)
+            } else 0.0
+
+            logger.info(
+                "📊 세션 [{}] 스레드 [{}] 해제 완료 - 지속: {}ms, 메시지: {}개, 오류: {}회, 평균: {:.1f}msg/s",
+                shortSessionId, threadName, connectionDuration, totalMessages, sessionErrors, avgMessagesPerSecond
+            )
+        }
+    }
+
+    // === 📊 실시간 성능 모니터링 메서드들 (스레드 정보 포함) ===
+
+    /**
+     * ✅ 실시간 연결 통계 (스레드 정보 포함)
+     */
+    fun getRealtimeStats(): Map<String, Any> {
         val currentTime = System.currentTimeMillis()
-        val activeSessions = connectedSessions.values.filter { it.isActive }
+        val activeSessions = connectedSessions.values.filter { it.isActive.get() }
+
+        val threadNames = activeSessions.map { it.threadName }
 
         return mapOf(
             "totalConnections" to totalConnections.get(),
             "activeConnections" to activeConnections.get(),
-            "messagesReceived" to messagesReceived.get(),
+            "realtimeSessions" to activeSessions.size,
             "messagesSent" to messagesSent.get(),
-            "smartPingCount" to smartPingCount.get(),
+            "transmissionCount" to transmissionCount.get(),
             "errorCount" to errorCount.get(),
-            "connectionErrors" to connectionErrors.get(),
             "averageConnectionDuration" to calculateAverageConnectionDuration(activeSessions, currentTime),
-            "backgroundSessions" to activeSessions.count { it.isClientBackground },
-            "dataStreamActiveSessions" to activeSessions.count { it.dataStreamActive },
-            "averageLatency" to calculateAverageLatency(activeSessions),
+            "transmissionInterval" to "${REALTIME_TRANSMISSION_INTERVAL_MS}ms",
+            "architecture" to "Session-Specific Thread WebSocket Controller",
+            "threadPriority" to "NORM_PRIORITY+1",
+            "serviceRole" to "WebSocket Transmission Only",
+            "activeThreads" to threadNames, // ✅ 활성 스레드 이름 목록
+            "threadNamingPattern" to "websocket-{sessionId8}",
+            "features" to listOf(
+                "30ms 정확한 주기",
+                "세션별 전용 스레드",
+                "고유한 스레드 이름",
+                "상세한 스레드 모니터링",
+                "자동 오류 복구",
+                "성능 모니터링"
+            ),
             "serverTime" to currentTime
         )
     }
@@ -427,232 +400,319 @@ class PushDataController(
         if (sessions.isEmpty()) return 0
         return sessions.map { currentTime - it.connectedTime }.average().toLong()
     }
-
     /**
-     * ✅ 평균 네트워크 지연 계산
+     * ✅ 실시간 세션 상세 정보 (스레드 정보 포함)
      */
-    private fun calculateAverageLatency(sessions: List<SessionInfo>): String {
-        val validLatencies = sessions.mapNotNull {
-            if (it.networkLatency > 0) it.networkLatency else null
-        }
-
-        return if (validLatencies.isNotEmpty()) {
-            "${validLatencies.average().toLong()}ms"
-        } else {
-            "측정안됨"
-        }
-    }
-
-    /**
-     * ✅ 특정 세션 상세 정보 반환
-     */
-    fun getSessionDetails(sessionId: String): Map<String, Any>? {
+    fun getRealtimeSessionDetails(sessionId: String): Map<String, Any>? {
         val sessionInfo = connectedSessions[sessionId] ?: return null
         val currentTime = System.currentTimeMillis()
 
         return mapOf(
             "sessionId" to sessionInfo.sessionId,
+            "shortSessionId" to sessionInfo.sessionId.take(8),
+            "threadName" to sessionInfo.threadName, // ✅ 스레드 이름
             "connectedTime" to sessionInfo.connectedTime,
             "connectionDuration" to (currentTime - sessionInfo.connectedTime),
-            "isActive" to sessionInfo.isActive,
+            "isActive" to sessionInfo.isActive.get(),
             "messagesSent" to sessionInfo.messagesSent.get(),
-            "messagesReceived" to sessionInfo.messagesReceived.get(),
-            "lastActivity" to sessionInfo.lastActivity.get(),
-            "timeSinceLastActivity" to (currentTime - sessionInfo.lastActivity.get()),
-            "lastDataReceived" to sessionInfo.lastDataReceived.get(),
-            "timeSinceLastData" to (currentTime - sessionInfo.lastDataReceived.get()),
-            "lastPingTime" to sessionInfo.lastPingTime.get(),
-            "timeSinceLastPing" to (currentTime - sessionInfo.lastPingTime.get()),
-            "isClientBackground" to sessionInfo.isClientBackground,
-            "dataStreamActive" to sessionInfo.dataStreamActive,
-            "lastClientResponse" to sessionInfo.lastClientResponse.get(),
-            "timeSinceLastResponse" to (currentTime - sessionInfo.lastClientResponse.get()),
-            "networkLatency" to if (sessionInfo.networkLatency > 0) "${sessionInfo.networkLatency}ms" else "측정안됨",
-            "streamErrorCount" to sessionInfo.streamErrorCount.get(),
-            "lastHeartbeat" to sessionInfo.lastHeartbeat.get(),
-            "timeSinceLastHeartbeat" to (currentTime - sessionInfo.lastHeartbeat.get()),
-            "clientInfo" to sessionInfo.clientInfo,
-            "isHeartbeatNeeded" to isHeartbeatNeeded(sessionInfo)
+            "lastDataSent" to sessionInfo.lastDataSent.get(),
+            "timeSinceLastData" to (currentTime - sessionInfo.lastDataSent.get()),
+            "errorCount" to sessionInfo.errorCount.get(),
+            "transmissionInterval" to "${REALTIME_TRANSMISSION_INTERVAL_MS}ms",
+            "isSessionOpen" to sessionInfo.session.isOpen,
+            "messagesPerSecond" to calculateMessagesPerSecond(sessionInfo, currentTime),
+            "executorStatus" to mapOf( // ✅ 스케줄러 상태 정보
+                "isShutdown" to sessionInfo.executor.isShutdown,
+                "isTerminated" to sessionInfo.executor.isTerminated
+            ),
+            "threadInfo" to mapOf( // ✅ 스레드 상세 정보
+                "threadName" to sessionInfo.threadName,
+                "threadPattern" to "websocket-{sessionId8}",
+                "priority" to "NORM_PRIORITY+1",
+                "isDaemon" to true
+            )
         )
     }
 
     /**
-     * ✅ 모든 활성 세션 목록 반환
+     * ✅ 초당 메시지 수 계산
      */
-    fun getActiveSessions(): List<Map<String, Any>> {
+    private fun calculateMessagesPerSecond(sessionInfo: SessionInfo, currentTime: Long): Double {
+        val durationSeconds = (currentTime - sessionInfo.connectedTime) / 1000.0
+        return if (durationSeconds > 0) {
+            sessionInfo.messagesSent.get() / durationSeconds
+        } else 0.0
+    }
+
+    /**
+     * ✅ 모든 실시간 세션 목록 (스레드 정보 포함)
+     */
+    fun getRealtimeSessions(): List<Map<String, Any>> {
         return connectedSessions.values
-            .filter { it.isActive }
+            .filter { it.isActive.get() }
             .map { sessionInfo ->
                 val currentTime = System.currentTimeMillis()
                 mapOf(
                     "sessionId" to sessionInfo.sessionId,
+                    "shortSessionId" to sessionInfo.sessionId.take(8),
+                    "threadName" to sessionInfo.threadName, // ✅ 스레드 이름
                     "connectionDuration" to (currentTime - sessionInfo.connectedTime),
                     "messagesSent" to sessionInfo.messagesSent.get(),
-                    "messagesReceived" to sessionInfo.messagesReceived.get(),
-                    "isBackground" to sessionInfo.isClientBackground,
-                    "dataStreamActive" to sessionInfo.dataStreamActive,
-                    "networkLatency" to if (sessionInfo.networkLatency > 0) "${sessionInfo.networkLatency}ms" else "측정안됨",
-                    "timeSinceLastActivity" to (currentTime - sessionInfo.lastActivity.get()),
-                    "streamErrorCount" to sessionInfo.streamErrorCount.get()
+                    "timeSinceLastData" to (currentTime - sessionInfo.lastDataSent.get()),
+                    "errorCount" to sessionInfo.errorCount.get(),
+                    "isSessionOpen" to sessionInfo.session.isOpen,
+                    "messagesPerSecond" to calculateMessagesPerSecond(sessionInfo, currentTime),
+                    "executorHealthy" to (!sessionInfo.executor.isShutdown && !sessionInfo.executor.isTerminated)
                 )
             }
     }
 
     /**
-     * ✅ 연결 상태 요약 반환
+     * ✅ 실시간 상태 요약 (스레드 정보 포함)
      */
-    fun getConnectionSummary(): String {
-        val stats = getConnectionStats()
-        val activeSessions = getActiveSessions()
+    fun getRealtimeSummary(): String {
+        val stats = getRealtimeStats()
+        val sessions = getRealtimeSessions()
 
         return buildString {
-            appendLine("=== WebSocket 연결 상태 요약 ===")
+            appendLine("=== 실시간 WebSocket 상태 요약 ===")
             appendLine("📊 전체 연결: ${stats["totalConnections"]}회")
             appendLine("🔗 활성 연결: ${stats["activeConnections"]}개")
+            appendLine("⚡ 실시간 세션: ${stats["realtimeSessions"]}개")
             appendLine("📤 송신 메시지: ${stats["messagesSent"]}개")
-            appendLine("📥 수신 메시지: ${stats["messagesReceived"]}개")
-            appendLine("🧠 스마트 핑: ${stats["smartPingCount"]}회")
+            appendLine("🔄 전송 횟수: ${stats["transmissionCount"]}개")
             appendLine("❌ 오류 발생: ${stats["errorCount"]}회")
-            appendLine("🏥 건강한 세션: ${stats["healthySessions"]}개")
-            appendLine("📱 백그라운드 세션: ${stats["backgroundSessions"]}개")
-            appendLine("📊 데이터 활성 세션: ${stats["dataStreamActiveSessions"]}개")
-            appendLine("⏱️ 평균 지연: ${stats["averageLatency"]}")
-            appendLine("🔧 핑 전략 분포: ${stats["pingStrategies"]}")
+            appendLine("⏱️ 전송 간격: ${stats["transmissionInterval"]}")
+            appendLine("🏗️ 아키텍처: ${stats["architecture"]}")
+            appendLine("🧵 스레드 우선순위: ${stats["threadPriority"]}")
+            appendLine("🎯 역할: ${stats["serviceRole"]}")
+            appendLine("📛 스레드 패턴: ${stats["threadNamingPattern"]}")
 
-            if (activeSessions.isNotEmpty()) {
-                appendLine("\n=== 활성 세션 상세 ===")
-                activeSessions.forEachIndexed { index, session ->
-                    appendLine("${index + 1}. ${session["sessionId"]} - ${session["connectionHealth"]} (${session["networkLatency"]})")
+            // ✅ 활성 스레드 목록
+            val activeThreads = stats["activeThreads"] as List<*>
+            if (activeThreads.isNotEmpty()) {
+                appendLine("\n=== 활성 스레드 목록 ===")
+                activeThreads.forEachIndexed { index, threadName ->
+                    appendLine("${index + 1}. $threadName")
+                }
+            }
+
+            if (sessions.isNotEmpty()) {
+                appendLine("\n=== 실시간 세션 상세 ===")
+                sessions.forEachIndexed { index, session ->
+                    val mps = String.format("%.1f", session["messagesPerSecond"])
+                    val threadName = session["threadName"]
+                    val shortId = session["shortSessionId"]
+                    appendLine("${index + 1}. [$shortId] $threadName - ${session["messagesSent"]}개 (${mps}msg/s)")
                 }
             }
         }
     }
 
     /**
-     * ✅ 비활성 세션 정리
+     * ✅ 실시간 성능 체크 (스레드 건강도 포함)
+     */
+    fun checkRealtimePerformance(): Map<String, Any> {
+        val stats = getRealtimeStats()
+        val sessions = getRealtimeSessions()
+
+        val totalMessages = stats["messagesSent"] as Long
+        val totalErrors = stats["errorCount"] as Long
+        val errorRate = if (totalMessages > 0) {
+            (totalErrors.toDouble() / totalMessages.toDouble()) * 100
+        } else 0.0
+
+        val avgMessagesPerSecond = sessions.map {
+            it["messagesPerSecond"] as Double
+        }.average().takeIf { !it.isNaN() } ?: 0.0
+
+        val expectedMessagesPerSecond = 1000.0 / REALTIME_TRANSMISSION_INTERVAL_MS // 약 33.3 msg/s
+
+        // ✅ 스레드 건강도 체크
+        val healthyExecutors = sessions.count { it["executorHealthy"] as Boolean }
+        val totalExecutors = sessions.size
+        val executorHealthRate = if (totalExecutors > 0) {
+            (healthyExecutors.toDouble() / totalExecutors.toDouble()) * 100
+        } else 100.0
+
+        return mapOf(
+            "errorRate" to String.format("%.2f%%", errorRate),
+            "avgMessagesPerSecond" to String.format("%.1f", avgMessagesPerSecond),
+            "expectedMessagesPerSecond" to String.format("%.1f", expectedMessagesPerSecond),
+            "performanceRatio" to String.format("%.1f%%", (avgMessagesPerSecond / expectedMessagesPerSecond) * 100),
+            "executorHealthRate" to String.format("%.1f%%", executorHealthRate), // ✅ 스레드 건강도
+            "healthyExecutors" to healthyExecutors,
+            "totalExecutors" to totalExecutors,
+            "isPerformanceGood" to (errorRate < 5.0 && avgMessagesPerSecond > (expectedMessagesPerSecond * 0.8) && executorHealthRate > 90.0),
+            "recommendation" to when {
+                executorHealthRate < 90.0 -> "스레드 상태가 불안정합니다. 시스템 리소스를 확인하세요."
+                errorRate > 5.0 -> "오류율이 높습니다. 네트워크 상태를 확인하세요."
+                avgMessagesPerSecond < (expectedMessagesPerSecond * 0.8) -> "전송 성능이 낮습니다. 서버 리소스를 확인하세요."
+                else -> "실시간 성능이 양호합니다."
+            }
+        )
+    }
+
+    /**
+     * ✅ 비활성 세션 정리 (스레드 정보 포함 로깅)
      */
     fun cleanupInactiveSessions(): Int {
         val currentTime = System.currentTimeMillis()
         var cleanedCount = 0
 
         val inactiveSessions = connectedSessions.values.filter { sessionInfo ->
-            !sessionInfo.isActive ||
-                    (currentTime - sessionInfo.lastActivity.get()) > (CLIENT_RESPONSE_TIMEOUT_MS * 2) // 1분 이상 비활성
+            !sessionInfo.isActive.get() ||
+                    !sessionInfo.session.isOpen ||
+                    (currentTime - sessionInfo.lastDataSent.get()) > SESSION_TIMEOUT_MS ||
+                    sessionInfo.executor.isShutdown ||
+                    sessionInfo.executor.isTerminated
         }
 
         inactiveSessions.forEach { sessionInfo ->
-            connectedSessions.remove(sessionInfo.sessionId)
-            cleanedCount++
+            val shortSessionId = sessionInfo.sessionId.take(8)
+            val threadName = sessionInfo.threadName
 
-            val inactiveDuration = currentTime - sessionInfo.lastActivity.get()
-            logger.info("🧹 비활성 세션 정리: {} (비활성 시간: {}ms)", sessionInfo.sessionId, inactiveDuration)
+            logger.info("🧹 비활성 세션 [{}] 스레드 [{}] 정리 중...", shortSessionId, threadName)
+
+            handleDisconnection(sessionInfo.sessionId)
+            cleanedCount++
         }
 
         if (cleanedCount > 0) {
-            logger.info("🧹 총 {}개 비활성 세션 정리 완료", cleanedCount)
+            logger.info("🧹 총 {}개 비활성 실시간 세션 및 스레드 정리 완료", cleanedCount)
         }
 
         return cleanedCount
     }
 
     /**
-     * ✅ 서비스 상태 체크
+     * ✅ 실시간 서비스 상태 체크 (스레드 건강도 포함)
      */
-    /**
-     * ✅ 서비스 상태 체크 (완전 수정 버전)
-     */
-    fun isServiceHealthy(): Boolean {
-        return try {
-            val stats = getConnectionStats()
+    fun isRealtimeServiceHealthy(): Boolean {
+        val stats = getRealtimeStats()
+        val performance = checkRealtimePerformance()
 
-            // 안전한 타입 변환
-            val messagesSentValue = when (val value = stats["messagesSent"]) {
-                is AtomicLong -> value.get()
-                is Long -> value
-                is Number -> value.toLong()
-                else -> 0L
-            }
-
-            val errorCountValue = when (val value = stats["errorCount"]) {
-                is AtomicLong -> value.get()
-                is Long -> value
-                is Number -> value.toLong()
-                else -> 0L
-            }
-
-            val activeConnectionsValue = when (val value = stats["activeConnections"]) {
-                is AtomicInteger -> value.get()
-                is Int -> value
-                is Number -> value.toInt()
-                else -> 0
-            }
-
-            val connectionErrorsValue = when (val value = stats["connectionErrors"]) {
-                is AtomicLong -> value.get()
-                is Long -> value
-                is Number -> value.toLong()
-                else -> 0L
-            }
-
-            // 오류율 계산
-            val errorRate = if (messagesSentValue > 0) {
-                errorCountValue.toDouble() / messagesSentValue.toDouble()
-            } else {
-                0.0
-            }
-
-            // 건강 상태 판단
-            val isHealthy = errorRate < 0.1 && // 오류율 10% 미만
-                    activeConnectionsValue >= 0 && // 활성 연결 존재 (0개도 정상)
-                    connectionErrorsValue < 100 // 연결 오류 100회 미만
-
-            logger.debug("🏥 서비스 건강 상태: {} (오류율: {:.2f}%, 활성연결: {}, 연결오류: {})",
-                if (isHealthy) "건강" else "문제있음", errorRate * 100, activeConnectionsValue, connectionErrorsValue)
-
-            isHealthy
-
-        } catch (e: Exception) {
-            logger.error("❌ 서비스 상태 체크 오류: {}", e.message, e)
-            false // 오류 발생 시 비건강 상태로 간주
-        }
+        return (stats["activeConnections"] as Int) >= 0 &&
+                (performance["isPerformanceGood"] as Boolean)
     }
 
     /**
-     * ✅ 디버그 정보 반환 (완전 수정 버전)
+     * ✅ 스레드 상태 진단
      */
-    fun getDebugInfo(): Map<String, Any> {
-        return try {
+    fun diagnoseThreadHealth(): Map<String, Any> {
+        val sessions = connectedSessions.values.filter { it.isActive.get() }
+
+        val threadDiagnostics = sessions.map { sessionInfo ->
+            val shortSessionId = sessionInfo.sessionId.take(8)
+
             mapOf(
-                "className" to (this::class.simpleName ?: "PushDataController"),
-                "realtimeDataInterval" to "${REALTIME_DATA_INTERVAL_MS}ms",
-                "dataTimeoutThreshold" to "${DATA_TIMEOUT_THRESHOLD_MS}ms",
-                "clientResponseTimeout" to "${CLIENT_RESPONSE_TIMEOUT_MS}ms",
-                "backgroundPingInterval" to "${BACKGROUND_PING_INTERVAL_MS}ms",
-                "heartbeatInterval" to "${HEARTBEAT_INTERVAL_MS}ms",
-                "streamRetryCount" to STREAM_RETRY_COUNT,
-                "backpressureBufferSize" to BACKPRESSURE_BUFFER_SIZE,
-                "serviceHealthy" to isServiceHealthy(),
-                "connectionStats" to getConnectionStats(),
-                "jvmMemory" to mapOf(
-                    "totalMemory" to Runtime.getRuntime().totalMemory(),
-                    "freeMemory" to Runtime.getRuntime().freeMemory(),
-                    "maxMemory" to Runtime.getRuntime().maxMemory(),
-                    "usedMemory" to (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory())
-                ),
-                "systemInfo" to mapOf(
-                    "availableProcessors" to Runtime.getRuntime().availableProcessors(),
-                    "javaVersion" to System.getProperty("java.version"),
-                    "osName" to System.getProperty("os.name"),
-                    "currentTime" to System.currentTimeMillis()
-                )
-            )
-        } catch (e: Exception) {
-            logger.error("❌ 디버그 정보 생성 오류: {}", e.message, e)
-            mapOf(
-                "error" to "디버그 정보 생성 실패",
-                "errorMessage" to (e.message ?: "알 수 없는 오류"),
-                "timestamp" to System.currentTimeMillis()
+                "sessionId" to shortSessionId,
+                "threadName" to sessionInfo.threadName,
+                "isExecutorShutdown" to sessionInfo.executor.isShutdown,
+                "isExecutorTerminated" to sessionInfo.executor.isTerminated,
+                "isSessionOpen" to sessionInfo.session.isOpen,
+                "isActive" to sessionInfo.isActive.get(),
+                "errorCount" to sessionInfo.errorCount.get(),
+                "messagesSent" to sessionInfo.messagesSent.get(),
+                "lastDataSent" to sessionInfo.lastDataSent.get(),
+                "timeSinceLastData" to (System.currentTimeMillis() - sessionInfo.lastDataSent.get()),
+                "healthStatus" to when {
+                    sessionInfo.executor.isShutdown || sessionInfo.executor.isTerminated -> "TERMINATED"
+                    !sessionInfo.session.isOpen -> "DISCONNECTED"
+                    !sessionInfo.isActive.get() -> "INACTIVE"
+                    sessionInfo.errorCount.get() > 10 -> "ERROR_PRONE"
+                    (System.currentTimeMillis() - sessionInfo.lastDataSent.get()) > SESSION_TIMEOUT_MS -> "TIMEOUT"
+                    else -> "HEALTHY"
+                }
             )
         }
+
+        val healthySessions = threadDiagnostics.count { (it["healthStatus"] as String) == "HEALTHY" }
+        val totalSessions = threadDiagnostics.size
+
+        return mapOf(
+            "totalSessions" to totalSessions,
+            "healthySessions" to healthySessions,
+            "healthyPercentage" to if (totalSessions > 0) {
+                String.format("%.1f%%", (healthySessions.toDouble() / totalSessions.toDouble()) * 100)
+            } else "100.0%",
+            "threadDiagnostics" to threadDiagnostics,
+            "overallHealth" to if (totalSessions == 0) "NO_SESSIONS"
+            else if (healthySessions.toDouble() / totalSessions.toDouble() > 0.8) "GOOD"
+            else if (healthySessions.toDouble() / totalSessions.toDouble() > 0.5) "FAIR"
+            else "POOR"
+        )
+    }
+
+    /**
+     * ✅ 아키텍처 정보 (스레드 정보 포함)
+     */
+    fun getArchitectureInfo(): String {
+        return """
+        🏗️ 세션별 전용 스레드 WebSocket Controller 아키텍처
+        
+        📡 역할 분리:
+        ├── PushDataService: 데이터 생성 + 클라이언트 카운트 관리
+        ├── PushDataController: WebSocket 연결 + 실시간 전송
+        └── 목적: 명확한 책임 분리
+        
+        🧵 스레드 관리:
+        ├── 스레드 이름 패턴: websocket-{sessionId8}
+        ├── 스레드 우선순위: NORM_PRIORITY+1 (UDP보다 낮음)
+        ├── 데몬 스레드: true (메인 스레드 종료 시 자동 정리)
+        ├── 예외 처리기: 스레드별 독립적 예외 처리
+        └── 생명주기: 세션과 동일한 생명주기
+        
+        🔄 실시간 전송:
+        ├── 30ms 정확한 주기: ScheduledExecutorService
+        ├── 세션별 전용 스레드: 독립적 처리
+        ├── Reactor 스케줄러: subscribeOn(Schedulers.boundedElastic())
+        └── 자동 오류 복구: 연속 오류 시 세션 정리
+        
+        ⚡ 성능 최적화:
+        1. 스레드 격리: 한 세션 문제가 다른 세션에 영향 없음
+        2. 처리 시간 모니터링: 25ms 이상 시 경고
+        3. 자동 세션 정리: 30초 타임아웃
+        4. 상세한 스레드 진단: 실시간 건강도 체크
+        
+        🎯 장점:
+        - 명확한 책임 분리: Service는 데이터, Controller는 전송
+        - 스레드 격리: 세션별 독립적 처리
+        - 실시간 보장: 30ms 정확한 주기
+        - 확장성: 세션 수에 따른 선형 확장
+        - 안정성: 자동 오류 복구 및 스레드 관리
+        - 모니터링: 상세한 스레드 상태 진단
+        """.trimIndent()
+    }
+
+    @PreDestroy
+    fun cleanup() {
+        logger.info("🏁 실시간 WebSocket Controller 종료 시작...")
+
+        // ✅ 모든 실시간 세션 및 스레드 정리
+        val sessionIds = connectedSessions.keys.toList()
+        logger.info("🧹 총 {}개 세션 정리 예정", sessionIds.size)
+
+        sessionIds.forEach { sessionId ->
+            val sessionInfo = connectedSessions[sessionId]
+            if (sessionInfo != null) {
+                val shortSessionId = sessionId.take(8)
+                val threadName = sessionInfo.threadName
+                logger.info("🔄 세션 [{}] 스레드 [{}] 정리 중...", shortSessionId, threadName)
+            }
+            handleDisconnection(sessionId)
+        }
+
+        val finalStats = getRealtimeStats()
+        val threadDiagnostics = diagnoseThreadHealth()
+
+        logger.info("📊 최종 실시간 통계:")
+        logger.info("  총 연결: {}", finalStats["totalConnections"])
+        logger.info("  총 메시지: {}", finalStats["messagesSent"])
+        logger.info("  총 오류: {}", finalStats["errorCount"])
+        logger.info("  아키텍처: {}", finalStats["architecture"])
+        logger.info("  스레드 건강도: {}", threadDiagnostics["overallHealth"])
+
+        logger.info("✅ 실시간 WebSocket Controller 및 모든 스레드 종료 완료")
     }
 }
