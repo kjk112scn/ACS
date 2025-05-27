@@ -268,7 +268,7 @@ class UdpFwICDService(
      */
     fun timeOffsetCommand(inputTimeOffset: Float) {
         Mono.fromCallable {
-            val localTime = GlobalData.Time.serverTime
+            val localTime = GlobalData.Time.utcNow
             val setDataFrameInstance = ICDService.TimeOffset.SetDataFrame(
                 stx = 0x02,
                 cmdOne = 'O',
@@ -485,16 +485,16 @@ class UdpFwICDService(
      */
     fun defaultInfoCommand(timeOffset: Float, azOffset: Float, elOffset: Float, tiOffset: Float) {
         Mono.fromCallable {
-            val localTime = GlobalData.Time.serverTime
+            val Time = GlobalData.Time.utcNow
             val setDataFrameInstance = ICDService.DefaultInfo.SetDataFrame(
                 cmd = 'W',
-                year = localTime.year.toUShort(),
-                month = localTime.month.value.toByte(),
-                day = localTime.dayOfMonth.toByte(),
-                hour = localTime.hour.toByte(),
-                minute = localTime.minute.toByte(),
-                second = localTime.second.toByte(),
-                ms = (localTime.nano / 1000000).toUShort(),
+                year = Time.year.toUShort(),
+                month = Time.month.value.toByte(),
+                day = Time.dayOfMonth.toByte(),
+                hour = Time.hour.toByte(),
+                minute = Time.minute.toByte(),
+                second = Time.second.toByte(),
+                ms = (Time.nano / 1000000).toUShort(),
                 timeOffset = timeOffset,
                 azimuthOffset = azOffset,
                 elevationOffset = elOffset,

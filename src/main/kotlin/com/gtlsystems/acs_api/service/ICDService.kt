@@ -11,6 +11,7 @@ import com.gtlsystems.acs_api.util.Crc16
 import com.gtlsystems.acs_api.util.JKUtil.JKConvert
 import com.gtlsystems.acs_api.util.JKUtil
 import com.gtlsystems.acs_api.util.JKUtil.JKConvert.Companion.byteToBinaryString
+import org.jetbrains.annotations.Debug
 import org.springframework.stereotype.Service
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -381,6 +382,7 @@ class ICDService {
             fun setDataFrame(): ByteArray {
                 // 위성 추적 정보를 제외한 순수 데이터 프레임 21
                 // 위성 추적 데이터 satelliteTrackData.size에서 데이터 바이트 12를 곱함
+                // 데이터 프레임 배열 사이즈 지정을 위함. 오해하지 말 것.
                 val dataFrame = ByteArray(21 + (satelliteTrackData.size * 12))
 
                 // 바이트 변환 (엔디안 변환 포함)
@@ -418,7 +420,7 @@ class ICDService {
                 // 위성 추적 데이터 추가
                 var i = 18
                 for (data in satelliteTrackData) {
-                    val byteCountArray = JKConvert.floatToByteArray(data.first * 50.00f, false)
+                    val byteCountArray = JKConvert.intToByteArray(data.first, false)
                     val byteAzimuthAngle = JKConvert.floatToByteArray(data.third, false)
                     val byteElevationAngle = JKConvert.floatToByteArray(data.second, false)
 
@@ -538,9 +540,7 @@ class ICDService {
                 // 위성 추적 데이터 추가
                 var i = 5
                 for (data in satelliteTrackData) {
-                    val byteCountArray = JKConvert.intToByteArray(data.first * 25, false)
-                    println("송신 시간 누적치: ${data.first * 25}")
-
+                    val byteCountArray = JKConvert.intToByteArray(data.first, false)
                     val byteAzimuthAngle = JKConvert.floatToByteArray(data.third, false)
                     val byteElevationAngle = JKConvert.floatToByteArray(data.second, false)
 
@@ -604,9 +604,9 @@ class ICDService {
                     if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
                         // 데이터 길이 추출
                         val requestDataLength = JKConvert.byteArrayToUShort(byteArrayOf(data[3], data[4]))
-
+                        println("Main Board의 요청 시간 누적치: $requestDataLength")
                         // 시간 누적치 추출
-                        val timeAcc = JKConvert.uintEndianConvert(data[5], data[6], data[7], data[8])
+                        val timeAcc = JKConvert.uintEndianConvert(data[5], data[6], data[7], data[8],false)
                         println("Main Board의 요청 시간 누적치: $timeAcc")
 
                         return GetDataFrame(

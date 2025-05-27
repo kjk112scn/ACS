@@ -33,6 +33,7 @@ object GlobalData {
         /**
          * 현재 로컬 시간을 출력함.
          * utcNow + addLocalTime을 계산하여 반환
+         * 로컬 타임으로 표시해줌 한국 시간으로 +9시간이 적용되어있음.
          */
         val serverTime: ZonedDateTime
             get() = ZonedDateTime.now(serverTimeZone)

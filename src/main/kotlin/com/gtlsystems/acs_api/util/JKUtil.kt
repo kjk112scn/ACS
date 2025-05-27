@@ -10,6 +10,60 @@ import java.util.BitSet
 class JKUtil {
     class JKConvert {
         companion object {
+            fun uintToByteArray(value: UInt, littleEndian: Boolean = true): ByteArray {
+                return if (littleEndian) {
+                    byteArrayOf(
+                        value.toByte(),
+                        (value shr 8).toByte(),
+                        (value shr 16).toByte(),
+                        (value shr 24).toByte(),
+                        value.toByte()
+                    )
+                } else {
+                    byteArrayOf(
+                        (value shr 24).toByte(),
+                        (value shr 16).toByte(),
+                        (value shr 8).toByte(),
+                        value.toByte()
+                    )
+                }
+            }
+            fun byteArrayToUInt(bytes: ByteArray, littleEndian: Boolean = true): Long {
+                require(bytes.size == 4)
+                val value = if (littleEndian) {
+                    ((bytes[3].toLong() and 0xFF) shl 24) or
+                            ((bytes[2].toLong() and 0xFF) shl 16) or
+                            ((bytes[1].toLong() and 0xFF) shl 8) or
+                            (bytes[0].toLong() and 0xFF)
+                } else {
+                    ((bytes[0].toLong() and 0xFF) shl 24) or
+                            ((bytes[1].toLong() and 0xFF) shl 16) or
+                            ((bytes[2].toLong() and 0xFF) shl 8) or
+                            (bytes[3].toLong() and 0xFF)
+
+                }
+                return value and 0xFFFFFFFFL
+            }
+            /**
+             * 바이트 배열을 INT 변환합니다 (리틀 엔디안 방식)
+             * @param bytes 변환할 바이트 배열 (4바이트 길이)
+             * @return 변환된 INT 값
+             */
+            fun byteArrayToInt(bytes: ByteArray, littleEndian: Boolean = true): Int {
+                require(bytes.size == 4) { "바이트 배열의 크기는 4여야 합니다." }
+                return if (littleEndian) {
+                    ((bytes[3].toInt() and 0xFF) shl 24) or
+                            ((bytes[2].toInt() and 0xFF) shl 16) or
+                            ((bytes[1].toInt() and 0xFF) shl 8) or
+                            (bytes[0].toInt() and 0xFF)
+                } else {
+                    ((bytes[0].toInt() and 0xFF) shl 24) or
+                            ((bytes[1].toInt() and 0xFF) shl 16) or
+                            ((bytes[2].toInt() and 0xFF) shl 8) or
+                            (bytes[3].toInt() and 0xFF)
+
+                }
+            }
             /**
              * 바이트 배열을 UShort로 변환합니다 (리틀 엔디안 방식)
              * @param bytes 변환할 바이트 배열 (2바이트 길이)
@@ -19,7 +73,7 @@ class JKUtil {
                 require(bytes.size >= 2) { "UShort 변환을 위해서는 최소 2바이트가 필요합니다." }
 
                 return ByteBuffer.wrap(bytes)
-                    .order(ByteOrder.LITTLE_ENDIAN)
+                    .order(ByteOrder.BIG_ENDIAN)
                     .short.toUShort()
             }
             /**
@@ -75,20 +129,45 @@ class JKUtil {
                 return buffer.array()
             }
             // JKUtil.JKConvert 클래스에 다음 메서드 추가
-            fun intToByteArray(value: Int, bigEndian: Boolean): ByteArray {
+            fun intToByteArray(value: Int, littleEndian: Boolean): ByteArray {
                 val buffer = ByteBuffer.allocate(4)
-                if (bigEndian) {
-                    buffer.order(ByteOrder.BIG_ENDIAN)
-                } else {
+                if (littleEndian) {
                     buffer.order(ByteOrder.LITTLE_ENDIAN)
+                } else {
+                    buffer.order(ByteOrder.BIG_ENDIAN)
                 }
                 buffer.putInt(value)
                 return buffer.array()
             }
-            fun uintEndianConvert(dataOne: Byte, dataTwo: Byte, dataThree: Byte, dataFour: Byte): UInt {
+            fun uintEndianConvert(
+                dataOne: Byte,
+                dataTwo: Byte,
+                dataThree: Byte,
+                dataFour: Byte,
+                littleEndian: Boolean
+            ): UInt {
                 val arr = byteArrayOf(dataOne, dataTwo, dataThree, dataFour)
-                arr.reverse() // 배열 순서를 뒤집습니다
-                return ByteBuffer.wrap(arr).order(ByteOrder.BIG_ENDIAN).int.toUInt()
+                val buffer = ByteBuffer.wrap(arr)
+                buffer.order(if (littleEndian) ByteOrder.LITTLE_ENDIAN else ByteOrder.BIG_ENDIAN)
+                return buffer.int.toUInt()
+            }
+
+            fun intEndianConvert(
+                dataOne: Byte,
+                dataTwo: Byte,
+                dataThree: Byte,
+                dataFour: Byte,
+                littleEndian: Boolean  = true
+            ): Int {
+                val arr = byteArrayOf(dataOne, dataTwo, dataThree, dataFour)
+                return if (littleEndian) {
+                    // 리틀 엔디안으로 읽기
+                    ByteBuffer.wrap(arr).order(ByteOrder.LITTLE_ENDIAN).int
+                } else {
+                    // 빅 엔디안으로 읽기
+                    ByteBuffer.wrap(arr).order(ByteOrder.BIG_ENDIAN).int
+
+                }
             }
             // Hex 형태로 값 변경
             fun byteArrayToHexString(byteArray: ByteArray): String {

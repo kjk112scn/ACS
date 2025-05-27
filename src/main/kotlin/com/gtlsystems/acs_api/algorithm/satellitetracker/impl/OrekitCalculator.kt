@@ -29,6 +29,7 @@ import java.io.FileOutputStream
 import java.net.JarURLConnection
 import java.nio.file.Files
 import java.time.Duration
+import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -835,8 +836,8 @@ class OrekitCalculator : SatellitePositionCalculator {
                             val startElevation = detailedTrackingData.firstOrNull()?.elevation ?: 0.0
                             val endAzimuth = detailedTrackingData.lastOrNull()?.azimuth ?: 0.0
                             val endElevation = detailedTrackingData.lastOrNull()?.elevation ?: 0.0
-                            val startTime = period.startTime.withZoneSameInstant(GlobalData.Time.serverTimeZone)
-                            val endTime = period.endTime.withZoneSameInstant(GlobalData.Time.serverTimeZone)
+                            val startTime = period.startTime.withZoneSameInstant(ZoneOffset.UTC)
+                            val endTime = period.endTime.withZoneSameInstant(ZoneOffset.UTC)
                             SatelliteTrackingPass(
                                 startTime = startTime,
                                 endTime = endTime,
@@ -873,8 +874,8 @@ class OrekitCalculator : SatellitePositionCalculator {
                     val startElevation = detailedTrackingData.firstOrNull()?.elevation ?: 0.0
                     val endAzimuth = detailedTrackingData.lastOrNull()?.azimuth ?: 0.0
                     val endElevation = detailedTrackingData.lastOrNull()?.elevation ?: 0.0
-                    val startTime = period.startTime.withZoneSameInstant(GlobalData.Time.serverTimeZone)
-                    val endTime = period.endTime.withZoneSameInstant(GlobalData.Time.serverTimeZone)
+                    val startTime = period.startTime.withZoneSameInstant(ZoneOffset.UTC)
+                    val endTime = period.endTime.withZoneSameInstant(ZoneOffset.UTC)
                     SatelliteTrackingPass(
                         startTime = startTime,
                         endTime = endTime,
