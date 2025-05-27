@@ -126,12 +126,16 @@
 
                     <div class="info-row">
                       <span class="info-label">시작 시간:</span>
-                      <span class="info-value">{{ formatToLocalTime(selectedScheduleInfo.startTime) }}</span>
+                      <span class="info-value">{{
+                        formatToLocalTime(selectedScheduleInfo.startTime)
+                      }}</span>
                     </div>
 
                     <div class="info-row">
                       <span class="info-label">종료 시간:</span>
-                      <span class="info-value">{{ formatToLocalTime(selectedScheduleInfo.endTime) }}</span>
+                      <span class="info-value">{{
+                        formatToLocalTime(selectedScheduleInfo.endTime)
+                      }}</span>
                     </div>
 
                     <div class="info-row">
@@ -338,6 +342,7 @@ import { useICDStore } from '../../stores/API/icdStore'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 import { ephemerisTrackService } from '../../services/ephemerisTrackService' // 서비스 임포트
+import { formatToLocalTime, formatTimeRemaining, getCalTimeTimestamp } from '../../utils/times'
 
 // ECharts 데이터 포인트 타입 정의
 interface EChartsScatterParam {
@@ -433,8 +438,22 @@ const scheduleColumns: QTableColumn[] = [
     sortable: true,
     format: (val, row) => val || row.SatelliteID || '이름 없음', // 위성 이름이 없으면 Satellite ID 표시, 둘 다 없으면 '이름 없음' 표시
   },
-  { name: 'StartTime', label: '시작 시간', field: 'StartTime', align: 'left', sortable: true },
-  { name: 'EndTime', label: '종료 시간', field: 'EndTime', align: 'left', sortable: true },
+  {
+    name: 'StartTime',
+    label: '시작 시간',
+    field: 'StartTime',
+    align: 'left',
+    sortable: true,
+    format: (val) => formatToLocalTime(val),
+  },
+  {
+    name: 'EndTime',
+    label: '종료 시간',
+    field: 'EndTime',
+    align: 'left',
+    sortable: true,
+    format: (val) => formatToLocalTime(val),
+  },
   { name: 'Duration', label: '지속 시간', field: 'Duration', align: 'left', sortable: true },
   {
     name: 'MaxElevation',
@@ -452,6 +471,7 @@ const outputs = ref<string[]>(['0.00', '0.00', '0.00', '0.00'])
 
 // Quasar 인스턴스 가져오기
 import { useQuasar } from 'quasar'
+
 const $q = useQuasar()
 
 // 선택된 스케줄 정보를 저장할 상태 추가
@@ -733,72 +753,13 @@ const updateChartWithTrajectory = (data: TrajectoryPoint[]) => {
   } catch (error) {
     console.error('차트 옵션 업데이트 중 오류 발생:', error)
   }
-}
-const getCalTimeTimestamp = () => {
-  const calTime = icdStore.resultTimeOffsetCalTime
-  if (!calTime) return Date.now()
-
-  try {
-    // Cal Time이 시간만 있는 경우 (예: "13:00:00.000")
-    if (calTime.includes(':') && !calTime.includes('T') && !calTime.includes('-')) {
-      // 오늘 날짜와 결합하여 UTC 기준으로 생성 (9시간 추가 없이)
-      const today = new Date()
-      const year = today.getUTCFullYear()
-      const month = String(today.getUTCMonth() + 1).padStart(2, '0')
-      const day = String(today.getUTCDate()).padStart(2, '0')
-
-      // ✅ UTC 기준으로 그대로 생성 (9시간 추가 안함)
-      const fullDateTime = `${year}-${month}-${day}T${calTime}Z`
-      const dateObj = new Date(fullDateTime)
-
-      if (isNaN(dateObj.getTime())) {
-        console.warn('Cal Time 파싱 실패:', fullDateTime)
-        return Date.now()
-      }
-
-      // ✅ UTC 타임스탬프 그대로 반환 (9시간 추가 없이)
-      return dateObj.getTime()
-    } else {
-      // 완전한 날짜 문자열인 경우
-      const dateObj = new Date(calTime)
-      if (isNaN(dateObj.getTime())) {
-        console.warn('유효하지 않은 Cal Time:', calTime)
-        return Date.now()
-      }
-      // ✅ 원본 타임스탬프 그대로 반환
-      return dateObj.getTime()
-    }
-  } catch (e) {
-    console.error('Cal Time 변환 오류:', e)
-    return Date.now()
-  }
-}
-
-// ✅ 시간 포맷팅 함수 - 남은 시간 표시
-const formatTimeRemaining = (milliseconds: number): string => {
-  const absMs = Math.abs(milliseconds)
-  const seconds = Math.floor((absMs / 1000) % 60)
-  const minutes = Math.floor((absMs / (1000 * 60)) % 60)
-  const hours = Math.floor(absMs / (1000 * 60 * 60))
-
-  const formattedTime = [
-    hours.toString().padStart(2, '0'),
-    minutes.toString().padStart(2, '0'),
-    seconds.toString().padStart(2, '0'),
-  ].join(':')
-
-  if (milliseconds <= 0) {
-    return `진행 중 (+${formattedTime})`
-  }
-  return `${formattedTime} 후 시작`
-}
-
-// ✅ 개선된 시간 계산 함수
+} 
+// ✅ 개선된 시간 계산 함수 수정
 const updateTimeRemaining = () => {
   if (selectedScheduleInfo.value.startTimeMs > 0) {
     try {
-      // Cal Time을 KST 타임스탬프로 변환
-      const currentCalTime = getCalTimeTimestamp()
+      // times.ts의 함수 사용
+      const currentCalTime = getCalTimeTimestamp(icdStore.resultTimeOffsetCalTime)
 
       // 스케줄 시작 시간을 Date 객체로 변환 (KST)
       const scheduleStartTime = new Date(selectedScheduleInfo.value.startTime)
@@ -854,25 +815,6 @@ const loadScheduleData = async () => {
     loadingSchedule.value = false
   }
 }
-// ✅ 로컬 타임으로 포맷팅하는 함수
-const formatToLocalTime = (dateString: string): string => {
-  try {
-    const date = new Date(dateString)
-
-    // 로컬 시간대 기준으로 포맷팅
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    const hours = String(date.getHours()).padStart(2, '0')
-    const minutes = String(date.getMinutes()).padStart(2, '0')
-    const seconds = String(date.getSeconds()).padStart(2, '0')
-
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
-  } catch (error) {
-    console.error('로컬 시간 포맷팅 오류:', error)
-    return dateString // 오류 시 원본 반환
-  }
-}
 // 스케줄 선택 함수 수정
 const selectSchedule = async () => {
   if (selectedSchedule.value.length === 0) return
@@ -891,8 +833,8 @@ const selectSchedule = async () => {
       passId: selectedItem.No,
       satelliteName: selectedItem.SatelliteName || selectedItem.SatelliteID || '알 수 없음',
       satelliteId: selectedItem.SatelliteID || 'N/A',
-      startTime: formatToLocalTime(selectedItem.StartTime),
-      endTime: formatToLocalTime(selectedItem.EndTime),
+      startTime: selectedItem.StartTime,
+      endTime: selectedItem.EndTime,
       duration: selectedItem.Duration,
       maxElevation: typeof selectedItem.MaxElevation === 'number' ? selectedItem.MaxElevation : 0,
       startTimeMs: new Date(selectedItem.StartTime).getTime(),
@@ -958,7 +900,7 @@ const selectSchedule = async () => {
     // 1초마다 남은 시간 업데이트
     timeUpdateTimer = window.setInterval(() => {
       updateTimeRemaining()
-    }, 1000)
+    }, 200)
 
     // 모달 닫기
     showScheduleModal.value = false

@@ -228,6 +228,7 @@ import { useICDStore } from '../stores/API/icdStore'
 import { useRouter, useRoute } from 'vue-router'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
+import { formatToLocalTimeWithMs } from '../utils/times'
 
 const icdStore = useICDStore()
 const router = useRouter()
@@ -249,32 +250,13 @@ let uiUpdateTimer: number | null = null
 const uiUpdateCount = ref(0)
 
 // ✅ 서버 시간 표시용 computed 속성 (icdStore에서 직접)
+
 const displayServerTime = computed(() => {
   if (!icdStore.serverTime) {
     return '서버 시간 대기 중...'
   }
 
-  try {
-    const serverTime = new Date(icdStore.serverTime)
-    //console.log('서버 시간:', icdStore.serverTime)
-    if (isNaN(serverTime.getTime())) {
-      return `원시 데이터: ${icdStore.serverTime}`
-    }
-
-    const year = serverTime.getFullYear()
-    const month = String(serverTime.getMonth() + 1).padStart(2, '0')
-    const day = String(serverTime.getDate()).padStart(2, '0')
-    const hours = String(serverTime.getHours()).padStart(2, '0')
-    const minutes = String(serverTime.getMinutes()).padStart(2, '0')
-    const seconds = String(serverTime.getSeconds()).padStart(2, '0')
-    const milliseconds = String(serverTime.getMilliseconds()).padStart(3, '0')
-
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`
-  } catch (error) {
-    console.error('서버 시간 파싱 오류:', error)
-
-    return `파싱 오류: ${icdStore.serverTime}`
-  }
+  return formatToLocalTimeWithMs(icdStore.serverTime)
 })
 
 // ✅ 값 표시 헬퍼 함수
