@@ -1,5 +1,4 @@
 import { api } from 'boot/axios'
-import { API_ENDPOINTS } from '../config/apiEndpoints'
 
 // 타입 정의를 직접 선언하여 충돌 방지
 export interface ScheduleItem {
@@ -150,13 +149,55 @@ class EphemerisTrackService {
         throw new Error('TLE 데이터가 유효하지 않습니다')
       }
 
-      const response = await api.post(API_ENDPOINTS.EPHEMERIS.GENERATE, request)
+      const response = await api.post('/ephemeris/generate', request)
       return response.data
     } catch (error) {
       return this.handleApiError(error, '위성 궤도 추적 데이터 생성에 실패했습니다')
     }
   }
 
+  /**
+   * Ephemeris PassID 입력 명령령
+   * @param passId 위성 추적 대상 No
+   */
+  async setCurrentTrackingPassId(passId: number) {
+    if (typeof passId !== 'number' || isNaN(passId)) {
+      throw new Error('유효하지 않은 passId 값입니다.')
+    }
+
+    try {
+      const response = await api.post('/ephemeris/set-current-tracking-pass-id', null, {
+        params: {
+          passId: passId,
+        },
+      })
+      return response.data
+    } catch (error) {
+      this.handleApiError(error, '위성 추적 대상 No 설정 명령 전송에 실패했습니다.')
+    }
+  }
+  /**
+   * Ephemeris 시간 오프셋 명령 전송
+   * @param timeOffset 시간 오프셋
+   */
+  async sendTimeOffsetCommand(timeOffset: number) {
+    console.log('Service - 받은 timeOffset:', timeOffset, typeof timeOffset)
+
+    if (typeof timeOffset !== 'number' || isNaN(timeOffset)) {
+      throw new Error('유효하지 않은 timeOffset 값입니다.')
+    }
+
+    try {
+      const response = await api.post('/ephemeris/time-offset-command', null, {
+        params: {
+          inputTimeOffset: timeOffset,
+        },
+      })
+      return response.data
+    } catch (error) {
+      this.handleApiError(error, '시간 오프셋 명령 전송에 실패했습니다.')
+    }
+  }
   /**
    * Ephemeris Designation 명령을 전송합니다.
    * @param command - 방위각, 고도각, 틸트각을 포함한 명령 객체
@@ -215,7 +256,7 @@ class EphemerisTrackService {
    */
   async fetchEphemerisMasterData(): Promise<ScheduleItem[]> {
     try {
-      const response = await api.get('/satellite/ephemeris/master')
+      const response = await api.get('/ephemeris/master')
 
       // 개발자 도구 콘솔에 응답 데이터 출력
       console.log('[fetchEphemerisMasterData] 응답 데이터:', response)
@@ -249,7 +290,7 @@ class EphemerisTrackService {
    */
   async fetchEphemerisDetailData(mstId: number): Promise<ScheduleDetailItem[]> {
     try {
-      const response = await api.get<ScheduleDetailItem[]>(`/satellite/ephemeris/detail/${mstId}`)
+      const response = await api.get<ScheduleDetailItem[]>(`/ephemeris/detail/${mstId}`)
       return response.data || []
     } catch (error) {
       return this.handleApiError(error, '세부 데이터 조회에 실패했습니다') as Promise<
@@ -266,7 +307,7 @@ class EphemerisTrackService {
    */
   async deleteEphemerisData(mstId: number): Promise<boolean> {
     try {
-      await api.delete(`/satellite/ephemeris/${mstId}`)
+      await api.delete(`/ephemeris/${mstId}`)
       return true
     } catch (error) {
       return this.handleApiError(error, '데이터 삭제에 실패했습니다') as Promise<boolean>
@@ -281,7 +322,7 @@ class EphemerisTrackService {
    */
   async startEphemerisTracking(passId: number): Promise<unknown> {
     try {
-      const response = await api.post(`/satellite/ephemeris/start/${passId}`)
+      const response = await api.post(`/ephemeris/start/${passId}`)
       return response.data
     } catch (error) {
       return this.handleApiError(error, '위성 추적 시작에 실패했습니다')

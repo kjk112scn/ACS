@@ -753,7 +753,7 @@ const updateChartWithTrajectory = (data: TrajectoryPoint[]) => {
   } catch (error) {
     console.error('차트 옵션 업데이트 중 오류 발생:', error)
   }
-} 
+}
 // ✅ 개선된 시간 계산 함수 수정
 const updateTimeRemaining = () => {
   if (selectedScheduleInfo.value.startTimeMs > 0) {
@@ -826,6 +826,7 @@ const selectSchedule = async () => {
     }
 
     const selectedItem = selectedSchedule.value[0]
+
     console.log('선택된 스케줄:', selectedItem)
 
     // 선택한 스케줄 정보 저장
@@ -848,6 +849,7 @@ const selectSchedule = async () => {
 
     // 선택한 스케줄의 세부 데이터 로드 - ephemerisTrackService.ts:249-259 사용
     console.log('세부 데이터 로드 시작:', selectedItem.No)
+    await ephemerisTrackService.setCurrentTrackingPassId(selectedItem.No)
     const detailData = await ephemerisTrackService.fetchEphemerisDetailData(selectedItem.No)
     console.log('로드된 세부 데이터:', detailData)
 
@@ -1037,12 +1039,6 @@ const calculateTLE = async () => {
     // 비동기 작업을 시뮬레이션하기 위한 Promise 추가 (ESLint 에러 해결)
     await Promise.resolve()
 
-    // API 호출 대신 임시 값 설정 (실제 계산 로직이 구현될 때까지)
-    // 여기서는 임의의 값을 설정하거나 기본값을 유지할 수 있습니다
-    ephemerisData.value.azimuth = 45 // 임의의 방위각 값
-    ephemerisData.value.elevation = 30 // 임의의 고도각 값
-    ephemerisData.value.tilt = 0 // 임의의 틸트각 값
-
     console.log('TLE 유효성 검증 성공:', {
       line1,
       line2,
@@ -1180,7 +1176,7 @@ const updateOffset = async (index: number, value: string) => {
 
     // For time offset (index 3), call the time offset command
     if (index === 3) {
-      await icdStore.sendTimeOffsetCommand(numValue)
+      await ephemerisTrackService.sendTimeOffsetCommand(numValue)
       return
     }
 

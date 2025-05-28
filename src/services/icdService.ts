@@ -1,5 +1,4 @@
 import { api } from 'boot/axios'
-import { API_ENDPOINTS } from '../config/apiEndpoints'
 
 export interface MessageData {
   [key: string]: unknown
@@ -322,7 +321,7 @@ export const icdService = {
    */
   async sendEmergency(commandType: 'E' | 'S' = 'E') {
     try {
-      const response = await api.post(API_ENDPOINTS.ICD.EMERGENCY_STOP, null, {
+      const response = await api.post("/icd/on-emergency-stop-command", null, {
         params: {
           commandType,
         },
@@ -334,7 +333,21 @@ export const icdService = {
       throw error
     }
   },
+  /**
+   * 비상 정지 명령 전송
+   * @param commandType 'E' 또는 'S' 값
+   */
+  async sendWriteNTP() {
+    try {
+      const response = await api.post('/icd/write-ntp-command')
 
+      console.log('sendWriteNTP 명령 전송 성공:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('sendWriteNTP 명령 전송 실패:', error)
+      throw error
+    }
+  },
   /**
    * Sun Track 시작 명령 전송
    * @param interval 간격
@@ -349,7 +362,7 @@ export const icdService = {
     tiltSpeed: number,
   ) {
     try {
-      const response = await api.post(API_ENDPOINTS.SUN_TRACK.START, null, {
+      const response = await api.post('/sun-track/start-sun-track', null, {
         params: {
           interval,
           cmdAzimuthSpeed: azimuthSpeed,

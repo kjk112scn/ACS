@@ -272,40 +272,6 @@ export const useICDStore = defineStore('icd', () => {
     }
   }
 
-  // 명령 전송 메서드들
-  const sendEmergency = async (commandType: 'E' | 'S' = 'E') => {
-    try {
-      error.value = ''
-      return await icdService.sendEmergency(commandType)
-    } catch (e) {
-      const errorMessage = e instanceof Error ? e.message : '알 수 없는 오류가 발생했습니다.'
-      error.value = `비상 정지 명령 실패: ${errorMessage}`
-      throw e
-    }
-  }
-
-  const sendMultiControlCommand = async (command: MultiControlCommand) => {
-    try {
-      error.value = ''
-      const result = await icdService.sendMultiControlCommand(command)
-      lastMultiControlCommandStatus.value = {
-        message: '명령이 성공적으로 전송되었습니다.',
-        success: true,
-        timestamp: Date.now(),
-      }
-      return result
-    } catch (e) {
-      const errorMessage = e instanceof Error ? e.message : '알 수 없는 오류가 발생했습니다.'
-      lastMultiControlCommandStatus.value = {
-        message: `명령 전송 실패: ${errorMessage}`,
-        success: false,
-        timestamp: Date.now(),
-      }
-      error.value = `명령 전송 실패: ${errorMessage}`
-      throw e
-    }
-  }
-
   // 초기화
   const initialize = async () => {
     try {
@@ -327,6 +293,41 @@ export const useICDStore = defineStore('icd', () => {
   const cleanup = () => {
     stopUIUpdates()
     disconnectWebSocket()
+  }
+
+  // 명령 전송 메서드들
+  const sendEmergency = async (commandType: 'E' | 'S' = 'E') => {
+    try {
+      error.value = ''
+      return await icdService.sendEmergency(commandType)
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : '알 수 없는 오류가 발생했습니다.'
+      error.value = `비상 정지 명령 실패: ${errorMessage}`
+      throw e
+    }
+  }
+
+  // 멀티 컨트롤 명령 전송
+  const sendMultiControlCommand = async (command: MultiControlCommand) => {
+    try {
+      error.value = ''
+      const result = await icdService.sendMultiControlCommand(command)
+      lastMultiControlCommandStatus.value = {
+        message: '명령이 성공적으로 전송되었습니다.',
+        success: true,
+        timestamp: Date.now(),
+      }
+      return result
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : '알 수 없는 오류가 발생했습니다.'
+      lastMultiControlCommandStatus.value = {
+        message: `명령 전송 실패: ${errorMessage}`,
+        success: false,
+        timestamp: Date.now(),
+      }
+      error.value = `명령 전송 실패: ${errorMessage}`
+      throw e
+    }
   }
 
   // 서보 프리셋 명령 전송
@@ -410,6 +411,16 @@ export const useICDStore = defineStore('icd', () => {
       return { success: false, error: String(error), message: 'Sun Track 시작에 실패했습니다.' }
     }
   }
+  // Sun Track 중지지
+  /* const stopSunTrack = async () => {
+    try {
+      const response = await icdService.stopSunTrack()
+      return { success: true, data: response, message: 'Sun Track이 중지지되었습니다.' }
+    } catch (error) {
+      console.error('Sun Track 시작 실패:', error)
+      return { success: false, error: String(error), message: 'Sun Track 중지지에 실패했습니다.' }
+    }
+  } */
 
   // 위치 오프셋 명령 전송
   const sendPositionOffsetCommand = async (
