@@ -1,5 +1,6 @@
 package com.gtlsystems.acs_api.controller
 
+import com.gtlsystems.acs_api.model.GlobalData
 import com.gtlsystems.acs_api.service.UdpFwICDService
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
@@ -268,28 +269,44 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
 
     @PostMapping("/default-info-command")
     fun defaultInfoCommand(
-        @RequestParam timeOffset: Float,
-        @RequestParam azOffset: Float,
-        @RequestParam elOffset: Float,
-        @RequestParam tiOffset: Float
     ): ResponseEntity<Map<String, String>> {
         return try {
-            udpFwICDService.defaultInfoCommand(timeOffset, azOffset, elOffset, tiOffset)
-
+            udpFwICDService.defaultInfoCommand()
             logger.info("DefaultInfo 명령 요청 완료")
 
             ResponseEntity.ok(mapOf(
                 "status" to "success",
                 "message" to "DefaultInfo 명령이 성공적으로 전송되었습니다",
                 "command" to "DefaultInfo",
-                "timeOffset" to timeOffset.toString(),
-                "offsets" to "Az:${azOffset}°, El:${elOffset}°, Ti:${tiOffset}°"
+                "timeOffset" to GlobalData.Offset.TimeOffset.toString(),
+                "offsets" to "Az:${GlobalData.Offset.azimuthPositionOffset}°, El:${GlobalData.Offset.elevationPositionOffset}°, Ti:${GlobalData.Offset.tiltPositionOffset}°"
             ))
         } catch (e: Exception) {
             logger.error("DefaultInfo 명령 요청 실패: {}", e.message, e)
             ResponseEntity.internalServerError().body(mapOf(
                 "status" to "error",
                 "message" to "DefaultInfo 명령 전송 실패: ${e.message}"
+            ))
+        }
+    }
+    @PostMapping("/write-ntp-command")
+    fun writeNtpCommand(
+    ): ResponseEntity<Map<String, String>> {
+        return try {
+            udpFwICDService.writeNTPCommand()
+            logger.info("writeNTPCommand 명령 요청 완료")
+
+            ResponseEntity.ok(mapOf(
+                "status" to "success",
+                "message" to "writeNTPCommand 명령이 성공적으로 전송되었습니다",
+                "command" to "writeNTPCommand",
+                "timeOffset" to GlobalData.Offset.TimeOffset.toString(),
+            ))
+        } catch (e: Exception) {
+            logger.error("writeNTPCommand 명령 요청 실패: {}", e.message, e)
+            ResponseEntity.internalServerError().body(mapOf(
+                "status" to "error",
+                "message" to "writeNTPCommand 명령 전송 실패: ${e.message}"
             ))
         }
     }

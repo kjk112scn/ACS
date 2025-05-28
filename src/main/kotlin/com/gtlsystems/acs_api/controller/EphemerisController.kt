@@ -2,19 +2,54 @@ package com.gtlsystems.acs_api.controller
 
 import com.gtlsystems.acs_api.algorithm.satellitetracker.impl.OrekitCalculator
 import com.gtlsystems.acs_api.algorithm.satellitetracker.model.SatelliteTrackData
-import com.gtlsystems.acs_api.service.SatelliteTrackService
+import com.gtlsystems.acs_api.service.EphemerisService
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import reactor.core.publisher.Mono
 import java.time.ZonedDateTime
 
 @RestController
-@RequestMapping("/api/satellite")
+@RequestMapping("/api/ephemeris")
 @CrossOrigin(origins = ["http://localhost:9000"])
-class SatelliteTrackerController(
+class EphemerisController(
     private val orekitCalculator: OrekitCalculator,
-    private val satelliteTrackService: SatelliteTrackService
-) {
-
+    private val ephemerisService: EphemerisService
+)
+{
+    @PostMapping("/set-current-tracking-pass-id")
+    fun setCurrentTrackingPassId(@RequestParam passId: UInt?): ResponseEntity<Map<String, String>> {
+        return try {
+            ephemerisService.setCurrentTrackingPassId(passId)
+            ResponseEntity.ok(mapOf(
+                "status" to "success",
+                "message" to "setCurrentTrackingPassId 명령이 성공적으로 전송되었습니다",
+                "command" to "setCurrentTrackingPassId",
+                "passId" to passId.toString()
+            ))
+        } catch (e: Exception) {
+            ResponseEntity.internalServerError().body(mapOf(
+                "status" to "error",
+                "message" to "setCurrentTrackingPassId 명령 전송 실패: ${e.message}"
+            ))
+        }
+    }
+    @PostMapping("/time-offset-command")
+    fun timeOffsetCommand(@RequestParam inputTimeOffset: Float): ResponseEntity<Map<String, String>> {
+        return try {
+            ephemerisService.ephemerisTimeOffsetCommand(inputTimeOffset)
+            ResponseEntity.ok(mapOf(
+                "status" to "success",
+                "message" to "TimeOffset 명령이 성공적으로 전송되었습니다",
+                "command" to "TimeOffset",
+                "timeOffset" to inputTimeOffset.toString()
+            ))
+        } catch (e: Exception) {
+            ResponseEntity.internalServerError().body(mapOf(
+                "status" to "error",
+                "message" to "TimeOffset 명령 전송 실패: ${e.message}"
+            ))
+        }
+    }
     /**
      * 현재 시간의 위성 위치를 계산합니다.
      */
@@ -69,10 +104,10 @@ class SatelliteTrackerController(
     /**
      * TLE 데이터로 위성 궤도 추적 데이터를 생성합니다.
      */
-    @PostMapping("/ephemeris/generate")
+    @PostMapping("/generate")
     fun generateEphemerisTrack(@RequestBody request: EphemerisTrackRequest): Mono<Map<String, Any>> {
         return Mono.fromCallable {
-            val (mstData, dtlData) = satelliteTrackService.generateEphemerisDesignationTrack(
+            val (mstData, dtlData) = ephemerisService.generateEphemerisDesignationTrack(
                 request.tleLine1,
                 request.tleLine2,
                 request.satelliteName
@@ -89,33 +124,33 @@ class SatelliteTrackerController(
     /**
      * 모든 위성 추적 마스터 데이터를 조회합니다.
      */
-    @GetMapping("/ephemeris/master")
+    @GetMapping("/master")
     fun getAllEphemerisTrackMst(): Mono<List<Map<String, Any?>>> {
         return Mono.fromCallable {
-            satelliteTrackService.getAllEphemerisTrackMst()
+            ephemerisService.getAllEphemerisTrackMst()
         }
     }
 
     /**
      * 특정 마스터 ID에 해당하는 세부 추적 데이터를 조회합니다.
      */
-    @GetMapping("/ephemeris/detail/{mstId}")
-    fun getEphemerisTrackDtlByMstId(@PathVariable mstId: Int): Mono<List<Map<String, Any?>>> {
+    @GetMapping("/detail/{mstId}")
+    fun getEphemerisTrackDtlByMstId(@PathVariable mstId: UInt): Mono<List<Map<String, Any?>>> {
         return Mono.fromCallable {
-            satelliteTrackService.getEphemerisTrackDtlByMstId(mstId)
+            ephemerisService.getEphemerisTrackDtlByMstId(mstId)
         }
     }
     /**
      * 위성 추적을 시작합니다.
      * 헤더 정보 전송 및 초기 추적 데이터 전송을 수행합니다.
      */
-    @PostMapping("/ephemeris/start/{passId}")
-    fun startEphemerisTracking(@PathVariable passId: Int): Mono<Map<String, Any>> {
+    @PostMapping("/start/{passId}")
+    fun startEphemerisTracking(@PathVariable passId: UInt): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             // 위성 추적 시작 (헤더 정보 전송)
-            satelliteTrackService.startSatelliteTracking(passId)
+            ephemerisService.startEphemerisTracking(passId)
             // 초기 추적 데이터 전송
-            satelliteTrackService.sendInitialTrackingData(passId)
+            ephemerisService.sendInitialTrackingData(passId)
 
             mapOf(
                 "message" to "위성 추적이 시작되었습니다.",
@@ -131,7 +166,7 @@ class SatelliteTrackerController(
     @PostMapping("/tracking/stop")
     fun stopEphemerisTracking(): Mono<Map<String, Any>> {
         return Mono.fromCallable {
-            satelliteTrackService.stopEphemerisTracking()
+            ephemerisService.stopEphemerisTracking()
 
             mapOf(
                 "message" to "위성 추적이 중지되었습니다.",
@@ -146,8 +181,8 @@ class SatelliteTrackerController(
     @GetMapping("/tracking/status")
     fun getTrackingStatus(): Mono<Map<String, Any>> {
         return Mono.fromCallable {
-            val isTracking = satelliteTrackService.isTracking()
-            val currentPass = satelliteTrackService.getCurrentTrackingPass()
+            val isTracking = ephemerisService.isTracking()
+            val currentPass = ephemerisService.getCurrentTrackingPass()
 
             if (isTracking && currentPass != null) {
                 mapOf(

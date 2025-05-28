@@ -120,7 +120,10 @@ class ICDService {
                 }
                 //2.5 Write NTP Info
                 else if (receiveData[1] == 'I'.code.toByte()) {
-
+                    val parsedData = WriteNTP.GetDataFrame.fromByteArray(receiveData)
+                    parsedData?.let {
+                        println("파싱된 ICD 데이터: $it")
+                    }
                 }
                 //2.6 ACU S/W Emergency Command
                 else if (receiveData[1] == 'E'.code.toByte()) {
@@ -375,7 +378,7 @@ class ICDService {
             var ntpSecond: Byte,
             var ntpMs: UShort,
             var timeOffset: Int,
-            var satelliteTrackData: List<Triple<Int, Float, Float>>, // Triple<count, elevationAngle, azimuthAngle>
+            var satelliteTrackData: List<Triple<UInt, Float, Float>>, // Triple<count, elevationAngle, azimuthAngle>
             var crc16: UShort = 0u,
             var etx: Byte = ICD_ETX
         ) {
@@ -420,7 +423,7 @@ class ICDService {
                 // 위성 추적 데이터 추가
                 var i = 18
                 for (data in satelliteTrackData) {
-                    val byteCountArray = JKConvert.intToByteArray(data.first, false)
+                    val byteCountArray = JKConvert.uintToByteArray(data.first, false)
                     val byteAzimuthAngle = JKConvert.floatToByteArray(data.third, false)
                     val byteElevationAngle = JKConvert.floatToByteArray(data.second, false)
 
@@ -627,7 +630,125 @@ class ICDService {
         }
     }
 
+    /**
+     * 2.5 Write NTP Info
+     * NTP 정보를 송신하기 위한 프로토콜이다.
+     * 주요 정보: NTP 시간 정보, Time Offset
+     * 설명: ACU S/W에서 ACU F/W로 NTP 시간 정보를 전송한다.
+     */
+    class WriteNTP {
+        data class SetDataFrame(
+            var stx: Byte = ICD_STX,
+            var cmd: Char,
+            var year: UShort,
+            var month: Byte,
+            var day: Byte,
+            var hour: Byte,
+            var minute: Byte,
+            var second: Byte,
+            var ms: UShort,
+            var timeOffset: Float,
+            var crc16: UShort = 0u,
+            var etx: Byte = ICD_ETX
+        ) {
+            fun setDataFrame(): ByteArray {
+                val dataFrame = ByteArray(18)
 
+                // 바이트 변환 (엔디안 변환 포함)
+                val byteYear = JKConvert.ushortToByteArray(year, false)
+                val byteMs = JKConvert.ushortToByteArray(ms, false)
+                val byteTimeOffset = JKConvert.floatToByteArray(timeOffset, false)
+
+                // CRC 대상 복사를 위한 배열
+                val byteCrc16Target = ByteArray(dataFrame.size - 4)
+
+                dataFrame[0] = ICD_STX
+                dataFrame[1] = cmd.code.toByte()
+                dataFrame[2] = byteYear[0]
+                dataFrame[3] = byteYear[1]
+                dataFrame[4] = month
+                dataFrame[5] = day
+                dataFrame[6] = hour
+                dataFrame[7] = minute
+                dataFrame[8] = second
+
+                // ms
+                dataFrame[9] = byteMs[0]
+                dataFrame[10] = byteMs[1]
+
+                // Time_Offset
+                dataFrame[11] = byteTimeOffset[0]
+                dataFrame[12] = byteTimeOffset[1]
+                dataFrame[13] = byteTimeOffset[2]
+                dataFrame[14] = byteTimeOffset[3]
+
+                // CRC 대상 복사
+                dataFrame.copyInto(byteCrc16Target, 0, 1, 1 + byteCrc16Target.size)
+
+                // CRC16 계산 및 엔디안 변환
+                val crc16s = Crc16.computeCrc(byteCrc16Target)
+                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+
+                // CRC16 값 설정
+                dataFrame[15] = crc16Buffer[0]
+                dataFrame[16] = crc16Buffer[1]
+                dataFrame[17] = ICD_ETX
+
+                return dataFrame
+            }
+        }
+
+        data class GetDataFrame(
+            var stx: Byte = ICD_STX,
+            var cmdOne: Byte = 0x00,
+            var year: UShort = 0u,
+            var month: Byte = 0,
+            var day: Byte = 0,
+            var hour: Byte = 0,
+            var minute: Byte = 0,
+            var sec: Byte = 0,
+            var ms: UShort = 0u,
+            var checkSum: UShort = 0u,
+            var etx: Byte = ICD_ETX
+        ) {
+            companion object {
+                const val FRAME_LENGTH = 14
+
+                fun fromByteArray(data: ByteArray): GetDataFrame? {
+                    if (data.size < FRAME_LENGTH) {
+                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        return null
+                    }
+
+                    // CRC 체크섬 추출 (리틀 엔디안)
+                    val rxChecksum = ByteBuffer.wrap(byteArrayOf(data[FRAME_LENGTH - 3], data[FRAME_LENGTH - 2]))
+                        .short.toUShort()
+                    val crc16Target = data.copyOfRange(1, FRAME_LENGTH - 3)
+                    val crc16Check = Crc16.computeCrc(crc16Target).toUShort()
+
+                    // CRC 검증 및 ETX 확인
+                    if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
+                        return GetDataFrame(
+                            stx = data[0],
+                            cmdOne = data[1],
+                            year = JKUtil.JKConvert.byteArrayToUShort(byteArrayOf(data[2], data[3])),
+                            month = data[4],
+                            day = data[5],
+                            hour = data[6],
+                            minute = data[7],
+                            sec = data[8],
+                            ms = JKUtil.JKConvert.byteArrayToUShort(byteArrayOf(data[9], data[10])),
+                            checkSum = rxChecksum,
+                            etx = data.last()
+                        )
+                    } else {
+                        println("CRC 체크 실패 또는 ETX 불일치")
+                        return null
+                    }
+                }
+            }
+        }
+    }
     /**
      * 2.13 Time Offset Command
      * Time Offset 정보를 송신하기 위한 프로토콜이다.

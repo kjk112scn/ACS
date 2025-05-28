@@ -207,8 +207,13 @@ class PushDataController(
                             shortSessionId, threadName, processingTime)
                     }
                 } else {
-                    logger.debug("⚠️ 세션 [{}] 스레드 [{}] 비활성 상태 - isActive: {}, isOpen: {}",
-                        shortSessionId, threadName, sessionInfo.isActive.get(), sessionInfo.session.isOpen)
+                    //logger.debug("⚠️ 세션 [{}] 스레드 [{}] 비활성 상태 - isActive: {}, isOpen: {}",
+                        //shortSessionId, threadName, sessionInfo.isActive.get(), sessionInfo.session.isOpen)
+                    // ✅ 비활성 상태 감지 시 즉시 정리
+                    logger.warn("⚠️ 세션 [{}] 스레드 [{}] 비활성 상태 감지 - 즉시 정리 시작",
+                        shortSessionId, threadName)
+                    handleDisconnection(sessionId)
+                    return@scheduleAtFixedRate // 스케줄러 태스크 종료
                 }
             } catch (e: Exception) {
                 sessionInfo.errorCount.incrementAndGet()
@@ -307,23 +312,19 @@ class PushDataController(
             val shortSessionId = sessionId.take(8)
             val threadName = removedSession.threadName
 
+            // ✅ 즉시 비활성화
             removedSession.isActive.set(false)
             activeConnections.decrementAndGet()
 
             logger.info("🔄 세션 [{}] 스레드 [{}] 정리 시작", shortSessionId, threadName)
 
             // ✅ 세션별 스케줄러 즉시 종료
-            removedSession.executor.shutdown()
             try {
-                if (!removedSession.executor.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+                removedSession.executor.shutdown()
+                if (!removedSession.executor.awaitTermination(100, TimeUnit.MILLISECONDS)) {
                     logger.warn("⚠️ 세션 [{}] 스레드 [{}] 정상 종료 실패, 강제 종료", shortSessionId, threadName)
-                    removedSession.executor.shutdownNow()
-
-                    if (!removedSession.executor.awaitTermination(500, TimeUnit.MILLISECONDS)) {
-                        logger.error("❌ 세션 [{}] 스레드 [{}] 강제 종료도 실패", shortSessionId, threadName)
-                    } else {
-                        logger.info("✅ 세션 [{}] 스레드 [{}] 강제 종료 완료", shortSessionId, threadName)
-                    }
+                    val shutdownTasks = removedSession.executor.shutdownNow()
+                    logger.info("강제 종료된 태스크 수: {}", shutdownTasks.size)
                 } else {
                     logger.info("✅ 세션 [{}] 스레드 [{}] 정상 종료 완료", shortSessionId, threadName)
                 }
@@ -353,6 +354,8 @@ class PushDataController(
                 "📊 세션 [{}] 스레드 [{}] 해제 완료 - 지속: {}ms, 메시지: {}개, 오류: {}회, 평균: {:.1f}msg/s",
                 shortSessionId, threadName, connectionDuration, totalMessages, sessionErrors, avgMessagesPerSecond
             )
+        } else {
+            logger.debug("세션 [{}] 이미 정리됨", sessionId.take(8))
         }
     }
 

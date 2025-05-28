@@ -3,9 +3,7 @@ package com.gtlsystems.acs_api.service
 import com.gtlsystems.acs_api.event.ACSEvent
 import com.gtlsystems.acs_api.event.ACSEventBus
 import com.gtlsystems.acs_api.model.GlobalData
-import com.gtlsystems.acs_api.model.GlobalData.Time.calUtcTimeOffsetTime
 import com.gtlsystems.acs_api.model.PushData
-import com.gtlsystems.acs_api.util.JKUtil
 import com.gtlsystems.acs_api.util.JKUtil.JKConvert.Companion.byteArrayToHexString
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
@@ -14,7 +12,6 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.core.env.Environment
 import org.springframework.stereotype.Service
 import reactor.core.Disposable
-import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import java.net.InetSocketAddress
@@ -479,15 +476,11 @@ class UdpFwICDService(
             }
         )
     }
-
-    /**
-     * 기본 정보 명령 - Mono 비동기 처리
-     */
-    fun defaultInfoCommand(timeOffset: Float, azOffset: Float, elOffset: Float, tiOffset: Float) {
+    fun writeNTPCommand() {
         Mono.fromCallable {
             val Time = GlobalData.Time.utcNow
-            val setDataFrameInstance = ICDService.DefaultInfo.SetDataFrame(
-                cmd = 'W',
+            val setDataFrameInstance = ICDService.WriteNTP.SetDataFrame(
+                cmd = 'I',
                 year = Time.year.toUShort(),
                 month = Time.month.value.toByte(),
                 day = Time.dayOfMonth.toByte(),
@@ -495,26 +488,58 @@ class UdpFwICDService(
                 minute = Time.minute.toByte(),
                 second = Time.second.toByte(),
                 ms = (Time.nano / 1000000).toUShort(),
-                timeOffset = timeOffset,
-                azimuthOffset = azOffset,
-                elevationOffset = elOffset,
-                tiltOffset = tiOffset,
+                timeOffset = GlobalData.Offset.TimeOffset,
                 crc16 = 0u
             )
-
             val dataToSend = setDataFrameInstance.setDataFrame()
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
-            logger.info("DefaultInfo 명령 전송 완료")
-            logger.debug("DefaultInfo 전송 데이터: {}", byteArrayToHexString(dataToSend))
+            logger.info("writeNTPCommand 명령 전송 완료")
+            logger.debug("writeNTPCommand 전송 데이터: {}", byteArrayToHexString(dataToSend))
         }
-        .subscribeOn(Schedulers.boundedElastic())
-        .subscribe(
-            { /* 성공 */ },
-            { error ->
-                logger.error("기본 정보 명령 처리 오류: {}", error.message, error)
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe(
+                { /* 성공 */ },
+                { error ->
+                    logger.error("기본 정보 명령 처리 오류: {}", error.message, error)
+                }
+            )
+        }
+        /**
+         * 기본 정보 명령 - Mono 비동기 처리
+         */
+        fun defaultInfoCommand() {
+            Mono.fromCallable {
+                val utcTime = GlobalData.Time.utcNow
+                val setDataFrameInstance = ICDService.DefaultInfo.SetDataFrame(
+                    cmd = 'W',
+                    year = utcTime.year.toUShort(),
+                    month = utcTime.month.value.toByte(),
+                    day = utcTime.dayOfMonth.toByte(),
+                    hour = utcTime.hour.toByte(),
+                    minute = utcTime.minute.toByte(),
+                    second = utcTime.second.toByte(),
+                    ms = (utcTime.nano / 1000000).toUShort(),
+                    timeOffset = GlobalData.Offset.TimeOffset,
+                    azimuthOffset = GlobalData.Offset.azimuthPositionOffset,
+                    elevationOffset = GlobalData.Offset.elevationPositionOffset,
+                    tiltOffset = GlobalData.Offset.tiltPositionOffset,
+                    crc16 = 0u
+                )
+
+                val dataToSend = setDataFrameInstance.setDataFrame()
+                channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
+
+                logger.info("DefaultInfo 명령 전송 완료")
+                logger.debug("DefaultInfo 전송 데이터: {}", byteArrayToHexString(dataToSend))
             }
-        )
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe(
+                { /* 성공 */ },
+                { error ->
+                    logger.error("기본 정보 명령 처리 오류: {}", error.message, error)
+                }
+            )
     }
 
     /**
