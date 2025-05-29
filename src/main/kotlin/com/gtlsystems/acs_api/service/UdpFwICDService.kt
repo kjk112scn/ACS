@@ -146,7 +146,7 @@ class UdpFwICDService(
                 } catch (e: Exception) {
                     logger.debug("UDP Receive 오류: {}", e.message)
                 }
-            }, 0, 20, TimeUnit.MILLISECONDS)
+            }, 0, 10, TimeUnit.MILLISECONDS)
 
             // UDP Send (높은 우선순위, 10ms 간격)
             udpSendExecutor.scheduleAtFixedRate({
@@ -156,7 +156,7 @@ class UdpFwICDService(
                 } catch (e: Exception) {
                     logger.debug("UDP Send 오류: {}", e.message)
                 }
-            }, 5, 10, TimeUnit.MILLISECONDS)
+            }, 0, 30, TimeUnit.MILLISECONDS)
 
             logger.info("실시간 UDP 통신 시작 완료")
         }

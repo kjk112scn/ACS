@@ -12,13 +12,18 @@ import com.gtlsystems.acs_api.algorithm.axistransformation.CoordinateTransformer
 import com.gtlsystems.acs_api.event.ACSEvent
 import com.gtlsystems.acs_api.event.ACSEventBus
 import com.gtlsystems.acs_api.event.subscribeToType
+import com.gtlsystems.acs_api.model.PushData.CMD
+import io.netty.handler.timeout.TimeoutException
 import reactor.core.Disposable
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
+import java.io.IOException
 import java.time.Duration
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
+import java.util.BitSet
+import java.util.concurrent.Executors
 
 /**
  * 위성 추적 서비스
@@ -50,14 +55,13 @@ class EphemerisService(
     private var currentTrackingPassId: UInt? = null
     private var subscriptions: MutableList<Disposable> = mutableListOf()
 
+
     @PostConstruct
     fun init() {
-
         eventBus()
-
         val satelliteName = "AQUA   "
-        val tle1 = "1 27424U 02022A   25140.87892865  .00001007  00000+0  21407-3 0  9994"
-        val tle2 = "2 27424  98.3765  98.8898 0002026  95.1111 287.6547 14.61253205226005"
+        val tle1 = "1 27424U 02022A   25148.82353884  .00000891  00000-0  19044-3 0  9995"
+        val tle2 = "2 27424  98.3771 106.9323 0002126  87.7409 303.2430 14.61267650227167"
         //generateEphemerisDesignationTrack(tle1,tle2,satelliteName)
         //compareTrackingPerformance(tle1,tle2)
         //satelliteTest()
@@ -360,12 +364,40 @@ class EphemerisService(
             }배 빠름), ${points2}개 포인트 (${String.format("%.2f", points2 * 100.0 / points1)}%)"
         )
     }
+    fun generateEphemerisDesignationTrackAsync(
+        tleLine1: String,
+        tleLine2: String,
+        satelliteName: String? = null
+    ): Mono<Pair<List<Map<String, Any?>>, List<Map<String, Any?>>>> {
+
+        return Mono.fromCallable {
+            generateEphemerisDesignationTrackSync(tleLine1, tleLine2, satelliteName)
+        }
+            .subscribeOn(Schedulers.boundedElastic())
+            .doOnSubscribe {
+                logger.info("위성 궤도 계산 시작 (비동기)")
+            }
+            .doOnSuccess {
+                logger.info("위성 궤도 계산 완료 (비동기)")
+            }
+            .doOnError { error ->
+                logger.error("위성 궤도 계산 실패 (비동기): ${error.message}", error)
+            }
+            .timeout(Duration.ofMinutes(5))
+            .onErrorMap { error ->
+                when (error) {
+                    is IOException -> RuntimeException("네트워크 연결 오류: ${error.message}", error)
+                    is TimeoutException -> RuntimeException("계산 시간 초과", error)
+                    else -> RuntimeException("위성 궤도 계산 실패: ${error.message}", error)
+                }
+            }
+    }
 
     /**
      * TLE 데이터로 위성 궤도 추적
      * 위성 이름이 제공되지 않으면 TLE에서 추출
      */
-    fun generateEphemerisDesignationTrack(
+    fun generateEphemerisDesignationTrackSync(
         tleLine1: String,
         tleLine2: String,
         satelliteName: String? = null
@@ -389,6 +421,7 @@ class EphemerisService(
             val ephemerisTrackDtl = mutableListOf<Map<String, Any?>>()
 
             // 위성 추적 스케줄 생성
+            /*
             val schedule = orekitCalculator.generateSatelliteTrackingScheduleWithVariableInterval(
                 tleLine1 = tleLine1,
                 tleLine2 = tleLine2,
@@ -402,7 +435,17 @@ class EphemerisService(
                 coarseIntervalMs = 1000,  // 일반 계산 간격 1000ms
                 transitionSeconds = 1
             )
-
+            */
+            val schedule = orekitCalculator.generateSatelliteTrackingSchedule(
+                tleLine1 = tleLine1,
+                tleLine2 = tleLine2,
+                startDate = today.withZoneSameInstant(ZoneOffset.UTC),
+                durationDays = 2,
+                minElevation = trackingData.minElevationAngle,
+                latitude = locationData.latitude,
+                longitude = locationData.longitude,
+                altitude = locationData.altitude,
+            )
             logger.info("위성 추적 스케줄 생성 완료: ${schedule.trackingPasses.size}개 패스")
 
             // 생성 메타데이터를 위한 현재 날짜와 사용자 정보
@@ -473,21 +516,47 @@ class EphemerisService(
         }
     }
 
+    fun moveStartAnglePosition(
+        cmdAzimuthAngle: Float,
+        cmdAzimuthSpeed: Float,
+        cmdElevationAngle: Float,
+        cmdElevationSpeed: Float,
+        cmdTiltAngle: Float,
+        cmdTiltSpeed: Float)
+    {
+        val multiAxis = BitSet()
+        multiAxis.set(0)
+        multiAxis.set(1)
+        udpFwICDService.multiManualCommand(
+            multiAxis,
+            cmdAzimuthAngle,  // null이면 0.0f 사용
+            cmdAzimuthSpeed,
+            cmdElevationAngle,
+            cmdElevationSpeed,
+            cmdTiltAngle ?: 0.0f,
+            cmdTiltSpeed ?: 0.0f
+        )
+    }
     /**
      * 위성 추적 시작 - 헤더 정보 전송
      * 2.12.1 위성 추적 해더 정보 송신 프로토콜 사용
      */
     fun startEphemerisTracking(passId: UInt) {
         try {
+
             currentTrackingPassId = passId
             // 선택된 패스 ID에 해당하는 마스터 데이터 찾기
             val selectedPass = ephemerisTrackMstStorage.find { it["No"] == passId }
+            // 시작 방위각과 고도각 가져오기
 
             if (selectedPass == null) {
                 logger.error("선택된 패스 ID($passId)에 해당하는 데이터를 찾을 수 없습니다.")
                 return
             }
-
+            val startAzimuth = selectedPass["StartAzimuth"] as Float
+            val startElevation = selectedPass["StartElevation"] as Float
+            //추적 중이라면 동작안함. 추적 전이라면 동작 기능 필요
+            //moveStartAnglePosition(startAzimuth,5f,startElevation,5f,0f,0f)
             // 현재 추적 중인 패스 설정
             currentTrackingPass = selectedPass
 
@@ -575,10 +644,7 @@ class EphemerisService(
                     } else 0.0
 
                     logger.info(
-                        "실시간 추적 정보: 진행률={:.1f}%, 인덱스={}/{}, 추출={}개",
-                        progressPercentage, safeStartIndex, totalSize, actualCount
-                    )
-
+                        "실시간 추적 정보: 진행률=${progressPercentage}%, 인덱스=${safeStartIndex}/${totalSize}, 추출=${actualCount}개")
 
                     initialTrackingData = passDetails
                         .drop(safeStartIndex)
@@ -593,8 +659,7 @@ class EphemerisService(
                     // 현재 위치 정보 로깅
                     val currentPoint = initialTrackingData.firstOrNull()
                     if (currentPoint != null) {
-                        logger.info("현재 추적 위치: 시간={}ms, 고도={:.2f}°, 방위={:.2f}°",
-                            currentPoint.first, currentPoint.second, currentPoint.third)
+                        logger.info("현재 추적 위치: 시간=${currentPoint.first}ms, 고도=${currentPoint.second}°, 방위=${currentPoint.third}°")
                     }
                 }
 
@@ -618,7 +683,7 @@ class EphemerisService(
                     // 시작 예정 위치 정보
                     val startPoint = initialTrackingData.firstOrNull()
                     if (startPoint != null) {
-                        logger.info("시작 예정 위치: 고도={:.2f}°, 방위={:.2f}°",
+                        logger.info("시작 예정 위치: 고도=${startPoint.second}°, 방위=${startPoint.third}",
                             startPoint.second, startPoint.third)
                     }
                 }
@@ -657,6 +722,7 @@ class EphemerisService(
 
             logger.info("위성 추적 초기 제어 길이 (${calculateInitialDataByteSize(initialTrackingData.size)} 길이)")
             logger.info("위성 추적 초기 제어 명령 전송 완료 (${initialTrackingData.size}개 데이터 포인트)")
+
 
         } catch (e: Exception) {
             logger.error("위성 추적 초기 제어 명령 전송 중 오류 발생: ${e.message}", e)
@@ -716,10 +782,8 @@ class EphemerisService(
 
         // timeAcc를 기반으로 시작 인덱스 계산 (timeAcc는 ms 단위)
         val startIndex = (timeAcc.toInt()) //
-
+        logger.info("startIndex :${startIndex}.")
         // 요청된 데이터 길이에 따라 데이터 포인트 수 계산
-
-
         sendAdditionalTrackingData(passId, startIndex, requestDataLength.toInt())
     }
 
@@ -764,7 +828,7 @@ class EphemerisService(
             val additionalDataFrame = ICDService.SatelliteTrackThree.SetDataFrame(
                 cmdOne = 'T',
                 cmdTwo = 'R',
-                dataLength = calculateAdditionalDataLength(additionalTrackingData.size).toUShort(),
+                dataLength = additionalTrackingData.size.toUShort(),
                 satelliteTrackData = additionalTrackingData
             )
 
@@ -785,6 +849,7 @@ class EphemerisService(
     fun ephemerisTimeOffsetCommand(inputTimeOffset: Float) {
         Mono.fromCallable {
             GlobalData.Offset.TimeOffset = inputTimeOffset
+            udpFwICDService.writeNTPCommand()
             // 현재 추적 중인 패스가 있을 때만 초기 데이터 전송
             currentTrackingPassId?.let { passId ->
                 logger.info("추적 중인 패스 발견, 초기 데이터 전송 시작: passId={}", passId)
@@ -904,6 +969,7 @@ class EphemerisService(
     }
 
     private fun calculateAdditionalDataLength(dataPointCount: Int): Int {
+
         return dataPointCount// 헤더 5바이트 + 각 데이터 포인트 12바이트
     }
 
@@ -912,7 +978,8 @@ class EphemerisService(
      */
     private fun calculateDataLength(passId: UInt): Int {
         val passDetails = getEphemerisTrackDtlByMstId(passId)
-        return passDetails.size // 각 데이터 포인트는 12바이트 (4바이트 시간, 4바이트 방위각, 4바이트 고도각)
+        logger.info("전체 데이터 길이 계산 시작: 패스 ID = $passId , 사이즈 : ${passDetails.size}")
+        return passDetails.size
     }
 
     /**

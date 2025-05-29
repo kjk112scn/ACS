@@ -3,6 +3,7 @@ package com.gtlsystems.acs_api.controller
 import com.gtlsystems.acs_api.algorithm.satellitetracker.impl.OrekitCalculator
 import com.gtlsystems.acs_api.algorithm.satellitetracker.model.SatelliteTrackData
 import com.gtlsystems.acs_api.service.EphemerisService
+import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import reactor.core.publisher.Mono
@@ -16,6 +17,7 @@ class EphemerisController(
     private val ephemerisService: EphemerisService
 )
 {
+    private val logger = LoggerFactory.getLogger(EphemerisController::class.java)
     @PostMapping("/set-current-tracking-pass-id")
     fun setCurrentTrackingPassId(@RequestParam passId: UInt?): ResponseEntity<Map<String, String>> {
         return try {
@@ -106,20 +108,27 @@ class EphemerisController(
      */
     @PostMapping("/generate")
     fun generateEphemerisTrack(@RequestBody request: EphemerisTrackRequest): Mono<Map<String, Any>> {
-        return Mono.fromCallable {
-            val (mstData, dtlData) = ephemerisService.generateEphemerisDesignationTrack(
-                request.tleLine1,
-                request.tleLine2,
-                request.satelliteName
+        return ephemerisService.generateEphemerisDesignationTrackAsync(
+            request.tleLine1,
+            request.tleLine2,
+            request.satelliteName
+        )
+            .map { (mstData, dtlData) ->
+                mapOf<String, Any>(  // ✅ 명시적 타입 지정
+                    "message" to "위성 궤도 추적 데이터 생성 완료",
+                    "mstCount" to mstData.size,
+                    "dtlCount" to dtlData.size
+                )
+            }
+            .onErrorReturn(
+                mapOf<String, Any>(  // ✅ 명시적 타입 지정
+                    "message" to "위성 궤도 추적 데이터 생성 실패",
+                    "error" to "계산 중 오류가 발생했습니다"
+                )
             )
-
-            mapOf(
-                "message" to "위성 궤도 추적 데이터 생성 완료",
-                "mstCount" to mstData.size,
-                "dtlCount" to dtlData.size
-            )
-        }
     }
+
+
 
     /**
      * 모든 위성 추적 마스터 데이터를 조회합니다.

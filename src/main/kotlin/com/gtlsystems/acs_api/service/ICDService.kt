@@ -33,7 +33,7 @@ class ICDService {
             val now = System.nanoTime()
             val interval = (now - lastPacketTime) / 1_000_000.0 // ms로 변환
             if (interval > 60.0) { // 예상보다 지연된 경우
-                logger.warn("패킷 지연 감지: ${interval}ms")
+               // logger.warn("패킷 지연 감지: ${interval}ms")
             }
             lastPacketTime = now
         }
