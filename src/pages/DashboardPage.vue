@@ -351,7 +351,7 @@ const updateCharts = () => {
     uiUpdateCount.value++
 
     // 100번마다 로그
-    if (uiUpdateCount.value % 100 === 0) {
+   /*  if (uiUpdateCount.value % 100 === 0) {
       console.log(`🔄 [${uiUpdateCount.value}] 차트 업데이트:`, {
         azimuth: icdStore.azimuthAngle,
         elevation: icdStore.elevationAngle,
@@ -359,7 +359,7 @@ const updateCharts = () => {
         serverTime: icdStore.serverTime,
         storeUpdateCount: icdStore.updateCount,
       })
-    }
+    } */
   } catch (error) {
     console.error('❌ 차트 업데이트 오류:', error)
   }

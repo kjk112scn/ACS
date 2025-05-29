@@ -762,15 +762,15 @@ const updateTimeRemaining = () => {
       const currentCalTime = getCalTimeTimestamp(icdStore.resultTimeOffsetCalTime)
 
       // 스케줄 시작 시간을 Date 객체로 변환 (KST)
-      const scheduleStartTime = new Date(selectedScheduleInfo.value.startTime)
-
+      //const scheduleStartTime = new Date(selectedScheduleInfo.value.startTime)
+/*
       // 디버깅을 위한 로그
       console.log('시간 계산:', {
         calTime: icdStore.resultTimeOffsetCalTime,
         currentCalTime: new Date(currentCalTime).toISOString(),
         scheduleStartTime: scheduleStartTime.toString(),
         scheduleStartTimeMs: selectedScheduleInfo.value.startTimeMs,
-      })
+      }) */
 
       // 남은 시간 계산 (밀리초 단위)
       const remainingMs = selectedScheduleInfo.value.startTimeMs - currentCalTime
@@ -1053,13 +1053,13 @@ const calculateTLE = async () => {
 // Stop 명령 전송
 const stopCommand = async () => {
   // 모든 축 정지 (방위각, 고도각, 틸트각)
-  await ephemerisTrackService.stopCommand(true, true, true)
+  await icdStore.stopCommand(true, true, true)
   console.log('정지 명령 전송 성공')
 }
 
 // Stow 명령 전송
 const stowCommand = async () => {
-  await ephemerisTrackService.stowCommand()
+  await icdStore.stowCommand()
   console.log('Stow 명령 전송 성공')
 }
 
