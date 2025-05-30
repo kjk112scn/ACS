@@ -1,4 +1,9 @@
 import { api } from 'boot/axios'
+export interface TrackingStatus {
+  ephemerisStatus?: boolean | null
+  passScheduleStatus?: boolean | null
+  sunTrackStatus?: boolean | null
+}
 
 export interface MessageData {
   [key: string]: unknown
@@ -17,6 +22,9 @@ export interface MessageData {
   cmdTime?: string
   serverTime?: string
   resultTimeOffsetCalTime?: string
+
+  // ✅ 추적 상태 추가
+  trackingStatus?: TrackingStatus
 }
 
 type WebSocketMessageHandler = (message: MessageData) => void
@@ -321,7 +329,7 @@ export const icdService = {
    */
   async sendEmergency(commandType: 'E' | 'S' = 'E') {
     try {
-      const response = await api.post("/icd/on-emergency-stop-command", null, {
+      const response = await api.post('/icd/on-emergency-stop-command', null, {
         params: {
           commandType,
         },

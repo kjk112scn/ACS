@@ -1,7 +1,4 @@
 <template>
-
-
-
   <div class="sun-track-mode">
     <div class="section-title text-h5 text-primary q-mb-sm">Sun Track Control</div>
 
@@ -162,26 +159,10 @@
         </div>
 
         <!-- 상태 메시지 표시 -->
-        <div class="status-message q-mt-md" v-if="showStatusMessage">
-          <q-banner
-            :class="
-              icdStore.lastOffsetCommandStatus.success
-                ? 'bg-positive text-white'
-                : 'bg-negative text-white'
-            "
-          >
-            {{ icdStore.lastOffsetCommandStatus.message }}
-          </q-banner>
+        <div class="status-message q-mt-md" >
+          <q-banner> </q-banner>
           <!-- Time Offset 상태 메시지 -->
-          <q-banner
-            :class="
-              icdStore.lastTimeOffsetCommandStatus.success
-                ? 'bg-positive text-white'
-                : 'bg-negative text-white'
-            "
-          >
-            {{ icdStore.lastTimeOffsetCommandStatus.message }}
-          </q-banner>
+          <q-banner> </q-banner>
         </div>
       </q-card-section>
     </q-card>
@@ -278,7 +259,6 @@
         </q-card-section>
       </q-card>
     </div>
-
   </div>
 </template>
 <script setup lang="ts">
@@ -296,13 +276,6 @@ const offsetCals = ref<string[]>(['0.00', '0.00', '0.00', '0.00'])
 const isGoLoading = ref(false)
 const isStopLoading = ref(false)
 const isStowLoading = ref(false)
-
-// 상태 메시지 표시 여부 (최근 3초 이내의 메시지만 표시)
-const showStatusMessage = computed(() => {
-  const currentTime = Date.now()
-  const messageTime = icdStore.lastOffsetCommandStatus.timestamp
-  return currentTime - messageTime < 3000 && icdStore.lastOffsetCommandStatus.message !== ''
-})
 
 // 입력값이 변경될 때마다 소수점 둘째 자리까지 포맷팅
 watch(
@@ -425,8 +398,12 @@ const increment = async (index: number) => {
         // 백엔드 응답에 해당 값이 있다면 그 값을 사용
         // 예시: response.azimuthResult, response.elevationResult, response.tiltResult
         // 실제 백엔드 응답 구조에 맞게 수정 필요
-        outputs.value[0] = String(response.azimuthResult?.toFixed(2) || offsetCals.value[0] || '0.00')
-        outputs.value[1] = String(response.elevationResult?.toFixed(2) || offsetCals.value[1] || '0.00')
+        outputs.value[0] = String(
+          response.azimuthResult?.toFixed(2) || offsetCals.value[0] || '0.00',
+        )
+        outputs.value[1] = String(
+          response.elevationResult?.toFixed(2) || offsetCals.value[1] || '0.00',
+        )
         outputs.value[2] = String(response.tiltResult?.toFixed(2) || offsetCals.value[2] || '0.00')
       } else {
         // 응답이 없거나 예상 형식이 아닌 경우 입력값을 그대로 출력값으로 사용
@@ -455,8 +432,14 @@ const increment = async (index: number) => {
       const response = await icdStore.sendTimeOffsetCommand(timeOffset)
 
       // 응답에서 출력값 업데이트
-      if (response && typeof response === 'object' && typeof response.inputTimeoffset === 'number') {
-        outputs.value[3] = String(response.inputTimeoffset.toFixed(2) || offsetCals.value[3] || '0.00')
+      if (
+        response &&
+        typeof response === 'object' &&
+        typeof response.inputTimeoffset === 'number'
+      ) {
+        outputs.value[3] = String(
+          response.inputTimeoffset.toFixed(2) || offsetCals.value[3] || '0.00',
+        )
       } else {
         // 응답이 없거나 예상 형식이 아닌 경우 입력값을 그대로 출력값으로 사용
         outputs.value[3] = offsetCals.value[3] || '0.00'
@@ -495,8 +478,12 @@ const decrement = async (index: number) => {
         // 백엔드 응답에 해당 값이 있다면 그 값을 사용
         // 예시: response.azimuthResult, response.elevationResult, response.tiltResult
         // 실제 백엔드 응답 구조에 맞게 수정 필요
-        outputs.value[0] = String(response.azimuthResult?.toFixed(2) || offsetCals.value[0] || '0.00')
-        outputs.value[1] = String(response.elevationResult?.toFixed(2) || offsetCals.value[1] || '0.00')
+        outputs.value[0] = String(
+          response.azimuthResult?.toFixed(2) || offsetCals.value[0] || '0.00',
+        )
+        outputs.value[1] = String(
+          response.elevationResult?.toFixed(2) || offsetCals.value[1] || '0.00',
+        )
         outputs.value[2] = String(response.tiltResult?.toFixed(2) || offsetCals.value[2] || '0.00')
       } else {
         // 응답이 없거나 예상 형식이 아닌 경우 입력값을 그대로 출력값으로 사용
@@ -525,8 +512,14 @@ const decrement = async (index: number) => {
       const response = await icdStore.sendTimeOffsetCommand(timeOffset)
 
       // 응답에서 출력값 업데이트
-      if (response && typeof response === 'object' && typeof response.inputTimeoffset === 'number') {
-        outputs.value[3] = String(response.inputTimeoffset.toFixed(2) || offsetCals.value[3] || '0.00')
+      if (
+        response &&
+        typeof response === 'object' &&
+        typeof response.inputTimeoffset === 'number'
+      ) {
+        outputs.value[3] = String(
+          response.inputTimeoffset.toFixed(2) || offsetCals.value[3] || '0.00',
+        )
       } else {
         // 응답이 없거나 예상 형식이 아닌 경우 입력값을 그대로 출력값으로 사용
         outputs.value[3] = offsetCals.value[3] || '0.00'
