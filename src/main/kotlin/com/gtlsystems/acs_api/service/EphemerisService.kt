@@ -12,7 +12,7 @@ import com.gtlsystems.acs_api.algorithm.axistransformation.CoordinateTransformer
 import com.gtlsystems.acs_api.event.ACSEvent
 import com.gtlsystems.acs_api.event.ACSEventBus
 import com.gtlsystems.acs_api.event.subscribeToType
-import com.gtlsystems.acs_api.model.PushData.CMD
+import com.gtlsystems.acs_api.model.PushData
 import io.netty.handler.timeout.TimeoutException
 import reactor.core.Disposable
 import reactor.core.publisher.Mono
@@ -23,7 +23,6 @@ import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import java.util.BitSet
-import java.util.concurrent.Executors
 
 /**
  * 위성 추적 서비스
@@ -33,7 +32,8 @@ import java.util.concurrent.Executors
 class EphemerisService(
     private val orekitCalculator: OrekitCalculator,
     private val acsEventBus: ACSEventBus,
-    private val udpFwICDService: UdpFwICDService
+    private val udpFwICDService: UdpFwICDService,
+    private val dataStoreService: DataStoreService // DataStoreService 주입
 ) {
 
     // 밀리초를 포함하는 사용자 정의 포맷터 생성
@@ -50,12 +50,11 @@ class EphemerisService(
 
     // 현재 추적 중인 위성 정보
     private var currentTrackingPass: Map<String, Any?>? = null
-    private var isTracking = false
 
     private var currentTrackingPassId: UInt? = null
     private var subscriptions: MutableList<Disposable> = mutableListOf()
 
-
+    private val trackingStatus = PushData.TRACKING_STATUS
     @PostConstruct
     fun init() {
         eventBus()
@@ -553,10 +552,6 @@ class EphemerisService(
                 logger.error("선택된 패스 ID($passId)에 해당하는 데이터를 찾을 수 없습니다.")
                 return
             }
-            val startAzimuth = selectedPass["StartAzimuth"] as Float
-            val startElevation = selectedPass["StartElevation"] as Float
-            //추적 중이라면 동작안함. 추적 전이라면 동작 기능 필요
-            //moveStartAnglePosition(startAzimuth,5f,startElevation,5f,0f,0f)
             // 현재 추적 중인 패스 설정
             currentTrackingPass = selectedPass
 
@@ -597,9 +592,12 @@ class EphemerisService(
             udpFwICDService.sendSatelliteTrackHeader(headerFrame)
             logger.info("위성 추적 전체 길이 ${calculateDataByteSize(passId).toUShort()}")
             logger.info("위성 추적 헤더 정보 전송 완료")
-            isTracking = true
+
+            dataStoreService.setEphemerisTracking(true)
+
 
         } catch (e: Exception) {
+            dataStoreService.setEphemerisTracking(false)
             logger.error("위성 추적 시작 중 오류 발생: ${e.message}", e)
         }
     }
@@ -610,11 +608,10 @@ class EphemerisService(
      */
     fun sendInitialTrackingData(passId: UInt) {
         try {
-            if (currentTrackingPass == null || !isTracking) {
+            if (currentTrackingPass == null || trackingStatus.ephemerisStatus != true) {
                 logger.error("위성 추적이 시작되지 않았습니다. 먼저 startSatelliteTracking을 호출하세요.")
                 return
             }
-
             var initialTrackingData: List<Triple<UInt, Float, Float>> = emptyList()
             val passDetails = getEphemerisTrackDtlByMstId(passId)
 
@@ -694,6 +691,8 @@ class EphemerisService(
             }
             if (passDetails.isEmpty()) {
                 logger.error("선택된 패스 ID($passId)에 해당하는 세부 데이터를 찾을 수 없습니다.")
+
+                dataStoreService.setEphemerisTracking(false)
                 return
             }
 
@@ -720,11 +719,14 @@ class EphemerisService(
             // UdpFwICDService를 통해 데이터 전송
             udpFwICDService.sendSatelliteTrackInitialControl(initialControlFrame)
 
+            dataStoreService.setEphemerisTracking(true)
+
             logger.info("위성 추적 초기 제어 길이 (${calculateInitialDataByteSize(initialTrackingData.size)} 길이)")
             logger.info("위성 추적 초기 제어 명령 전송 완료 (${initialTrackingData.size}개 데이터 포인트)")
 
 
         } catch (e: Exception) {
+            dataStoreService.setEphemerisTracking(false)
             logger.error("위성 추적 초기 제어 명령 전송 중 오류 발생: ${e.message}", e)
         }
     }
@@ -772,7 +774,7 @@ class EphemerisService(
      * 2.12.3 위성 추적 추가 데이터 요청에 대한 응답
      */
     fun handleEphemerisTrackingDataRequest(timeAcc: UInt, requestDataLength: UShort) {
-        if (!isTracking || currentTrackingPass == null) {
+        if (trackingStatus.ephemerisStatus != true || currentTrackingPass == null) {
             logger.error("위성 추적이 활성화되어 있지 않습니다.")
             return
         }
@@ -785,6 +787,7 @@ class EphemerisService(
         logger.info("startIndex :${startIndex}.")
         // 요청된 데이터 길이에 따라 데이터 포인트 수 계산
         sendAdditionalTrackingData(passId, startIndex, requestDataLength.toInt())
+        dataStoreService.setEphemerisTracking(true)
     }
 
     /**
@@ -793,7 +796,7 @@ class EphemerisService(
      */
     fun sendAdditionalTrackingData(passId: UInt, startIndex: Int, requestDataLength: Int = 25) {
         try {
-            if (currentTrackingPass == null || !isTracking) {
+            if (currentTrackingPass == null || trackingStatus.ephemerisStatus != true) {
                 logger.error("위성 추적이 시작되지 않았습니다. 먼저 startSatelliteTracking을 호출하세요.")
                 return
             }
@@ -887,13 +890,13 @@ class EphemerisService(
      * 위성 추적 중지
      */
     fun stopEphemerisTracking() {
-        if (!isTracking) {
+        if (trackingStatus.ephemerisStatus != true) {
             logger.info("위성 추적이 이미 중지되어 있습니다.")
             return
         }
 
         logger.info("위성 추적 중지")
-        isTracking = false
+        dataStoreService.setEphemerisTracking(false)
         //currentTrackingPass = null
         //currentTrackingPassId = null
     }
@@ -986,7 +989,7 @@ class EphemerisService(
      * 현재 추적 상태를 반환합니다.
      */
     fun isTracking(): Boolean {
-        return isTracking
+        return trackingStatus.ephemerisStatus == true
     }
 
     /**

@@ -15,6 +15,7 @@ import org.jetbrains.annotations.Debug
 import org.springframework.stereotype.Service
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.time.ZonedDateTime
 import java.util.BitSet
 
 @Service
@@ -33,75 +34,96 @@ class ICDService {
             val now = System.nanoTime()
             val interval = (now - lastPacketTime) / 1_000_000.0 // ms로 변환
             if (interval > 60.0) { // 예상보다 지연된 경우
-               // logger.warn("패킷 지연 감지: ${interval}ms")
+                // logger.warn("패킷 지연 감지: ${interval}ms")
             }
             lastPacketTime = now
         }
-       fun receivedCmd(receiveData: ByteArray) {
-    if (receiveData.size > 1 && receiveData[0] == 0x02.toByte()) {
-        monitorPacketTiming(receiveData)
-        if (receiveData[1] == 'R'.code.toByte()) {
-            //2.2 Read Status
-            if (receiveData[2] == 'R'.code.toByte()) {
-                val parsedData = ReadStatus.GetDataFrame.fromByteArray(receiveData)
-                parsedData?.let {
-                    val newData = PushData.ReadData(
-                        // Angle data
-                        azimuthAngle = it.azimuthAngle,
-                        elevationAngle = it.elevationAngle,
-                        tiltAngle = it.tiltAngle,
 
-                        // Speed data
-                        azimuthSpeed = it.azimuthSpeed,
-                        elevationSpeed = it.elevationSpeed,
-                        tiltSpeed = it.tiltSpeed,
+        fun receivedCmd(receiveData: ByteArray) {
+            if (receiveData.size > 1 && receiveData[0] == 0x02.toByte()) {
+                monitorPacketTiming(receiveData)
+                if (receiveData[1] == 'R'.code.toByte()) {
+                    //2.2 Read Status
+                    if (receiveData[2] == 'R'.code.toByte()) {
+                        val parsedData = ReadStatus.GetDataFrame.fromByteArray(receiveData)
+                        parsedData?.let {
+                            val newData = PushData.ReadData(
+                                // Angle data
+                                azimuthAngle = it.azimuthAngle,
+                                elevationAngle = it.elevationAngle,
+                                tiltAngle = it.tiltAngle,
 
-                        // Servo driver angle data
-                        servoDriverAzimuthAngle = it.servoDriverAzimuthAngle,
-                        servoDriverElevationAngle = it.servoDriverElevationAngle,
-                        servoDriverTiltAngle = it.servoDriverTiltAngle,
+                                // Speed data
+                                azimuthSpeed = it.azimuthSpeed,
+                                elevationSpeed = it.elevationSpeed,
+                                tiltSpeed = it.tiltSpeed,
 
-                        // Torque data
-                        torqueAzimuth = it.torqueAzimuth,
-                        torqueElevation = it.torqueElevation,
-                        torqueTilt = it.torqueTilt,
+                                // Servo driver angle data
+                                servoDriverAzimuthAngle = it.servoDriverAzimuthAngle,
+                                servoDriverElevationAngle = it.servoDriverElevationAngle,
+                                servoDriverTiltAngle = it.servoDriverTiltAngle,
 
-                        // Environmental data
-                        windSpeed = it.windSpeed,
-                        windDirection = it.windDirection,
-                        rtdOne = it.rtdOne,
-                        rtdTwo = it.rtdTwo,
+                                // Torque data
+                                torqueAzimuth = it.torqueAzimuth,
+                                torqueElevation = it.torqueElevation,
+                                torqueTilt = it.torqueTilt,
 
-                        // Status bits
-                        modeStatusBits = it.modeStatusBits,
-                        mainBoardProtocolStatusBits = it.mainBoardProtocolStatusBits,
-                        mainBoardStatusBits = it.mainBoardStatusBits,
-                        mainBoardMCOnOffBits = it.mainBoardMCOnOffBits,
-                        mainBoardReserveBits = it.mainBoardReserveBits,
-                        azimuthBoardServoStatusBits = it.azimuthBoardServoStatusBits,
-                        azimuthBoardStatusBits = it.azimuthBoardStatusBits,
-                        elevationBoardServoStatusBits = it.elevationBoardServoStatusBits,
-                        elevationBoardStatusBits = it.elevationBoardStatusBits,
-                        tiltBoardServoStatusBits = it.tiltBoardServoStatusBits,
-                        tiltBoardStatusBits = it.tiltBoardStatusBits,
-                        feedSBoardStatusBits = it.feedSBoardStatusBits,
-                        feedXBoardStatusBits = it.feedXBoardStatusBits,
+                                // Environmental data
+                                windSpeed = it.windSpeed,
+                                windDirection = it.windDirection,
+                                rtdOne = it.rtdOne,
+                                rtdTwo = it.rtdTwo,
 
-                        // Current and RSSI data
-                        currentSBandLNA_LHCP = it.currentSBandLNA_LHCP,
-                        currentSBandLNA_RHCP = it.currentSBandLNA_RHCP,
-                        currentXBandLNA_LHCP = it.currentXBandLNA_LHCP,
-                        currentXBandLNA_RHCP = it.currentXBandLNA_RHCP,
-                        rssiSBandLNA_LHCP = it.rssiSBandLNA_LHCP,
-                        rssiSBandLNA_RHCP = it.rssiSBandLNA_RHCP,
-                        rssiXBandLNA_LHCP = it.rssiXBandLNA_LHCP,
-                        rssiXBandLNA_RHCP = it.rssiXBandLNA_RHCP
-                    )
+                                // Status bits
+                                modeStatusBits = it.modeStatusBits,
+                                mainBoardProtocolStatusBits = it.mainBoardProtocolStatusBits,
+                                mainBoardStatusBits = it.mainBoardStatusBits,
+                                mainBoardMCOnOffBits = it.mainBoardMCOnOffBits,
+                                mainBoardReserveBits = it.mainBoardReserveBits,
+                                azimuthBoardServoStatusBits = it.azimuthBoardServoStatusBits,
+                                azimuthBoardStatusBits = it.azimuthBoardStatusBits,
+                                elevationBoardServoStatusBits = it.elevationBoardServoStatusBits,
+                                elevationBoardStatusBits = it.elevationBoardStatusBits,
+                                tiltBoardServoStatusBits = it.tiltBoardServoStatusBits,
+                                tiltBoardStatusBits = it.tiltBoardStatusBits,
+                                feedSBoardStatusBits = it.feedSBoardStatusBits,
+                                feedXBoardStatusBits = it.feedXBoardStatusBits,
 
-                    // PushService 대신 DataStoreService 사용
-                    dataStoreService.updateDataFromUdp(newData)
-                }
-            }
+                                // Current and RSSI data
+                                currentSBandLNALHCP = it.currentSBandLNALHCP,
+                                currentSBandLNARHCP = it.currentSBandLNARHCP,
+                                currentXBandLNALHCP = it.currentXBandLNALHCP,
+                                currentXBandLNARHCP = it.currentXBandLNARHCP,
+                                rssiSBandLNALHCP = it.rssiSBandLNALHCP,
+                                rssiSBandLNARHCP = it.rssiSBandLNARHCP,
+                                rssiXBandLNALHCP = it.rssiXBandLNALHCP,
+                                rssiXBandLNARHCP = it.rssiXBandLNARHCP,
+
+                                //각가속도, 최대 각가속도
+                                azimuthAcceleration = it.azimuthAcceleration,
+                                elevationAcceleration = it.elevationAcceleration,
+                                tiltAcceleration = it.tiltAcceleration,
+                                azimuthMaxAcceleration = it.azimuthMaxAcceleration,
+                                elevationMaxAcceleration = it.elevationMaxAcceleration,
+                                tiltMaxAcceleration = it.tiltMaxAcceleration,
+
+                                //traking 정보
+                                trackingAzimuthTime = it.trackingAzimuthTime,
+                                trackingCMDAzimuthAngle = it.trackingCMDAzimuthAngle,
+                                trackingActualAzimuthAngle = it.trackingActualAzimuthAngle,
+                                trackingElevationTime = it.trackingElevationTime,
+                                trackingCMDElevationAngle = it.trackingCMDElevationAngle,
+                                trackingActualElevationAngle = it.trackingActualElevationAngle,
+                                trackingTiltTime = it.trackingTiltTime,
+                                trackingCMDTiltAngle = it.trackingCMDTiltAngle,
+                                trackingActualTiltAngle = it.trackingActualTiltAngle,
+
+                            )
+
+                            // PushService 대신 DataStoreService 사용
+                            dataStoreService.updateDataFromUdp(newData)
+                        }
+                    }
                     //2.3 Read Positioner Status
                     else if (receiveData[2] == 'P'.code.toByte()) {
 
@@ -225,6 +247,7 @@ class ICDService {
             }
         }
     }
+
     /**
      * 2.12 Satellite Track Command
      * 위성 추적 정보를 송신하기 위한 프로토콜
@@ -356,6 +379,7 @@ class ICDService {
             }
         }
     }
+
     /**
      * 2.12.2 위성 추적 초기 제어 명령
      * 위성 추적 시 필요한 초기 제어 정보를 송신하기 위한 프로토콜이다.
@@ -503,6 +527,7 @@ class ICDService {
             }
         }
     }
+
     /**
      * 2.12.3 위성 추적 추가 데이터 요청
      * ACU F/W가 ACU S/W로 추가 위성 추적 데이터 요청을 하기 위한 프로토콜이다.
@@ -609,7 +634,7 @@ class ICDService {
                         val requestDataLength = JKConvert.byteArrayToUShort(byteArrayOf(data[3], data[4]))
                         println("Main Board의 요청 시간 누적치: $requestDataLength")
                         // 시간 누적치 추출
-                        val timeAcc = JKConvert.uintEndianConvert(data[5], data[6], data[7], data[8],false)
+                        val timeAcc = JKConvert.uintEndianConvert(data[5], data[6], data[7], data[8], false)
                         println("Main Board의 요청 시간 누적치: $timeAcc")
 
                         return GetDataFrame(
@@ -749,6 +774,7 @@ class ICDService {
             }
         }
     }
+
     /**
      * 2.13 Time Offset Command
      * Time Offset 정보를 송신하기 위한 프로토콜이다.
@@ -832,7 +858,7 @@ class ICDService {
             var ms: UShort = 0u,
             var timeOffset: Float = 0f,
             var checkSum: UShort = 0u,
-            var etx:  Byte = ICD_ETX
+            var etx: Byte = ICD_ETX
         ) {
             companion object {
                 const val FRAME_LENGTH = 19
@@ -972,7 +998,7 @@ class ICDService {
                 CMD.apply {
                     cmdAzimuthAngle = azimuthAngle + GlobalData.Offset.azimuthPositionOffset
                     cmdElevationAngle = elevationAngle + GlobalData.Offset.elevationPositionOffset
-                    cmdTiltAngle = tiltAngle  + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
+                    cmdTiltAngle = tiltAngle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
                 }
                 return dataFrame
             }
@@ -1580,14 +1606,29 @@ class ICDService {
             var tiltBoardStatusBits: String = "00000000",  // BitSet에서 String으로 변경
             var feedSBoardStatusBits: String = "00000000",  // BitSet에서 String으로 변경
             var feedXBoardStatusBits: String = "00000000",  // BitSet에서 String으로 변경
-            var currentSBandLNA_LHCP: Float = 0f,
-            var currentSBandLNA_RHCP: Float = 0f,
-            var currentXBandLNA_LHCP: Float = 0f,
-            var currentXBandLNA_RHCP: Float = 0f,
-            var rssiSBandLNA_LHCP: Float = 0f,
-            var rssiSBandLNA_RHCP: Float = 0f,
-            var rssiXBandLNA_LHCP: Float = 0f,
-            var rssiXBandLNA_RHCP: Float = 0f,
+            var currentSBandLNALHCP: Float = 0f,
+            var currentSBandLNARHCP: Float = 0f,
+            var currentXBandLNALHCP: Float = 0f,
+            var currentXBandLNARHCP: Float = 0f,
+            var rssiSBandLNALHCP: Float = 0f,
+            var rssiSBandLNARHCP: Float = 0f,
+            var rssiXBandLNALHCP: Float = 0f,
+            var rssiXBandLNARHCP: Float = 0f,
+            var azimuthAcceleration: Float = 0f,
+            var elevationAcceleration: Float = 0f,
+            var tiltAcceleration: Float = 0f,
+            var azimuthMaxAcceleration: Float = 0f,
+            var elevationMaxAcceleration: Float = 0f,
+            var tiltMaxAcceleration: Float = 0f,
+            var trackingAzimuthTime: Float = 0f,
+            var trackingCMDAzimuthAngle: Float = 0f,
+            var trackingActualAzimuthAngle: Float = 0f,
+            var trackingElevationTime: Float = 0f,
+            var trackingCMDElevationAngle: Float = 0f,
+            var trackingActualElevationAngle: Float = 0f,
+            var trackingTiltTime: Float = 0f,
+            var trackingCMDTiltAngle: Float = 0f,
+            var trackingActualTiltAngle: Float = 0f,
             var checkSum: UShort = 0u,
             var etx: Byte = ICD_ETX
         ) {
@@ -1806,14 +1847,14 @@ class ICDService {
                         frame.feedSBoardStatusBits = byteToBinaryString(feedSBoardStatusByte)
 
                         // 나머지 필드들 처리...
-                        frame.currentSBandLNA_LHCP = buffer.float
-                        frame.currentSBandLNA_RHCP = buffer.float
-                        frame.currentXBandLNA_LHCP = buffer.float
-                        frame.currentXBandLNA_RHCP = buffer.float
-                        frame.rssiSBandLNA_LHCP = buffer.float
-                        frame.rssiSBandLNA_RHCP = buffer.float
-                        frame.rssiXBandLNA_LHCP = buffer.float
-                        frame.rssiXBandLNA_RHCP = buffer.float
+                        frame.currentSBandLNALHCP = buffer.float
+                        frame.currentSBandLNARHCP = buffer.float
+                        frame.currentXBandLNALHCP = buffer.float
+                        frame.currentXBandLNARHCP = buffer.float
+                        frame.rssiSBandLNALHCP = buffer.float
+                        frame.rssiSBandLNARHCP = buffer.float
+                        frame.rssiXBandLNALHCP = buffer.float
+                        frame.rssiXBandLNARHCP = buffer.float
                         frame.servoDriverAzimuthAngle = buffer.float
                         frame.servoDriverElevationAngle = buffer.float
                         frame.servoDriverTiltAngle = buffer.float
@@ -1824,6 +1865,21 @@ class ICDService {
                         frame.windDirection = buffer.short.toUShort()
                         frame.rtdOne = buffer.float
                         frame.rtdTwo = buffer.float
+                        frame.azimuthAcceleration = buffer.float
+                        frame.elevationAcceleration = buffer.float
+                        frame.tiltAcceleration = buffer.float
+                        frame.azimuthMaxAcceleration = buffer.float
+                        frame.elevationMaxAcceleration = buffer.float
+                        frame.tiltMaxAcceleration = buffer.float
+                        frame.trackingAzimuthTime = buffer.float
+                        frame.trackingCMDAzimuthAngle = buffer.float
+                        frame.trackingActualAzimuthAngle = buffer.float
+                        frame.trackingElevationTime = buffer.float
+                        frame.trackingCMDElevationAngle = buffer.float
+                        frame.trackingActualElevationAngle = buffer.float
+                        frame.trackingTiltTime = buffer.float
+                        frame.trackingCMDTiltAngle = buffer.float
+                        frame.trackingActualTiltAngle = buffer.float
                         frame.checkSum = rxChecksum
                         frame.etx = data.last()
                         //println(" az :${frame.azimuthAngle}, el : ${frame.elevationAngle}, ti : ${frame.tiltAngle}")

@@ -9,7 +9,11 @@ object PushData {
         var cmdTiltAngle: Float? = null,
         var cmdTime: ZonedDateTime? = null
     )
-
+    data class TrackingStatus (
+        var ephemerisStatus: Boolean? = null,
+        var passScheduleStatus: Boolean? = null,
+        var sunTrackStatus: Boolean? = null,
+    )
     data class ReadData(
         val modeStatusBits: String? = null,
         val azimuthAngle: Float? = null,
@@ -40,14 +44,30 @@ object PushData {
         val tiltBoardStatusBits: String? = null,
         val feedSBoardStatusBits: String? = null,
         val feedXBoardStatusBits: String? = null,
-        val currentSBandLNA_LHCP: Float? = null,
-        val currentSBandLNA_RHCP: Float? = null,
-        val currentXBandLNA_LHCP: Float? = null,
-        val currentXBandLNA_RHCP: Float? = null,
-        val rssiSBandLNA_LHCP: Float? = null,
-        val rssiSBandLNA_RHCP: Float? = null,
-        val rssiXBandLNA_LHCP: Float? = null,
-        val rssiXBandLNA_RHCP: Float? = null
+        val currentSBandLNALHCP: Float? = null,
+        val currentSBandLNARHCP: Float? = null,
+        val currentXBandLNALHCP: Float? = null,
+        val currentXBandLNARHCP: Float? = null,
+        val rssiSBandLNALHCP: Float? = null,
+        val rssiSBandLNARHCP: Float? = null,
+        val rssiXBandLNALHCP: Float? = null,
+        val rssiXBandLNARHCP: Float? = null,
+        val azimuthAcceleration: Float? = null,
+        val elevationAcceleration: Float? = null,
+        val tiltAcceleration: Float? = null,
+        val azimuthMaxAcceleration: Float? = null,
+        val elevationMaxAcceleration: Float? = null,
+        val tiltMaxAcceleration: Float? = null,
+        val trackingAzimuthTime : Float? = null,
+        val trackingCMDAzimuthAngle : Float? = null,
+        val trackingActualAzimuthAngle : Float? = null,
+        val trackingElevationTime : Float? = null,
+        val trackingCMDElevationAngle : Float? = null,
+        val trackingActualElevationAngle : Float? = null,
+        val trackingTiltTime : Float? = null,
+        val trackingCMDTiltAngle : Float? = null,
+        val trackingActualTiltAngle : Float? = null
     )
     val CMD = CMDValue()
+    val TRACKING_STATUS = TrackingStatus() // ✅ 인스턴스 객체
 }

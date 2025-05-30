@@ -13,6 +13,8 @@ class DataStoreService {
     private val latestData = AtomicReference(PushData.ReadData())
     private val dataVersion = AtomicLong(0) // 버전 기반 변경 감지
 
+    private val trackingStatus = AtomicReference(PushData.TrackingStatus())
+
     // === UDP 연결 상태 관리 ===
     private val lastUdpUpdateTime = AtomicReference(Instant.now())
     private val udpConnected = AtomicReference(false)
@@ -56,14 +58,29 @@ class DataStoreService {
             tiltBoardStatusBits = newData.tiltBoardStatusBits ?: currentData.tiltBoardStatusBits,
             feedSBoardStatusBits = newData.feedSBoardStatusBits ?: currentData.feedSBoardStatusBits,
             feedXBoardStatusBits = newData.feedXBoardStatusBits ?: currentData.feedXBoardStatusBits,
-            currentSBandLNA_LHCP = newData.currentSBandLNA_LHCP ?: currentData.currentSBandLNA_LHCP,
-            currentSBandLNA_RHCP = newData.currentSBandLNA_RHCP ?: currentData.currentSBandLNA_RHCP,
-            currentXBandLNA_LHCP = newData.currentXBandLNA_LHCP ?: currentData.currentXBandLNA_LHCP,
-            currentXBandLNA_RHCP = newData.currentXBandLNA_RHCP ?: currentData.currentXBandLNA_RHCP,
-            rssiSBandLNA_LHCP = newData.rssiSBandLNA_LHCP ?: currentData.rssiSBandLNA_LHCP,
-            rssiSBandLNA_RHCP = newData.rssiSBandLNA_RHCP ?: currentData.rssiSBandLNA_RHCP,
-            rssiXBandLNA_LHCP = newData.rssiXBandLNA_LHCP ?: currentData.rssiXBandLNA_LHCP,
-            rssiXBandLNA_RHCP = newData.rssiXBandLNA_RHCP ?: currentData.rssiXBandLNA_RHCP
+            currentSBandLNALHCP = newData.currentSBandLNALHCP ?: currentData.currentSBandLNALHCP,
+            currentSBandLNARHCP = newData.currentSBandLNARHCP ?: currentData.currentSBandLNARHCP,
+            currentXBandLNALHCP = newData.currentXBandLNALHCP ?: currentData.currentXBandLNALHCP,
+            currentXBandLNARHCP = newData.currentXBandLNARHCP ?: currentData.currentXBandLNARHCP,
+            rssiSBandLNALHCP = newData.rssiSBandLNALHCP ?: currentData.rssiSBandLNALHCP,
+            rssiSBandLNARHCP = newData.rssiSBandLNARHCP ?: currentData.rssiSBandLNARHCP,
+            rssiXBandLNALHCP = newData.rssiXBandLNALHCP ?: currentData.rssiXBandLNALHCP,
+            rssiXBandLNARHCP = newData.rssiXBandLNARHCP ?: currentData.rssiXBandLNARHCP,
+            azimuthAcceleration = newData.azimuthAcceleration ?: currentData.azimuthAcceleration,
+            elevationAcceleration = newData.elevationAcceleration ?: currentData.elevationAcceleration,
+            tiltAcceleration = newData.tiltAcceleration ?: currentData.tiltAcceleration,
+            azimuthMaxAcceleration = newData.azimuthMaxAcceleration ?: currentData.azimuthMaxAcceleration,
+            elevationMaxAcceleration = newData.elevationMaxAcceleration ?: currentData.elevationMaxAcceleration,
+            tiltMaxAcceleration = newData.tiltMaxAcceleration ?: currentData.tiltMaxAcceleration,
+            trackingAzimuthTime = newData.trackingAzimuthTime ?: currentData.trackingAzimuthTime,
+            trackingCMDAzimuthAngle = newData.trackingCMDAzimuthAngle ?: currentData.trackingCMDAzimuthAngle,
+            trackingActualAzimuthAngle = newData.trackingActualAzimuthAngle ?: currentData.trackingActualAzimuthAngle,
+            trackingElevationTime = newData.trackingElevationTime ?: currentData.trackingElevationTime,
+            trackingCMDElevationAngle = newData.trackingCMDElevationAngle ?: currentData.trackingCMDElevationAngle,
+            trackingActualElevationAngle = newData.trackingActualElevationAngle ?: currentData.trackingActualElevationAngle,
+            trackingTiltTime = newData.trackingTiltTime ?: currentData.trackingTiltTime,
+            trackingCMDTiltAngle = newData.trackingCMDTiltAngle ?: currentData.trackingCMDTiltAngle,
+            trackingActualTiltAngle = newData.trackingActualTiltAngle ?: currentData.trackingActualTiltAngle,
         )
 
         // ⚡ 최적화: 실제로 변경된 경우에만 업데이트
@@ -76,6 +93,67 @@ class DataStoreService {
             udpConnected.set(true)
         }
     }
+    /**
+     * ✅ TrackingStatus 업데이트
+     */
+    // 기존 updateTrackingStatus 메서드는 그대로 유지
+    fun updateTrackingStatus(newStatus: PushData.TrackingStatus) {
+        val currentStatus = trackingStatus.get()
+
+        val mergedStatus = PushData.TrackingStatus(
+            ephemerisStatus = newStatus.ephemerisStatus ?: currentStatus.ephemerisStatus,
+            passScheduleStatus = newStatus.passScheduleStatus ?: currentStatus.passScheduleStatus,
+            sunTrackStatus = newStatus.sunTrackStatus ?: currentStatus.sunTrackStatus
+        )
+
+        trackingStatus.set(mergedStatus)
+
+        // PushData 전역 객체와 동기화
+        PushData.TRACKING_STATUS.ephemerisStatus = mergedStatus.ephemerisStatus
+        PushData.TRACKING_STATUS.passScheduleStatus = mergedStatus.passScheduleStatus
+        PushData.TRACKING_STATUS.sunTrackStatus = mergedStatus.sunTrackStatus
+
+        dataVersion.incrementAndGet()
+    }
+    /**
+     * ✅ 상호 배타적 추적 상태 업데이트 (하나만 true, 나머지는 false)
+     */
+    fun setEphemerisTracking(active: Boolean) {
+        val newStatus = PushData.TrackingStatus(
+            ephemerisStatus = active,
+            passScheduleStatus = false,
+            sunTrackStatus = false
+        )
+        updateTrackingStatus(newStatus)
+    }
+
+    fun setPassScheduleTracking(active: Boolean) {
+        val newStatus = PushData.TrackingStatus(
+            ephemerisStatus = false,
+            passScheduleStatus = active,
+            sunTrackStatus = false
+        )
+        updateTrackingStatus(newStatus)
+    }
+
+    fun setSunTracking(active: Boolean) {
+        val newStatus = PushData.TrackingStatus(
+            ephemerisStatus = false,
+            passScheduleStatus = false,
+            sunTrackStatus = active
+        )
+        updateTrackingStatus(newStatus)
+    }
+
+    fun stopAllTracking() {
+        val newStatus = PushData.TrackingStatus(
+            ephemerisStatus = false,
+            passScheduleStatus = false,
+            sunTrackStatus = false
+        )
+        updateTrackingStatus(newStatus)
+    }
+
 
     /**
      * ✅ 데이터 동등성 체크 (성능 최적화)
@@ -176,10 +254,10 @@ class DataStoreService {
             data.elevationBoardServoStatusBits, data.elevationBoardStatusBits,
             data.tiltBoardServoStatusBits, data.tiltBoardStatusBits,
             data.feedSBoardStatusBits, data.feedXBoardStatusBits,
-            data.currentSBandLNA_LHCP, data.currentSBandLNA_RHCP,
-            data.currentXBandLNA_LHCP, data.currentXBandLNA_RHCP,
-            data.rssiSBandLNA_LHCP, data.rssiSBandLNA_RHCP,
-            data.rssiXBandLNA_LHCP, data.rssiXBandLNA_RHCP
+            data.currentSBandLNALHCP, data.currentSBandLNARHCP,
+            data.currentXBandLNALHCP, data.currentXBandLNARHCP,
+            data.rssiSBandLNALHCP, data.rssiSBandLNARHCP,
+            data.rssiXBandLNALHCP, data.rssiXBandLNARHCP
         ).size
     }
 }
