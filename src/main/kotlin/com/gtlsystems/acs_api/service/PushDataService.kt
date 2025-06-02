@@ -30,7 +30,7 @@ class PushDataService(
             // 필수 데이터만 포함하여 처리 시간 최소화
             val dataWithInfo = mapOf(
                 "data" to currentData,
-                "TrackingStatus" to PushData.TRACKING_STATUS,
+                "trackingStatus" to PushData.TRACKING_STATUS,
                 "serverTime" to GlobalData.Time.serverTime,
                 "resultTimeOffsetCalTime" to GlobalData.Time.resultTimeOffsetCalTime,
                 "cmdAzimuthAngle" to PushData.CMD.cmdAzimuthAngle,

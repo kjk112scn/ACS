@@ -13,6 +13,7 @@ object PushData {
         var ephemerisStatus: Boolean? = null,
         var passScheduleStatus: Boolean? = null,
         var sunTrackStatus: Boolean? = null,
+        var manualControlStatus: Boolean? = null
     )
     data class ReadData(
         val modeStatusBits: String? = null,
@@ -68,6 +69,7 @@ object PushData {
         val trackingCMDTiltAngle : Float? = null,
         val trackingActualTiltAngle : Float? = null
     )
+    // ✅ 인스턴스 객체
     val CMD = CMDValue()
-    val TRACKING_STATUS = TrackingStatus() // ✅ 인스턴스 객체
+    val TRACKING_STATUS = TrackingStatus()
 }
