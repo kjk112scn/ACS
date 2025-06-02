@@ -115,7 +115,6 @@ export const useICDStore = defineStore('icd', () => {
   )
   const connectionStatus = computed(() => ({
     isConnected: isConnected.value,
-
     isUpdating: isUpdating.value,
     lastUpdate: lastUpdateTimeFormatted.value,
     updateCount: updateCount.value,
@@ -167,13 +166,11 @@ export const useICDStore = defineStore('icd', () => {
       }
 
       // resultTimeOffsetCalTime 업데이트
-
       if (message.resultTimeOffsetCalTime !== undefined) {
         resultTimeOffsetCalTime.value = safeToString(message.resultTimeOffsetCalTime)
       }
 
       // 명령 데이터 업데이트
-
       if (message.cmdAzimuthAngle !== undefined) {
         cmdAzimuthAngle.value = safeToString(message.cmdAzimuthAngle)
       }
@@ -606,7 +603,7 @@ export const useICDStore = defineStore('icd', () => {
     stopUIUpdates()
     disconnectWebSocket()
   }
-/*
+
   // ✅ Boolean 기반 computed 속성들 수정
   const ephemerisStatusInfo = computed(() => ({
     status: ephemerisStatus.value,
@@ -645,7 +642,8 @@ export const useICDStore = defineStore('icd', () => {
         : sunTrackStatus.value === false
           ? 'INACTIVE'
           : 'UNKNOWN',
-  })) */
+  }))
+
   // 명령 전송 메서드들
   const sendEmergency = async (commandType: 'E' | 'S' = 'E') => {
     try {
@@ -914,10 +912,14 @@ export const useICDStore = defineStore('icd', () => {
     lastUpdateTimeFormatted,
     connectionStatus,
 
+    //모드 상태 정보
+    ephemerisStatusInfo,
+    passScheduleStatusInfo,
+    sunTrackStatusInfo,
+
     // 메서드
     initialize,
     cleanup,
-
     startUIUpdates,
     stopUIUpdates,
     connectWebSocket,

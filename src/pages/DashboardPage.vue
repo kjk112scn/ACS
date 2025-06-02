@@ -22,15 +22,11 @@
               <div class="axis-data-row">
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">CMD</q-item-label>
-                  <q-item-label class="adaptive-text">{{
-                    displayValue(icdStore.cmdAzimuthAngle)
-                  }}</q-item-label>
+                  <q-item-label class="adaptive-text">{{ azimuthCmdValue }}</q-item-label>
                 </div>
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">Actual</q-item-label>
-                  <q-item-label class="adaptive-text">{{
-                    displayValue(icdStore.azimuthAngle)
-                  }}</q-item-label>
+                  <q-item-label class="adaptive-text">{{ azimuthActualValue }}</q-item-label>
                 </div>
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">Speed</q-item-label>
@@ -53,15 +49,11 @@
               <div class="axis-data-row">
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">CMD</q-item-label>
-                  <q-item-label class="adaptive-text">{{
-                    displayValue(icdStore.cmdElevationAngle)
-                  }}</q-item-label>
+                  <q-item-label class="adaptive-text">{{ elevationCmdValue }}</q-item-label>
                 </div>
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">Actual</q-item-label>
-                  <q-item-label class="adaptive-text">{{
-                    displayValue(icdStore.elevationAngle)
-                  }}</q-item-label>
+                  <q-item-label class="adaptive-text">{{ elevationActualValue }}</q-item-label>
                 </div>
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">Speed</q-item-label>
@@ -84,15 +76,11 @@
               <div class="axis-data-row">
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">CMD</q-item-label>
-                  <q-item-label class="adaptive-text">{{
-                    displayValue(icdStore.cmdTiltAngle)
-                  }}</q-item-label>
+                  <q-item-label class="adaptive-text">{{ tiltCmdValue }}</q-item-label>
                 </div>
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">Actual</q-item-label>
-                  <q-item-label class="adaptive-text">{{
-                    displayValue(icdStore.tiltAngle)
-                  }}</q-item-label>
+                  <q-item-label class="adaptive-text">{{ tiltActualValue }}</q-item-label>
                 </div>
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">Speed</q-item-label>
@@ -223,7 +211,7 @@
   </q-page>
 </template>
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useICDStore } from '../stores/API/icdStore'
 import { useRouter, useRoute } from 'vue-router'
 import * as echarts from 'echarts'
@@ -423,7 +411,7 @@ onMounted(async () => {
       console.log('✅ 차트 초기화 완료')
 
       // ✅ 차트 초기화 완료 후 차트 업데이트 시작
-      startChartUpdates()
+      void startChartUpdates()
     } catch (error) {
       console.error('❌ 차트 초기화 실패:', error)
     }
@@ -510,6 +498,65 @@ interface EChartsScatterParam {
   dimensionIndex: number
 }
 
+// ✅ 조건부 데이터 computed 속성들
+const azimuthCmdValue = computed(() => {
+  return icdStore.ephemerisStatusInfo.isActive
+    ? displayValue(icdStore.trackingCMDAzimuthAngle)
+    : displayValue(icdStore.cmdAzimuthAngle)
+})
+
+const azimuthActualValue = computed(() => {
+  return icdStore.ephemerisStatusInfo.isActive
+    ? displayValue(icdStore.trackingActualAzimuthAngle)
+    : displayValue(icdStore.azimuthAngle)
+})
+
+const elevationCmdValue = computed(() => {
+  return icdStore.ephemerisStatusInfo.isActive
+    ? displayValue(icdStore.trackingCMDElevationAngle)
+    : displayValue(icdStore.cmdElevationAngle)
+})
+
+const elevationActualValue = computed(() => {
+  return icdStore.ephemerisStatusInfo.isActive
+    ? displayValue(icdStore.trackingActualElevationAngle)
+    : displayValue(icdStore.elevationAngle)
+})
+
+const tiltCmdValue = computed(() => {
+  return icdStore.ephemerisStatusInfo.isActive
+    ? displayValue(icdStore.trackingCMDTiltAngle)
+    : displayValue(icdStore.cmdTiltAngle)
+})
+
+const tiltActualValue = computed(() => {
+  return icdStore.ephemerisStatusInfo.isActive
+    ? displayValue(icdStore.trackingActualTiltAngle)
+    : displayValue(icdStore.tiltAngle)
+})
+
+// ✅ 차트에서 사용할 실제 값들을 computed로 변경
+const getCurrentAzimuthActualValue = computed((): number => {
+  const isEphemerisActive = icdStore.ephemerisStatusInfo.isActive
+  const value = isEphemerisActive ? icdStore.trackingActualAzimuthAngle : icdStore.azimuthAngle
+  const numValue = Number(value)
+  return isNaN(numValue) ? 0 : numValue
+})
+
+const getCurrentElevationActualValue = computed((): number => {
+  const isEphemerisActive = icdStore.ephemerisStatusInfo.isActive
+  const value = isEphemerisActive ? icdStore.trackingActualElevationAngle : icdStore.elevationAngle
+  const numValue = Number(value)
+  return isNaN(numValue) ? 0 : numValue
+})
+
+const getCurrentTiltActualValue = computed((): number => {
+  const isEphemerisActive = icdStore.ephemerisStatusInfo.isActive
+  const value = isEphemerisActive ? icdStore.trackingActualTiltAngle : icdStore.tiltAngle
+  const numValue = Number(value)
+  return isNaN(numValue) ? 0 : numValue
+})
+
 // 차트 초기화 함수 - 각 차트를 완전히 독립적으로 초기화
 const initCharts = () => {
   console.log('차트 초기화 시작')
@@ -526,9 +573,9 @@ const initCharts = () => {
     // 새 차트 인스턴스 생성
     azimuthChart = echarts.init(azimuthChartRef.value)
 
-    // 현재 Actual 값으로 초기 데이터 설정
-    const initialAzimuth = icdStore.azimuthAngle || 0
-    console.log('Initial Azimuth value:', initialAzimuth)
+    // ✅ computed 값으로 초기 데이터 설정
+    const azimuth = getCurrentAzimuthActualValue.value
+    console.log('Initial Azimuth value:', azimuth)
 
     // Azimuth 차트만의 옵션 설정
     const azimuthOption = {
@@ -551,6 +598,7 @@ const initCharts = () => {
         axisTick: {
           show: true,
           interval: 30,
+
           lineStyle: { color: '#555' },
         },
         axisLabel: {
@@ -600,7 +648,7 @@ const initCharts = () => {
           symbol: 'circle',
           symbolSize: 12,
           itemStyle: { color: '#ff5722' },
-          data: [[1, initialAzimuth]], // [radius, angle] 형식으로 변경
+          data: [[1, azimuth]], // [radius, angle] 형식으로 변경
           zlevel: 2,
           label: {
             show: true,
@@ -644,9 +692,8 @@ const initCharts = () => {
     // 새 차트 인스턴스 생성
     elevationChart = echarts.init(elevationChartRef.value)
     // 초기 tilt 값 가져오기
-    const initialElevation = Number(icdStore.elevationAngle) || 0
-    const normalizedInitialElevation =
-      initialElevation < 0 ? initialElevation + 360 : initialElevation % 360
+    const elevation = getCurrentElevationActualValue.value // ✅ computed 값 사용
+    const normalizedInitialElevation = elevation < 0 ? elevation + 360 : elevation % 360
     // Elevation 차트만의 옵션 설정
     const elevationOption = {
       backgroundColor: 'transparent',
@@ -721,7 +768,7 @@ const initCharts = () => {
           label: {
             show: true,
             formatter: function () {
-              return `${initialElevation.toFixed(2)}°`
+              return `${elevation.toFixed(2)}°`
             },
             position: 'top',
             distance: 0,
@@ -751,8 +798,8 @@ const initCharts = () => {
     tiltChart = echarts.init(tiltChartRef.value)
 
     // 초기 tilt 값 가져오기
-    const initialTilt = Number(icdStore.tiltAngle) || 0
-    const normalizedInitialTilt = initialTilt < 0 ? initialTilt + 360 : initialTilt % 360
+    const tilt = getCurrentTiltActualValue.value // ✅ computed 값 사용
+    const normalizedInitialTilt = tilt < 0 ? tilt + 360 : tilt % 360
 
     const tiltOption = {
       backgroundColor: 'transparent',
@@ -827,7 +874,7 @@ const initCharts = () => {
           label: {
             show: true,
             formatter: function () {
-              return `${initialTilt.toFixed(2)}°`
+              return `${tilt.toFixed(2)}°`
             },
             position: 'top',
             distance: 0,
@@ -888,6 +935,193 @@ const releaseEmergency = async () => {
     console.error('Emergency Stop 해제 실패:', error)
   }
 }
+
+// ✅ 디버깅용 - Ephemeris 상태 변경 감시
+watch(
+  () => icdStore.ephemerisStatusInfo.isActive,
+  (newVal) => {
+    console.log('🔄 Ephemeris 상태 변경:', newVal)
+    console.log(
+      '📊 Azimuth Actual 값:',
+      newVal ? icdStore.trackingActualAzimuthAngle : icdStore.azimuthAngle,
+    )
+    console.log(
+      '📊 Elevation Actual 값:',
+      newVal ? icdStore.trackingActualElevationAngle : icdStore.elevationAngle,
+    )
+    console.log(
+      '📊 Tilt Actual 값:',
+      newVal ? icdStore.trackingActualTiltAngle : icdStore.tiltAngle,
+    )
+    console.log(
+      '📊 Azimuth CMD 값:',
+      newVal ? icdStore.trackingCMDAzimuthAngle : icdStore.cmdAzimuthAngle,
+    )
+    console.log(
+      '📊 Elevation CMD 값:',
+      newVal ? icdStore.trackingCMDElevationAngle : icdStore.cmdElevationAngle,
+    )
+    console.log('📊 Tilt CMD 값:', newVal ? icdStore.trackingCMDTiltAngle : icdStore.cmdTiltAngle)
+  },
+)
+
+// ✅ 개별 값 변경 감시
+watch(
+  () => icdStore.azimuthAngle,
+  (newVal) => {
+    console.log('🎯 일반 Azimuth 각도 변경:', newVal)
+  },
+)
+
+watch(
+  () => icdStore.trackingActualAzimuthAngle,
+  (newVal) => {
+    console.log('🛰️ 추적 Azimuth 각도 변경:', newVal)
+  },
+)
+
+watch(
+  () => icdStore.elevationAngle,
+  (newVal) => {
+    console.log('🎯 일반 Elevation 각도 변경:', newVal)
+  },
+)
+
+watch(
+  () => icdStore.trackingActualElevationAngle,
+  (newVal) => {
+    console.log('🛰️ 추적 Elevation 각도 변경:', newVal)
+  },
+)
+
+watch(
+  () => icdStore.tiltAngle,
+  (newVal) => {
+    console.log('🎯 일반 Tilt 각도 변경:', newVal)
+  },
+)
+
+watch(
+  () => icdStore.trackingActualTiltAngle,
+  (newVal) => {
+    console.log('🛰️ 추적 Tilt 각도 변경:', newVal)
+  },
+)
+
+// ✅ computed 값 변경 감시
+watch(
+  () => azimuthActualValue.value,
+  (newVal) => {
+    console.log(
+      '📈 표시되는 Azimuth Actual 값:',
+      newVal,
+      `(Ephemeris: ${icdStore.ephemerisStatusInfo.isActive})`,
+    )
+  },
+)
+
+watch(
+  () => elevationActualValue.value,
+  (newVal) => {
+    console.log(
+      '📈 표시되는 Elevation Actual 값:',
+      newVal,
+      `(Ephemeris: ${icdStore.ephemerisStatusInfo.isActive})`,
+    )
+  },
+)
+
+watch(
+  () => tiltActualValue.value,
+  (newVal) => {
+    console.log(
+      '📈 표시되는 Tilt Actual 값:',
+      newVal,
+      `(Ephemeris: ${icdStore.ephemerisStatusInfo.isActive})`,
+    )
+  },
+)
+
+watch(
+  () => azimuthCmdValue.value,
+  (newVal) => {
+    console.log(
+      '📈 표시되는 Azimuth CMD 값:',
+      newVal,
+      `(Ephemeris: ${icdStore.ephemerisStatusInfo.isActive})`,
+    )
+  },
+)
+
+watch(
+  () => elevationCmdValue.value,
+  (newVal) => {
+    console.log(
+      '📈 표시되는 Elevation CMD 값:',
+      newVal,
+      `(Ephemeris: ${icdStore.ephemerisStatusInfo.isActive})`,
+    )
+  },
+)
+
+watch(
+  () => tiltCmdValue.value,
+  (newVal) => {
+    console.log(
+      '📈 표시되는 Tilt CMD 값:',
+      newVal,
+      `(Ephemeris: ${icdStore.ephemerisStatusInfo.isActive})`,
+    )
+  },
+)
+
+// ✅ 전체 상태 요약 로그 (5초마다)
+let debugTimer: number | null = null
+
+onMounted(() => {
+  // 기존 onMounted 코드...
+
+  // 5초마다 전체 상태 요약 출력
+  debugTimer = window.setInterval(() => {
+    console.log('📋 === 전체 상태 요약 ===')
+    console.log('🔄 Ephemeris 활성화:', icdStore.ephemerisStatusInfo.isActive)
+    console.log('📊 현재 표시 값들:')
+    console.log('  - Azimuth Actual:', azimuthActualValue.value)
+    console.log('  - Elevation Actual:', elevationActualValue.value)
+    console.log('  - Tilt Actual:', tiltActualValue.value)
+    console.log('  - Azimuth CMD:', azimuthCmdValue.value)
+    console.log('  - Elevation CMD:', elevationCmdValue.value)
+    console.log('  - Tilt CMD:', tiltCmdValue.value)
+    console.log('📊 원본 데이터:')
+    console.log('  일반 모드:', {
+      azimuth: icdStore.azimuthAngle,
+      elevation: icdStore.elevationAngle,
+      tilt: icdStore.tiltAngle,
+      cmdAzimuth: icdStore.cmdAzimuthAngle,
+      cmdElevation: icdStore.cmdElevationAngle,
+      cmdTilt: icdStore.cmdTiltAngle,
+    })
+    console.log('  추적 모드:', {
+      azimuth: icdStore.trackingActualAzimuthAngle,
+      elevation: icdStore.trackingActualElevationAngle,
+      tilt: icdStore.trackingActualTiltAngle,
+      cmdAzimuth: icdStore.trackingCMDAzimuthAngle,
+      cmdElevation: icdStore.trackingCMDElevationAngle,
+      cmdTilt: icdStore.trackingCMDTiltAngle,
+    })
+    console.log('========================')
+  }, 5000)
+})
+
+onUnmounted(() => {
+  // 기존 onUnmounted 코드...
+
+  // 디버그 타이머 정리
+  if (debugTimer) {
+    clearInterval(debugTimer)
+    debugTimer = null
+  }
+})
 </script>
 
 <style>
