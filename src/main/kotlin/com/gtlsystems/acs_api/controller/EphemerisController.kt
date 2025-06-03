@@ -159,7 +159,7 @@ class EphemerisController(
             // 위성 추적 시작 (헤더 정보 전송)
             ephemerisService.startEphemerisTracking(passId)
             // 초기 추적 데이터 전송
-            ephemerisService.sendInitialTrackingData(passId)
+            //ephemerisService.sendInitialTrackingData(passId)
 
             mapOf(
                 "message" to "위성 추적이 시작되었습니다.",

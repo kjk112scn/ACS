@@ -559,7 +559,8 @@ class EphemerisService(
         hasFinishedTracking = false
 
         //dataStoreService.setEphemerisTracking(true)
-
+        currentTrackingPassId = passId
+        currentTrackingPass = ephemerisTrackMstStorage.find { it["No"] == passId }
         // ✅ 타이머 시작 (50ms 주기)
         startTimer()
 
@@ -580,7 +581,7 @@ class EphemerisService(
         hasStartedTracking = false
         hasFinishedTracking = false
 
-        dataStoreService.setEphemerisTracking(false)
+        //dataStoreService.setEphemerisTracking(false)
 
         logger.info("✅ 위성 추적 및 타이머 중지 완료")
     }
@@ -606,6 +607,7 @@ class EphemerisService(
         timer?.let {
             it.cancel()
             it.purge()
+            dataStoreService.setEphemerisTracking(false)
             logger.info("⏹️ 타이머 중지 완료")
         }
         timer = null
@@ -616,7 +618,11 @@ class EphemerisService(
      */
     private fun trackingSatelliteStateCheck() {
         try {
-            val passId = currentTrackingPass?.get("No") as? UInt ?: return
+            val passId = currentTrackingPassId
+            if (passId == null) {
+                logger.warn("현재 추적 중인 패스 ID가 설정되지 않았습니다.")
+                return
+            }
             val (startTime, endTime) = getCurrentTrackingPassTimes()
             val calTime = GlobalData.Time.calUtcTimeOffsetTime
             val timeDifference = Duration.between(startTime, calTime).seconds
@@ -689,7 +695,7 @@ class EphemerisService(
             val startAzimuth = (startPoint["Azimuth"] as Double).toFloat()
             val startElevation = (startPoint["Elevation"] as Double).toFloat()
             moveStartAnglePosition(startAzimuth,5f,startElevation,5f,0f,0f)
-            logger.info("📍 시작 위치 이동 완료: Az={:.2f}°, El={:.2f}°", startAzimuth, startElevation)
+            logger.info("📍 시작 위치 이동 완료: Az=${startAzimuth}°, El=${startElevation}°", startAzimuth, startElevation)
         }
     }
 
@@ -871,10 +877,8 @@ class EphemerisService(
                 dataStoreService.setEphemerisTracking(false)
                 return
             }
-
             // 현재 시간 기준으로 NTP 시간 정보 설정
             val currentTime = GlobalData.Time.utcNow
-
 
             // 2.12.2 위성 추적 초기 제어 명령 프로토콜 생성
             val initialControlFrame = ICDService.SatelliteTrackTwo.SetDataFrame(
@@ -894,8 +898,6 @@ class EphemerisService(
 
             // UdpFwICDService를 통해 데이터 전송
             udpFwICDService.sendSatelliteTrackInitialControl(initialControlFrame)
-
-
 
             logger.info("위성 추적 초기 제어 길이 (${calculateInitialDataByteSize(initialTrackingData.size)} 길이)")
             logger.info("위성 추적 초기 제어 명령 전송 완료 (${initialTrackingData.size}개 데이터 포인트)")
@@ -1070,11 +1072,9 @@ class EphemerisService(
             logger.info("위성 추적이 이미 중지되어 있습니다.")
             return
         }
-
         logger.info("위성 추적 중지")
-        dataStoreService.stopAllTracking()
-        //currentTrackingPass = null
-        //currentTrackingPassId = null
+        stopSatelliteTracking()
+        //dataStoreService.stopAllTracking()
     }
 
     /**
