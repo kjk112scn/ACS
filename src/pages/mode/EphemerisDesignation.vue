@@ -553,6 +553,49 @@ const selectedScheduleInfo = computed(() => {
 const timeRemaining = ref(0)
 let timeUpdateTimer: number | null = null
 
+// 추적 경로 저장을 위한 변수 추가 (개선된 버전)
+const trackingPath = ref<[number, number][]>([])
+const trackingPathRaw = ref<[number, number][]>([]) // 원본 데이터 저장용
+
+// 경로 데이터 샘플링 함수 추가
+const sampleTrackingPath = (
+  data: [number, number][],
+  maxPoints: number = 1000,
+): [number, number][] => {
+  if (data.length <= maxPoints) {
+    return data
+  }
+
+  // 샘플링 비율 계산 (예: 10000개 -> 1000개면 10개 중 1개)
+  const step = Math.ceil(data.length / maxPoints)
+  const sampledData: [number, number][] = []
+
+  // 첫 번째 점은 항상 포함
+
+  const firstPoint = data[0]
+  if (firstPoint) {
+    sampledData.push(firstPoint)
+  }
+
+  // step 간격으로 샘플링
+  for (let i = step; i < data.length - 1; i += step) {
+    const point = data[i]
+    if (point) {
+      sampledData.push(point)
+    }
+  }
+
+  // 마지막 점은 항상 포함 (현재 위치)
+  if (data.length > 1) {
+    const lastPoint = data[data.length - 1]
+    if (lastPoint) {
+      sampledData.push(lastPoint)
+    }
+  }
+
+  return sampledData
+}
+
 // 차트 초기화 함수
 const initChart = () => {
   if (!chartRef.value) return
@@ -629,7 +672,7 @@ const initChart = () => {
       type: 'value',
       min: 0,
       max: 90,
-      inverse: true,
+      inverse: true, // 고도각은 위에서 아래로 증가
       // ✅ 축 애니메이션 비활성화
       animation: false,
       axisLine: {
@@ -683,7 +726,8 @@ const initChart = () => {
           borderRadius: 4,
           fontSize: 10,
         },
-        zlevel: 2,
+
+        zlevel: 3,
       },
       {
         name: '위치 선',
@@ -701,7 +745,22 @@ const initChart = () => {
           [0, 0],
           [0, 0],
         ],
-        zlevel: 1,
+
+        zlevel: 2,
+      },
+      {
+        name: '실시간 추적 경로',
+        type: 'line',
+        coordinateSystem: 'polar',
+        symbol: 'none',
+        animation: false,
+        lineStyle: {
+          color: '#ffffff',
+          width: 3,
+          opacity: 0.8,
+        },
+        data: [],
+        zlevel: 2,
       },
       {
         name: '위성 궤적',
@@ -716,7 +775,8 @@ const initChart = () => {
         },
 
         data: [], // 초기에는 빈 배열
-        zlevel: 0,
+
+        zlevel: 1,
       },
     ],
   }
@@ -744,56 +804,61 @@ const updateChart = () => {
   }
 
   try {
-    // ✅ trackingActual 값을 우선적으로 사용
     let azimuth = 0
     let elevation = 0
-
-    // trackingActual 값이 있으면 우선 사용
-    const trackingAz = parseFloat(icdStore.trackingActualAzimuthAngle)
-    const trackingEl = parseFloat(icdStore.trackingActualElevationAngle)
-
-    if (!isNaN(trackingAz) && !isNaN(trackingEl)) {
-      // tracking 값이 유효하면 사용
-      azimuth = trackingAz
-      elevation = trackingEl
-
-      // 디버깅용 로그 (가끔씩만)
-      if (Math.random() < 0.01) {
-        // 1% 확률로 로그
-        console.log(`📍 Tracking 위치 사용: Az=${azimuth.toFixed(2)}°, El=${elevation.toFixed(2)}°`)
-      }
+    if (icdStore.ephemerisStatusInfo.isActive === true) {
+      azimuth = parseFloat(icdStore.trackingActualAzimuthAngle)
+      elevation = parseFloat(icdStore.trackingActualElevationAngle)
     } else {
-      // tracking 값이 없으면 일반 angle 값 사용
       azimuth = parseFloat(icdStore.azimuthAngle) || 0
       elevation = parseFloat(icdStore.elevationAngle) || 0
     }
 
-    // 방위각이 음수인 경우 0-360 범위로 변환
-
-    const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth % 360
-
-    // 고도각이 음수인 경우 0으로 처리 (차트에서는 0-90만 표시)
-
+    // ✅ DashboardPage와 동일한 정규화 방식 적용
+    const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
     const normalizedEl = Math.max(0, Math.min(90, elevation))
 
     // 현재 위치 정보 업데이트
-
     currentPosition.value.azimuth = azimuth
     currentPosition.value.elevation = elevation
     currentPosition.value.date = date.formatDate(new Date(), 'YYYY/MM/DD')
     currentPosition.value.time = date.formatDate(new Date(), 'HH:mm:ss')
 
-    // ✅ 차트 옵션 업데이트 - 첫 번째 시리즈(현재 위치 점)만 업데이트
-    chart.setOption({
+    // ✅ 추적 중일 때 경로 저장 - 데이터 순서 수정
+    if (icdStore.ephemerisStatusInfo.isActive === true) {
+      // ✅ [elevation, azimuth] 순서로 변경 (극좌표계: [radius, angle])
+      const currentPoint: [number, number] = [normalizedEl, normalizedAz]
+      
+      trackingPathRaw.value.push(currentPoint)
+      
+      if (trackingPathRaw.value.length > 50000) {
+        trackingPathRaw.value = trackingPathRaw.value.slice(-50000)
+      }
+      
+      trackingPath.value = sampleTrackingPath(trackingPathRaw.value, 1000)
+    } else {
+      trackingPath.value = []
+      trackingPathRaw.value = []
+    }
+
+    // ✅ 차트 옵션 업데이트 - [elevation, azimuth] 순서로 변경
+    const updateOption = {
       series: [
         {
-          // 첫 번째 시리즈(현재 위치 점) 업데이트
-          data: [[normalizedAz, normalizedEl]],
+          // ✅ [radius, angle] = [elevation, azimuth] 순서
+          data: [[normalizedEl, normalizedAz]],
         },
         {}, // 두 번째 시리즈는 그대로 유지
-        {}, // 세 번째 시리즈는 그대로 유지
+        {
+          // 세 번째 시리즈(실시간 추적 경로) 업데이트
+          data: [...trackingPath.value],
+        },
+        {}, // 네 번째 시리즈는 그대로 유지
       ],
-    })
+    } as unknown as Parameters<typeof chart.setOption>[0]
+
+    chart.setOption(updateOption)
+
   } catch (error) {
     console.error('차트 업데이트 중 오류 발생:', error)
   }
@@ -809,35 +874,34 @@ const updateChartWithTrajectory = (data: TrajectoryPoint[]) => {
   console.log('궤적 데이터 처리 시작:', data.length, '개의 포인트')
 
   try {
-    // 궤적 데이터 포인트 생성 (방위각, 고도각만 사용)
     const trajectoryPoints = data.map((point) => {
-      // 유효한 숫자인지 확인
       const az = typeof point.Azimuth === 'number' ? point.Azimuth : 0
       const el = typeof point.Elevation === 'number' ? point.Elevation : 0
 
-      // 방위각이 음수인 경우 0-360 범위로 변환
-      const normalizedAz = az < 0 ? az + 360 : az % 360
-
-      // 고도각이 음수인 경우 0으로 처리 (차트에서는 0-90만 표시)
+      // ✅ DashboardPage와 동일한 정규화 방식
+      const normalizedAz = az < 0 ? az + 360 : az
       const normalizedEl = Math.max(0, Math.min(90, el))
 
-      return [normalizedAz, normalizedEl]
+      // ✅ [elevation, azimuth] 순서로 반환 (극좌표계: [radius, angle])
+      return [normalizedEl, normalizedAz]
     })
 
     console.log('생성된 궤적 포인트 샘플:', trajectoryPoints.slice(0, 5))
 
-    // 차트 옵션 업데이트 - 세 번째 시리즈(궤적 라인)만 업데이트
-    chart.setOption({
+    // 차트 옵션 업데이트 - 네 번째 시리즈(궤적 라인)만 업데이트
+    const trajectoryOption = {
       series: [
         {}, // 첫 번째 시리즈는 그대로 유지
         {}, // 두 번째 시리즈는 그대로 유지
+        {}, // 세 번째 시리즈는 그대로 유지
         {
-          // 세 번째 시리즈(궤적 라인) 업데이트
-          type: 'line',
+          // 네 번째 시리즈(궤적 라인) 업데이트
           data: trajectoryPoints,
         },
       ],
-    })
+    } as unknown as Parameters<typeof chart.setOption>[0]
+
+    chart.setOption(trajectoryOption)
 
     console.log('차트 옵션 업데이트 완료')
   } catch (error) {

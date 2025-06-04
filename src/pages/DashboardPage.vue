@@ -964,7 +964,7 @@ watch(
     console.log('📊 Tilt CMD 값:', newVal ? icdStore.trackingCMDTiltAngle : icdStore.cmdTiltAngle)
   },
 )
-
+/* 
 // ✅ 개별 값 변경 감시
 watch(
   () => icdStore.azimuthAngle,
@@ -1073,7 +1073,7 @@ watch(
       `(Ephemeris: ${icdStore.ephemerisStatusInfo.isActive})`,
     )
   },
-)
+) */
 
 // ✅ 전체 상태 요약 로그 (5초마다)
 let debugTimer: number | null = null
