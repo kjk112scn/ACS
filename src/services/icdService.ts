@@ -500,7 +500,7 @@ export const icdService = {
         params: {
           azOffset,
           elOffset,
-          tiOffest: tiOffset, // 백엔드 파라미터 이름에 맞춤 (tiOffest)
+          tiOffset: tiOffset, // 백엔드 파라미터 이름에 맞춤 (tiOffest)
         },
       })
       console.log('Position offset command sent:', response.data)

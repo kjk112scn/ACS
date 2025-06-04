@@ -582,6 +582,8 @@ const initChart = () => {
       clockwise: true,
       min: 0,
       max: 360,
+      // ✅ 축 애니메이션 비활성화
+      animation: false,
       axisLine: {
         show: true,
         lineStyle: {
@@ -628,6 +630,8 @@ const initChart = () => {
       min: 0,
       max: 90,
       inverse: true,
+      // ✅ 축 애니메이션 비활성화
+      animation: false,
       axisLine: {
         show: false,
       },
@@ -653,6 +657,8 @@ const initChart = () => {
         coordinateSystem: 'polar',
         symbol: 'circle',
         symbolSize: 15,
+        // ✅ 축 애니메이션 비활성화
+        animation: false,
         itemStyle: {
           color: '#ff5722',
         },
@@ -684,6 +690,8 @@ const initChart = () => {
         type: 'line',
         coordinateSystem: 'polar',
         symbol: 'none',
+        // ✅ 축 애니메이션 비활성화
+        animation: false,
         lineStyle: {
           color: '#ff5722',
           width: 2,
@@ -700,6 +708,8 @@ const initChart = () => {
         type: 'line',
         coordinateSystem: 'polar',
         symbol: 'none',
+        // ✅ 축 애니메이션 비활성화
+        animation: false,
         lineStyle: {
           color: '#2196f3',
           width: 2,
@@ -707,7 +717,6 @@ const initChart = () => {
 
         data: [], // 초기에는 빈 배열
         zlevel: 0,
-        animation: false,
       },
     ],
   }
