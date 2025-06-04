@@ -14,6 +14,7 @@ import com.gtlsystems.acs_api.event.ACSEventBus
 import com.gtlsystems.acs_api.event.subscribeToType
 import com.gtlsystems.acs_api.model.PushData
 import io.netty.handler.timeout.TimeoutException
+import jakarta.annotation.PreDestroy
 import org.springframework.scheduling.TaskScheduler
 import reactor.core.Disposable
 import reactor.core.publisher.Mono
@@ -26,6 +27,11 @@ import java.time.temporal.ChronoUnit
 import java.util.BitSet
 import java.util.Timer
 import java.util.TimerTask
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.ThreadFactory
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -60,8 +66,22 @@ class EphemerisService(
     // ✅ 간단한 실행 완료 플래그 (Set 사용)
     private val executedActions = mutableSetOf<String>()
     // ✅ Timer 사용 (간단함)
-    private var timer: Timer? = null
+
     private val trackingStatus = PushData.TRACKING_STATUS
+    // ✅ 새로운 정교한 타이머 필드들 추가
+    private var trackingExecutor: ScheduledExecutorService? = null
+    private var trackingTask: ScheduledFuture<*>? = null
+
+    private val realtimeTrackingDataList = mutableListOf<Map<String, Any?>>()
+    private var trackingDataIndex = 0
+    // ✅ 커스텀 ThreadFactory 생성
+    private val trackingThreadFactory = ThreadFactory { runnable ->
+        Thread(runnable, "SatelliteTracking-Timer").apply {
+            priority = Thread.MAX_PRIORITY - 3  // 4번째 우선순위 (10-3=7)
+            isDaemon = true
+        }
+    }
+
 
     @PostConstruct
     fun init() {
@@ -100,12 +120,17 @@ class EphemerisService(
         subscriptions.add(dataRequestSubscription)
     }
 
-    // 서비스 종료 시 구독 해제
+    // ✅ 서비스 종료 시 정리 (기존 destroy() 메서드에 추가)
+    @PreDestroy
     fun destroy() {
+        // 기존 구독 해제
         subscriptions.forEach { it.dispose() }
         subscriptions.clear()
-    }
 
+        // ✅ 타이머 정리 추가
+        stopTimer()
+        logger.info("EphemerisService 정리 완료")
+    }
     fun satelliteTest() {
         try {
 
@@ -551,7 +576,6 @@ class EphemerisService(
         // ✅ 실행 플래그 초기화 (가장 중요!)
         executedActions.clear()
         logger.info("🔄 실행 플래그 초기화 완료")
-        //dataStoreService.setEphemerisTracking(true)
         currentTrackingPassId = passId
         currentTrackingPass = ephemerisTrackMstStorage.find { it["No"] == passId }
         if (currentTrackingPass == null) {
@@ -573,38 +597,109 @@ class EphemerisService(
         logger.info("위성 추적 중지")
         stopCommand()
         // ✅ 타이머 중지
-        //stopTimer()
+        stopTimer()
         dataStoreService.setEphemerisTracking(false)
         logger.info("✅ 위성 추적 및 타이머 중지 완료")
         //dataStoreService.stopAllTracking()
     }
     /**
-     * 타이머 시작
+     * ✅ 정교한 타이머 시작 (기존 startTimer() 메서드 대체)
      */
     private fun startTimer() {
-        timer = Timer("SatelliteTracking", true)
-        timer?.scheduleAtFixedRate(object : TimerTask() {
-            override fun run() {
-                trackingSatelliteStateCheck()
-            }
-        }, 0, 100) // 0ms 후 시작, 50ms 주기
+        // 기존 타이머가 있다면 정리
+        stopTimer()
 
-        logger.info("⏰ 50ms 주기 타이머 시작")
+        // 새로운 ScheduledExecutorService 생성
+        trackingExecutor = Executors.newSingleThreadScheduledExecutor(trackingThreadFactory)
+
+        // 정교한 스케줄링으로 작업 시작
+        trackingTask = trackingExecutor?.scheduleAtFixedRate(
+            {
+                try {
+                    trackingSatelliteStateCheck()
+                } catch (e: Exception) {
+                    logger.error("위성 추적 상태 체크 중 오류: ${e.message}", e)
+                }
+            },
+            0,      // 초기 지연 시간
+            100,    // 실행 간격 (100ms)
+            TimeUnit.MILLISECONDS
+        )
+
+        logger.info("⏰ 정교한 100ms 주기 타이머 시작 (우선순위: 7)")
     }
 
     /**
-     * 타이머 중지
+     * ✅ 정교한 타이머 중지 (기존 stopTimer() 메서드 대체)
      */
     private fun stopTimer() {
-        timer?.let {
-            it.cancel()
-            it.purge()
-            logger.info("⏹️ 타이머 중지 완료")
+        // 실행 중인 작업 취소
+        trackingTask?.let { task ->
+            if (!task.isCancelled) {
+                task.cancel(false) // 진행 중인 작업은 완료하도록 함
+                logger.debug("⏹️ 추적 작업 취소 완료")
+            }
         }
-        timer = null
+        trackingTask = null
+
+        // ExecutorService 종료
+        trackingExecutor?.let { executor ->
+            executor.shutdown()
+            try {
+                if (!executor.awaitTermination(2, TimeUnit.SECONDS)) {
+                    logger.warn("추적 타이머 정상 종료 실패, 강제 종료 시도")
+                    executor.shutdownNow()
+                    if (!executor.awaitTermination(1, TimeUnit.SECONDS)) {
+                        logger.error("추적 타이머 강제 종료 실패")
+                    } else {
+                        logger.info("⏹️ 추적 타이머 강제 종료 완료")
+                    }
+                } else {
+                    logger.info("⏹️ 추적 타이머 정상 종료 완료")
+                }
+            } catch (e: InterruptedException) {
+                logger.warn("추적 타이머 종료 중 인터럽트 발생")
+                executor.shutdownNow()
+                Thread.currentThread().interrupt()
+            }
+        }
+        trackingExecutor = null
     }
+
     /**
-     * 50ms 주기 상태 체크 (핵심 로직)
+     * ✅ 타이머 상태 확인 (기존 isTimerRunning() 메서드 수정)
+     */
+    fun isTimerRunning(): Boolean {
+        return trackingExecutor != null &&
+                !trackingExecutor!!.isShutdown &&
+                !trackingExecutor!!.isTerminated &&
+                trackingTask != null &&
+                !trackingTask!!.isCancelled
+    }
+
+    /**
+     * ✅ 타이머 상세 상태 정보 (새로운 메서드)
+     */
+    fun getTimerStatus(): Map<String, Any> {
+        val executor = trackingExecutor
+        val task = trackingTask
+
+        return mapOf(
+            "isRunning" to isTimerRunning(),
+            "executorExists" to (executor != null),
+            "executorShutdown" to (executor?.isShutdown ?: true),
+            "executorTerminated" to (executor?.isTerminated ?: true),
+            "taskExists" to (task != null),
+            "taskCancelled" to (task?.isCancelled ?: true),
+            "taskDone" to (task?.isDone ?: true),
+            "threadPriority" to 7,
+            "threadName" to "SatelliteTracking-Timer"
+        )
+    }
+
+
+    /**
+     * 100ms 주기 상태 체크 (핵심 로직)
      */
     private fun trackingSatelliteStateCheck() {
         try {
@@ -629,11 +724,17 @@ class EphemerisService(
                     handleBeforeStart(passId)
                 }
 
-                // ✅ 진행 중: 한 번만 실행
-                timeDifference > 0 && calTime.isBefore(endTime) && !executedActions.contains("IN_PROGRESS") -> {
-                    executedActions.add("IN_PROGRESS")
-                    logger.info("📡 추적 진행 중 처리 실행 - 데이터 전송 시작")
-                    handleInProgress(passId)
+                // ✅ 진행 중: 한 번만 실행 + 실시간 데이터 저장
+                timeDifference > 0 && calTime.isBefore(endTime) -> {
+                    // 한 번만 실행되는 부분 (기존 로직 유지)
+                    if (!executedActions.contains("IN_PROGRESS")) {
+                        executedActions.add("IN_PROGRESS")
+                        logger.info("📡 추적 진행 중 처리 실행 - 데이터 전송 시작")
+                        handleInProgress(passId)
+                    }
+
+                    // ✅ 실시간 추적 데이터 저장 (매번 실행)
+                    saveRealtimeTrackingData(passId, calTime, startTime)
                 }
 
                 // ✅ 완료: 한 번만 실행
@@ -653,12 +754,7 @@ class EphemerisService(
             logger.error("추적 상태 체크 오류: ${e.message}", e)
         }
     }
-    /**
-     * 타이머 상태 확인
-     */
-    fun isTimerRunning(): Boolean {
-        return timer != null
-    }
+
     /**
      * 추적 시작 전 처리
      */
@@ -682,6 +778,150 @@ class EphemerisService(
     private fun handleCompleted() {
         logger.info("✅ 완료 상태 - 추적 종료")
     }
+    /**
+     * ✅ 실시간 추적 데이터 저장
+     */
+    private fun saveRealtimeTrackingData(passId: UInt, currentTime: ZonedDateTime, startTime: ZonedDateTime) {
+        try {
+            // 현재 시간을 기준으로 추적 시간 계산 (시작 시간으로부터 경과된 시간, 초 단위)
+            val elapsedTimeSeconds = Duration.between(startTime, currentTime).toMillis() / 1000.0f
+
+            // 현재 추적해야 할 위성 위치 계산
+            val passDetails = getEphemerisTrackDtlByMstId(passId)
+            if (passDetails.isEmpty()) {
+                logger.debug("패스 세부 데이터가 없어 실시간 데이터 저장을 건너뜁니다.")
+                return
+            }
+
+            // 현재 시간에 해당하는 목표 위치 찾기
+            val timeDifferenceMs = Duration.between(startTime, currentTime).toMillis()
+            val calculatedIndex = (timeDifferenceMs / 100).toInt() // 100ms 간격
+
+            val targetPoint = if (calculatedIndex >= 0 && calculatedIndex < passDetails.size) {
+                passDetails[calculatedIndex]
+            } else {
+                passDetails.lastOrNull() ?: return
+            }
+
+              val cmdAzimuth = (targetPoint["Azimuth"] as Double).toFloat()
+              val cmdElevation = (targetPoint["Elevation"] as Double).toFloat()
+
+            // PushData에서 실제 현재 위치 가져오기 (실제 안테나 위치)
+            val readData = PushData.ReadData()
+            val trackingCmdAzimuthTime = readData.trackingAzimuthTime
+            val trackingCmdElevationTime = readData.trackingElevationTime
+            val trackingCmdTiltTime = readData.trackingTiltTime
+            // ✅ 추적 명령 및 실제 값 가져오기 (null 안전 처리)
+            val trackingCmdAzimuth = readData.trackingCMDAzimuthAngle
+            val trackingActualAzimuth = readData.trackingActualAzimuthAngle
+            val trackingCmdElevation = readData.trackingCMDElevationAngle
+            val trackingActualElevation = readData.trackingActualElevationAngle
+            val trackingCmdTilt = readData.trackingCMDTiltAngle
+            val trackingActualTilt = readData.trackingActualTiltAngle
+
+            // 실시간 추적 데이터 생성
+            val realtimeData = mapOf(
+                "index" to trackingDataIndex,
+                "timestamp" to currentTime,
+                "cmdAz" to cmdAzimuth,
+                "cmdEl" to cmdElevation,
+                "elapsedTimeSeconds" to elapsedTimeSeconds,
+                "trackingAzimuthTime" to trackingCmdAzimuthTime,
+                "trackingCMDAzimuthAngle" to trackingCmdAzimuth,
+                "trackingActualAzimuthAngle" to trackingActualAzimuth,
+                "trackingElevationTime" to trackingCmdElevationTime,
+                "trackingCMDElevationAngle" to trackingCmdElevation,
+                "trackingActualElevationAngle" to trackingActualElevation,
+                "trackingTiltTime" to trackingCmdTiltTime,
+                "trackingCMDTiltAngle" to trackingCmdTilt, // 틸트는 일반적으로 0
+                "trackingActualTiltAngle" to trackingActualTilt,
+                "passId" to passId,
+                "azimuthError" to ((trackingCmdAzimuth ?: 0.0f) - (trackingActualAzimuth ?: 0.0f)),
+                "elevationError" to ((trackingCmdElevation ?: 0.0f) - (trackingActualElevation ?: 0.0f)),
+            )
+
+            // 리스트에 추가
+            realtimeTrackingDataList.add(realtimeData)
+            trackingDataIndex++
+
+            // 주기적 로깅 (10초마다 또는 100개 데이터마다)
+            if (trackingDataIndex % 100 == 0) {
+                logger.info("📊 실시간 추적 데이터 저장 중 - 총 {}개 데이터 포인트 저장됨", trackingDataIndex)
+                logger.debug("현재 목표: Az={:.2f}°, El={:.2f}° | 실제: Az={:.2f}°, El={:.2f}°",
+                    trackingCmdAzimuth, trackingCmdElevationTime, trackingActualAzimuth, trackingActualElevation)
+            }
+
+        } catch (e: Exception) {
+            logger.error("실시간 추적 데이터 저장 중 오류: ${e.message}", e)
+        }
+    }
+
+    /**
+     * ✅ 실시간 추적 데이터 조회
+     */
+    fun getRealtimeTrackingData(): List<Map<String, Any?>> {
+        return realtimeTrackingDataList.toList()
+    }
+
+    /**
+     * ✅ 실시간 추적 데이터 개수 조회
+     */
+    fun getRealtimeTrackingDataCount(): Int {
+        return realtimeTrackingDataList.size
+    }
+
+    /**
+     * ✅ 최근 N개의 실시간 추적 데이터 조회
+     */
+    fun getRecentRealtimeTrackingData(count: Int = 100): List<Map<String, Any?>> {
+        return if (realtimeTrackingDataList.size <= count) {
+            realtimeTrackingDataList.toList()
+        } else {
+            realtimeTrackingDataList.takeLast(count)
+        }
+    }
+
+    /**
+     * ✅ 실시간 추적 데이터 초기화
+     */
+    fun clearRealtimeTrackingData() {
+        realtimeTrackingDataList.clear()
+        trackingDataIndex = 0
+        logger.info("실시간 추적 데이터 초기화 완료")
+    }
+
+    /**
+     * ✅ 실시간 추적 통계 정보
+     */
+    fun getRealtimeTrackingStats(): Map<String, Any> {
+        if (realtimeTrackingDataList.isEmpty()) {
+            return mapOf(
+                "totalCount" to 0,
+                "averageAzimuthError" to 0.0,
+                "averageElevationError" to 0.0,
+                "maxAzimuthError" to 0.0,
+                "maxElevationError" to 0.0
+            )
+        }
+
+        val azimuthErrors = realtimeTrackingDataList.mapNotNull {
+            it["azimuthError"] as? Float
+        }
+        val elevationErrors = realtimeTrackingDataList.mapNotNull {
+            it["elevationError"] as? Float
+        }
+
+        return mapOf(
+            "totalCount" to realtimeTrackingDataList.size,
+            "averageAzimuthError" to azimuthErrors.average(),
+            "averageElevationError" to elevationErrors.average(),
+            "maxAzimuthError" to (azimuthErrors.maxOrNull() ?: 0.0),
+            "maxElevationError" to (elevationErrors.maxOrNull() ?: 0.0),
+            "minAzimuthError" to (azimuthErrors.minOrNull() ?: 0.0),
+            "minElevationError" to (elevationErrors.minOrNull() ?: 0.0)
+        )
+    }
+
     /**
      * 시작 위치로 이동
      */

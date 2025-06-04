@@ -20,6 +20,25 @@ class EphemerisController(
 )
 {
     private val logger = LoggerFactory.getLogger(EphemerisController::class.java)
+
+    /**
+     * ✅ 실시간 추적 데이터 전체 조회
+     */
+    @GetMapping("/tracking/realtime-data")
+    fun getRealtimeTrackingData(): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            val data = ephemerisService.getRealtimeTrackingData()
+            val stats = ephemerisService.getRealtimeTrackingStats()
+
+            mapOf(
+                "message" to "실시간 추적 데이터 조회 완료",
+                "totalCount" to data.size,
+                "data" to data,
+                "statistics" to stats
+            )
+        }
+    }
+
     @PostMapping("/set-current-tracking-pass-id")
     fun setCurrentTrackingPassId(@RequestParam passId: UInt?): ResponseEntity<Map<String, String>> {
         return try {
