@@ -363,7 +363,7 @@ class UdpFwICDService(
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
             // 모든 추적 중지
-            stopAllCommand()
+            //stopAllCommand()
 
             logger.info("Stop 명령 전송 완료")
             logger.debug("Stop 전송 데이터: {}", byteArrayToHexString(dataToSend))

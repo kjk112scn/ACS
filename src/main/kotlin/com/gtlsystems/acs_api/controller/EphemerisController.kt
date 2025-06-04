@@ -3,6 +3,8 @@ package com.gtlsystems.acs_api.controller
 import com.gtlsystems.acs_api.algorithm.satellitetracker.impl.OrekitCalculator
 import com.gtlsystems.acs_api.algorithm.satellitetracker.model.SatelliteTrackData
 import com.gtlsystems.acs_api.service.EphemerisService
+import com.gtlsystems.acs_api.service.ICDService
+import com.gtlsystems.acs_api.service.UdpFwICDService
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -176,7 +178,6 @@ class EphemerisController(
     fun stopEphemerisTracking(): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             ephemerisService.stopEphemerisTracking()
-
             mapOf(
                 "message" to "위성 추적이 중지되었습니다.",
                 "status" to "stopped"

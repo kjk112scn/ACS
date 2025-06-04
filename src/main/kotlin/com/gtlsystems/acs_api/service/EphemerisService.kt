@@ -26,6 +26,7 @@ import java.time.temporal.ChronoUnit
 import java.util.BitSet
 import java.util.Timer
 import java.util.TimerTask
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * 위성 추적 서비스
@@ -56,16 +57,12 @@ class EphemerisService(
 
     private var currentTrackingPassId: UInt? = null
     private var subscriptions: MutableList<Disposable> = mutableListOf()
-    // 실행 상태 플래그 (한 번씩만 실행하기 위함)
-    private var hasMovedToStart = false
-    private var hasStartedTracking = false
-    private var hasFinishedTracking = false
-
-
+    // ✅ 간단한 실행 완료 플래그 (Set 사용)
+    private val executedActions = mutableSetOf<String>()
     // ✅ Timer 사용 (간단함)
     private var timer: Timer? = null
-
     private val trackingStatus = PushData.TRACKING_STATUS
+
     @PostConstruct
     fun init() {
         eventBus()
@@ -549,43 +546,38 @@ class EphemerisService(
     }
     fun startEphemerisTracking(passId: UInt) {
         logger.info("🚀 위성 추적 시작: 패스 ID = {}", passId)
-
         // 기존 타이머 중지
         stopTimer()
-
-        // 상태 초기화
-        hasMovedToStart = false
-        hasStartedTracking = false
-        hasFinishedTracking = false
-
+        // ✅ 실행 플래그 초기화 (가장 중요!)
+        executedActions.clear()
+        logger.info("🔄 실행 플래그 초기화 완료")
         //dataStoreService.setEphemerisTracking(true)
         currentTrackingPassId = passId
         currentTrackingPass = ephemerisTrackMstStorage.find { it["No"] == passId }
+        if (currentTrackingPass == null) {
+            logger.error("패스 ID {}에 해당하는 데이터를 찾을 수 없습니다", passId)
+            return
+        }
         // ✅ 타이머 시작 (50ms 주기)
         startTimer()
-
         logger.info("✅ 위성 추적 및 타이머 시작 완료")
     }
-
     /**
-     * 위성 추적 중지 + 타이머 중지
+     * 위성 추적 중지
      */
-    fun stopSatelliteTracking() {
-        logger.info("🛑 위성 추적 중지")
-
+    fun stopEphemerisTracking() {
+        if (trackingStatus.ephemerisStatus != true) {
+            logger.info("위성 추적이 이미 중지되어 있습니다.")
+            return
+        }
+        logger.info("위성 추적 중지")
+        stopCommand()
         // ✅ 타이머 중지
         stopTimer()
-
-        // 상태 초기화
-        hasMovedToStart = false
-        hasStartedTracking = false
-        hasFinishedTracking = false
-
-        //dataStoreService.setEphemerisTracking(false)
-
+        dataStoreService.setEphemerisTracking(false)
         logger.info("✅ 위성 추적 및 타이머 중지 완료")
+        //dataStoreService.stopAllTracking()
     }
-
     /**
      * 타이머 시작
      */
@@ -607,14 +599,13 @@ class EphemerisService(
         timer?.let {
             it.cancel()
             it.purge()
-            dataStoreService.setEphemerisTracking(false)
+
             logger.info("⏹️ 타이머 중지 완료")
         }
         timer = null
     }
-
     /**
-     * 50ms 주기 상태 체크
+     * 50ms 주기 상태 체크 (핵심 로직)
      */
     private fun trackingSatelliteStateCheck() {
         try {
@@ -623,35 +614,46 @@ class EphemerisService(
                 logger.warn("현재 추적 중인 패스 ID가 설정되지 않았습니다.")
                 return
             }
+
             val (startTime, endTime) = getCurrentTrackingPassTimes()
             val calTime = GlobalData.Time.calUtcTimeOffsetTime
             val timeDifference = Duration.between(startTime, calTime).seconds
 
+            // ✅ 디버깅 로그 (필요시 주석 처리)
+            logger.debug("⏰ 상태체크 - 시간차: {}초, 실행완료: {}", timeDifference, executedActions)
+
             when {
-                timeDifference <= 0 && !hasMovedToStart -> {
+                // ✅ 시작 전: 한 번만 실행
+                timeDifference <= 0 && !executedActions.contains("BEFORE_START") -> {
+                    executedActions.add("BEFORE_START")
+                    logger.info("📍 시작 전 처리 실행 - 시작 위치로 이동")
                     handleBeforeStart(passId)
-                    hasMovedToStart = true
-                    logger.debug("📍 시작 위치 이동 완료")
                 }
 
-                timeDifference > 0 && calTime.isBefore(endTime) && !hasStartedTracking -> {
+                // ✅ 진행 중: 한 번만 실행
+                timeDifference > 0 && calTime.isBefore(endTime) && !executedActions.contains("IN_PROGRESS") -> {
+                    executedActions.add("IN_PROGRESS")
+                    logger.info("📡 추적 진행 중 처리 실행 - 데이터 전송 시작")
                     handleInProgress(passId)
-                    hasStartedTracking = true
-                    logger.debug("📡 추적 데이터 전송 시작")
                 }
 
-                calTime.isAfter(endTime) && !hasFinishedTracking -> {
-                    handleAfterEnd()
-                    hasFinishedTracking = true
-                    logger.debug("✅ 추적 완료")
+                // ✅ 완료: 한 번만 실행
+                calTime.isAfter(endTime) && !executedActions.contains("COMPLETED") -> {
+                    executedActions.add("COMPLETED")
+                    logger.info("✅ 추적 완료 처리 실행")
+                    handleCompleted()
+                }
+
+                else -> {
+                    // 조건에 맞지 않거나 이미 실행된 경우
+                    logger.debug("⏸️ 대기 중 또는 이미 처리됨")
                 }
             }
 
         } catch (e: Exception) {
-            logger.error("50ms 추적 상태 체크 오류: ${e.message}", e)
+            logger.error("추적 상태 체크 오류: ${e.message}", e)
         }
     }
-
     /**
      * 타이머 상태 확인
      */
@@ -663,7 +665,6 @@ class EphemerisService(
      */
     private fun handleBeforeStart(passId: UInt) {
         logger.info("📍 시작 전 상태 - 시작 위치로 이동")
-
         moveToStartPosition(passId)
     }
 
@@ -677,13 +678,11 @@ class EphemerisService(
     }
 
     /**
-     * 추적 종료 후 처리
+     * 추적 완료 처리
      */
-    private fun handleAfterEnd() {
-        logger.info("✅ 종료 후 상태 - 추적 완료")
-        stopSatelliteTracking()
+    private fun handleCompleted() {
+        logger.info("✅ 완료 상태 - 추적 종료")
     }
-
     /**
      * 시작 위치로 이동
      */
@@ -705,17 +704,6 @@ class EphemerisService(
     private fun startTrackingDataTransmission(passId: UInt) {
         sendHeaderTrackingData(passId)
         logger.info("📡 추적 데이터 전송 시작 완료")
-    }
-
-    /**
-     * 현재 상태 조회
-     */
-    fun getTrackingStatus(): Map<String, Any> {
-        return mapOf(
-            "hasMovedToStart" to hasMovedToStart,
-            "hasStartedTracking" to hasStartedTracking,
-            "hasFinishedTracking" to hasFinishedTracking,
-        )
     }
 
     /**
@@ -873,7 +861,6 @@ class EphemerisService(
             }
             if (passDetails.isEmpty()) {
                 logger.error("선택된 패스 ID($passId)에 해당하는 세부 데이터를 찾을 수 없습니다.")
-
                 dataStoreService.setEphemerisTracking(false)
                 return
             }
@@ -901,7 +888,6 @@ class EphemerisService(
 
             logger.info("위성 추적 초기 제어 길이 (${calculateInitialDataByteSize(initialTrackingData.size)} 길이)")
             logger.info("위성 추적 초기 제어 명령 전송 완료 (${initialTrackingData.size}개 데이터 포인트)")
-            startEphemerisTracking(passId)
 
         } catch (e: Exception) {
             dataStoreService.setEphemerisTracking(false)
@@ -1064,19 +1050,15 @@ class EphemerisService(
         currentTrackingPassId = newPassId
     }
 
-    /**
-     * 위성 추적 중지
-     */
-    fun stopEphemerisTracking() {
-        if (trackingStatus.ephemerisStatus != true) {
-            logger.info("위성 추적이 이미 중지되어 있습니다.")
-            return
-        }
-        logger.info("위성 추적 중지")
-        stopSatelliteTracking()
-        //dataStoreService.stopAllTracking()
-    }
 
+    fun stopCommand()
+    {
+        val multiAxis = BitSet()
+        multiAxis.set(0)
+        multiAxis.set(1)
+        multiAxis.set(2)
+        udpFwICDService.stopCommand(multiAxis)
+    }
     /**
      * 패스의 첫 번째 방위각 가져오기
      */
