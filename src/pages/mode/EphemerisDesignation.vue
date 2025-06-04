@@ -244,6 +244,14 @@
                   @click="openScheduleModal"
                   class="q-mr-sm"
                 />
+                <!-- ✅ 다운로드 버튼 추가 -->
+                <q-btn
+                  color="secondary"
+                  label="Download"
+                  icon="download"
+                  @click="downloadRealtimeData"
+                  class="q-mr-sm"
+                />
               </div>
               <!-- 버튼 그룹 추가 -->
               <div class="button-group q-mt-md">
@@ -376,7 +384,12 @@ import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 import { useEphemerisTrackStore } from '../../stores/API/ephemerisTrackStore'
 import { formatToLocalTime, formatTimeRemaining, getCalTimeTimestamp } from '../../utils/times'
-
+// 인터페이스 정의 - 서비스의 타입과 동일하게 사용
+import {
+  ephemerisTrackService,
+  type ScheduleItem,
+  type RealtimeTrackingDataItem,
+} from '../../services/ephemerisTrackService'
 // ✅ 스토어 연동 추가
 const ephemerisStore = useEphemerisTrackStore()
 
@@ -409,10 +422,6 @@ interface TLEData {
   endTime?: string
   stepSize?: number
 }
-
-// 인터페이스 정의 - 서비스의 타입과 동일하게 사용
-
-import { ephemerisTrackService, type ScheduleItem } from '../../services/ephemerisTrackService'
 
 // 차트 데이터용 인터페이스
 interface TrajectoryPoint {
@@ -548,6 +557,114 @@ const selectedScheduleInfo = computed(() => {
     endElevation: 0,
   }
 })
+const downloadRealtimeData = async () => {
+  try {
+    // Loading 대신 notify로 시작 알림
+    $q.notify({
+      type: 'info',
+      message: '실시간 추적 데이터를 조회하고 있습니다...',
+      timeout: 1000,
+    })
+
+    const response = await ephemerisTrackService.fetchRealtimeTrackingData()
+
+    if (response.data && response.data.length > 0) {
+      downloadCSV(response.data)
+
+      $q.notify({
+        type: 'positive',
+        message: `${response.totalCount}개의 실시간 추적 데이터를 다운로드했습니다`,
+      })
+    } else {
+      $q.notify({
+        type: 'warning',
+        message: '다운로드할 실시간 추적 데이터가 없습니다',
+      })
+    }
+  } catch (error) {
+    console.error('실시간 추적 데이터 다운로드 실패:', error)
+    $q.notify({
+      type: 'negative',
+      message: '실시간 추적 데이터 다운로드에 실패했습니다',
+    })
+  }
+}
+const downloadCSV = (data: RealtimeTrackingDataItem[]) => {
+  // 안전한 숫자 포맷팅 함수
+  const safeToFixed = (value: number | null | undefined, digits: number = 4): string => {
+    if (value === null || value === undefined || isNaN(Number(value))) {
+      return '0.0000'
+    }
+    return Number(value).toFixed(digits)
+  }
+
+  // CSV 헤더 정의
+  const headers = [
+    'Index',
+    'Timestamp',
+    'CMD Azimuth (°)',
+    'CMD Elevation (°)',
+    'Elapsed Time (s)',
+    'Tracking Azimuth Time (s)',
+    'Tracking CMD Azimuth Angle (°)',
+    'Tracking Actual Azimuth Angle (°)',
+    'Tracking Elevation Time (s)',
+    'Tracking CMD Elevation Angle (°)',
+    'Tracking Actual Elevation Angle (°)',
+    'Tracking Tilt Time (s)',
+    'Tracking CMD Tilt Angle (°)',
+    'Tracking Actual Tilt Angle (°)',
+    'Pass ID',
+    'Azimuth Error (°)',
+    'Elevation Error (°)',
+  ]
+
+  // CSV 데이터 생성 (안전한 처리 적용)
+  const csvContent = [
+    headers.join(','),
+    ...data.map((item) =>
+      [
+        item.index || 0,
+        `"${item.timestamp ? formatToLocalTime(item.timestamp) : new Date().toISOString()}"`,
+        safeToFixed(item.cmdAz, 4),
+        safeToFixed(item.cmdEl, 4),
+        safeToFixed(item.elapsedTimeSeconds, 2),
+        safeToFixed(item.trackingAzimuthTime, 2),
+        safeToFixed(item.trackingCMDAzimuthAngle, 4),
+        safeToFixed(item.trackingActualAzimuthAngle, 4),
+        safeToFixed(item.trackingElevationTime, 2),
+        safeToFixed(item.trackingCMDElevationAngle, 4),
+        safeToFixed(item.trackingActualElevationAngle, 4),
+        safeToFixed(item.trackingTiltTime, 2),
+        safeToFixed(item.trackingCMDTiltAngle, 4),
+        safeToFixed(item.trackingActualTiltAngle, 4),
+        item.passId || 0,
+        safeToFixed(item.azimuthError, 4),
+        safeToFixed(item.elevationError, 4),
+      ].join(','),
+    ),
+  ].join('\n')
+
+  // BOM 추가 (한글 깨짐 방지)
+  const BOM = '\uFEFF'
+  const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' })
+
+  // 파일명 생성 (현재 시간 포함)
+  const now = new Date()
+  const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19)
+  const filename = `realtime_tracking_data_${timestamp}.csv`
+
+  // 다운로드 실행
+  const link = document.createElement('a')
+  const url = URL.createObjectURL(blob)
+  link.setAttribute('href', url)
+  link.setAttribute('download', filename)
+  link.style.visibility = 'hidden'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
 
 // 남은 시간 계산을 위한 상태
 const timeRemaining = ref(0)
@@ -828,13 +945,13 @@ const updateChart = () => {
     if (icdStore.ephemerisStatusInfo.isActive === true) {
       // ✅ [elevation, azimuth] 순서로 변경 (극좌표계: [radius, angle])
       const currentPoint: [number, number] = [normalizedEl, normalizedAz]
-      
+
       trackingPathRaw.value.push(currentPoint)
-      
+
       if (trackingPathRaw.value.length > 50000) {
         trackingPathRaw.value = trackingPathRaw.value.slice(-50000)
       }
-      
+
       trackingPath.value = sampleTrackingPath(trackingPathRaw.value, 1000)
     } else {
       trackingPath.value = []
@@ -858,7 +975,6 @@ const updateChart = () => {
     } as unknown as Parameters<typeof chart.setOption>[0]
 
     chart.setOption(updateOption)
-
   } catch (error) {
     console.error('차트 업데이트 중 오류 발생:', error)
   }

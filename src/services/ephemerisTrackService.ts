@@ -30,6 +30,34 @@ export interface EphemerisTrackRequest {
   satelliteName?: string
 }
 
+// 기존 인터페이스들 뒤에 추가
+export interface RealtimeTrackingDataItem {
+  index: number
+  timestamp: string
+  cmdAz: number
+  cmdEl: number
+  elapsedTimeSeconds: number
+  trackingAzimuthTime: number
+  trackingCMDAzimuthAngle: number
+  trackingActualAzimuthAngle: number
+  trackingElevationTime: number
+  trackingCMDElevationAngle: number
+  trackingActualElevationAngle: number
+  trackingTiltTime: number
+  trackingCMDTiltAngle: number
+  trackingActualTiltAngle: number
+  passId: number
+  azimuthError: number
+  elevationError: number
+}
+
+export interface RealtimeTrackingResponse {
+  message: string
+  totalCount: number
+  data: RealtimeTrackingDataItem[]
+  statistics: Record<string, unknown>
+}
+
 // 에러 클래스들
 export class TLEParseError extends Error {
   constructor(message: string) {
@@ -209,6 +237,15 @@ class EphemerisTrackService {
       return response.data
     } catch (error) {
       return this.handleApiError(error, '위성 추적 중지에 실패했습니다')
+    }
+  }
+
+  async fetchRealtimeTrackingData(): Promise<RealtimeTrackingResponse> {
+    try {
+      const response = await api.get<RealtimeTrackingResponse>('/ephemeris/tracking/realtime-data')
+      return response.data
+    } catch (error) {
+      return this.handleApiError(error, '실시간 추적 데이터 조회에 실패했습니다') as Promise<RealtimeTrackingResponse>
     }
   }
 }
