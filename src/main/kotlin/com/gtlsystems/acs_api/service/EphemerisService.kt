@@ -573,7 +573,7 @@ class EphemerisService(
         logger.info("위성 추적 중지")
         stopCommand()
         // ✅ 타이머 중지
-        stopTimer()
+        //stopTimer()
         dataStoreService.setEphemerisTracking(false)
         logger.info("✅ 위성 추적 및 타이머 중지 완료")
         //dataStoreService.stopAllTracking()
@@ -587,7 +587,7 @@ class EphemerisService(
             override fun run() {
                 trackingSatelliteStateCheck()
             }
-        }, 0, 50) // 0ms 후 시작, 50ms 주기
+        }, 0, 100) // 0ms 후 시작, 50ms 주기
 
         logger.info("⏰ 50ms 주기 타이머 시작")
     }
@@ -599,7 +599,6 @@ class EphemerisService(
         timer?.let {
             it.cancel()
             it.purge()
-
             logger.info("⏹️ 타이머 중지 완료")
         }
         timer = null
@@ -674,7 +673,7 @@ class EphemerisService(
     private fun handleInProgress(passId: UInt) {
         logger.info("📡 진행 중 상태 - 추적 데이터 전송 시작")
         dataStoreService.setEphemerisTracking(true)
-        startTrackingDataTransmission(passId)
+        sendHeaderTrackingData(passId)
     }
 
     /**
@@ -696,14 +695,6 @@ class EphemerisService(
             moveStartAnglePosition(startAzimuth,5f,startElevation,5f,0f,0f)
             logger.info("📍 시작 위치 이동 완료: Az=${startAzimuth}°, El=${startElevation}°", startAzimuth, startElevation)
         }
-    }
-
-    /**
-     * 추적 데이터 전송 시작
-     */
-    private fun startTrackingDataTransmission(passId: UInt) {
-        sendHeaderTrackingData(passId)
-        logger.info("📡 추적 데이터 전송 시작 완료")
     }
 
     /**
