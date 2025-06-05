@@ -833,7 +833,7 @@ const initChart = () => {
         label: {
           show: true,
           formatter: function (params: EChartsScatterParam) {
-            return `Az: ${params.value[0].toFixed(2)}°\nEl: ${params.value[1].toFixed(2)}°`
+            return `Az: ${params.value[1].toFixed(2)}°\nEl: ${params.value[0].toFixed(2)}°`
           },
           position: 'top',
           distance: 5,
