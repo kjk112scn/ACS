@@ -94,6 +94,83 @@ class DataStoreService {
         }
     }
     /**
+     * ✅ 전체 추적 데이터를 Map으로 반환하는 메서드 추가
+     */
+    fun getReadData(): Map<String, Any?> {
+        val data = latestData.get()
+        return mapOf(
+            "modeStatusBits" to data.modeStatusBits,
+            "azimuthAngle" to data.azimuthAngle,
+            "elevationAngle" to data.elevationAngle,
+            "tiltAngle" to data.tiltAngle,
+            "azimuthSpeed" to data.azimuthSpeed,
+            "elevationSpeed" to data.elevationSpeed,
+            "tiltSpeed" to data.tiltSpeed,
+            "servoDriverAzimuthAngle" to data.servoDriverAzimuthAngle,
+            "servoDriverElevationAngle" to data.servoDriverElevationAngle,
+            "servoDriverTiltAngle" to data.servoDriverTiltAngle,
+            "torqueAzimuth" to data.torqueAzimuth,
+            "torqueElevation" to data.torqueElevation,
+            "torqueTilt" to data.torqueTilt,
+            "windSpeed" to data.windSpeed,
+            "windDirection" to data.windDirection,
+            "rtdOne" to data.rtdOne,
+            "rtdTwo" to data.rtdTwo,
+            "mainBoardProtocolStatusBits" to data.mainBoardProtocolStatusBits,
+            "mainBoardStatusBits" to data.mainBoardStatusBits,
+            "mainBoardMCOnOffBits" to data.mainBoardMCOnOffBits,
+            "mainBoardReserveBits" to data.mainBoardReserveBits,
+            "azimuthBoardServoStatusBits" to data.azimuthBoardServoStatusBits,
+            "azimuthBoardStatusBits" to data.azimuthBoardStatusBits,
+            "elevationBoardServoStatusBits" to data.elevationBoardServoStatusBits,
+            "elevationBoardStatusBits" to data.elevationBoardStatusBits,
+            "tiltBoardServoStatusBits" to data.tiltBoardServoStatusBits,
+            "tiltBoardStatusBits" to data.tiltBoardStatusBits,
+            "feedSBoardStatusBits" to data.feedSBoardStatusBits,
+            "feedXBoardStatusBits" to data.feedXBoardStatusBits,
+            "currentSBandLNALHCP" to data.currentSBandLNALHCP,
+            "currentSBandLNARHCP" to data.currentSBandLNARHCP,
+            "currentXBandLNALHCP" to data.currentXBandLNALHCP,
+            "currentXBandLNARHCP" to data.currentXBandLNARHCP,
+            "rssiSBandLNALHCP" to data.rssiSBandLNALHCP,
+            "rssiSBandLNARHCP" to data.rssiSBandLNARHCP,
+            "rssiXBandLNALHCP" to data.rssiXBandLNALHCP,
+            "rssiXBandLNARHCP" to data.rssiXBandLNARHCP,
+            "azimuthAcceleration" to data.azimuthAcceleration,
+            "elevationAcceleration" to data.elevationAcceleration,
+            "tiltAcceleration" to data.tiltAcceleration,
+            "azimuthMaxAcceleration" to data.azimuthMaxAcceleration,
+            "elevationMaxAcceleration" to data.elevationMaxAcceleration,
+            "tiltMaxAcceleration" to data.tiltMaxAcceleration,
+            "trackingAzimuthTime" to data.trackingAzimuthTime,
+            "trackingCMDAzimuthAngle" to data.trackingCMDAzimuthAngle,
+            "trackingActualAzimuthAngle" to data.trackingActualAzimuthAngle,
+            "trackingElevationTime" to data.trackingElevationTime,
+            "trackingCMDElevationAngle" to data.trackingCMDElevationAngle,
+            "trackingActualElevationAngle" to data.trackingActualElevationAngle,
+            "trackingTiltTime" to data.trackingTiltTime,
+            "trackingCMDTiltAngle" to data.trackingCMDTiltAngle,
+            "trackingActualTiltAngle" to data.trackingActualTiltAngle
+        )
+    }
+    /**
+     * ✅ 추적 관련 데이터만 별도로 반환
+     */
+    fun getTrackingOnlyData(): Map<String, Float?> {
+        val data = latestData.get()
+        return mapOf(
+            "trackingAzimuthTime" to data.trackingAzimuthTime,
+            "trackingCMDAzimuthAngle" to data.trackingCMDAzimuthAngle,
+            "trackingActualAzimuthAngle" to data.trackingActualAzimuthAngle,
+            "trackingElevationTime" to data.trackingElevationTime,
+            "trackingCMDElevationAngle" to data.trackingCMDElevationAngle,
+            "trackingActualElevationAngle" to data.trackingActualElevationAngle,
+            "trackingTiltTime" to data.trackingTiltTime,
+            "trackingCMDTiltAngle" to data.trackingCMDTiltAngle,
+            "trackingActualTiltAngle" to data.trackingActualTiltAngle
+        )
+    }
+    /**
      * ✅ TrackingStatus 업데이트
      */
     // 기존 updateTrackingStatus 메서드는 그대로 유지

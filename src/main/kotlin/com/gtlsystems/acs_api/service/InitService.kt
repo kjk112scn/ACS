@@ -12,8 +12,8 @@ class InitService {
     초기 동작해야하는 로직이 있으면 이곳에 추가
      */
     fun init() {
-        GlobalData.Location.latitude = 37.566535
-        GlobalData.Location.longitude = 126.9779692
+        //GlobalData.Location.latitude = 37.566535
+        //GlobalData.Location.longitude = 126.9779692
         println("InitService init() called")
         println("utcNow: ${GlobalData.Time.utcNow}")
         println("localNow: ${GlobalData.Time.localNow}")
