@@ -15,7 +15,6 @@ import com.gtlsystems.acs_api.event.subscribeToType
 import com.gtlsystems.acs_api.model.PushData
 import io.netty.handler.timeout.TimeoutException
 import jakarta.annotation.PreDestroy
-import org.orekit.files.ccsds.section.XmlStructureKey
 import org.springframework.scheduling.TaskScheduler
 import reactor.core.Disposable
 import reactor.core.publisher.Mono
@@ -92,7 +91,7 @@ class EphemerisService(
         val tle2 = "2 27424  98.3771 106.9323 0002126  87.7409 303.2430 14.61267650227167"
         //generateEphemerisDesignationTrack(tle1,tle2,satelliteName)
         //compareTrackingPerformance(tle1,tle2)
-        satelliteTest()
+        //satelliteTest()
     }
 
     fun eventBus() {
@@ -134,23 +133,13 @@ class EphemerisService(
     }
     fun satelliteTest() {
         try {
-            // 테스트
-            val calculator = OrekitCalculator()
 
-            val tleLine1 = "1 45246U 20013B   25155.82248021 -.00000336  00000+0  00000+0 0  9993"
-            val tleLine2 = "2 45246   0.0246 244.1805 0000831 104.3709 329.2874  1.00273838 19462"
-
-            val testTime = ZonedDateTime.now().withHour(14).withMinute(0).withSecond(0).withZoneSameInstant(ZoneOffset.UTC)
-
-// 간단 비교 실행
-            calculator.findClosestToGpredict(tleLine1, tleLine2, testTime, GlobalData.Location.latitude, GlobalData.Location.longitude)
-
-          /*  calculateRotatorAngleTable(
+            calculateRotatorAngleTable(
                 standardAzimuth = 177.796609998884,
                 standardElevation = 46.4621529680836,
                 tiltAngle = -6.98,
                 rotatorStepDegrees = 356.62
-            )*/
+            )
         } catch (e: Exception) {
             logger.error("satellite_Test 실행 중 오류 발생: ${e.message}", e)
         }
@@ -440,10 +429,6 @@ class EphemerisService(
      * TLE 데이터로 위성 궤도 추적
      * 위성 이름이 제공되지 않으면 TLE에서 추출
      */
-    /**
-     * TLE 데이터로 위성 궤도 추적 (최적화된 버전)
-     * 위성 이름이 제공되지 않으면 TLE에서 추출
-     */
     fun generateEphemerisDesignationTrackSync(
         tleLine1: String,
         tleLine2: String,
@@ -467,8 +452,9 @@ class EphemerisService(
             // 추적 좌표를 위한 세부 리스트 생성
             val ephemerisTrackDtl = mutableListOf<Map<String, Any?>>()
 
-            // ✅ 최적화된 위성 추적 스케줄 생성 (한 번에 처리)
-            val schedule = orekitCalculator.generateSatelliteTrackingScheduleOptimized(
+            // 위성 추적 스케줄 생성
+            /*
+            val schedule = orekitCalculator.generateSatelliteTrackingScheduleWithVariableInterval(
                 tleLine1 = tleLine1,
                 tleLine2 = tleLine2,
                 startDate = today.withZoneSameInstant(ZoneOffset.UTC),
@@ -477,9 +463,21 @@ class EphemerisService(
                 latitude = locationData.latitude,
                 longitude = locationData.longitude,
                 altitude = locationData.altitude,
-                trackingIntervalMs = 100  // 100ms 간격
+                fineIntervalMs = 100,    // 정밀 계산 간격 100ms
+                coarseIntervalMs = 1000,  // 일반 계산 간격 1000ms
+                transitionSeconds = 1
             )
-
+            */
+            val schedule = orekitCalculator.generateSatelliteTrackingSchedule(
+                tleLine1 = tleLine1,
+                tleLine2 = tleLine2,
+                startDate = today.withZoneSameInstant(ZoneOffset.UTC),
+                durationDays = 2,
+                minElevation = trackingData.minElevationAngle,
+                latitude = locationData.latitude,
+                longitude = locationData.longitude,
+                altitude = locationData.altitude,
+            )
             logger.info("위성 추적 스케줄 생성 완료: ${schedule.trackingPasses.size}개 패스")
 
             // 생성 메타데이터를 위한 현재 날짜와 사용자 정보
@@ -542,7 +540,6 @@ class EphemerisService(
             ephemerisTrackDtlStorage.clear()
             ephemerisTrackMstStorage.addAll(ephemerisTrackMst)
             ephemerisTrackDtlStorage.addAll(ephemerisTrackDtl)
-
             return Pair(ephemerisTrackMst, ephemerisTrackDtl)
 
         } catch (e: Exception) {
@@ -808,21 +805,19 @@ class EphemerisService(
 
             val cmdAzimuth = (targetPoint["Azimuth"] as Double).toFloat()
             val cmdElevation = (targetPoint["Elevation"] as Double).toFloat()
-            var readData = dataStoreService.getReadData()
+
             // PushData에서 실제 현재 위치 가져오기 (실제 안테나 위치)
-
-            val trackingCmdAzimuthTime = readData["trackingAzimuthTime"]
-            val trackingCmdElevationTime =  readData["trackingCmdElevationTime"]
-            val trackingCmdTiltTime = readData["trackingCmdTiltTime"]
+            val readData = PushData.ReadData()
+            val trackingCmdAzimuthTime = readData.trackingAzimuthTime
+            val trackingCmdElevationTime = readData.trackingElevationTime
+            val trackingCmdTiltTime = readData.trackingTiltTime
             // ✅ 추적 명령 및 실제 값 가져오기 (null 안전 처리)
-            val trackingCmdAzimuth =  readData["trackingCMDAzimuthAngle"] as? Float ?: 0.0f
-            val trackingActualAzimuth =  readData["trackingActualAzimuthAngle"] as? Float ?: 0.0f
-            val trackingCmdElevation =  readData["trackingCMDElevationAngle"] as? Float ?: 0.0f
-            val trackingActualElevation =  readData["trackingActualElevationAngle"] as? Float ?: 0.0f
-            val trackingCmdTilt =  readData["trackingCMDTiltAngle"] as? Float ?: 0.0f
-            val trackingActualTilt = readData["trackingActualTiltAngle"] as? Float ?: 0.0f
-
-
+            val trackingCmdAzimuth = readData.trackingCMDAzimuthAngle
+            val trackingActualAzimuth = readData.trackingActualAzimuthAngle
+            val trackingCmdElevation = readData.trackingCMDElevationAngle
+            val trackingActualElevation = readData.trackingActualElevationAngle
+            val trackingCmdTilt = readData.trackingCMDTiltAngle
+            val trackingActualTilt = readData.trackingActualTiltAngle
 
             // 실시간 추적 데이터 생성
             val realtimeData = mapOf(
@@ -838,11 +833,11 @@ class EphemerisService(
                 "trackingCMDElevationAngle" to trackingCmdElevation,
                 "trackingActualElevationAngle" to trackingActualElevation,
                 "trackingTiltTime" to trackingCmdTiltTime,
-                "trackingCMDTiltAngle" to trackingCmdTilt,
+                "trackingCMDTiltAngle" to trackingCmdTilt, // 틸트는 일반적으로 0
                 "trackingActualTiltAngle" to trackingActualTilt,
                 "passId" to passId,
-                "azimuthError" to (trackingCmdAzimuth - trackingActualAzimuth),
-                "elevationError" to (trackingCmdElevation-trackingActualElevation)
+                "azimuthError" to ((trackingCmdAzimuth ?: 0.0f) - (trackingActualAzimuth ?: 0.0f)),
+                "elevationError" to ((trackingCmdElevation ?: 0.0f) - (trackingActualElevation ?: 0.0f)),
             )
 
             // 리스트에 추가
@@ -947,65 +942,65 @@ class EphemerisService(
      * 2.12.1 위성 추적 해더 정보 송신 프로토콜 사용
      */
 
-   fun sendHeaderTrackingData(passId: UInt){
-       try {
-           currentTrackingPassId = passId
-           // 선택된 패스 ID에 해당하는 마스터 데이터 찾기
-           val selectedPass = ephemerisTrackMstStorage.find { it["No"] == passId }
-           // 시작 방위각과 고도각 가져오기
+    fun sendHeaderTrackingData(passId: UInt){
+        try {
+            currentTrackingPassId = passId
+            // 선택된 패스 ID에 해당하는 마스터 데이터 찾기
+            val selectedPass = ephemerisTrackMstStorage.find { it["No"] == passId }
+            // 시작 방위각과 고도각 가져오기
 
-           if (selectedPass == null) {
-               logger.error("선택된 패스 ID($passId)에 해당하는 데이터를 찾을 수 없습니다.")
-               return
-           }
-           // 현재 추적 중인 패스 설정
-           currentTrackingPass = selectedPass
+            if (selectedPass == null) {
+                logger.error("선택된 패스 ID($passId)에 해당하는 데이터를 찾을 수 없습니다.")
+                return
+            }
+            // 현재 추적 중인 패스 설정
+            currentTrackingPass = selectedPass
 
-           // 패스 시작 및 종료 시간 가져오기
-           val startTime = (selectedPass["StartTime"] as ZonedDateTime).withZoneSameInstant(ZoneOffset.UTC)
-           val endTime = (selectedPass["EndTime"] as ZonedDateTime).withZoneSameInstant(ZoneOffset.UTC)
+            // 패스 시작 및 종료 시간 가져오기
+            val startTime = (selectedPass["StartTime"] as ZonedDateTime).withZoneSameInstant(ZoneOffset.UTC)
+            val endTime = (selectedPass["EndTime"] as ZonedDateTime).withZoneSameInstant(ZoneOffset.UTC)
 
-           // 시작 시간과 종료 시간을 문자열로 변환 (밀리초 포함)
-           logger.info("위성 추적 시작: ${selectedPass["SatelliteName"]} (패스 ID: $passId)")
-           logger.info("시작 시간: $startTime, 종료 시간: $endTime")
+            // 시작 시간과 종료 시간을 문자열로 변환 (밀리초 포함)
+            logger.info("위성 추적 시작: ${selectedPass["SatelliteName"]} (패스 ID: $passId)")
+            logger.info("시작 시간: $startTime, 종료 시간: $endTime")
 
-           // 밀리초 추출
-           val startTimeMs = (startTime.nano / 1_000_000).toUShort()
-           val endTimeMs = (endTime.nano / 1_000_000).toUShort()
+            // 밀리초 추출
+            val startTimeMs = (startTime.nano / 1_000_000).toUShort()
+            val endTimeMs = (endTime.nano / 1_000_000).toUShort()
 
-           // 2.12.1 위성 추적 헤더 정보 송신 프로토콜 생성
-           val headerFrame = ICDService.SatelliteTrackOne.SetDataFrame(
-               cmdOne = 'T',
-               cmdTwo = 'T',
-               dataLen = calculateDataLength(passId).toUShort(), // 전체 데이터 길이 계산
-               aosYear = startTime.year.toUShort(),
-               aosMonth = startTime.monthValue.toByte(),
-               aosDay = startTime.dayOfMonth.toByte(),
-               aosHour = startTime.hour.toByte(),
-               aosMinute = startTime.minute.toByte(),
-               aosSecond = startTime.second.toByte(),
-               aosMs = startTimeMs,
-               losYear = endTime.year.toUShort(),
-               losMonth = endTime.monthValue.toByte(),
-               losDay = endTime.dayOfMonth.toByte(),
-               losHour = endTime.hour.toByte(),
-               losMinute = endTime.minute.toByte(),
-               losSecond = endTime.second.toByte(),
-               losMs = endTimeMs,
-           )
+            // 2.12.1 위성 추적 헤더 정보 송신 프로토콜 생성
+            val headerFrame = ICDService.SatelliteTrackOne.SetDataFrame(
+                cmdOne = 'T',
+                cmdTwo = 'T',
+                dataLen = calculateDataLength(passId).toUShort(), // 전체 데이터 길이 계산
+                aosYear = startTime.year.toUShort(),
+                aosMonth = startTime.monthValue.toByte(),
+                aosDay = startTime.dayOfMonth.toByte(),
+                aosHour = startTime.hour.toByte(),
+                aosMinute = startTime.minute.toByte(),
+                aosSecond = startTime.second.toByte(),
+                aosMs = startTimeMs,
+                losYear = endTime.year.toUShort(),
+                losMonth = endTime.monthValue.toByte(),
+                losDay = endTime.dayOfMonth.toByte(),
+                losHour = endTime.hour.toByte(),
+                losMinute = endTime.minute.toByte(),
+                losSecond = endTime.second.toByte(),
+                losMs = endTimeMs,
+            )
 
-           // UdpFwICDService를 통해 데이터 전송
-           udpFwICDService.sendSatelliteTrackHeader(headerFrame)
-           logger.info("위성 추적 전체 길이 ${calculateDataByteSize(passId).toUShort()}")
-           logger.info("위성 추적 헤더 정보 전송 완료")
+            // UdpFwICDService를 통해 데이터 전송
+            udpFwICDService.sendSatelliteTrackHeader(headerFrame)
+            logger.info("위성 추적 전체 길이 ${calculateDataByteSize(passId).toUShort()}")
+            logger.info("위성 추적 헤더 정보 전송 완료")
 
-           //dataStoreService.setEphemerisTracking(true)
+            //dataStoreService.setEphemerisTracking(true)
 
 
-       } catch (e: Exception) {
-           dataStoreService.setEphemerisTracking(false)
-           logger.error("위성 추적 시작 중 오류 발생: ${e.message}", e)
-       }
+        } catch (e: Exception) {
+            dataStoreService.setEphemerisTracking(false)
+            logger.error("위성 추적 시작 중 오류 발생: ${e.message}", e)
+        }
     }
     /**
      * 위성 추적 초기 제어 명령 전송
