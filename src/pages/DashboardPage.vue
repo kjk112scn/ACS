@@ -161,6 +161,95 @@
             <q-card-section>
               <div class="text-subtitle1 text-weight-bold text-primary">Status</div>
               <div class="status-content">
+                <!-- Emergency LED -->
+                <div class="status-item q-mb-sm">
+                  <div class="status-led-container">
+                    <div
+                      class="status-led"
+                      :class="{ 'led-active': emergencyActive, 'led-inactive': !emergencyActive }"
+                    ></div>
+                    <span class="status-label">Emergency</span>
+                  </div>
+                </div>
+
+                <!-- Positioner LED -->
+                <div class="status-item q-mb-sm">
+                  <div class="status-led-container">
+                    <div
+                      class="status-led"
+                      :class="{ 'led-active': positionerActive, 'led-inactive': !positionerActive }"
+                    ></div>
+                    <span class="status-label">Positioner</span>
+                  </div>
+                </div>
+
+                <!-- Feed LED -->
+                <div class="status-item q-mb-sm">
+                  <div class="status-led-container">
+                    <div
+                      class="status-led"
+                      :class="{ 'led-active': feedActive, 'led-inactive': !feedActive }"
+                    ></div>
+                    <span class="status-label">Feed</span>
+                  </div>
+                </div>
+
+                <!-- Protocol LED -->
+                <div class="status-item q-mb-sm">
+                  <div class="status-led-container">
+                    <div
+                      class="status-led"
+                      :class="{ 'led-active': protocolActive, 'led-inactive': !protocolActive }"
+                    ></div>
+                    <span class="status-label">Protocol</span>
+                  </div>
+                </div>
+
+                <!-- Power LED -->
+                <div class="status-item q-mb-sm">
+                  <div class="status-led-container">
+                    <div
+                      class="status-led"
+                      :class="{ 'led-active': powerActive, 'led-inactive': !powerActive }"
+                    ></div>
+                    <span class="status-label">Power</span>
+                  </div>
+                </div>
+
+                <!-- Stow LED -->
+                <div class="status-item q-mb-sm">
+                  <div class="status-led-container">
+                    <div
+                      class="status-led"
+                      :class="{ 'led-active': stowActive, 'led-inactive': !stowActive }"
+                    ></div>
+                    <span class="status-label">Stow</span>
+                  </div>
+                </div>
+
+                <!-- Stow Pin LED -->
+                <div class="status-item q-mb-sm">
+                  <div class="status-led-container">
+                    <div
+                      class="status-led"
+                      :class="{ 'led-active': stowPinActive, 'led-inactive': !stowPinActive }"
+                    ></div>
+                    <span class="status-label">Stow Pin</span>
+                  </div>
+                </div>
+
+                <!-- All Status 버튼 -->
+                <div class="all-status-button q-mt-md">
+                  <q-btn
+                    color="primary"
+                    label="All Status"
+                    size="sm"
+                    outline
+                    @click="handleAllStatus"
+                    class="full-width"
+                  />
+                </div>
+
                 <div class="status-messages q-mt-md">
                   <p v-if="icdStore.error" class="text-negative">Error: {{ icdStore.error }}</p>
                   <p v-if="!icdStore.isConnected" class="text-warning">WebSocket Connecting...</p>
@@ -903,6 +992,22 @@ const initCharts = () => {
 const emergencyActive = ref(false)
 const emergencyModal = ref(false)
 
+// 추가 상태 LED들
+const positionerActive = ref(false)
+const feedActive = ref(false)
+const protocolActive = ref(false)
+const powerActive = ref(false)
+const stowActive = ref(false)
+const stowPinActive = ref(false)
+/*
+// 실제 데이터와 연결하는 경우 (예시)
+const positionerActive = computed(() => icdStore.positionerStatus === 'active')
+const feedActive = computed(() => icdStore.feedStatus === 'active')
+const protocolActive = computed(() => icdStore.protocolStatus === 'active')
+const powerActive = computed(() => icdStore.powerStatus === 'active')
+const stowActive = computed(() => icdStore.stowStatus === 'active')
+const stowPinActive = computed(() => icdStore.stowPinStatus === 'active')
+ */
 // Emergency 버튼 클릭 핸들러
 const handleEmergencyClick = async () => {
   console.log('Emergency 버튼 클릭됨')
@@ -1122,6 +1227,13 @@ onUnmounted(() => {
     debugTimer = null
   }
 })
+
+// All Status 버튼 핸들러
+const handleAllStatus = () => {
+  console.log('All Status 버튼 클릭됨')
+  // 여기에 All Status 기능 구현
+  // 예: 모달 열기, 다른 페이지로 이동, 상세 상태 표시 등
+}
 </script>
 
 <style>
@@ -1454,5 +1566,62 @@ onUnmounted(() => {
   height: 50%;
   background: transparent;
   pointer-events: none;
+}
+
+/* Status LED 스타일 */
+.status-item {
+  display: flex;
+  align-items: center;
+}
+
+.status-led-container {
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+}
+
+.status-led {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
+.led-active {
+  background-color: #f44336;
+
+  box-shadow:
+    0 0 12px #f44336,
+    0 0 24px #f44336;
+}
+
+.led-inactive {
+  background-color: #666;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
+.status-label {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+/* 다크 모드와 라이트 모드에 따른 라벨 색상 조정 */
+.body--dark .status-label {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.body--light .status-label {
+  color: rgba(0, 0, 0, 0.8);
+}
+
+.all-status-button {
+  margin-top: 1rem;
+}
+
+.all-status-button .q-btn {
+  font-size: 0.9rem;
+  padding: 8px 16px;
 }
 </style>
