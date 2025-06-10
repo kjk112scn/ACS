@@ -217,6 +217,33 @@ class UdpFwICDService(
     }
 
     // === 단순한 Mono 비동기 방식 명령 메서드들 ===
+    /**
+     * 대기 명령 - Mono 비동기 처리
+     */
+    fun standbyCommand(bitStandby: BitSet) {
+        Mono.fromCallable {
+            val setDataFrameInstance = ICDService.Standby.SetDataFrame(
+                stx = 0x02,
+                cmdOne = 'B',
+                axis = bitStandby,
+                crc16 = 0u,
+                etx = 0x03
+            )
+
+            val dataToSend = setDataFrameInstance.setDataFrame()
+            channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
+
+            logger.info("Standby 명령 전송 완료")
+            logger.debug("Standby 전송 데이터: {}", byteArrayToHexString(dataToSend))
+        }
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe(
+                { /* 성공 */ },
+                { error ->
+                    logger.error("대기 명령 처리 오류: {}", error.message, error)
+                }
+            )
+    }
 
     /**
      * 비상 명령 - Mono 비동기 처리

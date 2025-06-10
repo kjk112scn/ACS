@@ -26,9 +26,9 @@ object GlobalData {
         val localNow: LocalDateTime
             get() = LocalDateTime.now()
         val systemTimeZone: ZoneId = ZoneId.systemDefault()
-        @Volatile
+
         var serverTimeZone: ZoneId  = systemTimeZone
-        @Volatile
+
         var clientTimeZone: ZoneId = systemTimeZone
         /**
          * 현재 로컬 시간을 출력함.

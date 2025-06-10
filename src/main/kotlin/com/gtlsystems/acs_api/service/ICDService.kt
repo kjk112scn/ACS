@@ -174,7 +174,10 @@ class ICDService {
                 }
                 //2.10 Standby Command
                 else if (receiveData[1] == 'B'.code.toByte()) {
-
+                    val parsedData = Standby.GetDataFrame.fromByteArray(receiveData)
+                    parsedData?.let {
+                        println("파싱된 ICD 데이터: $it")
+                    }
                 }
                 //2.11 Feed On/Off Control Command
                 else if (receiveData[1] == 'F'.code.toByte()) {
@@ -247,7 +250,89 @@ class ICDService {
             }
         }
     }
+    /**
+     * 2.10 Standby Command
+     * 대기 상태 정보를 송신하기 위한 프로토콜이다.
+     * 주요 정보: 축별 대기 상태 정보
+     * 주요 사용처: 시스템 대기 모드 전환
+     */
+    class Standby {
+        data class SetDataFrame(
+            var stx: Byte = ICD_STX,
+            var cmdOne: Char,
+            var axis: BitSet,
+            var crc16: UShort = 0u,
+            var etx: Byte = ICD_ETX
+        ) {
+            fun setDataFrame(): ByteArray {
+                val dataFrame = ByteArray(6)
+                val byteCrc16Target = ByteArray(dataFrame.size - 4)
 
+                // BitSet을 바이트로 변환 (빈 BitSet은 0x00)
+                val byteAxis = if (axis.isEmpty) {
+                    0x00.toByte()
+                } else {
+                    axis.toByteArray().getOrElse(0) { 0x00.toByte() }
+                }
+                dataFrame[0] = ICD_STX
+                dataFrame[1] = cmdOne.code.toByte()
+                dataFrame[2] = byteAxis
+
+                // CRC 대상 복사
+                dataFrame.copyInto(byteCrc16Target, 0, 1, 1 + byteCrc16Target.size)
+
+                // CRC16 계산 및 엔디안 변환
+                val crc16s = Crc16.computeCrc(byteCrc16Target)
+                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+
+                // CRC16 값 설정
+                dataFrame[3] = crc16Buffer[0]
+                dataFrame[4] = crc16Buffer[1]
+                dataFrame[5] = ICD_ETX
+
+                return dataFrame
+            }
+        }
+
+        data class GetDataFrame(
+            var stx: Byte = ICD_STX,
+            var cmdOne: Byte = 0x00,
+            var ack: Byte = 0x00,
+            var checkSum: UShort = 0u,
+            var etx: Byte = ICD_ETX
+        ) {
+            companion object {
+                const val FRAME_LENGTH = 6
+
+                fun fromByteArray(data: ByteArray): GetDataFrame? {
+                    if (data.size < FRAME_LENGTH) {
+                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        return null
+                    }
+
+                    // CRC 체크섬 추출 (리틀 엔디안)
+                    val rxChecksum = ByteBuffer.wrap(byteArrayOf(data[FRAME_LENGTH - 3], data[FRAME_LENGTH - 2]))
+                        .short.toUShort()
+                    val crc16Target = data.copyOfRange(1, FRAME_LENGTH - 3)
+                    val crc16Check = Crc16.computeCrc(crc16Target).toUShort()
+
+                    // CRC 검증 및 ETX 확인
+                    if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
+                        return GetDataFrame(
+                            stx = data[0],
+                            cmdOne = data[1],
+                            ack = data[2],
+                            checkSum = crc16Check,
+                            etx = data.last()
+                        )
+                    } else {
+                        println("CRC 체크 실패 또는 ETX 불일치")
+                        return null
+                    }
+                }
+            }
+        }
+    }
     /**
      * 2.12 Satellite Track Command
      * 위성 추적 정보를 송신하기 위한 프로토콜

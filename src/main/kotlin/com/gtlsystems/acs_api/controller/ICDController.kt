@@ -54,6 +54,42 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
             ))
         }
     }
+    @PostMapping("/standby-command")
+    fun standbyCommand(
+        @RequestParam azStandby: Boolean = false,
+        @RequestParam elStandby: Boolean = false,
+        @RequestParam tiStandby: Boolean = false
+    ): ResponseEntity<Map<String, String>> {
+        return try {
+            val bitStandby = BitSet()
+            if (azStandby) bitStandby.set(0)
+            if (elStandby) bitStandby.set(1)
+            if (tiStandby) bitStandby.set(2)
+
+            val axesStr = listOfNotNull(
+                if (azStandby) "AZIMUTH" else null,
+                if (elStandby) "ELEVATION" else null,
+                if (tiStandby) "TILT" else null
+            ).joinToString(",")
+
+            udpFwICDService.standbyCommand(bitStandby)
+
+            logger.info("Standby 명령 요청 완료: {}", axesStr)
+
+            ResponseEntity.ok(mapOf(
+                "status" to "success",
+                "message" to "Standby 명령이 성공적으로 전송되었습니다",
+                "command" to "Standby",
+                "axes" to axesStr
+            ))
+        } catch (e: Exception) {
+            logger.error("Standby 명령 요청 실패: {}", e.message, e)
+            ResponseEntity.internalServerError().body(mapOf(
+                "status" to "error",
+                "message" to "Standby 명령 전송 실패: ${e.message}"
+            ))
+        }
+    }
 
     @PostMapping("/on-emergency-stop-command")
     fun onEmergencyStopCommand(@RequestParam commandType: Char): ResponseEntity<Map<String, String>> {

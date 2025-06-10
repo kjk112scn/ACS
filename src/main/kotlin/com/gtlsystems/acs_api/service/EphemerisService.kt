@@ -63,17 +63,20 @@ class EphemerisService(
 
     private var currentTrackingPassId: UInt? = null
     private var subscriptions: MutableList<Disposable> = mutableListOf()
+
     // ✅ 간단한 실행 완료 플래그 (Set 사용)
     private val executedActions = mutableSetOf<String>()
     // ✅ Timer 사용 (간단함)
 
     private val trackingStatus = PushData.TRACKING_STATUS
+
     // ✅ 새로운 정교한 타이머 필드들 추가
     private var trackingExecutor: ScheduledExecutorService? = null
     private var trackingTask: ScheduledFuture<*>? = null
 
     private val realtimeTrackingDataList = mutableListOf<Map<String, Any?>>()
     private var trackingDataIndex = 0
+
     // ✅ 커스텀 ThreadFactory 생성
     private val trackingThreadFactory = ThreadFactory { runnable ->
         Thread(runnable, "SatelliteTracking-Timer").apply {
@@ -131,6 +134,7 @@ class EphemerisService(
         stopTimer()
         logger.info("EphemerisService 정리 완료")
     }
+
     fun satelliteTest() {
         try {
 
@@ -396,6 +400,7 @@ class EphemerisService(
             }배 빠름), ${points2}개 포인트 (${String.format("%.2f", points2 * 100.0 / points1)}%)"
         )
     }
+
     fun generateEphemerisDesignationTrackAsync(
         tleLine1: String,
         tleLine2: String,
@@ -554,8 +559,8 @@ class EphemerisService(
         cmdElevationAngle: Float,
         cmdElevationSpeed: Float,
         cmdTiltAngle: Float,
-        cmdTiltSpeed: Float)
-    {
+        cmdTiltSpeed: Float
+    ) {
         val multiAxis = BitSet()
         multiAxis.set(0)
         multiAxis.set(1)
@@ -569,6 +574,7 @@ class EphemerisService(
             cmdTiltSpeed ?: 0.0f
         )
     }
+
     fun startEphemerisTracking(passId: UInt) {
         logger.info("🚀 위성 추적 시작: 패스 ID = {}", passId)
         // 기존 타이머 중지
@@ -586,6 +592,7 @@ class EphemerisService(
         startTimer()
         logger.info("✅ 위성 추적 및 타이머 시작 완료")
     }
+
     /**
      * 위성 추적 중지
      */
@@ -602,6 +609,7 @@ class EphemerisService(
         logger.info("✅ 위성 추적 및 타이머 중지 완료")
         //dataStoreService.stopAllTracking()
     }
+
     /**
      * ✅ 정교한 타이머 시작 (기존 startTimer() 메서드 대체)
      */
@@ -778,6 +786,7 @@ class EphemerisService(
     private fun handleCompleted() {
         logger.info("✅ 완료 상태 - 추적 종료")
     }
+
     /**
      * ✅ 실시간 추적 데이터 저장
      */
@@ -847,8 +856,10 @@ class EphemerisService(
             // 주기적 로깅 (10초마다 또는 100개 데이터마다)
             if (trackingDataIndex % 100 == 0) {
                 logger.info("📊 실시간 추적 데이터 저장 중 - 총 {}개 데이터 포인트 저장됨", trackingDataIndex)
-                logger.debug("현재 목표: Az={:.2f}°, El={:.2f}° | 실제: Az={:.2f}°, El={:.2f}°",
-                    trackingCmdAzimuth, trackingCmdElevationTime, trackingActualAzimuth, trackingActualElevation)
+                logger.debug(
+                    "현재 목표: Az={:.2f}°, El={:.2f}° | 실제: Az={:.2f}°, El={:.2f}°",
+                    trackingCmdAzimuth, trackingCmdElevationTime, trackingActualAzimuth, trackingActualElevation
+                )
             }
 
         } catch (e: Exception) {
@@ -932,8 +943,8 @@ class EphemerisService(
             val startPoint = passDetails.first()
             val startAzimuth = (startPoint["Azimuth"] as Double).toFloat()
             val startElevation = (startPoint["Elevation"] as Double).toFloat()
-            moveStartAnglePosition(startAzimuth,5f,startElevation,5f,0f,0f)
-            logger.info("📍 시작 위치 이동 완료: Az=${startAzimuth}°, El=${startElevation}°", startAzimuth, startElevation)
+            moveStartAnglePosition(startAzimuth, 5f, startElevation, 5f, 0f, 0f)
+            logger.info("📍 시작 위치 이동 완료: Az=${startAzimuth}°, El=${startElevation}°")
         }
     }
 
@@ -941,8 +952,7 @@ class EphemerisService(
      * 위성 추적 시작 - 헤더 정보 전송
      * 2.12.1 위성 추적 해더 정보 송신 프로토콜 사용
      */
-
-    fun sendHeaderTrackingData(passId: UInt){
+    fun sendHeaderTrackingData(passId: UInt) {
         try {
             currentTrackingPassId = passId
             // 선택된 패스 ID에 해당하는 마스터 데이터 찾기
@@ -1002,6 +1012,7 @@ class EphemerisService(
             logger.error("위성 추적 시작 중 오류 발생: ${e.message}", e)
         }
     }
+
     /**
      * 위성 추적 초기 제어 명령 전송
      * 2.12.2 위성 추적 초기 제어 명령 프로토콜 사용
@@ -1067,8 +1078,10 @@ class EphemerisService(
                     val secondsUntilStart = timeUntilStart.seconds
                     val minutesUntilStart = timeUntilStart.toMinutes()
 
-                    logger.info("추적 시작까지: {}분 {}초 (총 {}초)",
-                        minutesUntilStart, secondsUntilStart % 60, secondsUntilStart)
+                    logger.info(
+                        "추적 시작까지: {}분 {}초 (총 {}초)",
+                        minutesUntilStart, secondsUntilStart % 60, secondsUntilStart
+                    )
                     // ✅ 대기 모드: 초기 궤도 데이터 미리 준비
                     initialTrackingData = passDetails.take(50).mapIndexed { index, point ->
                         Triple(
@@ -1080,11 +1093,14 @@ class EphemerisService(
                     // 시작 예정 위치 정보
                     val startPoint = initialTrackingData.firstOrNull()
                     if (startPoint != null) {
-                        logger.info("시작 예정 위치: 고도=${startPoint.second}°, 방위=${startPoint.third}",
-                            startPoint.second, startPoint.third)
+                        logger.info(
+                            "시작 예정 위치: 고도=${startPoint.second}°, 방위=${startPoint.third}",
+                            startPoint.second, startPoint.third
+                        )
 
                     }
                 }
+
                 TimeRangeStatus.AFTER_END -> {
                     logger.warn("추적 종료 후입니다. 추적을 중지합니다")
                     // 추적 중지 로직
@@ -1282,14 +1298,14 @@ class EphemerisService(
     }
 
 
-    fun stopCommand()
-    {
+    fun stopCommand() {
         val multiAxis = BitSet()
         multiAxis.set(0)
         multiAxis.set(1)
         multiAxis.set(2)
         udpFwICDService.stopCommand(multiAxis)
     }
+
     /**
      * 패스의 첫 번째 방위각 가져오기
      */

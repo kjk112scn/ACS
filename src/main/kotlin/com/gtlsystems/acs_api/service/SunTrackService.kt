@@ -1,5 +1,7 @@
 package com.gtlsystems.acs_api.service
 
+import com.gtlsystems.acs_api.algorithm.ElevationCalculator
+import com.gtlsystems.acs_api.algorithm.suntrack.impl.SolarOrekitCalculator
 import com.gtlsystems.acs_api.algorithm.suntrack.interfaces.SunPositionCalculator
 import com.gtlsystems.acs_api.event.ACSEvent
 import com.gtlsystems.acs_api.event.ACSEventBus
@@ -13,6 +15,9 @@ import reactor.core.Disposable
 import reactor.core.publisher.Flux
 import reactor.core.scheduler.Schedulers
 import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 import java.util.BitSet
 
 @Service
@@ -22,7 +27,8 @@ class SunTrackService(
     private val eventBus: ACSEventBus  // 이 부분이 올바르게 주입되는지 확인
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
-
+    val solarOrekitCalculator = SolarOrekitCalculator()
+    val elevationCalculator = ElevationCalculator()
     // 주기적 작업을 관리하기 위한 Disposable 객체 저장 변수
     private var sunTrackCommandSubscription: Disposable? = null
     private var eventSubscription: Disposable? = null
@@ -49,12 +55,71 @@ class SunTrackService(
                     },
                     { error -> println("태양 추적 중지 이벤트 구독 중 오류 발생: ${error.message}") }
                 )
-
+            SolarOrekitData()
+            //ElevationCheck()
         } catch (e: Exception) {
             println("이벤트 버스 구독 설정 중 오류 발생: ${e.message}")
             e.printStackTrace() // 상세 오류 정보 출력
         }
-    }    /**
+    }
+
+    fun ElevationCheck()
+    {
+        // 서울 좌표로 테스트
+        val comparison = elevationCalculator.getElevationComparisonBlocking(
+            latitude = GlobalData.Location.latitude,
+            longitude = GlobalData.Location.longitude,
+            googleApiKey = "AIzaSyBbfXRX59vC4TAbzzdGyaehc8k-39vTTdo" // 실제 키 입력하면 Google API도 테스트 가능
+        )
+
+        println(comparison)
+    }
+    fun SolarOrekitData()
+    {
+        // GTL 지상국 설정 (altitude는 m단위)
+        solarOrekitCalculator.initializeGroundStation(GlobalData.Location.latitude, GlobalData.Location.longitude,30.0)
+        // 현재 태양 위치
+        val currentPosition = solarOrekitCalculator.getCurrentSunPosition()
+        println("Current sun position: $currentPosition")
+
+        // 오늘 UTC 00시부터 24시간 예측 (1시간 간격)
+        //val todayMidnightUTC = LocalDate.now(ZoneOffset.UTC).atStartOfDay() // UTC 기준 오늘 00:00:00
+        val todayMidnightUTC = LocalDate.of(2025,6,3).atStartOfDay() // UTC 기준 오늘 00:00:00
+        val tomorrowMidnightUTC = todayMidnightUTC.plusDays(1)              // UTC 기준 내일 00:00:00
+
+        println("Calculation period: ${todayMidnightUTC} UTC to ${tomorrowMidnightUTC} UTC")
+
+        val predictions = solarOrekitCalculator.predictSunPositions(todayMidnightUTC, tomorrowMidnightUTC, 60.0)
+
+        println("\nSun tracking predictions (UTC time):")
+        predictions.forEach {
+            // 로컬 시간도 함께 표시 (한국 시간 KST = UTC+9)
+            val kstTime = it.dateTime.plusHours(9)
+            println("UTC: ${it.dateTime} (KST: $kstTime) - Az: ${String.format("%.6f", it.azimuthDegrees)}°, El: ${String.format("%.6f", it.elevationDegrees)}°, Visible: ${it.isSunVisible()}")
+        }
+
+        // 오늘 UTC 00시부터 일출/일몰 찾기
+        val todaySunrise = solarOrekitCalculator.findNextSunrise(todayMidnightUTC)
+        val todaySunset = solarOrekitCalculator.findNextSunset(todayMidnightUTC)
+
+        println("\nToday's events (UTC time):")
+        if (todaySunrise != null) {
+            val sunriseKST = todaySunrise.dateTime.plusHours(9)
+            println("Sunrise: ${todaySunrise.dateTime} UTC (${sunriseKST} KST)")
+        }
+
+        if (todaySunset != null) {
+            val sunsetKST = todaySunset.dateTime.plusHours(9)
+            println("Sunset: ${todaySunset.dateTime} UTC (${sunsetKST} KST)")
+        }
+
+        // 현재 시간 정보 출력
+        val nowUTC = LocalDateTime.now(ZoneOffset.UTC)
+        val nowKST = nowUTC.plusHours(9)
+        println("\nCurrent time: $nowUTC UTC ($nowKST KST)")
+
+    }
+    /**
      * 송신 부 반복 수행 시작
      *
      * @param interval 명령 전송 간격 (밀리초)
@@ -99,7 +164,7 @@ class SunTrackService(
             val multiAxis = BitSet()
             multiAxis.set(0)
             multiAxis.set(1)
-            multiAxis.set(2)
+            //multiAxis.set(2)
             udpFwICDService.multiManualCommand(
                 multiAxis,
                 sunTrackData.azimuth,  // null이면 0.0f 사용
