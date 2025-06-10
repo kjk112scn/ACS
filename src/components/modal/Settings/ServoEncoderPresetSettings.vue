@@ -64,8 +64,22 @@
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn flat label="아니오" color="negative" v-close-popup @click="cancelPresetConfirmation" :disable="isLoading" />
-          <q-btn flat label="예" color="positive" @click="confirmPreset" :loading="isLoading" :disable="isLoading" />
+          <q-btn
+            flat
+            label="아니오"
+            color="negative"
+            v-close-popup
+            @click="cancelPresetConfirmation"
+            :disable="isLoading"
+          />
+          <q-btn
+            flat
+            label="예"
+            color="positive"
+            @click="confirmPreset"
+            :loading="isLoading"
+            :disable="isLoading"
+          />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -75,7 +89,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useQuasar } from 'quasar'
-import { useICDStore } from '../../../stores/API/icdStore'
+import { useICDStore } from '../../../stores/icd/icdStore'
 
 const $q = useQuasar()
 const icdStore = useICDStore() // ICD 스토어 사용

@@ -379,17 +379,17 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { date } from 'quasar'
 
 import type { QTableProps } from 'quasar'
-import { useICDStore } from '../../stores/API/icdStore'
+import { useICDStore } from '../../stores/icd/icdStore'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
-import { useEphemerisTrackStore } from '../../stores/API/ephemerisTrackStore'
+import { useEphemerisTrackStore } from '../../stores/mode/ephemerisTrackStore'
 import { formatToLocalTime, formatTimeRemaining, getCalTimeTimestamp } from '../../utils/times'
 // 인터페이스 정의 - 서비스의 타입과 동일하게 사용
 import {
   ephemerisTrackService,
   type ScheduleItem,
   type RealtimeTrackingDataItem,
-} from '../../services/ephemerisTrackService'
+} from '../../services/mode/ephemerisTrackService'
 // ✅ 스토어 연동 추가
 const ephemerisStore = useEphemerisTrackStore()
 
@@ -923,13 +923,9 @@ const updateChart = () => {
   try {
     let azimuth = 0
     let elevation = 0
-    if (icdStore.ephemerisStatusInfo.isActive === true) {
-      azimuth = parseFloat(icdStore.trackingActualAzimuthAngle)
-      elevation = parseFloat(icdStore.trackingActualElevationAngle)
-    } else {
-      azimuth = parseFloat(icdStore.azimuthAngle) || 0
-      elevation = parseFloat(icdStore.elevationAngle) || 0
-    }
+
+    azimuth = parseFloat(icdStore.azimuthAngle) || 0
+    elevation = parseFloat(icdStore.elevationAngle) || 0
 
     // ✅ DashboardPage와 동일한 정규화 방식 적용
     const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth

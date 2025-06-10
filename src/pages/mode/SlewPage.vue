@@ -12,21 +12,21 @@
               <!-- 체크박스 그룹 -->
               <div class="checkbox-group q-gutter-x-xl q-mb-lg">
                 <q-checkbox
-                  v-model="selectedAxes.azimuth"
+                  v-model="slewStore.selectedAxes.azimuth"
                   label="Azimuth"
                   color="primary"
                   class="axis-checkbox"
                   size="lg"
                 />
                 <q-checkbox
-                  v-model="selectedAxes.elevation"
+                  v-model="slewStore.selectedAxes.elevation"
                   label="Elevation"
                   color="primary"
                   class="axis-checkbox"
                   size="lg"
                 />
                 <q-checkbox
-                  v-model="selectedAxes.tilt"
+                  v-model="slewStore.selectedAxes.tilt"
                   label="Tilt"
                   color="primary"
                   class="axis-checkbox"
@@ -39,13 +39,13 @@
                 <div class="input-group">
                   <div class="text-subtitle2 q-mb-sm">Azimuth Speed</div>
                   <q-input
-                    v-model.number="speeds.azimuth"
+                    v-model="slewStore.speeds.azimuth"
                     type="number"
                     outlined
                     dense
                     class="full-width"
                     suffix="°/s"
-                    :disable="!selectedAxes.azimuth"
+                    :disable="!slewStore.selectedAxes.azimuth"
                     step="0.01"
                     placeholder="0.00"
                     @update:model-value="formatSpeed('azimuth')"
@@ -57,13 +57,13 @@
                 <div class="input-group">
                   <div class="text-subtitle2 q-mb-sm">Elevation Speed</div>
                   <q-input
-                    v-model.number="speeds.elevation"
+                    v-model="slewStore.speeds.elevation"
                     type="number"
                     outlined
                     dense
                     class="full-width"
                     suffix="°/s"
-                    :disable="!selectedAxes.elevation"
+                    :disable="!slewStore.selectedAxes.elevation"
                     step="0.01"
                     placeholder="0.00"
                     @update:model-value="formatSpeed('elevation')"
@@ -75,13 +75,13 @@
                 <div class="input-group">
                   <div class="text-subtitle2 q-mb-sm">Tilt Speed</div>
                   <q-input
-                    v-model.number="speeds.tilt"
+                    v-model="slewStore.speeds.tilt"
                     type="number"
                     outlined
                     dense
                     class="full-width"
                     suffix="°/s"
-                    :disable="!selectedAxes.tilt"
+                    :disable="!slewStore.selectedAxes.tilt"
                     step="0.01"
                     placeholder="0.00"
                     @update:model-value="formatSpeed('tilt')"
@@ -98,7 +98,7 @@
                   color="positive"
                   label="Go"
                   size="lg"
-                  :disable="!isAnyAxisSelected"
+                  :disable="!slewStore.isAnyAxisSelected()"
                   @click="handleGo"
                   icon="play_arrow"
                 />
@@ -114,72 +114,50 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useICDStore } from '../../stores/API/icdStore'
 import { defineComponent } from 'vue'
+import { useICDStore } from '../../stores/icd/icdStore'
+import { useSlewStore } from '../../stores/mode/slewStore'
 
 // 컴포넌트 이름 정의
 defineComponent({
   name: 'SlewMode',
 })
 
-// ICD 스토어 인스턴스 생성
+// 스토어 인스턴스 생성
 const icdStore = useICDStore()
-
-// 선택된 축 상태 관리
-const selectedAxes = ref({
-  azimuth: false,
-  elevation: false,
-  tilt: false,
-})
-
-// 속도 상태 관리
-const speeds = ref({
-  azimuth: '0.00',
-  elevation: '0.00',
-  tilt: '0.00',
-})
-
-// 최소 하나의 축이 선택되었는지 확인
-const isAnyAxisSelected = computed(() => {
-  return selectedAxes.value.azimuth || selectedAxes.value.elevation || selectedAxes.value.tilt
-})
-
-// 속도 값 포맷팅 (소수점 2자리)
-const formatSpeed = (axis: 'azimuth' | 'elevation' | 'tilt') => {
-  let value = parseFloat(speeds.value[axis])
-  if (isNaN(value)) {
-    value = 0
-  }
-  speeds.value[axis] = value.toFixed(2)
-}
-
-// 입력 필드 값 초기화
-const clearValue = (axis: 'azimuth' | 'elevation' | 'tilt') => {
-  speeds.value[axis] = ''
-}
-
-// 입력 필드 포커스 잃을 때 처리
-const handleBlur = (axis: 'azimuth' | 'elevation' | 'tilt') => {
-  const value = speeds.value[axis]
-  if (value === '' || value === undefined || value === null) {
-    speeds.value[axis] = '0.00'
-  }
-}
+const slewStore = useSlewStore()
 
 // Go 버튼 핸들러
 const handleGo = async () => {
   try {
+    // 속도 값에 따라 각도 계산
+    const azSpeed = parseFloat(slewStore.speeds.azimuth)
+    const elSpeed = parseFloat(slewStore.speeds.elevation)
+    const tiSpeed = parseFloat(slewStore.speeds.tilt)
+
+    // 각도 계산 함수
+    const calculateAzTiAngle = (speed: number) => {
+      if (speed < 0) return -270
+      if (speed > 0) return 270
+      return 0
+    }
+
+    const calculateElAngle = (speed: number) => {
+      if (speed < 0) return 0
+      if (speed > 0) return 180
+      return 0
+    }
+
     await icdStore.sendMultiControlCommand({
-      azimuth: selectedAxes.value.azimuth,
-      elevation: selectedAxes.value.elevation,
-      tilt: selectedAxes.value.tilt,
-      azAngle: 0,
-      elAngle: 0,
-      tiAngle: 0,
-      azSpeed: parseFloat(speeds.value.azimuth),
-      elSpeed: parseFloat(speeds.value.elevation),
-      tiSpeed: parseFloat(speeds.value.tilt),
+      azimuth: slewStore.selectedAxes.azimuth,
+      elevation: slewStore.selectedAxes.elevation,
+      tilt: slewStore.selectedAxes.tilt,
+      azAngle: calculateAzTiAngle(azSpeed),
+      elAngle: calculateElAngle(elSpeed),
+      tiAngle: calculateAzTiAngle(tiSpeed),
+      azSpeed: azSpeed,
+      elSpeed: elSpeed,
+      tiSpeed: tiSpeed,
     })
     console.log('Slew 명령 전송 성공')
   } catch (error) {
@@ -191,9 +169,9 @@ const handleGo = async () => {
 const handleStop = async () => {
   try {
     await icdStore.stopCommand(
-      selectedAxes.value.azimuth,
-      selectedAxes.value.elevation,
-      selectedAxes.value.tilt,
+      slewStore.selectedAxes.azimuth,
+      slewStore.selectedAxes.elevation,
+      slewStore.selectedAxes.tilt,
     )
     console.log('Stop 명령 전송 성공')
   } catch (error) {
@@ -208,6 +186,33 @@ const handleStow = async () => {
     console.log('Stow 명령 전송 성공')
   } catch (error) {
     console.error('Stow 명령 전송 실패:', error)
+  }
+}
+
+// 속도 값 포맷팅 (소수점 2자리까지, 음수 허용)
+const formatSpeed = (axis: 'azimuth' | 'elevation' | 'tilt') => {
+  let value = parseFloat(slewStore.speeds[axis].toString())
+  if (isNaN(value)) {
+    value = 0
+  }
+  // 음수도 허용하므로 Math.max 제거
+  slewStore.updateSpeed(axis, value.toFixed(2))
+}
+
+// 입력 필드 값 초기화
+const clearValue = (axis: 'azimuth' | 'elevation' | 'tilt') => {
+  slewStore.updateSpeed(axis, '')
+}
+
+// 입력 필드 포커스 잃을 때 처리
+const handleBlur = (axis: 'azimuth' | 'elevation' | 'tilt') => {
+  const value = slewStore.speeds[axis]
+  if (value === null || value === undefined || value === '' || isNaN(parseFloat(value.toString()))) {
+    slewStore.updateSpeed(axis, '0.00')
+  } else {
+    const numValue = parseFloat(value.toString())
+    // 음수도 허용하므로 Math.max 제거하고 소수점 2자리로 포맷팅
+    slewStore.updateSpeed(axis, numValue.toFixed(2))
   }
 }
 </script>

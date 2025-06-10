@@ -5,7 +5,7 @@ import {
   type ScheduleItem,
   type ScheduleDetailItem,
   type EphemerisTrackRequest,
-} from '../../services/ephemerisTrackService'
+} from '../../services/mode/ephemerisTrackService'
 
 export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
   // ===== 상태 정의 =====

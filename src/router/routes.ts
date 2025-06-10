@@ -19,32 +19,32 @@ const routes: RouteRecordRaw[] = [
           },
           {
             path: 'standby',
-            component: () => import('pages/mode/Standby.vue'),
+            component: () => import('pages/mode/StandbyPage.vue'),
           },
           {
             path: 'step',
-            component: () => import('pages/mode/Step.vue'),
+            component: () => import('pages/mode/StepPage.vue'),
           },
           {
             path: 'slew',
-            component: () => import('pages/mode/Slew.vue'),
+            component: () => import('pages/mode/SlewPage.vue'),
           },
           {
             path: 'pedestal',
-            component: () => import('pages/mode/PedestalPosition.vue'),
+            component: () => import('pages/mode/PedestalPositionPage.vue'),
           },
           {
             path: 'ephemeris',
-            component: () => import('pages/mode/EphemerisDesignation.vue'),
+            component: () => import('pages/mode/EphemerisDesignationPage.vue'),
           },
 
           {
             path: 'suntrack',
-            component: () => import('pages/mode/SunTrack.vue'),
+            component: () => import('pages/mode/SunTrackPage.vue'),
           },
           {
             path: 'feed',
-            component: () => import('pages/mode/FeedControl.vue'),
+            component: () => import('pages/mode/FeedPage.vue'),
           },
         ],
       },

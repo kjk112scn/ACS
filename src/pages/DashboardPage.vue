@@ -212,7 +212,7 @@
 </template>
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useICDStore } from '../stores/API/icdStore'
+import { useICDStore } from '../stores/icd/icdStore'
 import { useRouter, useRoute } from 'vue-router'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
@@ -964,7 +964,7 @@ watch(
     console.log('📊 Tilt CMD 값:', newVal ? icdStore.trackingCMDTiltAngle : icdStore.cmdTiltAngle)
   },
 )
-/* 
+/*
 // ✅ 개별 값 변경 감시
 watch(
   () => icdStore.azimuthAngle,

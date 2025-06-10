@@ -9,21 +9,21 @@
           <!-- 체크박스 그룹 -->
           <div class="checkbox-group q-gutter-x-xl">
             <q-checkbox
-              v-model="selectedAxes.azimuth"
+              v-model="azimuthChecked"
               label="Azimuth"
               color="primary"
               class="axis-checkbox"
               size="lg"
             />
             <q-checkbox
-              v-model="selectedAxes.elevation"
+              v-model="elevationChecked"
               label="Elevation"
               color="primary"
               class="axis-checkbox"
               size="lg"
             />
             <q-checkbox
-              v-model="selectedAxes.tilt"
+              v-model="tiltChecked"
               label="Tilt"
               color="primary"
               class="axis-checkbox"
@@ -33,14 +33,8 @@
 
           <!-- 버튼 그룹 -->
           <div class="button-group q-mt-lg q-gutter-x-lg">
-            <q-btn
-              color="primary"
-              label="Standby"
-              :disable="!isAnyAxisSelected"
-              @click="handleStow"
-              size="lg"
-            />
-            <q-btn color="secondary" label="All Standby" @click="handleStow" size="lg" />
+            <q-btn color="primary" label="Standby" @click="handleStandby" size="lg" />
+            <q-btn color="secondary" label="All Standby" @click="handleAllStandby" size="lg" />
             <q-btn color="negative" label="Stow" @click="handleStow" size="lg" />
           </div>
         </q-card-section>
@@ -50,8 +44,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useICDStore } from '../../stores/API/icdStore'
+import { computed } from 'vue'
+import { useICDStore } from '../../stores/icd/icdStore'
+import { useStandbyModeStore } from '../../stores/mode/standbyStore'
 import { defineComponent } from 'vue'
 
 // 컴포넌트 이름 정의
@@ -59,47 +54,47 @@ defineComponent({
   name: 'StandbyMode',
 })
 
-// ICD 스토어 인스턴스 생성
+// 스토어 인스턴스 생성
 const icdStore = useICDStore()
+const standbyStore = useStandbyModeStore()
 
-// 선택된 축 상태 관리
-const selectedAxes = ref({
-  azimuth: false,
-  elevation: false,
-  tilt: false,
+// 체크박스 상태를 computed로 양방향 바인딩
+const azimuthChecked = computed({
+  get: () => standbyStore.selectedAxes.azimuth,
+  set: (value: boolean) => standbyStore.updateAxis('azimuth', value),
 })
 
-// 최소 하나의 축이 선택되었는지 확인
-const isAnyAxisSelected = computed(() => {
-  return selectedAxes.value.azimuth || selectedAxes.value.elevation || selectedAxes.value.tilt
+const elevationChecked = computed({
+  get: () => standbyStore.selectedAxes.elevation,
+  set: (value: boolean) => standbyStore.updateAxis('elevation', value),
 })
-/*
-// Standby 버튼 핸들러
+
+const tiltChecked = computed({
+  get: () => standbyStore.selectedAxes.tilt,
+  set: (value: boolean) => standbyStore.updateAxis('tilt', value),
+})
+
+// Standby 버튼 핸들러 - 선택된 축만 standby
 const handleStandby = async () => {
   try {
-    // 선택된 축에 대해서만 Standby 명령 전송
-     await icdStore.standbyCommand(
-      selectedAxes.value.azimuth,
-      selectedAxes.value.elevation,
-      selectedAxes.value.tilt,
-    )
+    const axes = standbyStore.selectedAxes
+    await icdStore.standbyCommand(axes.azimuth, axes.elevation, axes.tilt)
     console.log('Standby 명령 전송 성공')
   } catch (error) {
     console.error('Standby 명령 전송 실패:', error)
   }
 }
 
-// All Standby 버튼 핸들러
+// 기존 코드 유지
 const handleAllStandby = async () => {
   try {
-    // 모든 축에 대해 Standby 명령 전송
     await icdStore.standbyCommand(true, true, true)
     console.log('All Standby 명령 전송 성공')
   } catch (error) {
     console.error('All Standby 명령 전송 실패:', error)
   }
 }
- */
+
 // Stow 버튼 핸들러
 const handleStow = async () => {
   try {

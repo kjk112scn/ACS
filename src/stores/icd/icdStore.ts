@@ -643,7 +643,25 @@ export const useICDStore = defineStore('icd', () => {
           ? 'INACTIVE'
           : 'UNKNOWN',
   }))
-
+  // Standby 명령 전송
+  const standbyCommand = async (azimuth: boolean, elevation: boolean, tilt: boolean) => {
+    try {
+      const response = await icdService.standbyCommand(azimuth, elevation, tilt)
+      return {
+        success: true,
+        data: response,
+        message: 'Standby 명령이 전송되었습니다.',
+        axes: response.axes || '', // 백엔드에서 반환하는 축 정보
+      }
+    } catch (error) {
+      console.error('Standby 명령 전송 실패:', error)
+      return {
+        success: false,
+        error: String(error),
+        message: 'Standby 명령 전송에 실패했습니다.',
+      }
+    }
+  }
   // 명령 전송 메서드들
   const sendEmergency = async (commandType: 'E' | 'S' = 'E') => {
     try {
@@ -798,7 +816,7 @@ export const useICDStore = defineStore('icd', () => {
   }
 
   // 시간 오프셋 명령 전송
-  const sendTimeOffsetCommand = async (timeOffset: number) => {
+  async function sendTimeOffsetCommand(timeOffset: number) {
     try {
       const response = await icdService.sendTimeOffsetCommand(timeOffset)
       return {
@@ -929,6 +947,7 @@ export const useICDStore = defineStore('icd', () => {
     sendMultiControlCommand,
     sendServoPresetCommand,
     stopCommand,
+    standbyCommand,
     stowCommand,
     sendFeedOnOffCommand,
     startSunTrack,

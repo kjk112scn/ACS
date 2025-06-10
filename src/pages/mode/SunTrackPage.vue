@@ -159,7 +159,7 @@
         </div>
 
         <!-- 상태 메시지 표시 -->
-        <div class="status-message q-mt-md" >
+        <div class="status-message q-mt-md">
           <q-banner> </q-banner>
           <!-- Time Offset 상태 메시지 -->
           <q-banner> </q-banner>
@@ -263,7 +263,7 @@
 </template>
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { useICDStore } from '../../stores/API/icdStore'
+import { useICDStore } from '../../stores/icd/icdStore'
 
 // ICD 스토어 인스턴스 생성
 const icdStore = useICDStore()

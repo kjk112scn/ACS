@@ -406,7 +406,22 @@ export const icdService = {
   async stopAllCommand() {
     return await this.stopSunTrack()
   },
-
+  async standbyCommand(azStandby: boolean, elStandby: boolean, tiStandby: boolean) {
+    try {
+      const response = await api.post('/icd/standby-command', null, {
+        params: {
+          azStandby,
+          elStandby,
+          tiStandby,
+        },
+      })
+      console.log('Standby command sent:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('Standby command failed:', error)
+      throw error
+    }
+  },
   /**
    * Stop 명령 전송
    * @param azStop 방위각 정지 여부
@@ -542,16 +557,32 @@ export const icdService = {
     fan: boolean = false,
   ) {
     try {
-      const response = await api.post('/icd/feed-on-off-command', null, {
-        params: {
+      // 모든 파라미터가 false인지 확인 (fan 포함)
+      const allParamsFalse = !sLHCP && !sRHCP && !sRFSwitch && !xLHCP && !xRHCP && !fan
+
+      let params
+
+      if (allParamsFalse) {
+        // 모든 파라미터가 false면 0x00 전송
+        params = {
+          feedCommand: 0x00,
+        }
+      } else {
+        // 하나라도 true면 기존 방식대로 개별 파라미터 전송
+        params = {
           sLHCP,
           sRHCP,
           sRFSwitch,
           xLHCP,
           xRHCP,
           fan,
-        },
+        }
+      }
+
+      const response = await api.post('/icd/feed-on-off-command', null, {
+        params,
       })
+
       console.log('Feed On/Off command sent:', response.data)
       return response.data
     } catch (error) {
