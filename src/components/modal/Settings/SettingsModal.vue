@@ -57,7 +57,7 @@
           <div class="col settings-content-area q-pa-md">
             <!-- 일반 설정 탭 -->
 
-            <GeneralSettign
+            <GeneralSettings
               v-if="activeTab === 'general'"
               :dark-mode="localDarkMode"
               @update:dark-mode="localDarkMode = $event"
@@ -65,10 +65,7 @@
 
             <!-- Server Preset 탭 -->
 
-            <ServoEncoderPresetSettings
-              v-if="activeTab === 'servo-preset'"
-
-            />
+            <ServoEncoderPresetSettings v-if="activeTab === 'servo-preset'" />
 
             <!-- 연결 설정 탭 -->
             <div v-if="activeTab === 'connection'">
@@ -101,15 +98,8 @@
 import { ref, watch, defineProps, defineEmits } from 'vue'
 import { useQuasar } from 'quasar'
 
-import GeneralSettign from './GeneralSettign.vue'
+import GeneralSettings from './GeneralSettings.vue'
 import ServoEncoderPresetSettings from './ServoEncoderPresetSettings.vue'
-
-
-
-
-
-
-
 
 const $q = useQuasar()
 
@@ -139,12 +129,6 @@ const localServerAddress = ref(props.serverAddress)
 const activeTab = ref('general')
 const apiBaseUrl = ref('http://localhost:8080/api')
 const autoReconnect = ref(true)
-
-
-
-
-
-
 
 // props 변경 감지
 watch(

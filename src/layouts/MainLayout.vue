@@ -68,7 +68,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import EssentialLink, { type EssentialLinkProps } from 'components/EssentialLink.vue'
-import SettingsModal from 'components/modal//Settings/SettingsModal.vue'
+import SettingsModal from 'src/components/modal/Settings/SettingsModal.vue'
 
 import { useQuasar } from 'quasar'
 

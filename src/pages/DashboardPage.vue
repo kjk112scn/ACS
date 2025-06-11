@@ -298,6 +298,9 @@
       </q-card-section>
     </q-card>
   </q-page>
+
+  <!-- All Status 모달 추가 -->
+  <AllStatus v-model="showAllStatusModal" />
 </template>
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
@@ -306,6 +309,7 @@ import { useRouter, useRoute } from 'vue-router'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 import { formatToLocalTimeWithMs } from '../utils/times'
+import AllStatus from '../components/modal/status/AllStatus.vue'
 
 const icdStore = useICDStore()
 const router = useRouter()
@@ -1227,12 +1231,13 @@ onUnmounted(() => {
     debugTimer = null
   }
 })
-
+// AllStatus 모달 상태
+const showAllStatusModal = ref(false)
 // All Status 버튼 핸들러
 const handleAllStatus = () => {
   console.log('All Status 버튼 클릭됨')
-  // 여기에 All Status 기능 구현
-  // 예: 모달 열기, 다른 페이지로 이동, 상세 상태 표시 등
+
+  showAllStatusModal.value = true
 }
 </script>
 
