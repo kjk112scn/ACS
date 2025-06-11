@@ -8,6 +8,13 @@
           <div class="cmd-time">
             <span class="adaptive-text time-value">{{ displayServerTime }}</span>
           </div>
+
+          <!-- 상태 메시지들을 우측으로 이동 -->
+          <div class="status-messages">
+            <p v-if="icdStore.error" class="text-negative">Error: {{ icdStore.error }}</p>
+            <p v-if="!icdStore.isConnected" class="text-warning">WebSocket Connecting...</p>
+            <p v-if="icdStore.isConnected && !icdStore.error" class="text-positive">Connected</p>
+          </div>
         </div>
 
         <div class="axis-grid">
@@ -248,14 +255,6 @@
                     @click="handleAllStatus"
                     class="full-width"
                   />
-                </div>
-
-                <div class="status-messages q-mt-md">
-                  <p v-if="icdStore.error" class="text-negative">Error: {{ icdStore.error }}</p>
-                  <p v-if="!icdStore.isConnected" class="text-warning">WebSocket Connecting...</p>
-                  <p v-if="icdStore.isConnected && !icdStore.error" class="text-positive">
-                    Connected
-                  </p>
                 </div>
               </div>
             </q-card-section>
@@ -1290,7 +1289,7 @@ const handleAllStatus = () => {
 
 .header-section {
   display: flex;
-  justify-content: flex-start;
+  justify-content: space-between; /* flex-start에서 space-between으로 변경 */
   align-items: center;
   margin-bottom: 1rem;
 }
@@ -1421,10 +1420,16 @@ const handleAllStatus = () => {
   flex-direction: column;
   justify-content: center;
 }
+.status-messages {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
 
 .status-messages p {
-  margin: 0.25rem 0;
+  margin: 0;
   font-size: 0.9rem;
+  font-weight: 500;
 }
 
 /* 차트 영역 스타일 */

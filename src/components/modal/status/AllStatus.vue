@@ -596,7 +596,7 @@
                     ></div>
                     <span class="status-label">Servo Brake</span>
                     <span class="status-value">
-                      {{ icdStore.azimuthBoardServoStatusInfo.servoBrake ? 'ENGAGED' : 'RELEASED' }}
+                      {{ icdStore.azimuthBoardServoStatusInfo.servoBrake ? 'ENGAGED' : 'INACTIVE' }}
                     </span>
                   </div>
 
@@ -739,7 +739,7 @@
                     <span class="status-label">Servo Brake</span>
                     <span class="status-value">
                       {{
-                        icdStore.elevationBoardServoStatusInfo.servoBrake ? 'ENGAGED' : 'RELEASED'
+                        icdStore.elevationBoardServoStatusInfo.servoBrake ? 'ENGAGED' : 'INACTIVE'
                       }}
                     </span>
                   </div>
@@ -839,7 +839,7 @@
                     ></div>
                     <span class="status-label">Servo Brake</span>
                     <span class="status-value">
-                      {{ icdStore.tiltBoardServoStatusInfo.servoBrake ? 'ENGAGED' : 'RELEASED' }}
+                      {{ icdStore.tiltBoardServoStatusInfo.servoBrake ? 'ENGAGED' : 'INACTIVE' }}
                     </span>
                   </div>
 
