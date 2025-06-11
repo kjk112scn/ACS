@@ -1258,71 +1258,123 @@ const refreshStatus = () => {
 </script>
 <style scoped>
 .all-status-modal {
-  min-width: 1200px; /* 더 넓게 조정 */
-  max-width: 1400px;
+  min-width: 1440px;
+  max-width: 1680px;
   width: 95vw;
+  max-height: 90vh;
+  overflow: auto;
+  container-type: inline-size;
+}
+
+.q-card-section:nth-child(2) {
+  overflow-y: auto;
+  max-height: calc(90vh - 120px);
+  padding-right: 10px;
+}
+
+.q-card-section:nth-child(2)::-webkit-scrollbar {
+  width: 8px;
+}
+
+.q-card-section:nth-child(2)::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.q-card-section:nth-child(2)::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.q-card-section:nth-child(2)::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
 
 .status-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr); /* 3열 그리드 */
-  gap: 1rem;
+  grid-template-columns: repeat(6, 1fr);
+  grid-template-rows: auto auto;
+  gap: 0.6rem;
 }
 
-/* 전체 행을 차지하는 카드 */
-.full-width-card {
-  grid-column: 1 / -1; /* 첫 번째 열부터 마지막 열까지 */
+/* 첫 번째 행: 6개 카드 */
+.protocol-status-card {
+  grid-column: 1;
+  grid-row: 1;
+}
+.power-status-card {
+  grid-column: 2;
+  grid-row: 1;
+}
+.emergency-status-card {
+  grid-column: 3;
+  grid-row: 1;
+}
+.servo-power-status-card {
+  grid-column: 4;
+  grid-row: 1;
+}
+.stow-status-card {
+  grid-column: 5;
+  grid-row: 1;
+}
+.stow-command-status-card {
+  grid-column: 6;
+  grid-row: 1;
 }
 
-/* Positioner Status Card */
+/* 두 번째 행: Positioner Status (1~3열) + Feed Status (4~5열) + 공백 (6열) */
 .positioner-status-card {
+  grid-column: 1 / 4;
+  grid-row: 2;
   border: 1px solid var(--q-indigo);
   border-top: 3px solid var(--q-indigo);
 }
 
-.positioner-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr); /* 3열로 배치 */
-  gap: 1rem;
-}
-
-/* Feed Status Card */
 .feed-status-card {
+  grid-column: 4 / 6;
+  grid-row: 2;
   border: 1px solid var(--q-deep-orange);
   border-top: 3px solid var(--q-deep-orange);
 }
 
-.feed-grid {
+.positioner-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr); /* 3열로 배치 */
-  gap: 1rem;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
 }
 
-/* 통합된 Status Item 스타일 */
+.feed-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+}
+
 .status-item {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem;
+  gap: 0.5rem;
+  padding: 0.3rem;
   border: 1px solid #e0e0e0;
-  border-radius: 4px;
+  border-radius: 3px;
   background-color: rgba(0, 0, 0, 0.02);
   transition: all 0.2s ease;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .status-item:hover {
   background-color: rgba(0, 0, 0, 0.05);
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
-/* 통합된 Status LED 스타일 */
 .status-led {
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   transition: all 0.3s ease;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
   flex-shrink: 0;
   position: relative;
 }
@@ -1340,12 +1392,11 @@ const refreshStatus = () => {
   transition: opacity 0.3s ease;
 }
 
-/* LED 상태별 색상 - ON (정상/활성) */
 .led-on {
   background-color: #4caf50;
   box-shadow:
-    0 0 8px #4caf50,
-    0 0 16px #4caf50;
+    0 0 5px #4caf50,
+    0 0 10px #4caf50;
 }
 
 .led-on::before {
@@ -1353,18 +1404,16 @@ const refreshStatus = () => {
   animation: pulse-green 2s infinite;
 }
 
-/* LED 상태별 색상 - OFF (비활성) */
 .led-off {
   background-color: #666;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
 }
 
-/* LED 상태별 색상 - ERROR (에러) */
 .led-error {
   background-color: #f44336;
   box-shadow:
-    0 0 8px #f44336,
-    0 0 16px #f44336;
+    0 0 5px #f44336,
+    0 0 10px #f44336;
 }
 
 .led-error::before {
@@ -1372,19 +1421,26 @@ const refreshStatus = () => {
   animation: pulse-red 2s infinite;
 }
 
-/* 통합된 Status Label & Value */
 .status-label {
   font-weight: 500;
-  min-width: 80px;
+  min-width: 66px;
   flex-shrink: 0;
+  font-size: 0.84rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .status-value {
   font-weight: 600;
   margin-left: auto;
+  font-size: 0.84rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-/* 상태별 텍스트 색상 */
 .status-item:has(.led-on) .status-value {
   color: #4caf50;
 }
@@ -1397,16 +1453,17 @@ const refreshStatus = () => {
   color: #f44336;
 }
 
-/* 통합된 Status Summary */
 .status-summary {
   border-top: 1px solid #e0e0e0;
-  padding-top: 1rem;
+  padding-top: 0.5rem;
+  margin-top: 0.5rem;
 }
 
 .summary-item {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.78rem;
 }
 
 .summary-label {
@@ -1419,7 +1476,29 @@ const refreshStatus = () => {
   font-family: 'Courier New', monospace;
 }
 
-/* LED 애니메이션 */
+.text-subtitle1 {
+  font-size: 1.08rem !important;
+  margin-bottom: 0.6rem !important;
+}
+
+.positioner-title,
+.feed-section-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #666;
+}
+
+.q-card {
+  margin-bottom: 0.36rem;
+  min-width: 0;
+}
+
+.q-card-section {
+  padding: 0.72rem;
+  min-width: 0;
+}
+
 @keyframes pulse-green {
   0%,
   100% {
@@ -1444,7 +1523,7 @@ const refreshStatus = () => {
   }
 }
 
-/* 다크 모드 지원 */
+/* 다크 모드 */
 .body--dark .status-item {
   background-color: rgba(255, 255, 255, 0.05);
   border-color: #444;
@@ -1454,25 +1533,16 @@ const refreshStatus = () => {
   background-color: rgba(255, 255, 255, 0.1);
 }
 
-.body--dark .status-summary,
-.body--dark .connection-stats,
-.body--dark .update-interval-section,
-.body--dark .timer-accuracy-section,
-.body--dark .memory-section {
+.body--dark .status-summary {
   border-color: #444;
 }
 
-.body--dark .summary-label,
-.body--dark .stat-label,
-.body--dark .interval-stat-label,
-.body--dark .timer-stat-label,
-.body--dark .memory-stat-label {
+.body--dark .summary-label {
   color: #bbb;
 }
 
-.body--dark .interval-title,
-.body--dark .timer-title,
-.body--dark .memory-title {
+.body--dark .positioner-title,
+.body--dark .feed-section-title {
   color: #bbb;
 }
 
@@ -1484,44 +1554,330 @@ const refreshStatus = () => {
   color: #999;
 }
 
-.body--dark .connection-item {
-  background-color: rgba(255, 255, 255, 0.05);
-  border-color: #444;
+.body--dark .q-card-section:nth-child(2)::-webkit-scrollbar-track {
+  background: #333;
 }
 
-.body--dark .connection-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+.body--dark .q-card-section:nth-child(2)::-webkit-scrollbar-thumb {
+  background: #666;
 }
 
-/* 반응형 디자인 */
-@media (max-width: 1200px) {
+.body--dark .q-card-section:nth-child(2)::-webkit-scrollbar-thumb:hover {
+  background: #777;
+}
+
+/* 컨테이너 쿼리 (더 정확한 반응형) */
+@container (max-width: 1400px) {
   .status-grid {
-    grid-template-columns: repeat(2, 1fr); /* 2열로 변경 */
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: auto auto auto auto;
+  }
+
+  .protocol-status-card {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .power-status-card {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .emergency-status-card {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .servo-power-status-card {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .stow-status-card {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .stow-command-status-card {
+    grid-column: 3;
+    grid-row: 2;
+  }
+  .positioner-status-card {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+  .feed-status-card {
+    grid-column: 1 / -1;
+    grid-row: 4;
   }
 
   .positioner-grid,
   .feed-grid {
-    grid-template-columns: repeat(2, 1fr); /* 2열로 변경 */
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
   }
 }
 
-@media (max-width: 768px) {
+@container (max-width: 900px) {
+  .status-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(8, auto);
+  }
+
+  .protocol-status-card {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .power-status-card {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .emergency-status-card {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .servo-power-status-card {
+    grid-column: 1;
+    grid-row: 4;
+  }
+  .stow-status-card {
+    grid-column: 1;
+    grid-row: 5;
+  }
+  .stow-command-status-card {
+    grid-column: 1;
+    grid-row: 6;
+  }
+  .positioner-status-card {
+    grid-column: 1;
+    grid-row: 7;
+  }
+  .feed-status-card {
+    grid-column: 1;
+    grid-row: 8;
+  }
+
+  .positioner-grid,
+  .feed-grid {
+    grid-template-columns: 1fr;
+    gap: 0.36rem;
+  }
+}
+
+/* 기존 미디어 쿼리 (폴백용) */
+@media (max-width: 1600px) {
+  .all-status-modal {
+    min-width: 1200px;
+    max-width: 1400px;
+  }
+}
+
+@media (max-width: 1440px) {
+  .all-status-modal {
+    min-width: 95vw;
+  }
+
+  .status-grid {
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: auto auto auto auto;
+  }
+
+  .protocol-status-card {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .power-status-card {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .emergency-status-card {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .servo-power-status-card {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .stow-status-card {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .stow-command-status-card {
+    grid-column: 3;
+    grid-row: 2;
+  }
+  .positioner-status-card {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+  .feed-status-card {
+    grid-column: 1 / -1;
+    grid-row: 4;
+  }
+
+  .positioner-grid,
+  .feed-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+
+  .status-label {
+    min-width: 50px;
+    font-size: 0.8rem;
+  }
+
+  .status-value {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 1200px) {
+  .status-grid {
+    gap: 0.4rem;
+  }
+
+  .status-item {
+    padding: 0.25rem;
+    gap: 0.4rem;
+  }
+
+  .status-label {
+    min-width: 45px;
+    font-size: 0.75rem;
+  }
+
+  .status-value {
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 1000px) {
+  .status-grid {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(5, auto);
+  }
+
+  .protocol-status-card {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .power-status-card {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .emergency-status-card {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .servo-power-status-card {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .stow-status-card {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .stow-command-status-card {
+    grid-column: 2;
+    grid-row: 3;
+  }
+  .positioner-status-card {
+    grid-column: 1 / -1;
+    grid-row: 4;
+  }
+  .feed-status-card {
+    grid-column: 1 / -1;
+    grid-row: 5;
+  }
+}
+
+@media (max-width: 922px) {
   .all-status-modal {
     min-width: 95vw;
     width: 95vw;
+    max-height: 85vh;
+  }
+  .status-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(8, auto);
   }
 
-  .status-grid {
-    grid-template-columns: 1fr; /* 1열로 변경 */
+  .protocol-status-card {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .power-status-card {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .emergency-status-card {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .servo-power-status-card {
+    grid-column: 1;
+    grid-row: 4;
+  }
+  .stow-status-card {
+    grid-column: 1;
+    grid-row: 5;
+  }
+  .stow-command-status-card {
+    grid-column: 1;
+    grid-row: 6;
+  }
+  .positioner-status-card {
+    grid-column: 1;
+    grid-row: 7;
+  }
+  .feed-status-card {
+    grid-column: 1;
+    grid-row: 8;
   }
 
   .positioner-grid,
   .feed-grid {
-    grid-template-columns: 1fr; /* 1열로 변경 */
+    grid-template-columns: 1fr;
+    gap: 0.36rem;
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 800px) {
+  .status-item {
+    padding: 0.2rem;
+    gap: 0.3rem;
+  }
+
+  .status-label {
+    min-width: 40px;
+    font-size: 0.7rem;
+  }
+
+  .status-value {
+    font-size: 0.7rem;
+  }
+
+  .text-subtitle1 {
+    font-size: 0.95rem !important;
+  }
+
+  .positioner-title,
+  .feed-section-title {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 700px) {
+  .all-status-modal {
+    min-width: 100vw;
+    width: 100vw;
+  }
+
+  .status-grid {
+    gap: 0.3rem;
+  }
+
+  .q-card-section {
+    padding: 0.5rem;
+  }
+}
+
+@media (max-width: 576px) {
   .all-status-modal {
     min-width: 100vw;
     width: 100vw;
@@ -1530,10 +1886,10 @@ const refreshStatus = () => {
   }
 
   .status-item {
-    padding: 0.75rem;
+    padding: 0.5rem;
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.5rem;
+    gap: 0.36rem;
   }
 
   .status-led {
@@ -1544,48 +1900,67 @@ const refreshStatus = () => {
   .status-value {
     align-self: center;
     min-width: auto;
+    font-size: 0.8rem;
   }
 
-  .summary-item,
-  .stat-item,
-  .interval-stat-item,
-  .timer-stat-item,
-  .memory-stat-item {
+  .summary-item {
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.18rem;
   }
 
-  .connection-item {
-    padding: 0.75rem;
+  .text-subtitle1 {
+    font-size: 0.9rem !important;
+    text-align: center;
   }
 
-  .connection-label {
-    min-width: auto;
+  .positioner-title,
+  .feed-section-title {
+    font-size: 0.75rem;
+    text-align: center;
   }
 }
 
-/* 접근성 개선 */
+@media (max-width: 480px) {
+  .q-card-section {
+    padding: 0.4rem;
+  }
+
+  .status-grid {
+    gap: 0.25rem;
+  }
+
+  .status-item {
+    padding: 0.4rem;
+  }
+
+  .status-label,
+  .status-value {
+    font-size: 0.75rem;
+  }
+
+  .text-subtitle1 {
+    font-size: 0.85rem !important;
+  }
+}
+
+/* 접근성 */
 @media (prefers-reduced-motion: reduce) {
-  .status-led::before,
-  .connection-led::before {
+  .status-led::before {
     animation: none;
   }
 
-  .status-item,
-  .connection-item {
+  .status-item {
     transition: none;
   }
 
-  .status-item:hover,
-  .connection-item:hover {
+  .status-item:hover {
     transform: none;
   }
 }
 
-/* 고대비 모드 지원 */
+/* 고대비 모드 */
 @media (prefers-contrast: high) {
-  .status-item,
-  .connection-item {
+  .status-item {
     border-width: 2px;
     border-color: #000;
   }
@@ -1604,16 +1979,6 @@ const refreshStatus = () => {
     background-color: #808080;
     box-shadow: none;
   }
-
-  .led-green {
-    background-color: #00ff00;
-    box-shadow: none;
-  }
-
-  .led-red {
-    background-color: #ff0000;
-    box-shadow: none;
-  }
 }
 
 /* 인쇄 스타일 */
@@ -1623,20 +1988,17 @@ const refreshStatus = () => {
     border: 1px solid #000;
   }
 
-  .status-led,
-  .connection-led {
+  .status-led {
     box-shadow: none;
     border: 1px solid #000;
   }
 
-  .led-on,
-  .led-green {
+  .led-on {
     background-color: #fff !important;
     border: 2px solid #000;
   }
 
-  .led-error,
-  .led-red {
+  .led-error {
     background-color: #000 !important;
   }
 
@@ -1645,8 +2007,7 @@ const refreshStatus = () => {
     border: 1px solid #000;
   }
 
-  .status-item,
-  .connection-item {
+  .status-item {
     break-inside: avoid;
   }
 }
