@@ -1,6 +1,22 @@
 import type { RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [
+  // 팝업 전용 라우트들
+  {
+    path: '/popup',
+    children: [
+      {
+        path: 'all-status',
+        component: () => import('../components/content/AllStatusContent.vue'),
+        name: 'PopupAllStatus',
+      },
+      {
+        path: 'system-info',
+        name: 'PopupSystemInfo',
+        component: () => import('../components/content/SystemInfoContent.vue'),
+      },
+    ],
+  },
   {
     path: '/',
     redirect: '/login',
@@ -56,6 +72,7 @@ const routes: RouteRecordRaw[] = [
     component: () => import('layouts/LoginLayout.vue'),
     children: [{ path: 'login', component: () => import('pages/LoginPage.vue') }],
   },
+
   // Always leave this as last one,
   // but you can also remove it
   {

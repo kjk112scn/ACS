@@ -50,7 +50,6 @@
                           class="full-width"
                           suffix="°"
                           :disable="!stepStore.selectedAxes.azimuth"
-
                           step="0.01"
                           placeholder="0.00"
                           @update:model-value="formatAngle('azimuth')"
@@ -98,7 +97,6 @@
                           class="full-width"
                           suffix="°"
                           :disable="!stepStore.selectedAxes.elevation"
-
                           step="0.01"
                           placeholder="0.00"
                           @update:model-value="formatAngle('elevation')"
@@ -146,7 +144,6 @@
                           class="full-width"
                           suffix="°"
                           :disable="!stepStore.selectedAxes.tilt"
-
                           step="0.01"
                           placeholder="0.00"
                           @update:model-value="formatAngle('tilt')"
@@ -217,15 +214,82 @@ const icdStore = useICDStore()
 const stepStore = useStepStore()
 
 // Go 버튼 핸들러
+// Go 버튼 핸들러
 const handleGo = async () => {
   try {
+    // azAngle 계산 로직
+    let calculatedAzAngle = parseFloat(stepStore.angles.azimuth)
+
+    if (stepStore.selectedAxes.azimuth) {
+      // azimuthBoardServoStatusInfo의 servoMotor 값 확인
+      if (icdStore.azimuthBoardServoStatusInfo.servoMotor) {
+        // servoMotor가 true이면 cmdAzimuthAngle 값에 stepStore.angles.azimuth 값을 더함
+        const cmdAzimuthValue = parseFloat(icdStore.cmdAzimuthAngle) || 0
+        calculatedAzAngle = cmdAzimuthValue + parseFloat(stepStore.angles.azimuth)
+        console.log(
+          `Azimuth 계산 (ServoMotor=true): ${cmdAzimuthValue} + ${parseFloat(stepStore.angles.azimuth)} = ${calculatedAzAngle}`,
+        )
+      } else {
+        // servoMotor가 false이면 azimuthAngle 값에 stepStore.angles.azimuth 값을 더함
+        const azimuthValue = parseFloat(icdStore.azimuthAngle) || 0
+        calculatedAzAngle = azimuthValue + parseFloat(stepStore.angles.azimuth)
+        console.log(
+          `Azimuth 계산 (ServoMotor=false): ${azimuthValue} + ${parseFloat(stepStore.angles.azimuth)} = ${calculatedAzAngle}`,
+        )
+      }
+    }
+
+    // elAngle 계산 로직
+    let calculatedElAngle = parseFloat(stepStore.angles.elevation)
+
+    if (stepStore.selectedAxes.elevation) {
+      // elevationBoardServoStatusInfo의 servoMotor 값 확인
+      if (icdStore.elevationBoardServoStatusInfo.servoMotor) {
+        // servoMotor가 true이면 cmdElevationAngle 값에 stepStore.angles.elevation 값을 더함
+        const cmdElevationValue = parseFloat(icdStore.cmdElevationAngle) || 0
+        calculatedElAngle = cmdElevationValue + parseFloat(stepStore.angles.elevation)
+        console.log(
+          `Elevation 계산 (ServoMotor=true): ${cmdElevationValue} + ${parseFloat(stepStore.angles.elevation)} = ${calculatedElAngle}`,
+        )
+      } else {
+        // servoMotor가 false이면 elevationAngle 값에 stepStore.angles.elevation 값을 더함
+        const elevationValue = parseFloat(icdStore.elevationAngle) || 0
+        calculatedElAngle = elevationValue + parseFloat(stepStore.angles.elevation)
+        console.log(
+          `Elevation 계산 (ServoMotor=false): ${elevationValue} + ${parseFloat(stepStore.angles.elevation)} = ${calculatedElAngle}`,
+        )
+      }
+    }
+
+    // tiAngle 계산 로직
+    let calculatedTiAngle = parseFloat(stepStore.angles.tilt)
+
+    if (stepStore.selectedAxes.tilt) {
+      // tiltBoardServoStatusInfo의 servoMotor 값 확인
+      if (icdStore.tiltBoardServoStatusInfo.servoMotor) {
+        // servoMotor가 true이면 cmdTiltAngle 값에 stepStore.angles.tilt 값을 더함
+        const cmdTiltValue = parseFloat(icdStore.cmdTiltAngle) || 0
+        calculatedTiAngle = cmdTiltValue + parseFloat(stepStore.angles.tilt)
+        console.log(
+          `Tilt 계산 (ServoMotor=true): ${cmdTiltValue} + ${parseFloat(stepStore.angles.tilt)} = ${calculatedTiAngle}`,
+        )
+      } else {
+        // servoMotor가 false이면 tiltAngle 값에 stepStore.angles.tilt 값을 더함
+        const tiltValue = parseFloat(icdStore.tiltAngle) || 0
+        calculatedTiAngle = tiltValue + parseFloat(stepStore.angles.tilt)
+        console.log(
+          `Tilt 계산 (ServoMotor=false): ${tiltValue} + ${parseFloat(stepStore.angles.tilt)} = ${calculatedTiAngle}`,
+        )
+      }
+    }
+
     await icdStore.sendMultiControlCommand({
       azimuth: stepStore.selectedAxes.azimuth,
       elevation: stepStore.selectedAxes.elevation,
       tilt: stepStore.selectedAxes.tilt,
-      azAngle: parseFloat(stepStore.angles.azimuth),
-      elAngle: parseFloat(stepStore.angles.elevation),
-      tiAngle: parseFloat(stepStore.angles.tilt),
+      azAngle: calculatedAzAngle,
+      elAngle: calculatedElAngle,
+      tiAngle: calculatedTiAngle,
       azSpeed: parseFloat(stepStore.speeds.azimuth),
       elSpeed: parseFloat(stepStore.speeds.elevation),
       tiSpeed: parseFloat(stepStore.speeds.tilt),

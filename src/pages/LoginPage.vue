@@ -35,12 +35,34 @@ const auth = useAuthStore()
 
 const login = () => {
   if (username.value === 'de' && password.value === 'de') {
-    auth.login()
+    auth.login() // localStorage에 저장됨
+
+    // 팝업 창들에게 인증 상태 변경 알림
+    broadcastAuthChange(true)
+
+    console.log('✅ 메인 창에서 로그인 성공')
+
     router.push('/dashboard').catch((err) => {
       console.error('Navigation error:', err)
     })
   } else {
     alert('Invalid credentials')
+  }
+}
+
+// 다른 창들에게 인증 상태 변경 알림
+const broadcastAuthChange = (isLoggedIn: boolean) => {
+  try {
+    const channel = new BroadcastChannel('auth-channel')
+    channel.postMessage({
+      type: 'auth-status-changed',
+      isLoggedIn: isLoggedIn,
+      timestamp: Date.now()
+    })
+    channel.close()
+    console.log('📡 인증 상태 브로드캐스트:', isLoggedIn)
+  } catch (error) {
+    console.warn('브로드캐스트 실패:', error)
   }
 }
 </script>

@@ -108,8 +108,8 @@
                 <div class="emergency-content">
                   <q-btn
                     class="full-width"
-                    :color="emergencyActive ? 'grey-8' : 'negative'"
-                    :label="emergencyActive ? 'Emergency Active' : 'Emergency Stop'"
+                    :color="acsEmergencyActive ? 'grey-8' : 'negative'"
+                    :label="acsEmergencyActive ? 'Emergency Active' : 'Emergency Stop'"
                     @click="handleEmergencyClick"
                     size="lg"
                   />
@@ -299,7 +299,7 @@
   </q-page>
 
   <!-- All Status 모달 추가 -->
-  <AllStatus v-model="showAllStatusModal" />
+  <!-- <AllStatus v-model="showAllStatusModal" /> -->
 </template>
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
@@ -308,7 +308,8 @@ import { useRouter, useRoute } from 'vue-router'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 import { formatToLocalTimeWithMs } from '../utils/times'
-import AllStatus from '../components/modal/status/AllStatus.vue'
+import { openComponent } from '../utils/windowUtils'
+//import AllStatus from '../components/modal/status/AllStatus.vue'
 
 const icdStore = useICDStore()
 const router = useRouter()
@@ -992,10 +993,11 @@ const initCharts = () => {
   }, 0)
 }
 
-const emergencyActive = ref(false)
+const acsEmergencyActive = ref(false)
 const emergencyModal = ref(false)
 
 // 추가 상태 LED들
+const emergencyActive = ref(false)
 const positionerActive = ref(false)
 const feedActive = ref(false)
 const protocolActive = ref(false)
@@ -1015,11 +1017,11 @@ const stowPinActive = computed(() => icdStore.stowPinStatus === 'active')
 const handleEmergencyClick = async () => {
   console.log('Emergency 버튼 클릭됨')
 
-  if (!emergencyActive.value) {
+  if (!acsEmergencyActive.value) {
     // 비상 정지 활성화 ('E' 명령 전송)
     try {
       await icdStore.sendEmergency('E')
-      emergencyActive.value = true
+      acsEmergencyActive.value = true
       console.log('Emergency Stop 활성화됨')
     } catch (error) {
       console.error('Emergency Stop 활성화 실패:', error)
@@ -1037,7 +1039,7 @@ const releaseEmergency = async () => {
   try {
     await icdStore.sendEmergency('S')
 
-    emergencyActive.value = false
+    acsEmergencyActive.value = false
     console.log('Emergency Stop 해제됨')
   } catch (error) {
     console.error('Emergency Stop 해제 실패:', error)
@@ -1230,14 +1232,63 @@ onUnmounted(() => {
     debugTimer = null
   }
 })
+// All Status 팝업 열기 함수 수정
+
+// All Status 버튼 핸들러 - 스마트 중앙 배치
+const handleAllStatus = () => {
+  console.log('All Status 버튼 클릭됨')
+  // ✅ 이렇게 되어야 함!
+  void openComponent('all-status', {
+    mode: 'popup',
+    width: 1700,
+    height: 700,
+    location: false,
+  })
+  /*
+  void openComponent('all-status', {
+    mode: 'modal', // 'popup' | 'modal' | 'auto'
+    width: 1700, // 너비
+    height: 700, // 높이
+    props: {
+      // 컴포넌트에 전달할 props
+      customData: 'some data',
+      theme: 'dark',
+    },
+    onClose: () => {
+      console.log('창이 닫혔습니다')
+    },
+    onError: (error) => {
+      console.error('오류 발생:', error)
+      alert('창을 열 수 없습니다.')
+    },
+  }) */
+}
+
+// 수동으로 배치 방식 선택하고 싶다면
+/* const handleAllStatusManual = () => {
+  const baseUrl = window.location.origin
+  const popupUrl = `${baseUrl}/#/popup/all-status`
+
+  // 현재 창 기준 중앙 배치 (듀얼 모니터 고려)
+  const popup = openCenteredPopup(popupUrl, 'AllStatusPopup', {
+    width: 1400,
+    height: 900,
+    relativeTo: 'window', // 'window' 또는 'screen'
+  })
+
+  if (!popup) {
+    alert('팝업이 차단되었습니다.')
+  }
+}
 // AllStatus 모달 상태
-const showAllStatusModal = ref(false)
+//const showAllStatusModal = ref(false)
 // All Status 버튼 핸들러
 const handleAllStatus = () => {
   console.log('All Status 버튼 클릭됨')
-
-  showAllStatusModal.value = true
+  openAllStatusPopup()
+  //showAllStatusModal.value = true
 }
+ */
 </script>
 
 <style>
@@ -1375,7 +1426,7 @@ const handleAllStatus = () => {
 /* Emergency 카드 */
 .emergency-card {
   border: 1px solid var(--q-negative);
-  border-top: 3px solid var(--q-negative);
+  border-top: 1px solid var(--q-negative);
   flex: 1;
 }
 
@@ -1384,7 +1435,7 @@ const handleAllStatus = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.5rem 0;
+  padding: 0.1rem 0;
 }
 
 /* Control 카드 */

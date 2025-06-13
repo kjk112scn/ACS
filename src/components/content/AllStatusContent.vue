@@ -4,7 +4,7 @@
       <q-card-section class="row items-center q-pb-none">
         <div class="text-h6">All Status Information</div>
         <q-space />
-        <q-btn icon="close" flat round dense v-close-popup />
+        <q-btn icon="close" flat round dense v-close-popup @click="handleClose" />
       </q-card-section>
 
       <q-card-section class="q-pt-none">
@@ -1140,43 +1140,18 @@
       </q-card-section>
 
       <q-card-actions align="right">
-        <q-btn flat label="새로고침" color="primary" @click="refreshStatus" />
-        <q-btn flat label="닫기" color="grey-7" v-close-popup />
+        <q-btn flat label="닫기" color="grey-7" @click="handleClose" />
       </q-card-actions>
     </q-card>
   </q-dialog>
 </template>
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useICDStore } from '../../../stores/icd/icdStore'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useICDStore } from '../../stores/icd/icdStore'
+import { closeWindow } from '../../utils/windowUtils'
 
-// Props
-interface Props {
-  modelValue: boolean
-}
-
-const props = defineProps<Props>()
-
-// Emits
-const emit = defineEmits<{
-  'update:modelValue': [value: boolean]
-}>()
-
-// Store
 const icdStore = useICDStore()
-
-// 메모리 정보 타입 정의
-interface MemoryInfo {
-  usedJSHeapSize: number
-  totalJSHeapSize: number
-  jsHeapSizeLimit: number
-}
-
-interface PerformanceWithMemory extends Performance {
-  memory?: MemoryInfo
-}
-
-// Computed
+// Computed for template
 const isOpen = computed({
   get: () => props.modelValue,
   set: (value: boolean) => emit('update:modelValue', value),
@@ -1184,77 +1159,200 @@ const isOpen = computed({
 
 const protocolStatusInfo = computed(() => icdStore.protocolStatusInfo)
 
-// 브라우저 성능 정보 (타입 안전하게)
-const getBrowserPerformance = () => {
+// Props를 선택적으로 만들기// 🎯 Props 정의
+const props = withDefaults(
+  defineProps<{
+    modelValue?: boolean
+  }>(),
+  {
+    modelValue: true,
+  },
+)
+
+// 🎯 Emits 정의
+const emit = defineEmits<{
+  'update:modelValue': [value: boolean]
+  close: []
+}>()
+
+// 🔍 실행 환경 감지 (isPopupWindow만 필요)
+const isPopupWindow = computed(() => window.opener !== null)
+
+// 표시 모드
+const displayMode = computed(() => (isPopupWindow.value ? '팝업 창 모드' : '모달 모드'))
+
+// 마지막 업데이트 시간
+const lastUpdateTime = ref(new Date().toLocaleTimeString())
+
+// 🚪 범용 닫기 함수
+const handleClose = () => {
+  console.log('🚪 닫기 요청 - 모드:', displayMode.value)
+  closeWindow() // 간단하게 한 줄!
   try {
-    // GPU 가속 확인
-    const canvas = document.createElement('canvas')
-    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
-    const gpuAcceleration = gl ? 'ON' : 'OFF'
+    if (isPopupWindow.value) {
+      // 팝업 창 모드
+      console.log('🪟 팝업 창 닫기 시도')
 
-    // 메모리 정보 (타입 안전하게)
-    const performanceWithMemory = performance as PerformanceWithMemory
-    const memoryInfo = performanceWithMemory.memory
-    const memoryData = memoryInfo
-      ? {
-          used: Math.round(memoryInfo.usedJSHeapSize / 1024 / 1024),
-          total: Math.round(memoryInfo.totalJSHeapSize / 1024 / 1024),
-          limit: Math.round(memoryInfo.jsHeapSizeLimit / 1024 / 1024),
+      // 부모 창에 닫기 알림
+      if (window.opener && !window.opener.closed) {
+        try {
+          window.opener.postMessage(
+            {
+              type: 'popup-closing',
+              timestamp: Date.now(),
+            },
+            window.location.origin,
+          )
+        } catch (error) {
+          console.warn('⚠️ 부모 창 통신 실패:', error)
         }
-      : null
+      }
 
-    console.log('🖥️ 브라우저 성능 정보:')
-    console.log('GPU 가속:', gpuAcceleration)
-    if (memoryData) {
-      console.log(
-        `메모리: ${memoryData.used}MB / ${memoryData.total}MB (한계: ${memoryData.limit}MB)`,
-      )
+      // 창 닫기
+      window.close()
+
+      // 브라우저에서 창 닫기가 실패할 경우 대비
+      setTimeout(() => {
+        if (!window.closed) {
+          console.warn('⚠️ 자동 창 닫기 실패 - 사용자 액션 필요')
+          alert('창을 수동으로 닫아주세요. (Alt+F4 또는 Ctrl+W)')
+        }
+      }, 100)
+    } else {
+      // 모달 모드
+      console.log('📱 모달 닫기')
+      emit('update:modelValue', false)
+      emit('close')
     }
-
-    return { gpuAcceleration, memoryData }
   } catch (error) {
-    console.log('성능 정보를 가져올 수 없습니다:', error)
-    return { gpuAcceleration: 'UNKNOWN', memoryData: null }
+    console.error('❌ 닫기 처리 중 오류:', error)
+
+    // 폴백 처리
+    if (isPopupWindow.value) {
+      alert('창을 수동으로 닫아주세요.')
+    } else {
+      emit('update:modelValue', false)
+    }
   }
 }
 
-// Methods
+// 🎹 키보드 이벤트 핸들러
+const handleKeydown = (event: KeyboardEvent) => {
+  switch (event.key) {
+    case 'Escape':
+      console.log('⌨️ ESC 키 - 닫기')
+      event.preventDefault()
+      handleClose()
+      break
+
+    case 'F5':
+      console.log('🔄 F5 키 - 새로고침')
+      event.preventDefault()
+      refreshStatus()
+      break
+
+    default:
+      // Ctrl+W (창 닫기)
+      if (event.ctrlKey && event.key === 'w') {
+        console.log('⌨️ Ctrl+W - 창 닫기')
+
+        if (isPopupWindow.value) {
+          // 팝업 창: 브라우저 기본 동작 허용
+          return
+        } else {
+          // 모달: 기본 동작 방지하고 커스텀 닫기
+          event.preventDefault()
+          handleClose()
+        }
+      }
+      break
+  }
+}
+
+// 🔄 새로고침 함수
 const refreshStatus = () => {
   console.log('🔄 상태 새로고침')
-  console.log('Protocol Status:', protocolStatusInfo.value)
-  console.log('Power Status:', {
-    powerSurgeProtector: icdStore.mainBoardStatusInfo.powerSurgeProtector,
-    powerReversePhaseSensor: icdStore.mainBoardStatusInfo.powerReversePhaseSensor,
-    hasPowerIssue: icdStore.mainBoardStatusInfo.summary?.hasPowerIssue,
-  })
-  console.log('Emergency Status:', {
-    emergencyStopACU: icdStore.mainBoardStatusInfo.emergencyStopACU,
-    emergencyStopPositioner: icdStore.mainBoardStatusInfo.emergencyStopPositioner,
-    hasEmergencyStop: icdStore.mainBoardStatusInfo.summary?.hasEmergencyStop,
-  })
-  console.log('Stow Status:', {
-    azimuthStowed: icdStore.azimuthBoardStatusInfo.stowPin,
-    elevationStowed: icdStore.elevationBoardStatusInfo.stowPin,
-    tiltStowed: icdStore.tiltBoardStatusInfo.stowPin,
-    stowedAxes: [
-      icdStore.azimuthBoardStatusInfo.stowPin && 'Azimuth',
-      icdStore.elevationBoardStatusInfo.stowPin && 'Elevation',
-      icdStore.tiltBoardStatusInfo.stowPin && 'Tilt',
-    ].filter(Boolean),
-    allStowed:
-      icdStore.azimuthBoardStatusInfo.stowPin &&
-      icdStore.elevationBoardStatusInfo.stowPin &&
-      icdStore.tiltBoardStatusInfo.stowPin,
-  })
-  console.log('Connection Status:', {
-    isConnected: icdStore.isConnected,
-    isUpdating: icdStore.isUpdating,
-    updateCount: icdStore.updateCount,
-    messageDelay: icdStore.messageDelay,
-  })
+  lastUpdateTime.value = new Date().toLocaleTimeString()
 
-  getBrowserPerformance()
+  // 팝업 창인 경우 제목 업데이트
+  if (isPopupWindow.value) {
+    document.title = `All Status - ${lastUpdateTime.value}`
+  }
 }
+
+// 🎯 라이프사이클 관리
+onMounted(() => {
+  console.log('📱 AllStatusContent 마운트됨')
+  console.log('🔍 실행 환경:', displayMode.value)
+
+  // 키보드 이벤트 리스너 추가
+  document.addEventListener('keydown', handleKeydown)
+
+  // 환경별 초기화
+  if (isPopupWindow.value) {
+    // 팝업 창 초기화
+    document.title = 'All Status Information'
+
+    // 부모 창 통신 설정
+    window.addEventListener('message', (event) => {
+      if (event.origin !== window.location.origin) return
+
+      console.log('📨 부모 창 메시지:', event.data)
+
+      switch (event.data.type) {
+        case 'refresh':
+          refreshStatus()
+          break
+        case 'close':
+          handleClose()
+          break
+      }
+    })
+
+    // 부모 창에 준비 완료 알림
+    if (window.opener && !window.opener.closed) {
+      try {
+        window.opener.postMessage(
+          {
+            type: 'popup-ready',
+            timestamp: Date.now(),
+          },
+          window.location.origin,
+        )
+      } catch (error) {
+        console.warn('⚠️ 부모 창 통신 설정 실패:', error)
+      }
+    }
+  } else {
+    // 모달 초기화
+    console.log('📱 모달 모드로 초기화됨')
+  }
+
+  // 초기 새로고침
+  setTimeout(refreshStatus, 100)
+})
+
+onUnmounted(() => {
+  console.log('🧹 AllStatusContent 언마운트됨')
+
+  // 이벤트 리스너 정리
+  document.removeEventListener('keydown', handleKeydown)
+
+  // 팝업 창인 경우 부모 창에 종료 알림
+  if (isPopupWindow.value && window.opener && !window.opener.closed) {
+    try {
+      window.opener.postMessage(
+        {
+          type: 'popup-unmounted',
+          timestamp: Date.now(),
+        },
+        window.location.origin,
+      )
+    } catch (error) {
+      console.warn('⚠️ 부모 창 종료 알림 실패:', error)
+    }
+  }
+})
 </script>
 <style scoped>
 .all-status-modal {

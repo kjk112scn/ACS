@@ -39,6 +39,15 @@
             aria-label="Toggle Dark Mode"
             @click="toggleDarkMode"
           />
+          <q-btn
+            flat
+            dense
+            round
+            icon="info"
+            aria-label="SystemsInfo"
+            size="md"
+            @click="handleSystemInfo"
+          />
         </div>
       </q-toolbar>
     </q-header>
@@ -69,7 +78,7 @@
 import { ref, onMounted } from 'vue'
 import EssentialLink, { type EssentialLinkProps } from 'components/EssentialLink.vue'
 import SettingsModal from 'src/components/modal/Settings/SettingsModal.vue'
-
+import { openComponent } from '../utils/windowUtils' // ✅ windowUtils import 추가
 import { useQuasar } from 'quasar'
 
 const $q = useQuasar()
@@ -136,7 +145,23 @@ const toggleDarkMode = () => {
   $q.dark.set(newState)
   localStorage.setItem('isDarkMode', String(newState))
 }
+// ✅ 시스템 정보 팝업 핸들러 추가
+const handleSystemInfo = () => {
+  console.log('🔧 시스템 정보 버튼 클릭됨')
 
+  void openComponent('system-info', {
+    mode: 'popup', // 'popup' | 'modal' | 'auto'
+    width: 1100,
+    height: 550,
+    onClose: () => {
+      console.log('시스템 정보 창이 닫혔습니다')
+    },
+    onError: (error) => {
+      console.error('시스템 정보 창 오류:', error)
+      alert('시스템 정보 창을 열 수 없습니다.')
+    },
+  })
+}
 // 설정 저장 핸들러
 const handleSettingsSave = (settings: { darkMode: boolean; serverAddress: string }) => {
   // 다크 모드 설정 적용
