@@ -375,7 +375,7 @@ ISS (ZARYA)
   </q-dialog>
 </template>
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { date } from 'quasar'
 
 import type { QTableProps } from 'quasar'
@@ -412,17 +412,6 @@ interface EChartsScatterParam {
 // 스토어 인스턴스 생성
 const icdStore = useICDStore()
 
-// TLE 데이터 인터페이스 정의
-interface TLEData {
-  displayText: string
-  tleLine1: string | undefined
-  tleLine2: string | undefined
-  satelliteName: string | null | undefined
-  startTime?: string
-  endTime?: string
-  stepSize?: number
-}
-
 // 차트 데이터용 인터페이스
 interface TrajectoryPoint {
   Time: string
@@ -436,14 +425,8 @@ const chartRef = ref<HTMLElement | null>(null)
 let chart: ECharts | null = null
 let updateTimer: number | null = null
 
-// TLE 데이터 상태
-const tleData = ref<TLEData>({
-  displayText: 'No TLE data available',
-  tleLine1: undefined,
-  tleLine2: undefined,
-  satelliteName: undefined,
-})
-
+// TLE Data 스토어에서 상태 가져오기
+const tleData = computed(() => ephemerisStore.tleDisplayData)
 // Ephemeris Designation 모드 데이터 - 현재 위치 정보 표시용
 const currentPosition = ref({
   azimuth: 0,
@@ -511,10 +494,16 @@ const scheduleColumns: QTableColumn[] = [
   },
 ]
 
-// 입력 및 출력 필드 (배열로 관리)
+// ✅ 새로운 코드로 교체:
+// 스토어에서 상태 가져오기
 const inputs = ref<string[]>(['0.00', '0.00', '0.00', '0.00'])
-const outputs = ref<string[]>(['0.00', '0.00', '0.00', '0.00'])
-
+// ✅ outputs 계산된 속성 수정 - Time Result 분리
+const outputs = computed(() => [
+  ephemerisStore.offsetValues.azimuth,
+  ephemerisStore.offsetValues.elevation,
+  ephemerisStore.offsetValues.tilt,
+  ephemerisStore.offsetValues.timeResult, // ✅ 별도 관리되는 Result 값
+])
 // Quasar 인스턴스 가져오기
 import { useQuasar } from 'quasar'
 
@@ -670,50 +659,10 @@ const downloadCSV = (data: RealtimeTrackingDataItem[]) => {
 const timeRemaining = ref(0)
 let timeUpdateTimer: number | null = null
 
-// 추적 경로 저장을 위한 변수 추가 (개선된 버전)
-const trackingPath = ref<[number, number][]>([])
-const trackingPathRaw = ref<[number, number][]>([]) // 원본 데이터 저장용
+/* const lastTrackingPathLength = 0
+const lastTrackingPathUpdate = 0 */
 
-// 경로 데이터 샘플링 함수 추가
-const sampleTrackingPath = (
-  data: [number, number][],
-  maxPoints: number = 1000,
-): [number, number][] => {
-  if (data.length <= maxPoints) {
-    return data
-  }
-
-  // 샘플링 비율 계산 (예: 10000개 -> 1000개면 10개 중 1개)
-  const step = Math.ceil(data.length / maxPoints)
-  const sampledData: [number, number][] = []
-
-  // 첫 번째 점은 항상 포함
-
-  const firstPoint = data[0]
-  if (firstPoint) {
-    sampledData.push(firstPoint)
-  }
-
-  // step 간격으로 샘플링
-  for (let i = step; i < data.length - 1; i += step) {
-    const point = data[i]
-    if (point) {
-      sampledData.push(point)
-    }
-  }
-
-  // 마지막 점은 항상 포함 (현재 위치)
-  if (data.length > 1) {
-    const lastPoint = data[data.length - 1]
-    if (lastPoint) {
-      sampledData.push(lastPoint)
-    }
-  }
-
-  return sampledData
-}
-
-// 차트 초기화 함수
+// ✅ 차트 초기화 함수 수정
 const initChart = () => {
   if (!chartRef.value) return
 
@@ -742,8 +691,7 @@ const initChart = () => {
       clockwise: true,
       min: 0,
       max: 360,
-      // ✅ 축 애니메이션 비활성화
-      animation: false,
+      animation: false, // ✅ 애니메이션 완전 비활성화
       axisLine: {
         show: true,
         lineStyle: {
@@ -789,9 +737,8 @@ const initChart = () => {
       type: 'value',
       min: 0,
       max: 90,
-      inverse: true, // 고도각은 위에서 아래로 증가
-      // ✅ 축 애니메이션 비활성화
-      animation: false,
+      inverse: true,
+      animation: false, // ✅ 애니메이션 완전 비활성화
       axisLine: {
         show: false,
       },
@@ -817,8 +764,7 @@ const initChart = () => {
         coordinateSystem: 'polar',
         symbol: 'circle',
         symbolSize: 15,
-        // ✅ 축 애니메이션 비활성화
-        animation: false,
+        animation: false, // ✅ 애니메이션 완전 비활성화
         itemStyle: {
           color: '#ff5722',
         },
@@ -843,7 +789,6 @@ const initChart = () => {
           borderRadius: 4,
           fontSize: 10,
         },
-
         zlevel: 3,
       },
       {
@@ -851,8 +796,7 @@ const initChart = () => {
         type: 'line',
         coordinateSystem: 'polar',
         symbol: 'none',
-        // ✅ 축 애니메이션 비활성화
-        animation: false,
+        animation: false, // ✅ 애니메이션 완전 비활성화
         lineStyle: {
           color: '#ff5722',
           width: 2,
@@ -862,7 +806,6 @@ const initChart = () => {
           [0, 0],
           [0, 0],
         ],
-
         zlevel: 2,
       },
       {
@@ -870,10 +813,10 @@ const initChart = () => {
         type: 'line',
         coordinateSystem: 'polar',
         symbol: 'none',
-        animation: false,
+        animation: false, // ✅ 애니메이션 완전 비활성화
         lineStyle: {
           color: '#ffffff',
-          width: 3,
+          width: 2, // ✅ 3 → 2로 줄여서 렌더링 부하 감소
           opacity: 0.8,
         },
         data: [],
@@ -884,15 +827,12 @@ const initChart = () => {
         type: 'line',
         coordinateSystem: 'polar',
         symbol: 'none',
-        // ✅ 축 애니메이션 비활성화
-        animation: false,
+        animation: false, // ✅ 애니메이션 완전 비활성화
         lineStyle: {
           color: '#2196f3',
           width: 2,
         },
-
-        data: [], // 초기에는 빈 배열
-
+        data: [],
         zlevel: 1,
       },
     ],
@@ -913,7 +853,19 @@ const initChart = () => {
   })
 }
 
-// 차트 업데이트 함수
+// ✅ 최적화된 차트 업데이트 함수 (완전 교체)
+// ✅ 타입 안전한 객체 재사용 변수들로 수정
+
+// ✅ 성능 측정 변수들 추가
+/* const performanceStats = {
+  updateChartTime: 0,
+  trackingPathUpdateTime: 0,
+  chartSetOptionTime: 0,
+  totalUpdateCount: 0,
+  slowUpdateCount: 0,
+} */
+
+// ✅ updateChart 함수 - 비동기 Worker 활용
 const updateChart = () => {
   if (!chart) {
     console.error('차트가 초기화되지 않았습니다.')
@@ -927,7 +879,6 @@ const updateChart = () => {
     azimuth = parseFloat(icdStore.azimuthAngle) || 0
     elevation = parseFloat(icdStore.elevationAngle) || 0
 
-    // ✅ DashboardPage와 동일한 정규화 방식 적용
     const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
     const normalizedEl = Math.max(0, Math.min(90, elevation))
 
@@ -937,36 +888,24 @@ const updateChart = () => {
     currentPosition.value.date = date.formatDate(new Date(), 'YYYY/MM/DD')
     currentPosition.value.time = date.formatDate(new Date(), 'HH:mm:ss')
 
-    // ✅ 추적 중일 때 경로 저장 - 데이터 순서 수정
+    // ✅ 추적 중일 때 Worker를 통한 비동기 경로 처리
     if (icdStore.ephemerisStatusInfo.isActive === true) {
-      // ✅ [elevation, azimuth] 순서로 변경 (극좌표계: [radius, angle])
-      const currentPoint: [number, number] = [normalizedEl, normalizedAz]
-
-      trackingPathRaw.value.push(currentPoint)
-
-      if (trackingPathRaw.value.length > 50000) {
-        trackingPathRaw.value = trackingPathRaw.value.slice(-50000)
-      }
-
-      trackingPath.value = sampleTrackingPath(trackingPathRaw.value, 1000)
-    } else {
-      trackingPath.value = []
-      trackingPathRaw.value = []
+      // ✅ 비동기 호출이지만 결과를 기다리지 않음 (성능 최적화)
+      void ephemerisStore.updateTrackingPath(azimuth, elevation)
     }
 
-    // ✅ 차트 옵션 업데이트 - [elevation, azimuth] 순서로 변경
+    // ✅ 차트 업데이트 (Worker에서 처리된 결과 사용)
     const updateOption = {
       series: [
         {
-          // ✅ [radius, angle] = [elevation, azimuth] 순서
           data: [[normalizedEl, normalizedAz]],
         },
-        {}, // 두 번째 시리즈는 그대로 유지
+        {},
         {
-          // 세 번째 시리즈(실시간 추적 경로) 업데이트
-          data: [...trackingPath.value],
+          // ✅ Worker가 처리한 최적화된 경로 데이터 사용
+          data: [...ephemerisStore.trackingPath.sampledPath],
         },
-        {}, // 네 번째 시리즈는 그대로 유지
+        {},
       ],
     } as unknown as Parameters<typeof chart.setOption>[0]
 
@@ -1095,13 +1034,13 @@ const selectSchedule = async () => {
 const increment = async (index: number) => {
   // 현재 출력값 (현재 상태)
   const currentOutput = parseFloat(outputs.value[index] || '0')
-
+  console.log('currentOutput:', currentOutput)
   // 입력된 값 (증가량)
   const inputValue = parseFloat(inputs.value[index] || '0')
-
+  console.log('inputValue:', inputValue)
   // 새로운 값 계산 (현재 출력값 + 입력된 값)
   const newValue = (currentOutput + inputValue).toFixed(2)
-
+  console.log('newValue:', newValue)
   // 출력값 업데이트
   outputs.value[index] = newValue
 
@@ -1132,37 +1071,57 @@ const reset = async (index: number) => {
   inputs.value[index] = '0.00'
   await updateOffset(index, '0.00')
 }
-
-// 오프셋 업데이트 함수
+// ✅ updateOffset 함수 수정 - Time 처리 분리
 const updateOffset = async (index: number, value: string) => {
   try {
-    // Parse the new value, default to 0 if invalid
+    // ✅ 디버깅 로그 추가
+    console.log('updateOffset 호출됨:', {
+      index,
+      value,
+      valueType: typeof value,
+      inputs3: inputs.value[3],
+      currentTimeResult: ephemerisStore.offsetValues.timeResult,
+    })
+
     const numValue = Number(parseFloat(value).toFixed(2)) || 0
+    console.log('계산된 numValue:', numValue)
 
-    // Update the output value
-    outputs.value[index] = numValue.toFixed(2)
+    const offsetTypes = ['azimuth', 'elevation', 'tilt', 'time'] as const
+    const offsetType = offsetTypes[index]
 
-    // For time offset (index 3), call the time offset command
-    if (index === 3) {
-      await ephemerisTrackService.sendTimeOffsetCommand(numValue)
+    if (!offsetType) {
+      console.error('Invalid offset index:', index)
       return
     }
 
-    // For position offsets (azimuth, elevation, tilt)
+    if (index === 3) {
+      const timeInputValue = inputs.value[3] || '0.00'
+      ephemerisStore.updateOffsetValues('time', timeInputValue)
+      try {
+        await ephemerisTrackService.sendTimeOffsetCommand(numValue)
+        ephemerisStore.updateOffsetValues('timeResult', numValue.toFixed(2))
+        console.log('Time Result 업데이트:', numValue.toFixed(2))
+      } catch (error) {
+        console.error('Time offset command failed:', error)
+      }
+      return
+    }
 
-    const azOffset = Number((parseFloat(outputs.value[0] || '0') || 0).toFixed(2))
-    const elOffset = Number((parseFloat(outputs.value[1] || '0') || 0).toFixed(2))
-    const tiOffset = Number((parseFloat(outputs.value[2] || '0') || 0).toFixed(2))
+    // Position Offset 처리 (azimuth, elevation, tilt)
+    ephemerisStore.updateOffsetValues(offsetType, numValue.toFixed(2))
 
-    // Send position offset command
+    const azOffset = Number((parseFloat(ephemerisStore.offsetValues.azimuth) || 0).toFixed(2))
+    const elOffset = Number((parseFloat(ephemerisStore.offsetValues.elevation) || 0).toFixed(2))
+    const tiOffset = Number((parseFloat(ephemerisStore.offsetValues.tilt) || 0).toFixed(2))
+
     await icdStore.sendPositionOffsetCommand(azOffset, elOffset, tiOffset)
   } catch (error) {
     console.error('Error updating offset:', error)
   }
 }
-
 // 입력값이 변경될 때 호출되는 함수
 const onInputChange = (index: number, value: string) => {
+  console.log('onInputChange 호출:', { index, value, inputs: inputs.value })
   inputs.value[index] = value
   void updateOffset(index, value)
 }
@@ -1217,18 +1176,6 @@ const addTLEData = async () => {
     // TLE 데이터 직접 처리
     await ephemerisStore.processTLEData(tempTLEData.value.line1)
 
-    // 처리된 TLE 데이터 저장 (UI 표시용)
-    // TLE 데이터 저장 (UI 표시용)
-    tleData.value = {
-      displayText: tempTLEData.value.line1,
-      tleLine1: tempTLEData.value.line1,
-      tleLine2: '',
-      satelliteName: 'Unknown',
-      startTime: new Date().toISOString(),
-      endTime: new Date(Date.now() + 86400000).toISOString(),
-      stepSize: 60,
-    }
-
     $q.notify({
       type: 'positive',
       message: 'TLE 데이터가 성공적으로 처리되었습니다',
@@ -1263,7 +1210,8 @@ const handleEphemerisCommand = async () => {
       })
       return
     }
-
+    // ✅ 추적 시작 전 경로 초기화
+    ephemerisStore.clearTrackingPath()
     await ephemerisStore.startTracking()
 
     $q.notify({
@@ -1313,16 +1261,53 @@ const handleStowCommand = async () => {
     })
   }
 }
+// ✅ 메인 스레드 블로킹 감지
+let mainThreadBlockingDetector: number | null = null
+
+const startMainThreadMonitoring = () => {
+  let lastCheck = performance.now()
+
+  const checkMainThread = () => {
+    const currentTime = performance.now()
+    const timeDiff = currentTime - lastCheck
+
+    // ✅ 예상보다 오래 걸렸다면 메인 스레드가 블로킹되었음
+    if (timeDiff > 20) {
+      // 10ms 체크 간격에서 20ms 이상이면 블로킹
+      console.warn(`🚫 메인 스레드 블로킹 감지: ${timeDiff.toFixed(2)}ms`)
+    }
+
+    lastCheck = currentTime
+    mainThreadBlockingDetector = requestAnimationFrame(checkMainThread)
+  }
+
+  mainThreadBlockingDetector = requestAnimationFrame(checkMainThread)
+}
+let lastTimerExecution = 0
+const timerIntervalStats = {
+  totalExecutions: 0,
+  totalInterval: 0,
+  maxInterval: 0,
+  minInterval: Infinity,
+}
 
 // ===== 라이프사이클 훅 =====
 
 onMounted(async () => {
   console.log('EphemerisDesignation 컴포넌트 마운트됨')
-
+  // ✅ 메인 스레드 모니터링 시작
+  startMainThreadMonitoring()
   // 차트 초기화
   setTimeout(() => {
     initChart()
   }, 100)
+  // ✅ 스토어에서 오프셋 값 복원
+  inputs.value = [
+    ephemerisStore.offsetValues.azimuth,
+    ephemerisStore.offsetValues.elevation,
+    ephemerisStore.offsetValues.tilt,
+    ephemerisStore.offsetValues.time,
+  ]
 
   // ✅ 스토어에 데이터가 없으면 로드 (탭 이동 시에도 데이터 유지)
   if (ephemerisStore.masterData.length === 0) {
@@ -1337,10 +1322,54 @@ onMounted(async () => {
       }
     }, 200)
   }
-
+  // ✅ 추가: 기존 추적 경로가 있으면 차트에 복원
+  if (ephemerisStore.trackingPath.sampledPath.length > 0) {
+    setTimeout(() => {
+      if (chart) {
+        const updateOption = {
+          series: [
+            {},
+            {},
+            {
+              data: [...ephemerisStore.trackingPath.sampledPath],
+            },
+            {},
+          ],
+        } as unknown as Parameters<typeof chart.setOption>[0]
+        chart.setOption(updateOption)
+      }
+    }, 300)
+  }
   // 차트 업데이트 타이머 시작
   updateTimer = window.setInterval(() => {
-    updateChart()
+    const currentTime = performance.now()
+
+    if (lastTimerExecution > 0) {
+      const interval = currentTime - lastTimerExecution
+      timerIntervalStats.totalExecutions++
+      timerIntervalStats.totalInterval += interval
+      timerIntervalStats.maxInterval = Math.max(timerIntervalStats.maxInterval, interval)
+      timerIntervalStats.minInterval = Math.min(timerIntervalStats.minInterval, interval)
+
+      // ✅ 타이머 간격이 150ms 이상이면 경고
+      if (interval > 150) {
+        console.warn(`⏰ 타이머 지연 감지: ${interval.toFixed(2)}ms (목표: 100ms)`)
+      }
+
+      // ✅ 100번마다 타이머 통계 출력
+      if (timerIntervalStats.totalExecutions % 100 === 0) {
+        const avgInterval = timerIntervalStats.totalInterval / timerIntervalStats.totalExecutions
+        console.log(`⏰ 타이머 통계:`, {
+          평균간격: avgInterval.toFixed(2) + 'ms',
+          최대간격: timerIntervalStats.maxInterval.toFixed(2) + 'ms',
+          최소간격: timerIntervalStats.minInterval.toFixed(2) + 'ms',
+          목표간격: '100ms',
+        })
+      }
+    }
+
+    lastTimerExecution = currentTime
+    void updateChart()
     updateTimeRemaining()
   }, 100)
 
@@ -1369,39 +1398,17 @@ onUnmounted(() => {
     chart.dispose()
     chart = null
   }
-
+  // ✅ 메인 스레드 모니터링 정리
+  if (mainThreadBlockingDetector) {
+    cancelAnimationFrame(mainThreadBlockingDetector)
+  }
+  // ✅ 추가: 추적 경로 정리 (메모리 절약)
+  ephemerisStore.clearTrackingPath()
+  // ✅ TypeScript Worker 정리
+  ephemerisStore.cleanupTrackingWorker()
   // 윈도우 이벤트 리스너 정리
   window.removeEventListener('resize', () => {})
 })
-
-// ✅ 스토어 상태 변화 감시 - 다른 탭에서 선택한 스케줄 반영
-watch(
-  () => ephemerisStore.selectedSchedule,
-  (newSchedule) => {
-    if (newSchedule && chart) {
-      // 선택된 스케줄이 변경되면 차트 업데이트
-      setTimeout(() => {
-        if (ephemerisStore.detailData.length > 0) {
-          updateChartWithTrajectory([...ephemerisStore.detailData] as TrajectoryPoint[])
-        }
-      }, 100)
-    }
-  },
-  { immediate: true },
-)
-
-// ✅ 상세 데이터 변화 감시 - 차트 업데이트
-watch(
-  () => ephemerisStore.detailData,
-  (newDetailData) => {
-    if (newDetailData.length > 0 && chart) {
-      setTimeout(() => {
-        updateChartWithTrajectory([...newDetailData] as TrajectoryPoint[])
-      }, 100)
-    }
-  },
-  { immediate: true },
-)
 </script>
 
 <style scoped>

@@ -168,78 +168,87 @@
             <q-card-section>
               <div class="text-subtitle1 text-weight-bold text-primary">Status</div>
               <div class="status-content">
-                <!-- Emergency LED -->
+                <!-- Emergency LED - TRUE면 빨간색, FALSE면 녹색 -->
                 <div class="status-item q-mb-sm">
                   <div class="status-led-container">
                     <div
                       class="status-led"
-                      :class="{ 'led-active': emergencyActive, 'led-inactive': !emergencyActive }"
+                      :class="{
+                        'led-error': errorEmergencyActive,
+                        'led-normal': !errorEmergencyActive,
+                      }"
                     ></div>
                     <span class="status-label">Emergency</span>
                   </div>
                 </div>
 
-                <!-- Positioner LED -->
+                <!-- Positioner LED - TRUE면 빨간색, FALSE면 녹색 -->
                 <div class="status-item q-mb-sm">
                   <div class="status-led-container">
                     <div
                       class="status-led"
-                      :class="{ 'led-active': positionerActive, 'led-inactive': !positionerActive }"
+                      :class="{
+                        'led-error': errorPositionerActive,
+                        'led-normal': !errorPositionerActive,
+                      }"
                     ></div>
                     <span class="status-label">Positioner</span>
                   </div>
                 </div>
 
-                <!-- Feed LED -->
+                <!-- Feed LED - TRUE면 빨간색, FALSE면 녹색 -->
                 <div class="status-item q-mb-sm">
                   <div class="status-led-container">
                     <div
                       class="status-led"
-                      :class="{ 'led-active': feedActive, 'led-inactive': !feedActive }"
+                      :class="{ 'led-error': errorFeedActive, 'led-normal': !errorFeedActive }"
                     ></div>
                     <span class="status-label">Feed</span>
                   </div>
                 </div>
 
-                <!-- Protocol LED -->
+                <!-- Protocol LED - TRUE면 빨간색, FALSE면 녹색 -->
                 <div class="status-item q-mb-sm">
                   <div class="status-led-container">
                     <div
                       class="status-led"
-                      :class="{ 'led-active': protocolActive, 'led-inactive': !protocolActive }"
+                      :class="{
+                        'led-error': errorProtocolActive,
+                        'led-normal': !errorProtocolActive,
+                      }"
                     ></div>
                     <span class="status-label">Protocol</span>
                   </div>
                 </div>
 
-                <!-- Power LED -->
+                <!-- Power LED - TRUE면 빨간색, FALSE면 녹색 -->
                 <div class="status-item q-mb-sm">
                   <div class="status-led-container">
                     <div
                       class="status-led"
-                      :class="{ 'led-active': powerActive, 'led-inactive': !powerActive }"
+                      :class="{ 'led-error': errorPowerActive, 'led-normal': !errorPowerActive }"
                     ></div>
                     <span class="status-label">Power</span>
                   </div>
                 </div>
 
-                <!-- Stow LED -->
+                <!-- ✅ Stow LED - TRUE면 녹색, FALSE면 회색 -->
                 <div class="status-item q-mb-sm">
                   <div class="status-led-container">
                     <div
                       class="status-led"
-                      :class="{ 'led-active': stowActive, 'led-inactive': !stowActive }"
+                      :class="{ 'led-stow-active': stowActive, 'led-inactive': !stowActive }"
                     ></div>
                     <span class="status-label">Stow</span>
                   </div>
                 </div>
 
-                <!-- Stow Pin LED -->
+                <!-- ✅ Stow Pin LED - TRUE면 녹색, FALSE면 회색 -->
                 <div class="status-item q-mb-sm">
                   <div class="status-led-container">
                     <div
                       class="status-led"
-                      :class="{ 'led-active': stowPinActive, 'led-inactive': !stowPinActive }"
+                      :class="{ 'led-stow-active': stowPinActive, 'led-inactive': !stowPinActive }"
                     ></div>
                     <span class="status-label">Stow Pin</span>
                   </div>
@@ -326,12 +335,108 @@ let tiltChart: ECharts | undefined = undefined
 
 const chartsInitialized = ref(false)
 
+const acsEmergencyActive = ref(false)
+const emergencyModal = ref(false)
+
+const errorEmergencyActive = computed(() => {
+  return (
+    acsEmergencyActive.value ||
+    icdStore.mainBoardStatusInfo.emergencyStopACU ||
+    icdStore.mainBoardStatusInfo.emergencyStopPositioner
+  )
+})
+
+const errorPositionerActive = computed(() => {
+  // ✅ Azimuth 축 상태 체크 (ServoBrake, ServoMotor 제외)
+  const azimuthError =
+    icdStore.azimuthBoardStatusInfo.limitSwitchNegative275 ||
+    icdStore.azimuthBoardStatusInfo.limitSwitchPositive275 ||
+    icdStore.azimuthBoardStatusInfo.encoder ||
+    icdStore.azimuthBoardServoStatusInfo.servoAlarm
+
+  // ✅ Elevation 축 상태 체크 (ServoBrake, ServoMotor 제외)
+  const elevationError =
+    icdStore.elevationBoardStatusInfo.limitSwitchNegative5 ||
+    icdStore.elevationBoardStatusInfo.limitSwitchNegative0 ||
+    icdStore.elevationBoardStatusInfo.limitSwitchPositive180 ||
+    icdStore.elevationBoardStatusInfo.limitSwitchPositive185 ||
+    icdStore.elevationBoardStatusInfo.encoder ||
+    icdStore.elevationBoardServoStatusInfo.servoAlarm
+
+  // ✅ Tilt 축 상태 체크 (ServoBrake, ServoMotor 제외)
+  const tiltError =
+    icdStore.tiltBoardStatusInfo.limitSwitchNegative275 ||
+    icdStore.tiltBoardStatusInfo.limitSwitchPositive275 ||
+    icdStore.tiltBoardStatusInfo.encoder ||
+    icdStore.tiltBoardServoStatusInfo.servoAlarm
+
+  // ✅ 하나라도 에러가 있으면 true 반환
+  return azimuthError || elevationError || tiltError
+})
+const errorFeedActive = computed(() => {
+  // ✅ Feed X Board Error Status 체크
+  const feedXError =
+    icdStore.feedXBoardStatusInfo.fanError ||
+    icdStore.feedXBoardStatusInfo.xLnaRHCPError ||
+    icdStore.feedXBoardStatusInfo.xLnaLHCPError
+
+  // ✅ Feed S Board Error Status 체크
+  const feedSError =
+    icdStore.feedSBoardStatusInfo.sLnaRHCPError ||
+    icdStore.feedSBoardStatusInfo.sLnaLHCPError ||
+    icdStore.feedSBoardStatusInfo.sRFSwitchError
+
+  // ✅ 하나라도 에러가 있으면 true 반환
+  return feedXError || feedSError
+})
+
+const errorProtocolActive = computed(() => {
+  // ✅ Protocol Status 체크 - 하나라도 활성화되면 에러로 판단
+  const protocolError =
+    icdStore.protocolStatusInfo.elevation ||
+    icdStore.protocolStatusInfo.azimuth ||
+    icdStore.protocolStatusInfo.tilt ||
+    icdStore.protocolStatusInfo.feed
+
+  return protocolError
+})
+
+const errorPowerActive = computed(() => {
+  const powerError =
+    icdStore.mainBoardStatusInfo.powerSurgeProtector ||
+    icdStore.mainBoardStatusInfo.powerReversePhaseSensor
+  return powerError
+})
+
+const stowActive = computed(() => {
+  return (
+    acsEmergencyActive.value ||
+    icdStore.mainBoardStatusInfo.emergencyStopACU ||
+    icdStore.mainBoardStatusInfo.emergencyStopPositioner
+  )
+})
+const stowPinActive = computed(() => {
+  return (
+    icdStore.azimuthBoardStatusInfo.stowPin ||
+    icdStore.elevationBoardStatusInfo.stowPin
+  )
+})
+
+// 추가 상태 LED들
+/*
+// 실제 데이터와 연결하는 경우 (예시)
+const errorPositionerActive = computed(() => icdStore.positionerStatus === 'active')
+const errorFeedActive = computed(() => icdStore.feedStatus === 'active')
+const errorProtocolActive = computed(() => icdStore.protocolStatus === 'active')
+const errorPowerActive = computed(() => icdStore.powerStatus === 'active')
+const stowActive = computed(() => icdStore.stowStatus === 'active')
+const stowPinActive = computed(() => icdStore.stowPinStatus === 'active')
+ */
 // ✅ 30ms UI 업데이트 타이머
 let uiUpdateTimer: number | null = null
 const uiUpdateCount = ref(0)
-
+///computed
 // ✅ 서버 시간 표시용 computed 속성 (icdStore에서 직접)
-
 const displayServerTime = computed(() => {
   if (!icdStore.serverTime) {
     return '서버 시간 대기 중...'
@@ -469,6 +574,7 @@ const stopChartUpdates = () => {
   }
 }
 
+let debugTimer: number | null = null
 onMounted(async () => {
   console.log('📱 DashboardPage 컴포넌트 마운트됨')
 
@@ -486,31 +592,36 @@ onMounted(async () => {
   } else {
     void router.push('/dashboard/standby')
   }
+  console.log('🚀 DashboardPage 마운트됨')
+  // 2. 전역 store 공유 설정 (가장 먼저)
+  console.log('🌍 Store 전역 공유 설정 중...')
+  window.sharedICDStore = icdStore
+  console.log('✅ Store 전역 공유 설정 완료')
 
-  // icdStore 초기화 (WebSocket + 30ms 데이터 업데이트)
+  // 3. icdStore 초기화 (WebSocket + 30ms 데이터 업데이트)
+  console.log('🚀 시스템 초기화 시작')
   try {
-    console.log('🚀 시스템 초기화 시작')
     await icdStore.initialize()
     console.log('✅ 시스템 초기화 완료')
   } catch (error) {
     console.error('❌ 시스템 초기화 실패:', error)
   }
 
-  // 차트 초기화
+  // 4. 차트 초기화 (시스템 초기화 후)
   setTimeout(() => {
     try {
       initCharts()
       chartsInitialized.value = true
       console.log('✅ 차트 초기화 완료')
 
-      // ✅ 차트 초기화 완료 후 차트 업데이트 시작
+      // 5. 차트 초기화 완료 후 차트 업데이트 시작
       void startChartUpdates()
     } catch (error) {
       console.error('❌ 차트 초기화 실패:', error)
     }
   }, 100)
 
-  // 리사이즈 핸들러
+  // 6. 리사이즈 핸들러 등록
   const handleResize = () => {
     if (chartsInitialized.value) {
       azimuthChart?.resize()
@@ -519,14 +630,55 @@ onMounted(async () => {
     }
   }
   window.addEventListener('resize', handleResize)
+
+  // 7. 디버그 타이머 시작 (5초마다 전체 상태 요약)
+  debugTimer = window.setInterval(() => {
+    console.log('📋 === 전체 상태 요약 ===')
+    console.log('🔄 Ephemeris 활성화:', icdStore.ephemerisStatusInfo.isActive)
+    console.log('📊 현재 표시 값들:')
+    console.log('  - Azimuth Actual:', azimuthActualValue.value)
+    console.log('  - Elevation Actual:', elevationActualValue.value)
+    console.log('  - Tilt Actual:', tiltActualValue.value)
+    console.log('  - Azimuth CMD:', azimuthCmdValue.value)
+    console.log('  - Elevation CMD:', elevationCmdValue.value)
+    console.log('  - Tilt CMD:', tiltCmdValue.value)
+    console.log('📊 원본 데이터:')
+    console.log('  일반 모드:', {
+      azimuth: icdStore.azimuthAngle,
+      elevation: icdStore.elevationAngle,
+      tilt: icdStore.tiltAngle,
+      cmdAzimuth: icdStore.cmdAzimuthAngle,
+      cmdElevation: icdStore.cmdElevationAngle,
+      cmdTilt: icdStore.cmdTiltAngle,
+    })
+    console.log('  추적 모드:', {
+      azimuth: icdStore.trackingActualAzimuthAngle,
+      elevation: icdStore.trackingActualElevationAngle,
+      tilt: icdStore.trackingActualTiltAngle,
+      cmdAzimuth: icdStore.trackingCMDAzimuthAngle,
+      cmdElevation: icdStore.trackingCMDElevationAngle,
+      cmdTilt: icdStore.trackingCMDTiltAngle,
+    })
+    console.log('========================')
+  }, 5000)
 })
 
 onUnmounted(() => {
   console.log('🧹 DashboardPage 정리 시작')
 
+  // 1. 차트 업데이트 타이머 중지
   stopChartUpdates()
+
+  // 2. 디버그 타이머 정리
+  if (debugTimer) {
+    clearInterval(debugTimer)
+    debugTimer = null
+  }
+
+  // 3. 이벤트 리스너 제거
   window.removeEventListener('resize', () => {})
 
+  // 4. icdStore 정리
   icdStore.cleanup()
 
   console.log('✅ DashboardPage 정리 완료')
@@ -992,27 +1144,6 @@ const initCharts = () => {
     if (tiltChart) tiltChart.resize()
   }, 0)
 }
-
-const acsEmergencyActive = ref(false)
-const emergencyModal = ref(false)
-
-// 추가 상태 LED들
-const emergencyActive = ref(false)
-const positionerActive = ref(false)
-const feedActive = ref(false)
-const protocolActive = ref(false)
-const powerActive = ref(false)
-const stowActive = ref(false)
-const stowPinActive = ref(false)
-/*
-// 실제 데이터와 연결하는 경우 (예시)
-const positionerActive = computed(() => icdStore.positionerStatus === 'active')
-const feedActive = computed(() => icdStore.feedStatus === 'active')
-const protocolActive = computed(() => icdStore.protocolStatus === 'active')
-const powerActive = computed(() => icdStore.powerStatus === 'active')
-const stowActive = computed(() => icdStore.stowStatus === 'active')
-const stowPinActive = computed(() => icdStore.stowPinStatus === 'active')
- */
 // Emergency 버튼 클릭 핸들러
 const handleEmergencyClick = async () => {
   console.log('Emergency 버튼 클릭됨')
@@ -1184,55 +1315,12 @@ watch(
     )
   },
 ) */
-
-// ✅ 전체 상태 요약 로그 (5초마다)
-let debugTimer: number | null = null
-
-onMounted(() => {
-  // 기존 onMounted 코드...
-
-  // 5초마다 전체 상태 요약 출력
-  debugTimer = window.setInterval(() => {
-    console.log('📋 === 전체 상태 요약 ===')
-    console.log('🔄 Ephemeris 활성화:', icdStore.ephemerisStatusInfo.isActive)
-    console.log('📊 현재 표시 값들:')
-    console.log('  - Azimuth Actual:', azimuthActualValue.value)
-    console.log('  - Elevation Actual:', elevationActualValue.value)
-    console.log('  - Tilt Actual:', tiltActualValue.value)
-    console.log('  - Azimuth CMD:', azimuthCmdValue.value)
-    console.log('  - Elevation CMD:', elevationCmdValue.value)
-    console.log('  - Tilt CMD:', tiltCmdValue.value)
-    console.log('📊 원본 데이터:')
-    console.log('  일반 모드:', {
-      azimuth: icdStore.azimuthAngle,
-      elevation: icdStore.elevationAngle,
-      tilt: icdStore.tiltAngle,
-      cmdAzimuth: icdStore.cmdAzimuthAngle,
-      cmdElevation: icdStore.cmdElevationAngle,
-      cmdTilt: icdStore.cmdTiltAngle,
-    })
-    console.log('  추적 모드:', {
-      azimuth: icdStore.trackingActualAzimuthAngle,
-      elevation: icdStore.trackingActualElevationAngle,
-      tilt: icdStore.trackingActualTiltAngle,
-      cmdAzimuth: icdStore.trackingCMDAzimuthAngle,
-      cmdElevation: icdStore.trackingCMDElevationAngle,
-      cmdTilt: icdStore.trackingCMDTiltAngle,
-    })
-    console.log('========================')
-  }, 5000)
-})
-
-onUnmounted(() => {
-  // 기존 onUnmounted 코드...
-
-  // 디버그 타이머 정리
-  if (debugTimer) {
-    clearInterval(debugTimer)
-    debugTimer = null
+// ✅ Window 인터페이스 확장으로 타입 안전성 확보
+declare global {
+  interface Window {
+    sharedICDStore?: ReturnType<typeof useICDStore>
   }
-})
-// All Status 팝업 열기 함수 수정
+}
 
 // All Status 버튼 핸들러 - 스마트 중앙 배치
 const handleAllStatus = () => {
@@ -1641,7 +1729,7 @@ const handleAllStatus = () => {
 
   gap: 12px;
 }
-
+/* Status LED 스타일 수정 */
 .status-led {
   width: 20px;
   height: 20px;
@@ -1650,19 +1738,35 @@ const handleAllStatus = () => {
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
 }
 
-.led-active {
-  background-color: #f44336;
+/* ✅ 기본 녹색 (정상 상태) */
+.led-normal {
+  background-color: #4caf50;
+  box-shadow:
+    0 0 8px #4caf50,
+    0 0 16px #4caf50;
+}
 
+/* ✅ 빨간색 (에러/활성 상태) */
+.led-error {
+  background-color: #f44336;
   box-shadow:
     0 0 12px #f44336,
     0 0 24px #f44336;
 }
 
+/* ✅ Stow용 녹색 (활성 상태) */
+.led-stow-active {
+  background-color: #4caf50;
+  box-shadow:
+    0 0 8px #4caf50,
+    0 0 16px #4caf50;
+}
+
+/* ✅ 기본 회색 (비활성 상태) */
 .led-inactive {
   background-color: #666;
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
 }
-
 .status-label {
   font-size: 1rem;
   font-weight: 500;

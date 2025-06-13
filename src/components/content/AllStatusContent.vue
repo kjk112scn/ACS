@@ -22,13 +22,13 @@
                   <div
                     class="status-led"
                     :class="{
-                      'led-on': !protocolStatusInfo.elevation,
-                      'led-error': protocolStatusInfo.elevation,
+                      'led-on': !realtimeData.protocolStatusInfo.elevation,
+                      'led-error': realtimeData.protocolStatusInfo.elevation,
                     }"
                   ></div>
                   <span class="status-label">Elevation</span>
                   <span class="status-value">
-                    {{ protocolStatusInfo.elevation ? 'ERROR' : 'NORMAL' }}
+                    {{ realtimeData.protocolStatusInfo.elevation ? 'ERROR' : 'NORMAL' }}
                   </span>
                 </div>
 
@@ -37,13 +37,13 @@
                   <div
                     class="status-led"
                     :class="{
-                      'led-on': !protocolStatusInfo.azimuth,
-                      'led-error': protocolStatusInfo.azimuth,
+                      'led-on': !realtimeData.protocolStatusInfo.azimuth,
+                      'led-error': realtimeData.protocolStatusInfo.azimuth,
                     }"
                   ></div>
                   <span class="status-label">Azimuth</span>
                   <span class="status-value">
-                    {{ protocolStatusInfo.azimuth ? 'ERROR' : 'NORMAL' }}
+                    {{ realtimeData.protocolStatusInfo.azimuth ? 'ERROR' : 'NORMAL' }}
                   </span>
                 </div>
 
@@ -52,13 +52,13 @@
                   <div
                     class="status-led"
                     :class="{
-                      'led-on': !protocolStatusInfo.tilt,
-                      'led-error': protocolStatusInfo.tilt,
+                      'led-on': !realtimeData.protocolStatusInfo.tilt,
+                      'led-error': realtimeData.protocolStatusInfo.tilt,
                     }"
                   ></div>
                   <span class="status-label">Tilt</span>
                   <span class="status-value">
-                    {{ protocolStatusInfo.tilt ? 'ERROR' : 'NORMAL' }}
+                    {{ realtimeData.protocolStatusInfo.tilt ? 'ERROR' : 'NORMAL' }}
                   </span>
                 </div>
 
@@ -67,13 +67,13 @@
                   <div
                     class="status-led"
                     :class="{
-                      'led-on': !protocolStatusInfo.feed,
-                      'led-error': protocolStatusInfo.feed,
+                      'led-on': !realtimeData.protocolStatusInfo.feed,
+                      'led-error': realtimeData.protocolStatusInfo.feed,
                     }"
                   ></div>
                   <span class="status-label">Feed</span>
                   <span class="status-value">
-                    {{ protocolStatusInfo.feed ? 'ERROR' : 'NORMAL' }}
+                    {{ realtimeData.protocolStatusInfo.feed ? 'ERROR' : 'NORMAL' }}
                   </span>
                 </div>
               </div>
@@ -98,7 +98,7 @@
                   </span>
                 </div>
               </div>
- -->
+               -->
             </q-card-section>
           </q-card>
 
@@ -113,13 +113,13 @@
                   <div
                     class="status-led"
                     :class="{
-                      'led-on': !icdStore.mainBoardStatusInfo.powerSurgeProtector,
-                      'led-error': icdStore.mainBoardStatusInfo.powerSurgeProtector,
+                      'led-on': !realtimeData.mainBoardStatusInfo.powerSurgeProtector,
+                      'led-error': realtimeData.mainBoardStatusInfo.powerSurgeProtector,
                     }"
                   ></div>
                   <span class="status-label">Surge Protector</span>
                   <span class="status-value">
-                    {{ icdStore.mainBoardStatusInfo.powerSurgeProtector ? 'FAULT' : 'NORMAL' }}
+                    {{ realtimeData.mainBoardStatusInfo.powerSurgeProtector ? 'FAULT' : 'NORMAL' }}
                   </span>
                 </div>
 
@@ -128,13 +128,15 @@
                   <div
                     class="status-led"
                     :class="{
-                      'led-on': !icdStore.mainBoardStatusInfo.powerReversePhaseSensor,
-                      'led-error': icdStore.mainBoardStatusInfo.powerReversePhaseSensor,
+                      'led-on': !realtimeData.mainBoardStatusInfo.powerReversePhaseSensor,
+                      'led-error': realtimeData.mainBoardStatusInfo.powerReversePhaseSensor,
                     }"
                   ></div>
                   <span class="status-label">Reverse Phase</span>
                   <span class="status-value">
-                    {{ icdStore.mainBoardStatusInfo.powerReversePhaseSensor ? 'FAULT' : 'NORMAL' }}
+                    {{
+                      realtimeData.mainBoardStatusInfo.powerReversePhaseSensor ? 'FAULT' : 'NORMAL'
+                    }}
                   </span>
                 </div>
               </div>
@@ -144,18 +146,18 @@
               <div class="status-summary q-mt-md">
                 <div class="summary-item">
                   <span class="summary-label">Raw Bits:</span>
-                  <span class="summary-value">{{ icdStore.mainBoardStatusInfo.raw }}</span>
+                  <span class="summary-value">{{ icdStore.realtimeData.mainBoardStatusInfo.raw }}</span>
                 </div>
                 <div class="summary-item">
                   <span class="summary-label">Power Issues:</span>
                   <span
                     class="summary-value"
                     :class="{
-                      'text-negative': icdStore.mainBoardStatusInfo.summary?.hasPowerIssue,
-                      'text-positive': !icdStore.mainBoardStatusInfo.summary?.hasPowerIssue,
+                      'text-negative': icdStore.realtimeData.mainBoardStatusInfo.summary?.hasPowerIssue,
+                      'text-positive': !icdStore.realtimeData.mainBoardStatusInfo.summary?.hasPowerIssue,
                     }"
                   >
-                    {{ icdStore.mainBoardStatusInfo.summary?.hasPowerIssue ? 'DETECTED' : 'NONE' }}
+                    {{ icdStore.realtimeData.mainBoardStatusInfo.summary?.hasPowerIssue ? 'DETECTED' : 'NONE' }}
                   </span>
                 </div>
               </div>
@@ -175,13 +177,13 @@
                   <div
                     class="status-led"
                     :class="{
-                      'led-on': !icdStore.mainBoardStatusInfo.emergencyStopACU,
-                      'led-error': icdStore.mainBoardStatusInfo.emergencyStopACU,
+                      'led-on': !realtimeData.mainBoardStatusInfo.emergencyStopACU,
+                      'led-error': realtimeData.mainBoardStatusInfo.emergencyStopACU,
                     }"
                   ></div>
                   <span class="status-label">ACU</span>
                   <span class="status-value">
-                    {{ icdStore.mainBoardStatusInfo.emergencyStopACU ? 'STOP' : 'NORMAL' }}
+                    {{ realtimeData.mainBoardStatusInfo.emergencyStopACU ? 'STOP' : 'NORMAL' }}
                   </span>
                 </div>
 
@@ -190,13 +192,15 @@
                   <div
                     class="status-led"
                     :class="{
-                      'led-on': !icdStore.mainBoardStatusInfo.emergencyStopPositioner,
-                      'led-error': icdStore.mainBoardStatusInfo.emergencyStopPositioner,
+                      'led-on': !realtimeData.mainBoardStatusInfo.emergencyStopPositioner,
+                      'led-error': realtimeData.mainBoardStatusInfo.emergencyStopPositioner,
                     }"
                   ></div>
                   <span class="status-label">Positioner</span>
                   <span class="status-value">
-                    {{ icdStore.mainBoardStatusInfo.emergencyStopPositioner ? 'STOP' : 'NORMAL' }}
+                    {{
+                      realtimeData.mainBoardStatusInfo.emergencyStopPositioner ? 'STOP' : 'NORMAL'
+                    }}
                   </span>
                 </div>
               </div>
@@ -209,11 +213,11 @@
                   <span
                     class="summary-value"
                     :class="{
-                      'text-negative': icdStore.mainBoardStatusInfo.summary?.hasEmergencyStop,
-                      'text-positive': !icdStore.mainBoardStatusInfo.summary?.hasEmergencyStop,
+                      'text-negative': icdStore.realtimeData.mainBoardStatusInfo.summary?.hasEmergencyStop,
+                      'text-positive': !icdStore.realtimeData.mainBoardStatusInfo.summary?.hasEmergencyStop,
                     }"
                   >
-                    {{ icdStore.mainBoardStatusInfo.summary?.hasEmergencyStop ? 'ACTIVE' : 'NONE' }}
+                    {{ icdStore.realtimeData.mainBoardStatusInfo.summary?.hasEmergencyStop ? 'ACTIVE' : 'NONE' }}
                   </span>
                 </div>
               </div>
@@ -234,13 +238,13 @@
                   <div
                     class="status-led"
                     :class="{
-                      'led-on': icdStore.mainBoardMCOnOffInfo.mcAzimuth,
-                      'led-off': !icdStore.mainBoardMCOnOffInfo.mcAzimuth,
+                      'led-on': realtimeData.mainBoardMCOnOffInfo.mcAzimuth,
+                      'led-off': !realtimeData.mainBoardMCOnOffInfo.mcAzimuth,
                     }"
                   ></div>
                   <span class="status-label">Azimuth</span>
                   <span class="status-value">
-                    {{ icdStore.mainBoardMCOnOffInfo.mcAzimuth ? 'ON' : 'OFF' }}
+                    {{ realtimeData.mainBoardMCOnOffInfo.mcAzimuth ? 'ON' : 'OFF' }}
                   </span>
                 </div>
 
@@ -249,13 +253,13 @@
                   <div
                     class="status-led"
                     :class="{
-                      'led-on': icdStore.mainBoardMCOnOffInfo.mcElevation,
-                      'led-off': !icdStore.mainBoardMCOnOffInfo.mcElevation,
+                      'led-on': realtimeData.mainBoardMCOnOffInfo.mcElevation,
+                      'led-off': !realtimeData.mainBoardMCOnOffInfo.mcElevation,
                     }"
                   ></div>
                   <span class="status-label">Elevation</span>
                   <span class="status-value">
-                    {{ icdStore.mainBoardMCOnOffInfo.mcElevation ? 'ON' : 'OFF' }}
+                    {{ realtimeData.mainBoardMCOnOffInfo.mcElevation ? 'ON' : 'OFF' }}
                   </span>
                 </div>
 
@@ -264,13 +268,13 @@
                   <div
                     class="status-led"
                     :class="{
-                      'led-on': icdStore.mainBoardMCOnOffInfo.mcTilt,
-                      'led-off': !icdStore.mainBoardMCOnOffInfo.mcTilt,
+                      'led-on': realtimeData.mainBoardMCOnOffInfo.mcTilt,
+                      'led-off': !realtimeData.mainBoardMCOnOffInfo.mcTilt,
                     }"
                   ></div>
                   <span class="status-label">Tilt</span>
                   <span class="status-value">
-                    {{ icdStore.mainBoardMCOnOffInfo.mcTilt ? 'ON' : 'OFF' }}
+                    {{ realtimeData.mainBoardMCOnOffInfo.mcTilt ? 'ON' : 'OFF' }}
                   </span>
                 </div>
               </div>
@@ -280,16 +284,16 @@
               <div class="status-summary q-mt-md">
                 <div class="summary-item">
                   <span class="summary-label">Raw Bits:</span>
-                  <span class="summary-value">{{ icdStore.mainBoardMCOnOffInfo.raw }}</span>
+                  <span class="summary-value">{{ icdStore.realtimeData.mainBoardMCOnOffInfo.raw }}</span>
                 </div>
                 <div class="summary-item">
                   <span class="summary-label">Active Servos:</span>
                   <span class="summary-value">
                     {{
                       [
-                        icdStore.mainBoardMCOnOffInfo.mcAzimuth && 'Azimuth',
-                        icdStore.mainBoardMCOnOffInfo.mcElevation && 'Elevation',
-                        icdStore.mainBoardMCOnOffInfo.mcTilt && 'Tilt',
+                        icdStore.realtimeData.mainBoardMCOnOffInfo.mcAzimuth && 'Azimuth',
+                        icdStore.realtimeData.mainBoardMCOnOffInfo.mcElevation && 'Elevation',
+                        icdStore.realtimeData.mainBoardMCOnOffInfo.mcTilt && 'Tilt',
                       ]
                         .filter(Boolean)
                         .join(', ') || 'None'
@@ -302,32 +306,32 @@
                     class="summary-value"
                     :class="{
                       'text-positive':
-                        icdStore.mainBoardMCOnOffInfo.mcAzimuth &&
-                        icdStore.mainBoardMCOnOffInfo.mcElevation &&
-                        icdStore.mainBoardMCOnOffInfo.mcTilt,
+                        icdStore.realtimeData.mainBoardMCOnOffInfo.mcAzimuth &&
+                        icdStore.realtimeData.mainBoardMCOnOffInfo.mcElevation &&
+                        icdStore.realtimeData.mainBoardMCOnOffInfo.mcTilt,
                       'text-warning':
-                        (icdStore.mainBoardMCOnOffInfo.mcAzimuth ||
-                          icdStore.mainBoardMCOnOffInfo.mcElevation ||
-                          icdStore.mainBoardMCOnOffInfo.mcTilt) &&
+                        (icdStore.realtimeData.mainBoardMCOnOffInfo.mcAzimuth ||
+                          icdStore.realtimeData.mainBoardMCOnOffInfo.mcElevation ||
+                          icdStore.realtimeData.mainBoardMCOnOffInfo.mcTilt) &&
                         !(
-                          icdStore.mainBoardMCOnOffInfo.mcAzimuth &&
-                          icdStore.mainBoardMCOnOffInfo.mcElevation &&
-                          icdStore.mainBoardMCOnOffInfo.mcTilt
+                          realtimeData.mainBoardMCOnOffInfo.mcAzimuth &&
+                          realtimeData.mainBoardMCOnOffInfo.mcElevation &&
+                          realtimeData.mainBoardMCOnOffInfo.mcTilt
                         ),
                       'text-negative':
-                        !icdStore.mainBoardMCOnOffInfo.mcAzimuth &&
-                        !icdStore.mainBoardMCOnOffInfo.mcElevation &&
-                        !icdStore.mainBoardMCOnOffInfo.mcTilt,
+                        !realtimeData.mainBoardMCOnOffInfo.mcAzimuth &&
+                        !realtimeData.mainBoardMCOnOffInfo.mcElevation &&
+                        !realtimeData.mainBoardMCOnOffInfo.mcTilt,
                     }"
                   >
                     {{
-                      icdStore.mainBoardMCOnOffInfo.mcAzimuth &&
-                      icdStore.mainBoardMCOnOffInfo.mcElevation &&
-                      icdStore.mainBoardMCOnOffInfo.mcTilt
+                      realtimeData.mainBoardMCOnOffInfo.mcAzimuth &&
+                      realtimeData.mainBoardMCOnOffInfo.mcElevation &&
+                      realtimeData.mainBoardMCOnOffInfo.mcTilt
                         ? 'ON'
-                        : icdStore.mainBoardMCOnOffInfo.mcAzimuth ||
-                            icdStore.mainBoardMCOnOffInfo.mcElevation ||
-                            icdStore.mainBoardMCOnOffInfo.mcTilt
+                        : realtimeData.mainBoardMCOnOffInfo.mcAzimuth ||
+                            realtimeData.mainBoardMCOnOffInfo.mcElevation ||
+                            realtimeData.mainBoardMCOnOffInfo.mcTilt
                           ? 'PARTIAL'
                           : 'OFF'
                     }}
@@ -349,13 +353,13 @@
                   <div
                     class="status-led"
                     :class="{
-                      'led-on': icdStore.azimuthBoardStatusInfo.stowPin,
-                      'led-off': !icdStore.azimuthBoardStatusInfo.stowPin,
+                      'led-on': realtimeData.azimuthBoardStatusInfo.stowPin,
+                      'led-off': !realtimeData.azimuthBoardStatusInfo.stowPin,
                     }"
                   ></div>
                   <span class="status-label">Azimuth</span>
                   <span class="status-value">
-                    {{ icdStore.azimuthBoardStatusInfo.stowPin ? 'STOWED' : 'UNSTOWED' }}
+                    {{ realtimeData.azimuthBoardStatusInfo.stowPin ? 'STOWED' : 'UNSTOWED' }}
                   </span>
                 </div>
 
@@ -364,13 +368,13 @@
                   <div
                     class="status-led"
                     :class="{
-                      'led-on': icdStore.elevationBoardStatusInfo.stowPin,
-                      'led-off': !icdStore.elevationBoardStatusInfo.stowPin,
+                      'led-on': realtimeData.elevationBoardStatusInfo.stowPin,
+                      'led-off': !realtimeData.elevationBoardStatusInfo.stowPin,
                     }"
                   ></div>
                   <span class="status-label">Elevation</span>
                   <span class="status-value">
-                    {{ icdStore.elevationBoardStatusInfo.stowPin ? 'STOWED' : 'UNSTOWED' }}
+                    {{ realtimeData.elevationBoardStatusInfo.stowPin ? 'STOWED' : 'UNSTOWED' }}
                   </span>
                 </div>
 
@@ -379,13 +383,13 @@
                   <div
                     class="status-led"
                     :class="{
-                      'led-on': icdStore.tiltBoardStatusInfo.stowPin,
-                      'led-off': !icdStore.tiltBoardStatusInfo.stowPin,
+                      'led-on': realtimeData.tiltBoardStatusInfo.stowPin,
+                      'led-off': !realtimeData.tiltBoardStatusInfo.stowPin,
                     }"
                   ></div>
                   <span class="status-label">Tilt</span>
                   <span class="status-value">
-                    {{ icdStore.tiltBoardStatusInfo.stowPin ? 'STOWED' : 'UNSTOWED' }}
+                    {{ realtimeData.tiltBoardStatusInfo.stowPin ? 'STOWED' : 'UNSTOWED' }}
                   </span>
                 </div>
               </div>
@@ -537,14 +541,14 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.azimuthBoardStatusInfo.limitSwitchNegative275,
-                        'led-off': !icdStore.azimuthBoardStatusInfo.limitSwitchNegative275,
+                        'led-on': realtimeData.azimuthBoardStatusInfo.limitSwitchNegative275,
+                        'led-off': !realtimeData.azimuthBoardStatusInfo.limitSwitchNegative275,
                       }"
                     ></div>
                     <span class="status-label">Limit Switch -275˚</span>
                     <span class="status-value">
                       {{
-                        icdStore.azimuthBoardStatusInfo.limitSwitchNegative275
+                        realtimeData.azimuthBoardStatusInfo.limitSwitchNegative275
                           ? 'ACTIVE'
                           : 'INACTIVE'
                       }}
@@ -556,14 +560,14 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.azimuthBoardStatusInfo.limitSwitchPositive275,
-                        'led-off': !icdStore.azimuthBoardStatusInfo.limitSwitchPositive275,
+                        'led-on': realtimeData.azimuthBoardStatusInfo.limitSwitchPositive275,
+                        'led-off': !realtimeData.azimuthBoardStatusInfo.limitSwitchPositive275,
                       }"
                     ></div>
                     <span class="status-label">Limit Switch +275˚</span>
                     <span class="status-value">
                       {{
-                        icdStore.azimuthBoardStatusInfo.limitSwitchPositive275
+                        realtimeData.azimuthBoardStatusInfo.limitSwitchPositive275
                           ? 'ACTIVE'
                           : 'INACTIVE'
                       }}
@@ -575,13 +579,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.azimuthBoardServoStatusInfo.servoMotor,
-                        'led-off': !icdStore.azimuthBoardServoStatusInfo.servoMotor,
+                        'led-on': realtimeData.azimuthBoardServoStatusInfo.servoMotor,
+                        'led-off': !realtimeData.azimuthBoardServoStatusInfo.servoMotor,
                       }"
                     ></div>
                     <span class="status-label">Servo Motor</span>
                     <span class="status-value">
-                      {{ icdStore.azimuthBoardServoStatusInfo.servoMotor ? 'ON' : 'OFF' }}
+                      {{ realtimeData.azimuthBoardServoStatusInfo.servoMotor ? 'ON' : 'OFF' }}
                     </span>
                   </div>
 
@@ -590,13 +594,15 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.azimuthBoardServoStatusInfo.servoBrake,
-                        'led-off': !icdStore.azimuthBoardServoStatusInfo.servoBrake,
+                        'led-on': realtimeData.azimuthBoardServoStatusInfo.servoBrake,
+                        'led-off': !realtimeData.azimuthBoardServoStatusInfo.servoBrake,
                       }"
                     ></div>
                     <span class="status-label">Servo Brake</span>
                     <span class="status-value">
-                      {{ icdStore.azimuthBoardServoStatusInfo.servoBrake ? 'ENGAGED' : 'INACTIVE' }}
+                      {{
+                        realtimeData.azimuthBoardServoStatusInfo.servoBrake ? 'ENGAGED' : 'INACTIVE'
+                      }}
                     </span>
                   </div>
 
@@ -605,13 +611,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-off': !icdStore.azimuthBoardStatusInfo.encoder,
-                        'led-error': icdStore.azimuthBoardStatusInfo.encoder,
+                        'led-off': !realtimeData.azimuthBoardStatusInfo.encoder,
+                        'led-error': realtimeData.azimuthBoardStatusInfo.encoder,
                       }"
                     ></div>
                     <span class="status-label">Servo Encoder</span>
                     <span class="status-value">
-                      {{ icdStore.azimuthBoardStatusInfo.encoder ? 'ERROR' : 'NORMAL' }}
+                      {{ realtimeData.azimuthBoardStatusInfo.encoder ? 'ERROR' : 'NORMAL' }}
                     </span>
                   </div>
 
@@ -620,13 +626,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-off': !icdStore.azimuthBoardServoStatusInfo.servoAlarm,
-                        'led-error': icdStore.azimuthBoardServoStatusInfo.servoAlarm,
+                        'led-off': !realtimeData.azimuthBoardServoStatusInfo.servoAlarm,
+                        'led-error': realtimeData.azimuthBoardServoStatusInfo.servoAlarm,
                       }"
                     ></div>
                     <span class="status-label">Servo Alarm</span>
                     <span class="status-value">
-                      {{ icdStore.azimuthBoardServoStatusInfo.servoAlarm ? 'ALARM' : 'NORMAL' }}
+                      {{ realtimeData.azimuthBoardServoStatusInfo.servoAlarm ? 'ALARM' : 'NORMAL' }}
                     </span>
                   </div>
                 </div>
@@ -640,14 +646,14 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.elevationBoardStatusInfo.limitSwitchNegative5,
-                        'led-off': !icdStore.elevationBoardStatusInfo.limitSwitchNegative5,
+                        'led-on': realtimeData.elevationBoardStatusInfo.limitSwitchNegative5,
+                        'led-off': !realtimeData.elevationBoardStatusInfo.limitSwitchNegative5,
                       }"
                     ></div>
                     <span class="status-label">Limit Switch -5˚</span>
                     <span class="status-value">
                       {{
-                        icdStore.elevationBoardStatusInfo.limitSwitchNegative5
+                        realtimeData.elevationBoardStatusInfo.limitSwitchNegative5
                           ? 'ACTIVE'
                           : 'INACTIVE'
                       }}
@@ -659,15 +665,15 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.elevationBoardStatusInfo.limitSwitchNegative0,
-                        'led-off': !icdStore.elevationBoardStatusInfo.limitSwitchNegative0,
+                        'led-on': realtimeData.elevationBoardStatusInfo.limitSwitchNegative0,
+                        'led-off': !realtimeData.elevationBoardStatusInfo.limitSwitchNegative0,
                       }"
                     ></div>
 
                     <span class="status-label">Limit Switch -0˚</span>
                     <span class="status-value">
                       {{
-                        icdStore.elevationBoardStatusInfo.limitSwitchNegative0
+                        realtimeData.elevationBoardStatusInfo.limitSwitchNegative0
                           ? 'ACTIVE'
                           : 'INACTIVE'
                       }}
@@ -679,14 +685,14 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.elevationBoardStatusInfo.limitSwitchPositive180,
-                        'led-off': !icdStore.elevationBoardStatusInfo.limitSwitchPositive180,
+                        'led-on': realtimeData.elevationBoardStatusInfo.limitSwitchPositive180,
+                        'led-off': !realtimeData.elevationBoardStatusInfo.limitSwitchPositive180,
                       }"
                     ></div>
                     <span class="status-label">Limit Switch +180˚</span>
                     <span class="status-value">
                       {{
-                        icdStore.elevationBoardStatusInfo.limitSwitchPositive180
+                        realtimeData.elevationBoardStatusInfo.limitSwitchPositive180
                           ? 'ACTIVE'
                           : 'INACTIVE'
                       }}
@@ -698,14 +704,14 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.elevationBoardStatusInfo.limitSwitchPositive185,
-                        'led-off': !icdStore.elevationBoardStatusInfo.limitSwitchPositive185,
+                        'led-on': realtimeData.elevationBoardStatusInfo.limitSwitchPositive185,
+                        'led-off': !realtimeData.elevationBoardStatusInfo.limitSwitchPositive185,
                       }"
                     ></div>
                     <span class="status-label">Limit Switch +185˚</span>
                     <span class="status-value">
                       {{
-                        icdStore.elevationBoardStatusInfo.limitSwitchPositive185
+                        realtimeData.elevationBoardStatusInfo.limitSwitchPositive185
                           ? 'ACTIVE'
                           : 'INACTIVE'
                       }}
@@ -717,13 +723,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.elevationBoardServoStatusInfo.servoMotor,
-                        'led-off': !icdStore.elevationBoardServoStatusInfo.servoMotor,
+                        'led-on': realtimeData.elevationBoardServoStatusInfo.servoMotor,
+                        'led-off': !realtimeData.elevationBoardServoStatusInfo.servoMotor,
                       }"
                     ></div>
                     <span class="status-label">Servo Motor</span>
                     <span class="status-value">
-                      {{ icdStore.elevationBoardServoStatusInfo.servoMotor ? 'ON' : 'OFF' }}
+                      {{ realtimeData.elevationBoardServoStatusInfo.servoMotor ? 'ON' : 'OFF' }}
                     </span>
                   </div>
 
@@ -732,14 +738,16 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.elevationBoardServoStatusInfo.servoBrake,
-                        'led-off': !icdStore.elevationBoardServoStatusInfo.servoBrake,
+                        'led-on': realtimeData.elevationBoardServoStatusInfo.servoBrake,
+                        'led-off': !realtimeData.elevationBoardServoStatusInfo.servoBrake,
                       }"
                     ></div>
                     <span class="status-label">Servo Brake</span>
                     <span class="status-value">
                       {{
-                        icdStore.elevationBoardServoStatusInfo.servoBrake ? 'ENGAGED' : 'INACTIVE'
+                        realtimeData.elevationBoardServoStatusInfo.servoBrake
+                          ? 'ENGAGED'
+                          : 'INACTIVE'
                       }}
                     </span>
                   </div>
@@ -749,13 +757,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-off': !icdStore.elevationBoardStatusInfo.encoder,
-                        'led-error': icdStore.elevationBoardStatusInfo.encoder,
+                        'led-off': !realtimeData.elevationBoardStatusInfo.encoder,
+                        'led-error': realtimeData.elevationBoardStatusInfo.encoder,
                       }"
                     ></div>
                     <span class="status-label">Servo Encoder</span>
                     <span class="status-value">
-                      {{ icdStore.elevationBoardStatusInfo.encoder ? 'ERROR' : 'NORMAL' }}
+                      {{ realtimeData.elevationBoardStatusInfo.encoder ? 'ERROR' : 'NORMAL' }}
                     </span>
                   </div>
 
@@ -764,13 +772,15 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-off': !icdStore.elevationBoardServoStatusInfo.servoAlarm,
-                        'led-error': icdStore.elevationBoardServoStatusInfo.servoAlarm,
+                        'led-off': !realtimeData.elevationBoardServoStatusInfo.servoAlarm,
+                        'led-error': realtimeData.elevationBoardServoStatusInfo.servoAlarm,
                       }"
                     ></div>
                     <span class="status-label">Servo Alarm</span>
                     <span class="status-value">
-                      {{ icdStore.elevationBoardServoStatusInfo.servoAlarm ? 'ALARM' : 'NORMAL' }}
+                      {{
+                        realtimeData.elevationBoardServoStatusInfo.servoAlarm ? 'ALARM' : 'NORMAL'
+                      }}
                     </span>
                   </div>
                 </div>
@@ -784,14 +794,16 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.tiltBoardStatusInfo.limitSwitchNegative275,
-                        'led-off': !icdStore.tiltBoardStatusInfo.limitSwitchNegative275,
+                        'led-on': realtimeData.tiltBoardStatusInfo.limitSwitchNegative275,
+                        'led-off': !realtimeData.tiltBoardStatusInfo.limitSwitchNegative275,
                       }"
                     ></div>
                     <span class="status-label">Limit Switch -275˚</span>
                     <span class="status-value">
                       {{
-                        icdStore.tiltBoardStatusInfo.limitSwitchNegative275 ? 'ACTIVE' : 'INACTIVE'
+                        realtimeData.tiltBoardStatusInfo.limitSwitchNegative275
+                          ? 'ACTIVE'
+                          : 'INACTIVE'
                       }}
                     </span>
                   </div>
@@ -801,14 +813,16 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.tiltBoardStatusInfo.limitSwitchPositive275,
-                        'led-off': !icdStore.tiltBoardStatusInfo.limitSwitchPositive275,
+                        'led-on': realtimeData.tiltBoardStatusInfo.limitSwitchPositive275,
+                        'led-off': !realtimeData.tiltBoardStatusInfo.limitSwitchPositive275,
                       }"
                     ></div>
                     <span class="status-label">Limit Switch +275˚</span>
                     <span class="status-value">
                       {{
-                        icdStore.tiltBoardStatusInfo.limitSwitchPositive275 ? 'ACTIVE' : 'INACTIVE'
+                        realtimeData.tiltBoardStatusInfo.limitSwitchPositive275
+                          ? 'ACTIVE'
+                          : 'INACTIVE'
                       }}
                     </span>
                   </div>
@@ -818,13 +832,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.tiltBoardServoStatusInfo.servoMotor,
-                        'led-off': !icdStore.tiltBoardServoStatusInfo.servoMotor,
+                        'led-on': realtimeData.tiltBoardServoStatusInfo.servoMotor,
+                        'led-off': !realtimeData.tiltBoardServoStatusInfo.servoMotor,
                       }"
                     ></div>
                     <span class="status-label">Servo Motor</span>
                     <span class="status-value">
-                      {{ icdStore.tiltBoardServoStatusInfo.servoMotor ? 'ON' : 'OFF' }}
+                      {{ realtimeData.tiltBoardServoStatusInfo.servoMotor ? 'ON' : 'OFF' }}
                     </span>
                   </div>
 
@@ -833,13 +847,15 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.tiltBoardServoStatusInfo.servoBrake,
-                        'led-off': !icdStore.tiltBoardServoStatusInfo.servoBrake,
+                        'led-on': realtimeData.tiltBoardServoStatusInfo.servoBrake,
+                        'led-off': !realtimeData.tiltBoardServoStatusInfo.servoBrake,
                       }"
                     ></div>
                     <span class="status-label">Servo Brake</span>
                     <span class="status-value">
-                      {{ icdStore.tiltBoardServoStatusInfo.servoBrake ? 'ENGAGED' : 'INACTIVE' }}
+                      {{
+                        realtimeData.tiltBoardServoStatusInfo.servoBrake ? 'ENGAGED' : 'INACTIVE'
+                      }}
                     </span>
                   </div>
 
@@ -848,13 +864,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-off': !icdStore.tiltBoardStatusInfo.encoder,
-                        'led-error': icdStore.tiltBoardStatusInfo.encoder,
+                        'led-off': !realtimeData.tiltBoardStatusInfo.encoder,
+                        'led-error': realtimeData.tiltBoardStatusInfo.encoder,
                       }"
                     ></div>
                     <span class="status-label">Servo Encoder</span>
                     <span class="status-value">
-                      {{ icdStore.tiltBoardStatusInfo.encoder ? 'ERROR' : 'NORMAL' }}
+                      {{ realtimeData.tiltBoardStatusInfo.encoder ? 'ERROR' : 'NORMAL' }}
                     </span>
                   </div>
 
@@ -863,13 +879,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-off': !icdStore.tiltBoardServoStatusInfo.servoAlarm,
-                        'led-error': icdStore.tiltBoardServoStatusInfo.servoAlarm,
+                        'led-off': !realtimeData.tiltBoardServoStatusInfo.servoAlarm,
+                        'led-error': realtimeData.tiltBoardServoStatusInfo.servoAlarm,
                       }"
                     ></div>
                     <span class="status-label">Servo Alarm</span>
                     <span class="status-value">
-                      {{ icdStore.tiltBoardServoStatusInfo.servoAlarm ? 'ALARM' : 'NORMAL' }}
+                      {{ realtimeData.tiltBoardServoStatusInfo.servoAlarm ? 'ALARM' : 'NORMAL' }}
                     </span>
                   </div>
                 </div>
@@ -912,13 +928,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-off': !icdStore.feedXBoardStatusInfo.fanError,
-                        'led-error': icdStore.feedXBoardStatusInfo.fanError,
+                        'led-off': !realtimeData.feedXBoardStatusInfo.fanError,
+                        'led-error': realtimeData.feedXBoardStatusInfo.fanError,
                       }"
                     ></div>
                     <span class="status-label">FAN ERROR</span>
                     <span class="status-value">
-                      {{ icdStore.feedXBoardStatusInfo.fanError ? 'ERROR' : 'NORMAL' }}
+                      {{ realtimeData.feedXBoardStatusInfo.fanError ? 'ERROR' : 'NORMAL' }}
                     </span>
                   </div>
 
@@ -927,13 +943,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-off': !icdStore.feedXBoardStatusInfo.xLnaRHCPError,
-                        'led-error': icdStore.feedXBoardStatusInfo.xLnaRHCPError,
+                        'led-off': !realtimeData.feedXBoardStatusInfo.xLnaRHCPError,
+                        'led-error': realtimeData.feedXBoardStatusInfo.xLnaRHCPError,
                       }"
                     ></div>
                     <span class="status-label">X-Band LNA RHCP</span>
                     <span class="status-value">
-                      {{ icdStore.feedXBoardStatusInfo.xLnaRHCPError ? 'ERROR' : 'NORMAL' }}
+                      {{ realtimeData.feedXBoardStatusInfo.xLnaRHCPError ? 'ERROR' : 'NORMAL' }}
                     </span>
                   </div>
 
@@ -942,13 +958,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-off': !icdStore.feedXBoardStatusInfo.xLnaLHCPError,
-                        'led-error': icdStore.feedXBoardStatusInfo.xLnaLHCPError,
+                        'led-off': !realtimeData.feedXBoardStatusInfo.xLnaLHCPError,
+                        'led-error': realtimeData.feedXBoardStatusInfo.xLnaLHCPError,
                       }"
                     ></div>
                     <span class="status-label">X-Band LNA LHCP</span>
                     <span class="status-value">
-                      {{ icdStore.feedXBoardStatusInfo.xLnaLHCPError ? 'ERROR' : 'NORMAL' }}
+                      {{ realtimeData.feedXBoardStatusInfo.xLnaLHCPError ? 'ERROR' : 'NORMAL' }}
                     </span>
                   </div>
 
@@ -957,13 +973,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-off': !icdStore.feedSBoardStatusInfo.sLnaRHCPError,
-                        'led-error': icdStore.feedSBoardStatusInfo.sLnaRHCPError,
+                        'led-off': !realtimeData.feedSBoardStatusInfo.sLnaRHCPError,
+                        'led-error': realtimeData.feedSBoardStatusInfo.sLnaRHCPError,
                       }"
                     ></div>
                     <span class="status-label">S-Band LNA RHCP</span>
                     <span class="status-value">
-                      {{ icdStore.feedSBoardStatusInfo.sLnaRHCPError ? 'ERROR' : 'NORMAL' }}
+                      {{ realtimeData.feedSBoardStatusInfo.sLnaRHCPError ? 'ERROR' : 'NORMAL' }}
                     </span>
                   </div>
 
@@ -972,13 +988,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-off': !icdStore.feedSBoardStatusInfo.sLnaLHCPError,
-                        'led-error': icdStore.feedSBoardStatusInfo.sLnaLHCPError,
+                        'led-off': !realtimeData.feedSBoardStatusInfo.sLnaLHCPError,
+                        'led-error': realtimeData.feedSBoardStatusInfo.sLnaLHCPError,
                       }"
                     ></div>
                     <span class="status-label">S-Band LNA LHCP</span>
                     <span class="status-value">
-                      {{ icdStore.feedSBoardStatusInfo.sLnaLHCPError ? 'ERROR' : 'NORMAL' }}
+                      {{ realtimeData.feedSBoardStatusInfo.sLnaLHCPError ? 'ERROR' : 'NORMAL' }}
                     </span>
                   </div>
 
@@ -987,13 +1003,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-off': !icdStore.feedSBoardStatusInfo.sRFSwitchError,
-                        'led-error': icdStore.feedSBoardStatusInfo.sRFSwitchError,
+                        'led-off': !realtimeData.feedSBoardStatusInfo.sRFSwitchError,
+                        'led-error': realtimeData.feedSBoardStatusInfo.sRFSwitchError,
                       }"
                     ></div>
                     <span class="status-label">S-Band RF Switch</span>
                     <span class="status-value">
-                      {{ icdStore.feedSBoardStatusInfo.sRFSwitchError ? 'ERROR' : 'NORMAL' }}
+                      {{ realtimeData.feedSBoardStatusInfo.sRFSwitchError ? 'ERROR' : 'NORMAL' }}
                     </span>
                   </div>
                 </div>
@@ -1007,13 +1023,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.feedXBoardStatusInfo.fanPower,
-                        'led-off': !icdStore.feedXBoardStatusInfo.fanPower,
+                        'led-on': realtimeData.feedXBoardStatusInfo.fanPower,
+                        'led-off': !realtimeData.feedXBoardStatusInfo.fanPower,
                       }"
                     ></div>
                     <span class="status-label">FAN Power</span>
                     <span class="status-value">
-                      {{ icdStore.feedXBoardStatusInfo.fanPower ? 'ON' : 'OFF' }}
+                      {{ realtimeData.feedXBoardStatusInfo.fanPower ? 'ON' : 'OFF' }}
                     </span>
                   </div>
 
@@ -1022,13 +1038,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.feedXBoardStatusInfo.xLnaRHCPPower,
-                        'led-off': !icdStore.feedXBoardStatusInfo.xLnaRHCPPower,
+                        'led-on': realtimeData.feedXBoardStatusInfo.xLnaRHCPPower,
+                        'led-off': !realtimeData.feedXBoardStatusInfo.xLnaRHCPPower,
                       }"
                     ></div>
                     <span class="status-label">X-Band LNA RHCP</span>
                     <span class="status-value">
-                      {{ icdStore.feedXBoardStatusInfo.xLnaRHCPPower ? 'ON' : 'OFF' }}
+                      {{ realtimeData.feedXBoardStatusInfo.xLnaRHCPPower ? 'ON' : 'OFF' }}
                     </span>
                   </div>
 
@@ -1037,13 +1053,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.feedXBoardStatusInfo.xLnaLHCPPower,
-                        'led-off': !icdStore.feedXBoardStatusInfo.xLnaLHCPPower,
+                        'led-on': realtimeData.feedXBoardStatusInfo.xLnaLHCPPower,
+                        'led-off': !realtimeData.feedXBoardStatusInfo.xLnaLHCPPower,
                       }"
                     ></div>
                     <span class="status-label">X-Band LNA LHCP</span>
                     <span class="status-value">
-                      {{ icdStore.feedXBoardStatusInfo.xLnaLHCPPower ? 'ON' : 'OFF' }}
+                      {{ realtimeData.feedXBoardStatusInfo.xLnaLHCPPower ? 'ON' : 'OFF' }}
                     </span>
                   </div>
 
@@ -1052,13 +1068,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.feedSBoardStatusInfo.sLnaRHCPPower,
-                        'led-off': !icdStore.feedSBoardStatusInfo.sLnaRHCPPower,
+                        'led-on': realtimeData.feedSBoardStatusInfo.sLnaRHCPPower,
+                        'led-off': !realtimeData.feedSBoardStatusInfo.sLnaRHCPPower,
                       }"
                     ></div>
                     <span class="status-label">S-Band LNA RHCP</span>
                     <span class="status-value">
-                      {{ icdStore.feedSBoardStatusInfo.sLnaRHCPPower ? 'ON' : 'OFF' }}
+                      {{ realtimeData.feedSBoardStatusInfo.sLnaRHCPPower ? 'ON' : 'OFF' }}
                     </span>
                   </div>
 
@@ -1067,13 +1083,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.feedSBoardStatusInfo.sLnaLHCPPower,
-                        'led-off': !icdStore.feedSBoardStatusInfo.sLnaLHCPPower,
+                        'led-on': realtimeData.feedSBoardStatusInfo.sLnaLHCPPower,
+                        'led-off': !realtimeData.feedSBoardStatusInfo.sLnaLHCPPower,
                       }"
                     ></div>
                     <span class="status-label">S-Band LNA LHCP</span>
                     <span class="status-value">
-                      {{ icdStore.feedSBoardStatusInfo.sLnaLHCPPower ? 'ON' : 'OFF' }}
+                      {{ realtimeData.feedSBoardStatusInfo.sLnaLHCPPower ? 'ON' : 'OFF' }}
                     </span>
                   </div>
 
@@ -1082,13 +1098,13 @@
                     <div
                       class="status-led"
                       :class="{
-                        'led-on': icdStore.feedSBoardStatusInfo.sRFSwitchMode,
-                        'led-off': !icdStore.feedSBoardStatusInfo.sRFSwitchMode,
+                        'led-on': realtimeData.feedSBoardStatusInfo.sRFSwitchMode,
+                        'led-off': !realtimeData.feedSBoardStatusInfo.sRFSwitchMode,
                       }"
                     ></div>
                     <span class="status-label">S-Band RF Switch</span>
                     <span class="status-value">
-                      {{ icdStore.feedSBoardStatusInfo.sRFSwitchMode ? 'ON' : 'OFF' }}
+                      {{ realtimeData.feedSBoardStatusInfo.sRFSwitchMode ? 'ON' : 'OFF' }}
                     </span>
                   </div>
                 </div>
@@ -1147,18 +1163,246 @@
 </template>
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useICDStore } from '../../stores/icd/icdStore'
+import { useSharedICDStore } from '../../composables/useSharedStore'
 import { closeWindow } from '../../utils/windowUtils'
 
-const icdStore = useICDStore()
+const icdStore = useSharedICDStore()
 // Computed for template
 const isOpen = computed({
   get: () => props.modelValue,
   set: (value: boolean) => emit('update:modelValue', value),
 })
 
-const protocolStatusInfo = computed(() => icdStore.protocolStatusInfo)
+// ✅ 실시간 업데이트를 위한 반응형 상태
+const realtimeData = ref({
+  updateCount: 0,
+  serverTime: '',
+  isConnected: false,
 
+  // Protocol Status
+  protocolStatusInfo: {
+    elevation: false,
+    azimuth: false,
+    tilt: false,
+    feed: false,
+  },
+
+  // Main Board Status
+  mainBoardStatusInfo: {
+    powerSurgeProtector: false,
+    powerReversePhaseSensor: false,
+    emergencyStopACU: false,
+    emergencyStopPositioner: false,
+  },
+
+  // MC On/Off Status
+  mainBoardMCOnOffInfo: {
+    mcAzimuth: false,
+    mcElevation: false,
+    mcTilt: false,
+  },
+
+  // Azimuth Board Status
+  azimuthBoardStatusInfo: {
+    stowPin: false,
+    limitSwitchNegative275: false,
+    limitSwitchPositive275: false,
+    encoder: false,
+  },
+
+  // Elevation Board Status
+  elevationBoardStatusInfo: {
+    stowPin: false,
+    limitSwitchNegative5: false,
+    limitSwitchNegative0: false,
+    limitSwitchPositive180: false,
+    limitSwitchPositive185: false,
+    encoder: false,
+  },
+
+  // Tilt Board Status
+  tiltBoardStatusInfo: {
+    stowPin: false,
+    limitSwitchNegative275: false,
+    limitSwitchPositive275: false,
+    encoder: false,
+  },
+
+  // Azimuth Servo Status
+  azimuthBoardServoStatusInfo: {
+    servoMotor: false,
+    servoBrake: false,
+    servoAlarm: false,
+  },
+
+  // Elevation Servo Status
+  elevationBoardServoStatusInfo: {
+    servoMotor: false,
+    servoBrake: false,
+    servoAlarm: false,
+  },
+
+  // Tilt Servo Status
+  tiltBoardServoStatusInfo: {
+    servoMotor: false,
+    servoBrake: false,
+    servoAlarm: false,
+  },
+
+  // Feed X Board Status
+  feedXBoardStatusInfo: {
+    fanError: false,
+    fanPower: false,
+    xLnaRHCPError: false,
+    xLnaRHCPPower: false,
+    xLnaLHCPError: false,
+    xLnaLHCPPower: false,
+  },
+
+  // Feed S Board Status
+  feedSBoardStatusInfo: {
+    sLnaRHCPError: false,
+    sLnaRHCPPower: false,
+    sLnaLHCPError: false,
+    sLnaLHCPPower: false,
+    sRFSwitchError: false,
+    sRFSwitchMode: false,
+  },
+})
+
+// ✅ 실시간 데이터 업데이트 함수
+const updateRealtimeData = () => {
+  realtimeData.value = {
+    updateCount: icdStore.updateCount,
+    serverTime: icdStore.serverTime,
+    isConnected: icdStore.isConnected,
+
+    // Protocol Status
+    protocolStatusInfo: {
+      elevation: icdStore.protocolStatusInfo.elevation,
+      azimuth: icdStore.protocolStatusInfo.azimuth,
+      tilt: icdStore.protocolStatusInfo.tilt,
+      feed: icdStore.protocolStatusInfo.feed,
+    },
+
+    // Main Board Status
+    mainBoardStatusInfo: {
+      powerSurgeProtector: icdStore.mainBoardStatusInfo.powerSurgeProtector,
+      powerReversePhaseSensor: icdStore.mainBoardStatusInfo.powerReversePhaseSensor,
+      emergencyStopACU: icdStore.mainBoardStatusInfo.emergencyStopACU,
+      emergencyStopPositioner: icdStore.mainBoardStatusInfo.emergencyStopPositioner,
+    },
+
+    // MC On/Off Status
+    mainBoardMCOnOffInfo: {
+      mcAzimuth: icdStore.mainBoardMCOnOffInfo.mcAzimuth,
+      mcElevation: icdStore.mainBoardMCOnOffInfo.mcElevation,
+      mcTilt: icdStore.mainBoardMCOnOffInfo.mcTilt,
+    },
+
+    // Azimuth Board Status
+    azimuthBoardStatusInfo: {
+      stowPin: icdStore.azimuthBoardStatusInfo.stowPin,
+      limitSwitchNegative275: icdStore.azimuthBoardStatusInfo.limitSwitchNegative275,
+      limitSwitchPositive275: icdStore.azimuthBoardStatusInfo.limitSwitchPositive275,
+      encoder: icdStore.azimuthBoardStatusInfo.encoder,
+    },
+
+    // Elevation Board Status
+    elevationBoardStatusInfo: {
+      stowPin: icdStore.elevationBoardStatusInfo.stowPin,
+      limitSwitchNegative5: icdStore.elevationBoardStatusInfo.limitSwitchNegative5,
+      limitSwitchNegative0: icdStore.elevationBoardStatusInfo.limitSwitchNegative0,
+      limitSwitchPositive180: icdStore.elevationBoardStatusInfo.limitSwitchPositive180,
+      limitSwitchPositive185: icdStore.elevationBoardStatusInfo.limitSwitchPositive185,
+      encoder: icdStore.elevationBoardStatusInfo.encoder,
+    },
+
+    // Tilt Board Status
+    tiltBoardStatusInfo: {
+      stowPin: icdStore.tiltBoardStatusInfo.stowPin,
+      limitSwitchNegative275: icdStore.tiltBoardStatusInfo.limitSwitchNegative275,
+      limitSwitchPositive275: icdStore.tiltBoardStatusInfo.limitSwitchPositive275,
+      encoder: icdStore.tiltBoardStatusInfo.encoder,
+    },
+
+    // Azimuth Servo Status
+    azimuthBoardServoStatusInfo: {
+      servoMotor: icdStore.azimuthBoardServoStatusInfo.servoMotor,
+      servoBrake: icdStore.azimuthBoardServoStatusInfo.servoBrake,
+      servoAlarm: icdStore.azimuthBoardServoStatusInfo.servoAlarm,
+    },
+
+    // Elevation Servo Status
+    elevationBoardServoStatusInfo: {
+      servoMotor: icdStore.elevationBoardServoStatusInfo.servoMotor,
+      servoBrake: icdStore.elevationBoardServoStatusInfo.servoBrake,
+      servoAlarm: icdStore.elevationBoardServoStatusInfo.servoAlarm,
+    },
+
+    // Tilt Servo Status
+    tiltBoardServoStatusInfo: {
+      servoMotor: icdStore.tiltBoardServoStatusInfo.servoMotor,
+      servoBrake: icdStore.tiltBoardServoStatusInfo.servoBrake,
+      servoAlarm: icdStore.tiltBoardServoStatusInfo.servoAlarm,
+    },
+
+    // Feed X Board Status
+    feedXBoardStatusInfo: {
+      fanError: icdStore.feedXBoardStatusInfo.fanError,
+      fanPower: icdStore.feedXBoardStatusInfo.fanPower,
+      xLnaRHCPError: icdStore.feedXBoardStatusInfo.xLnaRHCPError,
+      xLnaRHCPPower: icdStore.feedXBoardStatusInfo.xLnaRHCPPower,
+      xLnaLHCPError: icdStore.feedXBoardStatusInfo.xLnaLHCPError,
+      xLnaLHCPPower: icdStore.feedXBoardStatusInfo.xLnaLHCPPower,
+    },
+
+    // Feed S Board Status
+    feedSBoardStatusInfo: {
+      sLnaRHCPError: icdStore.feedSBoardStatusInfo.sLnaRHCPError,
+      sLnaRHCPPower: icdStore.feedSBoardStatusInfo.sLnaRHCPPower,
+      sLnaLHCPError: icdStore.feedSBoardStatusInfo.sLnaLHCPError,
+      sLnaLHCPPower: icdStore.feedSBoardStatusInfo.sLnaLHCPPower,
+      sRFSwitchError: icdStore.feedSBoardStatusInfo.sRFSwitchError,
+      sRFSwitchMode: icdStore.feedSBoardStatusInfo.sRFSwitchMode,
+    },
+  }
+} // ✅ 타이머 관리
+let updateTimer: NodeJS.Timeout | null = null
+
+onMounted(() => {
+  console.log('📱 AllStatusContent 마운트됨')
+  console.log('🔍 실행 환경:', isPopupWindow.value ? '팝업창' : '모달')
+
+  // ✅ 초기 데이터 로드
+  updateRealtimeData()
+
+  // ✅ 실시간 업데이트 타이머 시작 (100ms 간격)
+  updateTimer = setInterval(() => {
+    updateRealtimeData()
+  }, 100)
+
+  console.log('🔄 실시간 업데이트 타이머 시작 (100ms 간격)')
+
+  document.addEventListener('keydown', handleKeydown)
+
+  if (isPopupWindow.value) {
+    document.title = 'All Status Information'
+  }
+})
+
+onUnmounted(() => {
+  console.log('🧹 AllStatusContent 언마운트됨')
+
+  // ✅ 타이머 정리
+  if (updateTimer) {
+    clearInterval(updateTimer)
+    updateTimer = null
+    console.log('⏹️ 실시간 업데이트 타이머 중지')
+  }
+
+  document.removeEventListener('keydown', handleKeydown)
+})
 // Props를 선택적으로 만들기// 🎯 Props 정의
 const props = withDefaults(
   defineProps<{
