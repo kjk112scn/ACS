@@ -1405,7 +1405,7 @@ onUnmounted(() => {
   // ✅ 추가: 추적 경로 정리 (메모리 절약)
   ephemerisStore.clearTrackingPath()
   // ✅ TypeScript Worker 정리
-  ephemerisStore.cleanupTrackingWorker()
+  ephemerisStore.cleanupWorker()
   // 윈도우 이벤트 리스너 정리
   window.removeEventListener('resize', () => {})
 })

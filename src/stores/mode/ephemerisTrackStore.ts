@@ -7,6 +7,17 @@ import {
   type EphemerisTrackRequest,
 } from '../../services/mode/ephemerisTrackService'
 
+// ✅ 기본값 상수 정의 (파일 상단에 추가)
+const DEFAULT_WORKER_STATS = {
+  totalUpdates: 0,
+  totalProcessingTime: 0,
+  averageProcessingTime: 0,
+  pointsAdded: 0,
+  currentPathPoints: 0,
+  lastUpdateTime: 0,
+  errors: 0,
+} as const
+
 // ✅ Worker 타입 정의 (Worker 파일과 동일하게 유지)
 interface WorkerMessage {
   azimuth: number
@@ -124,19 +135,97 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
 
   /**
 
-   * ✅ Worker 초기화 (올바른 경로 사용)
+
+   * ✅ 인라인 Worker 생성 (파일 로딩 문제 해결)
+   */
+  const createInlineWorker = (): Worker => {
+    const workerScript = `
+      // Worker 메시지 타입 정의
+      self.onmessage = function(e) {
+        const startTime = performance.now()
+
+        try {
+          const { azimuth, elevation, currentPath, maxPoints, threshold } = e.data
+
+          // 정규화
+          const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
+          const normalizedEl = Math.max(0, Math.min(90, elevation))
+          const newPoint = [normalizedEl, normalizedAz]
+
+          // 경로 업데이트
+          const updatedPath = [...currentPath]
+
+          // 중복 체크
+          if (updatedPath.length > 0) {
+            const lastPoint = updatedPath[updatedPath.length - 1]
+            if (lastPoint) {
+              const azDiff = Math.abs(lastPoint[1] - normalizedAz)
+              const elDiff = Math.abs(lastPoint[0] - normalizedEl)
+
+              if (azDiff < threshold && elDiff < threshold) {
+                // 변화가 작으면 추가하지 않음
+                const processingTime = performance.now() - startTime
+                self.postMessage({
+                  updatedPath,
+                  processingTime,
+                  pointsAdded: 0,
+                  totalPoints: updatedPath.length,
+                })
+                return
+              }
+            }
+          }
+
+          // 새 포인트 추가
+          updatedPath.push(newPoint)
+
+          // 크기 제한
+          if (updatedPath.length > maxPoints) {
+            updatedPath.splice(0, updatedPath.length - maxPoints)
+          }
+
+          const processingTime = performance.now() - startTime
+
+          self.postMessage({
+            updatedPath,
+            processingTime,
+            pointsAdded: 1,
+            totalPoints: updatedPath.length,
+          })
+
+        } catch (error) {
+          const processingTime = performance.now() - startTime
+          self.postMessage({
+            updatedPath: [],
+            processingTime,
+            pointsAdded: 0,
+            totalPoints: 0,
+            error: error.message || 'Unknown error',
+          })
+        }
+      }
+    `
+
+    const blob = new Blob([workerScript], { type: 'application/javascript' })
+    return new Worker(URL.createObjectURL(blob))
+  }
+
+  /**
+   * ✅ Worker 초기화 (인라인 Worker 사용)
    */
   const initTrackingWorker = async (): Promise<void> => {
     if (workerInitialized) return
 
     try {
+      // ✅ 인라인 Worker 생성
+      trackingWorker = createInlineWorker()
 
-      // ✅ 올바른 Worker 경로
-      trackingWorker = new Worker(
 
-        new URL('../../workers/trackingPathWorker.ts', import.meta.url),
-        { type: 'module' }
-      )
+
+
+
+
+
 
 
       // ✅ Worker 준비 완료 대기
@@ -153,12 +242,14 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
           if (!isInitialized) {
             clearTimeout(initTimeout)
             isInitialized = true
+            console.log('✅ 인라인 Worker 초기화 완료')
             resolve()
           }
 
 
-          // 메시지 처리 로직
+
           const { updatedPath, processingTime, pointsAdded, totalPoints, error } = e.data
+
 
 
           pendingUpdates = Math.max(0, pendingUpdates - 1)
@@ -178,7 +269,8 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
 
 
 
-          // ✅ totalPoints 활용 - 통계에 추가
+
+          // 통계 업데이트
           workerStats.value.totalUpdates++
           workerStats.value.totalProcessingTime += processingTime
           workerStats.value.averageProcessingTime =
@@ -190,13 +282,15 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
 
 
 
-          // ✅ 100번마다 통계 출력 시 totalPoints 포함
+
+          // 100번마다 통계 출력
           if (workerStats.value.totalUpdates % 100 === 0) {
             console.log('📊 Worker 성능 통계:', {
               평균처리시간: workerStats.value.averageProcessingTime.toFixed(2) + 'ms',
               총업데이트: workerStats.value.totalUpdates,
               추가된포인트: workerStats.value.pointsAdded,
-              현재포인트수: totalPoints, // ✅ totalPoints 사용
+
+              현재포인트수: totalPoints,
               대기중업데이트: pendingUpdates,
               오류수: workerStats.value.errors,
             })
@@ -239,7 +333,8 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
 
       workerInitialized = true
 
-      console.log('✅ Worker 초기화 완료')
+
+      console.log('✅ 인라인 Worker 초기화 완료')
     } catch (error) {
       console.error('🚫 Worker 생성 실패:', error)
       workerInitialized = false
@@ -351,16 +446,29 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
   }
 
   /**
-   * ✅ Worker 정리
+
+   * ✅ Worker 정리 및 통계 초기화 (Blob URL 해제 포함)
    */
-  const cleanupTrackingWorker = (): void => {
+
+  const cleanupWorker = () => {
     if (trackingWorker) {
-      trackingWorker.terminate()
+
+      // ✅ Blob URL 해제 (메모리 누수 방지)
+      try {
+        trackingWorker.terminate()
+      } catch (error) {
+        console.warn('Worker 종료 중 오류:', error)
+      }
       trackingWorker = null
-      workerInitialized = false
-      pendingUpdates = 0
-      console.log('🧹 TypeScript Tracking Worker 정리 완료')
+
+
+
     }
+    workerInitialized = false
+    pendingUpdates = 0
+
+    // 통계 초기화
+    workerStats.value = { ...DEFAULT_WORKER_STATS }
   }
 
   /**
@@ -582,7 +690,8 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
     }
 
     // ✅ Worker도 정리
-    cleanupTrackingWorker()
+
+    cleanupWorker()
   }
 
   /**
@@ -638,7 +747,8 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
     // ✅ Worker-related 액션들
     updateTrackingPath,
     clearTrackingPath,
-    cleanupTrackingWorker,
+
+    cleanupWorker,
     updateOffsetValues,
     updateTLEDisplayData,
   }
