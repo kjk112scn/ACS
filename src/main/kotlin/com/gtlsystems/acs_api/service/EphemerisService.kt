@@ -1,5 +1,6 @@
 package com.gtlsystems.acs_api.service
 
+import com.gtlsystems.acs_api.algorithm.axislimitangle.limitAngleCalcualte
 import com.gtlsystems.acs_api.algorithm.satellitetracker.impl.OrekitCalculator
 import com.gtlsystems.acs_api.model.GlobalData
 import com.gtlsystems.acs_api.model.SatelliteTrackingData
@@ -84,7 +85,7 @@ class EphemerisService(
             isDaemon = true
         }
     }
-
+    private val limitAngleCalculator = limitAngleCalcualte()
 
     @PostConstruct
     fun init() {
@@ -539,13 +540,46 @@ class EphemerisService(
             }
 
             logger.info("위성 궤도 추적 데이터 생성 완료: ${ephemerisTrackMst.size}개 스케줄 항목과 ${ephemerisTrackDtl.size}개 좌표 포인트")
+            logger.info("방위각 변환 시작 (0~360도 -> ±270도)")
+            val (convertedMst, convertedDtl) = limitAngleCalculator.convertTrackingData(ephemerisTrackMst, ephemerisTrackDtl)
+            logger.info("방위각 변환 완료")
+            // 변환 결과 검증
+            val validationResult = limitAngleCalculator.validateConversion(
+                ephemerisTrackMst, ephemerisTrackDtl, convertedMst, convertedDtl
+            )
 
+            if (validationResult.isValid) {
+                logger.info("✅ 방위각 변환 검증 성공")
+            } else {
+                logger.warn("⚠️ 방위각 변환 검증 이슈:")
+                validationResult.issues.forEach { issue ->
+                    logger.warn("  - $issue")
+                }
+            }
             // 저장소에 데이터 저장
             ephemerisTrackMstStorage.clear()
             ephemerisTrackDtlStorage.clear()
-            ephemerisTrackMstStorage.addAll(ephemerisTrackMst)
-            ephemerisTrackDtlStorage.addAll(ephemerisTrackDtl)
-            return Pair(ephemerisTrackMst, ephemerisTrackDtl)
+            //ephemerisTrackMstStorage.addAll(ephemerisTrackMst)
+            //ephemerisTrackDtlStorage.addAll(ephemerisTrackDtl)
+            ephemerisTrackMstStorage.addAll(convertedMst)
+            ephemerisTrackDtlStorage.addAll(convertedDtl)
+
+            // 변환 결과 로깅
+            convertedMst.forEach { mst ->
+                val mstId = mst["No"] as UInt
+                val originalStartAz = mst["OriginalStartAzimuth"] as? Double
+                val originalEndAz = mst["OriginalEndAzimuth"] as? Double
+                val convertedStartAz = mst["StartAzimuth"] as Double
+                val convertedEndAz = mst["EndAzimuth"] as Double
+
+                logger.info("패스 #$mstId 변환 결과:")
+                if (originalStartAz != null && originalEndAz != null) {
+                    logger.info("  원본: ${String.format("%.2f", originalStartAz)}° ~ ${String.format("%.2f", originalEndAz)}°")
+                }
+                logger.info("  변환: ${String.format("%.2f", convertedStartAz)}° ~ ${String.format("%.2f", convertedEndAz)}°")
+            }
+
+            return Pair(convertedMst, convertedDtl)
 
         } catch (e: Exception) {
             logger.error("위성 궤도 추적 중 오류 발생: ${e.message}", e)
@@ -588,7 +622,7 @@ class EphemerisService(
             logger.error("패스 ID {}에 해당하는 데이터를 찾을 수 없습니다", passId)
             return
         }
-        // ✅ 타이머 시작 (50ms 주기)
+        // ✅ 타이머 시작 (100ms 주기)
         startTimer()
         logger.info("✅ 위성 추적 및 타이머 시작 완료")
     }

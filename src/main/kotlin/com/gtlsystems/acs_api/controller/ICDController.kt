@@ -13,7 +13,6 @@ import java.util.BitSet
 
 @RestController
 @RequestMapping("/api/icd")
-@CrossOrigin(origins = ["http://localhost:9000"])
 class ICDController(private val udpFwICDService: UdpFwICDService) {
 
     private val logger = LoggerFactory.getLogger(ICDController::class.java)

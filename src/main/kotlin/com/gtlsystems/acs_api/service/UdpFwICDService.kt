@@ -93,6 +93,7 @@ class UdpFwICDService(
         logger.info("UDP 통신 서비스 초기화 시작")
         initializeUdpChannel()
     }
+
     /**
      * UDP 채널 초기화 및 실시간 통신 시작
      */
@@ -255,10 +256,12 @@ class UdpFwICDService(
                     logger.info("비상 모드 활성화 요청")
                     true
                 }
+
                 'S' -> {
                     logger.info("비상 모드 비활성화 요청")
                     false
                 }
+
                 else -> {
                     logger.error("유효하지 않은 비상 명령 문자: {}", commandChar)
                     throw IllegalArgumentException("유효하지 않은 명령 문자: $commandChar")
@@ -278,13 +281,13 @@ class UdpFwICDService(
             logger.info("Emergency 명령 전송 완료: {}:{}", firmwareIp, firmwarePort)
             logger.debug("Emergency 전송 데이터: {}", byteArrayToHexString(dataToSend))
         }
-        .subscribeOn(Schedulers.boundedElastic())
-        .subscribe(
-            { /* 성공 */ },
-            { error ->
-                logger.error("비상 명령 처리 오류: {}", error.message, error)
-            }
-        )
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe(
+                { /* 성공 */ },
+                { error ->
+                    logger.error("비상 명령 처리 오류: {}", error.message, error)
+                }
+            )
     }
 
     /**
@@ -318,13 +321,13 @@ class UdpFwICDService(
             logger.info("TimeOffset 명령 전송 완료: {}s", inputTimeOffset)
             logger.debug("TimeOffset 전송 데이터: {}", byteArrayToHexString(dataToSend))
         }
-        .subscribeOn(Schedulers.boundedElastic())
-        .subscribe(
-            { /* 성공 */ },
-            { error ->
-                logger.error("시간 오프셋 명령 처리 오류: {}", error.message, error)
-            }
-        )
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe(
+                { /* 성공 */ },
+                { error ->
+                    logger.error("시간 오프셋 명령 처리 오류: {}", error.message, error)
+                }
+            )
     }
 
     /**
@@ -357,13 +360,13 @@ class UdpFwICDService(
             logger.info("Manual 제어 명령 전송 완료: Az={}°, El={}°, Ti={}°", azAngle, elAngle, tiAngle)
             logger.debug("Manual 제어 전송 데이터: {}", byteArrayToHexString(dataToSend))
         }
-        .subscribeOn(Schedulers.boundedElastic())
-        .subscribe(
-            { /* 성공 */ },
-            { error ->
-                logger.error("수동 제어 명령 처리 오류: {}", error.message, error)
-            }
-        )
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe(
+                { /* 성공 */ },
+                { error ->
+                    logger.error("수동 제어 명령 처리 오류: {}", error.message, error)
+                }
+            )
     }
 
     /**
@@ -395,13 +398,13 @@ class UdpFwICDService(
             logger.info("Stop 명령 전송 완료")
             logger.debug("Stop 전송 데이터: {}", byteArrayToHexString(dataToSend))
         }
-        .subscribeOn(Schedulers.boundedElastic())
-        .subscribe(
-            { /* 성공 */ },
-            { error ->
-                logger.error("정지 명령 처리 오류: {}", error.message, error)
-            }
-        )
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe(
+                { /* 성공 */ },
+                { error ->
+                    logger.error("정지 명령 처리 오류: {}", error.message, error)
+                }
+            )
     }
 
     /**
@@ -431,13 +434,13 @@ class UdpFwICDService(
             logger.info("PositionOffset 명령 전송 완료: Az={}°, El={}°, Ti={}°", azOffset, elOffset, tiOffset)
             logger.debug("PositionOffset 전송 데이터: {}", byteArrayToHexString(dataToSend))
         }
-        .subscribeOn(Schedulers.boundedElastic())
-        .subscribe(
-            { /* 성공 */ },
-            { error ->
-                logger.error("위치 오프셋 명령 처리 오류: {}", error.message, error)
-            }
-        )
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe(
+                { /* 성공 */ },
+                { error ->
+                    logger.error("위치 오프셋 명령 처리 오류: {}", error.message, error)
+                }
+            )
     }
 
     /**
@@ -459,13 +462,13 @@ class UdpFwICDService(
             logger.info("FeedOnOff 명령 전송 완료")
             logger.debug("FeedOnOff 전송 데이터: {}", byteArrayToHexString(dataToSend))
         }
-        .subscribeOn(Schedulers.boundedElastic())
-        .subscribe(
-            { /* 성공 */ },
-            { error ->
-                logger.error("피드 On/Off 명령 처리 오류: {}", error.message, error)
-            }
-        )
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe(
+                { /* 성공 */ },
+                { error ->
+                    logger.error("피드 On/Off 명령 처리 오류: {}", error.message, error)
+                }
+            )
     }
 
     /**
@@ -495,14 +498,15 @@ class UdpFwICDService(
             logger.info("ServoPreset 명령 전송 완료")
             logger.debug("ServoPreset 전송 데이터: {}", byteArrayToHexString(dataToSend))
         }
-        .subscribeOn(Schedulers.boundedElastic())
-        .subscribe(
-            { /* 성공 */ },
-            { error ->
-                logger.error("서보 프리셋 명령 처리 오류: {}", error.message, error)
-            }
-        )
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe(
+                { /* 성공 */ },
+                { error ->
+                    logger.error("서보 프리셋 명령 처리 오류: {}", error.message, error)
+                }
+            )
     }
+
     fun writeNTPCommand() {
         Mono.fromCallable {
             val Time = GlobalData.Time.utcNow
@@ -531,35 +535,36 @@ class UdpFwICDService(
                     logger.error("기본 정보 명령 처리 오류: {}", error.message, error)
                 }
             )
+    }
+
+    /**
+     * 기본 정보 명령 - Mono 비동기 처리
+     */
+    fun defaultInfoCommand() {
+        Mono.fromCallable {
+            val utcTime = GlobalData.Time.utcNow
+            val setDataFrameInstance = ICDService.DefaultInfo.SetDataFrame(
+                cmd = 'W',
+                year = utcTime.year.toUShort(),
+                month = utcTime.month.value.toByte(),
+                day = utcTime.dayOfMonth.toByte(),
+                hour = utcTime.hour.toByte(),
+                minute = utcTime.minute.toByte(),
+                second = utcTime.second.toByte(),
+                ms = (utcTime.nano / 1000000).toUShort(),
+                timeOffset = GlobalData.Offset.TimeOffset,
+                azimuthOffset = GlobalData.Offset.azimuthPositionOffset,
+                elevationOffset = GlobalData.Offset.elevationPositionOffset,
+                tiltOffset = GlobalData.Offset.tiltPositionOffset,
+                crc16 = 0u
+            )
+
+            val dataToSend = setDataFrameInstance.setDataFrame()
+            channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
+
+            logger.info("DefaultInfo 명령 전송 완료")
+            logger.debug("DefaultInfo 전송 데이터: {}", byteArrayToHexString(dataToSend))
         }
-        /**
-         * 기본 정보 명령 - Mono 비동기 처리
-         */
-        fun defaultInfoCommand() {
-            Mono.fromCallable {
-                val utcTime = GlobalData.Time.utcNow
-                val setDataFrameInstance = ICDService.DefaultInfo.SetDataFrame(
-                    cmd = 'W',
-                    year = utcTime.year.toUShort(),
-                    month = utcTime.month.value.toByte(),
-                    day = utcTime.dayOfMonth.toByte(),
-                    hour = utcTime.hour.toByte(),
-                    minute = utcTime.minute.toByte(),
-                    second = utcTime.second.toByte(),
-                    ms = (utcTime.nano / 1000000).toUShort(),
-                    timeOffset = GlobalData.Offset.TimeOffset,
-                    azimuthOffset = GlobalData.Offset.azimuthPositionOffset,
-                    elevationOffset = GlobalData.Offset.elevationPositionOffset,
-                    tiltOffset = GlobalData.Offset.tiltPositionOffset,
-                    crc16 = 0u
-                )
-
-                val dataToSend = setDataFrameInstance.setDataFrame()
-                channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
-
-                logger.info("DefaultInfo 명령 전송 완료")
-                logger.debug("DefaultInfo 전송 데이터: {}", byteArrayToHexString(dataToSend))
-            }
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe(
                 { /* 성공 */ },
@@ -663,40 +668,40 @@ class UdpFwICDService(
             stowTiltCommand(tiltAxis, stowTiltAngle, stowTiltSpeed)
             logger.info("Stow 1단계: 틸트 축 제어 명령 전송 완료")
         }
-        .subscribeOn(Schedulers.boundedElastic())
-        .delayElement(Duration.ofMillis(100)) // 명령 전송 후 잠시 대기
-        .flatMap {
-            // 2단계: 틸트 안정화 대기
-            logger.info("Stow 2단계: 틸트 안정화 대기 시작 (목표: {}°)", stowTiltAngle)
-            waitForTiltStabilization(stowTiltAngle)
-        }
-        .flatMap {
-            // 3단계: 방위각/고도각 제어
-            logger.info("Stow 3단계: 방위각/고도각 제어 시작")
-            val azElAxis = BitSet().apply {
-                set(0) // 방위각 축
-                set(1) // 고도각 축
-                set(7) // STOW 비트
-            }
-
-            Mono.fromCallable {
-                stowAzElCommand(
-                    azElAxis,
-                    stowAzimuthAngle, stowAzimuthSpeed,
-                    stowElevationAngle, stowElevationSpeed
-                )
-                logger.info("Stow 방위각/고도각 제어 명령 전송 완료")
-            }
             .subscribeOn(Schedulers.boundedElastic())
-        }
-        .subscribe(
-            {
-                logger.info("Stow 명령 완료")
-            },
-            { error ->
-                logger.error("Stow 명령 실패: {}", error.message, error)
+            .delayElement(Duration.ofMillis(100)) // 명령 전송 후 잠시 대기
+            .flatMap {
+                // 2단계: 틸트 안정화 대기
+                logger.info("Stow 2단계: 틸트 안정화 대기 시작 (목표: {}°)", stowTiltAngle)
+                waitForTiltStabilization(stowTiltAngle)
             }
-        )
+            .flatMap {
+                // 3단계: 방위각/고도각 제어
+                logger.info("Stow 3단계: 방위각/고도각 제어 시작")
+                val azElAxis = BitSet().apply {
+                    set(0) // 방위각 축
+                    set(1) // 고도각 축
+                    set(7) // STOW 비트
+                }
+
+                Mono.fromCallable {
+                    stowAzElCommand(
+                        azElAxis,
+                        stowAzimuthAngle, stowAzimuthSpeed,
+                        stowElevationAngle, stowElevationSpeed
+                    )
+                    logger.info("Stow 방위각/고도각 제어 명령 전송 완료")
+                }
+                    .subscribeOn(Schedulers.boundedElastic())
+            }
+            .subscribe(
+                {
+                    logger.info("Stow 명령 완료")
+                },
+                { error ->
+                    logger.error("Stow 명령 실패: {}", error.message, error)
+                }
+            )
     }
 
     /**
@@ -727,8 +732,10 @@ class UdpFwICDService(
                             logger.info("틸트 안정화 완료: 현재={}°, 목표={}°", currentAngle, targetAngle)
                             sink.success("stabilized")
                         } else {
-                            logger.debug("틸트 안정화 중: 현재={}°, 목표={}°, 차이={}°",
-                                currentAngle, targetAngle, Math.abs(currentAngle - targetAngle))
+                            logger.debug(
+                                "틸트 안정화 중: 현재={}°, 목표={}°, 차이={}°",
+                                currentAngle, targetAngle, Math.abs(currentAngle - targetAngle)
+                            )
 
                             // 100ms 후 다시 체크
                             Mono.delay(Duration.ofMillis(100))
@@ -814,8 +821,10 @@ class UdpFwICDService(
             val dataToSend = setDataFrameInstance.setDataFrame()
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
-            logger.info("Stow 방위각/고도각 제어: Az={}°({}°/s), El={}°({}°/s)",
-                azAngle, azSpeed, elAngle, elSpeed)
+            logger.info(
+                "Stow 방위각/고도각 제어: Az={}°({}°/s), El={}°({}°/s)",
+                azAngle, azSpeed, elAngle, elSpeed
+            )
             logger.debug("Stow 방위각/고도각 제어 전송 데이터: {}", byteArrayToHexString(dataToSend))
 
         } catch (e: Exception) {
@@ -853,8 +862,8 @@ class UdpFwICDService(
      */
     fun isCommunicationHealthy(): Boolean {
         return isUdpRunning.get() &&
-               ::channel.isInitialized &&
-               channel.isOpen
+                ::channel.isInitialized &&
+                channel.isOpen
     }
 
     /**
@@ -1008,11 +1017,11 @@ class UdpFwICDService(
             logger.info("테스트 명령 전송 완료")
             logger.debug("테스트 명령 전송 데이터: {}", byteArrayToHexString(dataToSend))
         }
-        .subscribeOn(Schedulers.boundedElastic())
-        .subscribe(
-            { logger.info("테스트 명령 성공") },
-            { error -> logger.error("테스트 명령 실패: {}", error.message, error) }
-        )
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe(
+                { logger.info("테스트 명령 성공") },
+                { error -> logger.error("테스트 명령 실패: {}", error.message, error) }
+            )
     }
 
     /**
@@ -1037,11 +1046,11 @@ class UdpFwICDService(
 
             logger.info("강제 재연결 완료")
         }
-        .subscribeOn(Schedulers.boundedElastic())
-        .subscribe(
-            { /* 성공 */ },
-            { error -> logger.error("강제 재연결 실패: {}", error.message, error) }
-        )
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe(
+                { /* 성공 */ },
+                { error -> logger.error("강제 재연결 실패: {}", error.message, error) }
+            )
     }
 
     /**

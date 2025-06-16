@@ -10,11 +10,9 @@ import reactor.core.publisher.Mono
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = ["http://localhost:9000"]) // 프론트엔드 도메인 허용
 class SunTrackController {
     @RestController
     @RequestMapping("/api/sun-track") // 새로운 API 경로 설정 (선택 사항)
-    @CrossOrigin(origins = ["http://localhost:9000"]) // 프론트엔드 도메인 허용
     class SunTracking(private val sunTrackService: SunTrackService) {
 
         // POST 요청 처리 (Sun Track Start UDP 명령 전송) - APIController에서 이동

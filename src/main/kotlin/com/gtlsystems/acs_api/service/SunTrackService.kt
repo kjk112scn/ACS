@@ -55,7 +55,7 @@ class SunTrackService(
                     },
                     { error -> println("태양 추적 중지 이벤트 구독 중 오류 발생: ${error.message}") }
                 )
-            SolarOrekitData()
+            //SolarOrekitData()
             //ElevationCheck()
         } catch (e: Exception) {
             println("이벤트 버스 구독 설정 중 오류 발생: ${e.message}")
@@ -77,19 +77,19 @@ class SunTrackService(
     fun SolarOrekitData()
     {
         // GTL 지상국 설정 (altitude는 m단위)
-        solarOrekitCalculator.initializeGroundStation(GlobalData.Location.latitude, GlobalData.Location.longitude,30.0)
+        solarOrekitCalculator.initializeGroundStation(GlobalData.Location.latitude, GlobalData.Location.longitude,0.0)
         // 현재 태양 위치
         val currentPosition = solarOrekitCalculator.getCurrentSunPosition()
         println("Current sun position: $currentPosition")
 
         // 오늘 UTC 00시부터 24시간 예측 (1시간 간격)
-        //val todayMidnightUTC = LocalDate.now(ZoneOffset.UTC).atStartOfDay() // UTC 기준 오늘 00:00:00
-        val todayMidnightUTC = LocalDate.of(2025,6,3).atStartOfDay() // UTC 기준 오늘 00:00:00
+        val todayMidnightUTC = LocalDate.now(ZoneOffset.UTC).atStartOfDay() // UTC 기준 오늘 00:00:00
+        //val todayMidnightUTC = LocalDate.of(2025,6,3).atStartOfDay() // UTC 기준 오늘 00:00:00
         val tomorrowMidnightUTC = todayMidnightUTC.plusDays(1)              // UTC 기준 내일 00:00:00
 
         println("Calculation period: ${todayMidnightUTC} UTC to ${tomorrowMidnightUTC} UTC")
 
-        val predictions = solarOrekitCalculator.predictSunPositions(todayMidnightUTC, tomorrowMidnightUTC, 60.0)
+        val predictions = solarOrekitCalculator.predictSunPositions(todayMidnightUTC, tomorrowMidnightUTC, 0.01)
 
         println("\nSun tracking predictions (UTC time):")
         predictions.forEach {

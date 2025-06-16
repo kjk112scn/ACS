@@ -6,20 +6,148 @@ import com.gtlsystems.acs_api.service.EphemerisService
 import com.gtlsystems.acs_api.service.ICDService
 import com.gtlsystems.acs_api.service.UdpFwICDService
 import org.slf4j.LoggerFactory
+import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import reactor.core.publisher.Mono
+import java.io.ByteArrayOutputStream
+import java.io.OutputStreamWriter
 import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+
+// ✅ 추가 필요한 import들
+import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
+import java.nio.charset.StandardCharsets
 
 @RestController
 @RequestMapping("/api/ephemeris")
-@CrossOrigin(origins = ["http://localhost:9000"])
 class EphemerisController(
     private val orekitCalculator: OrekitCalculator,
     private val ephemerisService: EphemerisService
 )
 {
     private val logger = LoggerFactory.getLogger(EphemerisController::class.java)
+
+    /**
+     * 실시간 추적 데이터 조회 (JSON)
+     */
+    @GetMapping("/realtime-data")
+    fun getRealtimeTrackingData(): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            val realtimeData = ephemerisService.getRealtimeTrackingData()
+            val stats = ephemerisService.getRealtimeTrackingStats()
+
+            mapOf(
+                "totalCount" to realtimeData.size,
+                "data" to realtimeData,
+                "statistics" to stats
+            )
+        }
+    }
+
+    /**
+     * 최근 N개의 실시간 추적 데이터 조회 (JSON)
+     */
+    @GetMapping("/realtime-data/recent")
+    fun getRecentRealtimeTrackingData(@RequestParam(defaultValue = "100") count: Int): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            val recentData = ephemerisService.getRecentRealtimeTrackingData(count)
+            val stats = ephemerisService.getRealtimeTrackingStats()
+
+            mapOf(
+                "requestedCount" to count,
+                "actualCount" to recentData.size,
+                "data" to recentData,
+                "statistics" to stats
+            )
+        }
+    }
+
+    /**
+     * 실시간 추적 데이터를 CSV 파일로 다운로드
+     */
+    @GetMapping("/tracking/realtime-data/csv")
+    fun downloadRealtimeTrackingDataCsv(): Mono<ResponseEntity<ByteArrayResource>> {
+        return Mono.fromCallable {
+            val realtimeData = ephemerisService.getRealtimeTrackingData()
+
+            if (realtimeData.isEmpty()) {
+                return@fromCallable ResponseEntity.noContent()
+                    .header("X-Message", "실시간 추적 데이터가 없습니다")
+                    .build<ByteArrayResource>()
+            }
+
+            // CSV 데이터 생성
+            val csvData = generateRealtimeTrackingCsv(realtimeData)
+            val resource = ByteArrayResource(csvData)
+
+            // 파일명 생성 (현재 시간 포함)
+            val timestamp = java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+            val filename = "realtime_tracking_data_${timestamp}.csv"
+
+            ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"$filename\"")
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .contentLength(csvData.size.toLong())
+                .body(resource)
+        }
+    }
+
+    /**
+     * 최근 N개의 실시간 추적 데이터를 CSV 파일로 다운로드
+     */
+    @GetMapping("/realtime-data/csv/recent")
+    fun downloadRecentRealtimeTrackingDataCsv(@RequestParam(defaultValue = "1000") count: Int): Mono<ResponseEntity<ByteArrayResource>> {
+        return Mono.fromCallable {
+            val recentData = ephemerisService.getRecentRealtimeTrackingData(count)
+
+            if (recentData.isEmpty()) {
+                return@fromCallable ResponseEntity.noContent()
+                    .header("X-Message", "실시간 추적 데이터가 없습니다")
+                    .build<ByteArrayResource>()
+            }
+
+            // CSV 데이터 생성
+            val csvData = generateRealtimeTrackingCsv(recentData)
+            val resource = ByteArrayResource(csvData)
+
+            // 파일명 생성
+            val timestamp = java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+            val filename = "recent_tracking_data_${count}_${timestamp}.csv"
+
+            ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"$filename\"")
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .contentLength(csvData.size.toLong())
+                .body(resource)
+        }
+    }
+
+    /**
+     * 실시간 추적 통계 정보 조회
+     */
+    @GetMapping("/realtime-stats")
+    fun getRealtimeTrackingStats(): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            ephemerisService.getRealtimeTrackingStats()
+        }
+    }
+
+    /**
+     * 실시간 추적 데이터 초기화
+     */
+    @PostMapping("/realtime-data/clear")
+    fun clearRealtimeTrackingData(): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            ephemerisService.clearRealtimeTrackingData()
+            mapOf(
+                "message" to "실시간 추적 데이터가 초기화되었습니다",
+                "status" to "cleared"
+            )
+        }
+    }
+
     @PostMapping("/set-current-tracking-pass-id")
     fun setCurrentTrackingPassId(@RequestParam passId: UInt?): ResponseEntity<Map<String, String>> {
         return try {
@@ -108,7 +236,7 @@ class EphemerisController(
     /**
      * TLE 데이터로 위성 궤도 추적 데이터를 생성합니다.
      */
-    @PostMapping("/generate")
+    @PostMapping("/tracking/generate")
     fun generateEphemerisTrack(@RequestBody request: EphemerisTrackRequest): Mono<Map<String, Any>> {
         return ephemerisService.generateEphemerisDesignationTrackAsync(
             request.tleLine1,
@@ -155,7 +283,7 @@ class EphemerisController(
      * 위성 추적을 시작합니다.
      * 헤더 정보 전송 및 초기 추적 데이터 전송을 수행합니다.
      */
-    @PostMapping("/start/{passId}")
+    @PostMapping("/tracking/start/{passId}")
     fun startEphemerisTracking(@PathVariable passId: UInt): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             // 위성 추적 시작 (헤더 정보 전송)
@@ -210,7 +338,68 @@ class EphemerisController(
         }
     }
 }
+/**
+ * CSV 데이터 생성 헬퍼 메서드
+ */
+private fun generateRealtimeTrackingCsv(data: List<Map<String, Any?>>): ByteArray {
+    val outputStream = ByteArrayOutputStream()
+    val writer = OutputStreamWriter(outputStream, StandardCharsets.UTF_8)
 
+    try {
+        // UTF-8 BOM 추가 (Excel에서 한글 깨짐 방지)
+        outputStream.write(0xEF)
+        outputStream.write(0xBB)
+        outputStream.write(0xBF)
+
+        // CSV 헤더 작성
+        val headers = listOf(
+            "Index", "Timestamp", "PassId", "ElapsedTime(s)",
+            "CmdAzimuth(°)", "CmdElevation(°)",
+            "TrackingAzimuthTime", "TrackingCMDAzimuth(°)", "TrackingActualAzimuth(°)",
+            "TrackingElevationTime", "TrackingCMDElevation(°)", "TrackingActualElevation(°)",
+            "TrackingTiltTime", "TrackingCMDTilt(°)", "TrackingActualTilt(°)",
+            "AzimuthError(°)", "ElevationError(°)"
+        )
+
+        writer.write(headers.joinToString(","))
+        writer.write("\n")
+
+        // 데이터 행 작성
+        val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
+
+        data.forEach { record ->
+            val row = listOf(
+                record["index"]?.toString() ?: "",
+                (record["timestamp"] as? java.time.ZonedDateTime)?.format(dateFormatter) ?: "",
+                record["passId"]?.toString() ?: "",
+                String.format("%.3f", record["elapsedTimeSeconds"] as? Float ?: 0.0f),
+                String.format("%.6f", record["cmdAz"] as? Float ?: 0.0f),
+                String.format("%.6f", record["cmdEl"] as? Float ?: 0.0f),
+                record["trackingAzimuthTime"]?.toString() ?: "",
+                String.format("%.6f", record["trackingCMDAzimuthAngle"] as? Float ?: 0.0f),
+                String.format("%.6f", record["trackingActualAzimuthAngle"] as? Float ?: 0.0f),
+                record["trackingElevationTime"]?.toString() ?: "",
+                String.format("%.6f", record["trackingCMDElevationAngle"] as? Float ?: 0.0f),
+                String.format("%.6f", record["trackingActualElevationAngle"] as? Float ?: 0.0f),
+                record["trackingTiltTime"]?.toString() ?: "",
+                String.format("%.6f", record["trackingCMDTiltAngle"] as? Float ?: 0.0f),
+                String.format("%.6f", record["trackingActualTiltAngle"] as? Float ?: 0.0f),
+                String.format("%.6f", record["azimuthError"] as? Float ?: 0.0f),
+                String.format("%.6f", record["elevationError"] as? Float ?: 0.0f)
+            )
+
+            writer.write(row.joinToString(","))
+            writer.write("\n")
+        }
+
+        writer.flush()
+        return outputStream.toByteArray()
+
+    } finally {
+        writer.close()
+        outputStream.close()
+    }
+}
 /**
  * 위성 위치 요청 모델
  */

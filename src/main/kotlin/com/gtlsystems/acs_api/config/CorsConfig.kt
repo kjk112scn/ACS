@@ -1,23 +1,29 @@
+package com.gtlsystems.acs_api.config
+
+import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.reactive.CorsWebFilter
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource
-import org.springframework.web.reactive.config.CorsRegistry
-import org.springframework.web.reactive.config.WebFluxConfigurer
 
 @Configuration
 class CorsConfig {
 
+    private val logger = LoggerFactory.getLogger(CorsConfig::class.java)
+
     @Bean
     fun corsWebFilter(): CorsWebFilter {
+        logger.info("🚀 WebFlux CORS 설정 초기화 중...")
+
         val corsConfig = CorsConfiguration().apply {
             // 허용할 Origin 설정
             allowedOriginPatterns = listOf(
                 "http://localhost:9000",
                 "http://127.0.0.1:9000",
-                "http://localhost:*",  // 개발 환경용
-                "http://127.0.0.1:*"   // 개발 환경용
+                "http://localhost:*",
+                "http://127.0.0.1:*",
+                "*"
             )
 
             // 허용할 HTTP 메서드
@@ -47,6 +53,7 @@ class CorsConfig {
             registerCorsConfiguration("/**", corsConfig)
         }
 
+        logger.info("✅ WebFlux CORS 설정 완료!")
         return CorsWebFilter(source)
     }
 }
