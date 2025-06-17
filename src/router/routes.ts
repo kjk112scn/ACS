@@ -53,7 +53,10 @@ const routes: RouteRecordRaw[] = [
             path: 'ephemeris',
             component: () => import('pages/mode/EphemerisDesignationPage.vue'),
           },
-
+          {
+            path: 'pass-schedule',
+            component: () => import('pages/mode/PassSchedulePage.vue'),
+          },
           {
             path: 'suntrack',
             component: () => import('pages/mode/SunTrackPage.vue'),

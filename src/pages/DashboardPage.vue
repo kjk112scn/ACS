@@ -292,6 +292,11 @@
             label="Ephemeris Designation"
             @click="navigateToMode('ephemeris')"
           />
+          <q-tab
+            name="pass-schedule"
+            label="Pass Schedule"
+            @click="navigateToMode('pass-schedule')"
+          />
           <q-tab name="suntrack" label="Sun Track" @click="navigateToMode('suntrack')" />
           <q-tab name="feed" label="Feed" @click="navigateToMode('feed')" />
         </q-tabs>
