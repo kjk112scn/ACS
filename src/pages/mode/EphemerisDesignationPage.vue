@@ -659,9 +659,198 @@ const downloadCSV = (data: RealtimeTrackingDataItem[]) => {
 const timeRemaining = ref(0)
 let timeUpdateTimer: number | null = null
 
-/* const lastTrackingPathLength = 0
-const lastTrackingPathUpdate = 0 */
+// ✅ 성능 모니터링 시스템
+// ✅ TypeScript 안전한 성능 모니터링 시스템
+class PerformanceMonitor {
+  private frameTimings: number[] = []
+  private gcDetectionThreshold = 50
+  private lastFrameTime = 0
+  private stats = {
+    totalFrames: 0,
+    gcSuspectedFrames: 0,
+    averageFrameTime: 0,
+    maxFrameTime: 0,
+    memorySnapshots: [] as Array<{
+      timestamp: number
+      used: string
+      total: string
+      frameCount: number
+    }>,
+  }
 
+  measureFrame(callback: () => void) {
+    const startTime = performance.now()
+
+    callback()
+
+    const endTime = performance.now()
+    const frameTime = endTime - startTime
+
+    this.frameTimings.push(frameTime)
+    if (this.frameTimings.length > 100) {
+      this.frameTimings.shift()
+    }
+
+    this.stats.totalFrames++
+    this.stats.maxFrameTime = Math.max(this.stats.maxFrameTime, frameTime)
+    this.stats.averageFrameTime =
+      this.frameTimings.reduce((a, b) => a + b, 0) / this.frameTimings.length
+
+    if (frameTime > this.gcDetectionThreshold) {
+      this.stats.gcSuspectedFrames++
+      console.warn(`🐌 느린 프레임 감지: ${frameTime.toFixed(2)}ms`, {
+        메모리: this.getMemoryInfo(),
+        프레임비율: `${this.stats.gcSuspectedFrames}/${this.stats.totalFrames}`,
+        평균프레임시간: this.stats.averageFrameTime.toFixed(2) + 'ms',
+      })
+    }
+
+    if (this.stats.totalFrames % 100 === 0) {
+      this.takeMemorySnapshot()
+    }
+  }
+
+  private getMemoryInfo(): { used: string; total: string } | null {
+    // ✅ performance.memory 타입 체크
+    if ('memory' in performance && performance.memory) {
+      const memory = performance.memory as {
+        usedJSHeapSize: number
+        totalJSHeapSize: number
+        jsHeapSizeLimit: number
+      }
+
+      return {
+        used: Math.round(memory.usedJSHeapSize / 1024 / 1024) + 'MB',
+        total: Math.round(memory.totalJSHeapSize / 1024 / 1024) + 'MB',
+      }
+    }
+    return null
+  }
+
+  private takeMemorySnapshot() {
+    const memInfo = this.getMemoryInfo()
+    if (memInfo) {
+      this.stats.memorySnapshots.push({
+        timestamp: Date.now(),
+        ...memInfo,
+        frameCount: this.stats.totalFrames,
+      })
+
+      if (this.stats.memorySnapshots.length > 10) {
+        this.stats.memorySnapshots.shift()
+      }
+
+      if (this.stats.memorySnapshots.length >= 3) {
+        const recent = this.stats.memorySnapshots.slice(-3)
+        const memoryTrend = recent.map((s) => parseInt(s.used))
+        const isIncreasing = memoryTrend.every(
+          (val, i) => i === 0 || val >= (memoryTrend[i - 1] ?? 0),
+        )
+
+        if (isIncreasing) {
+          console.warn('📈 메모리 지속 증가 감지:', memoryTrend)
+        }
+      }
+    }
+  }
+
+  getReport() {
+    return {
+      ...this.stats,
+      gcSuspectedRatio:
+        ((this.stats.gcSuspectedFrames / this.stats.totalFrames) * 100).toFixed(2) + '%',
+    }
+  }
+}
+
+const perfMonitor = new PerformanceMonitor()
+
+// ✅ 객체 풀링으로 GC 압박 최소화
+// ✅ TypeScript 안전한 차트 업데이트 풀
+class ChartUpdatePool {
+  private positionData: [number, number][] = [[0, 0]]
+  private trackingData: [number, number][] = []
+  private updateOption: {
+    series: Array<{ data?: [number, number][] }>
+  }
+
+  constructor() {
+    this.updateOption = {
+      series: [{ data: this.positionData }, {}, { data: this.trackingData }, {}],
+    }
+  }
+
+  updatePosition(elevation: number, azimuth: number) {
+    // ✅ 배열 존재 확인
+    if (this.positionData.length > 0 && this.positionData[0]) {
+      this.positionData[0][0] = elevation
+      this.positionData[0][1] = azimuth
+    } else {
+      this.positionData = [[elevation, azimuth]]
+      // 시리즈 데이터 참조 업데이트
+      if (this.updateOption.series[0]) {
+        this.updateOption.series[0].data = this.positionData
+      }
+    }
+    return this.updateOption
+  }
+
+  updateTrackingPath(newPath: [number, number][]) {
+    // ✅ 안전한 배열 업데이트
+    this.trackingData.length = 0
+    if (Array.isArray(newPath)) {
+      this.trackingData.push(...newPath)
+    }
+    return this.updateOption
+  }
+}
+
+const chartPool = new ChartUpdatePool()
+
+// ✅ 최적화된 차트 업데이트
+// ✅ 안전한 차트 업데이트
+const updateChart = () => {
+  if (!chart) {
+    console.error('차트가 초기화되지 않았습니다.')
+    return
+  }
+
+  perfMonitor.measureFrame(() => {
+    try {
+      const azimuth = parseFloat(icdStore.azimuthAngle) || 0
+      const elevation = parseFloat(icdStore.elevationAngle) || 0
+
+      const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
+      const normalizedEl = Math.max(0, Math.min(90, elevation))
+
+      // ✅ 안전한 속성 업데이트
+      if (currentPosition.value) {
+        currentPosition.value.azimuth = azimuth
+        currentPosition.value.elevation = elevation
+        currentPosition.value.date = date.formatDate(new Date(), 'YYYY/MM/DD')
+        currentPosition.value.time = date.formatDate(new Date(), 'HH:mm:ss')
+      }
+
+      // ✅ 안전한 상태 체크
+      if (icdStore.ephemerisStatusInfo?.isActive === true) {
+        void ephemerisStore.updateTrackingPath(azimuth, elevation)
+      }
+
+      // ✅ 안전한 차트 옵션 업데이트
+      const option = chartPool.updatePosition(normalizedEl, normalizedAz)
+      if (ephemerisStore.trackingPath?.sampledPath) {
+        chartPool.updateTrackingPath(ephemerisStore.trackingPath.sampledPath as [number, number][])
+      }
+
+      // ✅ 차트가 여전히 존재하는지 확인
+      if (chart && !chart.isDisposed()) {
+        chart.setOption(option, false, true)
+      }
+    } catch (error) {
+      console.error('차트 업데이트 중 오류 발생:', error)
+    }
+  })
+}
 // ✅ 차트 초기화 함수 수정
 const initChart = () => {
   if (!chartRef.value) return
@@ -866,7 +1055,7 @@ const initChart = () => {
 } */
 
 // ✅ updateChart 함수 - 비동기 Worker 활용
-const updateChart = () => {
+/* const updateChart = () => {
   if (!chart) {
     console.error('차트가 초기화되지 않았습니다.')
     return
@@ -914,7 +1103,7 @@ const updateChart = () => {
     console.error('차트 업데이트 중 오류 발생:', error)
   }
 }
-
+ */
 // 궤적 라인을 차트에 추가하는 함수@
 const updateChartWithTrajectory = (data: TrajectoryPoint[]) => {
   if (!chart) {

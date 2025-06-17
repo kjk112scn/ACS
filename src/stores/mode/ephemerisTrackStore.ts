@@ -52,7 +52,6 @@ interface TrackingPath {
   sampledPath: [number, number][]
   lastUpdateTime: number
 }
-
 export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
   // ===== 상태 정의 =====
   const masterData = ref<ScheduleItem[]>([])
@@ -90,7 +89,6 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
   let workerInitialized = false
   let pendingUpdates = 0
   const maxPendingUpdates = 5
-
 
   // ✅ Worker 통계 상태에 currentPathPoints 추가
   const workerStats = ref({
@@ -147,13 +145,36 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
         try {
           const { azimuth, elevation, currentPath, maxPoints, threshold } = e.data
 
+          // ✅ 입력 데이터 검증 강화
+          if (typeof azimuth !== 'number' || isNaN(azimuth) || !isFinite(azimuth)) {
+            throw new Error('Invalid azimuth value: ' + azimuth)
+          }
+
+          if (typeof elevation !== 'number' || isNaN(elevation) || !isFinite(elevation)) {
+            throw new Error('Invalid elevation value: ' + elevation)
+          }
+
+          if (!Array.isArray(currentPath)) {
+            throw new Error('currentPath is not an array: ' + typeof currentPath)
+          }
+
+          // ✅ 배열 데이터 정제
+          const safePath = currentPath.filter(point => {
+            return Array.isArray(point) &&
+                   point.length === 2 &&
+                   typeof point[0] === 'number' &&
+                   typeof point[1] === 'number' &&
+                   !isNaN(point[0]) && !isNaN(point[1]) &&
+                   isFinite(point[0]) && isFinite(point[1])
+          })
+
           // 정규화
           const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
           const normalizedEl = Math.max(0, Math.min(90, elevation))
           const newPoint = [normalizedEl, normalizedAz]
 
           // 경로 업데이트
-          const updatedPath = [...currentPath]
+          const updatedPath = [...safePath]
 
           // 중복 체크
           if (updatedPath.length > 0) {
@@ -180,9 +201,9 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
           updatedPath.push(newPoint)
 
           // 크기 제한
-          if (updatedPath.length > maxPoints) {
-            updatedPath.splice(0, updatedPath.length - maxPoints)
-          }
+          //if (updatedPath.length > maxPoints) {
+          //  updatedPath.splice(0, updatedPath.length - maxPoints)
+          //}
 
           const processingTime = performance.now() - startTime
 
@@ -220,25 +241,15 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
       // ✅ 인라인 Worker 생성
       trackingWorker = createInlineWorker()
 
-
-
-
-
-
-
-
-
       // ✅ Worker 준비 완료 대기
       await new Promise<void>((resolve, reject) => {
         const initTimeout = setTimeout(() => {
-
           reject(new Error('Worker 초기화 타임아웃'))
         }, 5000)
 
         let isInitialized = false
 
         trackingWorker!.onmessage = (e: MessageEvent<WorkerResponse>) => {
-
           if (!isInitialized) {
             clearTimeout(initTimeout)
             isInitialized = true
@@ -246,29 +257,20 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
             resolve()
           }
 
-
-
           const { updatedPath, processingTime, pointsAdded, totalPoints, error } = e.data
-
-
 
           pendingUpdates = Math.max(0, pendingUpdates - 1)
 
           if (error) {
-
             console.error('🚫 Worker 오류:', error)
             workerStats.value.errors++
             return
           }
 
-
           // 상태 업데이트
           trackingPath.value.rawPath = updatedPath
           trackingPath.value.sampledPath = updatedPath
           trackingPath.value.lastUpdateTime = Date.now()
-
-
-
 
           // 통계 업데이트
           workerStats.value.totalUpdates++
@@ -278,10 +280,6 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
           workerStats.value.pointsAdded += pointsAdded
           workerStats.value.currentPathPoints = totalPoints
           workerStats.value.lastUpdateTime = Date.now()
-
-
-
-
 
           // 100번마다 통계 출력
           if (workerStats.value.totalUpdates % 100 === 0) {
@@ -295,18 +293,6 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
               오류수: workerStats.value.errors,
             })
           }
-
-
-
-
-
-
-
-
-
-
-
-
         }
 
         trackingWorker!.onerror = (error: ErrorEvent) => {
@@ -319,20 +305,17 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
           reject(new Error(`Worker 오류: ${error.message}`))
         }
 
-
         // 초기화 테스트 메시지
         trackingWorker!.postMessage({
           azimuth: 0,
           elevation: 0,
           currentPath: [],
-          maxPoints: 1,
+          maxPoints: Number.MAX_SAFE_INTEGER,
           threshold: 0.1,
-
         })
       })
 
       workerInitialized = true
-
 
       console.log('✅ 인라인 Worker 초기화 완료')
     } catch (error) {
@@ -343,12 +326,19 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
   }
 
   /**
-   * ✅ 추적 경로 업데이트 (비동기 최적화의 핵심)
+
+   * ✅ 추적 경로 업데이트 (비동기 최적화의 핵심) - 수정된 버전
    */
   const updateTrackingPath = async (azimuth: number, elevation: number): Promise<void> => {
     // ✅ 입력 검증
     if (typeof azimuth !== 'number' || typeof elevation !== 'number') {
       console.warn('🚫 잘못된 입력 타입:', { azimuth, elevation })
+      return
+    }
+
+    // ✅ NaN 체크 추가
+    if (isNaN(azimuth) || isNaN(elevation)) {
+      console.warn('🚫 NaN 값 감지:', { azimuth, elevation })
       return
     }
 
@@ -388,17 +378,38 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
       }
     }
 
-    // ✅ Worker에 비동기 처리 요청
-    const message: WorkerMessage = {
-      azimuth,
-      elevation,
-      currentPath: [...currentPath], // 깊은 복사로 안전성 보장
-      maxPoints: 150,
-      threshold: 0.3,
-    }
+    try {
+      // ✅ 안전한 데이터 준비 (직렬화 가능한 형태로 변환)
+      const safeCurrentPath: [number, number][] = currentPath
+        .filter((point) => Array.isArray(point) && point.length === 2)
+        .map((point) => [Number(point[0]) || 0, Number(point[1]) || 0] as [number, number])
+        .filter((point) => !isNaN(point[0]) && !isNaN(point[1]))
 
-    pendingUpdates++
-    trackingWorker.postMessage(message)
+      // ✅ Worker에 비동기 처리 요청 - 안전한 메시지 생성
+      const message: WorkerMessage = {
+        azimuth: Number(azimuth),
+        elevation: Number(elevation),
+        currentPath: safeCurrentPath, // 정제된 안전한 데이터
+        maxPoints: 150,
+        threshold: 0.3,
+      }
+
+      // ✅ 메시지 직렬화 테스트
+      try {
+        JSON.stringify(message)
+      } catch (serializeError) {
+        console.error('🚫 메시지 직렬화 실패:', serializeError)
+        fallbackUpdatePath(azimuth, elevation)
+        return
+      }
+
+      pendingUpdates++
+      trackingWorker.postMessage(message)
+    } catch (error) {
+      console.error('🚫 Worker 메시지 전송 실패:', error)
+      pendingUpdates = Math.max(0, pendingUpdates - 1)
+      fallbackUpdatePath(azimuth, elevation)
+    }
   }
 
   /**
@@ -427,9 +438,9 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
       currentPath.push(currentPoint)
 
       // 크기 제한
-      if (currentPath.length > 150) {
+      /*      if (currentPath.length > 150) {
         currentPath.splice(0, currentPath.length - 150)
-      }
+      } */
 
       // 상태 업데이트
       trackingPath.value.rawPath = currentPath
@@ -452,7 +463,6 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
 
   const cleanupWorker = () => {
     if (trackingWorker) {
-
       // ✅ Blob URL 해제 (메모리 누수 방지)
       try {
         trackingWorker.terminate()
@@ -460,9 +470,6 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
         console.warn('Worker 종료 중 오류:', error)
       }
       trackingWorker = null
-
-
-
     }
     workerInitialized = false
     pendingUpdates = 0

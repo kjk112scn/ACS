@@ -309,7 +309,7 @@ const handleGoCommand = async () => {
     const tiltSpeed = parseFloat(speedInputs.value.tilt) || 0.0
 
     // 기본 interval 값 (밀리초 단위, 필요에 따라 조정)
-    const interval = 100 // 1초
+    const interval = 1000 // 1초
 
     // Sun Track 시작 API 호출
     await icdStore.startSunTrack(interval, azimuthSpeed, elevationSpeed, tiltSpeed)

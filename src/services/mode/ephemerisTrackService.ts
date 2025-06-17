@@ -160,7 +160,7 @@ class EphemerisTrackService {
       if (!request.tleLine1 || !request.tleLine2) {
         throw new Error('TLE 데이터가 유효하지 않습니다')
       }
-      const response = await api.post('/ephemeris/generate', request)
+      const response = await api.post('/ephemeris/tracking/generate', request)
       return response.data
     } catch (error) {
       return this.handleApiError(error, '위성 궤도 추적 데이터 생성에 실패했습니다')
@@ -200,7 +200,9 @@ class EphemerisTrackService {
       const response = await api.get('/ephemeris/master')
       return response.data || []
     } catch (error) {
-      return this.handleApiError(error, '마스터 데이터 조회에 실패했습니다') as Promise<ScheduleItem[]>
+      return this.handleApiError(error, '마스터 데이터 조회에 실패했습니다') as Promise<
+        ScheduleItem[]
+      >
     }
   }
 
@@ -209,7 +211,9 @@ class EphemerisTrackService {
       const response = await api.get<ScheduleDetailItem[]>(`/ephemeris/detail/${mstId}`)
       return response.data || []
     } catch (error) {
-      return this.handleApiError(error, '세부 데이터 조회에 실패했습니다') as Promise<ScheduleDetailItem[]>
+      return this.handleApiError(error, '세부 데이터 조회에 실패했습니다') as Promise<
+        ScheduleDetailItem[]
+      >
     }
   }
 
@@ -224,7 +228,7 @@ class EphemerisTrackService {
 
   async startEphemerisTracking(passId: number): Promise<unknown> {
     try {
-      const response = await api.post(`/ephemeris/start/${passId}`)
+      const response = await api.post(`/ephemeris/tracking/start/${passId}`)
       return response.data
     } catch (error) {
       return this.handleApiError(error, '위성 추적 시작에 실패했습니다')
@@ -245,7 +249,10 @@ class EphemerisTrackService {
       const response = await api.get<RealtimeTrackingResponse>('/ephemeris/tracking/realtime-data')
       return response.data
     } catch (error) {
-      return this.handleApiError(error, '실시간 추적 데이터 조회에 실패했습니다') as Promise<RealtimeTrackingResponse>
+      return this.handleApiError(
+        error,
+        '실시간 추적 데이터 조회에 실패했습니다',
+      ) as Promise<RealtimeTrackingResponse>
     }
   }
 }

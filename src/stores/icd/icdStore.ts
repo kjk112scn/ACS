@@ -1130,7 +1130,7 @@ export const useICDStore = defineStore('icd', () => {
 
         // 간격이 너무 불규칙하면 건너뛰기
         if (currentInterval < UPDATE_INTERVAL * 0.5) {
-          console.warn(`⚠️ 너무 빠른 업데이트 건너뛰기: ${currentInterval.toFixed(2)}ms`)
+          //console.warn(`⚠️ 너무 빠른 업데이트 건너뛰기: ${currentInterval.toFixed(2)}ms`)
           return
         }
 
