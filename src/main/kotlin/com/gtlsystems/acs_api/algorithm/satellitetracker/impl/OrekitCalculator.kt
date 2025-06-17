@@ -623,7 +623,6 @@ class OrekitCalculator : SatellitePositionCalculator {
                 altitude
             )
             // 지상국 기준 위치 프레임 생성
-            // 지상국 기준 위치 프레임 생성
             val stationFrame = TopocentricFrame(earth, stationPosition, "GroundStation")
 
             // UTC 시간을 Orekit의 AbsoluteDate로 변환

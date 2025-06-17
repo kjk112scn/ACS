@@ -72,4 +72,5 @@ object PushData {
     // ✅ 인스턴스 객체
     val CMD = CMDValue()
     val TRACKING_STATUS = TrackingStatus()
+    val READ_DATA = ReadData() // ✅ 추가 필요!
 }

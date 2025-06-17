@@ -32,7 +32,7 @@ class EphemerisController(
     /**
      * 실시간 추적 데이터 조회 (JSON)
      */
-    @GetMapping("/realtime-data")
+    @GetMapping("/tracking/realtime-data")
     fun getRealtimeTrackingData(): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             val realtimeData = ephemerisService.getRealtimeTrackingData()
@@ -45,95 +45,6 @@ class EphemerisController(
             )
         }
     }
-
-    /**
-     * 최근 N개의 실시간 추적 데이터 조회 (JSON)
-     */
-    @GetMapping("/realtime-data/recent")
-    fun getRecentRealtimeTrackingData(@RequestParam(defaultValue = "100") count: Int): Mono<Map<String, Any>> {
-        return Mono.fromCallable {
-            val recentData = ephemerisService.getRecentRealtimeTrackingData(count)
-            val stats = ephemerisService.getRealtimeTrackingStats()
-
-            mapOf(
-                "requestedCount" to count,
-                "actualCount" to recentData.size,
-                "data" to recentData,
-                "statistics" to stats
-            )
-        }
-    }
-
-    /**
-     * 실시간 추적 데이터를 CSV 파일로 다운로드
-     */
-    @GetMapping("/tracking/realtime-data/csv")
-    fun downloadRealtimeTrackingDataCsv(): Mono<ResponseEntity<ByteArrayResource>> {
-        return Mono.fromCallable {
-            val realtimeData = ephemerisService.getRealtimeTrackingData()
-
-            if (realtimeData.isEmpty()) {
-                return@fromCallable ResponseEntity.noContent()
-                    .header("X-Message", "실시간 추적 데이터가 없습니다")
-                    .build<ByteArrayResource>()
-            }
-
-            // CSV 데이터 생성
-            val csvData = generateRealtimeTrackingCsv(realtimeData)
-            val resource = ByteArrayResource(csvData)
-
-            // 파일명 생성 (현재 시간 포함)
-            val timestamp = java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-            val filename = "realtime_tracking_data_${timestamp}.csv"
-
-            ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"$filename\"")
-                .contentType(MediaType.parseMediaType("text/csv"))
-                .contentLength(csvData.size.toLong())
-                .body(resource)
-        }
-    }
-
-    /**
-     * 최근 N개의 실시간 추적 데이터를 CSV 파일로 다운로드
-     */
-    @GetMapping("/realtime-data/csv/recent")
-    fun downloadRecentRealtimeTrackingDataCsv(@RequestParam(defaultValue = "1000") count: Int): Mono<ResponseEntity<ByteArrayResource>> {
-        return Mono.fromCallable {
-            val recentData = ephemerisService.getRecentRealtimeTrackingData(count)
-
-            if (recentData.isEmpty()) {
-                return@fromCallable ResponseEntity.noContent()
-                    .header("X-Message", "실시간 추적 데이터가 없습니다")
-                    .build<ByteArrayResource>()
-            }
-
-            // CSV 데이터 생성
-            val csvData = generateRealtimeTrackingCsv(recentData)
-            val resource = ByteArrayResource(csvData)
-
-            // 파일명 생성
-            val timestamp = java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-            val filename = "recent_tracking_data_${count}_${timestamp}.csv"
-
-            ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"$filename\"")
-                .contentType(MediaType.parseMediaType("text/csv"))
-                .contentLength(csvData.size.toLong())
-                .body(resource)
-        }
-    }
-
-    /**
-     * 실시간 추적 통계 정보 조회
-     */
-    @GetMapping("/realtime-stats")
-    fun getRealtimeTrackingStats(): Mono<Map<String, Any>> {
-        return Mono.fromCallable {
-            ephemerisService.getRealtimeTrackingStats()
-        }
-    }
-
     /**
      * 실시간 추적 데이터 초기화
      */
@@ -257,8 +168,6 @@ class EphemerisController(
                 )
             )
     }
-
-
 
     /**
      * 모든 위성 추적 마스터 데이터를 조회합니다.

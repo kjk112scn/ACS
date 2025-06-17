@@ -1,6 +1,6 @@
 package com.gtlsystems.acs_api.service
 
-import com.gtlsystems.acs_api.algorithm.axislimitangle.limitAngleCalcualte
+import com.gtlsystems.acs_api.algorithm.axislimitangle.LimitAngleCalculator
 import com.gtlsystems.acs_api.algorithm.satellitetracker.impl.OrekitCalculator
 import com.gtlsystems.acs_api.model.GlobalData
 import com.gtlsystems.acs_api.model.SatelliteTrackingData
@@ -16,7 +16,6 @@ import com.gtlsystems.acs_api.event.subscribeToType
 import com.gtlsystems.acs_api.model.PushData
 import io.netty.handler.timeout.TimeoutException
 import jakarta.annotation.PreDestroy
-import org.springframework.scheduling.TaskScheduler
 import reactor.core.Disposable
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
@@ -26,14 +25,11 @@ import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import java.util.BitSet
-import java.util.Timer
-import java.util.TimerTask
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * 위성 추적 서비스
@@ -85,7 +81,7 @@ class EphemerisService(
             isDaemon = true
         }
     }
-    private val limitAngleCalculator = limitAngleCalcualte()
+    private val limitAngleCalculator = LimitAngleCalculator()
 
     @PostConstruct
     fun init() {
@@ -100,24 +96,24 @@ class EphemerisService(
 
     fun eventBus() {
         // 위성 추적 헤더 이벤트 구독
-        val headerSubscription = acsEventBus.subscribeToType<ACSEvent.ICDEvent.SatelliteTrackHeaderReceived>()
-            .subscribe { event ->
-                // 위성 추적 헤더가 수신되면 초기 추적 데이터 전송
-                currentTrackingPassId?.let { passId ->
-                    sendInitialTrackingData(passId)
+        val headerSubscription =
+            acsEventBus.subscribeToType<ACSEvent.ICDEvent.SatelliteTrackHeaderReceived>().subscribe { event ->
+                    // 위성 추적 헤더가 수신되면 초기 추적 데이터 전송
+                    currentTrackingPassId?.let { passId ->
+                        sendInitialTrackingData(passId)
+                    }
                 }
-            }
 
         // 위성 추적 데이터 요청 이벤트 구독
-        val dataRequestSubscription = acsEventBus.subscribeToType<ACSEvent.ICDEvent.SatelliteTrackDataRequested>()
-            .subscribe { event ->
-                // 데이터 요청에 응답하여 추가 데이터 전송
-                currentTrackingPassId?.let { passId ->
-                    // 요청된 시간 누적치에 따라 적절한 데이터 전송
-                    val requestData = event.requestData as ICDService.SatelliteTrackThree.GetDataFrame
-                    handleEphemerisTrackingDataRequest(requestData.timeAcc, requestData.requestDataLength)
+        val dataRequestSubscription =
+            acsEventBus.subscribeToType<ACSEvent.ICDEvent.SatelliteTrackDataRequested>().subscribe { event ->
+                    // 데이터 요청에 응답하여 추가 데이터 전송
+                    currentTrackingPassId?.let { passId ->
+                        // 요청된 시간 누적치에 따라 적절한 데이터 전송
+                        val requestData = event.requestData as ICDService.SatelliteTrackThree.GetDataFrame
+                        handleEphemerisTrackingDataRequest(requestData.timeAcc, requestData.requestDataLength)
+                    }
                 }
-            }
 
         // 구독 객체 저장
         subscriptions.add(headerSubscription)
@@ -151,10 +147,7 @@ class EphemerisService(
     }
 
     fun calculateRotatorAngleTable(
-        standardAzimuth: Double,
-        standardElevation: Double,
-        tiltAngle: Double,
-        rotatorStepDegrees: Double = 30.0
+        standardAzimuth: Double, standardElevation: Double, tiltAngle: Double, rotatorStepDegrees: Double = 30.0
     ) {
         val table = CoordinateTransformer.generateRotatorAngleTable(
             standardAzimuth, standardElevation, tiltAngle, rotatorStepDegrees
@@ -170,16 +163,14 @@ class EphemerisService(
             logger.info(
                 "│ ${String.format("%20.8f", rotatorAngle)}° │ ${
                     String.format(
-                        "%20.8f",
-                        az
+                        "%20.8f", az
                     )
                 }° │ ${String.format("%20.8f", el)}° │"
             )
         }
 
         logger.info("─────────────────────────────────────────────")
-    }
-    /*
+    }/*
      * 위성 추적 성능 비교 메서드 (3가지 방식)
      * 1. 기존 방식 (100ms 고정 간격)
      * 2. 가변 간격 방식 (필요 시 100ms, 일반적으로 1000ms)
@@ -253,8 +244,7 @@ class EphemerisService(
         logger.info(
             "   - 기존 대비 데이터 감소율: ${
                 String.format(
-                    "%.2f",
-                    (1 - points2.toDouble() / points1.toDouble()) * 100
+                    "%.2f", (1 - points2.toDouble() / points1.toDouble()) * 100
                 )
             }%"
         )
@@ -269,16 +259,14 @@ class EphemerisService(
             logger.info(
                 "   - 기존 방식: ${pass1.trackingData.size}개 포인트, 최대 고도각: ${
                     String.format(
-                        "%.2f",
-                        pass1.maxElevation
+                        "%.2f", pass1.maxElevation
                     )
                 }°"
             )
             logger.info(
                 "   - 가변 간격 방식: ${pass2.trackingData.size}개 포인트, 최대 고도각: ${
                     String.format(
-                        "%.2f",
-                        pass2.maxElevation
+                        "%.2f", pass2.maxElevation
                     )
                 }°"
             )
@@ -288,16 +276,14 @@ class EphemerisService(
             logger.info(
                 "   - 기존 방식: 최대 Az속도=${String.format("%.2f", pass1.maxAzimuthRate)}°/s, 최대 El속도=${
                     String.format(
-                        "%.2f",
-                        pass1.maxElevationRate
+                        "%.2f", pass1.maxElevationRate
                     )
                 }°/s"
             )
             logger.info(
                 "   - 가변 간격 방식: 최대 Az속도=${
                     String.format(
-                        "%.2f",
-                        pass2.maxAzimuthRate
+                        "%.2f", pass2.maxAzimuthRate
                     )
                 }°/s, 최대 El속도=${String.format("%.2f", pass2.maxElevationRate)}°/s"
             )
@@ -305,16 +291,14 @@ class EphemerisService(
             logger.info(
                 "   - 기존 방식: 최대 Az가속도=${
                     String.format(
-                        "%.2f",
-                        pass1.maxAzimuthAccel
+                        "%.2f", pass1.maxAzimuthAccel
                     )
                 }°/s², 최대 El가속도=${String.format("%.2f", pass1.maxElevationAccel)}°/s²"
             )
             logger.info(
                 "   - 가변 간격 방식: 최대 Az가속도=${
                     String.format(
-                        "%.2f",
-                        pass2.maxAzimuthAccel
+                        "%.2f", pass2.maxAzimuthAccel
                     )
                 }°/s², 최대 El가속도=${String.format("%.2f", pass2.maxElevationAccel)}°/s²"
             )
@@ -336,16 +320,14 @@ class EphemerisService(
                 logger.info(
                     "   - 기존 방식: Az=${String.format("%.2f", start1.azimuth)}°, El=${
                         String.format(
-                            "%.2f",
-                            start1.elevation
+                            "%.2f", start1.elevation
                         )
                     }°"
                 )
                 logger.info(
                     "   - 가변 간격 방식: Az=${String.format("%.2f", start2.azimuth)}°, El=${
                         String.format(
-                            "%.2f",
-                            start2.elevation
+                            "%.2f", start2.elevation
                         )
                     }°"
                 )
@@ -358,16 +340,14 @@ class EphemerisService(
                 logger.info(
                     "   - 기존 방식: Az=${String.format("%.2f", end1.azimuth)}°, El=${
                         String.format(
-                            "%.2f",
-                            end1.elevation
+                            "%.2f", end1.elevation
                         )
                     }°"
                 )
                 logger.info(
                     "   - 가변 간격 방식: Az=${String.format("%.2f", end2.azimuth)}°, El=${
                         String.format(
-                            "%.2f",
-                            end2.elevation
+                            "%.2f", end2.elevation
                         )
                     }°"
                 )
@@ -395,34 +375,25 @@ class EphemerisService(
         logger.info(
             "2. 가변 간격 방식: ${duration2}ms (${
                 String.format(
-                    "%.2f",
-                    duration1.toDouble() / duration2.toDouble()
+                    "%.2f", duration1.toDouble() / duration2.toDouble()
                 )
             }배 빠름), ${points2}개 포인트 (${String.format("%.2f", points2 * 100.0 / points1)}%)"
         )
     }
 
     fun generateEphemerisDesignationTrackAsync(
-        tleLine1: String,
-        tleLine2: String,
-        satelliteName: String? = null
+        tleLine1: String, tleLine2: String, satelliteName: String? = null
     ): Mono<Pair<List<Map<String, Any?>>, List<Map<String, Any?>>>> {
 
         return Mono.fromCallable {
             generateEphemerisDesignationTrackSync(tleLine1, tleLine2, satelliteName)
-        }
-            .subscribeOn(Schedulers.boundedElastic())
-            .doOnSubscribe {
+        }.subscribeOn(Schedulers.boundedElastic()).doOnSubscribe {
                 logger.info("위성 궤도 계산 시작 (비동기)")
-            }
-            .doOnSuccess {
+            }.doOnSuccess {
                 logger.info("위성 궤도 계산 완료 (비동기)")
-            }
-            .doOnError { error ->
+            }.doOnError { error ->
                 logger.error("위성 궤도 계산 실패 (비동기): ${error.message}", error)
-            }
-            .timeout(Duration.ofMinutes(5))
-            .onErrorMap { error ->
+            }.timeout(Duration.ofMinutes(30)).onErrorMap { error ->
                 when (error) {
                     is IOException -> RuntimeException("네트워크 연결 오류: ${error.message}", error)
                     is TimeoutException -> RuntimeException("계산 시간 초과", error)
@@ -436,9 +407,7 @@ class EphemerisService(
      * 위성 이름이 제공되지 않으면 TLE에서 추출
      */
     fun generateEphemerisDesignationTrackSync(
-        tleLine1: String,
-        tleLine2: String,
-        satelliteName: String? = null
+        tleLine1: String, tleLine2: String, satelliteName: String? = null
     ): Pair<List<Map<String, Any?>>, List<Map<String, Any?>>> {
         try {
             // TLE에서 위성 ID 추출
@@ -541,12 +510,20 @@ class EphemerisService(
 
             logger.info("위성 궤도 추적 데이터 생성 완료: ${ephemerisTrackMst.size}개 스케줄 항목과 ${ephemerisTrackDtl.size}개 좌표 포인트")
             logger.info("방위각 변환 시작 (0~360도 -> ±270도)")
-            val (convertedMst, convertedDtl) = limitAngleCalculator.convertTrackingData(ephemerisTrackMst, ephemerisTrackDtl)
+            val (convertedMst, convertedDtl) = limitAngleCalculator.convertTrackingData(
+                ephemerisTrackMst, ephemerisTrackDtl
+            )
             logger.info("방위각 변환 완료")
-            // 변환 결과 검증
+
+            // 검증
             val validationResult = limitAngleCalculator.validateConversion(
                 ephemerisTrackMst, ephemerisTrackDtl, convertedMst, convertedDtl
             )
+            logger.info(validationResult.getSummary())
+
+            // 통계
+            val statistics = limitAngleCalculator.getConversionStatistics(ephemerisTrackDtl, convertedDtl)
+            logger.info(statistics.getSummary())
 
             if (validationResult.isValid) {
                 logger.info("✅ 방위각 변환 검증 성공")
@@ -574,9 +551,21 @@ class EphemerisService(
 
                 logger.info("패스 #$mstId 변환 결과:")
                 if (originalStartAz != null && originalEndAz != null) {
-                    logger.info("  원본: ${String.format("%.2f", originalStartAz)}° ~ ${String.format("%.2f", originalEndAz)}°")
+                    logger.info(
+                        "  원본: ${String.format("%.2f", originalStartAz)}° ~ ${
+                            String.format(
+                                "%.2f", originalEndAz
+                            )
+                        }°"
+                    )
                 }
-                logger.info("  변환: ${String.format("%.2f", convertedStartAz)}° ~ ${String.format("%.2f", convertedEndAz)}°")
+                logger.info(
+                    "  변환: ${String.format("%.2f", convertedStartAz)}° ~ ${
+                        String.format(
+                            "%.2f", convertedEndAz
+                        )
+                    }°"
+                )
             }
 
             return Pair(convertedMst, convertedDtl)
@@ -599,13 +588,8 @@ class EphemerisService(
         multiAxis.set(0)
         multiAxis.set(1)
         udpFwICDService.multiManualCommand(
-            multiAxis,
-            cmdAzimuthAngle,  // null이면 0.0f 사용
-            cmdAzimuthSpeed,
-            cmdElevationAngle,
-            cmdElevationSpeed,
-            cmdTiltAngle ?: 0.0f,
-            cmdTiltSpeed ?: 0.0f
+            multiAxis, cmdAzimuthAngle,  // null이면 0.0f 사용
+            cmdAzimuthSpeed, cmdElevationAngle, cmdElevationSpeed, cmdTiltAngle ?: 0.0f, cmdTiltSpeed ?: 0.0f
         )
     }
 
@@ -639,6 +623,7 @@ class EphemerisService(
         stopCommand()
         // ✅ 타이머 중지
         stopTimer()
+        clearRealtimeTrackingData()
         dataStoreService.setEphemerisTracking(false)
         logger.info("✅ 위성 추적 및 타이머 중지 완료")
         //dataStoreService.stopAllTracking()
@@ -662,8 +647,7 @@ class EphemerisService(
                 } catch (e: Exception) {
                     logger.error("위성 추적 상태 체크 중 오류: ${e.message}", e)
                 }
-            },
-            0,      // 초기 지연 시간
+            }, 0,      // 초기 지연 시간
             100,    // 실행 간격 (100ms)
             TimeUnit.MILLISECONDS
         )
@@ -712,11 +696,7 @@ class EphemerisService(
      * ✅ 타이머 상태 확인 (기존 isTimerRunning() 메서드 수정)
      */
     fun isTimerRunning(): Boolean {
-        return trackingExecutor != null &&
-                !trackingExecutor!!.isShutdown &&
-                !trackingExecutor!!.isTerminated &&
-                trackingTask != null &&
-                !trackingTask!!.isCancelled
+        return trackingExecutor != null && !trackingExecutor!!.isShutdown && !trackingExecutor!!.isTerminated && trackingTask != null && !trackingTask!!.isCancelled
     }
 
     /**
@@ -782,6 +762,7 @@ class EphemerisService(
                 // ✅ 완료: 한 번만 실행
                 calTime.isAfter(endTime) && !executedActions.contains("COMPLETED") -> {
                     executedActions.add("COMPLETED")
+                    //stopEphemerisTracking()
                     logger.info("✅ 추적 완료 처리 실행")
                     handleCompleted()
                 }
@@ -826,7 +807,7 @@ class EphemerisService(
      */
     private fun saveRealtimeTrackingData(passId: UInt, currentTime: ZonedDateTime, startTime: ZonedDateTime) {
         try {
-            // 현재 시간을 기준으로 추적 시간 계산 (시작 시간으로부터 경과된 시간, 초 단위)
+            // 현재 시간을 기준으로 추적 시간 계산
             val elapsedTimeSeconds = Duration.between(startTime, currentTime).toMillis() / 1000.0f
 
             // 현재 추적해야 할 위성 위치 계산
@@ -838,7 +819,7 @@ class EphemerisService(
 
             // 현재 시간에 해당하는 목표 위치 찾기
             val timeDifferenceMs = Duration.between(startTime, currentTime).toMillis()
-            val calculatedIndex = (timeDifferenceMs / 100).toInt() // 100ms 간격
+            val calculatedIndex = (timeDifferenceMs / 100).toInt()
 
             val targetPoint = if (calculatedIndex >= 0 && calculatedIndex < passDetails.size) {
                 passDetails[calculatedIndex]
@@ -849,18 +830,31 @@ class EphemerisService(
             val cmdAzimuth = (targetPoint["Azimuth"] as Double).toFloat()
             val cmdElevation = (targetPoint["Elevation"] as Double).toFloat()
 
-            // PushData에서 실제 현재 위치 가져오기 (실제 안테나 위치)
-            val readData = PushData.ReadData()
-            val trackingCmdAzimuthTime = readData.trackingAzimuthTime
-            val trackingCmdElevationTime = readData.trackingElevationTime
-            val trackingCmdTiltTime = readData.trackingTiltTime
-            // ✅ 추적 명령 및 실제 값 가져오기 (null 안전 처리)
-            val trackingCmdAzimuth = readData.trackingCMDAzimuthAngle
-            val trackingActualAzimuth = readData.trackingActualAzimuthAngle
-            val trackingCmdElevation = readData.trackingCMDElevationAngle
-            val trackingActualElevation = readData.trackingActualElevationAngle
-            val trackingCmdTilt = readData.trackingCMDTiltAngle
-            val trackingActualTilt = readData.trackingActualTiltAngle
+            // ✅ 변경: PushData 대신 DataStoreService에서 데이터 가져오기
+            val currentData = dataStoreService.getLatestData()
+
+            // ✅ DataStoreService에서 추적 관련 데이터만 별도로 가져오기
+            val trackingOnlyData = dataStoreService.getTrackingOnlyData()
+
+            val trackingCmdAzimuthTime = trackingOnlyData["trackingAzimuthTime"]
+            val trackingCmdElevationTime = trackingOnlyData["trackingElevationTime"]
+            val trackingCmdTiltTime = trackingOnlyData["trackingTiltTime"]
+
+            val trackingCmdAzimuth = trackingOnlyData["trackingCMDAzimuthAngle"]
+            val trackingActualAzimuth = trackingOnlyData["trackingActualAzimuthAngle"]
+            val trackingCmdElevation = trackingOnlyData["trackingCMDElevationAngle"]
+            val trackingActualElevation = trackingOnlyData["trackingActualElevationAngle"]
+            val trackingCmdTilt = trackingOnlyData["trackingCMDTiltAngle"]
+            val trackingActualTilt = trackingOnlyData["trackingActualTiltAngle"]
+
+            // ✅ 데이터 유효성 검사
+            val hasValidData =
+                trackingCmdAzimuth != null || trackingActualAzimuth != null || trackingCmdElevation != null || trackingActualElevation != null
+
+            if (!hasValidData && trackingDataIndex % 50 == 0) {
+                logger.warn("⚠️ DataStoreService에서 유효한 추적 데이터를 받지 못하고 있습니다.")
+                debugDataStoreStatus()
+            }
 
             // 실시간 추적 데이터 생성
             val realtimeData = mapOf(
@@ -876,28 +870,80 @@ class EphemerisService(
                 "trackingCMDElevationAngle" to trackingCmdElevation,
                 "trackingActualElevationAngle" to trackingActualElevation,
                 "trackingTiltTime" to trackingCmdTiltTime,
-                "trackingCMDTiltAngle" to trackingCmdTilt, // 틸트는 일반적으로 0
+                "trackingCMDTiltAngle" to trackingCmdTilt,
                 "trackingActualTiltAngle" to trackingActualTilt,
                 "passId" to passId,
                 "azimuthError" to ((trackingCmdAzimuth ?: 0.0f) - (trackingActualAzimuth ?: 0.0f)),
                 "elevationError" to ((trackingCmdElevation ?: 0.0f) - (trackingActualElevation ?: 0.0f)),
+                "hasValidData" to hasValidData,
+                "dataSource" to "DataStoreService" // ✅ 데이터 소스 표시
             )
 
             // 리스트에 추가
             realtimeTrackingDataList.add(realtimeData)
             trackingDataIndex++
 
-            // 주기적 로깅 (10초마다 또는 100개 데이터마다)
+            // 주기적 로깅
             if (trackingDataIndex % 100 == 0) {
                 logger.info("📊 실시간 추적 데이터 저장 중 - 총 {}개 데이터 포인트 저장됨", trackingDataIndex)
-                logger.debug(
-                    "현재 목표: Az={:.2f}°, El={:.2f}° | 실제: Az={:.2f}°, El={:.2f}°",
-                    trackingCmdAzimuth, trackingCmdElevationTime, trackingActualAzimuth, trackingActualElevation
-                )
+                if (hasValidData) {
+                    logger.info(
+                        "✅ DataStore에서 유효한 데이터: 목표 Az=$cmdAzimuth°, El=$cmdElevation° | 실제 Az=$trackingActualAzimuth°, El=$trackingActualElevation°",
+                        cmdAzimuth,
+                        cmdElevation,
+                        trackingActualAzimuth ?: 0.0f,
+                        trackingActualElevation ?: 0.0f
+                    )
+                } else {
+                    logger.warn("❌ DataStore에서 무효한 데이터")
+                }
             }
 
         } catch (e: Exception) {
             logger.error("실시간 추적 데이터 저장 중 오류: ${e.message}", e)
+        }
+    }
+
+    fun debugPushDataStatus() {
+        val readData = PushData.READ_DATA
+        logger.info("🔍 PushData 디버깅 정보:")
+        logger.info("  - trackingAzimuthTime: {}", readData.trackingAzimuthTime)
+        logger.info("  - trackingCMDAzimuthAngle: {}", readData.trackingCMDAzimuthAngle)
+        logger.info("  - trackingActualAzimuthAngle: {}", readData.trackingActualAzimuthAngle)
+        logger.info("  - trackingElevationTime: {}", readData.trackingElevationTime)
+        logger.info("  - trackingCMDElevationAngle: {}", readData.trackingCMDElevationAngle)
+        logger.info("  - trackingActualElevationAngle: {}", readData.trackingActualElevationAngle)
+        logger.info("  - trackingTiltTime: {}", readData.trackingTiltTime)
+        logger.info("  - trackingCMDTiltAngle: {}", readData.trackingCMDTiltAngle)
+        logger.info("  - trackingActualTiltAngle: {}", readData.trackingActualTiltAngle)
+    }
+
+    // ✅ 새로운 디버깅 메서드 추가
+    fun debugDataStoreStatus() {
+        try {
+            val currentData = dataStoreService.getLatestData()
+            val trackingData = dataStoreService.getTrackingOnlyData()
+            val statusInfo = dataStoreService.getStatusInfo()
+
+            logger.info("🔍 DataStoreService 디버깅 정보:")
+            logger.info("  - 데이터 버전: {}", statusInfo["dataVersion"])
+            logger.info("  - 마지막 업데이트: {}", statusInfo["lastUpdateTime"])
+            logger.info("  - UDP 연결 상태: {}", statusInfo["isUdpConnected"])
+            logger.info("  - 유효한 데이터 여부: {}", statusInfo["hasValidData"])
+            logger.info("  - null이 아닌 필드 수: {}", statusInfo["nonNullFields"])
+
+            logger.info("  추적 전용 데이터:")
+            trackingData.forEach { (key, value) ->
+                logger.info("    - {}: {}", key, value)
+            }
+
+            logger.info("  일반 각도 데이터:")
+            logger.info("    - azimuthAngle: {}", currentData.azimuthAngle)
+            logger.info("    - elevationAngle: {}", currentData.elevationAngle)
+            logger.info("    - tiltAngle: {}", currentData.tiltAngle)
+
+        } catch (e: Exception) {
+            logger.error("DataStore 디버깅 중 오류: {}", e.message, e)
         }
     }
 
@@ -906,24 +952,6 @@ class EphemerisService(
      */
     fun getRealtimeTrackingData(): List<Map<String, Any?>> {
         return realtimeTrackingDataList.toList()
-    }
-
-    /**
-     * ✅ 실시간 추적 데이터 개수 조회
-     */
-    fun getRealtimeTrackingDataCount(): Int {
-        return realtimeTrackingDataList.size
-    }
-
-    /**
-     * ✅ 최근 N개의 실시간 추적 데이터 조회
-     */
-    fun getRecentRealtimeTrackingData(count: Int = 100): List<Map<String, Any?>> {
-        return if (realtimeTrackingDataList.size <= count) {
-            realtimeTrackingDataList.toList()
-        } else {
-            realtimeTrackingDataList.takeLast(count)
-        }
     }
 
     /**
@@ -1086,18 +1114,17 @@ class EphemerisService(
                     } else 0.0
 
                     logger.info(
-                        "실시간 추적 정보: 진행률=${progressPercentage}%, 인덱스=${safeStartIndex}/${totalSize}, 추출=${actualCount}개")
+                        "실시간 추적 정보: 진행률=${progressPercentage}%, 인덱스=${safeStartIndex}/${totalSize}, 추출=${actualCount}개"
+                    )
 
-                    initialTrackingData = passDetails
-                        .drop(safeStartIndex)
-                        .take(actualCount)
-                        .mapIndexed { index, point ->
-                            Triple(
-                                ((safeStartIndex + index) * 100).toUInt(),
-                                (point["Elevation"] as Double).toFloat(),
-                                (point["Azimuth"] as Double).toFloat()
-                            )
-                        }
+                    initialTrackingData =
+                        passDetails.drop(safeStartIndex).take(actualCount).mapIndexed { index, point ->
+                                Triple(
+                                    ((safeStartIndex + index) * 100).toUInt(),
+                                    (point["Elevation"] as Double).toFloat(),
+                                    (point["Azimuth"] as Double).toFloat()
+                                )
+                            }
                     // 현재 위치 정보 로깅
                     val currentPoint = initialTrackingData.firstOrNull()
                     if (currentPoint != null) {
@@ -1113,15 +1140,13 @@ class EphemerisService(
                     val minutesUntilStart = timeUntilStart.toMinutes()
 
                     logger.info(
-                        "추적 시작까지: {}분 {}초 (총 {}초)",
-                        minutesUntilStart, secondsUntilStart % 60, secondsUntilStart
+                        "추적 시작까지: {}분 {}초 (총 {}초)", minutesUntilStart, secondsUntilStart % 60, secondsUntilStart
                     )
                     // ✅ 대기 모드: 초기 궤도 데이터 미리 준비
                     initialTrackingData = passDetails.take(50).mapIndexed { index, point ->
                         Triple(
                             (index * 100).toUInt(), //
-                            (point["Elevation"] as Double).toFloat(),
-                            (point["Azimuth"] as Double).toFloat()
+                            (point["Elevation"] as Double).toFloat(), (point["Azimuth"] as Double).toFloat()
                         )
                     }
                     // 시작 예정 위치 정보
@@ -1129,7 +1154,8 @@ class EphemerisService(
                     if (startPoint != null) {
                         logger.info(
                             "시작 예정 위치: 고도=${startPoint.second}°, 방위=${startPoint.third}",
-                            startPoint.second, startPoint.third
+                            startPoint.second,
+                            startPoint.third
                         )
 
                     }
@@ -1178,16 +1204,12 @@ class EphemerisService(
 
     // 열거형 정의
     enum class TimeRangeStatus {
-        BEFORE_START,
-        IN_RANGE,
-        AFTER_END
+        BEFORE_START, IN_RANGE, AFTER_END
     }
 
     // 시간 범위 체크 함수
     private fun checkTimeInTrackingRange(
-        currentTime: ZonedDateTime,
-        startTime: ZonedDateTime,
-        endTime: ZonedDateTime
+        currentTime: ZonedDateTime, startTime: ZonedDateTime, endTime: ZonedDateTime
     ): TimeRangeStatus {
         return when {
             currentTime.isBefore(startTime) -> {
@@ -1206,8 +1228,7 @@ class EphemerisService(
                 val timeFromStart = Duration.between(startTime, currentTime)
                 val timeToEnd = Duration.between(currentTime, endTime)
                 logger.debug(
-                    "추적 진행 중 - 시작 후: {}초, 종료까지: {}초",
-                    timeFromStart.seconds, timeToEnd.seconds
+                    "추적 진행 중 - 시작 후: {}초, 종료까지: {}초", timeFromStart.seconds, timeToEnd.seconds
                 )
                 TimeRangeStatus.IN_RANGE
             }
@@ -1256,19 +1277,17 @@ class EphemerisService(
             val indexMs = startIndex / 100
             logger.info("indexMs :${indexMs}.")
             // 요청된 인덱스부터 추가 데이터 준비
-            val additionalTrackingData = passDetails
-                .drop(indexMs)
-                .take(requestDataLength)
-                .mapIndexed { index, point ->
+            val additionalTrackingData = passDetails.drop(indexMs).take(requestDataLength).mapIndexed { index, point ->
                     Triple(
                         startIndex + index * 100, // 카운트 (누적 인덱스)
-                        (point["Elevation"] as Double).toFloat(),
-                        (point["Azimuth"] as Double).toFloat()
+                        (point["Elevation"] as Double).toFloat(), (point["Azimuth"] as Double).toFloat()
                     )
                 }
 
             if (additionalTrackingData.isEmpty()) {
                 logger.info("더 이상 전송할 추적 데이터가 없습니다.")
+
+
                 return
             }
 
@@ -1312,14 +1331,9 @@ class EphemerisService(
 
 
             logger.info("TimeOffset 명령 전송 완료: {}s", inputTimeOffset)
-        }
-            .subscribeOn(Schedulers.boundedElastic())
-            .subscribe(
-                { /* 성공 */ },
-                { error ->
-                    logger.error("시간 오프셋 명령 처리 오류: {}", error.message, error)
-                }
-            )
+        }.subscribeOn(Schedulers.boundedElastic()).subscribe({ /* 성공 */ }, { error ->
+                logger.error("시간 오프셋 명령 처리 오류: {}", error.message, error)
+            })
     }
 
     fun setCurrentTrackingPassId(newPassId: UInt?) {
@@ -1366,8 +1380,7 @@ class EphemerisService(
 
     // 헬퍼 함수 정의
     private fun getCurrentTrackingPassTimes(): Pair<ZonedDateTime, ZonedDateTime> {
-        val pass = currentTrackingPass
-            ?: throw IllegalStateException("현재 추적 중인 패스가 설정되지 않았습니다")
+        val pass = currentTrackingPass ?: throw IllegalStateException("현재 추적 중인 패스가 설정되지 않았습니다")
 
         val startTime = try {
             (pass["StartTime"] as ZonedDateTime).withZoneSameInstant(ZoneOffset.UTC)
