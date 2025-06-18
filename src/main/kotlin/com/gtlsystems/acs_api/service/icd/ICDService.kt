@@ -1,21 +1,16 @@
-package com.gtlsystems.acs_api.service
-
+package com.gtlsystems.acs_api.service.icd
 
 import com.gtlsystems.acs_api.event.ACSEvent
 import com.gtlsystems.acs_api.event.ACSEventBus
 import com.gtlsystems.acs_api.model.GlobalData
 import com.gtlsystems.acs_api.model.PushData
-import com.gtlsystems.acs_api.model.PushData.CMD
-
+import com.gtlsystems.acs_api.service.datastore.DataStoreService
 import com.gtlsystems.acs_api.util.Crc16
-import com.gtlsystems.acs_api.util.JKUtil.JKConvert
 import com.gtlsystems.acs_api.util.JKUtil
-import com.gtlsystems.acs_api.util.JKUtil.JKConvert.Companion.byteToBinaryString
-import org.jetbrains.annotations.Debug
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.time.ZonedDateTime
 import java.util.BitSet
 
 @Service
@@ -27,7 +22,7 @@ class ICDService {
 
     class Classify(private val dataStoreService: DataStoreService, private val acsEventBus: ACSEventBus) {
         private var lastPacketTime = System.nanoTime()
-        private val logger = org.slf4j.LoggerFactory.getLogger(Classify::class.java)
+        private val logger = LoggerFactory.getLogger(Classify::class.java)
 
         // 패킷 타이밍 모니터링 메서드
         private fun monitorPacketTiming(data: ByteArray) {
@@ -283,7 +278,7 @@ class ICDService {
 
                 // CRC16 계산 및 엔디안 변환
                 val crc16s = Crc16.computeCrc(byteCrc16Target)
-                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+                val crc16Buffer = JKUtil.JKConvert.Companion.shortToByteArray(crc16s, false)
 
                 // CRC16 값 설정
                 dataFrame[3] = crc16Buffer[0]
@@ -367,11 +362,11 @@ class ICDService {
                 val dataFrame = ByteArray(26)
 
                 // 바이트 변환 (엔디안 변환 포함)
-                val byteDataLength = JKConvert.ushortToByteArray(dataLen, false)
-                val byteAosYear = JKConvert.ushortToByteArray(aosYear, false)
-                val byteAosMs = JKConvert.ushortToByteArray(aosMs, false)
-                val byteLosYear = JKConvert.ushortToByteArray(losYear, false)
-                val byteLosMs = JKConvert.ushortToByteArray(losMs, false)
+                val byteDataLength = JKUtil.JKConvert.Companion.ushortToByteArray(dataLen, false)
+                val byteAosYear = JKUtil.JKConvert.Companion.ushortToByteArray(aosYear, false)
+                val byteAosMs = JKUtil.JKConvert.Companion.ushortToByteArray(aosMs, false)
+                val byteLosYear = JKUtil.JKConvert.Companion.ushortToByteArray(losYear, false)
+                val byteLosMs = JKUtil.JKConvert.Companion.ushortToByteArray(losMs, false)
 
                 // CRC 대상 복사를 위한 배열
                 val byteCrc16Target = ByteArray(dataFrame.size - 4)
@@ -409,7 +404,7 @@ class ICDService {
 
                 // CRC16 계산 및 엔디안 변환
                 val crc16s = Crc16.computeCrc(byteCrc16Target)
-                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+                val crc16Buffer = JKUtil.JKConvert.Companion.shortToByteArray(crc16s, false)
 
                 // CRC16 값 설정
                 dataFrame[23] = crc16Buffer[0]
@@ -498,10 +493,10 @@ class ICDService {
                 val dataFrame = ByteArray(21 + (satelliteTrackData.size * 12))
 
                 // 바이트 변환 (엔디안 변환 포함)
-                val byteDataLength = JKConvert.ushortToByteArray(dataLen, false)
-                val byteNtpYear = JKConvert.ushortToByteArray(ntpYear, false)
-                val byteNtpMs = JKConvert.ushortToByteArray(ntpMs, false)
-                val byteTimeOffset = JKConvert.intToByteArray(timeOffset, false)
+                val byteDataLength = JKUtil.JKConvert.Companion.ushortToByteArray(dataLen, false)
+                val byteNtpYear = JKUtil.JKConvert.Companion.ushortToByteArray(ntpYear, false)
+                val byteNtpMs = JKUtil.JKConvert.Companion.ushortToByteArray(ntpMs, false)
+                val byteTimeOffset = JKUtil.JKConvert.Companion.intToByteArray(timeOffset, false)
 
                 // CRC 대상 복사를 위한 배열
                 val byteCrc16Target = ByteArray(dataFrame.size - 4)
@@ -532,9 +527,9 @@ class ICDService {
                 // 위성 추적 데이터 추가
                 var i = 18
                 for (data in satelliteTrackData) {
-                    val byteCountArray = JKConvert.uintToByteArray(data.first, false)
-                    val byteAzimuthAngle = JKConvert.floatToByteArray(data.third, false)
-                    val byteElevationAngle = JKConvert.floatToByteArray(data.second, false)
+                    val byteCountArray = JKUtil.JKConvert.Companion.uintToByteArray(data.first, false)
+                    val byteAzimuthAngle = JKUtil.JKConvert.Companion.floatToByteArray(data.third, false)
+                    val byteElevationAngle = JKUtil.JKConvert.Companion.floatToByteArray(data.second, false)
 
                     dataFrame[i++] = byteCountArray[0]
                     dataFrame[i++] = byteCountArray[1]
@@ -557,7 +552,7 @@ class ICDService {
 
                 // CRC16 계산 및 엔디안 변환
                 val crc16s = Crc16.computeCrc(byteCrc16Target)
-                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+                val crc16Buffer = JKUtil.JKConvert.Companion.shortToByteArray(crc16s, false)
 
                 // CRC16 값 설정
                 dataFrame[i++] = crc16Buffer[0]
@@ -637,7 +632,7 @@ class ICDService {
                 val dataFrame = ByteArray(8 + (satelliteTrackData.size * 12))
 
                 // 바이트 변환 (엔디안 변환 포함)
-                val byteDataLength = JKConvert.ushortToByteArray(dataLength, false)
+                val byteDataLength = JKUtil.JKConvert.Companion.ushortToByteArray(dataLength, false)
 
                 // CRC 대상 복사를 위한 배열
                 val byteCrc16Target = ByteArray(dataFrame.size - 4)
@@ -653,9 +648,9 @@ class ICDService {
                 // 위성 추적 데이터 추가
                 var i = 5
                 for (data in satelliteTrackData) {
-                    val byteCountArray = JKConvert.intToByteArray(data.first, false)
-                    val byteAzimuthAngle = JKConvert.floatToByteArray(data.third, false)
-                    val byteElevationAngle = JKConvert.floatToByteArray(data.second, false)
+                    val byteCountArray = JKUtil.JKConvert.Companion.intToByteArray(data.first, false)
+                    val byteAzimuthAngle = JKUtil.JKConvert.Companion.floatToByteArray(data.third, false)
+                    val byteElevationAngle = JKUtil.JKConvert.Companion.floatToByteArray(data.second, false)
 
                     dataFrame[i++] = byteCountArray[0]
                     dataFrame[i++] = byteCountArray[1]
@@ -678,7 +673,7 @@ class ICDService {
 
                 // CRC16 계산 및 엔디안 변환
                 val crc16s = Crc16.computeCrc(byteCrc16Target)
-                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+                val crc16Buffer = JKUtil.JKConvert.Companion.shortToByteArray(crc16s, false)
 
                 // CRC16 값 설정
                 dataFrame[i++] = crc16Buffer[0]
@@ -716,10 +711,10 @@ class ICDService {
                     // CRC 검증 및 ETX 확인
                     if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
                         // 데이터 길이 추출
-                        val requestDataLength = JKConvert.byteArrayToUShort(byteArrayOf(data[3], data[4]))
+                        val requestDataLength = JKUtil.JKConvert.Companion.byteArrayToUShort(byteArrayOf(data[3], data[4]))
                         println("Main Board의 요청 시간 누적치: $requestDataLength")
                         // 시간 누적치 추출
-                        val timeAcc = JKConvert.uintEndianConvert(data[5], data[6], data[7], data[8], false)
+                        val timeAcc = JKUtil.JKConvert.Companion.uintEndianConvert(data[5], data[6], data[7], data[8], false)
                         println("Main Board의 요청 시간 누적치: $timeAcc")
 
                         return GetDataFrame(
@@ -765,9 +760,9 @@ class ICDService {
                 val dataFrame = ByteArray(18)
 
                 // 바이트 변환 (엔디안 변환 포함)
-                val byteYear = JKConvert.ushortToByteArray(year, false)
-                val byteMs = JKConvert.ushortToByteArray(ms, false)
-                val byteTimeOffset = JKConvert.floatToByteArray(timeOffset, false)
+                val byteYear = JKUtil.JKConvert.Companion.ushortToByteArray(year, false)
+                val byteMs = JKUtil.JKConvert.Companion.ushortToByteArray(ms, false)
+                val byteTimeOffset = JKUtil.JKConvert.Companion.floatToByteArray(timeOffset, false)
 
                 // CRC 대상 복사를 위한 배열
                 val byteCrc16Target = ByteArray(dataFrame.size - 4)
@@ -797,7 +792,7 @@ class ICDService {
 
                 // CRC16 계산 및 엔디안 변환
                 val crc16s = Crc16.computeCrc(byteCrc16Target)
-                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+                val crc16Buffer = JKUtil.JKConvert.Companion.shortToByteArray(crc16s, false)
 
                 // CRC16 값 설정
                 dataFrame[15] = crc16Buffer[0]
@@ -886,9 +881,9 @@ class ICDService {
             fun setDataFrame(): ByteArray {
                 val dataFrame = ByteArray(19)
 
-                val byteYear = JKConvert.ushortToByteArray(year, false)
-                val byteMs = JKConvert.ushortToByteArray(ms, false)
-                val byteTimeOffset = JKConvert.floatToByteArray(timeOffset, false)
+                val byteYear = JKUtil.JKConvert.Companion.ushortToByteArray(year, false)
+                val byteMs = JKUtil.JKConvert.Companion.ushortToByteArray(ms, false)
+                val byteTimeOffset = JKUtil.JKConvert.Companion.floatToByteArray(timeOffset, false)
 
                 val byteCrc16Target = ByteArray(dataFrame.size - 4)
 
@@ -918,7 +913,7 @@ class ICDService {
 
                 // CRC16 계산 및 엔디안 변환
                 val crc16s = Crc16.computeCrc(byteCrc16Target)
-                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+                val crc16Buffer = JKUtil.JKConvert.Companion.shortToByteArray(crc16s, false)
                 val crc16Check = crc16Buffer
 
                 // CRC16 값 설정
@@ -1018,12 +1013,12 @@ class ICDService {
                 val byteCrc16Target = ByteArray(dataFrame.size - 4)
 
                 // Float 값들을 바이트 배열로 변환 (엔디안 변환 포함)
-                val byteAzimuthAngle = JKConvert.floatToByteArray(azimuthAngle, false)
-                val byteAzimuthSpeed = JKConvert.floatToByteArray(azimuthSpeed, false)
-                val byteElevationAngle = JKConvert.floatToByteArray(elevationAngle, false)
-                val byteElevationSpeed = JKConvert.floatToByteArray(elevationSpeed, false)
-                val byteTiltAngle = JKConvert.floatToByteArray(tiltAngle, false)
-                val byteTiltSpeed = JKConvert.floatToByteArray(tiltSpeed, false)
+                val byteAzimuthAngle = JKUtil.JKConvert.Companion.floatToByteArray(azimuthAngle, false)
+                val byteAzimuthSpeed = JKUtil.JKConvert.Companion.floatToByteArray(azimuthSpeed, false)
+                val byteElevationAngle = JKUtil.JKConvert.Companion.floatToByteArray(elevationAngle, false)
+                val byteElevationSpeed = JKUtil.JKConvert.Companion.floatToByteArray(elevationSpeed, false)
+                val byteTiltAngle = JKUtil.JKConvert.Companion.floatToByteArray(tiltAngle, false)
+                val byteTiltSpeed = JKUtil.JKConvert.Companion.floatToByteArray(tiltSpeed, false)
 
                 // BitSet을 바이트 배열로 변환
                 val byteAxis = axis.toByteArray()[0]
@@ -1073,14 +1068,14 @@ class ICDService {
 
                 // CRC16 계산 및 엔디안 변환
                 val crc16s = Crc16.computeCrc(byteCrc16Target)
-                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+                val crc16Buffer = JKUtil.JKConvert.Companion.shortToByteArray(crc16s, false)
                 val crc16Check = crc16Buffer
 
                 // CRC16 값 설정
                 dataFrame[27] = crc16Check[0]
                 dataFrame[28] = crc16Check[1]
                 dataFrame[29] = ICD_ETX
-                CMD.apply {
+                PushData.CMD.apply {
                     cmdAzimuthAngle = azimuthAngle + GlobalData.Offset.azimuthPositionOffset
                     cmdElevationAngle = elevationAngle + GlobalData.Offset.elevationPositionOffset
                     cmdTiltAngle = tiltAngle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
@@ -1158,7 +1153,7 @@ class ICDService {
 
                 // CRC16 계산 및 엔디안 변환
                 val crc16s = Crc16.computeCrc(byteCrc16Target)
-                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+                val crc16Buffer = JKUtil.JKConvert.Companion.shortToByteArray(crc16s, false)
                 val crc16Check = crc16Buffer
 
                 // CRC16 값 설정
@@ -1233,9 +1228,9 @@ class ICDService {
                 val dataFrame = ByteArray(18)
 
                 // Float 값을 바이트 배열로 변환 (엔디안 변환 포함)
-                val byteAzimuthOffset = JKConvert.floatToByteArray(azimuthOffset, false)
-                val byteElevationOffset = JKConvert.floatToByteArray(elevationOffset, false)
-                val byteTiltOffset = JKConvert.floatToByteArray(tiltOffset, false)
+                val byteAzimuthOffset = JKUtil.JKConvert.Companion.floatToByteArray(azimuthOffset, false)
+                val byteElevationOffset = JKUtil.JKConvert.Companion.floatToByteArray(elevationOffset, false)
+                val byteTiltOffset = JKUtil.JKConvert.Companion.floatToByteArray(tiltOffset, false)
 
                 val byteCrc16Target = ByteArray(dataFrame.size - 4)
 
@@ -1266,7 +1261,7 @@ class ICDService {
 
                 // CRC16 계산 및 엔디안 변환
                 val crc16s = Crc16.computeCrc(byteCrc16Target)
-                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+                val crc16Buffer = JKUtil.JKConvert.Companion.shortToByteArray(crc16s, false)
                 val crc16Check = crc16Buffer
 
                 // CRC16 값 설정
@@ -1363,7 +1358,7 @@ class ICDService {
 
                 // CRC16 계산 및 엔디안 변환
                 val crc16s = Crc16.computeCrc(byteCrc16Target)
-                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+                val crc16Buffer = JKUtil.JKConvert.Companion.shortToByteArray(crc16s, false)
                 val crc16Check = crc16Buffer
 
                 // CRC16 값 설정
@@ -1444,7 +1439,7 @@ class ICDService {
 
                 // CRC16 계산 및 엔디안 변환
                 val crc16s = Crc16.computeCrc(byteCrc16Target)
-                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+                val crc16Buffer = JKUtil.JKConvert.Companion.shortToByteArray(crc16s, false)
                 val crc16Check = crc16Buffer
 
                 // CRC16 값 설정
@@ -1565,7 +1560,7 @@ class ICDService {
 
                 dataFrame.copyInto(byteCrc16Target, 0, 1, 1 + byteCrc16Target.size) // destinationOffset을 0으로 수정
                 val crc16s = Crc16.computeCrc(byteCrc16Target)
-                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+                val crc16Buffer = JKUtil.JKConvert.Companion.shortToByteArray(crc16s, false)
                 val crc16Check = crc16Buffer
                 // CRC16
                 dataFrame[27] = crc16Check[0];
@@ -1644,7 +1639,7 @@ class ICDService {
 
                 dataFrame.copyInto(byteCrc16Target, 0, 1, 1 + byteCrc16Target.size) // destinationOffset을 0으로 수정
                 val crc16s = Crc16.computeCrc(byteCrc16Target)
-                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+                val crc16Buffer = JKUtil.JKConvert.Companion.shortToByteArray(crc16s, false)
                 val crc16Check = crc16Buffer
 
                 // CRC16 (Little Endian 가정)
@@ -1881,7 +1876,7 @@ class ICDService {
                         frame.cmdOne = buffer.get()
                         frame.cmdTwo = buffer.get()
                         val modeStatusByte = buffer.get()
-                        frame.modeStatusBits = byteToBinaryString(modeStatusByte)
+                        frame.modeStatusBits = JKUtil.JKConvert.Companion.byteToBinaryString(modeStatusByte)
 
                         frame.azimuthAngle = buffer.float
                         frame.elevationAngle = buffer.float
@@ -1892,44 +1887,50 @@ class ICDService {
 
                         // Main Board Status (4 bytes)
                         val mainBoardReserveByte = buffer.get()
-                        frame.mainBoardReserveBits = byteToBinaryString(mainBoardReserveByte)
+                        frame.mainBoardReserveBits = JKUtil.JKConvert.Companion.byteToBinaryString(mainBoardReserveByte)
 
                         val mainBoardMCOnOffByte = buffer.get()
-                        frame.mainBoardMCOnOffBits = byteToBinaryString(mainBoardMCOnOffByte)
+                        frame.mainBoardMCOnOffBits = JKUtil.JKConvert.Companion.byteToBinaryString(mainBoardMCOnOffByte)
 
                         val mainBoardStatusByte = buffer.get()
-                        frame.mainBoardStatusBits = byteToBinaryString(mainBoardStatusByte)
+                        frame.mainBoardStatusBits = JKUtil.JKConvert.Companion.byteToBinaryString(mainBoardStatusByte)
 
                         val mainBoardProtocolStatusByte = buffer.get()
-                        frame.mainBoardProtocolStatusBits = byteToBinaryString(mainBoardProtocolStatusByte)
+                        frame.mainBoardProtocolStatusBits =
+                            JKUtil.JKConvert.Companion.byteToBinaryString(mainBoardProtocolStatusByte)
 
                         // Azimuth Board Status (2 bytes)
                         val azimuthBoardStatusByte = buffer.get()
-                        frame.azimuthBoardStatusBits = byteToBinaryString(azimuthBoardStatusByte)
+                        frame.azimuthBoardStatusBits =
+                            JKUtil.JKConvert.Companion.byteToBinaryString(azimuthBoardStatusByte)
 
                         val azimuthBoardServoStatusByte = buffer.get()
-                        frame.azimuthBoardServoStatusBits = byteToBinaryString(azimuthBoardServoStatusByte)
+                        frame.azimuthBoardServoStatusBits =
+                            JKUtil.JKConvert.Companion.byteToBinaryString(azimuthBoardServoStatusByte)
 
                         // Elevation Board Status (2 bytes)
                         val elevationBoardStatusByte = buffer.get()
-                        frame.elevationBoardStatusBits = byteToBinaryString(elevationBoardStatusByte)
+                        frame.elevationBoardStatusBits =
+                            JKUtil.JKConvert.Companion.byteToBinaryString(elevationBoardStatusByte)
 
                         val elevationBoardServoStatusByte = buffer.get()
-                        frame.elevationBoardServoStatusBits = byteToBinaryString(elevationBoardServoStatusByte)
+                        frame.elevationBoardServoStatusBits =
+                            JKUtil.JKConvert.Companion.byteToBinaryString(elevationBoardServoStatusByte)
 
                         // Tilt Board Status (2 bytes)
                         val tiltBoardStatusByte = buffer.get()
-                        frame.tiltBoardStatusBits = byteToBinaryString(tiltBoardStatusByte)
+                        frame.tiltBoardStatusBits = JKUtil.JKConvert.Companion.byteToBinaryString(tiltBoardStatusByte)
 
                         val tiltBoardServoStatusByte = buffer.get()
-                        frame.tiltBoardServoStatusBits = byteToBinaryString(tiltBoardServoStatusByte)
+                        frame.tiltBoardServoStatusBits =
+                            JKUtil.JKConvert.Companion.byteToBinaryString(tiltBoardServoStatusByte)
 
                         // Feed Board Status (2 bytes)
                         val feedXBoardStatusByte = buffer.get()
-                        frame.feedXBoardStatusBits = byteToBinaryString(feedXBoardStatusByte)
+                        frame.feedXBoardStatusBits = JKUtil.JKConvert.Companion.byteToBinaryString(feedXBoardStatusByte)
 
                         val feedSBoardStatusByte = buffer.get()
-                        frame.feedSBoardStatusBits = byteToBinaryString(feedSBoardStatusByte)
+                        frame.feedSBoardStatusBits = JKUtil.JKConvert.Companion.byteToBinaryString(feedSBoardStatusByte)
 
                         // 나머지 필드들 처리...
                         frame.currentSBandLNALHCP = buffer.float
@@ -2010,7 +2011,7 @@ class ICDService {
 
                 // CRC16 계산 및 엔디안 변환
                 val crc16s = Crc16.computeCrc(byteCrc16Target)
-                val crc16Buffer = JKConvert.shortToByteArray(crc16s, false)
+                val crc16Buffer = JKUtil.JKConvert.Companion.shortToByteArray(crc16s, false)
                 val crc16Check = crc16Buffer
 
                 // CRC16 값 설정
@@ -2066,6 +2067,3 @@ class ICDService {
         }
     }
 }
-
-
-

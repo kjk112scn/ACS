@@ -1,10 +1,9 @@
-package com.gtlsystems.acs_api.controller
+package com.gtlsystems.acs_api.controller.icd
 
 import com.gtlsystems.acs_api.model.GlobalData
-import com.gtlsystems.acs_api.service.UdpFwICDService
+import com.gtlsystems.acs_api.service.udp.UdpFwICDService
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.CrossOrigin
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam

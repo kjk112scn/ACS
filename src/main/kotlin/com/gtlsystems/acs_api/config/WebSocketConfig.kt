@@ -1,6 +1,6 @@
 package com.gtlsystems.acs_api.config
 
-import com.gtlsystems.acs_api.controller.PushDataController
+import com.gtlsystems.acs_api.controller.websocket.PushDataController
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.reactive.HandlerMapping

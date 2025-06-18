@@ -1,4 +1,4 @@
-package com.gtlsystems.acs_api.service
+package com.gtlsystems.acs_api.service.mode
 
 import com.gtlsystems.acs_api.algorithm.axislimitangle.LimitAngleCalculator
 import com.gtlsystems.acs_api.algorithm.satellitetracker.impl.OrekitCalculator
@@ -14,6 +14,9 @@ import com.gtlsystems.acs_api.event.ACSEvent
 import com.gtlsystems.acs_api.event.ACSEventBus
 import com.gtlsystems.acs_api.event.subscribeToType
 import com.gtlsystems.acs_api.model.PushData
+import com.gtlsystems.acs_api.service.datastore.DataStoreService
+import com.gtlsystems.acs_api.service.icd.ICDService
+import com.gtlsystems.acs_api.service.udp.UdpFwICDService
 import io.netty.handler.timeout.TimeoutException
 import jakarta.annotation.PreDestroy
 import reactor.core.Disposable
@@ -1016,6 +1019,7 @@ class EphemerisService(
      */
     fun sendHeaderTrackingData(passId: UInt) {
         try {
+            udpFwICDService.writeNTPCommand()
             currentTrackingPassId = passId
             // 선택된 패스 ID에 해당하는 마스터 데이터 찾기
             val selectedPass = ephemerisTrackMstStorage.find { it["No"] == passId }

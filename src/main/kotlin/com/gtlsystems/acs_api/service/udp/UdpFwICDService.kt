@@ -1,10 +1,12 @@
-package com.gtlsystems.acs_api.service
+package com.gtlsystems.acs_api.service.udp
 
 import com.gtlsystems.acs_api.event.ACSEvent
 import com.gtlsystems.acs_api.event.ACSEventBus
 import com.gtlsystems.acs_api.model.GlobalData
 import com.gtlsystems.acs_api.model.PushData
-import com.gtlsystems.acs_api.util.JKUtil.JKConvert.Companion.byteArrayToHexString
+import com.gtlsystems.acs_api.service.datastore.DataStoreService
+import com.gtlsystems.acs_api.service.icd.ICDService
+import com.gtlsystems.acs_api.util.JKUtil
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
@@ -235,7 +237,7 @@ class UdpFwICDService(
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
             logger.info("Standby 명령 전송 완료")
-            logger.debug("Standby 전송 데이터: {}", byteArrayToHexString(dataToSend))
+            logger.debug("Standby 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
         }
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe(
@@ -279,7 +281,7 @@ class UdpFwICDService(
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
             logger.info("Emergency 명령 전송 완료: {}:{}", firmwareIp, firmwarePort)
-            logger.debug("Emergency 전송 데이터: {}", byteArrayToHexString(dataToSend))
+            logger.debug("Emergency 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
         }
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe(
@@ -319,7 +321,7 @@ class UdpFwICDService(
             GlobalData.Offset.TimeOffset = inputTimeOffset
 
             logger.info("TimeOffset 명령 전송 완료: {}s", inputTimeOffset)
-            logger.debug("TimeOffset 전송 데이터: {}", byteArrayToHexString(dataToSend))
+            logger.debug("TimeOffset 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
         }
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe(
@@ -358,7 +360,7 @@ class UdpFwICDService(
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
             logger.info("Manual 제어 명령 전송 완료: Az={}°, El={}°, Ti={}°", azAngle, elAngle, tiAngle)
-            logger.debug("Manual 제어 전송 데이터: {}", byteArrayToHexString(dataToSend))
+            logger.debug("Manual 제어 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
         }
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe(
@@ -396,7 +398,7 @@ class UdpFwICDService(
             //stopAllCommand()
 
             logger.info("Stop 명령 전송 완료")
-            logger.debug("Stop 전송 데이터: {}", byteArrayToHexString(dataToSend))
+            logger.debug("Stop 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
         }
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe(
@@ -432,7 +434,7 @@ class UdpFwICDService(
             GlobalData.Offset.tiltPositionOffset = tiOffset
 
             logger.info("PositionOffset 명령 전송 완료: Az={}°, El={}°, Ti={}°", azOffset, elOffset, tiOffset)
-            logger.debug("PositionOffset 전송 데이터: {}", byteArrayToHexString(dataToSend))
+            logger.debug("PositionOffset 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
         }
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe(
@@ -460,7 +462,7 @@ class UdpFwICDService(
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
             logger.info("FeedOnOff 명령 전송 완료")
-            logger.debug("FeedOnOff 전송 데이터: {}", byteArrayToHexString(dataToSend))
+            logger.debug("FeedOnOff 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
         }
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe(
@@ -496,7 +498,7 @@ class UdpFwICDService(
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
             logger.info("ServoPreset 명령 전송 완료")
-            logger.debug("ServoPreset 전송 데이터: {}", byteArrayToHexString(dataToSend))
+            logger.debug("ServoPreset 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
         }
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe(
@@ -526,7 +528,7 @@ class UdpFwICDService(
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
             logger.info("writeNTPCommand 명령 전송 완료")
-            logger.debug("writeNTPCommand 전송 데이터: {}", byteArrayToHexString(dataToSend))
+            logger.debug("writeNTPCommand 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
         }
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe(
@@ -563,7 +565,7 @@ class UdpFwICDService(
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
             logger.info("DefaultInfo 명령 전송 완료")
-            logger.debug("DefaultInfo 전송 데이터: {}", byteArrayToHexString(dataToSend))
+            logger.debug("DefaultInfo 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
         }
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe(
@@ -597,7 +599,7 @@ class UdpFwICDService(
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
             logger.info("위성 추적 헤더 정보 전송 완료: {}:{}", firmwareIp, firmwarePort)
-            logger.debug("위성 추적 헤더 전송 데이터: {}", byteArrayToHexString(dataToSend))
+            logger.debug("위성 추적 헤더 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
 
         } catch (e: Exception) {
             logger.error("위성 추적 헤더 정보 전송 오류: {}", e.message, e)
@@ -614,7 +616,7 @@ class UdpFwICDService(
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
             logger.info("위성 추적 초기 제어 명령 전송 완료: {}:{}", firmwareIp, firmwarePort)
-            logger.debug("위성 추적 초기 제어 전송 데이터: {}", byteArrayToHexString(dataToSend))
+            logger.debug("위성 추적 초기 제어 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
 
         } catch (e: Exception) {
             logger.error("위성 추적 초기 제어 명령 전송 오류: {}", e.message, e)
@@ -631,7 +633,7 @@ class UdpFwICDService(
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
             logger.info("위성 추적 추가 데이터 전송 완료: {}:{}", firmwareIp, firmwarePort)
-            logger.debug("위성 추적 추가 데이터 전송: {}", byteArrayToHexString(dataToSend))
+            logger.debug("위성 추적 추가 데이터 전송: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
 
         } catch (e: Exception) {
             logger.error("위성 추적 추가 데이터 전송 오류: {}", e.message, e)
@@ -783,7 +785,7 @@ class UdpFwICDService(
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
             logger.info("Stow 틸트 제어: 각도={}°, 속도={}°/s", tiAngle, tiSpeed)
-            logger.debug("Stow 틸트 제어 전송 데이터: {}", byteArrayToHexString(dataToSend))
+            logger.debug("Stow 틸트 제어 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
 
         } catch (e: Exception) {
             logger.error("틸트 축 제어 명령 오류: {}", e.message, e)
@@ -825,7 +827,7 @@ class UdpFwICDService(
                 "Stow 방위각/고도각 제어: Az={}°({}°/s), El={}°({}°/s)",
                 azAngle, azSpeed, elAngle, elSpeed
             )
-            logger.debug("Stow 방위각/고도각 제어 전송 데이터: {}", byteArrayToHexString(dataToSend))
+            logger.debug("Stow 방위각/고도각 제어 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
 
         } catch (e: Exception) {
             logger.error("방위각/고도각 제어 명령 오류: {}", e.message, e)
@@ -1015,7 +1017,7 @@ class UdpFwICDService(
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
             logger.info("테스트 명령 전송 완료")
-            logger.debug("테스트 명령 전송 데이터: {}", byteArrayToHexString(dataToSend))
+            logger.debug("테스트 명령 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
         }
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe(

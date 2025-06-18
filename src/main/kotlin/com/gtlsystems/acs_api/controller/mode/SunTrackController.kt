@@ -1,7 +1,6 @@
-package com.gtlsystems.acs_api.controller
+package com.gtlsystems.acs_api.controller.mode
 
-import com.gtlsystems.acs_api.service.SunTrackService
-import org.springframework.web.bind.annotation.CrossOrigin
+import com.gtlsystems.acs_api.service.mode.SunTrackService
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam

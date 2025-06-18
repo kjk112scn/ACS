@@ -1,12 +1,9 @@
-package com.gtlsystems.acs_api.controller
+package com.gtlsystems.acs_api.controller.mode
 
 import com.gtlsystems.acs_api.algorithm.satellitetracker.impl.OrekitCalculator
 import com.gtlsystems.acs_api.algorithm.satellitetracker.model.SatelliteTrackData
-import com.gtlsystems.acs_api.service.EphemerisService
-import com.gtlsystems.acs_api.service.ICDService
-import com.gtlsystems.acs_api.service.UdpFwICDService
+import com.gtlsystems.acs_api.service.mode.EphemerisService
 import org.slf4j.LoggerFactory
-import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import reactor.core.publisher.Mono
@@ -16,8 +13,6 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
 // ✅ 추가 필요한 import들
-import org.springframework.http.HttpHeaders
-import org.springframework.http.MediaType
 import java.nio.charset.StandardCharsets
 
 @RestController
@@ -279,7 +274,7 @@ private fun generateRealtimeTrackingCsv(data: List<Map<String, Any?>>): ByteArra
         data.forEach { record ->
             val row = listOf(
                 record["index"]?.toString() ?: "",
-                (record["timestamp"] as? java.time.ZonedDateTime)?.format(dateFormatter) ?: "",
+                (record["timestamp"] as? ZonedDateTime)?.format(dateFormatter) ?: "",
                 record["passId"]?.toString() ?: "",
                 String.format("%.3f", record["elapsedTimeSeconds"] as? Float ?: 0.0f),
                 String.format("%.6f", record["cmdAz"] as? Float ?: 0.0f),

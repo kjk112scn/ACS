@@ -1,7 +1,7 @@
-package com.gtlsystems.acs_api.controller
+package com.gtlsystems.acs_api.controller.websocket
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.gtlsystems.acs_api.service.PushDataService
+import com.gtlsystems.acs_api.service.websocket.PushDataService
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
@@ -9,8 +9,11 @@ import org.springframework.web.reactive.socket.WebSocketHandler
 import org.springframework.web.reactive.socket.WebSocketSession
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
-import java.time.Duration
-import java.util.concurrent.*
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ThreadFactory
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
@@ -70,8 +73,10 @@ class PushDataController(
 
                 // ✅ 상세한 예외 처리기
                 uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { thread, ex ->
-                    logger.error("🚨 WebSocket 세션 [{}] 스레드 [{}] 예외 발생: {}",
-                        shortSessionId, thread.name, ex.message, ex)
+                    logger.error(
+                        "🚨 WebSocket 세션 [{}] 스레드 [{}] 예외 발생: {}",
+                        shortSessionId, thread.name, ex.message, ex
+                    )
 
                     // 세션 정리 시도
                     try {

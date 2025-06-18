@@ -1,10 +1,10 @@
-package com.gtlsystems.acs_api.service
+package com.gtlsystems.acs_api.service.datastore
 
 import com.gtlsystems.acs_api.model.PushData
 import org.springframework.stereotype.Service
-import java.util.concurrent.atomic.AtomicReference
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 @Service
 class DataStoreService {
