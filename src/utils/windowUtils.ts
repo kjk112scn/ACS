@@ -55,7 +55,6 @@ class ModalManager {
     return ModalManager.instance
   }
 
-
   // 모달 등록 (디버깅 강화)
   registerModal(id: string, closeFunction: () => void) {
     this.activeModals.set(id, closeFunction)
@@ -63,7 +62,6 @@ class ModalManager {
     console.log(`📊 현재 활성 모달 수: ${this.activeModals.size}`)
     console.log(`📋 활성 모달 목록:`, Array.from(this.activeModals.keys()))
   }
-
 
   // 모달 닫기 (디버깅 강화)
   closeModal(id?: string): boolean {
@@ -92,20 +90,16 @@ class ModalManager {
         console.warn(`⚠️ 지정된 모달을 찾을 수 없음: ${id}`)
       }
     } else {
-
       // 가장 최근 모달 닫기
       const entries = Array.from(this.activeModals.entries())
-
 
       if (entries.length === 0) {
         console.warn('⚠️ 닫을 모달이 없습니다')
         return false
       }
 
-
       const lastIndex = entries.length - 1
       const lastEntry = entries[lastIndex]
-
 
       if (!lastEntry || lastEntry.length !== 2) {
         console.error('❌ 잘못된 모달 엔트리 형식')
@@ -113,12 +107,6 @@ class ModalManager {
       }
 
       const [lastId, closeFunction] = lastEntry
-
-
-
-
-
-
 
       try {
         console.log(`🎯 최근 모달 닫기 실행: ${lastId}`)
@@ -134,7 +122,6 @@ class ModalManager {
         return false
       }
     }
-
 
     return false
   }
@@ -159,18 +146,10 @@ class ModalManager {
     return closedCount
   }
 
-
   // 모달 해제 (디버깅 강화)
   unregisterModal(id: string): boolean {
     const existed = this.activeModals.has(id)
     this.activeModals.delete(id)
-
-
-
-
-
-
-
 
     console.log(`🗑️ 모달 해제: ${id} (존재했음: ${existed})`)
     console.log(`📊 해제 후 활성 모달 수: ${this.activeModals.size}`)
@@ -380,7 +359,6 @@ export const getComponentConfig = (componentName: ComponentName): ComponentConfi
   return config
 }
 
-
 // 🆕 Vue 모달 생성 (개선된 버전) - 투명 배경 버전
 export const createVueModal = async (
   componentName: ComponentName,
@@ -410,7 +388,6 @@ export const createVueModal = async (
       'default' in componentModule ? componentModule.default : componentModule
     console.log(`✅ 컴포넌트 로딩 완료: ${componentName}`)
 
-
     // 🎨 투명 모달 오버레이 생성 (배경 투명)
     const overlay = document.createElement('div')
     overlay.className = `${modalClass}-overlay`
@@ -430,7 +407,6 @@ export const createVueModal = async (
       animation: modalFadeIn 0.3s ease-out;
       pointer-events: none;
     `
-
 
     // 🎨 투명 모달 컨테이너 생성 (헤더 제거, 투명 배경)
     const modal = document.createElement('div')
@@ -457,48 +433,6 @@ export const createVueModal = async (
       pointer-events: auto;
     `
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     // Vue 컴포넌트를 마운트할 컨테이너 (전체 영역 사용)
     const componentContainer = document.createElement('div')
     componentContainer.style.cssText = `
@@ -508,7 +442,6 @@ export const createVueModal = async (
       flex-direction: column;
       background: transparent;
     `
-
 
     // 🎯 모달 닫기 함수 정의
     const closeModal = () => {
@@ -539,20 +472,11 @@ export const createVueModal = async (
       }, 300)
     }
 
-
     // ✅ 🎯 모달 매니저에 등록
     console.log(`📝 모달 매니저에 등록 시도: ${modalId}`)
 
-
-
     ModalManager.getInstance().registerModal(modalId, closeModal)
     console.log(`✅ 모달 매니저 등록 완료: ${modalId}`)
-
-
-
-
-
-
 
     // Vue 앱 생성
     const app = createApp(component, {
@@ -570,20 +494,6 @@ export const createVueModal = async (
     app.config.globalProperties.$closeModal = closeModal
     app.config.globalProperties.$modalId = modalId
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     // 🎨 이벤트 리스너들 (오버레이 클릭 비활성화)
     // ESC 키로만 닫기 가능
     const handleKeydown = (e: KeyboardEvent) => {
@@ -595,18 +505,6 @@ export const createVueModal = async (
     }
     document.addEventListener('keydown', handleKeydown)
 
-
-
-
-
-
-
-
-
-
-
-
-
     // DOM 구성 (헤더 없이 컨텐츠만)
     modal.appendChild(componentContainer)
     overlay.appendChild(modal)
@@ -617,8 +515,6 @@ export const createVueModal = async (
       throw new Error(`모달 컨테이너를 찾을 수 없습니다: ${modalContainer}`)
     }
     container.appendChild(overlay)
-
-
 
     // 🎨 CSS 애니메이션 추가 (투명 배경용)
     if (!document.querySelector('#transparent-modal-animations')) {
@@ -664,7 +560,6 @@ export const createVueModal = async (
     console.log(`📊 최종 활성 모달 수: ${finalActiveCount}`)
 
     return { element: overlay, app, close: closeModal }
-
   } catch (error) {
     console.error(`❌ 모달 생성 실패: ${componentName}`, error)
     onError?.(error as Error)
@@ -742,7 +637,8 @@ export const openTrackingInfo = (options: DisplayOptions = {}) =>
 
 export const openCommandHistory = (options: DisplayOptions = {}) =>
   openComponent('command-history', options)
-
+// TLE Upload 편의 함수 추가
+export const openTLEUpload = (options: DisplayOptions = {}) => openComponent('tle-upload', options)
 // 🆕 모든 컴포넌트 목록 가져오기
 export const getAvailableComponents = () => {
   return Object.values(POPUP_COMPONENTS)
@@ -1080,7 +976,6 @@ export const closeWindow = (): boolean => {
   console.log('🚪 범용 닫기 함수 호출')
 
   try {
-
     const isPopupWindow = window.opener !== null
 
     console.log(`🔍 팝업 창 여부: ${isPopupWindow}`)
@@ -1114,10 +1009,8 @@ export const closeWindow = (): boolean => {
 
       return true
     } else {
-
       // 모달 모드
       console.log('📱 모달 닫기 시도')
-
 
       const modalManager = ModalManager.getInstance()
       console.log('🎯 ModalManager 인스턴스 획득')
@@ -1132,23 +1025,10 @@ export const closeWindow = (): boolean => {
         modalManager.debugPrintModals()
       }
 
-
       return success
     }
   } catch (error) {
     console.error('❌ 창 닫기 중 오류:', error)
-
-
-
-
-
-
-
-
-
-
-
-
 
     return false
   }

@@ -224,21 +224,49 @@
 
               <!-- 버튼 그룹 -->
               <div class="button-group q-mt-md">
-                <q-btn
-                  color="primary"
-                  label="Load Schedule"
-                  @click="loadScheduleData"
-                  class="q-mr-sm"
-                />
-                <q-btn
-                  color="positive"
-                  label="Start"
-                  @click="handleStartCommand"
-                  :disable="!selectedSchedule"
-                  class="q-mr-sm"
-                />
-                <q-btn color="warning" label="Stop" @click="handleStopCommand" class="q-mr-sm" />
-                <q-btn color="negative" label="Reset" @click="handleResetCommand" />
+                <div class="button-row q-mb-md">
+                  <q-btn
+                    color="info"
+                    label="TLE Upload"
+                    icon="upload_file"
+                    @click="handleTLEUpload"
+                    class="q-mr-sm upload-btn"
+                    size="md"
+                  />
+                  <q-btn
+                    color="primary"
+                    label="Load Schedule"
+                    icon="refresh"
+                    @click="loadScheduleData"
+                    class="upload-btn"
+                    size="md"
+                  />
+                </div>
+
+                <div class="control-button-row">
+                  <q-btn
+                    color="positive"
+                    label="Start"
+                    @click="handleStartCommand"
+                    :disable="!selectedSchedule"
+                    class="control-btn"
+                    size="md"
+                  />
+                  <q-btn
+                    color="warning"
+                    label="Stop"
+                    @click="handleStopCommand"
+                    class="control-btn"
+                    size="md"
+                  />
+                  <q-btn
+                    color="negative"
+                    label="Stow"
+                    @click="handleStowCommand"
+                    class="control-btn"
+                    size="md"
+                  />
+                </div>
               </div>
             </q-card-section>
           </q-card>
@@ -256,6 +284,7 @@ import { useICDStore } from '../../stores/icd/icdStore'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 import type { QTableProps } from 'quasar'
+import { openModal } from '../../utils/windowUtils'
 
 const $q = useQuasar()
 const passScheduleStore = usePassScheduleStore()
@@ -321,6 +350,39 @@ const scheduleColumns: QTableColumn[] = [
   },
   { name: 'Status', label: '상태', field: 'Status', align: 'left' as const, sortable: true },
 ]
+// TLE 업로드 핸들러
+const handleTLEUpload = async () => {
+  try {
+    console.log('TLE 업로드 모달 열기')
+
+    const modal = await openModal('tle-upload', {
+      width: 800,
+      height: 700,
+      modalClass: 'tle-upload-modal',
+      onClose: () => {
+        console.log('TLE 업로드 모달 닫힘')
+        // 모달 닫힌 후 스케줄 데이터 새로고침
+      },
+      onError: (error) => {
+        console.error('TLE 업로드 모달 오류:', error)
+        $q.notify({
+          type: 'negative',
+          message: 'TLE 업로드 창을 열 수 없습니다',
+        })
+      },
+    })
+
+    if (modal) {
+      console.log('TLE 업로드 모달 열기 성공')
+    }
+  } catch (error) {
+    console.error('TLE 업로드 모달 열기 실패:', error)
+    $q.notify({
+      type: 'negative',
+      message: 'TLE 업로드 창을 열 수 없습니다',
+    })
+  }
+}
 
 // 페이지네이션 설정
 const pagination = {
@@ -599,7 +661,7 @@ const handleStopCommand = async () => {
   }
 }
 
-const handleResetCommand = async () => {
+const handleStowCommand = async () => {
   try {
     selectedSchedule.value = null
     inputs.value = ['0.00', '0.00', '0.00', '0']
@@ -723,6 +785,35 @@ onUnmounted(() => {
   margin-top: 0.5rem;
   width: 100%;
   flex-shrink: 0;
+}
+
+.button-row {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.control-button-row {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.upload-btn {
+  flex: 1;
+  min-width: 0;
+  height: 48px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.control-btn {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .schedule-info {

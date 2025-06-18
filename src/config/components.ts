@@ -29,6 +29,15 @@ export const POPUP_COMPONENTS: Record<string, ComponentConfig> = {
     component: () => import('../components/content/SystemInfoContent.vue'),
     description: '시스템 정보 및 성능',
   },
+  'tle-upload': {
+    name: 'tle-upload',
+    title: 'TLE Upload',
+    icon: '📡',
+    description: 'TLE 데이터 업로드',
+    defaultWidth: 800,
+    defaultHeight: 600,
+    component: () => import('../components/content/TLEUploadContent.vue'),
+  },
 }
 
 export type ComponentName = keyof typeof POPUP_COMPONENTS
