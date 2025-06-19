@@ -4,6 +4,7 @@ import com.gtlsystems.acs_api.service.mode.PassScheduleService
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import reactor.core.publisher.Mono
 
 /**
  * 패스 스케줄링 TLE 관리 API 컨트롤러
@@ -73,7 +74,8 @@ class PassScheduleController(
             passScheduleService.addPassScheduleTle(
                 finalSatelliteId,  // request.satelliteId 대신 finalSatelliteId 사용
                 request.tleLine1,
-                request.tleLine2
+                request.tleLine2,
+                request.satelliteName  // 위성 이름 추가
             )
 
             logger.info("TLE 데이터 추가 성공: 위성 ID = ${request.satelliteId}")
@@ -110,9 +112,10 @@ class PassScheduleController(
     @GetMapping("/tle/{satelliteId}")
     fun getTle(@PathVariable satelliteId: String): ResponseEntity<Map<String, Any>> {
         return try {
-            val tleData = passScheduleService.getPassScheduleTle(satelliteId)
+            val tleData = passScheduleService.getPassScheduleTleWithName(satelliteId)
 
             if (tleData != null) {
+                val (tleLine1, tleLine2, satelliteName) = tleData
                 logger.info("TLE 데이터 조회 성공: 위성 ID = $satelliteId")
                 ResponseEntity.ok(
                     mapOf(
@@ -120,8 +123,9 @@ class PassScheduleController(
                         "message" to "TLE 데이터 조회 성공",
                         "data" to mapOf(
                             "satelliteId" to satelliteId,
-                            "tleLine1" to tleData.first,
-                            "tleLine2" to tleData.second
+                            "satelliteName" to satelliteName,
+                            "tleLine1" to tleLine1,
+                            "tleLine2" to tleLine2
                         ),
                         "timestamp" to System.currentTimeMillis()
                     )
@@ -158,13 +162,15 @@ class PassScheduleController(
             val tleList = mutableListOf<Map<String, Any>>()
 
             satelliteIds.forEach { satelliteId ->
-                val tleData = passScheduleService.getPassScheduleTle(satelliteId)
+                val tleData = passScheduleService.getPassScheduleTleWithName(satelliteId)
                 if (tleData != null) {
+                    val (tleLine1, tleLine2, satelliteName) = tleData
                     tleList.add(
                         mapOf(
                             "satelliteId" to satelliteId,
-                            "tleLine1" to tleData.first,
-                            "tleLine2" to tleData.second
+                            "satelliteName" to satelliteName,
+                            "tleLine1" to tleLine1,
+                            "tleLine2" to tleLine2
                         )
                     )
                 }
@@ -351,7 +357,8 @@ class PassScheduleController(
             passScheduleService.addPassScheduleTle(
                 satelliteId,
                 request.tleLine1,
-                request.tleLine2
+                request.tleLine2,
+                request.satelliteName  // 위성 이름 추가
             )
 
             val message = if (isUpdate) {
@@ -385,7 +392,668 @@ class PassScheduleController(
             )
         }
     }
+    // ==================== 추적 데이터 생성 및 관리 API ====================
+
+    /**
+     * 모든 TLE 데이터에 대해 위성 추적 정보를 생성합니다 (비동기)
+     */
+    @PostMapping("/tracking/generate-all")
+    fun generateAllTrackingData(): Mono<ResponseEntity<Map<String, Any>>> {
+        logger.info("모든 위성 추적 데이터 생성 요청 수신")
+
+        return passScheduleService.generateAllPassScheduleTrackingDataAsync()
+            .map { results ->
+                logger.info("모든 위성 추적 데이터 생성 완료: ${results.size}개 위성")
+
+                val summary = results.map { (satelliteId, data) ->
+                    val (mstData, dtlData) = data
+                    mapOf(
+                        "satelliteId" to satelliteId,
+                        "passCount" to mstData.size,
+                        "trackingPointCount" to dtlData.size,
+                        "satelliteName" to (mstData.firstOrNull()?.get("SatelliteName") ?: "Unknown")
+                    )
+                }
+
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "모든 위성 추적 데이터 생성 완료",
+                        "data" to mapOf(
+                            "processedSatellites" to results.size,
+                            "totalPasses" to summary.sumOf { it["passCount"] as Int },
+                            "totalTrackingPoints" to summary.sumOf { it["trackingPointCount"] as Int },
+                            "satellites" to summary
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            }
+            .onErrorResume { error ->
+                logger.error("모든 위성 추적 데이터 생성 실패: ${error.message}", error)
+                Mono.just(
+                    ResponseEntity.internalServerError().body(
+                        mapOf(
+                            "success" to false,
+                            "message" to "모든 위성 추적 데이터 생성 중 오류가 발생했습니다: ${error.message}",
+                            "timestamp" to System.currentTimeMillis()
+                        )
+                    )
+                )
+            }
+    }
+
+    /**
+     * 특정 위성의 추적 데이터를 생성합니다 (비동기)
+     */
+    @PostMapping("/tracking/generate/{satelliteId}")
+    fun generateTrackingData(@PathVariable satelliteId: String): Mono<ResponseEntity<Map<String, Any>>> {
+        logger.info("위성 $satelliteId 추적 데이터 생성 요청 수신")
+
+        return Mono.fromCallable {
+            val tleData = passScheduleService.getPassScheduleTle(satelliteId)
+            if (tleData == null) {
+                throw IllegalArgumentException("위성 ID $satelliteId 의 TLE 데이터를 찾을 수 없습니다.")
+            }
+            tleData
+        }
+            .flatMap { tleData ->
+                val (tleLine1, tleLine2) = tleData
+                passScheduleService.generatePassScheduleTrackingDataAsync(satelliteId, tleLine1, tleLine2)
+            }
+            .map { (mstData, dtlData) ->
+                logger.info("위성 $satelliteId 추적 데이터 생성 완료: ${mstData.size}개 패스, ${dtlData.size}개 추적 포인트")
+
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "위성 추적 데이터 생성 완료",
+                        "data" to mapOf(
+                            "satelliteId" to satelliteId,
+                            "satelliteName" to (mstData.firstOrNull()?.get("SatelliteName") ?: "Unknown"),
+                            "passCount" to mstData.size,
+                            "trackingPointCount" to dtlData.size,
+                            "passes" to mstData.map { pass ->
+                                mapOf(
+                                    "passId" to pass["No"],
+                                    "startTime" to pass["StartTime"],
+                                    "endTime" to pass["EndTime"],
+                                    "duration" to pass["Duration"],
+                                    "maxElevation" to pass["MaxElevation"]
+                                )
+                            }
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            }
+            .onErrorResume { error ->
+                logger.error("위성 $satelliteId 추적 데이터 생성 실패: ${error.message}", error)
+                Mono.just(
+                    ResponseEntity.badRequest().body(
+                        mapOf(
+                            "success" to false,
+                            "message" to "위성 추적 데이터 생성 중 오류가 발생했습니다: ${error.message}",
+                            "timestamp" to System.currentTimeMillis()
+                        )
+                    )
+                )
+            }
+    }
+
+    /**
+     * 특정 위성의 패스 스케줄 마스터 데이터를 조회합니다.
+     */
+    @GetMapping("/tracking/master/{satelliteId}")
+    fun getTrackingMasterData(@PathVariable satelliteId: String): ResponseEntity<Map<String, Any>> {
+        return try {
+            val mstData = passScheduleService.getPassScheduleTrackMstBySatelliteId(satelliteId)
+
+            if (mstData != null && mstData.isNotEmpty()) {
+                logger.info("위성 $satelliteId 마스터 데이터 조회 성공: ${mstData.size}개 패스")
+
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "위성 마스터 데이터 조회 성공",
+                        "data" to mapOf(
+                            "satelliteId" to satelliteId,
+                            "passCount" to mstData.size,
+                            "passes" to mstData
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            } else {
+                logger.warn("위성 $satelliteId 마스터 데이터 없음")
+                ResponseEntity.status(404).body(
+                    mapOf(
+                        "success" to false,
+                        "message" to "해당 위성의 추적 데이터를 찾을 수 없습니다. 먼저 추적 데이터를 생성해주세요.",
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            logger.error("위성 $satelliteId 마스터 데이터 조회 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "마스터 데이터 조회 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * 특정 위성의 패스 스케줄 세부 데이터를 조회합니다.
+     */
+    @GetMapping("/tracking/detail/{satelliteId}")
+    fun getTrackingDetailData(@PathVariable satelliteId: String): ResponseEntity<Map<String, Any>> {
+        return try {
+            val dtlData = passScheduleService.getPassScheduleTrackDtlBySatelliteId(satelliteId)
+
+            if (dtlData != null && dtlData.isNotEmpty()) {
+                logger.info("위성 $satelliteId 세부 데이터 조회 성공: ${dtlData.size}개 추적 포인트")
+
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "위성 세부 데이터 조회 성공",
+                        "data" to mapOf(
+                            "satelliteId" to satelliteId,
+                            "trackingPointCount" to dtlData.size,
+                            "trackingPoints" to dtlData
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            } else {
+                logger.warn("위성 $satelliteId 세부 데이터 없음")
+                ResponseEntity.status(404).body(
+                    mapOf(
+                        "success" to false,
+                        "message" to "해당 위성의 추적 세부 데이터를 찾을 수 없습니다. 먼저 추적 데이터를 생성해주세요.",
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            logger.error("위성 $satelliteId 세부 데이터 조회 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "세부 데이터 조회 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * 특정 위성의 특정 패스에 대한 세부 데이터를 조회합니다.
+     */
+    @GetMapping("/tracking/detail/{satelliteId}/pass/{passId}")
+    fun getTrackingDetailDataByPass(
+        @PathVariable satelliteId: String,
+        @PathVariable passId: UInt
+    ): ResponseEntity<Map<String, Any>> {
+        return try {
+            val dtlData = passScheduleService.getPassScheduleTrackDtlByMstId(satelliteId, passId)
+
+            if (dtlData.isNotEmpty()) {
+                logger.info("위성 $satelliteId 패스 $passId 세부 데이터 조회 성공: ${dtlData.size}개 추적 포인트")
+
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "패스별 세부 데이터 조회 성공",
+                        "data" to mapOf(
+                            "satelliteId" to satelliteId,
+                            "passId" to passId,
+                            "trackingPointCount" to dtlData.size,
+                            "trackingPoints" to dtlData
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            } else {
+                logger.warn("위성 $satelliteId 패스 $passId 세부 데이터 없음")
+                ResponseEntity.status(404).body(
+                    mapOf(
+                        "success" to false,
+                        "message" to "해당 위성의 패스에 대한 추적 세부 데이터를 찾을 수 없습니다.",
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            logger.error("위성 $satelliteId 패스 $passId 세부 데이터 조회 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "패스별 세부 데이터 조회 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * 모든 위성의 패스 스케줄 마스터 데이터를 조회합니다.
+     */
+    @GetMapping("/tracking/master")
+    fun getAllTrackingMasterData(): ResponseEntity<Map<String, Any>> {
+        return try {
+            val allMstData = passScheduleService.getAllPassScheduleTrackMst()
+
+            if (allMstData.isNotEmpty()) {
+                val totalPasses = allMstData.values.sumOf { it.size }
+                logger.info("전체 마스터 데이터 조회 성공: ${allMstData.size}개 위성, ${totalPasses}개 패스")
+
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "전체 마스터 데이터 조회 성공",
+                        "data" to mapOf(
+                            "satelliteCount" to allMstData.size,
+                            "totalPassCount" to totalPasses,
+                            "satellites" to allMstData
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            } else {
+                logger.warn("전체 마스터 데이터 없음")
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "추적 데이터가 없습니다. 먼저 추적 데이터를 생성해주세요.",
+                        "data" to mapOf(
+                            "satelliteCount" to 0,
+                            "totalPassCount" to 0,
+                            "satellites" to emptyMap<String, Any>()
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            logger.error("전체 마스터 데이터 조회 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "전체 마스터 데이터 조회 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * 추적 데이터 통계 정보를 조회합니다.
+     */
+    @GetMapping("/tracking/statistics")
+    fun getTrackingStatistics(): ResponseEntity<Map<String, Any>> {
+        return try {
+            val statistics = passScheduleService.getTrackingDataStatistics()
+            logger.info("추적 데이터 통계 조회 성공")
+
+            ResponseEntity.ok(
+                mapOf(
+                    "success" to true,
+                    "message" to "추적 데이터 통계 조회 성공",
+                    "data" to statistics,
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        } catch (e: Exception) {
+            logger.error("추적 데이터 통계 조회 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "추적 데이터 통계 조회 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+    /**
+     * 특정 위성의 간단한 패스 정보만 조회합니다 (요약 정보)
+     */
+    @GetMapping("/tracking/summary/{satelliteId}")
+    fun getTrackingSummary(@PathVariable satelliteId: String): ResponseEntity<Map<String, Any>> {
+        return try {
+            val mstData = passScheduleService.getPassScheduleTrackMstBySatelliteId(satelliteId)
+            val dtlData = passScheduleService.getPassScheduleTrackDtlBySatelliteId(satelliteId)
+
+            if (mstData != null && mstData.isNotEmpty()) {
+                val summary = mstData.map { pass ->
+                    mapOf(
+                        "passId" to pass["No"],
+                        "satelliteName" to pass["SatelliteName"],
+                        "startTime" to pass["StartTime"],
+                        "endTime" to pass["EndTime"],
+                        "duration" to pass["Duration"],
+                        "maxElevation" to pass["MaxElevation"],
+                        "maxElevationTime" to pass["MaxElevationTime"],
+                        "startAzimuth" to pass["StartAzimuth"],
+                        "startElevation" to pass["StartElevation"],
+                        "endAzimuth" to pass["EndAzimuth"],
+                        "endElevation" to pass["EndElevation"]
+                    )
+                }
+
+                logger.info("위성 $satelliteId 추적 요약 정보 조회 성공: ${mstData.size}개 패스")
+
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "위성 추적 요약 정보 조회 성공",
+                        "data" to mapOf(
+                            "satelliteId" to satelliteId,
+                            "satelliteName" to (mstData.firstOrNull()?.get("SatelliteName") ?: "Unknown"),
+                            "passCount" to mstData.size,
+                            "trackingPointCount" to (dtlData?.size ?: 0),
+                            "passes" to summary
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            } else {
+                logger.warn("위성 $satelliteId 추적 요약 정보 없음")
+                ResponseEntity.status(404).body(
+                    mapOf(
+                        "success" to false,
+                        "message" to "해당 위성의 추적 데이터를 찾을 수 없습니다. 먼저 추적 데이터를 생성해주세요.",
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            logger.error("위성 $satelliteId 추적 요약 정보 조회 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "추적 요약 정보 조회 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * 모든 위성의 간단한 패스 정보만 조회합니다 (전체 요약 정보)
+     */
+    @GetMapping("/tracking/summary")
+    fun getAllTrackingSummary(): ResponseEntity<Map<String, Any>> {
+        return try {
+            val allMstData = passScheduleService.getAllPassScheduleTrackMst()
+            val allDtlData = passScheduleService.getAllPassScheduleTrackDtl()
+
+            if (allMstData.isNotEmpty()) {
+                val satelliteSummaries = allMstData.map { (satelliteId, mstData) ->
+                    val dtlData = allDtlData[satelliteId] ?: emptyList()
+                    val passSummaries = mstData.map { pass ->
+                        mapOf(
+                            "passId" to pass["No"],
+                            "startTime" to pass["StartTime"],
+                            "endTime" to pass["EndTime"],
+                            "duration" to pass["Duration"],
+                            "maxElevation" to pass["MaxElevation"]
+                        )
+                    }
+
+                    mapOf(
+                        "satelliteId" to satelliteId,
+                        "satelliteName" to (mstData.firstOrNull()?.get("SatelliteName") ?: "Unknown"),
+                        "passCount" to mstData.size,
+                        "trackingPointCount" to dtlData.size,
+                        "passes" to passSummaries
+                    )
+                }
+
+                val totalPasses = allMstData.values.sumOf { it.size }
+                val totalTrackingPoints = allDtlData.values.sumOf { it.size }
+
+                logger.info("전체 추적 요약 정보 조회 성공: ${allMstData.size}개 위성, ${totalPasses}개 패스")
+
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "전체 추적 요약 정보 조회 성공",
+                        "data" to mapOf(
+                            "totalSatellites" to allMstData.size,
+                            "totalPasses" to totalPasses,
+                            "totalTrackingPoints" to totalTrackingPoints,
+                            "satellites" to satelliteSummaries
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            } else {
+                logger.warn("전체 추적 요약 정보 없음")
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "추적 데이터가 없습니다. 먼저 추적 데이터를 생성해주세요.",
+                        "data" to mapOf(
+                            "totalSatellites" to 0,
+                            "totalPasses" to 0,
+                            "totalTrackingPoints" to 0,
+                            "satellites" to emptyList<Any>()
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            logger.error("전체 추적 요약 정보 조회 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "전체 추적 요약 정보 조회 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * 특정 위성의 추적 데이터를 삭제합니다.
+     */
+    @DeleteMapping("/tracking/{satelliteId}")
+    fun deleteTrackingData(@PathVariable satelliteId: String): ResponseEntity<Map<String, Any>> {
+        return try {
+            // 삭제 전 존재 여부 확인
+            val mstData = passScheduleService.getPassScheduleTrackMstBySatelliteId(satelliteId)
+            val dtlData = passScheduleService.getPassScheduleTrackDtlBySatelliteId(satelliteId)
+
+            if (mstData == null && dtlData == null) {
+                logger.warn("삭제할 추적 데이터 없음: 위성 ID = $satelliteId")
+                return ResponseEntity.status(404).body(
+                    mapOf(
+                        "success" to false,
+                        "message" to "해당 위성의 추적 데이터를 찾을 수 없습니다.",
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            }
+
+            val deletedPassCount = mstData?.size ?: 0
+            val deletedTrackingPointCount = dtlData?.size ?: 0
+
+            passScheduleService.clearPassScheduleTrackingData(satelliteId)
+            logger.info("위성 $satelliteId 추적 데이터 삭제 성공: ${deletedPassCount}개 패스, ${deletedTrackingPointCount}개 추적 포인트")
+
+            ResponseEntity.ok(
+                mapOf(
+                    "success" to true,
+                    "message" to "위성 추적 데이터가 성공적으로 삭제되었습니다.",
+                    "data" to mapOf(
+                        "satelliteId" to satelliteId,
+                        "deletedPassCount" to deletedPassCount,
+                        "deletedTrackingPointCount" to deletedTrackingPointCount,
+                        "deleted" to true
+                    ),
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        } catch (e: Exception) {
+            logger.error("위성 $satelliteId 추적 데이터 삭제 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "추적 데이터 삭제 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * 모든 위성의 추적 데이터를 삭제합니다.
+     */
+    @DeleteMapping("/tracking")
+    fun deleteAllTrackingData(): ResponseEntity<Map<String, Any>> {
+        return try {
+            val statistics = passScheduleService.getTrackingDataStatistics()
+            val beforeSatelliteCount = statistics["totalSatellites"] as Int
+            val beforePassCount = statistics["totalPasses"] as Int
+            val beforeTrackingPointCount = statistics["totalTrackingPoints"] as Int
+
+            passScheduleService.clearAllPassScheduleTrackingData()
+            logger.info("전체 추적 데이터 삭제 성공: ${beforeSatelliteCount}개 위성, ${beforePassCount}개 패스, ${beforeTrackingPointCount}개 추적 포인트")
+
+            ResponseEntity.ok(
+                mapOf(
+                    "success" to true,
+                    "message" to "전체 추적 데이터가 성공적으로 삭제되었습니다.",
+                    "data" to mapOf(
+                        "deletedSatelliteCount" to beforeSatelliteCount,
+                        "deletedPassCount" to beforePassCount,
+                        "deletedTrackingPointCount" to beforeTrackingPointCount,
+                        "remainingSatelliteCount" to 0,
+                        "remainingPassCount" to 0,
+                        "remainingTrackingPointCount" to 0
+                    ),
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        } catch (e: Exception) {
+            logger.error("전체 추적 데이터 삭제 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "전체 추적 데이터 삭제 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * TLE 데이터 추가와 동시에 추적 데이터를 생성합니다 (원스톱 API)
+     */
+    @PostMapping("/tle-and-tracking")
+    fun addTleAndGenerateTracking(@RequestBody request: AddTleRequest): Mono<ResponseEntity<Map<String, Any>>> {
+        logger.info("TLE 추가 및 추적 데이터 생성 요청 수신")
+
+        return Mono.fromCallable {
+            // satelliteId 결정
+            val finalSatelliteId = if (request.satelliteId.isNullOrBlank()) {
+                try {
+                    request.tleLine1.substring(2, 7).trim()
+                } catch (e: Exception) {
+                    throw IllegalArgumentException("satelliteId가 제공되지 않았고, TLE Line1에서 위성 번호를 추출할 수 없습니다.")
+                }
+            } else {
+                request.satelliteId
+            }
+
+            if (finalSatelliteId.isBlank()) {
+                throw IllegalArgumentException("유효한 위성 ID를 확인할 수 없습니다.")
+            }
+
+            if (request.tleLine1.isBlank() || request.tleLine2.isBlank()) {
+                throw IllegalArgumentException("TLE Line1과 Line2는 필수입니다.")
+            }
+
+            // TLE 형식 기본 검증
+            if (request.tleLine1.length != 69 || request.tleLine2.length != 69) {
+                throw IllegalArgumentException("TLE 형식이 올바르지 않습니다. 각 라인은 69자여야 합니다.")
+            }
+
+            // TLE 데이터 추가
+            passScheduleService.addPassScheduleTle(
+                finalSatelliteId,
+                request.tleLine1,
+                request.tleLine2,
+                request.satelliteName  // 위성 이름 추가
+            )
+
+            val finalSatelliteName = passScheduleService.getPassScheduleSatelliteName(finalSatelliteId)
+                ?: request.satelliteName
+                ?: "Satellite-$finalSatelliteId"
+
+            Triple(finalSatelliteId, finalSatelliteName, request)
+        }
+            .flatMap { (satelliteId, satelliteName, request) ->
+                // 추적 데이터 생성
+                passScheduleService.generatePassScheduleTrackingDataAsync(
+                    satelliteId,
+                    request.tleLine1,
+                    request.tleLine2,
+                    satelliteName  // 위성 이름 전달
+                ).map { (mstData, dtlData) ->
+                    Triple(satelliteId, mstData, dtlData)
+                }
+            }
+            .map { (satelliteId, mstData, dtlData) ->
+                logger.info("TLE 추가 및 추적 데이터 생성 완료: 위성 ID = $satelliteId, ${mstData.size}개 패스, ${dtlData.size}개 추적 포인트")
+
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "TLE 데이터 추가 및 추적 데이터 생성이 완료되었습니다.",
+                        "data" to mapOf(
+                            "satelliteId" to satelliteId,
+                            "satelliteName" to (mstData.firstOrNull()?.get("SatelliteName") ?: "Unknown"),
+                            "tleLine1" to request.tleLine1,
+                            "tleLine2" to request.tleLine2,
+                            "passCount" to mstData.size,
+                            "trackingPointCount" to dtlData.size,
+                            "satelliteIdSource" to if (request.satelliteId.isNullOrBlank()) "extracted_from_tle" else "provided",
+                            "passes" to mstData.map { pass ->
+                                mapOf(
+                                    "passId" to pass["No"],
+                                    "startTime" to pass["StartTime"],
+                                    "endTime" to pass["EndTime"],
+                                    "duration" to pass["Duration"],
+                                    "maxElevation" to pass["MaxElevation"]
+                                )
+                            }
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            }
+            .onErrorResume { error ->
+                logger.error("TLE 추가 및 추적 데이터 생성 실패: ${error.message}", error)
+                Mono.just(
+                    ResponseEntity.badRequest().body(
+                        mapOf(
+                            "success" to false,
+                            "message" to "TLE 추가 및 추적 데이터 생성 중 오류가 발생했습니다: ${error.message}",
+                            "timestamp" to System.currentTimeMillis()
+                        )
+                    )
+                )
+            }
+    }
 }
+
 
 /**
  * TLE 추가 요청 데이터 클래스
@@ -393,14 +1061,15 @@ class PassScheduleController(
  */
 data class AddTleRequest(
     val satelliteId: String? = null,  // 선택적 필드 - null 허용
+    val satelliteName: String? = null, // 새로 추가된 선택적 필드
     val tleLine1: String,             // 필수 필드
     val tleLine2: String              // 필수 필드
 )
-
 /**
  * TLE 업데이트 요청 데이터 클래스
  */
 data class UpdateTleRequest(
+    val satelliteName: String? = null, // 새로 추가된 선택적 필드
     val tleLine1: String,
     val tleLine2: String
 )
