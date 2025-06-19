@@ -9,15 +9,13 @@
     <!-- 툴바 -->
     <div class="toolbar-section">
       <q-btn icon="upload_file" color="primary" size="md" class="toolbar-btn" @click="handleFileUpload"
-        title="파일 업로드" />
+        :disable="isSaving" title="파일 업로드" />
       <q-btn icon="download" color="info" size="md" class="toolbar-btn" @click="handleExportTXT"
-        :disable="tleData.length === 0" title="TXT로 내보내기" />
+        :disable="tleData.length === 0 || isSaving" title="TXT로 내보내기" />
       <q-btn icon="delete" color="negative" size="md" class="toolbar-btn" @click="handleDelete"
-        :disable="selected.length === 0" title="선택 항목 삭제" />
-
-
+        :disable="selected.length === 0 || isSaving" title="선택 항목 삭제" />
       <q-btn icon="clear_all" color="warning" size="md" class="toolbar-btn" @click="handleClearAll"
-        :disable="tleData.length === 0" title="전체 삭제" />
+        :disable="tleData.length === 0 || isSaving" title="전체 삭제" />
     </div>
 
     <!-- 테이블 (스크롤 가능) -->
@@ -51,6 +49,38 @@
       </q-table>
     </div>
 
+    <!-- 🆕 진행바 섹션 (업로드 중일 때만 표시) -->
+    <div v-if="isSaving" class="progress-section">
+      <div class="progress-header">
+        <div class="text-subtitle2 text-white">TLE 데이터 처리 중...</div>
+        <div class="text-caption text-grey-4">{{ progressLabel }}</div>
+      </div>
+
+      <q-linear-progress :value="saveProgress" color="primary" track-color="grey-8" size="12px" rounded
+        class="progress-bar" />
+
+      <div class="progress-stats">
+        <div class="stat-item">
+          <q-icon name="satellite" color="primary" size="16px" />
+          <span>{{ completedCount }}/{{ totalCount }}</span>
+        </div>
+        <div class="stat-item">
+          <q-icon name="check_circle" color="positive" size="16px" />
+          <span>{{ completedSatellites.length }}개 완료</span>
+        </div>
+        <div class="stat-item" v-if="failedSatellites.length > 0">
+          <q-icon name="error" color="negative" size="16px" />
+          <span>{{ failedSatellites.length }}개 실패</span>
+        </div>
+      </div>
+
+      <!-- 현재 처리 중인 위성 표시 -->
+      <div v-if="currentProcessing.show" class="current-processing">
+        <q-spinner-dots color="primary" size="20px" />
+        <span class="processing-text">{{ currentProcessing.satelliteId }} 처리 중...</span>
+      </div>
+    </div>
+
     <!-- 하단 버튼 -->
     <div class="footer-section">
       <div class="footer-info">
@@ -59,8 +89,9 @@
         </span>
       </div>
       <div class="footer-buttons">
-        <q-btn color="positive" label="Save & Close" @click="handleSaveAndClose" size="md" />
-        <q-btn color="grey-7" label="Close" @click="handleClose" size="md" />
+        <q-btn color="positive" label="Save & Close" @click="handleSaveAndClose" size="md" :disable="isSaving"
+          :loading="isSaving" />
+        <q-btn color="grey-7" label="Close" @click="handleClose" size="md" :disable="isSaving" />
       </div>
     </div>
 
@@ -133,19 +164,25 @@
 </template>
 
 <script setup lang="ts">
-
-
 import { ref, computed, onMounted, onUnmounted, getCurrentInstance } from 'vue'
-
 import { useQuasar } from 'quasar'
 import { usePassScheduleStore } from '../../stores/mode/passScheduleStore'
 import { closeWindow } from '../../utils/windowUtils'
 import type { QTableProps } from 'quasar'
 
+
 // Props 정의 (모달 ID 관리용)
 interface Props {
   modalId?: string
   modalTitle?: string
+}
+// TLE 업로드 결과 타입 정의 추가
+interface TLEUploadResult {
+  success: boolean
+  successCount: number
+  failedCount: number
+  totalPasses: number
+  processingTime: number
 }
 
 const props = defineProps<Props>()
@@ -160,14 +197,27 @@ const instance = getCurrentInstance()
 const isPopupWindow = ref(false)
 const isModalMode = ref(false)
 
-
-// 로컬 상태에 confirmDialog 추가
+// 로컬 상태
 const fileInput = ref<HTMLInputElement | null>(null)
 const selected = ref<TLEItem[]>([])
-const confirmDialog = ref(false) // 추가
-const confirmAllDialog = ref(false) // 전체 삭제용 추가
-const confirmCloseDialog = ref(false) // 닫기 확인용 추가
+const confirmDialog = ref(false)
+const confirmAllDialog = ref(false)
+const confirmCloseDialog = ref(false)
 
+// 진행바 상태 (Store에서 가져옴)
+const isSaving = computed(() => passScheduleStore.isUploading)
+const saveProgress = computed(() => passScheduleStore.uploadProgress)
+const progressLabel = computed(() => passScheduleStore.uploadStatus)
+
+// 진행 상태 추적용 로컬 상태
+const completedCount = ref(0)
+const totalCount = ref(0)
+const completedSatellites = ref<string[]>([])
+const failedSatellites = ref<string[]>([])
+const currentProcessing = ref({
+  show: false,
+  satelliteId: ''
+})
 
 // 임시 TLE 데이터 (저장 전까지 임시로 관리)
 const tempTleData = ref<TLEItem[]>([])
@@ -205,10 +255,8 @@ const columns: QTableColumn[] = [
   },
 ]
 
-
-
 // 컴포넌트 마운트 시 설정
-onMounted(() => {
+onMounted(async () => {
   console.log('🔧 TLE Upload 컴포넌트 마운트')
   console.log('🆔 모달 ID:', props.modalId)
   console.log('📋 모달 제목:', props.modalTitle)
@@ -228,29 +276,50 @@ onMounted(() => {
     modalId: props.modalId
   })
 
-  // 기존 저장된 TLE 데이터를 임시 데이터로 복사
-  tempTleData.value = [...passScheduleStore.tleData]
+  try {
+    // Store에서 서버 데이터 로드
+    await passScheduleStore.loadTLEDataFromServer()
 
-  console.log('📦 기존 TLE 데이터 로드:', tempTleData.value.length, '개')
+    // 기존 저장된 TLE 데이터를 임시 데이터로 복사
+    tempTleData.value = [...passScheduleStore.tleData]
+
+    console.log('📦 기존 TLE 데이터 로드:', tempTleData.value.length, '개')
+  } catch (error) {
+    console.error('❌ 초기 데이터 로드 실패:', error)
+    // 로컬 데이터라도 사용
+    tempTleData.value = [...passScheduleStore.tleData]
+  }
 })
 
 // TLE 이름 추출 (첫 번째 줄)
+// TLE 이름 추출 (개선된 버전)
 const getTLEName = (tleContent: string): string => {
   if (!tleContent) return ''
 
   const lines = tleContent.split('\n').filter((line) => line.trim())
   if (lines.length === 0) return ''
 
-  const firstLine = lines[0]?.trim() || ''
+  // 🔧 3줄 형식인 경우 (위성명 + Line1 + Line2)
+  if (lines.length >= 3 &&
+    !lines[0]?.startsWith('1 ') &&
+    !lines[0]?.startsWith('2 ') &&
+    lines[1]?.startsWith('1 ') &&
+    lines[2]?.startsWith('2 ')) {
 
-  // 첫 번째 줄이 TLE Line1이 아닌 경우 (위성명)
-  if (!firstLine.startsWith('1 ')) {
-    return firstLine
+    const satelliteName = lines[0]?.trim() || ''
+    console.log(`🔍 위성명 추출 (3줄): "${satelliteName}"`)
+    return satelliteName
   }
 
-  // TLE Line1에서 위성 ID 추출
-  const satelliteId = firstLine.substring(2, 7).trim()
-  return `Satellite ${satelliteId}`
+  // 🔧 2줄 형식인 경우 - TLE Line1에서 위성 ID 추출
+  const line1 = lines.find(line => line.startsWith('1 '))
+  if (line1) {
+    const satelliteId = line1.substring(2, 7).trim()
+    console.log(`🔍 위성 ID 추출 (2줄): "${satelliteId}"`)
+    return `${satelliteId}`
+  }
+
+  return ''
 }
 
 // TLE 라인들 추출 (Line1, Line2)
@@ -295,57 +364,95 @@ const readFileContent = (file: File): Promise<string> => {
   })
 }
 
-// TLE 텍스트 파싱 (개선된 버전)
+// TLE 텍스트 파싱 (개선된 버전 - undefined 체크 추가)
 const parseTLEText = (content: string): string[] => {
   if (!content) return []
 
+  console.log('🔍 TLE 파싱 시작')
+  console.log('원본 내용:', content)
+
   // 줄바꿈 정규화
   const normalizedContent = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-  const lines = normalizedContent.split('\n')
+  const allLines = normalizedContent.split('\n')
+
+  console.log('전체 라인 수:', allLines.length)
+
+  // 빈 줄 제거하되 순서 유지
+  const lines = allLines.map(line => line.trim()).filter(line => line.length > 0)
+
+  console.log('필터링된 라인들:')
+  lines.forEach((line, index) => {
+    console.log(`${index}: "${line}"`)
+  })
 
   const tleBlocks: string[] = []
   let i = 0
 
   while (i < lines.length) {
-    const currentLine = lines[i]?.trim()
+    const currentLine = lines[i]
 
+    // 🔧 undefined 체크 추가
     if (!currentLine) {
       i++
       continue
     }
 
-    // 3줄 형식 감지: 위성명 + TLE Line1 + TLE Line2
+    // 🔧 3줄 형식 우선 체크: 위성명 + TLE Line1 + TLE Line2
     if (i + 2 < lines.length) {
-      const line1 = lines[i + 1]?.trim()
-      const line2 = lines[i + 2]?.trim()
+      const line1 = lines[i + 1]
+      const line2 = lines[i + 2]
 
-      if (line1?.startsWith('1 ') && line2?.startsWith('2 ')) {
-        // 위성명이 있는 3줄 형식
+      // 🔧 모든 라인이 존재하는지 확인
+      if (currentLine && line1 && line2 &&
+        !currentLine.startsWith('1 ') &&
+        !currentLine.startsWith('2 ') &&
+        line1.startsWith('1 ') &&
+        line2.startsWith('2 ')) {
+
         const satelliteName = currentLine
         const tleBlock = `${satelliteName}\n${line1}\n${line2}`
         tleBlocks.push(tleBlock)
+
+        console.log(`✅ 3줄 형식 TLE 발견: "${satelliteName}"`)
+
         i += 3
         continue
       }
     }
 
-    // 2줄 형식 감지: TLE Line1 + TLE Line2
-    if (currentLine.startsWith('1 ') && i + 1 < lines.length) {
-      const line2 = lines[i + 1]?.trim()
+    // 🔧 2줄 형식 체크: TLE Line1 + TLE Line2
+    if (i + 1 < lines.length) {
+      const line2 = lines[i + 1]
 
-      if (line2?.startsWith('2 ')) {
+      // 🔧 라인 존재 확인 추가
+      if (currentLine && line2 &&
+        currentLine.startsWith('1 ') &&
+        line2.startsWith('2 ')) {
+
         const tleBlock = `${currentLine}\n${line2}`
         tleBlocks.push(tleBlock)
+
+        console.log(`✅ 2줄 형식 TLE 발견`)
+
         i += 2
         continue
       }
     }
 
+    // 처리되지 않은 라인
+    console.log(`⚠️ 건너뛴 라인: "${currentLine}"`)
     i++
   }
 
+  console.log(`🎯 파싱 완료: ${tleBlocks.length}개 TLE 블록`)
+  tleBlocks.forEach((block, index) => {
+    console.log(`\n=== TLE ${index + 1} ===`)
+    console.log(block)
+  })
+
   return tleBlocks
 }
+
 
 // 파일 업로드 핸들러
 const handleFileUpload = () => {
@@ -353,6 +460,7 @@ const handleFileUpload = () => {
 }
 
 // 파일 업로드 핸들러 - 임시 데이터에 추가
+// 파일 업로드 핸들러 - 순서 보장
 const onFileSelected = async (event: Event) => {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
@@ -360,8 +468,13 @@ const onFileSelected = async (event: Event) => {
   if (!file) return
 
   try {
+    console.log('📁 파일 업로드 시작:', file.name)
+
     const content = await readFileContent(file)
+    console.log('📄 파일 내용 길이:', content.length)
+
     const tleBlocks = parseTLEText(content)
+    console.log('🔍 파싱된 TLE 블록 수:', tleBlocks.length)
 
     if (tleBlocks.length === 0) {
       $q.notify({
@@ -371,24 +484,31 @@ const onFileSelected = async (event: Event) => {
       return
     }
 
-    // 임시 데이터에 추가 (기존 데이터에 이어서 추가)
-    tleBlocks.forEach((block) => {
-      const newNo = tempTleData.value.length > 0
-        ? Math.max(...tempTleData.value.map(item => item.No)) + 1
-        : 1
+    // 🔧 기존 데이터의 마지막 No 찾기
+    const lastNo = tempTleData.value.length > 0
+      ? Math.max(...tempTleData.value.map(item => item.No))
+      : 0
+
+    // 🔧 순서를 보장하면서 임시 데이터에 추가
+    tleBlocks.forEach((block, index) => {
+      const newNo = lastNo + index + 1
 
       tempTleData.value.push({
         No: newNo,
         TLE: block
       })
+
+      console.log(`➕ TLE ${newNo} 추가:`, getTLEName(block))
     })
+
+    console.log('✅ 총', tempTleData.value.length, '개 TLE 데이터')
 
     $q.notify({
       type: 'positive',
-      message: `${tleBlocks.length}개의 TLE 데이터가 추가되었습니다 (임시)`,
+      message: `${tleBlocks.length}개의 TLE 데이터가 추가되었습니다`,
     })
   } catch (error) {
-    console.error('파일 처리 오류:', error)
+    console.error('❌ 파일 처리 오류:', error)
     $q.notify({
       type: 'negative',
       message: '파일 처리 중 오류가 발생했습니다',
@@ -401,16 +521,10 @@ const onFileSelected = async (event: Event) => {
   }
 }
 
-
-
-
-
-
 // 삭제 핸들러 - 커스텀 다이얼로그 사용
 const handleDelete = () => {
   console.log('🗑️ 삭제 버튼 클릭')
   console.log('📋 선택된 항목들:', selected.value)
-
 
   if (selected.value.length === 0) {
     console.warn('⚠️ 선택된 항목이 없음')
@@ -431,9 +545,6 @@ const onConfirmDelete = () => {
 
   const count = selected.value.length
   performDelete(count)
-
-  // v-close-popup이 자동으로 처리하므로 수동 닫기 제거
-  // confirmDialog.value = false // 이 줄 제거
 }
 
 // 실제 삭제 수행 함수
@@ -475,27 +586,6 @@ const performDelete = (count: number) => {
   selected.value = []
   console.log('🧹 선택 항목 초기화')
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   $q.notify({
     type: 'positive',
     message: `${count}개의 TLE 데이터가 삭제되었습니다`,
@@ -504,45 +594,20 @@ const performDelete = (count: number) => {
   console.log('✅ 삭제 완료')
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
 // 전체 삭제 핸들러
 const handleClearAll = () => {
   console.log('🗑️ 전체 삭제 버튼 클릭')
 
-
-
   if (tempTleData.value.length === 0) {
-
     $q.notify({
-
-
       type: 'warning',
       message: '삭제할 TLE 데이터가 없습니다',
     })
-
     return
   }
 
   confirmAllDialog.value = true
 }
-
-
-
-
-
-
-
 
 // 전체 삭제 확인 처리
 const onConfirmClearAll = () => {
@@ -610,68 +675,143 @@ const onRowClick = (evt: Event, row: TLEItem) => {
     selected.value.push(row)
   }
 }
+// TLE 업로드 결과 타입 정의 (Store와 동일하게)
+interface TLEUploadResult {
+  success: boolean
+  successCount: number
+  failedCount: number
+  totalPasses: number
+  processingTime: number
+}
 
-
-// Save & Close - 임시 데이터를 실제 store에 저장하고 닫기
-const handleSaveAndClose = () => {
-  console.log('💾 Save & Close 버튼 클릭')
-  console.log('📊 저장할 임시 데이터 개수:', tempTleData.value.length)
-  console.log('📊 현재 store 데이터 개수:', passScheduleStore.tleData.length)
-
-  try {
-
-    // 1. 기존 store 데이터 모두 삭제
-    console.log('🗑️ 기존 store 데이터 삭제')
-    passScheduleStore.clearTLEData()
-
-
-
-
-    // 2. 임시 데이터를 store에 저장
-    console.log('💾 임시 데이터를 store에 저장 시작')
-    tempTleData.value.forEach((item, index) => {
-      console.log(`💾 저장 중: ${index + 1}/${tempTleData.value.length} - ${item.TLE.substring(0, 30)}...`)
-      passScheduleStore.addTLEData(item.TLE)
-    })
-
-
-    console.log('✅ 모든 데이터 저장 완료')
-    console.log('📊 저장 후 store 데이터 개수:', passScheduleStore.tleData.length)
-
-    // 3. 성공 알림
-    $q.notify({
-      type: 'positive',
-      message: `${tempTleData.value.length}개의 TLE 데이터가 저장되었습니다`,
-      timeout: 2000
-    })
-
-
-
-    // 4. 잠시 후 창 닫기 (사용자가 알림을 볼 수 있도록)
-    setTimeout(() => {
-      console.log('🚪 저장 완료 후 창 닫기')
-      performClose()
-    }, 1000)
-
-  } catch (error) {
-
-    console.error('❌ 저장 중 오류 발생:', error)
-
-    $q.notify({
-      type: 'negative',
-      message: '저장 중 오류가 발생했습니다',
-      timeout: 3000
-    })
+// TLE 응답 타입 (Store에서 정의된 것과 동일)
+interface TleResponse {
+  success: boolean
+  message: string
+  data?: {
+    satelliteId: string
+    passCount: number
+    [key: string]: unknown
   }
 }
 
+// Save & Close - Store를 통한 서버 연동
+const handleSaveAndClose = async () => {
+  console.log('💾 Save & Close 버튼 클릭 - Store 연동')
+  console.log('📊 저장할 임시 데이터 개수:', tempTleData.value.length)
 
+  if (tempTleData.value.length === 0) {
+    $q.notify({
+      type: 'warning',
+      message: '저장할 TLE 데이터가 없습니다',
+    })
+    return
+  }
+
+  try {
+    // 진행 상태 초기화
+    completedCount.value = 0
+    totalCount.value = 0
+    completedSatellites.value = []
+    failedSatellites.value = []
+    currentProcessing.value = { show: false, satelliteId: '' }
+
+    console.log('🚀 Store 업로드 함수 호출 시작')
+
+    // 🔧 Store를 통해 TLE 데이터 업로드 (타입 안전)
+    const result = await passScheduleStore.uploadTLEDataToServer(tempTleData.value, {
+      onProgress: (completed: number, total: number, currentSatellite: string) => {
+        completedCount.value = completed
+        totalCount.value = total
+        currentProcessing.value = { show: true, satelliteId: currentSatellite }
+        console.log(`🔄 진행: ${completed}/${total} - ${currentSatellite}`)
+      },
+
+      onSuccess: (satelliteId: string, response: TleResponse) => {
+        completedSatellites.value.push(satelliteId)
+        console.log(`✅ 성공: ${satelliteId}`, response.data)
+
+        // 🔧 $q 존재 확인 후 알림 처리
+        if ($q && $q.notify) {
+          $q.notify({
+            type: 'positive',
+            message: `${satelliteId} 완료 (${response.data?.passCount || 0}개 패스)`,
+            timeout: 1500,
+            position: 'top-right'
+          })
+        }
+      },
+
+      onError: (satelliteId: string, error: string) => {
+        failedSatellites.value.push(satelliteId)
+        console.error(`❌ 실패: ${satelliteId} - ${error}`)
+
+        // 🔧 $q 존재 확인 후 알림 처리
+        if ($q && $q.notify) {
+          $q.notify({
+            type: 'negative',
+            message: `${satelliteId} 실패: ${error}`,
+            timeout: 2000,
+            position: 'top-right'
+          })
+        }
+      },
+
+      onComplete: (uploadResult: TLEUploadResult) => {
+        currentProcessing.value.show = false
+        console.log('🎉 전체 완료:', uploadResult)
+
+        // 🔧 $q 존재 확인 후 최종 알림 처리
+        if ($q && $q.notify) {
+          if (uploadResult.success) {
+            $q.notify({
+              type: 'positive',
+              message: `🎉 모든 위성 처리 완료!\n${uploadResult.successCount}개 위성, ${uploadResult.totalPasses}개 패스 생성\n소요시간: ${uploadResult.processingTime}초`,
+              timeout: 5000,
+              multiLine: true,
+              actions: [{ label: '확인', color: 'white' }]
+            })
+          } else {
+            $q.notify({
+              type: 'warning',
+              message: `처리 완료: ${uploadResult.successCount}개 성공, ${uploadResult.failedCount}개 실패\n총 ${uploadResult.totalPasses}개 패스 생성 (${uploadResult.processingTime}초 소요)`,
+              timeout: 5000,
+              multiLine: true,
+              actions: [{ label: '확인', color: 'white' }]
+            })
+          }
+        }
+
+        // 잠시 후 창 닫기
+        setTimeout(() => {
+          console.log('🚪 저장 완료 후 창 닫기')
+          performClose()
+        }, 3000)
+      }
+    })
+
+    console.log('✅ Store를 통한 업로드 완료:', result)
+
+  } catch (error) {
+    console.error('❌ 업로드 중 오류:', error)
+
+    // 🔧 에러 처리 개선
+    if ($q && $q.notify) {
+      $q.notify({
+        type: 'negative',
+        message: `업로드 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`,
+      })
+    }
+
+    // 진행 상태 초기화
+    currentProcessing.value.show = false
+  }
+}
 
 
 // 닫기 핸들러
 const handleClose = () => {
   console.log('🚪 닫기 요청 - TLE Upload')
-
 
   const originalData = passScheduleStore.tleData
   const hasChanges = tempTleData.value.length !== originalData.length ||
@@ -679,10 +819,8 @@ const handleClose = () => {
       originalData[index]?.TLE === item.TLE)
 
   if (hasChanges) {
-
     confirmCloseDialog.value = true
   } else {
-
     performClose()
   }
 }
@@ -693,7 +831,6 @@ const onConfirmClose = () => {
   performClose()
   confirmCloseDialog.value = false
 }
-
 
 // 실제 닫기 수행
 const performClose = () => {
@@ -728,9 +865,8 @@ const performClose = () => {
   }
 }
 
-// 컴포넌트 마운트/언마운트
+// 컴포넌트 언마운트
 onUnmounted(() => {
-
   console.log('🧹 TLE Upload 컴포넌트 언마운트')
   console.log('🆔 정리할 모달 ID:', props.modalId)
 
@@ -741,12 +877,17 @@ onUnmounted(() => {
     // 임시 데이터 초기화 (메모리 정리)
     tempTleData.value = []
 
+    // 진행 상태 초기화
+    completedCount.value = 0
+    totalCount.value = 0
+    completedSatellites.value = []
+    failedSatellites.value = []
+    currentProcessing.value = { show: false, satelliteId: '' }
+
     // 모달 모드인 경우 추가 정리 작업
     if (isModalMode.value && props.modalId) {
       console.log('🗑️ 모달 정리 작업 수행')
 
-      // ModalManager에서 모달 해제 (이미 닫혔을 수도 있지만 안전하게 정리)
-      // closeWindow 함수가 이미 처리했을 수도 있지만, 혹시 모르니 정리
       const globalProperties = instance?.appContext.config.globalProperties
       if (globalProperties?.$modalId === props.modalId) {
         console.log('🧹 전역 모달 ID 정리')
@@ -766,6 +907,7 @@ onUnmounted(() => {
   }
 })
 </script>
+
 
 <style scoped>
 .tle-upload-content {
@@ -905,29 +1047,18 @@ onUnmounted(() => {
 .tle-cell {
   width: 100% !important;
   height: 100% !important;
-  min-height: 80px !important;
 
 
-
-
-
-  padding: 8px !important;
+  min-height: 120px !important;
+  padding: 16px !important;
   box-sizing: border-box !important;
-
-
 }
 
 .tle-preview {
-
-
-
-
-
-
-
   display: block !important;
   width: 100% !important;
   height: 100% !important;
+  padding-top: 12px;
 }
 
 .tle-name {
@@ -940,64 +1071,42 @@ onUnmounted(() => {
   width: 100%;
   text-align: center;
 
-  margin-bottom: 8px;
+
+  margin-bottom: 12px;
 }
 
 .tle-lines {
   font-family: 'Courier New', monospace;
 
-  font-size: 10px;
+
+  font-size: 12px;
   color: #e0e0e0;
-  white-space: pre-wrap;
-  word-break: break-all;
 
 
-  line-height: 1.3;
-  max-height: 60px;
+  white-space: pre-line;
+  word-break: keep-all;
+
+
+
+
+  line-height: 1.4;
+  max-height: 100px;
   overflow: hidden;
   background-color: rgba(255, 255, 255, 0.05);
 
 
-  padding: 6px 8px;
+
+  padding: 10px 12px;
   border-radius: 4px;
   border-left: 3px solid #64b5f6;
   width: 100%;
 
-  text-align: left;
+
+  text-align: center;
 
   box-sizing: border-box;
+  margin-top: 4px;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 /* 테이블 헤더 - 3개 컬럼이 전체 너비를 꽉 채우도록 */
 .tle-table :deep(.q-table thead) {
@@ -1025,32 +1134,28 @@ onUnmounted(() => {
   z-index: 11;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  padding: 16px 8px !important;
-  height: 60px !important;
-  min-height: 60px !important;
+
+
+
+  padding: 6px 4px !important;
+  height: 28px !important;
+  min-height: 28px !important;
   box-sizing: border-box !important;
 
 
-
-
-
-  /* 테이블 셀 기본 속성 유지하면서 가운데 정렬 */
   display: table-cell !important;
   text-align: center !important;
   vertical-align: middle !important;
 
-  /* 텍스트 줄바꿈 방지 */
+
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
+  font-size: 13px !important;
 }
 
 /* 체크박스 헤더 컬럼 - 고정 너비 */
 .tle-table :deep(.q-table thead th.q-table--col-auto-width) {
-
-
-
-
   width: 50px !important;
   min-width: 50px !important;
   max-width: 50px !important;
@@ -1058,10 +1163,6 @@ onUnmounted(() => {
 
 /* No 헤더 컬럼 - 고정 너비 */
 .tle-table :deep(.q-table thead th:nth-child(2)) {
-
-
-
-
   width: 80px !important;
   min-width: 80px !important;
   max-width: 80px !important;
@@ -1069,10 +1170,8 @@ onUnmounted(() => {
 
 /* TLE Data 헤더 컬럼 - 나머지 전체 공간 사용 */
 .tle-table :deep(.q-table thead th:nth-child(3)) {
-
   width: calc(100% - 130px) !important;
   min-width: 200px !important;
-
 }
 
 /* 테이블 바디 */
@@ -1105,10 +1204,6 @@ onUnmounted(() => {
   min-height: 80px !important;
   box-sizing: border-box !important;
 
-
-
-
-
   /* 테이블 셀 기본 속성 유지하면서 가운데 정렬 */
   display: table-cell !important;
   text-align: center !important;
@@ -1117,9 +1212,6 @@ onUnmounted(() => {
 
 /* 체크박스 바디 컬럼 */
 .tle-table :deep(.q-table tbody td.q-table--col-auto-width) {
-
-
-
   width: 50px !important;
   min-width: 50px !important;
   max-width: 50px !important;
@@ -1128,9 +1220,6 @@ onUnmounted(() => {
 
 /* No 바디 컬럼 */
 .tle-table :deep(.q-table tbody td:nth-child(2)) {
-
-
-
   width: 80px !important;
   min-width: 80px !important;
   max-width: 80px !important;
@@ -1141,9 +1230,6 @@ onUnmounted(() => {
 
 /* TLE Data 바디 컬럼 */
 .tle-table :deep(.q-table tbody td:nth-child(3)) {
-
-
-
   width: calc(100% - 110px) !important;
   min-width: 300px !important;
   padding: 0 !important;
@@ -1434,5 +1520,92 @@ onUnmounted(() => {
 /* 다이얼로그 배경 오버레이 */
 :deep(.dialog-center .q-dialog__backdrop) {
   background: rgba(0, 0, 0, 0.6) !important;
+}
+
+/* 진행바 섹션 스타일 */
+.progress-section {
+  flex-shrink: 0;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.progress-header {
+  margin-bottom: 0.75rem;
+}
+
+.progress-bar {
+  margin-bottom: 0.75rem;
+}
+
+.progress-stats {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: white;
+  font-size: 12px;
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.current-processing {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background-color: rgba(33, 150, 243, 0.1);
+  border-left: 3px solid #2196f3;
+  border-radius: 4px;
+}
+
+.processing-text {
+  color: #64b5f6;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* 반응형 진행바 */
+@media (max-width: 768px) {
+  .progress-section {
+    padding: 0.75rem;
+  }
+
+  .progress-stats {
+    gap: 0.5rem;
+  }
+
+  .stat-item {
+    font-size: 11px;
+    padding: 0.2rem 0.4rem;
+  }
+
+  .processing-text {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .progress-section {
+    padding: 0.5rem;
+  }
+
+  .progress-stats {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .current-processing {
+    padding: 0.4rem;
+  }
 }
 </style>

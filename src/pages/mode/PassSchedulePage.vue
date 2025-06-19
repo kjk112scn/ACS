@@ -11,15 +11,8 @@
             <div class="text-subtitle2 text-weight-bold text-primary">Azimuth</div>
           </q-card-section>
           <q-card-section>
-            <q-input
-              v-model="inputs[0]"
-              @input="(val: string) => onInputChange(0, val)"
-              dense
-              outlined
-              type="number"
-              step="0.01"
-              class="q-mb-sm"
-            />
+            <q-input v-model="inputs[0]" @input="(val: string) => onInputChange(0, val)" dense outlined type="number"
+              step="0.01" class="q-mb-sm" />
             <div class="row q-gutter-xs">
               <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
               <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
@@ -38,15 +31,8 @@
             <div class="text-subtitle2 text-weight-bold text-primary">Elevation</div>
           </q-card-section>
           <q-card-section>
-            <q-input
-              v-model="inputs[1]"
-              @input="(val: string) => onInputChange(1, val)"
-              dense
-              outlined
-              type="number"
-              step="0.01"
-              class="q-mb-sm"
-            />
+            <q-input v-model="inputs[1]" @input="(val: string) => onInputChange(1, val)" dense outlined type="number"
+              step="0.01" class="q-mb-sm" />
             <div class="row q-gutter-xs">
               <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(1)" />
               <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
@@ -65,15 +51,8 @@
             <div class="text-subtitle2 text-weight-bold text-primary">Tilt</div>
           </q-card-section>
           <q-card-section>
-            <q-input
-              v-model="inputs[2]"
-              @input="(val: string) => onInputChange(2, val)"
-              dense
-              outlined
-              type="number"
-              step="0.01"
-              class="q-mb-sm"
-            />
+            <q-input v-model="inputs[2]" @input="(val: string) => onInputChange(2, val)" dense outlined type="number"
+              step="0.01" class="q-mb-sm" />
             <div class="row q-gutter-xs">
               <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(2)" />
               <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
@@ -92,15 +71,8 @@
             <div class="text-subtitle2 text-weight-bold text-primary">Time</div>
           </q-card-section>
           <q-card-section>
-            <q-input
-              v-model="inputs[3]"
-              @input="(val: string) => onInputChange(3, val)"
-              dense
-              outlined
-              type="number"
-              step="1"
-              class="q-mb-sm"
-            />
+            <q-input v-model="inputs[3]" @input="(val: string) => onInputChange(3, val)" dense outlined type="number"
+              step="1" class="q-mb-sm" />
             <div class="row q-gutter-xs">
               <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(3)" />
               <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
@@ -202,19 +174,9 @@
               <div class="text-subtitle1 text-weight-bold text-primary">Schedule Control</div>
 
               <!-- 스케줄 테이블 -->
-              <q-table
-                flat
-                bordered
-                :rows="scheduleData"
-                :columns="scheduleColumns"
-                row-key="No"
-                :pagination="pagination"
-                :loading="loading"
-                selection="single"
-                @row-click="onRowClick"
-                class="schedule-table q-mt-sm"
-                style="height: 300px"
-              >
+              <q-table flat bordered :rows="scheduleData" :columns="scheduleColumns" row-key="No"
+                :pagination="pagination" :loading="loading" selection="single" @row-click="onRowClick"
+                class="schedule-table q-mt-sm" style="height: 300px">
                 <template v-slot:loading>
                   <q-inner-loading showing color="primary">
                     <q-spinner size="50px" color="primary" />
@@ -222,50 +184,26 @@
                 </template>
               </q-table>
 
-              <!-- 버튼 그룹 -->
+
+              <!-- 버튼 그룹 섹션 -->
               <div class="button-group q-mt-md">
                 <div class="button-row q-mb-md">
-                  <q-btn
-                    color="info"
-                    label="TLE Upload"
-                    icon="upload_file"
-                    @click="handleTLEUpload"
-                    class="q-mr-sm upload-btn"
-                    size="md"
-                  />
-                  <q-btn
-                    color="primary"
-                    label="Load Schedule"
-                    icon="refresh"
-                    @click="loadScheduleData"
-                    class="upload-btn"
-                    size="md"
-                  />
+                  <q-btn color="info" label="TLE Upload" icon="upload_file" @click="handleTLEUpload"
+                    class="q-mr-sm upload-btn" size="md" />
+
+
+
+                  <q-btn color="primary" label="Select Schedule" icon="playlist_add_check" @click="selectScheduleData"
+                    class="upload-btn" size="md">
+                    <q-tooltip>스케줄 목록을 불러와서 선택할 수 있습니다</q-tooltip>
+                  </q-btn>
                 </div>
 
                 <div class="control-button-row">
-                  <q-btn
-                    color="positive"
-                    label="Start"
-                    @click="handleStartCommand"
-                    :disable="!selectedSchedule"
-                    class="control-btn"
-                    size="md"
-                  />
-                  <q-btn
-                    color="warning"
-                    label="Stop"
-                    @click="handleStopCommand"
-                    class="control-btn"
-                    size="md"
-                  />
-                  <q-btn
-                    color="negative"
-                    label="Stow"
-                    @click="handleStowCommand"
-                    class="control-btn"
-                    size="md"
-                  />
+                  <q-btn color="positive" label="Start" @click="handleStartCommand" :disable="!selectedSchedule"
+                    class="control-btn" size="md" />
+                  <q-btn color="warning" label="Stop" @click="handleStopCommand" class="control-btn" size="md" />
+                  <q-btn color="negative" label="Stow" @click="handleStowCommand" class="control-btn" size="md" />
                 </div>
               </div>
             </q-card-section>
@@ -356,8 +294,8 @@ const handleTLEUpload = async () => {
     console.log('TLE 업로드 모달 열기')
 
     const modal = await openModal('tle-upload', {
-      width: 800,
-      height: 700,
+      width: 1000,
+      height: 860,
       modalClass: 'tle-upload-modal',
       onClose: () => {
         console.log('TLE 업로드 모달 닫힘')
@@ -520,26 +458,42 @@ const updateChart = () => {
     console.error('차트 업데이트 중 오류 발생:', error)
   }
 }
-
-// 스케줄 데이터 로드
-const loadScheduleData = async () => {
+const selectScheduleData = async () => {
   try {
-    loading.value = true
-    await passScheduleStore.fetchScheduleData()
-    scheduleData.value = passScheduleStore.scheduleData as ScheduleItem[]
+    console.log('스케줄 선택 모달 열기')
 
-    $q.notify({
-      type: 'positive',
-      message: '스케줄 데이터를 성공적으로 로드했습니다',
+    const modal = await openModal('select-schedule', {
+      width: 1200,
+      height: 700,
+      modalClass: 'select-schedule-modal',
+      onClose: (selectedData?: ScheduleItem) => {
+        console.log('스케줄 선택 모달 닫힘', selectedData)
+        if (selectedData) {
+          selectedSchedule.value = selectedData
+          $q.notify({
+            type: 'positive',
+            message: `스케줄 "${selectedData.Name}"이 선택되었습니다`,
+          })
+        }
+      },
+      onError: (error) => {
+        console.error('스케줄 선택 모달 오류:', error)
+        $q.notify({
+          type: 'negative',
+          message: '스케줄 선택 창을 열 수 없습니다',
+        })
+      },
     })
+
+    if (modal) {
+      console.log('스케줄 선택 모달 열기 성공')
+    }
   } catch (error) {
-    console.error('Failed to load schedule data:', error)
+    console.error('스케줄 선택 모달 열기 실패:', error)
     $q.notify({
       type: 'negative',
-      message: '스케줄 데이터 로드에 실패했습니다',
+      message: '스케줄 선택 창을 열 수 없습니다',
     })
-  } finally {
-    loading.value = false
   }
 }
 
@@ -692,7 +646,7 @@ const init = async () => {
   }, 100)
 
   // 초기 스케줄 데이터 로드
-  await loadScheduleData()
+  await selectScheduleData()
 }
 
 // 컴포넌트 마운트
@@ -720,7 +674,7 @@ onUnmounted(() => {
     chart = null
   }
 
-  window.removeEventListener('resize', () => {})
+  window.removeEventListener('resize', () => { })
 })
 </script>
 
@@ -883,6 +837,7 @@ onUnmounted(() => {
 }
 
 @media (max-width: 767px) {
+
   /* 모바일에서는 오프셋 컨트롤을 세로로 배치 */
   .row:first-of-type .col-3 {
     width: 100%;

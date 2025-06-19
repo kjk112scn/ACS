@@ -38,6 +38,15 @@ export const POPUP_COMPONENTS: Record<string, ComponentConfig> = {
     defaultHeight: 600,
     component: () => import('../components/content/TLEUploadContent.vue'),
   },
+  'select-schedule': {
+    name: 'select-schedule',
+    title: 'Select Schedule',
+    icon: '📡',
+    description: 'Select Schedule',
+    defaultWidth: 800,
+    defaultHeight: 600,
+    component: () => import('../components/content/SelectScheduleContent.vue'),
+  },
 }
 
 export type ComponentName = keyof typeof POPUP_COMPONENTS

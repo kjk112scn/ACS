@@ -1,8 +1,9 @@
 import { api } from 'boot/axios'
 
-// 타입 정의
+// 타입 정의 (기존 타입들과 함께)
 export interface TLEItem {
   satelliteId: string
+  satelliteName?: string
   tleLine1: string
   tleLine2: string
 }
@@ -57,6 +58,60 @@ export interface CacheStatusResponse {
     }
   }
   timestamp: number
+}
+
+export interface AddTleAndTrackingRequest {
+  satelliteId?: string
+  satelliteName?: string
+  tleLine1: string
+  tleLine2: string
+}
+
+export interface PassInfo {
+  passId: string
+  startTime: string
+  endTime: string
+  duration: string
+  maxElevation: number
+}
+
+export interface TleAndTrackingResponse {
+  success: boolean
+  message: string
+  data?: {
+    satelliteId: string
+    satelliteName: string
+    tleLine1: string
+    tleLine2: string
+    passCount: number
+    trackingPointCount: number
+    satelliteIdSource: string
+    passes: PassInfo[]
+  }
+  timestamp: number
+}
+
+// 🆕 패스 스케줄 관련 타입들 추가
+export interface PassScheduleMasterData {
+  id: string
+  satelliteId: string
+  satelliteName: string
+  passNumber: number
+  startTime: string
+  endTime: string
+  maxElevation: number
+  duration: number
+  status: string
+  azimuthStart: number
+  azimuthEnd: number
+  elevationStart: number
+  elevationEnd: number
+}
+
+export interface GetAllTrackingMasterResponse {
+  satelliteCount: number
+  totalPassCount: number
+  satellites: Record<string, PassScheduleMasterData[]>
 }
 
 // 에러 클래스들
@@ -144,7 +199,10 @@ class PassScheduleService {
       const response = await api.get('/pass-schedule/tle')
       return response.data
     } catch (error) {
-      return this.handleApiError(error, '전체 TLE 데이터 조회에 실패했습니다') as Promise<AllTLEResponse>
+      return this.handleApiError(
+        error,
+        '전체 TLE 데이터 조회에 실패했습니다',
+      ) as Promise<AllTLEResponse>
     }
   }
 
@@ -201,12 +259,15 @@ class PassScheduleService {
       const response = await api.get('/pass-schedule/status')
       return response.data
     } catch (error) {
-      return this.handleApiError(error, 'TLE 캐시 상태 조회에 실패했습니다') as Promise<CacheStatusResponse>
+      return this.handleApiError(
+        error,
+        'TLE 캐시 상태 조회에 실패했습니다',
+      ) as Promise<CacheStatusResponse>
     }
   }
 
   /**
-   * TLE 텍스트 파싱 (클라이언트 사이드)
+   * TLE 텍스트 파싱 (순서 보장 및 위성명 처리 개선)
    */
   parseTLEText(tleText: string): TLEItem[] {
     if (!tleText || typeof tleText !== 'string') {
@@ -214,56 +275,74 @@ class PassScheduleService {
     }
 
     const normalizedText = tleText.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-    const lines = normalizedText.split('\n').filter((line) => line.trim() !== '')
+
+    const lines = normalizedText
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+
+    console.log('🔍 Service 파싱 - 라인 수:', lines.length)
 
     const tleItems: TLEItem[] = []
     let i = 0
 
     while (i < lines.length) {
-      // 3줄 형식 (위성명 + TLE Line1 + TLE Line2)
-      if (i + 2 < lines.length &&
-          lines[i + 1]?.startsWith('1 ') &&
-          lines[i + 2]?.startsWith('2 ')) {
-
+      // 3줄 형식 우선 처리 (위성명 + TLE Line1 + TLE Line2)
+      if (
+        i + 2 < lines.length &&
+        !lines[i]?.startsWith('1 ') &&
+        !lines[i]?.startsWith('2 ') &&
+        lines[i + 1]?.startsWith('1 ') &&
+        lines[i + 2]?.startsWith('2 ')
+      ) {
         const satelliteName = lines[i]?.trim() || ''
         const tleLine1 = lines[i + 1]?.trim() || ''
         const tleLine2 = lines[i + 2]?.trim() || ''
 
-        // 위성 ID 추출 (TLE Line1에서)
         const satelliteId = tleLine1.substring(2, 7).trim()
 
-        tleItems.push({
-          satelliteId: satelliteId || satelliteName,
-          tleLine1,
-          tleLine2
-        })
+        console.log(`✅ Service 3줄 형식: "${satelliteName}" (ID: ${satelliteId})`)
 
+        const tleItem: TLEItem = {
+          satelliteId: satelliteId,
+          tleLine1,
+          tleLine2,
+        }
+
+        if (satelliteName && satelliteName.length > 0) {
+          tleItem.satelliteName = satelliteName
+        }
+
+        tleItems.push(tleItem)
         i += 3
       }
-      // 2줄 형식 (TLE Line1 + TLE Line2)
-      else if (i + 1 < lines.length &&
-               lines[i]?.startsWith('1 ') &&
-               lines[i + 1]?.startsWith('2 ')) {
-
+      // 2줄 형식 처리 (TLE Line1 + TLE Line2)
+      else if (
+        i + 1 < lines.length &&
+        lines[i]?.startsWith('1 ') &&
+        lines[i + 1]?.startsWith('2 ')
+      ) {
         const tleLine1 = lines[i]?.trim() || ''
         const tleLine2 = lines[i + 1]?.trim() || ''
 
-        // 위성 ID 추출
         const satelliteId = tleLine1.substring(2, 7).trim()
+
+        console.log(`✅ Service 2줄 형식: ID ${satelliteId}`)
 
         tleItems.push({
           satelliteId,
           tleLine1,
-          tleLine2
+          tleLine2,
         })
 
         i += 2
-      }
-      else {
+      } else {
+        console.log(`⚠️ Service 건너뛴 라인: "${lines[i]}"`)
         i++
       }
     }
 
+    console.log(`🎯 Service 파싱 완료: ${tleItems.length}개`)
     return tleItems
   }
 
@@ -271,9 +350,11 @@ class PassScheduleService {
    * TLE 데이터를 텍스트로 변환
    */
   convertTLEsToText(tleItems: TLEItem[]): string {
-    return tleItems.map(item => {
-      return `${item.satelliteId}\n${item.tleLine1}\n${item.tleLine2}`
-    }).join('\n\n')
+    return tleItems
+      .map((item) => {
+        return `${item.satelliteId}\n${item.tleLine1}\n${item.tleLine2}`
+      })
+      .join('\n\n')
   }
 
   /**
@@ -341,6 +422,93 @@ class PassScheduleService {
     document.body.removeChild(link)
 
     URL.revokeObjectURL(url)
+  }
+
+  /**
+   * TLE 데이터 추가와 동시에 추적 데이터를 생성합니다 (원스톱 API)
+   */
+  async addTleAndGenerateTracking(
+    request: AddTleAndTrackingRequest,
+  ): Promise<TleAndTrackingResponse> {
+    try {
+      if (!request.tleLine1 || !request.tleLine2) {
+        throw new Error('TLE Line1과 Line2는 필수입니다')
+      }
+
+      console.log('🚀 TLE 추가 및 추적 데이터 생성 API 호출:', {
+        satelliteId: request.satelliteId,
+        tleLine1Length: request.tleLine1.length,
+        tleLine2Length: request.tleLine2.length,
+      })
+
+      const response = await api.post('/pass-schedule/tle-and-tracking', request, {
+        timeout: 600000, // 10분 타임아웃
+      })
+
+      console.log('✅ TLE 추가 및 추적 데이터 생성 응답:', response.data)
+
+      return response.data
+    } catch (error) {
+      console.error('❌ TLE 추가 및 추적 데이터 생성 실패:', error)
+      return this.handleApiError(
+        error,
+        'TLE 데이터 추가 및 추적 데이터 생성에 실패했습니다',
+      ) as Promise<TleAndTrackingResponse>
+    }
+  }
+
+  /**
+   * 모든 위성의 패스 스케줄 마스터 데이터 조회
+   */
+  async getAllTrackingMasterData(): Promise<{
+    success: boolean
+    data?: GetAllTrackingMasterResponse
+    message: string
+  }> {
+    try {
+      console.log('📡 모든 패스 스케줄 마스터 데이터 조회')
+
+      const response = await api.get('/pass-schedule/tracking/master')
+
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message || '패스 스케줄 마스터 데이터 조회 완료',
+      }
+    } catch (error) {
+      console.error('❌ 패스 스케줄 마스터 데이터 조회 실패:', error)
+      return {
+        success: false,
+        message: '패스 스케줄 마스터 데이터 조회에 실패했습니다',
+      }
+    }
+  }
+
+  /**
+   * 특정 위성의 패스 스케줄 마스터 데이터 조회
+   */
+  async getTrackingMasterDataBySatellite(satelliteId: string): Promise<{
+    success: boolean
+    data?: PassScheduleMasterData[]
+    message: string
+  }> {
+    try {
+      console.log('🛰️ 위성별 패스 스케줄 마스터 데이터 조회:', satelliteId)
+
+      const response = await api.get(`/pass-schedule/tracking/master/${satelliteId}`)
+
+      return {
+        success: true,
+        data: response.data.data,
+        message: '위성별 패스 스케줄 마스터 데이터 조회 완료',
+      }
+    } catch (error) {
+      console.error('❌ 위성별 패스 스케줄 마스터 데이터 조회 실패:', error)
+      return {
+        success: false,
+        message: '위성별 패스 스케줄 마스터 데이터 조회에 실패했습니다',
+      }
+    }
   }
 }
 
