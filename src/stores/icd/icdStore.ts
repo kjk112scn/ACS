@@ -208,6 +208,7 @@ export const useICDStore = defineStore('icd', () => {
   const ephemerisStatus = ref<boolean | null>(null)
   const passScheduleStatus = ref<boolean | null>(null)
   const sunTrackStatus = ref<boolean | null>(null)
+  const communicationStatus = ref('')
 
   // 비트 문자열을 개별 boolean으로 파싱하는 헬퍼 함수
   const parseProtocolStatusBits = (bitString: string) => {
@@ -1193,6 +1194,9 @@ export const useICDStore = defineStore('icd', () => {
       if (message.trackingStatus && typeof message.trackingStatus === 'object') {
         updataTrackingStatus(message.trackingStatus)
       }
+      if (message.communicationStatus !== undefined) {
+        communicationStatus.value = safeToString(message.communicationStatus)
+      }
 
       // 성능 측정
       const endTime = performance.now()
@@ -1927,9 +1931,9 @@ export const useICDStore = defineStore('icd', () => {
         success: true,
         data: response,
         message: '위치 오프셋 명령이 전송되었습니다.',
-        azimuthResult: 0, // 실제 응답 구조에 맞게 수정 필요
-        elevationResult: 0, // 실제 응답 구조에 맞게 수정 필요
-        tiltResult: 0, // 실제 응답 구조에 맞게 수정 필요
+        azimuthOffset: azOffset, // 실제 응답 구조에 맞게 수정 필요
+        elevationOffset: elOffset, // 실제 응답 구조에 맞게 수정 필요
+        tiltOffset: tiOffset, // 실제 응답 구조에 맞게 수정 필요
       }
     } catch (error) {
       console.error('위치 오프셋 명령 전송 실패:', error)
@@ -1937,9 +1941,9 @@ export const useICDStore = defineStore('icd', () => {
         success: false,
         error: String(error),
         message: '위치 오프셋 명령 전송에 실패했습니다.',
-        azimuthResult: 0,
-        elevationResult: 0,
-        tiltResult: 0,
+        azimuthOffset: 0,
+        elevationOffset: 0,
+        tiltOffset: 0,
       }
     }
   }
@@ -1952,7 +1956,7 @@ export const useICDStore = defineStore('icd', () => {
         success: true,
         data: response,
         message: '시간 오프셋 명령이 전송되었습니다.',
-        inputTimeoffset: 0, // 실제 응답 구조에 맞게 수정 필요
+        inputTimeoffset: timeOffset, // 실제 응답 구조에 맞게 수정 필요
         resultTimeOffset: 0, // 실제 응답 구조에 맞게 수정 필요
       }
     } catch (error) {
@@ -2077,6 +2081,8 @@ export const useICDStore = defineStore('icd', () => {
     ephemerisStatusInfo,
     passScheduleStatusInfo,
     sunTrackStatusInfo,
+    //펌웨어 UDP 상태
+    communicationStatus,
 
     adaptiveInterval,
     driftCorrection,

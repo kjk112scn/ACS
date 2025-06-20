@@ -399,12 +399,12 @@ const increment = async (index: number) => {
         // 예시: response.azimuthResult, response.elevationResult, response.tiltResult
         // 실제 백엔드 응답 구조에 맞게 수정 필요
         outputs.value[0] = String(
-          response.azimuthResult?.toFixed(2) || offsetCals.value[0] || '0.00',
+          response.azimuthOffset?.toFixed(2) || offsetCals.value[0] || '0.00',
         )
         outputs.value[1] = String(
-          response.elevationResult?.toFixed(2) || offsetCals.value[1] || '0.00',
+          response.elevationOffset?.toFixed(2) || offsetCals.value[1] || '0.00',
         )
-        outputs.value[2] = String(response.tiltResult?.toFixed(2) || offsetCals.value[2] || '0.00')
+        outputs.value[2] = String(response.tiltOffset?.toFixed(2) || offsetCals.value[2] || '0.00')
       } else {
         // 응답이 없거나 예상 형식이 아닌 경우 입력값을 그대로 출력값으로 사용
         outputs.value[0] = offsetCals.value[0] || '0.00'
@@ -479,12 +479,12 @@ const decrement = async (index: number) => {
         // 예시: response.azimuthResult, response.elevationResult, response.tiltResult
         // 실제 백엔드 응답 구조에 맞게 수정 필요
         outputs.value[0] = String(
-          response.azimuthResult?.toFixed(2) || offsetCals.value[0] || '0.00',
+          response.azimuthOffset?.toFixed(2) || offsetCals.value[0] || '0.00',
         )
         outputs.value[1] = String(
-          response.elevationResult?.toFixed(2) || offsetCals.value[1] || '0.00',
+          response.elevationOffset?.toFixed(2) || offsetCals.value[1] || '0.00',
         )
-        outputs.value[2] = String(response.tiltResult?.toFixed(2) || offsetCals.value[2] || '0.00')
+        outputs.value[2] = String(response.tiltOffset?.toFixed(2) || offsetCals.value[2] || '0.00')
       } else {
         // 응답이 없거나 예상 형식이 아닌 경우 입력값을 그대로 출력값으로 사용
         outputs.value[0] = offsetCals.value[0] || '0.00'
@@ -544,17 +544,17 @@ const reset = async (index: number) => {
       // 방위각 오프셋 초기화 - 다른 축은 현재 값 유지
       const response = await icdStore.sendPositionOffsetCommand(0, elOffset, tiOffset)
       // azOffset 대신 azimuthResult 사용
-      outputs.value[0] = response.azimuthResult?.toFixed(2) || '0.00'
+      outputs.value[0] = response.azimuthOffset?.toFixed(2) || '0.00'
       offsetCals.value[0] = outputs.value[0]
     } else if (index === 1) {
       // 고도각 오프셋 초기화 - 다른 축은 현재 값 유지
       const response = await icdStore.sendPositionOffsetCommand(azOffset, 0, tiOffset)
-      outputs.value[1] = response.elevationResult?.toFixed(2) || '0.00'
+      outputs.value[1] = response.elevationOffset?.toFixed(2) || '0.00'
       offsetCals.value[1] = outputs.value[1]
     } else if (index === 2) {
       // 틸트각 오프셋 초기화 - 다른 축은 현재 값 유지
       const response = await icdStore.sendPositionOffsetCommand(azOffset, elOffset, 0)
-      outputs.value[2] = response.tiltResult?.toFixed(2) || '0.00'
+      outputs.value[2] = response.tiltOffset?.toFixed(2) || '0.00'
       offsetCals.value[2] = outputs.value[2]
     } else if (index === 3) {
       const response = await icdStore.sendTimeOffsetCommand(0)

@@ -11,9 +11,11 @@
 
           <!-- 상태 메시지들을 우측으로 이동 -->
           <div class="status-messages">
-            <p v-if="icdStore.error" class="text-negative">Error: {{ icdStore.error }}</p>
-            <p v-if="!icdStore.isConnected" class="text-warning">WebSocket Connecting...</p>
-            <p v-if="icdStore.isConnected && !icdStore.error" class="text-positive">Connected</p>
+            <p v-if="icdStore.error" class="text-negative">Server : Error: {{ icdStore.error }}</p>
+            <p v-if="!icdStore.isConnected" class="text-warning">Server : WebSocket Connecting...</p>
+            <p v-if="icdStore.isConnected && !icdStore.error" class="text-positive">Server : Connected</p>
+            <p v-if="icdStore.communicationStatus" class="text-info">Communication : {{ icdStore.communicationStatus }}
+            </p>
           </div>
         </div>
 
@@ -39,7 +41,7 @@
                   <q-item-label class="adaptive-caption">Speed</q-item-label>
                   <q-item-label class="adaptive-text">{{
                     displayValue(icdStore.azimuthSpeed)
-                  }}</q-item-label>
+                    }}</q-item-label>
                 </div>
               </div>
             </q-card-section>
@@ -66,7 +68,7 @@
                   <q-item-label class="adaptive-caption">Speed</q-item-label>
                   <q-item-label class="adaptive-text">{{
                     displayValue(icdStore.elevationSpeed)
-                  }}</q-item-label>
+                    }}</q-item-label>
                 </div>
               </div>
             </q-card-section>
@@ -93,7 +95,7 @@
                   <q-item-label class="adaptive-caption">Speed</q-item-label>
                   <q-item-label class="adaptive-text">{{
                     displayValue(icdStore.tiltSpeed)
-                  }}</q-item-label>
+                    }}</q-item-label>
                 </div>
               </div>
             </q-card-section>
@@ -106,13 +108,9 @@
               <q-card-section>
                 <div class="text-subtitle1 text-weight-bold text-negative">Emergency</div>
                 <div class="emergency-content">
-                  <q-btn
-                    class="full-width"
-                    :color="acsEmergencyActive ? 'grey-8' : 'negative'"
-                    :label="acsEmergencyActive ? 'Emergency Active' : 'Emergency Stop'"
-                    @click="handleEmergencyClick"
-                    size="lg"
-                  />
+                  <q-btn class="full-width" :color="acsEmergencyActive ? 'grey-8' : 'negative'"
+                    :label="acsEmergencyActive ? 'Emergency Active' : 'Emergency Stop'" @click="handleEmergencyClick"
+                    size="lg" />
                 </div>
               </q-card-section>
             </q-card>
@@ -132,18 +130,12 @@
 
                 <q-card-actions align="right">
                   <q-btn flat label="닫기" color="grey-7" v-close-popup />
-                  <q-btn
-                    flat
-                    label="해제"
-                    color="primary"
-                    @click="
-                      () => {
-                        releaseEmergency()
-                        emergencyModal = false
-                      }
-                    "
-                    v-close-popup
-                  />
+                  <q-btn flat label="해제" color="primary" @click="
+                    () => {
+                      releaseEmergency()
+                      emergencyModal = false
+                    }
+                  " v-close-popup />
                 </q-card-actions>
               </q-card>
             </q-dialog>
@@ -171,13 +163,10 @@
                 <!-- Emergency LED - TRUE면 빨간색, FALSE면 녹색 -->
                 <div class="status-item q-mb-sm">
                   <div class="status-led-container">
-                    <div
-                      class="status-led"
-                      :class="{
-                        'led-error': errorEmergencyActive,
-                        'led-normal': !errorEmergencyActive,
-                      }"
-                    ></div>
+                    <div class="status-led" :class="{
+                      'led-error': errorEmergencyActive,
+                      'led-normal': !errorEmergencyActive,
+                    }"></div>
                     <span class="status-label">Emergency</span>
                   </div>
                 </div>
@@ -185,13 +174,10 @@
                 <!-- Positioner LED - TRUE면 빨간색, FALSE면 녹색 -->
                 <div class="status-item q-mb-sm">
                   <div class="status-led-container">
-                    <div
-                      class="status-led"
-                      :class="{
-                        'led-error': errorPositionerActive,
-                        'led-normal': !errorPositionerActive,
-                      }"
-                    ></div>
+                    <div class="status-led" :class="{
+                      'led-error': errorPositionerActive,
+                      'led-normal': !errorPositionerActive,
+                    }"></div>
                     <span class="status-label">Positioner</span>
                   </div>
                 </div>
@@ -199,10 +185,8 @@
                 <!-- Feed LED - TRUE면 빨간색, FALSE면 녹색 -->
                 <div class="status-item q-mb-sm">
                   <div class="status-led-container">
-                    <div
-                      class="status-led"
-                      :class="{ 'led-error': errorFeedActive, 'led-normal': !errorFeedActive }"
-                    ></div>
+                    <div class="status-led" :class="{ 'led-error': errorFeedActive, 'led-normal': !errorFeedActive }">
+                    </div>
                     <span class="status-label">Feed</span>
                   </div>
                 </div>
@@ -210,13 +194,10 @@
                 <!-- Protocol LED - TRUE면 빨간색, FALSE면 녹색 -->
                 <div class="status-item q-mb-sm">
                   <div class="status-led-container">
-                    <div
-                      class="status-led"
-                      :class="{
-                        'led-error': errorProtocolActive,
-                        'led-normal': !errorProtocolActive,
-                      }"
-                    ></div>
+                    <div class="status-led" :class="{
+                      'led-error': errorProtocolActive,
+                      'led-normal': !errorProtocolActive,
+                    }"></div>
                     <span class="status-label">Protocol</span>
                   </div>
                 </div>
@@ -224,10 +205,8 @@
                 <!-- Power LED - TRUE면 빨간색, FALSE면 녹색 -->
                 <div class="status-item q-mb-sm">
                   <div class="status-led-container">
-                    <div
-                      class="status-led"
-                      :class="{ 'led-error': errorPowerActive, 'led-normal': !errorPowerActive }"
-                    ></div>
+                    <div class="status-led" :class="{ 'led-error': errorPowerActive, 'led-normal': !errorPowerActive }">
+                    </div>
                     <span class="status-label">Power</span>
                   </div>
                 </div>
@@ -235,10 +214,8 @@
                 <!-- ✅ Stow LED - TRUE면 녹색, FALSE면 회색 -->
                 <div class="status-item q-mb-sm">
                   <div class="status-led-container">
-                    <div
-                      class="status-led"
-                      :class="{ 'led-stow-active': stowActive, 'led-inactive': !stowActive }"
-                    ></div>
+                    <div class="status-led" :class="{ 'led-stow-active': stowActive, 'led-inactive': !stowActive }">
+                    </div>
                     <span class="status-label">Stow</span>
                   </div>
                 </div>
@@ -246,24 +223,16 @@
                 <!-- ✅ Stow Pin LED - TRUE면 녹색, FALSE면 회색 -->
                 <div class="status-item q-mb-sm">
                   <div class="status-led-container">
-                    <div
-                      class="status-led"
-                      :class="{ 'led-stow-active': stowPinActive, 'led-inactive': !stowPinActive }"
-                    ></div>
+                    <div class="status-led"
+                      :class="{ 'led-stow-active': stowPinActive, 'led-inactive': !stowPinActive }"></div>
                     <span class="status-label">Stow Pin</span>
                   </div>
                 </div>
 
                 <!-- All Status 버튼 -->
                 <div class="all-status-button q-mt-md">
-                  <q-btn
-                    color="primary"
-                    label="All Status"
-                    size="sm"
-                    outline
-                    @click="handleAllStatus"
-                    class="full-width"
-                  />
+                  <q-btn color="primary" label="All Status" size="sm" outline @click="handleAllStatus"
+                    class="full-width" />
                 </div>
               </div>
             </q-card-section>
@@ -275,28 +244,14 @@
     <!-- 모드 선택 탭 -->
     <q-card class="mode-selection-section q-mt-md">
       <q-card-section>
-        <q-tabs
-          v-model="currentMode"
-          class="text-primary compact-tabs"
-          active-color="primary"
-          indicator-color="primary"
-          align="left"
-          narrow-indicator
-        >
+        <q-tabs v-model="currentMode" class="text-primary compact-tabs" active-color="primary" indicator-color="primary"
+          align="left" narrow-indicator>
           <q-tab name="standby" label="Standby" @click="navigateToMode('standby')" />
           <q-tab name="step" label="Step" @click="navigateToMode('step')" />
           <q-tab name="slew" label="Slew" @click="navigateToMode('slew')" />
           <q-tab name="pedestal" label="Pedestal Position" @click="navigateToMode('pedestal')" />
-          <q-tab
-            name="ephemeris"
-            label="Ephemeris Designation"
-            @click="navigateToMode('ephemeris')"
-          />
-          <q-tab
-            name="pass-schedule"
-            label="Pass Schedule"
-            @click="navigateToMode('pass-schedule')"
-          />
+          <q-tab name="ephemeris" label="Ephemeris Designation" @click="navigateToMode('ephemeris')" />
+          <q-tab name="pass-schedule" label="Pass Schedule" @click="navigateToMode('pass-schedule')" />
           <q-tab name="suntrack" label="Sun Track" @click="navigateToMode('suntrack')" />
           <q-tab name="feed" label="Feed" @click="navigateToMode('feed')" />
         </q-tabs>
@@ -681,7 +636,7 @@ onUnmounted(() => {
   }
 
   // 3. 이벤트 리스너 제거
-  window.removeEventListener('resize', () => {})
+  window.removeEventListener('resize', () => { })
 
   // 4. icdStore 정리
   icdStore.cleanup()
@@ -1433,7 +1388,8 @@ const handleAllStatus = () => {
 
 .header-section {
   display: flex;
-  justify-content: space-between; /* flex-start에서 space-between으로 변경 */
+  justify-content: space-between;
+  /* flex-start에서 space-between으로 변경 */
   align-items: center;
   margin-bottom: 1rem;
 }
@@ -1456,10 +1412,8 @@ const handleAllStatus = () => {
 
 .axis-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(
-      0,
-      0.8fr
-    );
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0,
+      0.8fr);
   gap: 1rem;
   margin-top: 1rem;
 }
@@ -1564,6 +1518,7 @@ const handleAllStatus = () => {
   flex-direction: column;
   justify-content: center;
 }
+
 .status-messages {
   display: flex;
   gap: 1rem;
@@ -1734,6 +1689,7 @@ const handleAllStatus = () => {
 
   gap: 12px;
 }
+
 /* Status LED 스타일 수정 */
 .status-led {
   width: 20px;
@@ -1772,6 +1728,7 @@ const handleAllStatus = () => {
   background-color: #666;
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
 }
+
 .status-label {
   font-size: 1rem;
   font-weight: 500;
