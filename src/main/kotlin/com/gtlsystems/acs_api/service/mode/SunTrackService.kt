@@ -58,7 +58,7 @@ class SunTrackService(
                     },
                     { error -> println("태양 추적 중지 이벤트 구독 중 오류 발생: ${error.message}") }
                 )
-            solarOrekitCompareTime()
+           // solarOrekitCompareTime()
         //SolarOrekitData()
             //ElevationCheck()
         } catch (e: Exception) {

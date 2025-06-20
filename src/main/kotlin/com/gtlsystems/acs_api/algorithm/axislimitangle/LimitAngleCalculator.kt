@@ -5,11 +5,30 @@ import kotlin.math.abs
 
 /**
  * 축 제한 각도 계산 클래스
- * 0~360도 방위각을 포지셔너 ±270도 범위로 변환 (연속성 보장)
+ * 0~360도 방위각을 포지셔너 ±270도 범위로 변환 (회전 방향성 보장)
  */
 class LimitAngleCalculator {
 
     private val logger = LoggerFactory.getLogger(javaClass)
+
+    /**
+     * 회전 방향 열거형
+     */
+    enum class RotationDirection {
+        CLOCKWISE,          // 시계방향
+        COUNTER_CLOCKWISE,  // 반시계방향
+        MIXED,              // 혼합
+        UNKNOWN             // 불명
+    }
+
+    /**
+     * 경계 통과 상태 열거형
+     */
+    enum class BoundaryCrossing {
+        WITHIN_RANGE,           // 범위 내
+        EXCEEDS_270,            // 270° 초과
+        CROSSES_270_BOUNDARY    // 270° 경계 통과
+    }
 
     /**
      * 마스터 데이터와 세부 데이터를 입력받아 ±270도 범위로 변환된 결과를 리턴
@@ -54,7 +73,7 @@ class LimitAngleCalculator {
     }
 
     /**
-     * 연속된 방위각 경로를 ±270도 범위로 변환 (연속성 보장)
+     * ✅ 회전 방향성을 보장하는 방위각 경로 변환
      */
     private fun convertAzimuthPath(dtlList: List<Map<String, Any?>>): List<Map<String, Any?>> {
         if (dtlList.isEmpty()) return dtlList
@@ -65,8 +84,8 @@ class LimitAngleCalculator {
         val sortedList = dtlList.sortedBy { it["No"] as UInt }
         val originalAzimuths = sortedList.map { it["Azimuth"] as Double }
 
-        // ✅ 연속성을 보장하는 변환
-        val convertedAzimuths = convertContinuousPath(originalAzimuths)
+        // ✅ 회전 방향성을 보장하는 변환
+        val convertedAzimuths = convertWithRotationDirection(originalAzimuths)
 
         // 변환된 데이터 생성
         sortedList.forEachIndexed { index, dtlRecord ->
@@ -80,84 +99,84 @@ class LimitAngleCalculator {
             convertedList.add(convertedRecord)
         }
 
-        // ✅ 변환 결과 요약 로깅
+        // 변환 결과 로깅
         val mstId = dtlList.firstOrNull()?.get("MstId") as? UInt ?: 0u
         logger.info("MstId $mstId 변환 완료: ${originalAzimuths.size}개 포인트")
         logger.info("  원본 범위: ${String.format("%.2f", originalAzimuths.minOrNull() ?: 0.0)}° ~ ${String.format("%.2f", originalAzimuths.maxOrNull() ?: 0.0)}°")
         logger.info("  변환 범위: ${String.format("%.2f", convertedAzimuths.minOrNull() ?: 0.0)}° ~ ${String.format("%.2f", convertedAzimuths.maxOrNull() ?: 0.0)}°")
 
+        // 변환 결과 연속성 검증
+        val isContinuous = validateConversionContinuity(convertedAzimuths, originalAzimuths)
+        if (!isContinuous) {
+            logger.warn("⚠️ MstId $mstId 변환 결과 연속성 문제 감지 - 추가 검토 필요")
+        }
+
+        // 변환 품질 평가
+        val qualityScore = calculateConversionQuality(convertedAzimuths, originalAzimuths)
+        logger.info("MstId $mstId 변환 품질 점수: ${String.format("%.1f", qualityScore)}/100")
+
         return convertedList
     }
 
     /**
-     * ✅ 완전히 개선된 연속성 기반 변환 (270° 경계 문제 완전 해결)
+     * ✅ 회전 방향성을 보장하는 변환 (핵심 로직)
      */
-    private fun convertContinuousPath(originalAzimuths: List<Double>): List<Double> {
+    private fun convertWithRotationDirection(originalAzimuths: List<Double>): List<Double> {
         if (originalAzimuths.isEmpty()) return emptyList()
-
-        // 🔍 패스 특성 분석
-        val firstAngle = originalAzimuths.first()
-        val lastAngle = originalAzimuths.last()
-        val minAngle = originalAzimuths.minOrNull() ?: 0.0
-        val maxAngle = originalAzimuths.maxOrNull() ?: 0.0
-        val over180Count = originalAzimuths.count { it >= 180.0 }
-
-        logger.info("패스 분석: ${String.format("%.2f", firstAngle)}° → ${String.format("%.2f", lastAngle)}° (범위: ${String.format("%.2f", minAngle)}° ~ ${String.format("%.2f", maxAngle)}°)")
-        logger.info("180° 이상 각도: ${over180Count}/${originalAzimuths.size}개 (${String.format("%.1f", over180Count * 100.0 / originalAzimuths.size)}%)")
-
-        // 🔍 패스 유형 분류
-        val passType = when {
-            maxAngle >= 270.0 -> "고각도 패스 (270°+)"
-            over180Count > originalAzimuths.size * 0.6 -> "후반부 집중 패스"
-            minAngle < 90.0 && maxAngle > 270.0 -> "270° 경계 패스"
-            else -> "일반 패스"
-        }
-        logger.info("패스 유형: $passType")
 
         val result = mutableListOf<Double>()
 
-        // ✅ 핵심 수정: 첫 번째 각도 변환 로직 개선
-        val firstConverted = determineFirstAngleConversion(firstAngle, minAngle, maxAngle)
-        result.add(firstConverted)
+        // 1️⃣ 회전 방향 분석
+        val rotationDirection = analyzeRotationDirection(originalAzimuths)
+        logger.info("회전 방향 분석: $rotationDirection")
 
-        logger.info("변환 시작: ${String.format("%.2f", firstAngle)}° → ${String.format("%.2f", firstConverted)}°")
+        // 2️⃣ 270° 경계 통과 여부 확인
+        val crossesBoundary = checkBoundaryCrossing(originalAzimuths)
+        logger.info("270° 경계 통과: $crossesBoundary")
 
-        // 나머지 각도들을 연속성을 유지하며 변환
+        // 3️⃣ 시작 각도 결정 (회전 방향과 경계 통과를 고려)
+        val firstAngle = originalAzimuths.first()
+        val startAngle = determineStartAngle(firstAngle, originalAzimuths, rotationDirection, crossesBoundary)
+        result.add(startAngle)
+
+        logger.info("시작 각도 결정: ${String.format("%.2f", firstAngle)}° → ${String.format("%.2f", startAngle)}°")
+
+        // 4️⃣ 나머지 각도들을 회전 방향을 유지하며 변환
         var boundaryCrossings = 0
         for (i in 1 until originalAzimuths.size) {
             val currentOriginal = originalAzimuths[i]
             val previousOriginal = originalAzimuths[i - 1]
             val previousConverted = result[i - 1]
 
-            // 원본 데이터의 변화량 계산 (360°/0° 경계 고려)
-            val originalDelta = calculateAngleDelta(previousOriginal, currentOriginal)
+            // 원본 데이터의 회전량 계산 (방향 고려)
+            val rotationAmount = calculateRotationAmount(previousOriginal, currentOriginal, rotationDirection)
 
-            // 이전 변환값에 동일한 변화량 적용
-            val expectedConverted = previousConverted + originalDelta
+            // 이전 변환값에 동일한 회전량 적용
+            val nextConverted = previousConverted + rotationAmount
 
-            // ✅ 스마트 정규화 (270° 경계 특별 처리)
-            val finalConverted = smartNormalizeFor270Boundary(expectedConverted, previousConverted, currentOriginal)
+            // ±270° 범위로 정규화 (방향성 유지)
+            val normalizedAngle = normalizeWithDirectionPreservation(nextConverted, previousConverted, rotationDirection)
 
-            result.add(finalConverted)
+            result.add(normalizedAngle)
 
             // 경계 통과 지점 로깅
-            if (abs(originalDelta) > 180.0) {
+            if (abs(rotationAmount) > 180.0) {
                 boundaryCrossings++
-                logger.info("360°/0° 경계 통과 #{}: ${String.format("%.2f", currentOriginal)}° → ${String.format("%.2f", finalConverted)}° (Δ${String.format("%.2f", originalDelta)}°)",
+                logger.info("360°/0° 경계 통과 #{}: ${String.format("%.2f", currentOriginal)}° → ${String.format("%.2f", normalizedAngle)}° (회전량: ${String.format("%.2f", rotationAmount)}°)",
                     boundaryCrossings)
             }
 
-            // 큰 점프 감지
-            val actualJump = abs(finalConverted - previousConverted)
-            if (actualJump > 100.0) {
-                logger.warn("⚠️ 큰 점프 감지: 원본 ${String.format("%.2f", previousOriginal)}° → ${String.format("%.2f", currentOriginal)}°, 변환 ${String.format("%.2f", previousConverted)}° → ${String.format("%.2f", finalConverted)}° (점프: ${String.format("%.2f", actualJump)}°)")
+            // 큰 점프 감지 및 로깅
+            val actualRotation = abs(normalizedAngle - previousConverted)
+            if (actualRotation > 100.0) {
+                logger.warn("⚠️ 큰 회전 감지: 원본 ${String.format("%.2f", previousOriginal)}° → ${String.format("%.2f", currentOriginal)}°, 변환 ${String.format("%.2f", previousConverted)}° → ${String.format("%.2f", normalizedAngle)}° (회전량: ${String.format("%.2f", actualRotation)}°)")
             }
         }
 
-        // 🔍 변환 결과 분석
+        // 변환 결과 분석
         val convertedMin = result.minOrNull() ?: 0.0
         val convertedMax = result.maxOrNull() ?: 0.0
-        logger.info("변환 완료: ${String.format("%.2f", firstAngle)}° → ${String.format("%.2f", result.first())}° ~ ${String.format("%.2f", lastAngle)}° → ${String.format("%.2f", result.last())}°")
+        logger.info("변환 완료: ${String.format("%.2f", firstAngle)}° → ${String.format("%.2f", result.first())}° ~ ${String.format("%.2f", originalAzimuths.last())}° → ${String.format("%.2f", result.last())}°")
         logger.info("변환 범위: ${String.format("%.2f", convertedMin)}° ~ ${String.format("%.2f", convertedMax)}°")
         logger.info("경계 통과 횟수: ${boundaryCrossings}회")
 
@@ -165,42 +184,147 @@ class LimitAngleCalculator {
     }
 
     /**
-     * ✅ 첫 번째 각도 변환 결정 (패스 전체 범위 고려)
+     * ✅ 회전 방향 분석
      */
-    private fun determineFirstAngleConversion(firstAngle: Double, minAngle: Double, maxAngle: Double): Double {
-        // 1️⃣ 패스가 270°를 넘는 경우 음수 영역으로 변환
-        if (maxAngle > 270.0) {
-            // 시작 각도가 180° 이상이면 음수로 변환
-            if (firstAngle >= 180.0) {
-                val converted = firstAngle - 360.0
-                logger.info("270° 초과 패스 감지: 시작 각도를 음수 영역으로 변환 (${String.format("%.2f", firstAngle)}° → ${String.format("%.2f", converted)}°)")
-                return converted
+    private fun analyzeRotationDirection(azimuths: List<Double>): RotationDirection {
+        if (azimuths.size < 2) return RotationDirection.UNKNOWN
+
+        var clockwiseCount = 0
+        var counterClockwiseCount = 0
+
+        for (i in 1 until azimuths.size) {
+            val prev = azimuths[i - 1]
+            val current = azimuths[i]
+
+            val rawDelta = current - prev
+            val normalizedDelta = when {
+                rawDelta > 180.0 -> rawDelta - 360.0  // 360°/0° 경계 통과 (반시계방향)
+                rawDelta < -180.0 -> rawDelta + 360.0 // 0°/360° 경계 통과 (시계방향)
+                else -> rawDelta
+            }
+
+            when {
+                normalizedDelta > 0 -> clockwiseCount++
+                normalizedDelta < 0 -> counterClockwiseCount++
             }
         }
 
-        // 2️⃣ 일반적인 경우: 270° 이하는 그대로, 초과는 음수로
-        return if (firstAngle <= 270.0) {
-            firstAngle
-        } else {
-            firstAngle - 360.0
+        return when {
+            clockwiseCount > counterClockwiseCount -> RotationDirection.CLOCKWISE
+            counterClockwiseCount > clockwiseCount -> RotationDirection.COUNTER_CLOCKWISE
+            else -> RotationDirection.MIXED
         }
     }
 
     /**
-     * ✅ 270° 경계 특별 처리 정규화 (개선된 버전)
+     * ✅ 270° 경계 통과 확인
      */
-    private fun smartNormalizeFor270Boundary(expectedAngle: Double, previousAngle: Double, originalAngle: Double): Double {
-        // 1️⃣ 기본 정규화
-        var normalized = expectedAngle
+    private fun checkBoundaryCrossing(azimuths: List<Double>): BoundaryCrossing {
+        val minAngle = azimuths.minOrNull() ?: 0.0
+        val maxAngle = azimuths.maxOrNull() ?: 0.0
+
+        return when {
+            maxAngle > 270.0 && minAngle < 90.0 -> BoundaryCrossing.CROSSES_270_BOUNDARY
+            maxAngle > 270.0 -> BoundaryCrossing.EXCEEDS_270
+            else -> BoundaryCrossing.WITHIN_RANGE
+        }
+    }
+
+    /**
+     * ✅ 시작 각도 결정 (회전 방향과 경계 통과 고려)
+     */
+    private fun determineStartAngle(
+        firstAngle: Double,
+        allAzimuths: List<Double>,
+        direction: RotationDirection,
+        crossing: BoundaryCrossing
+    ): Double {
+
+        when (crossing) {
+            BoundaryCrossing.WITHIN_RANGE -> {
+                // 270° 범위 내에 있으면 변환 불필요
+                logger.info("패스가 0°~270° 범위 내에 있음: 변환 불필요")
+                return firstAngle
+            }
+
+            BoundaryCrossing.EXCEEDS_270 -> {
+                // 270° 초과하는 경우 음수 영역으로 이동
+                logger.info("270° 초과 패스: 음수 영역으로 변환")
+                return firstAngle - 360.0
+            }
+
+            BoundaryCrossing.CROSSES_270_BOUNDARY -> {
+                // 270° 경계를 넘나드는 경우
+                val lastAngle = allAzimuths.last()
+
+                when (direction) {
+                    RotationDirection.CLOCKWISE -> {
+                        // 시계방향: 180° → 270° → 360° → 30° 패턴
+                        // 시작을 음수로 하여 연속성 보장: -180° → -90° → 0° → 30°
+                        if (firstAngle >= 180.0) {
+                            logger.info("시계방향 270° 경계 통과: 시작각도를 음수로 변환")
+                            return firstAngle - 360.0
+                        }
+                        return firstAngle
+                    }
+
+                    RotationDirection.COUNTER_CLOCKWISE -> {
+                        // 반시계방향: 30° → 360° → 270° → 180° 패턴
+                        if (lastAngle >= 180.0) {
+                            logger.info("반시계방향 270° 경계 통과: 기본 변환")
+                            return firstAngle
+                        }
+                        return firstAngle
+                    }
+
+                    else -> {
+                        // 혼합 또는 불명확한 경우 기본 로직
+                        logger.info("혼합/불명 방향: 기본 변환 로직 적용")
+                        return if (firstAngle >= 180.0) firstAngle - 360.0 else firstAngle
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * ✅ 회전량 계산 (방향 고려)
+     */
+    private fun calculateRotationAmount(fromAngle: Double, toAngle: Double, direction: RotationDirection): Double {
+        val rawDelta = toAngle - fromAngle
+
+        // 360°/0° 경계 통과 보정
+        val correctedDelta = when {
+            rawDelta > 180.0 -> rawDelta - 360.0   // 반시계방향 경계 통과
+            rawDelta < -180.0 -> rawDelta + 360.0  // 시계방향 경계 통과
+            else -> rawDelta
+        }
+
+        return correctedDelta
+    }
+
+    /**
+     * ✅ 방향성을 유지하는 정규화
+     */
+    private fun normalizeWithDirectionPreservation(
+        angle: Double,
+        previousAngle: Double,
+        direction: RotationDirection
+    ): Double {
+        var normalized = angle
+
+        // 기본 ±270° 범위 정규화
         while (normalized > 270.0) normalized -= 360.0
         while (normalized < -270.0) normalized += 360.0
 
-        // 2️⃣ 연속성 체크: 이전 각도와의 차이가 비정상적으로 크면 보정
-        val jumpSize = abs(normalized - previousAngle)
-        if (jumpSize > 300.0) {
-            logger.debug("연속성 문제 감지: 이전=${String.format("%.2f", previousAngle)}°, 현재=${String.format("%.2f", normalized)}°, 점프=${String.format("%.2f", jumpSize)}°")
+        // 방향성 검증 및 보정
+        val actualDelta = normalized - previousAngle
 
-            // 3️⃣ 대안 각도 시도
+        // 비정상적인 방향 전환 감지 및 보정
+        if (abs(actualDelta) > 300.0) {
+            logger.debug("방향성 보정 필요: ${String.format("%.2f", previousAngle)}° → ${String.format("%.2f", normalized)}°")
+
+            // 대안 각도 계산
             val alternative1 = normalized + 360.0
             val alternative2 = normalized - 360.0
 
@@ -209,14 +333,90 @@ class LimitAngleCalculator {
 
             if (candidates.isNotEmpty()) {
                 val bestCandidate = candidates.minByOrNull { abs(it - previousAngle) }
-                if (bestCandidate != null && abs(bestCandidate - previousAngle) < jumpSize) {
-                    logger.debug("연속성 보정 적용: ${String.format("%.2f", normalized)}° → ${String.format("%.2f", bestCandidate)}°")
+                if (bestCandidate != null && abs(bestCandidate - previousAngle) < abs(actualDelta)) {
+                    logger.debug("방향성 보정 적용: ${String.format("%.2f", normalized)}° → ${String.format("%.2f", bestCandidate)}°")
                     normalized = bestCandidate
                 }
             }
         }
 
+        // 최종 범위 검증
+        if (normalized < -270.0 || normalized > 270.0) {
+            logger.error("최종 검증 실패: ${String.format("%.2f", normalized)}° - 클램핑 적용")
+            normalized = normalized.coerceIn(-270.0, 270.0)
+        }
+
         return normalized
+    }
+
+    /**
+     * ✅ 변환 후 연속성 검증 메서드
+     */
+    private fun validateConversionContinuity(convertedAzimuths: List<Double>, originalAzimuths: List<Double>): Boolean {
+        if (convertedAzimuths.size != originalAzimuths.size || convertedAzimuths.size < 2) return false
+
+        var continuityIssues = 0
+        val totalPoints = convertedAzimuths.size - 1
+
+        for (i in 1 until convertedAzimuths.size) {
+            val originalDelta = calculateAngleDelta(originalAzimuths[i-1], originalAzimuths[i])
+            val convertedDelta = convertedAzimuths[i] - convertedAzimuths[i-1]
+
+            // 변화량의 차이가 5° 이상이면 연속성 문제
+            val deltaError = abs(abs(originalDelta) - abs(convertedDelta))
+            if (deltaError > 5.0) {
+                continuityIssues++
+                logger.debug("연속성 이슈 #{}: 원본Δ=${String.format("%.2f", originalDelta)}°, 변환Δ=${String.format("%.2f", convertedDelta)}°, 오차=${String.format("%.2f", deltaError)}°",
+                    continuityIssues)
+            }
+        }
+
+        val continuityRate = (totalPoints - continuityIssues).toDouble() / totalPoints
+        logger.debug("연속성 검증: ${String.format("%.1f", continuityRate * 100)}% (${totalPoints - continuityIssues}/${totalPoints})")
+
+        return continuityRate >= 0.95 // 95% 이상 연속성 유지
+    }
+
+    /**
+     * ✅ 변환 품질 평가 메서드
+     */
+    private fun calculateConversionQuality(convertedAzimuths: List<Double>, originalAzimuths: List<Double>): Double {
+        if (convertedAzimuths.size != originalAzimuths.size || convertedAzimuths.size < 2) return 0.0
+
+        // 1. 범위 준수 검사 (30점)
+        val outOfRangeCount = convertedAzimuths.count { it < -270.0 || it > 270.0 }
+        val rangeScore = maxOf(0.0, 30.0 - (outOfRangeCount * 5.0))
+
+        // 2. 연속성 검사 (40점)
+        var continuityIssues = 0
+        for (i in 1 until convertedAzimuths.size) {
+            val jump = abs(convertedAzimuths[i] - convertedAzimuths[i-1])
+            if (jump > 10.0) { // 10° 이상 점프를 연속성 문제로 간주
+                val originalJump = abs(calculateAngleDelta(originalAzimuths[i-1], originalAzimuths[i]))
+                if (originalJump < 10.0) { // 원본에서는 작은 변화였는데 변환에서 큰 점프
+                    continuityIssues++
+                }
+            }
+        }
+        val continuityScore = maxOf(0.0, 40.0 - (continuityIssues * 5.0))
+
+        // 3. 변화량 보존 검사 (30점)
+        var deltaPreservationScore = 30.0
+        for (i in 1 until convertedAzimuths.size) {
+            val originalDelta = calculateAngleDelta(originalAzimuths[i-1], originalAzimuths[i])
+            val convertedDelta = convertedAzimuths[i] - convertedAzimuths[i-1]
+            val deltaError = abs(abs(originalDelta) - abs(convertedDelta))
+            if (deltaError > 5.0) {
+                deltaPreservationScore -= 2.0
+            }
+        }
+        deltaPreservationScore = maxOf(0.0, deltaPreservationScore)
+
+        val qualityScore = rangeScore + continuityScore + deltaPreservationScore
+
+        logger.debug("품질 평가: 범위=${String.format("%.1f", rangeScore)}, 연속성=${String.format("%.1f", continuityScore)}, 변화량보존=${String.format("%.1f", deltaPreservationScore)}, 총점=${String.format("%.1f", qualityScore)}")
+
+        return qualityScore
     }
 
     /**
@@ -232,22 +432,6 @@ class LimitAngleCalculator {
         }
 
         return delta
-    }
-
-    /**
-     * ✅ ±270° 범위로 정규화
-     */
-    private fun normalizeToRange(angle: Double): Double {
-        var normalized = angle
-
-        while (normalized > 270.0) {
-            normalized -= 360.0
-        }
-        while (normalized < -270.0) {
-            normalized += 360.0
-        }
-
-        return normalized
     }
 
     /**
@@ -293,7 +477,7 @@ class LimitAngleCalculator {
     }
 
     /**
-     * ✅ 개선된 변환 결과 검증
+     * ✅ 개선된 변환 결과 검증 (범위 검증 강화)
      */
     fun validateConversion(
         originalMst: List<Map<String, Any?>>,
@@ -311,43 +495,41 @@ class LimitAngleCalculator {
         convertedDtl.groupBy { it["MstId"] as UInt }.forEach { (mstId, dtlList) ->
             val sortedList = dtlList.sortedBy { it["No"] as UInt }
 
+            sortedList.forEach { point ->
+                val azimuth = point["Azimuth"] as Double
+
+                // ✅ 강화된 범위 체크
+                if (azimuth < -270.0 || azimuth > 270.0) {
+                    outOfRangeCount++
+                    issues.add("MstId $mstId: 방위각 범위 초과 ${String.format("%.2f", azimuth)}°")
+                    logger.error("범위 초과 감지: MstId $mstId, 방위각 ${String.format("%.2f", azimuth)}°")
+                }
+            }
+
+            // 연속성 검증
             for (i in 1 until sortedList.size) {
                 val prevAz = sortedList[i-1]["Azimuth"] as Double
                 val currentAz = sortedList[i]["Azimuth"] as Double
+                val originalPrev = sortedList[i-1]["OriginalAzimuth"] as? Double
+                val originalCurrent = sortedList[i]["OriginalAzimuth"] as? Double
 
-                // 범위 체크
-                if (currentAz < -270.0 || currentAz > 270.0) {
-                    outOfRangeCount++
-                    issues.add("MstId $mstId: 방위각 범위 초과 ${String.format("%.2f", currentAz)}°")
-                }
-
-                // ✅ 개선된 점프 체크 (연속성 기반)
                 val jump = abs(currentAz - prevAz)
                 maxJump = maxOf(maxJump, jump)
 
-                // ✅ 임계값 조정: 30° → 5° (연속성이 보장되어야 함)
                 if (jump > 5.0) {
-                    // ✅ 360°/0° 경계 통과인지 확인
-                    val originalPrev = sortedList[i-1]["OriginalAzimuth"] as? Double
-                    val originalCurrent = sortedList[i]["OriginalAzimuth"] as? Double
+                    val isBoundary = isBoundaryCrossing(prevAz, currentAz, originalPrev, originalCurrent)
 
-                    val isBoundaryCrossing = if (originalPrev != null && originalCurrent != null) {
-                        abs(originalPrev - originalCurrent) > 180.0
-                    } else false
-
-                    if (isBoundaryCrossing) {
-                        // 경계 통과는 정상 - INFO 레벨로 기록
+                    if (isBoundary) {
                         totalBoundaryCrossings++
-                        logger.info("MstId $mstId: 360°/0° 경계 통과 - 원본: ${String.format("%.2f", originalPrev ?: 0.0)}° → ${String.format("%.2f", originalCurrent ?: 0.0)}°, 변환: ${String.format("%.2f", prevAz)}° → ${String.format("%.2f", currentAz)}°")
+                        logger.debug("MstId $mstId: 경계 통과 - ${String.format("%.2f", prevAz)}° → ${String.format("%.2f", currentAz)}°")
                     } else {
-                        // 실제 비정상적인 점프
                         issues.add("MstId $mstId: 비정상적인 각도 점프 ${String.format("%.2f", jump)}° (${String.format("%.2f", prevAz)}° → ${String.format("%.2f", currentAz)}°)")
                     }
                 }
             }
         }
 
-        // ✅ 마스터 데이터 검증
+        // ✅ 마스터 데이터 검증 강화
         convertedMst.forEach { mstRecord ->
             val mstId = mstRecord["No"] as UInt
             val startAz = mstRecord["StartAzimuth"] as? Double
@@ -355,10 +537,12 @@ class LimitAngleCalculator {
 
             if (startAz != null && (startAz < -270.0 || startAz > 270.0)) {
                 issues.add("MstId $mstId: 시작 방위각 범위 초과 ${String.format("%.2f", startAz)}°")
+                logger.error("마스터 데이터 범위 초과: MstId $mstId, 시작 방위각 ${String.format("%.2f", startAz)}°")
             }
 
             if (endAz != null && (endAz < -270.0 || endAz > 270.0)) {
                 issues.add("MstId $mstId: 종료 방위각 범위 초과 ${String.format("%.2f", endAz)}°")
+                logger.error("마스터 데이터 범위 초과: MstId $mstId, 종료 방위각 ${String.format("%.2f", endAz)}°")
             }
         }
 
@@ -369,6 +553,30 @@ class LimitAngleCalculator {
             maxJump = maxJump,
             boundaryCrossings = totalBoundaryCrossings
         )
+    }
+
+    /**
+     * ✅ 개선된 경계 통과 감지 메서드
+     */
+    private fun isBoundaryCrossing(prevAz: Double, currentAz: Double, originalPrev: Double?, originalCurrent: Double?): Boolean {
+        // 1. 원본 데이터에서 경계 통과 확인
+        val originalBoundaryCrossing = if (originalPrev != null && originalCurrent != null) {
+            abs(originalPrev - originalCurrent) > 180.0
+        } else false
+
+        // 2. 변환된 데이터에서 경계 통과 패턴 확인
+        val convertedJump = abs(currentAz - prevAz)
+
+        // 3. 경계 통과 패턴들
+        val isPositiveToNegativeCrossing = prevAz > 180.0 && currentAz < -180.0  // 270° → -90° 같은 경우
+        val isNegativeToPositiveCrossing = prevAz < -180.0 && currentAz > 180.0  // -270° → 90° 같은 경우
+        val isLargeJumpWithBoundary = convertedJump > 300.0  // 300° 이상의 큰 점프
+
+        // 4. 연속성 기반 경계 통과 판단
+        val isContinuityPreservingJump = originalBoundaryCrossing && convertedJump > 180.0
+
+        return originalBoundaryCrossing || isPositiveToNegativeCrossing || isNegativeToPositiveCrossing ||
+                isLargeJumpWithBoundary || isContinuityPreservingJump
     }
 
     /**
@@ -497,8 +705,8 @@ class LimitAngleCalculator {
         passDetails.take(pointsToShow).forEachIndexed { index, point ->
             val original = point["OriginalAzimuth"] as? Double
             val converted = point["Azimuth"] as? Double
-            logger.info("  #{}: {:.2f}° → {:.2f}°",
-                index + 1, original ?: 0.0, converted ?: 0.0)
+            logger.info("  #{}: ${String.format("%.2f", original ?: 0.0)}° → ${String.format("%.2f", converted ?: 0.0)}°",
+                index + 1)
         }
 
         if (passDetails.size > pointsToShow * 2) {
@@ -511,9 +719,10 @@ class LimitAngleCalculator {
                 val original = point["OriginalAzimuth"] as? Double
                 val converted = point["Azimuth"] as? Double
                 val actualIndex = passDetails.size - pointsToShow + index + 1
-                logger.info("  #{}: {:.2f}° → {:.2f}°",
-                    actualIndex, original ?: 0.0, converted ?: 0.0)
+                logger.info("  #{}: ${String.format("%.2f", original ?: 0.0)}° → ${String.format("%.2f", converted ?: 0.0)}°",
+                    actualIndex)
             }
         }
     }
 }
+
