@@ -639,7 +639,7 @@ const handleExportTXT = () => {
     // 현재 데이터를 TXT 형식으로 변환
     const tleContent = tempTleData.value
       .map(item => item.TLE)
-      .join('\n\n')
+      .join('\n')
 
     // 파일 다운로드
     const blob = new Blob([tleContent], { type: 'text/plain' })

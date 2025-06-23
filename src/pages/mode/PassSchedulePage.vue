@@ -113,47 +113,42 @@
 
                     <div class="info-row">
                       <span class="info-label">스케줄 ID:</span>
-                      <span class="info-value">{{ selectedSchedule.No }}</span>
+                      <span class="info-value">{{ selectedSchedule.no }}</span>
                     </div>
 
                     <div class="info-row">
                       <span class="info-label">위성 이름:</span>
-                      <span class="info-value">{{ selectedSchedule.Name }}</span>
+                      <span class="info-value">{{ selectedSchedule.satelliteName }}</span>
                     </div>
 
                     <div class="info-row">
                       <span class="info-label">시작 시간:</span>
-                      <span class="info-value">{{ selectedSchedule.StartTime }}</span>
+                      <span class="info-value">{{ new Date(selectedSchedule.startTime).toLocaleString('ko-KR') }}</span>
                     </div>
 
                     <div class="info-row">
                       <span class="info-label">종료 시간:</span>
-                      <span class="info-value">{{ selectedSchedule.EndTime }}</span>
+                      <span class="info-value">{{ new Date(selectedSchedule.endTime).toLocaleString('ko-KR') }}</span>
                     </div>
 
                     <div class="info-row">
                       <span class="info-label">지속 시간:</span>
-                      <span class="info-value">{{ selectedSchedule.Duration }}</span>
+                      <span class="info-value">{{ selectedSchedule.duration }}</span>
                     </div>
 
                     <div class="info-row">
-                      <span class="info-label">상태:</span>
-                      <span class="info-value">{{ selectedSchedule.Status }}</span>
+                      <span class="info-label">시작 방위각:</span>
+                      <span class="info-value">{{ selectedSchedule.startAzimuthAngle.toFixed(2) }}°</span>
                     </div>
 
                     <div class="info-row">
-                      <span class="info-label">방위각:</span>
-                      <span class="info-value">{{ selectedSchedule.Azimuth }}°</span>
+                      <span class="info-label">시작 고도각:</span>
+                      <span class="info-value">{{ selectedSchedule.startElevationAngle.toFixed(2) }}°</span>
                     </div>
 
                     <div class="info-row">
-                      <span class="info-label">고도각:</span>
-                      <span class="info-value">{{ selectedSchedule.Elevation }}°</span>
-                    </div>
-
-                    <div class="info-row">
-                      <span class="info-label">틸트각:</span>
-                      <span class="info-value">{{ selectedSchedule.Tilt }}°</span>
+                      <span class="info-label">최대 고도각:</span>
+                      <span class="info-value">{{ selectedSchedule.maxElevation?.toFixed(2) }}°</span>
                     </div>
                   </div>
 
@@ -174,13 +169,22 @@
               <div class="text-subtitle1 text-weight-bold text-primary">Schedule Control</div>
 
               <!-- 스케줄 테이블 -->
-              <q-table flat bordered :rows="scheduleData" :columns="scheduleColumns" row-key="No"
+              <q-table flat bordered :rows="scheduleData" :columns="scheduleColumns" row-key="no"
                 :pagination="pagination" :loading="loading" selection="single" @row-click="onRowClick"
-                class="schedule-table q-mt-sm" style="height: 300px">
+                class="schedule-table q-mt-sm" style="height: 300px" :no-data-label="'선택된 스케줄이 없습니다'">
                 <template v-slot:loading>
                   <q-inner-loading showing color="primary">
                     <q-spinner size="50px" color="primary" />
                   </q-inner-loading>
+                </template>
+
+                <!-- 🆕 삭제 버튼 컬럼 -->
+                <template v-slot:body-cell-actions="props">
+                  <q-td :props="props">
+                    <q-btn icon="delete" color="negative" size="sm" flat round>
+                      <q-tooltip>목록에서 제거</q-tooltip>
+                    </q-btn>
+                  </q-td>
                 </template>
               </q-table>
 
@@ -205,6 +209,11 @@
                   <q-btn color="warning" label="Stop" @click="handleStopCommand" class="control-btn" size="md" />
                   <q-btn color="negative" label="Stow" @click="handleStowCommand" class="control-btn" size="md" />
                 </div>
+
+                <!-- 🆕 선택된 스케줄 개수 표시 -->
+                <div class="q-mt-sm text-caption text-grey-5">
+                  선택된 스케줄: {{ scheduleData.length }}개
+                </div>
               </div>
             </q-card-section>
           </q-card>
@@ -217,7 +226,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useQuasar } from 'quasar'
-import { usePassScheduleStore } from '../../stores/mode/passScheduleStore'
+import { usePassScheduleStore, type ScheduleItem } from '../../stores/mode/passScheduleStore'
 import { useICDStore } from '../../stores/icd/icdStore'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
@@ -233,19 +242,6 @@ const chartRef = ref<HTMLElement | null>(null)
 let chart: ECharts | null = null
 let updateTimer: number | null = null
 
-// Store의 실제 데이터 타입에 맞춤 (passScheduleStore.ts의 ScheduleItem 타입과 일치)
-interface ScheduleItem {
-  No: number
-  Name: string
-  StartTime: string
-  EndTime: string
-  Status: string
-  Azimuth: number
-  Elevation: number
-  Tilt: number
-  Duration: number
-}
-
 // ECharts 매개변수 타입 정의
 interface EChartsScatterParam {
   value: [number, number]
@@ -257,9 +253,9 @@ interface EChartsScatterParam {
 }
 
 // 스케줄 데이터
-const scheduleData = ref<ScheduleItem[]>([])
+const scheduleData = passScheduleStore.selectedScheduleList
 const selectedSchedule = ref<ScheduleItem | null>(null)
-const loading = ref(false)
+const loading = passScheduleStore.loading
 
 // 입력값과 출력값 - PassSchedule 독립적 상태
 const inputs = ref<string[]>(['0.00', '0.00', '0.00', '0'])
@@ -269,24 +265,45 @@ const outputs = ref<string[]>(['0.00', '0.00', '0.00', '0'])
 type QTableColumn = NonNullable<QTableProps['columns']>[0]
 
 const scheduleColumns: QTableColumn[] = [
-  { name: 'No', label: 'No', field: 'No', align: 'left' as const, sortable: true },
-  { name: 'Name', label: '위성 이름', field: 'Name', align: 'left' as const, sortable: true },
+  { name: 'no', label: 'No', field: 'no', align: 'left' as const, sortable: true },
+  { name: 'satelliteName', label: '위성 이름', field: 'satelliteName', align: 'left' as const, sortable: true },
   {
-    name: 'StartTime',
+    name: 'startTime',
     label: '시작 시간',
-    field: 'StartTime',
+    field: 'startTime',
     align: 'left' as const,
     sortable: true,
+    format: (val: string) => {
+      try {
+        return new Date(val).toLocaleString('ko-KR')
+      } catch {
+        return val
+      }
+    }
   },
-  { name: 'EndTime', label: '종료 시간', field: 'EndTime', align: 'left' as const, sortable: true },
   {
-    name: 'Duration',
+    name: 'endTime',
+    label: '종료 시간',
+    field: 'endTime',
+    align: 'left' as const,
+    sortable: true,
+    format: (val: string) => {
+      try {
+        return new Date(val).toLocaleString('ko-KR')
+      } catch {
+        return val
+      }
+    }
+  },
+  {
+    name: 'duration',
     label: '지속 시간',
-    field: 'Duration',
+    field: 'duration',
     align: 'left' as const,
     sortable: true,
   },
-  { name: 'Status', label: '상태', field: 'Status', align: 'left' as const, sortable: true },
+  // 🆕 삭제 버튼 컬럼 추가
+  { name: 'actions', label: '작업', field: 'actions', align: 'center' as const, sortable: false },
 ]
 // TLE 업로드 핸들러
 const handleTLEUpload = async () => {
@@ -324,11 +341,10 @@ const handleTLEUpload = async () => {
 
 // 페이지네이션 설정
 const pagination = {
-  sortBy: 'No',
+  sortBy: 'no',
   descending: false,
   page: 1,
-  rowsPerPage: 5,
-  rowsNumber: 10,
+  rowsPerPage: 10,
 }
 
 // 차트 초기화
@@ -469,10 +485,12 @@ const selectScheduleData = async () => {
       onClose: (selectedData?: ScheduleItem) => {
         console.log('스케줄 선택 모달 닫힘', selectedData)
         if (selectedData) {
-          selectedSchedule.value = selectedData
+          // 🔧 선택된 스케줄을 목록에 추가
+          passScheduleStore.addSelectedSchedule(selectedData)
+
           $q.notify({
             type: 'positive',
-            message: `스케줄 "${selectedData.Name}"이 선택되었습니다`,
+            message: `스케줄 "${selectedData.satelliteName}"이 목록에 추가되었습니다`,
           })
         }
       },
@@ -500,7 +518,14 @@ const selectScheduleData = async () => {
 // 테이블 행 클릭 이벤트 핸들러
 const onRowClick = (evt: Event, row: ScheduleItem) => {
   selectedSchedule.value = row
+  passScheduleStore.selectSchedule(row) // Store에도 선택 상태 저장
   updateScheduleChart()
+
+  console.log('스케줄 선택됨:', {
+    no: row.no,
+    satelliteName: row.satelliteName,
+    startTime: row.startTime,
+  })
 }
 
 // 선택된 스케줄에 따른 차트 업데이트
@@ -587,7 +612,7 @@ const handleStartCommand = () => {
 
     $q.notify({
       type: 'positive',
-      message: `스케줄 ${selectedSchedule.value.Name} 시작됨`,
+      message: `스케줄 ${selectedSchedule.value.satelliteName} 시작됨`,
     })
   } catch (error) {
     console.error('Failed to start schedule:', error)
@@ -621,6 +646,9 @@ const handleStowCommand = async () => {
     inputs.value = ['0.00', '0.00', '0.00', '0']
     outputs.value = ['0.00', '0.00', '0.00', '0']
 
+    // 🔧 선택된 스케줄 목록도 초기화
+    passScheduleStore.clearSelectedSchedules()
+
     // 모든 오프셋 리셋
     await icdStore.sendPositionOffsetCommand(0, 0, 0)
 
@@ -645,10 +673,18 @@ const init = async () => {
     initChart()
   }, 100)
 
-  // 초기 스케줄 데이터 로드
-  await selectScheduleData()
+  // Store 초기화 호출
+  try {
+    await passScheduleStore.init() // 🔧 Store의 init 메서드 직접 호출
+    console.log('✅ 스케줄 데이터 로드 완료:', passScheduleStore.scheduleData.length, '개')
+  } catch (error) {
+    console.error('스케줄 데이터 로드 실패:', error)
+    $q.notify({
+      type: 'negative',
+      message: '스케줄 데이터를 불러오는데 실패했습니다',
+    })
+  }
 }
-
 // 컴포넌트 마운트
 onMounted(async () => {
   console.log('PassSchedulePage 컴포넌트 마운트됨')

@@ -93,19 +93,26 @@ export interface TleAndTrackingResponse {
 
 // 🆕 패스 스케줄 관련 타입들 추가
 export interface PassScheduleMasterData {
-  id: string
-  satelliteId: string
-  satelliteName: string
-  passNumber: number
-  startTime: string
-  endTime: string
-  maxElevation: number
-  duration: number
-  status: string
-  azimuthStart: number
-  azimuthEnd: number
-  elevationStart: number
-  elevationEnd: number
+  No: number
+  SatelliteID: string
+  SatelliteName: string
+  StartTime: string
+  EndTime: string
+  Duration: string
+  MaxElevation: number
+  MaxElevationTime: string
+  StartAzimuth: number
+  StartElevation: number
+  EndAzimuth: number
+  EndElevation: number
+  MaxAzRate: number
+  MaxElRate: number
+  MaxAzAccel: number
+  MaxElAccel: number
+  CreationDate: string
+  Creator: string
+  OriginalStartAzimuth: number
+  OriginalEndAzimuth: number
 }
 
 export interface GetAllTrackingMasterResponse {
@@ -458,7 +465,7 @@ class PassScheduleService {
   }
 
   /**
-   * 모든 위성의 패스 스케줄 마스터 데이터 조회
+   * 모든 위성의 패스 스케줄 마스터 데이터 조회 (디버깅 강화)
    */
   async getAllTrackingMasterData(): Promise<{
     success: boolean
@@ -466,20 +473,100 @@ class PassScheduleService {
     message: string
   }> {
     try {
-      console.log('📡 모든 패스 스케줄 마스터 데이터 조회')
+      console.log('📡 API 호출: /pass-schedule/tracking/master')
 
       const response = await api.get('/pass-schedule/tracking/master')
 
-      return {
-        success: true,
-        data: response.data.data,
-        message: response.data.message || '패스 스케줄 마스터 데이터 조회 완료',
+      // 🔍 상세 디버깅
+      console.log('=== Service 상세 디버깅 ===')
+      console.log('1. HTTP Status:', response.status)
+      console.log('2. Raw Response:', response.data)
+      console.log('3. Response Type:', typeof response.data)
+
+      if (response.data) {
+        console.log('4. Response Keys:', Object.keys(response.data))
+        console.log('5. response.data.success:', response.data.success)
+        console.log('6. response.data.message:', response.data.message)
+        console.log('7. response.data.data:', response.data.data)
+
+        if (response.data.data) {
+          console.log('8. data.data Type:', typeof response.data.data)
+          console.log('9. data.data Keys:', Object.keys(response.data.data))
+          console.log('10. data.data.satelliteCount:', response.data.data.satelliteCount)
+          console.log('11. data.data.totalPassCount:', response.data.data.totalPassCount)
+          console.log('12. data.data.satellites:', response.data.data.satellites)
+          console.log('13. satellites Type:', typeof response.data.data.satellites)
+
+          if (response.data.data.satellites) {
+            console.log('14. satellites Keys:', Object.keys(response.data.data.satellites))
+          } else {
+            console.log('14. satellites is null/undefined/empty')
+          }
+        } else {
+          console.log('8. data.data is null/undefined')
+        }
       }
+      console.log('=== Service 디버깅 끝 ===')
+
+      // 🔧 응답이 없는 경우
+      if (!response.data) {
+        console.error('❌ API 응답에 data가 없음')
+        return {
+          success: false,
+          message: 'API 응답에 데이터가 없습니다',
+        }
+      }
+
+      // 🔧 성공 응답 처리
+      if (response.data.success === true) {
+        console.log('✅ API 성공 응답 확인됨')
+
+        if (response.data.data) {
+          console.log('✅ response.data.data 존재 확인됨')
+          return {
+            success: true,
+            data: response.data.data,
+            message: response.data.message || '데이터 조회 완료',
+          }
+        } else {
+          console.warn('⚠️ response.data.data가 없음')
+          return {
+            success: false,
+            message: 'API 응답에 실제 데이터가 없습니다',
+          }
+        }
+      } else {
+        console.warn('⚠️ API 응답이 성공이 아님:', response.data.success)
+        return {
+          success: false,
+          message: response.data.message || '서버에서 실패 응답을 받았습니다',
+        }
+      }
+
     } catch (error) {
-      console.error('❌ 패스 스케줄 마스터 데이터 조회 실패:', error)
+      console.error('❌ Service API 호출 실패:', error)
+
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as {
+          response?: {
+            status?: number
+            statusText?: string
+            data?: unknown
+          }
+          message?: string
+        }
+
+        console.error('Service Axios 에러 상세:', {
+          status: axiosError.response?.status,
+          statusText: axiosError.response?.statusText,
+          responseData: axiosError.response?.data,
+          message: axiosError.message,
+        })
+      }
+
       return {
         success: false,
-        message: '패스 스케줄 마스터 데이터 조회에 실패했습니다',
+        message: '서버 연결에 실패했습니다',
       }
     }
   }

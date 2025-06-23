@@ -3,15 +3,20 @@
     <div class="content-header">
       <div class="text-h6 text-primary">스케줄 선택</div>
       <div class="text-caption text-grey-5">
-        총 {{ scheduleData.length }}개의 패스 스케줄
+        총 {{ scheduleData.length }}개의 패스 스케줄 ({{ selectedRows.length }}개 선택됨)
+        <span v-if="overlappingGroups.length > 0" class="text-warning q-ml-sm">
+          ⚠️ {{ overlappingGroups.flat().length }}개 시간 겹침
+        </span>
       </div>
     </div>
 
     <div class="content-body">
       <!-- 스케줄 테이블 -->
-      <q-table flat bordered dark :rows="scheduleData" :columns="scheduleColumns" row-key="No" :pagination="pagination"
-        :loading="loading" selection="single" v-model:selected="selectedRows" @row-click="onRowClick"
-        class="schedule-table" style="height: 400px; background-color: var(--q-dark);">
+      <q-table flat bordered dark :rows="scheduleData" :columns="scheduleColumns" row-key="no" :loading="loading"
+        selection="multiple" v-model:selected="selectedRows" @row-click="onRowClick" class="schedule-table"
+        style="height: 400px; background-color: var(--q-dark);" virtual-scroll :virtual-scroll-sticky-size-start="48"
+        hide-pagination :rows-per-page-options="[0]" :row-class="getRowClass">
+
         <template v-slot:loading>
           <q-inner-loading showing color="primary">
             <q-spinner size="50px" color="primary" />
@@ -25,39 +30,92 @@
           </div>
         </template>
 
-        <template v-slot:body-cell-Status="props">
-          <q-td :props="props">
-            <q-badge :color="getStatusColor(props.value)" :label="props.value" class="status-badge" />
+        <!-- ✅ 체크박스 컬럼 완전 차단 처리 -->
+        <template v-slot:body-cell-selection="props">
+          <q-td :props="props"
+                @click.stop.prevent="handleCheckboxInteraction(props.row, $event)"
+                @mousedown.stop.prevent="handleCheckboxInteraction(props.row, $event)"
+                @touchstart.stop.prevent="handleCheckboxInteraction(props.row, $event)">
+            <q-checkbox
+              :model-value="isScheduleSelected(props.row)"
+              :disable="!canSelectSchedule(props.row)"
+              :color="isScheduleOverlapping(props.row.no) ? 'warning' : 'primary'"
+              @click.stop.prevent="handleCheckboxInteraction(props.row, $event)"
+              @update:model-value="handleCheckboxInteraction(props.row, $event)"
+              @mousedown.stop.prevent="handleCheckboxInteraction(props.row, $event)"
+              @touchstart.stop.prevent="handleCheckboxInteraction(props.row, $event)"
+              class="schedule-checkbox"
+              :class="{ 'checkbox-blocked': !canSelectSchedule(props.row) }" />
+            <q-tooltip v-if="!canSelectSchedule(props.row)" class="bg-warning text-black">
+              시간이 겹치는 다른 스케줄이 이미 선택되어 있습니다
+            </q-tooltip>
           </q-td>
         </template>
 
-        <template v-slot:body-cell-StartTime="props">
+        <template v-slot:body-cell-startTime="props">
+          <q-td :props="props">
+            {{ formatDateTime(props.value) }}
+            <q-icon v-if="isScheduleOverlapping(props.row.no)" name="warning" color="warning" size="xs" class="q-ml-xs">
+              <q-tooltip class="bg-warning text-black">
+                시간이 겹치는 스케줄입니다
+              </q-tooltip>
+            </q-icon>
+          </q-td>
+        </template>
+
+        <template v-slot:body-cell-endTime="props">
           <q-td :props="props">
             {{ formatDateTime(props.value) }}
           </q-td>
         </template>
 
-        <template v-slot:body-cell-EndTime="props">
-          <q-td :props="props">
-            {{ formatDateTime(props.value) }}
-          </q-td>
-        </template>
-
-        <template v-slot:body-cell-MaxElevation="props">
+        <template v-slot:body-cell-maxElevation="props">
           <q-td :props="props">
             {{ props.value ? props.value.toFixed(1) + '°' : '-' }}
           </q-td>
         </template>
 
-        <template v-slot:body-cell-SatelliteId="props">
+        <template v-slot:body-cell-satelliteId="props">
           <q-td :props="props">
-            <q-chip :label="props.value" color="info" text-color="white" size="sm" v-if="props.value" />
+            <q-chip :label="props.value" color="info" text-color="white" size="md" class="satellite-id-chip"
+              v-if="props.value" />
+          </q-td>
+        </template>
+
+        <!-- ✅ Azimuth 각도 컬럼 템플릿 -->
+        <template v-slot:body-cell-azimuthAngles="props">
+          <q-td :props="props" class="angle-cell">
+            <div class="angle-container">
+              <div class="angle-line start-angle">
+                <span class="angle-label">시작:</span>
+                <span class="angle-value">{{ formatAngle(props.row.startAzimuthAngle) }}</span>
+              </div>
+              <div class="angle-line end-angle">
+                <span class="angle-label">종료:</span>
+                <span class="angle-value">{{ formatAngle(props.row.endAzimuthAngle) }}</span>
+              </div>
+            </div>
           </q-td>
         </template>
       </q-table>
     </div>
 
     <div class="content-footer">
+      <div class="selection-info" v-if="selectedRows.length > 0">
+        <div class="text-body2 text-primary">
+          {{ selectedRows.length }}개의 스케줄이 선택되었습니다
+        </div>
+        <q-btn flat dense color="grey-5" label="전체 해제" @click="clearSelection" size="sm" />
+      </div>
+
+      <!-- ✅ 겹침 경고 정보 -->
+      <div class="overlap-warning" v-if="overlappingGroups.length > 0">
+        <q-icon name="info" color="warning" size="sm" />
+        <span class="text-caption text-warning q-ml-xs">
+          주황색 행들은 시간이 겹치므로 동시 선택할 수 없습니다
+        </span>
+      </div>
+
       <div class="button-group">
         <q-btn color="primary" label="Select" icon="check" @click="handleSelect" :disable="selectedRows.length === 0"
           class="action-btn" />
@@ -66,128 +124,388 @@
     </div>
   </div>
 </template>
-
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useQuasar } from 'quasar'
 import { usePassScheduleStore, type ScheduleItem } from '../../stores/mode/passScheduleStore'
 import type { QTableProps } from 'quasar'
+import { formatToLocalTime } from '../../utils/times'
 
 const $q = useQuasar()
 const passScheduleStore = usePassScheduleStore()
 
-// ✅ 올바른 데이터 참조
-const scheduleData = computed(() => passScheduleStore.scheduleData)
+// ✅ 시간 순 정렬 및 no 재생성된 데이터 참조
+const scheduleData = computed(() => {
+  const rawData = passScheduleStore.scheduleData
+  if (rawData.length === 0) return []
+
+  // 시간 순으로 정렬
+  const sortedData = [...rawData].sort((a, b) => {
+    try {
+      return new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    } catch {
+      return 0
+    }
+  })
+
+
+  // no를 1부터 순서대로 재생성
+  return sortedData.map((item, index) => ({
+    ...item,
+
+
+
+    no: index + 1
+  }))
+})
+
 const loading = computed(() => passScheduleStore.loading)
 
-// 선택된 행
+
 const selectedRows = ref<ScheduleItem[]>([])
+
+// ✅ 시간 겹침 검사 함수
+const checkTimeOverlap = (schedule1: ScheduleItem, schedule2: ScheduleItem): boolean => {
+  try {
+    const start1 = new Date(schedule1.startTime).getTime()
+    const end1 = new Date(schedule1.endTime).getTime()
+    const start2 = new Date(schedule2.startTime).getTime()
+    const end2 = new Date(schedule2.endTime).getTime()
+
+
+
+    return (start1 < end2) && (end1 > start2)
+  } catch (error) {
+    console.error('시간 겹침 검사 오류:', error)
+    return false
+  }
+}
+
+// ✅ 겹치는 스케줄 그룹 계산
+const overlappingGroups = computed(() => {
+  const data = scheduleData.value
+  const groups: number[][] = []
+  const processed = new Set<number>()
+
+  data.forEach((schedule, index) => {
+    if (processed.has(schedule.no)) return
+
+    const overlappingSchedules = [schedule.no]
+
+
+    data.forEach((otherSchedule, otherIndex) => {
+      if (index !== otherIndex && !processed.has(otherSchedule.no)) {
+        if (checkTimeOverlap(schedule, otherSchedule)) {
+          overlappingSchedules.push(otherSchedule.no)
+        }
+      }
+    })
+
+
+    if (overlappingSchedules.length > 1) {
+      groups.push(overlappingSchedules)
+      overlappingSchedules.forEach(no => processed.add(no))
+    }
+  })
+
+
+  return groups
+})
+
+// ✅ 특정 스케줄이 겹치는지 확인
+const isScheduleOverlapping = (scheduleNo: number): boolean => {
+  return overlappingGroups.value.some(group => group.includes(scheduleNo))
+}
+
+// ✅ 특정 스케줄의 겹치는 그룹 가져오기
+const getOverlappingGroup = (scheduleNo: number): number[] => {
+  const group = overlappingGroups.value.find(group => group.includes(scheduleNo))
+  return group || []
+}
+
+// ✅ 선택 가능 여부 확인 함수 (통합)
+const canSelectSchedule = (schedule: ScheduleItem): boolean => {
+  if (!isScheduleOverlapping(schedule.no)) {
+    return true
+  }
+
+  const overlappingGroup = getOverlappingGroup(schedule.no)
+  const otherSelectedInGroup = selectedRows.value.filter(selected =>
+    overlappingGroup.includes(selected.no) && selected.no !== schedule.no
+  )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  return otherSelectedInGroup.length === 0
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ✅ 체크박스 상태 확인 함수 (통합)
+const isScheduleSelected = (schedule: ScheduleItem): boolean => {
+  return selectedRows.value.some(selected => selected.no === schedule.no)
+}
+
+
+
+
+
+
+
+
+// ✅ 스케줄 선택 토글 함수 (통합)
+const toggleScheduleSelection = (row: ScheduleItem) => {
+  if (!canSelectSchedule(row)) {
+
+    showOverlapWarning(row)
+    return
+  }
+
+
+
+
+
+
+
+
+  const index = selectedRows.value.findIndex(item => item.no === row.no)
+
+  if (index >= 0) {
+
+    selectedRows.value.splice(index, 1)
+    console.log('✅ 스케줄 선택 해제:', row.satelliteName)
+  } else {
+
+    selectedRows.value.push(row)
+    console.log('✅ 스케줄 선택 추가:', row.satelliteName)
+  }
+
+
+}
+
+// ✅ 겹침 경고 메시지 표시 함수
+const showOverlapWarning = (row: ScheduleItem) => {
+  const overlappingGroup = getOverlappingGroup(row.no)
+  const selectedInGroup = selectedRows.value.filter(s => overlappingGroup.includes(s.no))
+
+  $q.notify({
+    type: 'warning',
+    message: `시간이 겹치는 스케줄이 이미 선택되어 있습니다. (선택된: ${selectedInGroup.map(s => s.satelliteName).join(', ')})`,
+    timeout: 3000,
+    position: 'top',
+    actions: [
+      {
+        label: '확인',
+        color: 'white',
+        handler: () => { }
+      }
+    ]
+  })
+}
+
+// ✅ 체크박스 관련 모든 이벤트 통합 처리 (완전 차단)
+const handleCheckboxInteraction = (row: ScheduleItem, event: Event) => {
+  event.stopPropagation()
+  event.preventDefault()
+
+  console.log('☑️ 체크박스 상호작용:', row.satelliteName, '선택 가능:', canSelectSchedule(row))
+
+  if (!canSelectSchedule(row)) {
+    console.log('❌ 선택 불가능한 체크박스 상호작용 완전 차단')
+    showOverlapWarning(row)
+    return false
+  }
+
+  // 선택 가능한 경우에도 직접 체크박스 조작은 차단
+  console.log('✅ 체크박스 직접 조작 차단, 토글 처리')
+  toggleScheduleSelection(row)
+  return false
+}
+
+// ✅ 행 클릭 이벤트 핸들러 (체크박스 영역 완전 제외)
+const onRowClick = (evt: Event, row: ScheduleItem) => {
+  console.log('🖱️ 행 클릭:', row.satelliteName)
+
+  // 체크박스 영역 클릭 감지 및 완전 차단
+  const target = evt.target as HTMLElement
+  const isCheckboxArea = target.closest('.q-checkbox') ||
+    target.closest('[data-col="selection"]') ||
+    target.classList.contains('q-checkbox__inner') ||
+    target.classList.contains('q-checkbox__bg') ||
+    target.classList.contains('schedule-checkbox') ||
+    target.closest('td[data-col="selection"]')
+
+  if (isCheckboxArea) {
+    console.log('☑️ 체크박스 영역 클릭 감지, 행 클릭 이벤트 무시')
+    evt.stopPropagation()
+    evt.preventDefault()
+    return
+  }
+
+  // 선택 가능 여부 확인 후 토글
+  toggleScheduleSelection(row)
+}
 
 // 테이블 컬럼 정의
 type QTableColumn = NonNullable<QTableProps['columns']>[0]
 
 const scheduleColumns: QTableColumn[] = [
-  { name: 'No', label: 'No', field: 'No', align: 'left' as const, sortable: true, style: 'width: 60px' },
-  { name: 'SatelliteId', label: '위성 ID', field: 'SatelliteId', align: 'center' as const, sortable: true, style: 'width: 100px' },
-  { name: 'Name', label: '위성명', field: 'Name', align: 'left' as const, sortable: true },
+  { name: 'no', label: 'No', field: 'no', align: 'left' as const, sortable: true, style: 'width: 60px' },
+  { name: 'satelliteId', label: '위성 ID', field: 'satelliteId', align: 'center' as const, sortable: true, style: 'width: 100px' },
+  { name: 'satelliteName', label: '위성명', field: 'satelliteName', align: 'left' as const, sortable: true },
   {
-    name: 'StartTime',
+    name: 'startTime',
     label: '시작 시간',
-    field: 'StartTime',
+    field: 'startTime',
     align: 'left' as const,
     sortable: true,
     style: 'width: 150px'
   },
   {
-    name: 'EndTime',
+    name: 'endTime',
     label: '종료 시간',
-    field: 'EndTime',
+    field: 'endTime',
     align: 'left' as const,
     sortable: true,
     style: 'width: 150px'
   },
   {
-    name: 'Duration',
+    name: 'duration',
     label: '지속 시간',
-    field: 'Duration',
+    field: 'duration',
     align: 'center' as const,
     sortable: true,
-    format: (val: number) => `${Math.round(val)}분`,
     style: 'width: 80px'
   },
   {
-    name: 'MaxElevation',
+    name: 'maxElevation',
     label: '최대 고도',
-    field: 'MaxElevation',
+    field: 'maxElevation',
     align: 'center' as const,
     sortable: true,
     style: 'width: 80px'
   },
   {
-    name: 'Status',
-    label: '상태',
-    field: 'Status',
+    name: 'azimuthAngles',
+    label: 'Azimuth 각도',
+    field: (row: ScheduleItem) => ({ start: row.startAzimuthAngle, end: row.endAzimuthAngle }),
     align: 'center' as const,
-    sortable: true,
-    style: 'width: 80px'
+    sortable: false,
+    style: 'width: 120px'
   },
 ]
-
-// 페이지네이션 설정
-const pagination = {
-  sortBy: 'StartTime',
-  descending: false,
-  page: 1,
-  rowsPerPage: 15,
-  rowsNumber: 15,
-}
 
 // 유틸리티 함수들
 const formatDateTime = (dateString: string): string => {
   try {
-    const date = new Date(dateString)
-    return date.toLocaleString('ko-KR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    })
-  } catch {
+    return formatToLocalTime(dateString)
+  } catch (error) {
+    console.error('시간 포맷팅 오류:', error)
     return dateString
   }
 }
 
-const getStatusColor = (status: string): string => {
-  switch (status.toLowerCase()) {
-    case 'running':
-    case 'active':
-      return 'positive'
-    case 'pending':
-    case 'scheduled':
-      return 'warning'
-    case 'completed':
-    case 'finished':
-      return 'info'
-    case 'stopped':
-    case 'cancelled':
-    case 'failed':
-      return 'negative'
-    default:
-      return 'grey'
-  }
+const formatAngle = (angle: number | undefined | null): string => {
+  if (angle === undefined || angle === null) return '-'
+  return `${angle.toFixed(1)}°`
 }
 
-// 이벤트 핸들러들
-const onRowClick = (evt: Event, row: ScheduleItem) => {
-  selectedRows.value = [row]
-  console.log('📋 패스 스케줄 행 선택:', {
-    name: row.Name,
-    satelliteId: row.SatelliteId,
-    startTime: row.StartTime,
-    passNumber: row.PassNumber
-  })
+const clearSelection = () => {
+  selectedRows.value = []
+  console.log('🗑️ 모든 선택 해제됨')
+}
+
+const getRowClass = (row: ScheduleItem): string => {
+  const classes = []
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  if (isScheduleOverlapping(row.no)) {
+    classes.push('overlapping-row')
+  }
+
+
+
+  if (!canSelectSchedule(row)) {
+
+
+
+
+
+
+
+
+
+
+
+
+
+    classes.push('disabled-row')
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  return classes.join(' ')
 }
 
 const handleSelect = () => {
@@ -199,36 +517,36 @@ const handleSelect = () => {
     return
   }
 
-  const schedule = selectedRows.value[0]
-  if (!schedule) return
 
-  // Store에 선택된 스케줄 저장
-  passScheduleStore.selectSchedule(schedule)
+  selectedRows.value.forEach(schedule => {
+    passScheduleStore.addSelectedSchedule(schedule)
+  })
 
   console.log('✅ 패스 스케줄 선택됨:', {
-    name: schedule.Name,
-    satelliteId: schedule.SatelliteId,
-    startTime: schedule.StartTime,
-    duration: schedule.Duration
+    count: selectedRows.value.length,
+    schedules: selectedRows.value.map(s => ({
+      name: s.satelliteName,
+      satelliteId: s.satelliteId,
+      startTime: s.startTime
+    }))
   })
 
   $q.notify({
     type: 'positive',
-    message: `패스 스케줄 "${schedule.Name}"이 선택되었습니다`,
+    message: `${selectedRows.value.length}개의 패스 스케줄이 선택되었습니다`,
   })
 
-  // 모달 닫기
   handleClose()
 }
 
 const handleClose = () => {
-  // 모달 닫기 (부모 컴포넌트에서 처리)
   window.close()
 }
 
 onMounted(async () => {
   console.log('SelectScheduleContent 마운트됨')
-  console.log('🔍 초기 스케줄 데이터 상태:', scheduleData.value.length)
+
+
 
   try {
     console.log('🚀 서버에서 패스 스케줄 데이터 로드 시작')
@@ -237,14 +555,17 @@ onMounted(async () => {
 
     if (success) {
       console.log('✅ 패스 스케줄 데이터 로드 성공:', scheduleData.value.length, '개')
-      console.log('📋 로드된 데이터 샘플:', scheduleData.value.slice(0, 3))
 
-      // ✅ 테이블에 표시될 데이터 확인
-      console.log('🔍 테이블 표시용 데이터:', {
-        totalCount: scheduleData.value.length,
-        firstItem: scheduleData.value[0],
-        columns: scheduleColumns.map(col => col.name)
-      })
+
+
+      console.log('🔍 겹치는 스케줄 그룹:', overlappingGroups.value)
+
+
+
+
+
+
+
     } else {
       console.log('⚠️ 패스 스케줄 데이터 없음')
     }
@@ -257,8 +578,112 @@ onMounted(async () => {
     })
   }
 })
-</script>
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</script>
 <style scoped>
 .select-schedule-content {
   display: flex;
@@ -296,17 +721,45 @@ onMounted(async () => {
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.selection-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+  min-width: 200px;
+}
+
+/* ✅ 겹침 경고 정보 스타일 */
+.overlap-warning {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: rgba(255, 152, 0, 0.1);
+  border-radius: 4px;
+  border-left: 3px solid #ff9800;
+  flex-shrink: 0;
 }
 
 .button-group {
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
+/* ✅ 버튼 너비 통일 및 확대 */
 .action-btn {
-  min-width: 100px;
+
+  min-width: 120px;
+  width: 120px;
   height: 40px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .schedule-table {
@@ -316,25 +769,40 @@ onMounted(async () => {
   width: 100%;
 }
 
-/* ✅ 테이블 컨테이너 배경 설정 */
+/* ✅ 가상 스크롤 및 고정 헤더 스타일 */
 .schedule-table :deep(.q-table__container) {
   background-color: var(--q-dark) !important;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 4px;
+  max-height: 100%;
 }
 
-/* ✅ 테이블 헤더 배경 설정 */
+/* ✅ 테이블 헤더 고정 및 불투명 배경 설정 */
 .schedule-table :deep(.q-table thead) {
-  background-color: rgba(255, 255, 255, 0.1) !important;
+  background-color: #1d1d1d !important;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .schedule-table :deep(.q-table thead th) {
-  background-color: rgba(255, 255, 255, 0.1) !important;
+  background-color: #1d1d1d !important;
   color: white !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  font-weight: 600;
+  padding: 12px 8px;
 }
 
-/* ✅ 테이블 바디 배경 설정 */
+/* ✅ 헤더 호버 효과 */
+.schedule-table :deep(.q-table thead th:hover) {
+  background-color: #2a2a2a !important;
+}
+
+/* ✅ 테이블 바디 스크롤 영역 */
 .schedule-table :deep(.q-table tbody) {
   background-color: var(--q-dark) !important;
 }
@@ -349,13 +817,307 @@ onMounted(async () => {
 }
 
 .schedule-table :deep(.q-table tbody tr.selected) {
-  background-color: rgba(25, 118, 210, 0.12) !important;
+  background-color: rgba(25, 118, 210, 0.2) !important;
+  border-left: 3px solid #1976d2 !important;
+}
+
+/* ✅ 겹치는 스케줄 행 스타일 (주황색) */
+.schedule-table :deep(.q-table tbody tr.overlapping-row) {
+  background-color: rgba(255, 152, 0, 0.15) !important;
+  border-left: 3px solid #ff9800 !important;
+}
+
+.schedule-table :deep(.q-table tbody tr.overlapping-row:hover) {
+  background-color: rgba(255, 152, 0, 0.25) !important;
+}
+
+/* ✅ 겹치는 스케줄이 선택된 경우 */
+.schedule-table :deep(.q-table tbody tr.overlapping-row.selected) {
+  background-color: rgba(255, 152, 0, 0.3) !important;
+  border-left: 3px solid #ff9800 !important;
+}
+
+/* ✅ 선택 불가능한 행 스타일 */
+.schedule-table :deep(.q-table tbody tr.disabled-row) {
+  opacity: 0.6;
+  background-color: rgba(255, 152, 0, 0.1) !important;
+}
+
+.schedule-table :deep(.q-table tbody tr.disabled-row:hover) {
+  background-color: rgba(255, 152, 0, 0.15) !important;
+  cursor: not-allowed;
 }
 
 .schedule-table :deep(.q-table tbody td) {
   background-color: transparent !important;
   color: white !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  padding: 8px;
+}
+
+/* ✅ 시간 관련 셀 내용 폰트 크기 증가 */
+.schedule-table :deep(.q-table tbody td[data-col="startTime"]),
+.schedule-table :deep(.q-table tbody td[data-col="endTime"]) {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  padding: 10px 8px !important;
+}
+
+/* ✅ 지속시간 셀 내용 폰트 크기 증가 */
+.schedule-table :deep(.q-table tbody td[data-col="duration"]) {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  padding: 10px 8px !important;
+}
+
+/* ✅ 최대고도 셀 내용 폰트 크기 증가 */
+.schedule-table :deep(.q-table tbody td[data-col="maxElevation"]) {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  padding: 10px 8px !important;
+}
+
+/* ✅ 체크박스 영역 완전 차단 스타일 */
+.schedule-table :deep(.q-table tbody td[data-col="selection"]) {
+  pointer-events: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+/* ✅ 체크박스 자체도 완전 차단 */
+.schedule-table :deep(.schedule-checkbox) {
+  pointer-events: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  color: #1976d2 !important;
+}
+
+.schedule-table :deep(.schedule-checkbox .q-checkbox__inner) {
+  pointer-events: none !important;
+  user-select: none !important;
+  color: #1976d2 !important;
+}
+
+.schedule-table :deep(.schedule-checkbox .q-checkbox__bg) {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+/* ✅ 비활성화된 체크박스 스타일 강화 */
+.schedule-table :deep(.schedule-checkbox.disabled) {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
+.schedule-table :deep(.schedule-checkbox.disabled .q-checkbox__inner) {
+  color: #666 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
+.schedule-table :deep(.schedule-checkbox.disabled:hover) {
+  opacity: 0.4 !important;
+}
+
+/* ✅ 겹치는 스케줄의 체크박스 스타일 */
+.schedule-table :deep(.overlapping-row .schedule-checkbox) {
+  color: #ff9800 !important;
+  pointer-events: none !important;
+}
+
+.schedule-table :deep(.overlapping-row .schedule-checkbox .q-checkbox__inner) {
+  color: #ff9800 !important;
+  pointer-events: none !important;
+}
+
+/* ✅ 겹치는 스케줄의 비활성화된 체크박스 */
+.schedule-table :deep(.overlapping-row .schedule-checkbox.disabled) {
+  color: #ff9800 !important;
+  opacity: 0.3 !important;
+  pointer-events: none !important;
+}
+
+.schedule-table :deep(.overlapping-row .schedule-checkbox.disabled .q-checkbox__inner) {
+  color: #ff9800 !important;
+  opacity: 0.3 !important;
+  pointer-events: none !important;
+}
+
+/* ✅ 선택 불가능한 행의 체크박스 영역 완전 차단 */
+.schedule-table :deep(.disabled-row .schedule-checkbox) {
+  pointer-events: none !important;
+  opacity: 0.3 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+.schedule-table :deep(.disabled-row td[data-col="selection"]) {
+  pointer-events: none !important;
+  cursor: not-allowed !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+/* ✅ 체크박스 차단 표시 */
+.schedule-table :deep(.checkbox-blocked) {
+  position: relative;
+}
+
+.schedule-table :deep(.checkbox-blocked::after) {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 0, 0, 0.1);
+  pointer-events: none;
+  border-radius: 2px;
+}
+
+/* ✅ 모든 체크박스 관련 요소 터치/마우스 이벤트 완전 차단 */
+.schedule-table :deep(.q-checkbox),
+.schedule-table :deep(.q-checkbox *),
+.schedule-table :deep(.q-checkbox__inner),
+.schedule-table :deep(.q-checkbox__bg),
+.schedule-table :deep(.q-checkbox__svg),
+.schedule-table :deep(.q-checkbox__truthy),
+.schedule-table :deep(.q-checkbox__falsy) {
+  pointer-events: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* ✅ 체크박스 셀 전체 터치/마우스 이벤트 차단 */
+.schedule-table :deep(td[data-col="selection"]) {
+  pointer-events: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* ✅ 모바일에서 터치 이벤트 완전 차단 */
+@media (max-width: 768px) {
+  .schedule-table :deep(.q-checkbox),
+  .schedule-table :deep(.q-checkbox *),
+  .schedule-table :deep(td[data-col="selection"]) {
+    -webkit-touch-callout: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    touch-action: none !important;
+    pointer-events: none !important;
+  }
+}
+
+/* ✅ 위성 ID 칩 스타일 */
+.schedule-table :deep(.satellite-id-chip) {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  padding: 8px 12px !important;
+  min-height: 32px !important;
+  border-radius: 6px !important;
+}
+
+.schedule-table :deep(.satellite-id-chip .q-chip__content) {
+  padding: 0 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.5px;
+}
+
+/* ✅ 위성 ID 칩 호버 효과 */
+.schedule-table :deep(.satellite-id-chip:hover) {
+  transform: scale(1.05);
+  transition: transform 0.2s ease;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+}
+
+/* ✅ Azimuth 각도 셀 스타일 */
+.schedule-table :deep(.angle-cell) {
+  padding: 6px 10px !important;
+  vertical-align: middle;
+}
+
+.angle-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 50px;
+  justify-content: center;
+}
+
+.angle-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px !important;
+  line-height: 1.3;
+}
+
+.angle-label {
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600 !important;
+  min-width: 35px;
+  font-size: 13px !important;
+}
+
+.angle-value {
+  color: white;
+  font-weight: 700 !important;
+  text-align: right;
+  font-size: 14px !important;
+}
+
+.start-angle .angle-value {
+  color: #4caf50;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+}
+
+.end-angle .angle-value {
+  color: #ff9800;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+}
+
+/* ✅ 가상 스크롤 컨테이너 스타일 */
+.schedule-table :deep(.q-virtual-scroll) {
+  max-height: 100%;
+}
+
+.schedule-table :deep(.q-virtual-scroll__content) {
+  background-color: var(--q-dark) !important;
+}
+
+/* ✅ 스크롤바 스타일링 */
+.schedule-table :deep(.q-scrollarea__thumb) {
+  background-color: rgba(255, 255, 255, 0.3) !important;
+  border-radius: 4px;
+}
+
+.schedule-table :deep(.q-scrollarea__bar) {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ✅ 테이블 전체 스크롤 영역 스타일 */
+.schedule-table :deep(.q-table__middle) {
+  overflow-y: auto;
+  max-height: 100%;
 }
 
 .status-badge {
@@ -383,6 +1145,11 @@ onMounted(async () => {
   padding: 2rem;
 }
 
+/* ✅ 페이지네이션 숨기기 */
+.schedule-table :deep(.q-table__bottom) {
+  display: none !important;
+}
+
 /* ✅ 반응형 디자인에서도 배경 유지 */
 @media (max-width: 768px) {
   .select-schedule-content {
@@ -395,11 +1162,139 @@ onMounted(async () => {
   .content-footer {
     background-color: transparent;
   }
+
+  .content-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .overlap-warning {
+    order: -1;
+    margin-bottom: 0.5rem;
+    width: 100%;
+  }
+
+  .selection-info {
+    justify-content: center;
+    min-width: unset;
+    width: 100%;
+  }
+
+  .button-group {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .action-btn {
+    min-width: 100px;
+    width: 100px;
+    height: 38px;
+    font-size: 13px;
+  }
+
+  .schedule-table :deep(.q-table thead th) {
+    font-size: 12px;
+    padding: 8px 4px;
+    background-color: #1d1d1d !important;
+  }
+
+  .schedule-table :deep(.q-table tbody td) {
+    font-size: 12px;
+    padding: 8px 4px;
+  }
+
+  .schedule-table :deep(.q-table tbody td[data-col="startTime"]),
+  .schedule-table :deep(.q-table tbody td[data-col="endTime"]),
+  .schedule-table :deep(.q-table tbody td[data-col="duration"]),
+  .schedule-table :deep(.q-table tbody td[data-col="maxElevation"]) {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+  }
+
+  .angle-container {
+    gap: 2px;
+    min-height: 40px;
+  }
+
+  .angle-line {
+    font-size: 12px !important;
+  }
+
+  .angle-label {
+    min-width: 30px;
+    font-size: 12px !important;
+  }
+
+  .angle-value {
+    font-size: 13px !important;
+  }
 }
 
 @media (max-width: 480px) {
   .select-schedule-content {
     background-color: var(--q-dark) !important;
+    padding: 0.25rem;
+  }
+
+  .content-header {
+    margin-bottom: 0.5rem;
+  }
+
+  .content-footer {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+  }
+
+  .action-btn {
+
+    min-width: 90px;
+    width: 90px;
+    height: 36px;
+    font-size: 12px;
+  }
+
+  .schedule-table :deep(.q-table thead th) {
+    background-color: #1d1d1d !important;
+  }
+
+  .schedule-table :deep(.q-table tbody td[data-col="startTime"]),
+  .schedule-table :deep(.q-table tbody td[data-col="endTime"]),
+  .schedule-table :deep(.q-table tbody td[data-col="duration"]),
+  .schedule-table :deep(.q-table tbody td[data-col="maxElevation"]) {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+  }
+
+  .angle-line {
+    font-size: 11px !important;
+  }
+
+  .angle-label {
+    font-size: 11px !important;
+  }
+
+  .angle-value {
+    font-size: 12px !important;
+  }
+
+  .overlap-warning {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+}
+
+/* ✅ 큰 화면에서 더 넓은 버튼 */
+@media (min-width: 1200px) {
+  .action-btn {
+    min-width: 140px;
+    width: 140px;
+    height: 42px;
+    font-size: 15px;
+  }
+
+  .button-group {
+    gap: 1.5rem;
   }
 }
 </style>

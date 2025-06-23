@@ -10,5 +10,5 @@
   "[vue]": {
     "editor.defaultFormatter": "Vue.volar"
   },
-  "cody.chat.preInstruction": " Please reply in Korean. Please only write the parts that need to be revised. If the reply is too long and seems like it will be cut off in the middle, please write it in parts."
+  "cody.chat.preInstruction": "Please reply in Korean. Please write only the parts that need to be corrected. Please write them separately by Script, Template, and Style."
 }

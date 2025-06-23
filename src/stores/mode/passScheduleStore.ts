@@ -9,22 +9,25 @@ import {
 } from '../../services/mode/passScheduleService'
 
 export interface ScheduleItem {
-  No: number
-  Name: string
-  StartTime: string
-  EndTime: string
-  Status: string
-  Azimuth: number
-  Elevation: number
-  Tilt: number
-  Duration: number
-  SatelliteId?: string
-  PassNumber?: number
-  MaxElevation?: number
-  AzimuthStart?: number
-  AzimuthEnd?: number
-  ElevationStart?: number
-  ElevationEnd?: number
+  no: number
+  satelliteId?: string
+  satelliteName: string
+  startTime: string
+  endTime: string
+  startAzimuthAngle: number
+  endAzimuthAngle: number
+  startElevationAngle: number
+  endElevationAngle: number
+  tilt: number
+  duration: string
+  maxAzimuthRate?: number
+  maxElevationRate?: number
+  maxAzimuthAccel?: number
+  maxElevationAccel?: number
+  originalStartAzimuth?: number
+  originalEndAzimuth?: number
+  maxElevation?: number
+  maxElevationTime?: string
 }
 
 // 🔧 타입들을 export하여 다른 파일에서 사용 가능하게 함
@@ -64,7 +67,8 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
   const $q = useQuasar()
 
   // 상태
-  const scheduleData = ref<ScheduleItem[]>([])
+  const scheduleData = ref<ScheduleItem[]>([]) // 🔧 서버에서 가져온 전체 스케줄 (모달용)
+  const selectedScheduleList = ref<ScheduleItem[]>([]) // 🆕 사용자가 선택한 스케줄 목록 (테이블용)
   const selectedSchedule = ref<ScheduleItem | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -84,9 +88,43 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     return await fetchScheduleDataFromServer()
   }
 
+  // 🆕 선택된 스케줄을 목록에 추가
+  const addSelectedSchedule = (schedule: ScheduleItem) => {
+    // 중복 체크
+    const exists = selectedScheduleList.value.find((item) => item.no === schedule.no)
+    if (!exists) {
+      selectedScheduleList.value.push(schedule)
+      console.log('✅ 스케줄이 선택 목록에 추가됨:', schedule.satelliteName)
+    } else {
+      console.log('⚠️ 이미 선택된 스케줄:', schedule.satelliteName)
+    }
+  }
+
+  // 🆕 선택된 스케줄을 목록에서 제거
+  const removeSelectedSchedule = (scheduleNo: number) => {
+    const index = selectedScheduleList.value.findIndex((item) => item.no === scheduleNo)
+    if (index >= 0) {
+      const removed = selectedScheduleList.value.splice(index, 1)[0]
+      console.log('✅ 스케줄이 선택 목록에서 제거됨:', removed?.satelliteName)
+
+      // 현재 선택된 스케줄이 제거된 경우 선택 해제
+      if (selectedSchedule.value?.no === scheduleNo) {
+        selectedSchedule.value = null
+      }
+    }
+  }
+
+  // 🆕 선택된 스케줄 목록 초기화
+  const clearSelectedSchedules = () => {
+    selectedScheduleList.value = []
+    selectedSchedule.value = null
+    console.log('✅ 선택된 스케줄 목록이 초기화됨')
+  }
+
   // 스케줄 선택
   const selectSchedule = (schedule: ScheduleItem) => {
     selectedSchedule.value = schedule
+    console.log('✅ 현재 스케줄 선택됨:', schedule.satelliteName)
   }
 
   // TLE 데이터 추가
@@ -445,7 +483,8 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
       uploadStatus.value = ''
     }
   }
-  // 🆕 서버에서 실제 패스 스케줄 데이터 가져오기
+
+  // 🔧 사용하지 않는 함수 제거하고 실제 데이터 처리 로직 수정
   const fetchScheduleDataFromServer = async (): Promise<boolean> => {
     try {
       loading.value = true
@@ -455,69 +494,145 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
 
       const response = await passScheduleService.getAllTrackingMasterData()
 
+      console.log('🔍 Store에서 받은 응답:', {
+        success: response.success,
+        message: response.message,
+        hasData: !!response.data,
+      })
+
       if (response.success && response.data) {
         const serverData = response.data
-        const allSchedules: ScheduleItem[] = []
 
-        console.log('📊 서버 데이터:', {
+        console.log('📊 서버 데이터 상세:', {
           satelliteCount: serverData.satelliteCount,
           totalPassCount: serverData.totalPassCount,
+          hasSatellites: !!serverData.satellites,
+          satellitesType: typeof serverData.satellites,
         })
 
-        // 각 위성의 패스 데이터를 ScheduleItem 형식으로 변환
-        let scheduleNo = 1
-        Object.entries(serverData.satellites).forEach(([satelliteId, passes]) => {
-          // 🔧 타입 단언으로 passes 타입 명시
-          const passArray = passes
+        // 🔧 satellites 안전 검증
+        if (!serverData.satellites || typeof serverData.satellites !== 'object') {
+          console.warn('⚠️ satellites 데이터가 없거나 올바르지 않음')
+          scheduleData.value = []
 
-          passArray.forEach((pass: PassScheduleMasterData) => {
-            const scheduleItem: ScheduleItem = {
-              No: scheduleNo++,
-              Name: `${pass.satelliteName || satelliteId} Pass ${pass.passNumber}`,
-              StartTime: pass.startTime,
-              EndTime: pass.endTime,
-              Status: pass.status || 'Pending',
-              Azimuth: pass.azimuthStart || 0,
-              Elevation: pass.maxElevation || 0,
-              Tilt: 0, // 기본값
-              Duration: pass.duration || 0,
-              SatelliteId: satelliteId,
-              PassNumber: pass.passNumber,
-              MaxElevation: pass.maxElevation,
-              AzimuthStart: pass.azimuthStart,
-              AzimuthEnd: pass.azimuthEnd,
-              ElevationStart: pass.elevationStart,
-              ElevationEnd: pass.elevationEnd,
+          $q.notify({
+            type: 'info',
+            message: '위성 데이터가 없습니다. TLE 데이터를 먼저 업로드해주세요.',
+          })
+
+          return false
+        }
+
+        // 🔧 빈 객체 확인
+        const satelliteKeys = Object.keys(serverData.satellites)
+        if (satelliteKeys.length === 0) {
+          console.warn('⚠️ satellites 객체가 비어있음')
+          scheduleData.value = []
+
+          $q.notify({
+            type: 'info',
+            message: '등록된 위성이 없습니다.',
+          })
+
+          return false
+        }
+
+        console.log('✅ satellites 검증 통과:', satelliteKeys)
+
+        const allSchedules: ScheduleItem[] = []
+        let scheduleNo = 1
+
+        // 🔧 직접 Object.entries 사용 (안전 검증 후)
+        Object.entries(serverData.satellites).forEach(([satelliteId, passes]) => {
+          console.log(`🛰️ 위성 ${satelliteId} 처리:`, {
+            isArray: Array.isArray(passes),
+            passCount: Array.isArray(passes) ? passes.length : 'Not Array',
+          })
+
+          if (!Array.isArray(passes)) {
+            console.warn(`⚠️ 위성 ${satelliteId}의 패스 데이터가 배열이 아님`)
+            return
+          }
+
+          passes.forEach((pass: PassScheduleMasterData) => {
+            try {
+              const scheduleItem: ScheduleItem = {
+                no: scheduleNo++,
+                satelliteId: pass.SatelliteID || satelliteId,
+                satelliteName: pass.SatelliteName || `Satellite-${satelliteId}`,
+                startTime: pass.StartTime || '',
+                endTime: pass.EndTime || '',
+                duration: pass.Duration || '00:00:00',
+                startAzimuthAngle: pass.StartAzimuth || 0,
+                endAzimuthAngle: pass.EndAzimuth || 0,
+                startElevationAngle: pass.StartElevation || 0,
+                endElevationAngle: pass.EndElevation || 0,
+                tilt: 0,
+                maxElevation: pass.MaxElevation || 0,
+                maxElevationTime: pass.MaxElevationTime || '',
+                maxAzimuthRate: pass.MaxAzRate || 0,
+                maxElevationRate: pass.MaxElRate || 0,
+                maxAzimuthAccel: pass.MaxAzAccel || 0,
+                maxElevationAccel: pass.MaxElAccel || 0,
+                originalStartAzimuth: pass.OriginalStartAzimuth || 0,
+                originalEndAzimuth: pass.OriginalEndAzimuth || 0,
+              }
+
+              allSchedules.push(scheduleItem)
+              console.log(
+                `✅ 스케줄 생성: ${scheduleItem.satelliteName} - ${scheduleItem.startTime}`,
+              )
+            } catch (itemError) {
+              console.error(`❌ 스케줄 아이템 생성 실패:`, itemError)
             }
-            allSchedules.push(scheduleItem)
           })
         })
 
-        // 시작 시간 순으로 정렬
-        allSchedules.sort(
-          (a, b) => new Date(a.StartTime).getTime() - new Date(b.StartTime).getTime(),
-        )
+        if (allSchedules.length === 0) {
+          console.warn('⚠️ 생성된 스케줄이 없음')
+          scheduleData.value = []
+
+          $q.notify({
+            type: 'info',
+            message: '유효한 패스 스케줄이 없습니다.',
+          })
+
+          return false
+        }
+
+        // 시간 순 정렬
+        allSchedules.sort((a, b) => {
+          try {
+            return new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+          } catch {
+            return 0
+          }
+        })
 
         scheduleData.value = allSchedules
 
         console.log('✅ 패스 스케줄 데이터 로드 완료:', allSchedules.length, '개')
 
+        $q.notify({
+          type: 'positive',
+          message: `${allSchedules.length}개의 패스 스케줄을 로드했습니다.`,
+        })
+
         return true
       } else {
-        console.warn('⚠️ 서버 패스 스케줄 데이터 없음')
+        console.warn('⚠️ 서버 응답 실패:', response)
         scheduleData.value = []
 
         $q.notify({
           type: 'info',
-          message:
-            response.message ||
-            '추적 데이터가 없습니다. 먼저 TLE 데이터를 업로드하고 추적 데이터를 생성해주세요.',
+          message: response.message || '추적 데이터가 없습니다.',
         })
 
         return false
       }
     } catch (err) {
       console.error('❌ 서버 패스 스케줄 데이터 로드 실패:', err)
+      scheduleData.value = []
       error.value = 'Failed to fetch schedule data from server'
 
       $q.notify({
@@ -531,14 +646,33 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     }
   }
 
-  // 초기화
+  // 🔧 초기화 함수 수정 (fetchScheduleData 대신 fetchScheduleDataFromServer 직접 호출)
   const init = async () => {
-    await Promise.all([fetchScheduleData(), loadTLEDataFromServer()])
+    console.log('🚀 PassScheduleStore 초기화 시작')
+
+    try {
+      // 🔧 서버에서 직접 데이터 로드
+      const scheduleResult = await fetchScheduleDataFromServer()
+      const tleResult = await loadTLEDataFromServer()
+
+      console.log('✅ PassScheduleStore 초기화 완료:', {
+        scheduleLoaded: scheduleResult,
+        tleLoaded: tleResult,
+        scheduleCount: scheduleData.value.length,
+        tleCount: tleData.value.length,
+      })
+
+      return { scheduleResult, tleResult }
+    } catch (error) {
+      console.error('❌ PassScheduleStore 초기화 실패:', error)
+      throw error
+    }
   }
 
   return {
     // 상태
-    scheduleData,
+    scheduleData, // 전체 스케줄 (모달용)
+    selectedScheduleList, // 🆕 선택된 스케줄 목록 (테이블용)
     selectedSchedule,
     loading,
     error,
@@ -547,7 +681,7 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     tleData,
     selectedTLE,
 
-    // 🆕 업로드 상태
+    // 업로드 상태
     isUploading,
     uploadProgress,
     uploadStatus,
@@ -557,6 +691,11 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     fetchScheduleDataFromServer,
     selectSchedule,
 
+    // 🆕 선택된 스케줄 관리 액션
+    addSelectedSchedule,
+    removeSelectedSchedule,
+    clearSelectedSchedules,
+
     // TLE 액션
     addTLEData,
     removeTLEData,
@@ -564,7 +703,7 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     selectTLE,
     exportTLEData,
 
-    // 🆕 서버 연동 액션
+    // 서버 연동 액션
     loadTLEDataFromServer,
     uploadTLEDataToServer,
 
