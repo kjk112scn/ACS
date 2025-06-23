@@ -184,6 +184,7 @@ class ModalManager {
     }
   }
 }
+export { ModalManager }
 export const openCenteredPopup = (
   url: string,
   name: string,

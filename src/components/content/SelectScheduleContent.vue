@@ -32,19 +32,15 @@
 
         <!-- ✅ 체크박스 컬럼 완전 차단 처리 -->
         <template v-slot:body-cell-selection="props">
-          <q-td :props="props"
-                @click.stop.prevent="handleCheckboxInteraction(props.row, $event)"
-                @mousedown.stop.prevent="handleCheckboxInteraction(props.row, $event)"
-                @touchstart.stop.prevent="handleCheckboxInteraction(props.row, $event)">
-            <q-checkbox
-              :model-value="isScheduleSelected(props.row)"
-              :disable="!canSelectSchedule(props.row)"
+          <q-td :props="props" @click.stop.prevent="handleCheckboxInteraction(props.row, $event)"
+            @mousedown.stop.prevent="handleCheckboxInteraction(props.row, $event)"
+            @touchstart.stop.prevent="handleCheckboxInteraction(props.row, $event)">
+            <q-checkbox :model-value="isScheduleSelected(props.row)" :disable="!canSelectSchedule(props.row)"
               :color="isScheduleOverlapping(props.row.no) ? 'warning' : 'primary'"
               @click.stop.prevent="handleCheckboxInteraction(props.row, $event)"
               @update:model-value="handleCheckboxInteraction(props.row, $event)"
               @mousedown.stop.prevent="handleCheckboxInteraction(props.row, $event)"
-              @touchstart.stop.prevent="handleCheckboxInteraction(props.row, $event)"
-              class="schedule-checkbox"
+              @touchstart.stop.prevent="handleCheckboxInteraction(props.row, $event)" class="schedule-checkbox"
               :class="{ 'checkbox-blocked': !canSelectSchedule(props.row) }" />
             <q-tooltip v-if="!canSelectSchedule(props.row)" class="bg-warning text-black">
               시간이 겹치는 다른 스케줄이 이미 선택되어 있습니다
@@ -125,11 +121,12 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, getCurrentInstance, onUnmounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { usePassScheduleStore, type ScheduleItem } from '../../stores/mode/passScheduleStore'
 import type { QTableProps } from 'quasar'
 import { formatToLocalTime } from '../../utils/times'
+import { closeWindow } from '../../utils/windowUtils'
 
 const $q = useQuasar()
 const passScheduleStore = usePassScheduleStore()
@@ -234,55 +231,13 @@ const canSelectSchedule = (schedule: ScheduleItem): boolean => {
     overlappingGroup.includes(selected.no) && selected.no !== schedule.no
   )
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   return otherSelectedInGroup.length === 0
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // ✅ 체크박스 상태 확인 함수 (통합)
 const isScheduleSelected = (schedule: ScheduleItem): boolean => {
   return selectedRows.value.some(selected => selected.no === schedule.no)
 }
-
-
-
-
-
-
-
 
 // ✅ 스케줄 선택 토글 함수 (통합)
 const toggleScheduleSelection = (row: ScheduleItem) => {
@@ -291,12 +246,6 @@ const toggleScheduleSelection = (row: ScheduleItem) => {
     showOverlapWarning(row)
     return
   }
-
-
-
-
-
-
 
 
   const index = selectedRows.value.findIndex(item => item.no === row.no)
@@ -449,238 +398,213 @@ const clearSelection = () => {
 const getRowClass = (row: ScheduleItem): string => {
   const classes = []
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   if (isScheduleOverlapping(row.no)) {
     classes.push('overlapping-row')
   }
 
-
-
   if (!canSelectSchedule(row)) {
-
-
-
-
-
-
-
-
-
-
-
-
 
     classes.push('disabled-row')
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   return classes.join(' ')
 }
 
 const handleSelect = () => {
-  if (selectedRows.value.length === 0) {
-    $q.notify({
-      type: 'warning',
-      message: '패스 스케줄을 선택하세요',
+  try {
+    if (selectedRows.value.length === 0) {
+      // 🔧 $q 존재 확인 후 알림 처리
+      if ($q && $q.notify) {
+        $q.notify({
+          type: 'warning',
+          message: '패스 스케줄을 선택하세요',
+        })
+      }
+      return
+    }
+
+    console.log('🚀 스케줄 선택 처리 시작')
+
+    // 선택된 스케줄을 스토어에 추가
+    selectedRows.value.forEach(schedule => {
+      passScheduleStore.addSelectedSchedule(schedule)
     })
-    return
+
+    console.log('✅ 패스 스케줄 선택됨:', {
+      count: selectedRows.value.length,
+      schedules: selectedRows.value.map(s => ({
+        name: s.satelliteName,
+        satelliteId: s.satelliteId,
+        startTime: s.startTime
+      }))
+    })
+
+    // 🔧 $q 존재 확인 후 알림 처리
+    if ($q && $q.notify) {
+      $q.notify({
+        type: 'positive',
+        message: `${selectedRows.value.length}개의 패스 스케줄이 선택되었습니다`,
+      })
+    }
+
+    // 선택 완료 후 창 닫기
+    console.log('🚪 스케줄 선택 완료, 창 닫기 시작')
+
+    // 약간의 지연을 두어 사용자가 성공 메시지를 볼 수 있도록 함
+    setTimeout(() => {
+      try {
+        handleClose()
+      } catch (closeError) {
+        console.error('❌ 창 닫기 중 오류:', closeError)
+        // 창 닫기 실패해도 사용자에게는 알리지 않음 (이미 작업은 완료됨)
+      }
+    }, 500) // 1초 후 창 닫기
+
+  } catch (error) {
+    console.error('❌ 스케줄 선택 처리 중 오류:', error)
+
+    // 🔧 $q 존재 확인 후 알림 처리
+    if ($q && $q.notify) {
+      $q.notify({
+        type: 'negative',
+        message: '스케줄 선택 처리 중 오류가 발생했습니다',
+      })
+    }
   }
-
-
-  selectedRows.value.forEach(schedule => {
-    passScheduleStore.addSelectedSchedule(schedule)
-  })
-
-  console.log('✅ 패스 스케줄 선택됨:', {
-    count: selectedRows.value.length,
-    schedules: selectedRows.value.map(s => ({
-      name: s.satelliteName,
-      satelliteId: s.satelliteId,
-      startTime: s.startTime
-    }))
-  })
-
-  $q.notify({
-    type: 'positive',
-    message: `${selectedRows.value.length}개의 패스 스케줄이 선택되었습니다`,
-  })
-
-  handleClose()
 }
+interface Props {
+  modalId?: string
+  modalTitle?: string
+}
+const props = defineProps<Props>()
+const instance = getCurrentInstance()
 
+const isPopupWindow = ref(false)
+const isModalMode = ref(false)
+
+// 실제 닫기 수행
+const performClose = () => {
+  console.log('🚪 실제 닫기 수행')
+
+  try {
+    if (isPopupWindow.value) {
+      // 팝업 창 모드
+      console.log('🪟 팝업 창 닫기')
+      window.close()
+    } else if (isModalMode.value && props.modalId) {
+      // 모달 모드 - closeWindow가 ModalManager를 통해 처리
+      console.log('📱 모달 닫기 - ID:', props.modalId)
+
+      // 전역 closeModal 함수 사용 (있는 경우)
+      const globalProperties = instance?.appContext.config.globalProperties
+      if (globalProperties?.$closeModal) {
+        console.log('🎯 전역 closeModal 함수 사용')
+        globalProperties.$closeModal()
+      } else {
+        console.log('🎯 closeWindow 함수 사용 (모달 ID 포함)')
+        // 특정 모달 ID로 닫기 시도
+        import('../../utils/windowUtils').then(({ closeModalWindow }) => {
+          const success = closeModalWindow(props.modalId)
+          console.log('🎯 특정 모달 닫기 결과:', success)
+          if (!success) {
+            console.log('🔄 일반 closeWindow 시도')
+            closeWindow()
+          }
+        }).catch(error => {
+          console.error('❌ 모달 닫기 import 실패:', error)
+          closeWindow()
+        })
+      }
+    } else {
+      // 일반 모드
+      console.log('🔲 일반 창 닫기')
+      closeWindow()
+    }
+  } catch (error) {
+    console.error('❌ 닫기 처리 중 오류:', error)
+    closeWindow()
+  }
+}
 const handleClose = () => {
-  window.close()
+  performClose()
 }
 
 onMounted(async () => {
   console.log('SelectScheduleContent 마운트됨')
 
+  // 🆕 모드 감지 로직 추가
+  isPopupWindow.value = window.opener !== null ||
+    window.location.search.includes('popup=true') ||
+    window.location.pathname.includes('/popup/')
 
+  isModalMode.value = !!props.modalId ||
+    window.location.search.includes('modal=true') ||
+    window.location.pathname.includes('/modal/')
 
+  console.log('🔍 모드 감지:', {
+    isPopupWindow: isPopupWindow.value,
+    isModalMode: isModalMode.value,
+    modalId: props.modalId
+  })
+
+  // 🆕 모달 모드인 경우 ModalManager에 등록
+  if (isModalMode.value && props.modalId) {
+    console.log('📝 ModalManager에 모달 등록 시도:', props.modalId)
+
+    try {
+      // ModalManager import
+      const { ModalManager } = await import('../../utils/windowUtils')
+
+      ModalManager.getInstance().registerModal(props.modalId, () => {
+        console.log('🚪 ModalManager를 통한 닫기 실행:', props.modalId)
+        performClose()
+      })
+
+      console.log('✅ ModalManager 등록 완료:', props.modalId)
+    } catch (error) {
+      console.error('❌ ModalManager 등록 실패:', error)
+    }
+  }
+
+  // 기존 데이터 로드 로직
   try {
     console.log('🚀 서버에서 패스 스케줄 데이터 로드 시작')
-
     const success = await passScheduleStore.fetchScheduleDataFromServer()
 
     if (success) {
       console.log('✅ 패스 스케줄 데이터 로드 성공:', scheduleData.value.length, '개')
-
-
-
       console.log('🔍 겹치는 스케줄 그룹:', overlappingGroups.value)
-
-
-
-
-
-
-
     } else {
       console.log('⚠️ 패스 스케줄 데이터 없음')
     }
   } catch (error) {
     console.error('❌ 패스 스케줄 데이터 로드 실패:', error)
 
-    $q.notify({
-      type: 'negative',
-      message: '패스 스케줄 데이터 로드에 실패했습니다',
-    })
+    // 🔧 $q 존재 확인 후 알림 처리
+    if ($q && $q.notify) {
+      $q.notify({
+        type: 'negative',
+        message: '패스 스케줄 데이터 로드에 실패했습니다',
+      })
+    }
   }
 })
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+// 🆕 컴포넌트 언마운트 시 모달 해제 추가
+onUnmounted(async () => {
+  console.log('🧹 SelectScheduleContent 언마운트')
+
+  if (isModalMode.value && props.modalId) {
+    try {
+      console.log('🗑️ ModalManager에서 모달 해제 시도:', props.modalId)
+
+      const { ModalManager } = await import('../../utils/windowUtils')
+      const unregistered = ModalManager.getInstance().unregisterModal(props.modalId)
+      console.log('🗑️ ModalManager 해제 결과:', unregistered)
+    } catch (error) {
+      console.error('❌ 모달 해제 중 오류:', error)
+    }
+  }
+})
 
 
 </script>
@@ -1014,6 +938,7 @@ onMounted(async () => {
 
 /* ✅ 모바일에서 터치 이벤트 완전 차단 */
 @media (max-width: 768px) {
+
   .schedule-table :deep(.q-checkbox),
   .schedule-table :deep(.q-checkbox *),
   .schedule-table :deep(td[data-col="selection"]) {
