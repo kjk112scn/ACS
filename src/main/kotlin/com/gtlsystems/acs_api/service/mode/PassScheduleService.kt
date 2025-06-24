@@ -34,6 +34,23 @@ class PassScheduleService(
     private val passScheduleTrackMstStorage = ConcurrentHashMap<String, List<Map<String, Any?>>>()
     private val passScheduleTrackDtlStorage = ConcurrentHashMap<String, List<Map<String, Any?>>>()
 
+    // ✅ 위성 추적 스케줄 대상 목록 저장소 추가
+    private val trackingTargetList = mutableListOf<TrackingTarget>()
+
+    // ✅ 선별된 추적 마스터 데이터 저장소 (추적 대상만 포함)
+    private val selectedTrackMstStorage = ConcurrentHashMap<String, List<Map<String, Any?>>>()
+
+    // ✅ 위성 추적 스케줄 대상 데이터 클래스 추가
+    data class TrackingTarget(
+        val mstId: UInt,
+        val satelliteId: String,
+        val satelliteName: String? = null,
+        val startTime: ZonedDateTime,
+        val endTime: ZonedDateTime,
+        val maxElevation: Double,
+        val createdAt: ZonedDateTime = ZonedDateTime.now()
+    )
+
     // 추적 데이터 및 위치 정보
     private val trackingData = SatelliteTrackingData.Tracking
     private val locationData = GlobalData.Location
@@ -48,7 +65,7 @@ class PassScheduleService(
      * 위성 TLE 데이터를 캐시에 추가합니다.
      */
     fun addPassScheduleTle(satelliteId: String, tleLine1: String, tleLine2: String, satelliteName: String? = null) {
-        val finalSatelliteName = satelliteName ?: "Satellite-$satelliteId"
+        val finalSatelliteName = satelliteName ?: satelliteId
         passScheduleTleCache[satelliteId] = Triple(tleLine1, tleLine2, finalSatelliteName)
         logger.info("위성 TLE 데이터가 캐시에 추가되었습니다. 위성 ID: $satelliteId, 이름: $finalSatelliteName")
     }
@@ -66,14 +83,14 @@ class PassScheduleService(
     }
 
     /**
-     * 위성 이름을 가져옵니다. (새로 추가)
+     * 위성 이름을 가져옵니다.
      */
     fun getPassScheduleSatelliteName(satelliteId: String): String? {
         return passScheduleTleCache[satelliteId]?.third
     }
 
     /**
-     * 위성 TLE 전체 정보를 가져옵니다. (새로 추가)
+     * 위성 TLE 전체 정보를 가져옵니다.
      */
     fun getPassScheduleTleWithName(satelliteId: String): Triple<String, String, String>? {
         return passScheduleTleCache[satelliteId]
@@ -399,6 +416,202 @@ class PassScheduleService(
         logger.info("모든 패스 스케줄 추적 데이터가 삭제되었습니다. (마스터: ${mstSize}개, 세부: ${dtlSize}개)")
     }
 
+    /**
+     * ✅ 위성 추적 스케줄 대상 목록을 설정합니다. (수정: 자동으로 선별된 데이터 생성)
+     */
+    fun setTrackingTargetList(targets: List<TrackingTarget>) {
+        synchronized(trackingTargetList) {
+            trackingTargetList.clear()
+            trackingTargetList.addAll(targets)
+        }
+        logger.info("위성 추적 스케줄 대상 목록이 설정되었습니다. 총 ${targets.size}개 대상")
+
+        // 대상 목록 로깅
+        targets.forEach { target ->
+            logger.info("추적 대상: ${target.satelliteName ?: target.satelliteId} (MST ID: ${target.mstId}, 최대 고도: ${target.maxElevation}°)")
+        }
+
+        // ✅ 자동으로 선별된 추적 데이터 생성
+        generateSelectedTrackingData()
+    }
+
+    /**
+     * ✅ 위성 추적 스케줄 대상 목록을 조회합니다.
+     */
+    fun getTrackingTargetList(): List<TrackingTarget> {
+        return synchronized(trackingTargetList) {
+            trackingTargetList.toList()
+        }
+    }
+
+    /**
+     * ✅ 특정 위성의 추적 대상 목록을 조회합니다.
+     */
+    fun getTrackingTargetsBySatelliteId(satelliteId: String): List<TrackingTarget> {
+        return synchronized(trackingTargetList) {
+            trackingTargetList.filter { it.satelliteId == satelliteId }
+        }
+    }
+
+    /**
+     * ✅ 특정 MST ID의 추적 대상을 조회합니다.
+     */
+    fun getTrackingTargetByMstId(mstId: UInt): TrackingTarget? {
+        return synchronized(trackingTargetList) {
+            trackingTargetList.find { it.mstId == mstId }
+        }
+    }
+
+    /**
+     * ✅ 추적 대상 목록을 초기화합니다. (수정: 선별된 데이터도 함께 초기화)
+     */
+    fun clearTrackingTargetList() {
+        val size = synchronized(trackingTargetList) {
+            val currentSize = trackingTargetList.size
+            trackingTargetList.clear()
+            currentSize
+        }
+
+        // 선별된 추적 데이터도 함께 초기화
+        clearSelectedTrackingData()
+
+        logger.info("위성 추적 스케줄 대상 목록이 초기화되었습니다. ${size}개 항목 삭제")
+    }
+
+
+    /**
+     * ✅ trackingTargetList를 기준으로 선별된 마스터 데이터를 생성합니다.
+     */
+    fun generateSelectedTrackingData() {
+        synchronized(trackingTargetList) {
+            if (trackingTargetList.isEmpty()) {
+                logger.warn("추적 대상 목록이 비어있습니다.")
+                selectedTrackMstStorage.clear()
+                return
+            }
+
+            logger.info("선별된 추적 데이터 생성 시작: ${trackingTargetList.size}개 대상")
+
+            // 기존 선별된 데이터 초기화
+            selectedTrackMstStorage.clear()
+
+            // 추적 대상의 mstId 목록 추출
+            val targetMstIds = trackingTargetList.map { it.mstId }.toSet()
+
+            // 위성별로 필터링
+            passScheduleTrackMstStorage.forEach { (satelliteId, allMstData) ->
+                val selectedMstData = allMstData.filter { mstRecord ->
+                    val mstId = mstRecord["No"] as? UInt
+                    mstId != null && targetMstIds.contains(mstId)
+                }
+
+                if (selectedMstData.isNotEmpty()) {
+                    selectedTrackMstStorage[satelliteId] = selectedMstData
+                    logger.info("위성 $satelliteId 선별된 패스: ${selectedMstData.size}개")
+                }
+            }
+
+            val totalSelectedPasses = selectedTrackMstStorage.values.sumOf { it.size }
+            logger.info("선별된 추적 데이터 생성 완료: ${selectedTrackMstStorage.size}개 위성, ${totalSelectedPasses}개 패스")
+        }
+    }
+
+    /**
+     * ✅ 특정 위성의 선별된 마스터 데이터를 조회합니다.
+     */
+    fun getSelectedTrackMstBySatelliteId(satelliteId: String): List<Map<String, Any?>>? {
+        return selectedTrackMstStorage[satelliteId]
+    }
+
+    /**
+     * ✅ 모든 위성의 선별된 마스터 데이터를 조회합니다.
+     */
+    fun getAllSelectedTrackMst(): Map<String, List<Map<String, Any?>>> {
+        return selectedTrackMstStorage.toMap()
+    }
+
+    /**
+     * ✅ 특정 MST ID의 선별된 마스터 데이터를 조회합니다.
+     */
+    fun getSelectedTrackMstByMstId(mstId: UInt): Map<String, Any?>? {
+        selectedTrackMstStorage.values.forEach { mstDataList ->
+            val found = mstDataList.find { it["No"] == mstId }
+            if (found != null) return found
+        }
+        return null
+    }
+
+    /**
+     * ✅ 특정 MST ID의 세부 데이터를 조회합니다 (기존 저장소에서 실시간 조회)
+     */
+    fun getSelectedTrackDtlByMstId(mstId: UInt): List<Map<String, Any?>> {
+        // 먼저 해당 mstId가 선별된 목록에 있는지 확인
+        val selectedMst = getSelectedTrackMstByMstId(mstId) ?: return emptyList()
+        val satelliteId = selectedMst["SatelliteID"] as? String ?: return emptyList()
+
+        // 기존 세부 데이터 저장소에서 조회
+        val allDtlData = passScheduleTrackDtlStorage[satelliteId] ?: return emptyList()
+        return allDtlData.filter { it["MstId"] == mstId }
+    }
+
+    /**
+     * ✅ 선별된 추적 데이터를 시간순으로 정렬하여 조회합니다.
+     */
+    fun getSelectedTrackingSchedule(): List<Map<String, Any?>> {
+        val allSelectedPasses = mutableListOf<Map<String, Any?>>()
+
+        selectedTrackMstStorage.values.forEach { mstDataList ->
+            allSelectedPasses.addAll(mstDataList)
+        }
+
+        // 시작 시간 기준으로 정렬
+        return allSelectedPasses.sortedBy { mstRecord ->
+            mstRecord["StartTime"] as? ZonedDateTime
+        }
+    }
+
+    /**
+     * ✅ 현재 시간 기준으로 진행 중인 선별된 추적 패스를 조회합니다.
+     */
+    fun getCurrentSelectedTrackingPass(): Map<String, Any?>? {
+        val now = ZonedDateTime.now()
+
+        selectedTrackMstStorage.values.forEach { mstDataList ->
+            val currentPass = mstDataList.find { mstRecord ->
+                val startTime = mstRecord["StartTime"] as? ZonedDateTime
+                val endTime = mstRecord["EndTime"] as? ZonedDateTime
+
+                startTime != null && endTime != null &&
+                !now.isBefore(startTime) && !now.isAfter(endTime)
+            }
+            if (currentPass != null) return currentPass
+        }
+        return null
+    }
+
+    /**
+     * ✅ 다음 선별된 추적 패스를 조회합니다.
+     */
+    fun getNextSelectedTrackingPass(): Map<String, Any?>? {
+        val now = ZonedDateTime.now()
+        return getSelectedTrackingSchedule()
+            .filter { mstRecord ->
+                val startTime = mstRecord["StartTime"] as? ZonedDateTime
+                startTime != null && startTime.isAfter(now)
+            }
+            .minByOrNull { mstRecord ->
+                mstRecord["StartTime"] as ZonedDateTime
+            }
+    }
+
+    /**
+     * ✅ 선별된 추적 데이터를 초기화합니다.
+     */
+    fun clearSelectedTrackingData() {
+        val size = selectedTrackMstStorage.values.sumOf { it.size }
+        selectedTrackMstStorage.clear()
+        logger.info("선별된 추적 데이터가 초기화되었습니다. ${size}개 패스 삭제")
+    }
     /**
      * 추적 데이터 통계 정보를 반환합니다.
      */

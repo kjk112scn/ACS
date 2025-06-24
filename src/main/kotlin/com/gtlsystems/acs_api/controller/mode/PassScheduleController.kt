@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import reactor.core.publisher.Mono
+import java.time.ZonedDateTime
 
 /**
  * 패스 스케줄링 TLE 관리 API 컨트롤러
@@ -1052,8 +1053,273 @@ class PassScheduleController(
                 )
             }
     }
-}
 
+    // ==================== 위성 추적 스케줄 대상 목록 관리 API ====================
+
+    /**
+     * ✅ 위성 추적 스케줄 대상 목록을 설정합니다.
+     */
+    @PostMapping("/tracking-targets")
+    fun setTrackingTargets(@RequestBody request: SetTrackingTargetsRequest): ResponseEntity<Map<String, Any>> {
+        return try {
+            // 입력 검증
+            if (request.targets.isEmpty()) {
+                return ResponseEntity.badRequest().body(
+                    mapOf(
+                        "success" to false,
+                        "message" to "추적 대상 목록이 비어있습니다.",
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            }
+
+            // 각 대상의 유효성 검증
+            val invalidTargets = mutableListOf<String>()
+            request.targets.forEachIndexed { index, target ->
+                if (target.satelliteId.isBlank()) {
+                    invalidTargets.add("인덱스 $index: satelliteId가 비어있습니다.")
+                }
+                if (target.mstId == 0u) {
+                    invalidTargets.add("인덱스 $index: mstId가 0입니다.")
+                }
+                if (target.startTime.isAfter(target.endTime)) {
+                    invalidTargets.add("인덱스 $index: 시작 시간이 종료 시간보다 늦습니다.")
+                }
+                if (target.maxElevation < 0 || target.maxElevation > 90) {
+                    invalidTargets.add("인덱스 $index: 최대 고도각이 유효하지 않습니다. (0-90도)")
+                }
+            }
+
+            if (invalidTargets.isNotEmpty()) {
+                return ResponseEntity.badRequest().body(
+                    mapOf(
+                        "success" to false,
+                        "message" to "유효하지 않은 추적 대상이 있습니다.",
+                        "errors" to invalidTargets,
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            }
+
+            // TrackingTarget 객체로 변환
+            val trackingTargets = request.targets.map { target ->
+                PassScheduleService.TrackingTarget(
+                    mstId = target.mstId,
+                    satelliteId = target.satelliteId,
+                    satelliteName = target.satelliteName,
+                    startTime = target.startTime,
+                    endTime = target.endTime,
+                    maxElevation = target.maxElevation
+                )
+            }
+
+            // 서비스에 설정
+            passScheduleService.setTrackingTargetList(trackingTargets)
+
+            logger.info("위성 추적 스케줄 대상 목록 설정 성공: ${trackingTargets.size}개 대상")
+
+            ResponseEntity.ok(
+                mapOf(
+                    "success" to true,
+                    "message" to "위성 추적 스케줄 대상 목록이 성공적으로 설정되었습니다.",
+                    "data" to mapOf(
+                        "totalTargets" to trackingTargets.size,
+                        "uniqueSatellites" to trackingTargets.map { it.satelliteId }.distinct().size,
+                        "targets" to trackingTargets.map { target ->
+                            mapOf(
+                                "mstId" to target.mstId,
+                                "satelliteId" to target.satelliteId,
+                                "satelliteName" to target.satelliteName,
+                                "startTime" to target.startTime,
+                                "endTime" to target.endTime,
+                                "maxElevation" to target.maxElevation
+                            )
+                        }
+                    ),
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        } catch (e: Exception) {
+            logger.error("위성 추적 스케줄 대상 목록 설정 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "위성 추적 스케줄 대상 목록 설정 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * ✅ 위성 추적 스케줄 대상 목록을 조회합니다.
+     */
+    @GetMapping("/tracking-targets")
+    fun getTrackingTargets(): ResponseEntity<Map<String, Any>> {
+        return try {
+            val trackingTargets = passScheduleService.getTrackingTargetList()
+
+            logger.info("위성 추적 스케줄 대상 목록 조회 성공: ${trackingTargets.size}개 대상")
+
+            ResponseEntity.ok(
+                mapOf(
+                    "success" to true,
+                    "message" to "위성 추적 스케줄 대상 목록 조회 성공",
+                    "data" to mapOf(
+                        "totalTargets" to trackingTargets.size,
+                        "targets" to trackingTargets.map { target ->
+                            mapOf(
+                                "mstId" to target.mstId,
+                                "satelliteId" to target.satelliteId,
+                                "satelliteName" to target.satelliteName,
+                                "startTime" to target.startTime,
+                                "endTime" to target.endTime,
+                                "maxElevation" to target.maxElevation,
+                                "createdAt" to target.createdAt
+                            )
+                        }
+                    ),
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        } catch (e: Exception) {
+            logger.error("위성 추적 스케줄 대상 목록 조회 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "위성 추적 스케줄 대상 목록 조회 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * ✅ 특정 위성의 추적 대상 목록을 조회합니다.
+     */
+    @GetMapping("/tracking-targets/satellite/{satelliteId}")
+    fun getTrackingTargetsBySatellite(@PathVariable satelliteId: String): ResponseEntity<Map<String, Any>> {
+        return try {
+            val trackingTargets = passScheduleService.getTrackingTargetsBySatelliteId(satelliteId)
+
+            logger.info("위성 $satelliteId 추적 대상 목록 조회 성공: ${trackingTargets.size}개 대상")
+
+            ResponseEntity.ok(
+                mapOf(
+                    "success" to true,
+                    "message" to "위성별 추적 대상 목록 조회 성공",
+                    "data" to mapOf(
+                        "satelliteId" to satelliteId,
+                        "totalTargets" to trackingTargets.size,
+                        "targets" to trackingTargets.map { target ->
+                            mapOf(
+                                "mstId" to target.mstId,
+                                "satelliteId" to target.satelliteId,
+                                "satelliteName" to target.satelliteName,
+                                "startTime" to target.startTime,
+                                "endTime" to target.endTime,
+                                "maxElevation" to target.maxElevation,
+                                "createdAt" to target.createdAt
+                            )
+                        }
+                    ),
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        } catch (e: Exception) {
+            logger.error("위성 $satelliteId 추적 대상 목록 조회 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "위성별 추적 대상 목록 조회 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * ✅ 특정 MST ID의 추적 대상을 조회합니다.
+     */
+    @GetMapping("/tracking-targets/mst/{mstId}")
+    fun getTrackingTargetByMstId(@PathVariable mstId: UInt): ResponseEntity<Map<String, Any>> {
+        return try {
+            val trackingTarget = passScheduleService.getTrackingTargetByMstId(mstId)
+
+            if (trackingTarget != null) {
+                logger.info("MST ID $mstId 추적 대상 조회 성공")
+
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "MST ID별 추적 대상 조회 성공",
+                        "data" to mapOf(
+                            "mstId" to trackingTarget.mstId,
+                            "satelliteId" to trackingTarget.satelliteId,
+                            "satelliteName" to trackingTarget.satelliteName,
+                            "startTime" to trackingTarget.startTime,
+                            "endTime" to trackingTarget.endTime,
+                            "maxElevation" to trackingTarget.maxElevation,
+                            "createdAt" to trackingTarget.createdAt
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            } else {
+                logger.warn("MST ID $mstId 추적 대상을 찾을 수 없음")
+                ResponseEntity.status(404).body(
+                    mapOf(
+                        "success" to false,
+                        "message" to "해당 MST ID의 추적 대상을 찾을 수 없습니다.",
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            logger.error("MST ID $mstId 추적 대상 조회 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "MST ID별 추적 대상 조회 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+    /**
+     * ✅ 추적 대상 목록을 초기화합니다.
+     */
+    @DeleteMapping("/tracking-targets")
+    fun clearTrackingTargets(): ResponseEntity<Map<String, Any>> {
+        return try {
+            val beforeCount = passScheduleService.getTrackingTargetList().size
+            passScheduleService.clearTrackingTargetList()
+
+            logger.info("추적 대상 목록 초기화 성공: ${beforeCount}개 삭제")
+
+            ResponseEntity.ok(
+                mapOf(
+                    "success" to true,
+                    "message" to "추적 대상 목록이 성공적으로 초기화되었습니다.",
+                    "data" to mapOf(
+                        "deletedCount" to beforeCount,
+                        "remainingCount" to 0
+                    ),
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        } catch (e: Exception) {
+            logger.error("추적 대상 목록 초기화 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "추적 대상 목록 초기화 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+}
 
 /**
  * TLE 추가 요청 데이터 클래스
@@ -1072,4 +1338,23 @@ data class UpdateTleRequest(
     val satelliteName: String? = null, // 새로 추가된 선택적 필드
     val tleLine1: String,
     val tleLine2: String
+)
+
+/**
+ * ✅ 추적 대상 설정 요청 데이터 클래스
+ */
+data class SetTrackingTargetsRequest(
+    val targets: List<TrackingTargetRequest>
+)
+
+/**
+ * ✅ 추적 대상 요청 데이터 클래스
+ */
+data class TrackingTargetRequest(
+    val mstId: UInt,
+    val satelliteId: String,
+    val satelliteName: String? = null,
+    val startTime: ZonedDateTime,
+    val endTime: ZonedDateTime,
+    val maxElevation: Double
 )
