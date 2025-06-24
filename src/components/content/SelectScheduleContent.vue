@@ -1,5 +1,10 @@
 <template>
   <div class="select-schedule-content">
+    <!-- ✅ X 아이콘 추가 -->
+    <q-btn flat round dense icon="close" color="grey-5" size="sm" @click="handleClose" class="close-btn">
+      <q-tooltip>닫기</q-tooltip>
+    </q-btn>
+
     <div class="content-header">
       <div class="text-h6 text-primary">스케줄 선택</div>
       <div class="text-caption text-grey-5">
@@ -409,10 +414,11 @@ const getRowClass = (row: ScheduleItem): string => {
   return classes.join(' ')
 }
 
-const handleSelect = () => {
+// 🔧 대안: Store의 addSelectedSchedules 활용
+// 🔧 handleSelect 함수 - 초기화 후 추가
+const handleSelect = async () => {
   try {
     if (selectedRows.value.length === 0) {
-      // 🔧 $q 존재 확인 후 알림 처리
       if ($q && $q.notify) {
         $q.notify({
           type: 'warning',
@@ -422,47 +428,50 @@ const handleSelect = () => {
       return
     }
 
-    console.log('🚀 스케줄 선택 처리 시작')
+    console.log('🚀 스케줄 선택 처리 시작 (기존 목록 초기화):', selectedRows.value.length, '개')
 
-    // 선택된 스케줄을 스토어에 추가
-    selectedRows.value.forEach(schedule => {
-      passScheduleStore.addSelectedSchedule(schedule)
-    })
+    // 🔧 기존 목록 초기화 후 새 스케줄 추가
+    const success = await passScheduleStore.replaceSelectedSchedules(selectedRows.value)
 
-    console.log('✅ 패스 스케줄 선택됨:', {
-      count: selectedRows.value.length,
-      schedules: selectedRows.value.map(s => ({
-        name: s.satelliteName,
-        satelliteId: s.satelliteId,
-        startTime: s.startTime
-      }))
-    })
-
-    // 🔧 $q 존재 확인 후 알림 처리
-    if ($q && $q.notify) {
-      $q.notify({
-        type: 'positive',
-        message: `${selectedRows.value.length}개의 패스 스케줄이 선택되었습니다`,
+    if (success) {
+      console.log('✅ 스케줄 목록 교체 완료:', {
+        count: selectedRows.value.length,
+        schedules: selectedRows.value.map(s => ({
+          no: s.no, // 서버 원본 No 값
+          name: s.satelliteName,
+          satelliteId: s.satelliteId,
+          startTime: s.startTime
+        }))
       })
-    }
 
-    // 선택 완료 후 창 닫기
-    console.log('🚪 스케줄 선택 완료, 창 닫기 시작')
-
-    // 약간의 지연을 두어 사용자가 성공 메시지를 볼 수 있도록 함
-    setTimeout(() => {
-      try {
-        handleClose()
-      } catch (closeError) {
-        console.error('❌ 창 닫기 중 오류:', closeError)
-        // 창 닫기 실패해도 사용자에게는 알리지 않음 (이미 작업은 완료됨)
+      if ($q && $q.notify) {
+        $q.notify({
+          type: 'positive',
+          message: `기존 목록을 초기화하고 ${selectedRows.value.length}개의 새 스케줄이 추적 대상으로 설정되었습니다`,
+        })
       }
-    }, 500) // 1초 후 창 닫기
+
+      // 선택 완료 후 창 닫기
+      setTimeout(() => {
+        try {
+          handleClose()
+        } catch (closeError) {
+          console.error('❌ 창 닫기 중 오류:', closeError)
+        }
+      }, 1000) // 성공 메시지를 볼 시간 제공
+
+    } else {
+      if ($q && $q.notify) {
+        $q.notify({
+          type: 'negative',
+          message: '스케줄 선택에 실패했습니다',
+        })
+      }
+    }
 
   } catch (error) {
     console.error('❌ 스케줄 선택 처리 중 오류:', error)
 
-    // 🔧 $q 존재 확인 후 알림 처리
     if ($q && $q.notify) {
       $q.notify({
         type: 'negative',
@@ -471,6 +480,7 @@ const handleSelect = () => {
     }
   }
 }
+
 interface Props {
   modalId?: string
   modalTitle?: string
@@ -609,7 +619,26 @@ onUnmounted(async () => {
 
 </script>
 <style scoped>
+/* ✅ X 아이콘 위치 및 스타일 */
+.close-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 100;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+}
+
+.close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
 .select-schedule-content {
+  position: relative;
+  /* X 아이콘 절대 위치를 위해 추가 */
   display: flex;
   flex-direction: column;
   height: 100%;

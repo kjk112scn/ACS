@@ -1,5 +1,10 @@
 <template>
   <div class="tle-upload-content">
+    <!-- ✅ X 아이콘 추가 -->
+    <q-btn flat round dense icon="close" color="grey-5" size="sm" @click="handleClose" :disable="isSaving"
+      class="close-btn">
+      <q-tooltip>닫기</q-tooltip>
+    </q-btn>
     <!-- 헤더 -->
     <div class="header-section">
       <div class="text-h6 text-primary">TLE Upload</div>
@@ -459,8 +464,7 @@ const handleFileUpload = () => {
   fileInput.value?.click()
 }
 
-// 파일 업로드 핸들러 - 임시 데이터에 추가
-// 파일 업로드 핸들러 - 순서 보장
+// 파일 업로드 핸들러 수정 - $q 존재 확인 후 사용
 const onFileSelected = async (event: Event) => {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
@@ -469,6 +473,13 @@ const onFileSelected = async (event: Event) => {
 
   try {
     console.log('📁 파일 업로드 시작:', file.name)
+    console.log('🧹 기존 데이터 초기화 전 - 현재 개수:', tempTleData.value.length)
+
+    // 🔧 기존 데이터 전체 초기화 (명시적으로)
+    tempTleData.value.splice(0, tempTleData.value.length) // 배열 완전 초기화
+    selected.value.splice(0, selected.value.length) // 선택된 항목도 초기화
+
+    console.log('🧹 기존 데이터 초기화 완료 - 현재 개수:', tempTleData.value.length)
 
     const content = await readFileContent(file)
     console.log('📄 파일 내용 길이:', content.length)
@@ -477,21 +488,21 @@ const onFileSelected = async (event: Event) => {
     console.log('🔍 파싱된 TLE 블록 수:', tleBlocks.length)
 
     if (tleBlocks.length === 0) {
-      $q.notify({
-        type: 'warning',
-        message: '유효한 TLE 데이터를 찾을 수 없습니다',
-      })
+      // 🔧 $q 존재 확인 후 알림 처리
+      if ($q && $q.notify) {
+        $q.notify({
+          type: 'warning',
+          message: '유효한 TLE 데이터를 찾을 수 없습니다',
+        })
+      } else {
+        console.warn('⚠️ 유효한 TLE 데이터를 찾을 수 없습니다')
+      }
       return
     }
 
-    // 🔧 기존 데이터의 마지막 No 찾기
-    const lastNo = tempTleData.value.length > 0
-      ? Math.max(...tempTleData.value.map(item => item.No))
-      : 0
-
-    // 🔧 순서를 보장하면서 임시 데이터에 추가
+    // 🔧 새로운 데이터를 1번부터 순서대로 추가
     tleBlocks.forEach((block, index) => {
-      const newNo = lastNo + index + 1
+      const newNo = index + 1
 
       tempTleData.value.push({
         No: newNo,
@@ -501,18 +512,29 @@ const onFileSelected = async (event: Event) => {
       console.log(`➕ TLE ${newNo} 추가:`, getTLEName(block))
     })
 
-    console.log('✅ 총', tempTleData.value.length, '개 TLE 데이터')
+    console.log('✅ 새로운 TLE 데이터 총', tempTleData.value.length, '개 추가 완료')
 
-    $q.notify({
-      type: 'positive',
-      message: `${tleBlocks.length}개의 TLE 데이터가 추가되었습니다`,
-    })
+    // 🔧 $q 존재 확인 후 알림 처리
+    if ($q && $q.notify) {
+      $q.notify({
+        type: 'positive',
+        message: `기존 데이터를 초기화하고 ${tleBlocks.length}개의 새로운 TLE 데이터를 추가했습니다`,
+      })
+    } else {
+      console.log('✅ 기존 데이터를 초기화하고', tleBlocks.length, '개의 새로운 TLE 데이터를 추가했습니다')
+    }
   } catch (error) {
     console.error('❌ 파일 처리 오류:', error)
-    $q.notify({
-      type: 'negative',
-      message: '파일 처리 중 오류가 발생했습니다',
-    })
+
+    // 🔧 $q 존재 확인 후 알림 처리
+    if ($q && $q.notify) {
+      $q.notify({
+        type: 'negative',
+        message: '파일 처리 중 오류가 발생했습니다',
+      })
+    } else {
+      console.error('❌ 파일 처리 중 오류가 발생했습니다')
+    }
   } finally {
     // 파일 입력 초기화
     if (target) {
@@ -520,6 +542,7 @@ const onFileSelected = async (event: Event) => {
     }
   }
 }
+
 
 // 삭제 핸들러 - 커스텀 다이얼로그 사용
 const handleDelete = () => {
@@ -910,6 +933,34 @@ onUnmounted(() => {
 
 
 <style scoped>
+/* ✅ X 아이콘 위치 및 스타일 */
+.close-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 100;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+}
+
+.close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.close-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tle-upload-content {
+  position: relative;
+  /* X 아이콘 절대 위치를 위해 추가 */
+  /* 기존 스타일 유지 */
+}
+
 .tle-upload-content {
   display: flex;
   flex-direction: column;

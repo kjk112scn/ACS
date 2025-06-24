@@ -10,8 +10,8 @@
 
     <!-- 스케줄 테이블 -->
     <div class="table-container q-pa-md">
-      <q-table flat bordered dark :rows="scheduleData" :columns="columns" row-key="no" :pagination="pagination"
-        :loading="loading" selection="single" v-model:selected="selected" @row-click="onRowClick" class="schedule-table"
+      <q-table flat bordered dark :rows="scheduleData" :columns="columns" row-key="no" :loading="loading"
+        selection="single" v-model:selected="selected" @row-click="onRowClick" class="schedule-table"
         :no-data-label="'스케줄 데이터가 없습니다'">
         <template v-slot:loading>
           <q-inner-loading showing color="primary">
@@ -91,8 +91,10 @@
     <div class="button-area q-pa-md">
       <div class="row q-gutter-md justify-end">
         <q-btn color="grey-7" label="Close" @click="handleClose" class="q-px-lg" size="md" />
-        <q-btn color="primary" label="Select" @click="handleSelect" :disable="!selectedSchedule" class="q-px-lg"
-          size="md" />
+        <!-- Select 버튼에 로딩 상태 추가 -->
+        <q-btn color="primary" label="Select" @click="handleSelect" :disable="!selectedSchedule || loading"
+          :loading="loading" class="q-px-lg" size="md" />
+        size="md" />
       </div>
     </div>
   </div>
@@ -100,9 +102,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed, getCurrentInstance, onUnmounted } from 'vue'
+import { useQuasar } from 'quasar' // 🔧 추가
 import { usePassScheduleStore, type ScheduleItem } from '../../stores/mode/passScheduleStore'
 import { closeWindow } from '../../utils/windowUtils'
 
+const $q = useQuasar() // 🔧 추가
 // Props
 interface Props {
   modalId?: string
@@ -145,14 +149,6 @@ const scheduleData = computed(() => {
   }
 
   return data
-})
-
-// 테이블 설정
-const pagination = ref({
-  sortBy: 'startTime',
-  descending: false,
-  page: 1,
-  rowsPerPage: 10,
 })
 
 const columns = [
@@ -215,24 +211,54 @@ const onRowClick = (evt: Event, row: ScheduleItem) => {
   console.log('✅ 스케줄 선택됨:', row.satelliteName)
 }
 
-// 🔧 TLEUploadContent.vue 참고 - Select 버튼 핸들러
-const handleSelect = () => {
-  if (!selectedSchedule.value) {
-    console.warn('⚠️ 선택된 스케줄이 없음')
-    return
-  }
-
-  console.log('✅ 스케줄 확정 선택:', selectedSchedule.value.satelliteName)
-
+// 🔧 handleSelect 함수 - 한 번에 처리하도록 개선
+const handleSelect = async () => {
   try {
-    // emit으로 선택된 스케줄 데이터 전달
-    emit('close', selectedSchedule.value)
+    if (selected.value.length === 0) {
+      $q.notify({
+        type: 'warning',
+        message: '패스 스케줄을 선택하세요',
+      })
+      return
+    }
 
-    // 창 닫기 처리
-    performClose()
+    console.log('🚀 스케줄 선택 처리 시작:', selected.value.length, '개')
+    loading.value = true
+
+    // 🔧 Store에서 처리 (기존 목록 초기화 후 추가)
+    const success = await passScheduleStore.replaceSelectedSchedules(selected.value)
+
+    if (success) {
+      console.log('✅ 스케줄 선택 완료')
+
+      $q.notify({
+        type: 'positive',
+        message: `${selected.value.length}개의 패스 스케줄이 선택되고 추적 대상으로 설정되었습니다`,
+      })
+
+      // 🔧 선택된 데이터를 emit으로 전달 (PassSchedulePage에서 추가 처리하지 않음)
+      emit('close', selected.value[0])
+
+      setTimeout(() => {
+        performClose()
+      }, 200)
+
+    } else {
+      $q.notify({
+        type: 'negative',
+        message: '스케줄 선택에 실패했습니다',
+      })
+    }
+
   } catch (error) {
     console.error('❌ 스케줄 선택 처리 중 오류:', error)
+    $q.notify({
+      type: 'negative',
+      message: '스케줄 선택 처리 중 오류가 발생했습니다',
+    })
     emit('error', error instanceof Error ? error : new Error('스케줄 선택 실패'))
+  } finally {
+    loading.value = false
   }
 }
 

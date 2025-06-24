@@ -114,6 +114,30 @@ export interface PassScheduleMasterData {
   OriginalStartAzimuth: number
   OriginalEndAzimuth: number
 }
+export interface TrackingTarget {
+  mstId: number
+  satelliteId: string
+  satelliteName: string
+  startTime: string
+  endTime: string
+  maxElevation: number
+}
+
+export interface SetTrackingTargetsRequest {
+  targets: TrackingTarget[]
+}
+
+export interface SetTrackingTargetsResponse {
+  success: boolean
+  message: string
+  data?: {
+    totalTargets: number
+    uniqueSatellites: number
+    targets: TrackingTarget[]
+  }
+  errors?: string[]
+  timestamp: number
+}
 
 export interface GetAllTrackingMasterResponse {
   satelliteCount: number
@@ -595,6 +619,43 @@ class PassScheduleService {
         success: false,
         message: '위성별 패스 스케줄 마스터 데이터 조회에 실패했습니다',
       }
+    }
+  }
+
+  // 추적 대상 설정 관련 타입 추가
+ 
+  /**
+   * 위성 추적 스케줄 대상 목록을 설정합니다
+   */
+  async setTrackingTargets(request: SetTrackingTargetsRequest): Promise<SetTrackingTargetsResponse> {
+    try {
+      if (!request.targets || request.targets.length === 0) {
+        throw new Error('추적 대상 목록이 비어있습니다')
+      }
+
+      console.log('🚀 추적 대상 설정 API 호출:', {
+        targetCount: request.targets.length,
+        targets: request.targets.map(t => ({
+          mstId: t.mstId,
+          satelliteId: t.satelliteId,
+          satelliteName: t.satelliteName,
+          startTime: t.startTime,
+          endTime: t.endTime,
+          maxElevation: t.maxElevation
+        }))
+      })
+
+      const response = await api.post('/pass-schedule/tracking-targets', request)
+
+      console.log('✅ 추적 대상 설정 응답:', response.data)
+
+      return response.data
+    } catch (error) {
+      console.error('❌ 추적 대상 설정 실패:', error)
+      return this.handleApiError(
+        error,
+        '추적 대상 설정에 실패했습니다'
+      ) as Promise<SetTrackingTargetsResponse>
     }
   }
 }

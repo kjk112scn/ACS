@@ -11,15 +11,28 @@
             <div class="text-subtitle2 text-weight-bold text-primary">Azimuth</div>
           </q-card-section>
           <q-card-section>
-            <q-input v-model="inputs[0]" @input="(val: string) => onInputChange(0, val)" dense outlined type="number"
-              step="0.01" class="q-mb-sm" />
-            <div class="row q-gutter-xs">
-              <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
-              <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
-              <q-space />
-              <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(0)" />
+
+
+
+
+
+
+
+            <div class="compact-control-row">
+              <q-input v-model="inputs[0]" @input="(val: string) => onInputChange(0, val)" dense outlined type="number"
+                step="0.01" class="control-input" label="Input" />
+              <div class="control-buttons">
+
+
+
+                <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
+                <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
+              </div>
+
+              <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(0)" class="reset-button" />
+              <q-input v-model="outputs[0]" dense outlined readonly class="output-input" label="Output" />
             </div>
-            <q-input v-model="outputs[0]" dense outlined readonly label="Output" class="q-mt-sm" />
+
           </q-card-section>
         </q-card>
       </div>
@@ -31,19 +44,19 @@
             <div class="text-subtitle2 text-weight-bold text-primary">Elevation</div>
           </q-card-section>
           <q-card-section>
-            <q-input v-model="inputs[1]" @input="(val: string) => onInputChange(1, val)" dense outlined type="number"
-              step="0.01" class="q-mb-sm" />
-            <div class="row q-gutter-xs">
-              <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(1)" />
-              <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
-              <q-space />
-              <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(1)" />
+            <div class="compact-control-row">
+              <q-input v-model="inputs[1]" @input="(val: string) => onInputChange(1, val)" dense outlined type="number"
+                step="0.01" class="control-input" label="Input" />
+              <div class="control-buttons">
+                <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(1)" />
+                <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
+              </div>
+              <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(1)" class="reset-button" />
+              <q-input v-model="outputs[1]" dense outlined readonly class="output-input" label="Output" />
             </div>
-            <q-input v-model="outputs[1]" dense outlined readonly label="Output" class="q-mt-sm" />
           </q-card-section>
         </q-card>
       </div>
-
       <!-- Tilt Control -->
       <div class="col-6 col-sm-3">
         <q-card flat bordered class="control-card">
@@ -51,19 +64,19 @@
             <div class="text-subtitle2 text-weight-bold text-primary">Tilt</div>
           </q-card-section>
           <q-card-section>
-            <q-input v-model="inputs[2]" @input="(val: string) => onInputChange(2, val)" dense outlined type="number"
-              step="0.01" class="q-mb-sm" />
-            <div class="row q-gutter-xs">
-              <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(2)" />
-              <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
-              <q-space />
-              <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(2)" />
+            <div class="compact-control-row">
+              <q-input v-model="inputs[2]" @input="(val: string) => onInputChange(2, val)" dense outlined type="number"
+                step="0.01" class="control-input" label="Input" />
+              <div class="control-buttons">
+                <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(2)" />
+                <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
+              </div>
+              <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(2)" class="reset-button" />
+              <q-input v-model="outputs[2]" dense outlined readonly class="output-input" label="Output" />
             </div>
-            <q-input v-model="outputs[2]" dense outlined readonly label="Output" class="q-mt-sm" />
           </q-card-section>
         </q-card>
       </div>
-
       <!-- Time Control -->
       <div class="col-6 col-sm-3">
         <q-card flat bordered class="control-card">
@@ -71,24 +84,25 @@
             <div class="text-subtitle2 text-weight-bold text-primary">Time</div>
           </q-card-section>
           <q-card-section>
-            <q-input v-model="inputs[3]" @input="(val: string) => onInputChange(3, val)" dense outlined type="number"
-              step="1" class="q-mb-sm" />
-            <div class="row q-gutter-xs">
-              <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(3)" />
-              <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
-              <q-space />
-              <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(3)" />
+            <div class="compact-control-row">
+              <q-input v-model="inputs[3]" @input="(val: string) => onInputChange(3, val)" dense outlined type="number"
+                step="1" class="control-input" label="Input" />
+              <div class="control-buttons">
+                <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(3)" />
+                <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
+              </div>
+              <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(3)" class="reset-button" />
+              <q-input v-model="outputs[3]" dense outlined readonly class="output-input" label="Output" />
             </div>
-            <q-input v-model="outputs[3]" dense outlined readonly label="Output" class="q-mt-sm" />
           </q-card-section>
         </q-card>
       </div>
     </div>
-
     <!-- Main Content Section - 2행 구조로 변경 -->
     <div class="schedule-container">
       <div class="row q-col-gutter-sm">
-        <!-- 1행: Position View -->
+
+        <!-- 1행: Position View - 기존 크기 유지 -->
         <div class="col-12 col-md-4">
           <q-card class="control-section">
             <q-card-section>
@@ -97,9 +111,8 @@
             </q-card-section>
           </q-card>
         </div>
-
-        <!-- 1행: Schedule Information -->
-        <div class="col-12 col-md-4">
+        <!-- 1행: Schedule Information - 30% 축소 -->
+        <div class="col-12 col-md-2">
           <q-card class="control-section">
             <q-card-section>
               <div class="text-subtitle1 text-weight-bold text-primary">Schedule Information</div>
@@ -110,42 +123,34 @@
                     <div class="text-subtitle2 text-weight-bold text-primary q-mb-sm">
                       선택된 스케줄 정보
                     </div>
-
                     <div class="info-row">
                       <span class="info-label">스케줄 ID:</span>
                       <span class="info-value">{{ selectedSchedule.no }}</span>
                     </div>
-
                     <div class="info-row">
                       <span class="info-label">위성 이름:</span>
                       <span class="info-value">{{ selectedSchedule.satelliteName }}</span>
                     </div>
-
                     <div class="info-row">
                       <span class="info-label">시작 시간:</span>
-                      <span class="info-value">{{ new Date(selectedSchedule.startTime).toLocaleString('ko-KR') }}</span>
+                      <span class="info-value">{{ formatToLocalTime(selectedSchedule.startTime) }}</span>
                     </div>
-
                     <div class="info-row">
                       <span class="info-label">종료 시간:</span>
-                      <span class="info-value">{{ new Date(selectedSchedule.endTime).toLocaleString('ko-KR') }}</span>
+                      <span class="info-value">{{ formatToLocalTime(selectedSchedule.endTime) }}</span>
                     </div>
-
                     <div class="info-row">
                       <span class="info-label">지속 시간:</span>
                       <span class="info-value">{{ selectedSchedule.duration }}</span>
                     </div>
-
                     <div class="info-row">
                       <span class="info-label">시작 방위각:</span>
                       <span class="info-value">{{ selectedSchedule.startAzimuthAngle.toFixed(2) }}°</span>
                     </div>
-
                     <div class="info-row">
                       <span class="info-label">시작 고도각:</span>
                       <span class="info-value">{{ selectedSchedule.startElevationAngle.toFixed(2) }}°</span>
                     </div>
-
                     <div class="info-row">
                       <span class="info-label">최대 고도각:</span>
                       <span class="info-value">{{ selectedSchedule.maxElevation?.toFixed(2) }}°</span>
@@ -162,23 +167,31 @@
           </q-card>
         </div>
 
-        <!-- 1행: Schedule Control -->
-        <div class="col-12 col-md-4">
+
+
+        <!-- Schedule Control - 30% 확대 -->
+        <div class="col-12 col-md-6">
           <q-card class="control-section">
             <q-card-section>
-              <div class="text-subtitle1 text-weight-bold text-primary">Schedule Control</div>
-
-              <!-- 스케줄 테이블 -->
+              <!-- ✅ 등록된 스케줄 정보를 Schedule Control과 같은 행에 우측 배치 -->
+              <div class="schedule-header">
+                <div class="text-subtitle1 text-weight-bold text-primary">Schedule Control</div>
+                <div class="registered-schedule-info">
+                  <span class="text-body2 text-primary">등록된 스케줄</span>
+                  <span class="text-caption text-grey-5 q-ml-xs">{{ scheduleData.length }}개</span>
+                </div>
+              </div>
+              <!-- ✅ 스케줄 테이블 - 체크박스 제거 -->
               <q-table flat bordered :rows="scheduleData" :columns="scheduleColumns" row-key="no"
-                :pagination="pagination" :loading="loading" selection="single" @row-click="onRowClick"
-                class="schedule-table q-mt-sm" style="height: 300px" :no-data-label="'선택된 스케줄이 없습니다'">
+                :pagination="{ rowsPerPage: 0 }" hide-pagination :loading="loading" @row-click="onRowClick"
+                class="schedule-table q-mt-sm" style="height: 300px" :no-data-label="'등록된 스케줄이 없습니다'" virtual-scroll
+                :virtual-scroll-sticky-size-start="48">
                 <template v-slot:loading>
                   <q-inner-loading showing color="primary">
                     <q-spinner size="50px" color="primary" />
                   </q-inner-loading>
                 </template>
-
-                <!-- 🆕 삭제 버튼 컬럼 -->
+                <!-- 삭제 버튼 컬럼 -->
                 <template v-slot:body-cell-actions="props">
                   <q-td :props="props">
                     <q-btn icon="delete" color="negative" size="sm" flat round>
@@ -186,16 +199,53 @@
                     </q-btn>
                   </q-td>
                 </template>
+                <!-- 위성 정보 컬럼 템플릿 -->
+                <template v-slot:body-cell-satelliteInfo="props">
+                  <q-td :props="props" class="satellite-info-cell">
+                    <div class="satellite-container">
+                      <div class="satellite-id">{{ props.row.satelliteId || '-' }}</div>
+                      <div class="satellite-name">{{ props.row.satelliteName }}</div>
+                    </div>
+                  </q-td>
+                </template>
+
+                <!-- 시간 범위 컬럼 템플릿 - formatDateTime 함수 사용 -->
+                <template v-slot:body-cell-timeRange="props">
+                  <q-td :props="props" class="time-range-cell">
+                    <div class="time-container">
+
+
+                      <div class="start-time">{{ formatDateTime(props.row.startTime) }}</div>
+                      <div class="end-time">{{ formatDateTime(props.row.endTime) }}</div>
+                    </div>
+                  </q-td>
+                </template>
+
+                <!-- Azimuth 범위 컬럼 템플릿 -->
+                <template v-slot:body-cell-azimuthRange="props">
+                  <q-td :props="props" class="azimuth-range-cell">
+                    <div class="azimuth-container">
+                      <div class="start-az">{{ formatAngle(props.row.startAzimuthAngle) }}</div>
+                      <div class="end-az">{{ formatAngle(props.row.endAzimuthAngle) }}</div>
+                    </div>
+                  </q-td>
+                </template>
+
+                <!-- Elevation 정보 컬럼 템플릿 -->
+                <template v-slot:body-cell-elevationInfo="props">
+                  <q-td :props="props" class="elevation-info-cell">
+                    <div class="elevation-container">
+                      <div class="max-elevation">{{ formatAngle(props.row.maxElevation) }}</div>
+                      <div class="tilt">{{ formatAngle(0) }}</div>
+                    </div>
+                  </q-td>
+                </template>
               </q-table>
-
-
               <!-- 버튼 그룹 섹션 -->
               <div class="button-group q-mt-md">
                 <div class="button-row q-mb-md">
                   <q-btn color="info" label="TLE Upload" icon="upload_file" @click="handleTLEUpload"
                     class="q-mr-sm upload-btn" size="md" />
-
-
 
                   <q-btn color="primary" label="Select Schedule" icon="playlist_add_check" @click="selectScheduleData"
                     class="upload-btn" size="md">
@@ -208,11 +258,6 @@
                     class="control-btn" size="md" />
                   <q-btn color="warning" label="Stop" @click="handleStopCommand" class="control-btn" size="md" />
                   <q-btn color="negative" label="Stow" @click="handleStowCommand" class="control-btn" size="md" />
-                </div>
-
-                <!-- 🆕 선택된 스케줄 개수 표시 -->
-                <div class="q-mt-sm text-caption text-grey-5">
-                  선택된 스케줄: {{ scheduleData.length }}개
                 </div>
               </div>
             </q-card-section>
@@ -232,6 +277,7 @@ import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 import type { QTableProps } from 'quasar'
 import { openModal } from '../../utils/windowUtils'
+import { formatToLocalTime } from '../../utils/times'
 
 const $q = useQuasar()
 const passScheduleStore = usePassScheduleStore()
@@ -265,46 +311,91 @@ const outputs = ref<string[]>(['0.00', '0.00', '0.00', '0'])
 type QTableColumn = NonNullable<QTableProps['columns']>[0]
 
 const scheduleColumns: QTableColumn[] = [
-  { name: 'no', label: 'No', field: 'no', align: 'left' as const, sortable: true },
-  { name: 'satelliteName', label: '위성 이름', field: 'satelliteName', align: 'left' as const, sortable: true },
+
+
+  { name: 'no', label: 'No', field: 'no', align: 'left' as const, sortable: true, style: 'width: 60px' },
+
+
+
+
+
   {
-    name: 'startTime',
-    label: '시작 시간',
+    name: 'satelliteInfo',
+    label: '위성 ID\n위성 이름',
+    field: 'satelliteName',
+    align: 'left' as const,
+    sortable: true,
+    style: 'width: 120px',
+    headerStyle: 'white-space: pre-line; line-height: 1.3;'
+  },
+  {
+
+
+    name: 'timeRange',
+    label: '시작 시간\n종료 시간', // ✅ 줄바꿈 적용
     field: 'startTime',
     align: 'left' as const,
     sortable: true,
-    format: (val: string) => {
-      try {
-        return new Date(val).toLocaleString('ko-KR')
-      } catch {
-        return val
-      }
-    }
+
+
+    style: 'width: 150px',
+    headerStyle: 'white-space: pre-line; line-height: 1.3;' // ✅ 헤더 스타일 추가
   },
   {
-    name: 'endTime',
-    label: '종료 시간',
-    field: 'endTime',
-    align: 'left' as const,
-    sortable: true,
-    format: (val: string) => {
-      try {
-        return new Date(val).toLocaleString('ko-KR')
-      } catch {
-        return val
-      }
-    }
-  },
-  {
+
+
+
+
+
+
+
+
     name: 'duration',
     label: '지속 시간',
     field: 'duration',
-    align: 'left' as const,
+
+    align: 'center' as const,
     sortable: true,
+    style: 'width: 80px'
   },
-  // 🆕 삭제 버튼 컬럼 추가
-  { name: 'actions', label: '작업', field: 'actions', align: 'center' as const, sortable: false },
+
+
+
+  {
+    name: 'azimuthRange',
+    label: 'Start Az\nEnd Az',
+    field: (row: ScheduleItem) => ({ start: row.startAzimuthAngle, end: row.endAzimuthAngle }),
+    align: 'center' as const,
+    sortable: false,
+    style: 'width: 100px',
+    headerStyle: 'white-space: pre-line; line-height: 1.3;'
+  },
+  {
+    name: 'elevationInfo',
+    label: 'Max El\nTilt',
+    field: (row: ScheduleItem) => ({ maxElevation: row.maxElevation, tilt: row.tilt }),
+    align: 'center' as const,
+    sortable: false,
+    style: 'width: 80px',
+    headerStyle: 'white-space: pre-line; line-height: 1.3;'
+  },
+  { name: 'actions', label: '작업', field: 'actions', align: 'center' as const, sortable: false, style: 'width: 60px' },
 ]
+
+const formatDateTime = (dateString: string): string => {
+  try {
+    return formatToLocalTime(dateString)
+  } catch (error) {
+    console.error('시간 포맷팅 오류:', error)
+    return dateString
+  }
+}
+
+const formatAngle = (angle: number | undefined | null): string => {
+  if (angle === undefined || angle === null) return '-'
+  return `${angle.toFixed(1)}°`
+}
+
 // TLE 업로드 핸들러
 const handleTLEUpload = async () => {
   try {
@@ -337,14 +428,6 @@ const handleTLEUpload = async () => {
       message: 'TLE 업로드 창을 열 수 없습니다',
     })
   }
-}
-
-// 페이지네이션 설정
-const pagination = {
-  sortBy: 'no',
-  descending: false,
-  page: 1,
-  rowsPerPage: 10,
 }
 
 // 차트 초기화
@@ -474,6 +557,7 @@ const updateChart = () => {
     console.error('차트 업데이트 중 오류 발생:', error)
   }
 }
+
 const selectScheduleData = async () => {
   try {
     console.log('스케줄 선택 모달 열기')
@@ -484,14 +568,9 @@ const selectScheduleData = async () => {
       modalClass: 'select-schedule-modal',
       onClose: (selectedData?: ScheduleItem) => {
         console.log('스케줄 선택 모달 닫힘', selectedData)
+        // 🔧 SelectScheduleContent에서 이미 처리했으므로 추가 작업 없음
         if (selectedData) {
-          // 🔧 선택된 스케줄을 목록에 추가
-          passScheduleStore.addSelectedSchedule(selectedData)
-
-          $q.notify({
-            type: 'positive',
-            message: `스케줄 "${selectedData.satelliteName}"이 목록에 추가되었습니다`,
-          })
+          console.log('✅ 스케줄이 이미 SelectScheduleContent에서 처리되었습니다:', selectedData.satelliteName)
         }
       },
       onError: (error) => {
@@ -879,16 +958,217 @@ onUnmounted(() => {
     width: 100%;
   }
 }
+
+/* ✅ 스케줄 헤더 컨테이너 */
+.schedule-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+/* ✅ 등록된 스케줄 정보를 헤더 우측에 배치 */
+.registered-schedule-info {
+  background-color: rgba(0, 0, 0, 0.8);
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.registered-schedule-info .text-body2 {
+  margin-bottom: 2px;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.registered-schedule-info .text-caption {
+  font-size: 11px;
+}
+
+/* ✅ Records per page 관련 요소들 숨기기 */
+.schedule-table :deep(.q-table__bottom) {
+  display: none !important;
+}
+
+.schedule-table :deep(.q-table__control) {
+  display: none !important;
+}
+
+/* 위성 정보 셀 스타일 */
+.satellite-info-cell {
+  padding: 6px 8px !important;
+}
+
+.satellite-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ✅ 위성 ID가 위로, 위성 이름이 아래로 */
+.satellite-id {
+  font-weight: 600;
+  font-size: 13px;
+  color: #2196f3;
+  /* 위성 ID 강조 색상 */
+}
+
+.satellite-name {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+}
+
+/* Azimuth 범위 셀 스타일 */
+.azimuth-range-cell {
+  padding: 6px 8px !important;
+  vertical-align: middle !important;
+}
+
+.azimuth-container {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.start-az,
+.end-az {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.start-az {
+  color: #4caf50;
+  /* 시작 방위각 - 녹색 */
+}
+
+.end-az {
+  color: #ff9800;
+  /* 종료 방위각 - 주황색 */
+}
+
+/* Elevation 정보 셀 스타일 */
+.elevation-info-cell {
+  padding: 6px 8px !important;
+  vertical-align: middle !important;
+}
+
+.elevation-container {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.max-elevation,
+.tilt {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.max-elevation {
+  color: #9c27b0;
+  /* 최대 고도각 - 보라색 */
+}
+
+.tilt {
+  color: #607d8b;
+  /* Tilt - 회색 */
+}
+
+/* 컨트롤 카드 높이 조정 */
+.control-card {
+  height: auto;
+  min-height: 84px;
+  /* 120px에서 30% 감소 (120 * 0.7 = 84) */
+}
+
+.control-card .q-card-section:first-child {
+  padding: 6px 8px;
+  /* 헤더 패딩 줄임 */
+}
+
+.control-card .q-card-section:last-child {
+  padding: 8px;
+  /* 12px에서 8px로 줄임 */
+}
+
+/* 컴팩트 컨트롤 행 스타일 */
+.compact-control-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.control-input {
+  flex: 1;
+  min-width: 70px;
+}
+
+.control-buttons {
+  display: flex;
+  flex-direction: column;
+
+  gap: 1px;
+  /* 2px에서 1px로 줄임 */
+  flex-shrink: 0;
+}
+
+.control-buttons .q-btn {
+  min-width: 32px;
+  width: 32px;
+
+  height: 24px;
+  /* 28px에서 24px로 줄임 */
+}
+
+.reset-button {
+  min-width: 32px;
+  width: 32px;
+
+  height: 49px;
+  /* +, - 버튼 합친 높이 (24px + 24px + 1px gap) */
+  flex-shrink: 0;
+}
+
+.output-input {
+  flex: 1;
+  min-width: 70px;
+}
 </style>
 
 <style>
-/* 전역 스타일 */
-.col-md-4 {
-  width: 33.3333%;
+/* 전역 스타일 - 컬럼 비율 조정 */
+.col-md-2 {
+
+  width: 21.6667% !important;
+  /* Schedule Information 확대 (16.6667% → 21.6667%) */
   padding: 4px;
 }
 
-.q-btn {
-  flex: 1;
+.col-md-4 {
+  width: 33.3333% !important;
+  /* Position View 유지 */
+  padding: 4px;
+}
+
+.col-md-6 {
+
+  width: 45% !important;
+  /* Schedule Control 축소 (50% → 45%) */
+  padding: 4px;
 }
 </style>

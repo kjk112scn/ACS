@@ -6,6 +6,8 @@ import {
   type AddTleAndTrackingRequest,
   type TleAndTrackingResponse,
   type PassScheduleMasterData,
+  type SetTrackingTargetsRequest,
+  type TrackingTarget,
 } from '../../services/mode/passScheduleService'
 
 export interface ScheduleItem {
@@ -87,14 +89,197 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     // 서버에서 실제 데이터를 가져오도록 변경
     return await fetchScheduleDataFromServer()
   }
+  // 🔧 addSelectedSchedule 함수 개선 - API 호출 추가
+  const addSelectedSchedule = async (schedule: ScheduleItem): Promise<boolean> => {
+    try {
+      // 중복 체크
+      const exists = selectedScheduleList.value.find((item) => item.no === schedule.no)
+      if (exists) {
+        console.log('⚠️ 이미 선택된 스케줄:', schedule.satelliteName)
+        return true // 이미 선택된 경우 성공으로 처리
+      }
 
-  // 🆕 선택된 스케줄을 목록에 추가
-  const addSelectedSchedule = (schedule: ScheduleItem) => {
-    // 중복 체크
+      console.log('🚀 스케줄 선택 및 추적 대상 설정 시작:', schedule.satelliteName)
+
+      // 🔧 서버에 추적 대상 설정 먼저 수행
+      const success = await setTrackingTargets([schedule])
+
+      if (success) {
+        // 서버 설정 성공 시에만 로컬 배열에 추가
+        selectedScheduleList.value.push(schedule)
+        console.log('✅ 스케줄이 선택 목록에 추가됨:', schedule.satelliteName)
+        return true
+      } else {
+        console.error('❌ 서버 추적 대상 설정 실패')
+        return false
+      }
+    } catch (error) {
+      console.error('❌ 스케줄 선택 중 오류:', error)
+
+      $q.notify({
+        type: 'negative',
+        message: '스케줄 선택 중 오류가 발생했습니다',
+      })
+
+      return false
+    }
+  }
+  // 🔧 유연한 스케줄 추가 함수 (단일/다중 모두 처리)
+  const addSchedulesToSelection = async (
+    schedules: ScheduleItem | ScheduleItem[],
+  ): Promise<boolean> => {
+    try {
+      // 단일 스케줄인 경우 배열로 변환
+      const scheduleArray = Array.isArray(schedules) ? schedules : [schedules]
+
+      console.log('🚀 스케줄 선택 처리:', scheduleArray.length, '개')
+
+      return await addSelectedSchedules(scheduleArray)
+    } catch (error) {
+      console.error('❌ 스케줄 선택 처리 중 오류:', error)
+      return false
+    }
+  }
+  // 🆕 명시적 초기화 후 추가 함수
+  const replaceSelectedSchedules = async (schedules: ScheduleItem[]): Promise<boolean> => {
+    try {
+      console.log('🔄 선택된 스케줄 목록 교체 시작:', {
+        기존개수: selectedScheduleList.value.length,
+        새로운개수: schedules.length
+      })
+
+      // 🔧 명시적으로 배열 초기화
+      selectedScheduleList.value.splice(0) // 기존 배열 완전 비우기
+      selectedSchedule.value = null
+      
+      console.log('🗑️ 기존 목록 초기화 완료, 현재 길이:', selectedScheduleList.value.length)
+
+      // 추적 대상 설정
+      const success = await setTrackingTargets(schedules)
+
+      if (success) {
+        // 🔧 Vue의 반응성을 보장하는 방식으로 추가
+        schedules.forEach(schedule => {
+          selectedScheduleList.value.push(schedule)
+        })
+        
+        // 🔧 또는 한 번에 교체
+        // selectedScheduleList.value = [...schedules]
+        
+        console.log('✅ 새 스케줄 목록 설정 완료:', {
+          설정된개수: selectedScheduleList.value.length,
+          목록: selectedScheduleList.value.map(s => ({
+            no: s.no,
+            name: s.satelliteName
+          }))
+        })
+
+        // 🔧 강제 반응성 트리거 (필요한 경우)
+        // nextTick(() => {
+        //   console.log('🔄 nextTick 후 selectedScheduleList 길이:', selectedScheduleList.value.length)
+        // })
+
+        $q.notify({
+          type: 'positive',
+          message: `기존 목록을 초기화하고 ${schedules.length}개의 새 스케줄이 추적 대상으로 설정되었습니다`,
+        })
+
+        return true
+      } else {
+        console.error('❌ 추적 대상 설정 실패')
+        return false
+      }
+    } catch (error) {
+      console.error('❌ 스케줄 목록 교체 실패:', error)
+      return false
+    }
+  }
+
+  // 🔧 addSelectedSchedules 함수 - 한 번에 처리하도록 개선
+  // 🔧 addSelectedSchedules 함수에 초기화 옵션 추가
+  const addSelectedSchedules = async (
+    schedules: ScheduleItem[],
+    clearExisting: boolean = false, // 🆕 기존 목록 초기화 옵션
+  ): Promise<boolean> => {
+    try {
+      if (schedules.length === 0) {
+        console.warn('⚠️ 추가할 스케줄이 없음')
+        return false
+      }
+
+      console.log('🚀 여러 스케줄 선택 처리 시작:', {
+        newCount: schedules.length,
+        clearExisting,
+        currentCount: selectedScheduleList.value.length,
+      })
+
+      // 🔧 기존 목록 초기화 (옵션)
+      if (clearExisting) {
+        console.log('🗑️ 기존 선택된 스케줄 목록 초기화')
+        selectedScheduleList.value = []
+        selectedSchedule.value = null
+      }
+
+      // 🔧 한 번에 모든 스케줄을 추적 대상으로 설정
+      const success = await setTrackingTargets(schedules)
+
+      if (success) {
+        // 🔧 성공한 경우에만 선택 목록에 추가 (중복 제거)
+        schedules.forEach((schedule) => {
+          const exists = selectedScheduleList.value.find((item) => item.no === schedule.no)
+          if (!exists) {
+            selectedScheduleList.value.push(schedule)
+            console.log('✅ 스케줄이 선택 목록에 추가됨:', {
+              no: schedule.no,
+              satelliteName: schedule.satelliteName,
+            })
+          } else {
+            console.log('⚠️ 이미 선택된 스케줄 (건너뜀):', schedule.satelliteName)
+          }
+        })
+
+        console.log('✅ 모든 스케줄 선택 처리 완료:', {
+          requestCount: schedules.length,
+          totalSelectedCount: selectedScheduleList.value.length,
+          wasCleared: clearExisting,
+        })
+
+        $q.notify({
+          type: 'positive',
+          message: clearExisting
+            ? `기존 목록을 초기화하고 ${schedules.length}개의 새 스케줄이 추적 대상으로 설정되었습니다`
+            : `${schedules.length}개의 스케줄이 추적 대상으로 설정되었습니다`,
+        })
+
+        return true
+      } else {
+        console.error('❌ 추적 대상 설정 실패')
+
+        $q.notify({
+          type: 'negative',
+          message: '스케줄을 추적 대상으로 설정하는데 실패했습니다',
+        })
+
+        return false
+      }
+    } catch (error) {
+      console.error('❌ 여러 스케줄 선택 처리 실패:', error)
+
+      $q.notify({
+        type: 'negative',
+        message: '스케줄 선택 처리 중 오류가 발생했습니다',
+      })
+
+      return false
+    }
+  }
+
+  // 🔧 단순 로컬 추가 함수 (API 호출 없이)
+  const addSelectedScheduleLocal = (schedule: ScheduleItem) => {
     const exists = selectedScheduleList.value.find((item) => item.no === schedule.no)
     if (!exists) {
       selectedScheduleList.value.push(schedule)
-      console.log('✅ 스케줄이 선택 목록에 추가됨:', schedule.satelliteName)
+      console.log('✅ 스케줄이 로컬 선택 목록에 추가됨:', schedule.satelliteName)
     } else {
       console.log('⚠️ 이미 선택된 스케줄:', schedule.satelliteName)
     }
@@ -540,7 +725,6 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
         console.log('✅ satellites 검증 통과:', satelliteKeys)
 
         const allSchedules: ScheduleItem[] = []
-        let scheduleNo = 1
 
         // 🔧 직접 Object.entries 사용 (안전 검증 후)
         Object.entries(serverData.satellites).forEach(([satelliteId, passes]) => {
@@ -557,7 +741,7 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
           passes.forEach((pass: PassScheduleMasterData) => {
             try {
               const scheduleItem: ScheduleItem = {
-                no: scheduleNo++,
+                no: pass.No,
                 satelliteId: pass.SatelliteID || satelliteId,
                 satelliteName: pass.SatelliteName || `Satellite-${satelliteId}`,
                 startTime: pass.StartTime || '',
@@ -669,6 +853,63 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     }
   }
 
+  // 추적 대상 설정 함수 추가
+  const setTrackingTargets = async (schedules: ScheduleItem[]): Promise<boolean> => {
+    try {
+      loading.value = true
+      console.log('🚀 추적 대상 설정 시작:', schedules.length, '개')
+
+      // ScheduleItem을 TrackingTarget으로 변환
+      const trackingTargets: TrackingTarget[] = schedules.map((schedule) => ({
+        mstId: schedule.no, // store에서 받아온 원본 no 값을 mstId로 사용
+        satelliteId: schedule.satelliteId || '',
+        satelliteName: schedule.satelliteName,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        maxElevation: schedule.maxElevation || 0,
+      }))
+
+      console.log('🔄 변환된 추적 대상:', trackingTargets)
+
+      const request: SetTrackingTargetsRequest = {
+        targets: trackingTargets,
+      }
+
+      const response = await passScheduleService.setTrackingTargets(request)
+
+      if (response.success) {
+        console.log('✅ 추적 대상 설정 성공:', response.data)
+
+        $q.notify({
+          type: 'positive',
+          message: `${response.data?.totalTargets || schedules.length}개의 추적 대상이 설정되었습니다`,
+        })
+
+        return true
+      } else {
+        console.error('❌ 추적 대상 설정 실패:', response.message)
+
+        $q.notify({
+          type: 'negative',
+          message: response.message || '추적 대상 설정에 실패했습니다',
+        })
+
+        return false
+      }
+    } catch (error) {
+      console.error('❌ 추적 대상 설정 중 오류:', error)
+
+      $q.notify({
+        type: 'negative',
+        message: '추적 대상 설정 중 오류가 발생했습니다',
+      })
+
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     // 상태
     scheduleData, // 전체 스케줄 (모달용)
@@ -690,9 +931,13 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     fetchScheduleData,
     fetchScheduleDataFromServer,
     selectSchedule,
+    addSelectedSchedule, // 🔧 API 호출 포함
+    addSelectedSchedules, // 🔧 새로 추가
+    addSelectedScheduleLocal, // 🔧 로컬만 (기존 로
+    addSchedulesToSelection,
+    replaceSelectedSchedules,
 
     // 🆕 선택된 스케줄 관리 액션
-    addSelectedSchedule,
     removeSelectedSchedule,
     clearSelectedSchedules,
 
@@ -708,5 +953,6 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     uploadTLEDataToServer,
 
     init,
+    setTrackingTargets,
   }
 })
