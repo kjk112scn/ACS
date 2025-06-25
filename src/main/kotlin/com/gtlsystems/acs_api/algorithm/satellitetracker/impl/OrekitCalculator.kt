@@ -4,30 +4,28 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
-import com.gtlsystems.acs_api.algorithm.satellitetracker.interfaces.SatellitePositionCalculator
 import com.gtlsystems.acs_api.algorithm.satellitetracker.model.SatelliteTrackData
+import com.gtlsystems.acs_api.config.OrekitConfig
 import org.orekit.time.AbsoluteDate
 import com.gtlsystems.acs_api.model.GlobalData
 import org.hipparchus.util.FastMath
 import org.orekit.bodies.GeodeticPoint
 import org.orekit.bodies.OneAxisEllipsoid
 import org.orekit.data.DataContext
-import org.orekit.data.DirectoryCrawler
 import org.orekit.frames.Frame
 import org.orekit.frames.FramesFactory
 import org.orekit.frames.TopocentricFrame
 import org.orekit.propagation.analytical.tle.TLE
 import org.orekit.propagation.analytical.tle.TLEPropagator
+import org.orekit.time.TimeScale
 import org.orekit.time.TimeScalesFactory
 import org.orekit.utils.Constants
 import org.orekit.utils.IERSConventions
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.io.File
-import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.net.JarURLConnection
-import java.nio.file.Files
 import java.time.Duration
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
@@ -39,22 +37,24 @@ import java.time.temporal.ChronoUnit
  * Orekit 라이브러리를 사용하여 위성 위치를 계산하는 클래스
  */
 @Service
-class OrekitCalculator : SatellitePositionCalculator {
+class OrekitCalculator(
+    private val utcTimeScale: TimeScale,
+    private val earthFrame: Frame,
+    private val earthModel: OneAxisEllipsoid,
+    private val orekitStatus: OrekitConfig.OrekitInitializationStatus
+){
     private val logger = LoggerFactory.getLogger(javaClass)
-    private val earthFrame: Frame
-    private val earth: OneAxisEllipsoid
-
+    private var isOrekitInitialized = true
+    // 수정 후 - 간단한 초기화 확인만
     init {
-        // Orekit 데이터 파일 설정
-        setupOrekitData()
-
-        // 지구 모델 및 프레임 설정
-        earthFrame = FramesFactory.getITRF(IERSConventions.IERS_2010, true)
-        earth = OneAxisEllipsoid(
-            Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
-            Constants.WGS84_EARTH_FLATTENING,
-            earthFrame
-        )
+        // Orekit 초기화 상태 확인
+        if (orekitStatus.isInitialized) {
+            isOrekitInitialized = true
+            logger.info("OrekitCalculator 초기화 완료 (데이터 프로바이더: ${orekitStatus.dataProvidersCount}개)")
+        } else {
+            logger.error("Orekit이 초기화되지 않았습니다!")
+            throw RuntimeException("Orekit 초기화 실패")
+        }
     }
     /**
      * 한 번에 가시성 기간 찾기 + 상세 추적 데이터 생성
@@ -87,8 +87,7 @@ class OrekitCalculator : SatellitePositionCalculator {
                 FastMath.toRadians(longitude),
                 altitude
             )
-            val stationFrame = TopocentricFrame(earth, stationPosition, "GroundStation")
-            val utcScale = TimeScalesFactory.getUTC()
+            val stationFrame = TopocentricFrame(earthModel, stationPosition, "GroundStation")
 
             // 현재 패스 추적 변수들
             var currentPassData = mutableListOf<SatelliteTrackData>()
@@ -121,7 +120,7 @@ class OrekitCalculator : SatellitePositionCalculator {
                     currentTime.year, currentTime.monthValue, currentTime.dayOfMonth,
                     currentTime.hour, currentTime.minute,
                     currentTime.second + currentTime.nano / 1e9,
-                    utcScale
+                    utcTimeScale
                 )
 
                 val state = propagator.propagate(date)
@@ -333,13 +332,12 @@ class OrekitCalculator : SatellitePositionCalculator {
                 FastMath.toRadians(longitude),
                 altitude
             )
-            val stationFrame = TopocentricFrame(earth, stationPosition, "GroundStation")
+            val stationFrame = TopocentricFrame(earthModel, stationPosition, "GroundStation")
 
-            val utcScale = TimeScalesFactory.getUTC()
             val date = AbsoluteDate(
                 dateTime.year, dateTime.monthValue, dateTime.dayOfMonth,
                 dateTime.hour, dateTime.minute, dateTime.second + dateTime.nano / 1e9,
-                utcScale
+                utcTimeScale
             )
 
             val state = propagator.propagate(date)
@@ -601,7 +599,7 @@ class OrekitCalculator : SatellitePositionCalculator {
     /**
      * 지정된 시간과 위치에 대한 위성 위치를 계산합니다.
      */
-    override fun calculatePosition(
+    fun calculatePosition(
         tleLine1: String,
         tleLine2: String,
         dateTime: ZonedDateTime,
@@ -623,14 +621,12 @@ class OrekitCalculator : SatellitePositionCalculator {
                 altitude
             )
             // 지상국 기준 위치 프레임 생성
-            val stationFrame = TopocentricFrame(earth, stationPosition, "GroundStation")
+            val stationFrame = TopocentricFrame(earthModel, stationPosition, "GroundStation")
 
-            // UTC 시간을 Orekit의 AbsoluteDate로 변환
-            val utcScale = TimeScalesFactory.getUTC()
             val date = AbsoluteDate(
                 dateTime.year, dateTime.monthValue, dateTime.dayOfMonth,
                 dateTime.hour, dateTime.minute, dateTime.second + dateTime.nano / 1e9,
-                utcScale
+                utcTimeScale
             )
             // 해당 시간의 위성 위치 계산
             // 해당 시간의 위성 상태 계산
@@ -947,11 +943,10 @@ class OrekitCalculator : SatellitePositionCalculator {
                 FastMath.toRadians(longitude),
                 altitude
             )
-            val stationFrame = TopocentricFrame(earth, stationPosition, "GroundStation")
+            val stationFrame = TopocentricFrame(earthModel, stationPosition, "GroundStation")
 
             // 시간 간격으로 위성 위치 계산
             var currentTime = startTime
-            val utcScale = TimeScalesFactory.getUTC()
             var pointsCalculated = 0
             var pointsAdded = 0
             var pointsFiltered = 0
@@ -962,7 +957,7 @@ class OrekitCalculator : SatellitePositionCalculator {
                 val date = AbsoluteDate(
                     currentTime.year, currentTime.monthValue, currentTime.dayOfMonth,
                     currentTime.hour, currentTime.minute, currentTime.second + currentTime.nano / 1e9,
-                    utcScale
+                    utcTimeScale
                 )
 
                 val state = propagator.propagate(date)
@@ -1026,7 +1021,7 @@ class OrekitCalculator : SatellitePositionCalculator {
                     val date = AbsoluteDate(
                         currentTime.year, currentTime.monthValue, currentTime.dayOfMonth,
                         currentTime.hour, currentTime.minute, currentTime.second + currentTime.nano / 1e9,
-                        utcScale
+                        utcTimeScale
                     )
 
                     val state = propagator.propagate(date)
@@ -1082,7 +1077,7 @@ class OrekitCalculator : SatellitePositionCalculator {
                 FastMath.toRadians(longitude),
                 altitude
             )
-            val stationFrame = TopocentricFrame(earth, stationPosition, "GroundStation")
+            val stationFrame = TopocentricFrame(earthModel, stationPosition, "GroundStation")
 
             // 시간 간격으로 위성 위치 계산
             var currentTime = startTime
@@ -1731,38 +1726,17 @@ class OrekitCalculator : SatellitePositionCalculator {
      */
     private fun setupOrekitData() {
         try {
-            logger.info("Orekit 데이터 파일을 리소스에서 로드합니다.")
+            logger.info("Orekit 데이터 초기화 상태 확인...")
 
-            // 리소스에서 orekit-data-main 디렉토리 찾기
-            val classLoader = javaClass.classLoader
-            val orekitDataUrl = classLoader.getResource("orekit-data-main")
-
-            if (orekitDataUrl == null) {
-                logger.error("리소스에서 orekit-data-main 디렉토리를 찾을 수 없습니다.")
-                throw FileNotFoundException("리소스에서 orekit-data-main 디렉토리를 찾을 수 없습니다.")
+            // OrekitConfig에서 이미 초기화되었는지 확인
+            if (!orekitStatus.isInitialized) {
+                throw RuntimeException("Orekit 데이터가 초기화되지 않았습니다. OrekitConfig를 확인하세요.")
             }
 
-            // URL을 File로 변환 (JAR 내부 리소스인 경우 임시 디렉토리에 복사)
-            val orekitDataDir = if (orekitDataUrl.protocol == "jar") {
-                // 임시 디렉토리 생성
-                val tempDir = Files.createTempDirectory("orekit-data").toFile()
-                tempDir.deleteOnExit()
+            logger.info("Orekit 데이터 초기화 확인 완료. (프로바이더 수: ${orekitStatus.dataProvidersCount})")
 
-                // JAR 내부 리소스를 임시 디렉토리에 복사
-                copyResourcesFromJar("orekit-data-main", tempDir)
-                tempDir
-            } else {
-                File(orekitDataUrl.toURI())
-            }
-
-            // 데이터 컨텍스트 설정
-            val dataContext = DataContext.getDefault()
-            val dataProvidersManager = dataContext.dataProvidersManager
-            dataProvidersManager.addProvider(DirectoryCrawler(orekitDataDir))
-
-            logger.info("Orekit 데이터 파일이 성공적으로 로드되었습니다. 경로: ${orekitDataDir.absolutePath}")
         } catch (e: Exception) {
-            logger.error("Orekit 데이터 설정 중 오류 발생: ${e.message}", e)
+            logger.error("Orekit 데이터 확인 중 오류 발생: ${e.message}", e)
             throw e
         }
     }
@@ -1770,31 +1744,5 @@ class OrekitCalculator : SatellitePositionCalculator {
     /**
      * JAR 내부 리소스를 지정된 디렉토리로 복사합니다.
      */
-    private fun copyResourcesFromJar(resourcePath: String, targetDir: File) {
-        val classLoader = javaClass.classLoader
-        val jarUrl = classLoader.getResource(resourcePath) ?: return
-        val jarConnection = jarUrl.openConnection() as JarURLConnection
-        val jarFile = jarConnection.jarFile
-
-        val entries = jarFile.entries()
-        val prefix = "$resourcePath/"
-
-        while (entries.hasMoreElements()) {
-            val entry = entries.nextElement()
-            if (entry.name.startsWith(prefix) && !entry.isDirectory) {
-                val destFile = File(targetDir, entry.name.substring(prefix.length))
-
-                // 필요한 경우 상위 디렉토리 생성
-                destFile.parentFile?.mkdirs()
-
-                // 파일 복사
-                classLoader.getResourceAsStream(entry.name)?.use { input ->
-                    FileOutputStream(destFile).use { output ->
-                        input.copyTo(output)
-                    }
-                }
-            }
-        }
-    }
 }
 

@@ -27,10 +27,10 @@ import java.util.BitSet
 class SunTrackService(
     private val udpFwICDService: UdpFwICDService,
     private val sunPositionCalculator: SunPositionCalculator,
+    private val solarOrekitCalculator: SolarOrekitCalculator,
     private val eventBus: ACSEventBus  // 이 부분이 올바르게 주입되는지 확인
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
-    val solarOrekitCalculator = SolarOrekitCalculator()
     val elevationCalculator = ElevationCalculator()
     // 주기적 작업을 관리하기 위한 Disposable 객체 저장 변수
     private var sunTrackCommandSubscription: Disposable? = null

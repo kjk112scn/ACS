@@ -401,7 +401,6 @@ class PassScheduleController(
     @PostMapping("/tracking/generate-all")
     fun generateAllTrackingData(): Mono<ResponseEntity<Map<String, Any>>> {
         logger.info("모든 위성 추적 데이터 생성 요청 수신")
-
         return passScheduleService.generateAllPassScheduleTrackingDataAsync()
             .map { results ->
                 logger.info("모든 위성 추적 데이터 생성 완료: ${results.size}개 위성")

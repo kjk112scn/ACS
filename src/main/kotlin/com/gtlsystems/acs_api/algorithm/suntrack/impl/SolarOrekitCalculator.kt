@@ -1,5 +1,6 @@
 package com.gtlsystems.acs_api.algorithm.suntrack.impl
 
+import com.gtlsystems.acs_api.config.OrekitConfig
 import org.orekit.bodies.CelestialBodies
 import org.orekit.bodies.CelestialBody
 import org.orekit.data.DataContext
@@ -15,40 +16,37 @@ import org.orekit.utils.IERSConventions
 import org.hipparchus.geometry.euclidean.threed.Vector3D
 import org.hipparchus.util.FastMath
 import org.orekit.time.TimeScale
+import org.slf4j.LoggerFactory
+import org.springframework.stereotype.Component
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.*
 
-class SolarOrekitCalculator {
+// 수정 후
+@Component
+class SolarOrekitCalculator(
+    private val utcTimeScale: TimeScale,
+    private val ut1TimeScale: TimeScale,
+    private val earthModel: OneAxisEllipsoid,
+    private val sun: CelestialBody,
+    private val orekitStatus: OrekitConfig.OrekitInitializationStatus
+) {
 
     private lateinit var groundStation: TopocentricFrame
-    private lateinit var sun: CelestialBody
     private var isInitialized = false
-    private lateinit var utcTimeScale: TimeScale
-    private lateinit var ut1TimeScale: TimeScale
-
+    private val logger = LoggerFactory.getLogger(javaClass)
     /**
      * 지상국 위치를 설정하고 초기화
-     * @param latitude 위도 (도)
-     * @param longitude 경도 (도)
-     * @param altitude 고도 (미터)
      */
     fun initializeGroundStation(latitude: Double, longitude: Double, altitude: Double) {
         try {
-            utcTimeScale = TimeScalesFactory.getUTC()
-            ut1TimeScale = TimeScalesFactory.getUT1(IERSConventions.IERS_2010, true)
-            // DataContext에서 CelestialBodies 가져오기 (Orekit 13.x 방식)
-            val celestialBodies = DataContext.getDefault().celestialBodies
-            sun = celestialBodies.sun
 
-            // 지구 모델 생성 (Orekit 13.x 방식)
-            val earth = OneAxisEllipsoid(
-                Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
-                Constants.WGS84_EARTH_FLATTENING,
-                FramesFactory.getITRF(IERSConventions.IERS_2010, true)
-            )
+            // ✅ 간단한 상태 확인만
+            if (!orekitStatus.isInitialized) {
+                throw RuntimeException("Orekit이 초기화되지 않았습니다. OrekitConfig를 확인하세요.")
+            }
 
-            // 지상국 위치 설정
+            // 지상국 위치 설정 (주입받은 earthModel 사용)
             val stationPosition = GeodeticPoint(
                 FastMath.toRadians(latitude),
                 FastMath.toRadians(longitude),
@@ -56,15 +54,49 @@ class SolarOrekitCalculator {
             )
 
             // 지상국 기준 좌표계 생성
-            groundStation = TopocentricFrame(earth, stationPosition, "GroundStation")
+            groundStation = TopocentricFrame(earthModel, stationPosition, "GroundStation")
 
             isInitialized = true
+            logger.info("SolarOrekitCalculator 초기화 완료 (위도: $latitude, 경도: $longitude, 고도: $altitude)")
 
         } catch (e: Exception) {
+            logger.error("SolarOrekitCalculator 초기화 실패: ${e.message}", e)
             throw RuntimeException("Failed to initialize ground station: ${e.message}", e)
         }
     }
 
+    /**
+     * 초기화 후 정확도 검증 수행
+     */
+    private fun performInitialAccuracyValidation() {
+        try {
+            logger.info("태양 위치 계산 정확도 초기 검증 시작...")
+
+            val currentTime = LocalDateTime.now()
+            val accuracy = validateSunPositionAccuracy(currentTime)
+
+            val totalDiff = (accuracy["angular_differences"] as Map<*, *>)["total_angular_diff_arcsec"] as String
+            val totalDiffValue = totalDiff.toDouble()
+
+            when {
+                totalDiffValue < 1.0 -> logger.info("태양 위치 정확도: 매우 높음 (${totalDiff}\")")
+                totalDiffValue < 10.0 -> logger.info("태양 위치 정확도: 높음 (${totalDiff}\")")
+                totalDiffValue < 60.0 -> logger.warn("태양 위치 정확도: 보통 (${totalDiff}\")")
+                else -> logger.error("태양 위치 정확도: 낮음 (${totalDiff}\") - EOP 데이터 확인 필요")
+            }
+
+        } catch (e: Exception) {
+            logger.warn("초기 정확도 검증 실패: ${e.message}")
+        }
+    }
+
+    /**
+     * 개발 모드 확인
+     */
+    private fun isDevelopmentMode(): Boolean {
+        return System.getProperty("spring.profiles.active")?.contains("dev") == true ||
+               System.getProperty("spring.profiles.active")?.contains("test") == true
+    }
     /**
      * 현재 시간의 태양 위치 계산
      */
@@ -219,9 +251,11 @@ class SolarOrekitCalculator {
     }
 
     /**
-     * AbsoluteDate를 LocalDateTime으로 변환
+     * AbsoluteDate를 LocalDateTime으로 변환 (UT1 기준)
+     * @param absoluteDate UT1 기준 AbsoluteDate
      */
     private fun absoluteDateToLocalDateTime(absoluteDate: AbsoluteDate): LocalDateTime {
+        // ✅ 명시적으로 UT1 시간 척도 사용
         val date = absoluteDate.toDate(ut1TimeScale)
         val instant = date.toInstant()
         return LocalDateTime.ofInstant(instant, ZoneOffset.UTC)
@@ -384,7 +418,7 @@ class SolarOrekitCalculator {
         var minAngularDiff = Double.MAX_VALUE
         var minAngularDiffTime: LocalDateTime? = null
 
-        // UT1 TimeScale 두 가지 설정
+        // ✅ eopEnabled 참조 제거하고 직접 값 사용
         val ut1SimpleTrue = TimeScalesFactory.getUT1(IERSConventions.IERS_2010, true)   // SimpleEOP = true
         val ut1SimpleFalse = TimeScalesFactory.getUT1(IERSConventions.IERS_2010, false) // SimpleEOP = false
 
@@ -564,7 +598,55 @@ class SolarOrekitCalculator {
         )
     }
 
+    /**
+     * 태양 위치 계산 정확도 검증
+     */
+    fun validateSunPositionAccuracy(dateTime: LocalDateTime): Map<String, Any> {
+        checkInitialized()
 
+        val epochSecond = dateTime.toEpochSecond(ZoneOffset.UTC)
+        val date = Date(epochSecond * 1000)
+
+        // UTC vs UT1 비교
+        val utcDate = AbsoluteDate(date, utcTimeScale)
+        val ut1Date = AbsoluteDate(date, ut1TimeScale)
+
+        val utcSunPos = calculateSunPositionWithTimeScale(utcDate)
+        val ut1SunPos = calculateSunPositionWithTimeScale(ut1Date)
+
+        // DUT1 계산
+        val dut1Seconds = ut1Date.durationFrom(utcDate)
+
+        // 각도 차이 계산
+        val azimuthDiff = ut1SunPos.azimuthDegrees - utcSunPos.azimuthDegrees
+        val elevationDiff = ut1SunPos.elevationDegrees - utcSunPos.elevationDegrees
+        val totalAngularDiff = Math.sqrt(azimuthDiff * azimuthDiff + elevationDiff * elevationDiff)
+
+        return mapOf(
+            "input_time" to dateTime.toString(),
+            "dut1_seconds" to dut1Seconds,
+            "utc_sun_position" to mapOf(
+                "azimuth_deg" to String.format("%.6f", utcSunPos.azimuthDegrees),
+                "elevation_deg" to String.format("%.6f", utcSunPos.elevationDegrees)
+            ),
+            "ut1_sun_position" to mapOf(
+                "azimuth_deg" to String.format("%.6f", ut1SunPos.azimuthDegrees),
+                "elevation_deg" to String.format("%.6f", ut1SunPos.elevationDegrees)
+            ),
+            "angular_differences" to mapOf(
+                "azimuth_diff_deg" to String.format("%.6f", azimuthDiff),
+                "elevation_diff_deg" to String.format("%.6f", elevationDiff),
+                "total_angular_diff_deg" to String.format("%.6f", totalAngularDiff),
+                "total_angular_diff_arcsec" to String.format("%.3f", totalAngularDiff * 3600.0)
+            ),
+            "accuracy_assessment" to when {
+                totalAngularDiff < 0.001 -> "매우 높은 정확도 (<0.001°, <3.6\")"
+                totalAngularDiff < 0.01 -> "높은 정확도 (<0.01°, <36\")"
+                totalAngularDiff < 0.1 -> "보통 정확도 (<0.1°, <360\")"
+                else -> "낮은 정확도 (≥0.1°, ≥360\")"
+            }
+        )
+    }
 
     /**
      * 태양 위치 정보를 담는 데이터 클래스

@@ -55,6 +55,7 @@ class PassScheduleService(
     private val trackingData = SatelliteTrackingData.Tracking
     private val locationData = GlobalData.Location
     private val limitAngleCalculator = LimitAngleCalculator()
+    private var globalMstId = 0;
 
     @PostConstruct
     fun init() {
@@ -228,17 +229,17 @@ class PassScheduleService(
 
             // 스케줄 정보로 마스터 리스트 채우기
             schedule.trackingPasses.forEachIndexed { index, pass ->
-                val mstId = index + 1
+                globalMstId++
 
                 // 시작 시간과 종료 시간에 밀리초 정보 추가
                 val startTimeWithMs = pass.startTime.withZoneSameInstant(ZoneOffset.UTC)
                 val endTimeWithMs = pass.endTime.withZoneSameInstant(ZoneOffset.UTC)
 
-                logger.debug("패스 #$mstId: 시작=$startTimeWithMs, 종료=$endTimeWithMs")
+                logger.debug("패스 #$globalMstId: 시작=$startTimeWithMs, 종료=$endTimeWithMs")
 
                 passScheduleTrackMst.add(
                     mapOf(
-                        "No" to mstId.toUInt(),
+                        "No" to globalMstId.toUInt(),
                         "SatelliteID" to satelliteId,
                         "SatelliteName" to actualSatelliteName,
                         "StartTime" to startTimeWithMs,
@@ -264,7 +265,7 @@ class PassScheduleService(
                     passScheduleTrackDtl.add(
                         mapOf(
                             "No" to (dtlIndex + 1).toUInt(),
-                            "MstId" to mstId.toUInt(),
+                            "MstId" to globalMstId.toUInt(),
                             "SatelliteID" to satelliteId,
                             "Time" to data.timestamp,
                             "Azimuth" to data.azimuth,
@@ -409,11 +410,17 @@ class PassScheduleService(
     fun clearAllPassScheduleTrackingData() {
         val mstSize = passScheduleTrackMstStorage.size
         val dtlSize = passScheduleTrackDtlStorage.values.sumOf { it.size }
-
+        globalMstId =0;
         passScheduleTrackMstStorage.clear()
         passScheduleTrackDtlStorage.clear()
 
         logger.info("모든 패스 스케줄 추적 데이터가 삭제되었습니다. (마스터: ${mstSize}개, 세부: ${dtlSize}개)")
+    }
+    /**
+     * 모든 위성의 추적 데이터를 삭제합니다.
+     */
+    fun clearMstId() {
+
     }
 
     /**
