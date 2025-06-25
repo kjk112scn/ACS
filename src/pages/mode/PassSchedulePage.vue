@@ -11,32 +11,19 @@
             <div class="text-subtitle2 text-weight-bold text-primary">Azimuth</div>
           </q-card-section>
           <q-card-section>
-
-
-
-
-
-
-
             <div class="compact-control-row">
               <q-input v-model="inputs[0]" @input="(val: string) => onInputChange(0, val)" dense outlined type="number"
                 step="0.01" class="control-input" label="Input" />
               <div class="control-buttons">
-
-
-
                 <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
                 <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
               </div>
-
               <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(0)" class="reset-button" />
               <q-input v-model="outputs[0]" dense outlined readonly class="output-input" label="Output" />
             </div>
-
           </q-card-section>
         </q-card>
       </div>
-
       <!-- Elevation Control -->
       <div class="col-6 col-sm-3">
         <q-card flat bordered class="control-card">
@@ -156,7 +143,6 @@
                       <span class="info-value">{{ selectedSchedule.maxElevation?.toFixed(2) }}°</span>
                     </div>
                   </div>
-
                   <!-- 스케줄이 선택되지 않은 경우 -->
                   <div v-else class="no-schedule-selected">
                     <div class="text-grey-5">스케줄을 선택하세요</div>
@@ -166,9 +152,6 @@
             </q-card-section>
           </q-card>
         </div>
-
-
-
         <!-- Schedule Control - 30% 확대 -->
         <div class="col-12 col-md-6">
           <q-card class="control-section">
@@ -269,7 +252,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed,watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { usePassScheduleStore, type ScheduleItem } from '../../stores/mode/passScheduleStore'
 import { useICDStore } from '../../stores/icd/icdStore'
@@ -299,7 +282,21 @@ interface EChartsScatterParam {
 }
 
 // 스케줄 데이터
-const scheduleData = passScheduleStore.selectedScheduleList
+const scheduleData = computed(() => {
+  const data = passScheduleStore.selectedScheduleList
+  console.log('🔍 PassSchedulePage scheduleData:', data.length, '개')
+  return data
+})
+
+// 🆕 Store 상태 변경 즉시 감지
+watch(
+  () => passScheduleStore.selectedScheduleList,
+  (newData) => {
+    console.log('👀 Store 변경 감지 - 새 데이터:', newData.length, '개')
+  },
+  { immediate: true, deep: true } // immediate: true가 중요!
+)
+
 const selectedSchedule = ref<ScheduleItem | null>(null)
 const loading = passScheduleStore.loading
 
@@ -311,14 +308,8 @@ const outputs = ref<string[]>(['0.00', '0.00', '0.00', '0'])
 type QTableColumn = NonNullable<QTableProps['columns']>[0]
 
 const scheduleColumns: QTableColumn[] = [
-
-
   { name: 'no', label: 'No', field: 'no', align: 'left' as const, sortable: true, style: 'width: 60px' },
-
-
-
-
-
+  { name: 'index', label: 'Index', field: 'index', align: 'left' as const, sortable: true, style: 'width: 70px' },
   {
     name: 'satelliteInfo',
     label: '위성 ID\n위성 이름',
@@ -329,7 +320,6 @@ const scheduleColumns: QTableColumn[] = [
     headerStyle: 'white-space: pre-line; line-height: 1.3;'
   },
   {
-
 
     name: 'timeRange',
     label: '시작 시간\n종료 시간', // ✅ 줄바꿈 적용
@@ -342,14 +332,6 @@ const scheduleColumns: QTableColumn[] = [
     headerStyle: 'white-space: pre-line; line-height: 1.3;' // ✅ 헤더 스타일 추가
   },
   {
-
-
-
-
-
-
-
-
     name: 'duration',
     label: '지속 시간',
     field: 'duration',
@@ -358,9 +340,6 @@ const scheduleColumns: QTableColumn[] = [
     sortable: true,
     style: 'width: 80px'
   },
-
-
-
   {
     name: 'azimuthRange',
     label: 'Start Az\nEnd Az',

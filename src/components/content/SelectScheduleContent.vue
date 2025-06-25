@@ -98,6 +98,13 @@
             </div>
           </q-td>
         </template>
+
+        <!-- ✅ Index 컬럼 템플릿 추가 -->
+        <template v-slot:body-cell-index="props">
+          <q-td :props="props" class="index-cell">
+            <span class="index-value">{{ props.value }}</span>
+          </q-td>
+        </template>
       </q-table>
     </div>
 
@@ -136,9 +143,14 @@ import { closeWindow } from '../../utils/windowUtils'
 const $q = useQuasar()
 const passScheduleStore = usePassScheduleStore()
 
-// ✅ 시간 순 정렬 및 no 재생성된 데이터 참조
+
+
+
+// ✅ 디버깅을 위한 로그 추가 및 안전한 데이터 처리
 const scheduleData = computed(() => {
   const rawData = passScheduleStore.scheduleData
+  console.log('🔍 원본 데이터 확인:', rawData.slice(0, 3)) // 처음 3개 항목 로그
+
   if (rawData.length === 0) return []
 
   // 시간 순으로 정렬
@@ -150,15 +162,26 @@ const scheduleData = computed(() => {
     }
   })
 
+  // 원본 no를 index로 보존하고, no를 1부터 순서대로 재생성
+  const result = sortedData.map((item, sortedIndex) => {
+    // 디버깅: 원본 item의 구조 확인
+    if (sortedIndex < 3) {
+      console.log(`🔍 Item ${sortedIndex}:`, {
+        originalNo: item.no,
+        satelliteName: item.satelliteName,
+        allKeys: Object.keys(item)
+      })
+    }
 
-  // no를 1부터 순서대로 재생성
-  return sortedData.map((item, index) => ({
-    ...item,
+    return {
+      ...item,
+      index: item.no, // 원본 no 값을 index로 보존
+      no: sortedIndex + 1 // 정렬된 순서로 1부터 재생성
+    }
+  })
 
-
-
-    no: index + 1
-  }))
+  console.log('🔍 변환된 데이터 (처음 3개):', result.slice(0, 3))
+  return result
 })
 
 const loading = computed(() => passScheduleStore.loading)
@@ -173,9 +196,6 @@ const checkTimeOverlap = (schedule1: ScheduleItem, schedule2: ScheduleItem): boo
     const end1 = new Date(schedule1.endTime).getTime()
     const start2 = new Date(schedule2.startTime).getTime()
     const end2 = new Date(schedule2.endTime).getTime()
-
-
-
     return (start1 < end2) && (end1 > start2)
   } catch (error) {
     console.error('시간 겹침 검사 오류:', error)
@@ -203,14 +223,11 @@ const overlappingGroups = computed(() => {
       }
     })
 
-
     if (overlappingSchedules.length > 1) {
       groups.push(overlappingSchedules)
       overlappingSchedules.forEach(no => processed.add(no))
     }
   })
-
-
   return groups
 })
 
@@ -335,6 +352,7 @@ const onRowClick = (evt: Event, row: ScheduleItem) => {
 type QTableColumn = NonNullable<QTableProps['columns']>[0]
 
 const scheduleColumns: QTableColumn[] = [
+  { name: 'index', label: 'Index', field: 'index', align: 'left' as const, sortable: true, style: 'width: 70px' },
   { name: 'no', label: 'No', field: 'no', align: 'left' as const, sortable: true, style: 'width: 60px' },
   { name: 'satelliteId', label: '위성 ID', field: 'satelliteId', align: 'center' as const, sortable: true, style: 'width: 100px' },
   { name: 'satelliteName', label: '위성명', field: 'satelliteName', align: 'left' as const, sortable: true },
@@ -434,7 +452,7 @@ const handleSelect = async () => {
     const success = await passScheduleStore.replaceSelectedSchedules(selectedRows.value)
 
     if (success) {
-      console.log('✅ 스케줄 목록 교체 완료:', {
+      console.log('✅ 스케줄 목록 교체 완료:', { 
         count: selectedRows.value.length,
         schedules: selectedRows.value.map(s => ({
           no: s.no, // 서버 원본 No 값
@@ -458,7 +476,7 @@ const handleSelect = async () => {
         } catch (closeError) {
           console.error('❌ 창 닫기 중 오류:', closeError)
         }
-      }, 1000) // 성공 메시지를 볼 시간 제공
+      }, 100) // 성공 메시지를 볼 시간 제공
 
     } else {
       if ($q && $q.notify) {
@@ -1183,6 +1201,12 @@ onUnmounted(async () => {
   .angle-value {
     font-size: 13px !important;
   }
+
+  /* ✅ Index 컬럼 스타일 */
+  .schedule-table :deep(.q-table tbody td[data-col="index"]) {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1234,6 +1258,17 @@ onUnmounted(async () => {
 
   .overlap-warning {
     padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  /* ✅ Index 컬럼 스타일 */
+  .schedule-table :deep(.q-table tbody td[data-col="index"]) {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+  }
+
+  .index-value {
+    padding: 2px 6px;
     font-size: 12px;
   }
 }

@@ -623,7 +623,7 @@ class PassScheduleService {
   }
 
   // 추적 대상 설정 관련 타입 추가
- 
+
   /**
    * 위성 추적 스케줄 대상 목록을 설정합니다
    */
@@ -656,6 +656,51 @@ class PassScheduleService {
         error,
         '추적 대상 설정에 실패했습니다'
       ) as Promise<SetTrackingTargetsResponse>
+    }
+  }
+
+  /**
+   * 전체 추적 데이터 삭제
+   */
+  async deleteAllTrackingData(): Promise<{
+    success: boolean
+    message: string
+    data?: {
+      deletedSatelliteCount: number
+      deletedPassCount: number
+      deletedTrackingPointCount: number
+      remainingSatelliteCount: number
+      remainingPassCount: number
+      remainingTrackingPointCount: number
+    }
+    timestamp: number
+  }> {
+    try {
+      console.log('🗑️ 전체 추적 데이터 삭제 API 호출')
+
+      const response = await api.delete('/pass-schedule/tracking')
+
+      console.log('✅ 전체 추적 데이터 삭제 응답:', response.data)
+
+      return response.data
+    } catch (error) {
+      console.error('❌ 전체 추적 데이터 삭제 실패:', error)
+      return this.handleApiError(
+        error,
+        '전체 추적 데이터 삭제에 실패했습니다'
+      ) as Promise<{
+        success: boolean
+        message: string
+        data?: {
+          deletedSatelliteCount: number
+          deletedPassCount: number
+          deletedTrackingPointCount: number
+          remainingSatelliteCount: number
+          remainingPassCount: number
+          remainingTrackingPointCount: number
+        }
+        timestamp: number
+      }>
     }
   }
 }

@@ -151,7 +151,7 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
       // 🔧 명시적으로 배열 초기화
       selectedScheduleList.value.splice(0) // 기존 배열 완전 비우기
       selectedSchedule.value = null
-      
+
       console.log('🗑️ 기존 목록 초기화 완료, 현재 길이:', selectedScheduleList.value.length)
 
       // 추적 대상 설정
@@ -162,10 +162,10 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
         schedules.forEach(schedule => {
           selectedScheduleList.value.push(schedule)
         })
-        
+
         // 🔧 또는 한 번에 교체
         // selectedScheduleList.value = [...schedules]
-        
+
         console.log('✅ 새 스케줄 목록 설정 완료:', {
           설정된개수: selectedScheduleList.value.length,
           목록: selectedScheduleList.value.map(s => ({
@@ -743,7 +743,7 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
               const scheduleItem: ScheduleItem = {
                 no: pass.No,
                 satelliteId: pass.SatelliteID || satelliteId,
-                satelliteName: pass.SatelliteName || `Satellite-${satelliteId}`,
+                satelliteName: pass.SatelliteName || satelliteId,
                 startTime: pass.StartTime || '',
                 endTime: pass.EndTime || '',
                 duration: pass.Duration || '00:00:00',
@@ -910,6 +910,55 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     }
   }
 
+  /**
+   * 전체 추적 데이터 삭제
+   */
+  const deleteAllTrackingData = async (): Promise<boolean> => {
+    try {
+      loading.value = true
+      console.log('🗑️ 전체 추적 데이터 삭제 시작')
+
+      const response = await passScheduleService.deleteAllTrackingData()
+
+      if (response.success) {
+        console.log('✅ 전체 추적 데이터 삭제 성공:', response.data)
+
+        // 로컬 데이터도 초기화
+        scheduleData.value = []
+        selectedScheduleList.value = []
+        selectedSchedule.value = null
+
+        $q.notify({
+          type: 'positive',
+          message: `전체 추적 데이터가 삭제되었습니다. (${response.data?.deletedSatelliteCount || 0}개 위성, ${response.data?.deletedPassCount || 0}개 패스)`,
+          timeout: 3000
+        })
+
+        return true
+      } else {
+        console.error('❌ 전체 추적 데이터 삭제 실패:', response.message)
+
+        $q.notify({
+          type: 'negative',
+          message: response.message || '전체 추적 데이터 삭제에 실패했습니다',
+        })
+
+        return false
+      }
+    } catch (error) {
+      console.error('❌ 전체 추적 데이터 삭제 중 오류:', error)
+
+      $q.notify({
+        type: 'negative',
+        message: '전체 추적 데이터 삭제 중 오류가 발생했습니다',
+      })
+
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     // 상태
     scheduleData, // 전체 스케줄 (모달용)
@@ -954,5 +1003,6 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
 
     init,
     setTrackingTargets,
+    deleteAllTrackingData, // 🆕 추가
   }
 })

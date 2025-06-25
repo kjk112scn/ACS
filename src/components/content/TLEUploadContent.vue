@@ -739,7 +739,23 @@ const handleSaveAndClose = async () => {
     failedSatellites.value = []
     currentProcessing.value = { show: false, satelliteId: '' }
 
-    console.log('🚀 Store 업로드 함수 호출 시작')
+    console.log('🚀 스케줄 선택 처리 시작')
+    console.log('🚀 TLE 업로드 및 추적 데이터 생성 시작')
+    console.log('1️⃣ 전체 추적 데이터 삭제 수행')
+
+    // 🆕 1단계: 전체 추적 데이터 삭제
+    const deleteSuccess = await passScheduleStore.deleteAllTrackingData()
+
+    if (!deleteSuccess) {
+      console.error('❌ 전체 추적 데이터 삭제 실패')
+      if ($q && $q.notify) {
+        $q.notify({
+          type: 'negative',
+          message: '기존 추적 데이터 삭제에 실패했습니다',
+        })
+      }
+      return
+    }
 
     // 🔧 Store를 통해 TLE 데이터 업로드 (타입 안전)
     const result = await passScheduleStore.uploadTLEDataToServer(tempTleData.value, {
@@ -809,7 +825,7 @@ const handleSaveAndClose = async () => {
         setTimeout(() => {
           console.log('🚪 저장 완료 후 창 닫기')
           performClose()
-        }, 3000)
+        }, 100)
       }
     })
 
