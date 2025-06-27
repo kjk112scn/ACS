@@ -1318,6 +1318,441 @@ class PassScheduleController(
             )
         }
     }
+    // ==================== 선별된 추적 데이터 조회 API ====================
+
+    /**
+     * ✅ 특정 위성의 선별된 마스터 데이터를 조회합니다.
+     */
+    @GetMapping("/selected-tracking/master/{satelliteId}")
+    fun getSelectedTrackingMasterData(@PathVariable satelliteId: String): ResponseEntity<Map<String, Any>> {
+        return try {
+            val selectedMstData = passScheduleService.getSelectedTrackMstBySatelliteId(satelliteId)
+
+            if (selectedMstData != null && selectedMstData.isNotEmpty()) {
+                logger.info("위성 $satelliteId 선별된 마스터 데이터 조회 성공: ${selectedMstData.size}개 패스")
+
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "선별된 마스터 데이터 조회 성공",
+                        "data" to mapOf(
+                            "satelliteId" to satelliteId,
+                            "selectedPassCount" to selectedMstData.size,
+                            "selectedPasses" to selectedMstData
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            } else {
+                logger.warn("위성 $satelliteId 선별된 마스터 데이터 없음")
+                ResponseEntity.status(404).body(
+                    mapOf(
+                        "success" to false,
+                        "message" to "해당 위성의 선별된 추적 데이터를 찾을 수 없습니다. 먼저 추적 대상을 설정해주세요.",
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            logger.error("위성 $satelliteId 선별된 마스터 데이터 조회 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "선별된 마스터 데이터 조회 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * ✅ 모든 위성의 선별된 마스터 데이터를 조회합니다.
+     */
+    @GetMapping("/selected-tracking/master")
+    fun getAllSelectedTrackingMasterData(): ResponseEntity<Map<String, Any>> {
+        return try {
+            val allSelectedMstData = passScheduleService.getAllSelectedTrackMst()
+
+            if (allSelectedMstData.isNotEmpty()) {
+                val totalSelectedPasses = allSelectedMstData.values.sumOf { it.size }
+                logger.info("전체 선별된 마스터 데이터 조회 성공: ${allSelectedMstData.size}개 위성, ${totalSelectedPasses}개 패스")
+
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "전체 선별된 마스터 데이터 조회 성공",
+                        "data" to mapOf(
+                            "selectedSatelliteCount" to allSelectedMstData.size,
+                            "totalSelectedPassCount" to totalSelectedPasses,
+                            "selectedSatellites" to allSelectedMstData
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            } else {
+                logger.warn("전체 선별된 마스터 데이터 없음")
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "선별된 추적 데이터가 없습니다. 먼저 추적 대상을 설정해주세요.",
+                        "data" to mapOf(
+                            "selectedSatelliteCount" to 0,
+                            "totalSelectedPassCount" to 0,
+                            "selectedSatellites" to emptyMap<String, Any>()
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            logger.error("전체 선별된 마스터 데이터 조회 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "전체 선별된 마스터 데이터 조회 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * ✅ 특정 MST ID의 선별된 세부 데이터를 조회합니다.
+     */
+    @GetMapping("/selected-tracking/detail/mst/{mstId}")
+    fun getSelectedTrackingDetailByMstId(@PathVariable mstId: UInt): ResponseEntity<Map<String, Any>> {
+        return try {
+            val selectedDtlData = passScheduleService.getSelectedTrackDtlByMstId(mstId)
+
+            if (selectedDtlData.isNotEmpty()) {
+                logger.info("MST ID $mstId 선별된 세부 데이터 조회 성공: ${selectedDtlData.size}개 추적 포인트")
+
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "선별된 세부 데이터 조회 성공",
+                        "data" to mapOf(
+                            "mstId" to mstId,
+                            "trackingPointCount" to selectedDtlData.size,
+                            "trackingPoints" to selectedDtlData
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            } else {
+                logger.warn("MST ID $mstId 선별된 세부 데이터 없음")
+                ResponseEntity.status(404).body(
+                    mapOf(
+                        "success" to false,
+                        "message" to "해당 MST ID의 선별된 추적 세부 데이터를 찾을 수 없습니다.",
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            logger.error("MST ID $mstId 선별된 세부 데이터 조회 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "선별된 세부 데이터 조회 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * ✅ 현재 시간 기준으로 진행 중인 선별된 추적 패스를 조회합니다.
+     */
+    @GetMapping("/selected-tracking/current")
+    fun getCurrentSelectedTrackingPass(): ResponseEntity<Map<String, Any>> {
+        return try {
+            val currentPass = passScheduleService.getCurrentSelectedTrackingPass()
+
+            if (currentPass != null) {
+                logger.info("현재 진행 중인 선별된 추적 패스 조회 성공")
+
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "현재 진행 중인 선별된 추적 패스 조회 성공",
+                        "data" to mapOf(
+                            "currentPass" to currentPass,
+                            "isActive" to true
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            } else {
+                logger.info("현재 진행 중인 선별된 추적 패스 없음")
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "현재 진행 중인 선별된 추적 패스가 없습니다.",
+                        "data" to mapOf(
+                            "currentPass" to null,
+                            "isActive" to false
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            logger.error("현재 진행 중인 선별된 추적 패스 조회 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "현재 진행 중인 선별된 추적 패스 조회 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * ✅ 다음 선별된 추적 패스를 조회합니다.
+     */
+    @GetMapping("/selected-tracking/next")
+    fun getNextSelectedTrackingPass(): ResponseEntity<Map<String, Any>> {
+        return try {
+            val nextPass = passScheduleService.getNextSelectedTrackingPass()
+
+            if (nextPass != null) {
+                logger.info("다음 선별된 추적 패스 조회 성공")
+
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "다음 선별된 추적 패스 조회 성공",
+                        "data" to mapOf(
+                            "nextPass" to nextPass,
+                            "hasNext" to true
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            } else {
+                logger.info("다음 선별된 추적 패스 없음")
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "다음 선별된 추적 패스가 없습니다.",
+                        "data" to mapOf(
+                            "nextPass" to null,
+                            "hasNext" to false
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            logger.error("다음 선별된 추적 패스 조회 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "다음 선별된 추적 패스 조회 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+    // ==================== 추적 모니터링 제어 API ====================
+
+    /**
+     * ✅ 추적 모니터링 시작 (100ms 주기)
+     */
+    @PostMapping("/tracking/start")
+    fun startScheduleTracking(): ResponseEntity<Map<String, Any>> {
+        return try {
+            passScheduleService.startScheduleTracking()
+
+            logger.info("추적 모니터링 시작 API 호출 성공")
+
+            ResponseEntity.ok(
+                mapOf(
+                    "success" to true,
+                    "message" to "추적 모니터링이 성공적으로 시작되었습니다.",
+                    "data" to mapOf(
+                        "monitoringInterval" to "100ms",
+                        "timeReference" to "GlobalData.Time.calUtcTimeOffsetTime",
+                        "threadName" to "tracking-monitor",
+                        "isRunning" to true
+                    ),
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        } catch (e: Exception) {
+            logger.error("추적 모니터링 시작 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "추적 모니터링 시작 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * ✅ 추적 모니터링 중지
+     */
+    @PostMapping("/tracking/stop")
+    fun stopScheduleTracking(): ResponseEntity<Map<String, Any>> {
+        return try {
+            passScheduleService.stopScheduleTracking()
+
+            logger.info("추적 모니터링 중지 API 호출 성공")
+
+            ResponseEntity.ok(
+                mapOf(
+                    "success" to true,
+                    "message" to "추적 모니터링이 성공적으로 중지되었습니다.",
+                    "data" to mapOf(
+                        "isRunning" to false,
+                        "stoppedAt" to System.currentTimeMillis(),
+                        "resourcesCleaned" to true
+                    ),
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        } catch (e: Exception) {
+            logger.error("추적 모니터링 중지 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "추적 모니터링 중지 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * ✅ 추적 모니터링 상태 조회
+     */
+    @GetMapping("/tracking-monitor/status")
+    fun getTrackingMonitorStatus(): ResponseEntity<Map<String, Any>> {
+        return try {
+            val status = passScheduleService.getTrackingMonitorStatus()
+
+            logger.info("추적 모니터링 상태 조회 성공")
+
+            ResponseEntity.ok(
+                mapOf(
+                    "success" to true,
+                    "message" to "추적 모니터링 상태 조회 성공",
+                    "data" to status,
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        } catch (e: Exception) {
+            logger.error("추적 모니터링 상태 조회 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "추적 모니터링 상태 조회 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * ✅ 현재 표시 중인 스케줄 조회
+     */
+    @GetMapping("/tracking-monitor/current-schedule")
+    fun getCurrentDisplayedSchedule(): ResponseEntity<Map<String, Any>> {
+        return try {
+            val currentSchedule = passScheduleService.getCurrentDisplayedSchedule()
+
+            if (currentSchedule != null) {
+                logger.info("현재 표시 스케줄 조회 성공")
+
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "현재 표시 중인 스케줄 조회 성공",
+                        "data" to mapOf(
+                            "hasCurrentSchedule" to true,
+                            "currentSchedule" to currentSchedule,
+                            "passId" to currentSchedule["No"],
+                            "satelliteName" to currentSchedule["SatelliteName"],
+                            "startTime" to currentSchedule["StartTime"],
+                            "endTime" to currentSchedule["EndTime"],
+                            "maxElevation" to currentSchedule["MaxElevation"]
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            } else {
+                logger.info("현재 표시 스케줄 없음")
+
+                ResponseEntity.ok(
+                    mapOf(
+                        "success" to true,
+                        "message" to "현재 표시 중인 스케줄이 없습니다.",
+                        "data" to mapOf(
+                            "hasCurrentSchedule" to false,
+                            "currentSchedule" to null
+                        ),
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            logger.error("현재 표시 스케줄 조회 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "현재 표시 스케줄 조회 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * ✅ 추적 모니터링 재시작 (중지 후 시작)
+     */
+    @PostMapping("/tracking-monitor/restart")
+    fun restartTrackingMonitor(): ResponseEntity<Map<String, Any>> {
+        return try {
+            // 먼저 중지
+            passScheduleService.stopScheduleTracking()
+
+            // 잠시 대기 (리소스 정리 시간)
+            Thread.sleep(100)
+
+            // 다시 시작
+            passScheduleService.startScheduleTracking()
+
+            logger.info("추적 모니터링 재시작 API 호출 성공")
+
+            ResponseEntity.ok(
+                mapOf(
+                    "success" to true,
+                    "message" to "추적 모니터링이 성공적으로 재시작되었습니다.",
+                    "data" to mapOf(
+                        "action" to "restart",
+                        "isRunning" to true,
+                        "restartedAt" to System.currentTimeMillis()
+                    ),
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        } catch (e: Exception) {
+            logger.error("추적 모니터링 재시작 실패: ${e.message}", e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "추적 모니터링 재시작 중 오류가 발생했습니다: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+
 }
 
 /**
