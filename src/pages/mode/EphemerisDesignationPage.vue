@@ -11,15 +11,8 @@
             <div class="text-subtitle2 text-weight-bold text-primary">Azimuth</div>
           </q-card-section>
           <q-card-section>
-            <q-input
-              v-model="inputs[0]"
-              @input="(val: string) => onInputChange(0, val)"
-              dense
-              outlined
-              type="number"
-              step="0.01"
-              class="q-mb-sm"
-            />
+            <q-input v-model="inputs[0]" @input="(val: string) => onInputChange(0, val)" dense outlined type="number"
+              step="0.01" class="q-mb-sm" />
             <div class="row q-gutter-xs">
               <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
               <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
@@ -39,15 +32,8 @@
             <div class="text-subtitle2 text-weight-bold text-primary">Elevation</div>
           </q-card-section>
           <q-card-section>
-            <q-input
-              v-model="inputs[1]"
-              @input="(val: string) => onInputChange(1, val)"
-              dense
-              outlined
-              type="number"
-              step="0.01"
-              class="q-mb-sm"
-            />
+            <q-input v-model="inputs[1]" @input="(val: string) => onInputChange(1, val)" dense outlined type="number"
+              step="0.01" class="q-mb-sm" />
             <div class="row q-gutter-xs">
               <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(1)" />
               <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
@@ -66,15 +52,8 @@
             <div class="text-subtitle2 text-weight-bold text-primary">Tilt</div>
           </q-card-section>
           <q-card-section>
-            <q-input
-              v-model="inputs[2]"
-              @input="(val: string) => onInputChange(2, val)"
-              dense
-              outlined
-              type="number"
-              step="0.01"
-              class="q-mb-sm"
-            />
+            <q-input v-model="inputs[2]" @input="(val: string) => onInputChange(2, val)" dense outlined type="number"
+              step="0.01" class="q-mb-sm" />
             <div class="row q-gutter-xs">
               <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(2)" />
               <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
@@ -93,15 +72,8 @@
             <div class="text-subtitle2 text-weight-bold text-primary">Time</div>
           </q-card-section>
           <q-card-section>
-            <q-input
-              v-model="inputs[3]"
-              @input="(val: string) => onInputChange(3, val)"
-              dense
-              outlined
-              type="number"
-              step="0.01"
-              class="q-mb-sm"
-            />
+            <q-input v-model="inputs[3]" @input="(val: string) => onInputChange(3, val)" dense outlined type="number"
+              step="0.01" class="q-mb-sm" />
             <div class="row q-gutter-xs">
               <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(3)" />
               <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
@@ -109,14 +81,7 @@
               <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(3)" />
             </div>
             <q-input v-model="outputs[3]" dense outlined readonly label="Result" class="q-mt-sm" />
-            <q-input
-              v-model="formattedCalTime"
-              dense
-              outlined
-              readonly
-              label="Cal Time"
-              class="q-mt-sm"
-            />
+            <q-input v-model="formattedCalTime" dense outlined readonly label="Cal Time" class="q-mt-sm" />
           </q-card-section>
         </q-card>
       </div>
@@ -160,14 +125,14 @@
                       <span class="info-label">시작 시간:</span>
                       <span class="info-value">{{
                         formatToLocalTime(selectedScheduleInfo.startTime)
-                      }}</span>
+                        }}</span>
                     </div>
 
                     <div class="info-row">
                       <span class="info-label">종료 시간:</span>
                       <span class="info-value">{{
                         formatToLocalTime(selectedScheduleInfo.endTime)
-                      }}</span>
+                        }}</span>
                     </div>
 
                     <div class="info-row">
@@ -177,18 +142,14 @@
 
                     <div class="info-row">
                       <span class="info-label">시작 방위각/고도:</span>
-                      <span class="info-value"
-                        >{{ selectedScheduleInfo.startAzimuth }}° /
-                        {{ selectedScheduleInfo.startElevation }}°</span
-                      >
+                      <span class="info-value">{{ selectedScheduleInfo.startAzimuth }}° /
+                        {{ selectedScheduleInfo.startElevation }}°</span>
                     </div>
 
                     <div class="info-row">
                       <span class="info-label">종료 방위각/고도:</span>
-                      <span class="info-value"
-                        >{{ selectedScheduleInfo.endAzimuth }}° /
-                        {{ selectedScheduleInfo.endElevation }}°</span
-                      >
+                      <span class="info-value">{{ selectedScheduleInfo.endAzimuth }}° /
+                        {{ selectedScheduleInfo.endElevation }}°</span>
                     </div>
 
                     <div class="info-row">
@@ -198,14 +159,11 @@
 
                     <div class="info-row">
                       <span class="info-label">남은 시간:</span>
-                      <span
-                        class="info-value"
-                        :class="{
-                          'text-negative': timeRemaining < 0,
-                          'text-positive': timeRemaining > 0,
-                          'text-grey': timeRemaining === 0,
-                        }"
-                      >
+                      <span class="info-value" :class="{
+                        'text-negative': timeRemaining < 0,
+                        'text-positive': timeRemaining > 0,
+                        'text-grey': timeRemaining === 0,
+                      }">
                         {{ formatTimeRemaining(timeRemaining) }}
                       </span>
                     </div>
@@ -221,46 +179,23 @@
           <q-card class="control-section">
             <q-card-section>
               <div class="text-subtitle1 text-weight-bold text-primary">TLE Data</div>
-              <q-editor
-                v-model="tleData.displayText"
-                readonly
-                flat
-                dense
-                class="tle-display q-mt-sm"
-                :toolbar="[]"
+              <q-editor v-model="tleData.displayText" readonly flat dense class="tle-display q-mt-sm" :toolbar="[]"
                 :definitions="{
                   bold: undefined,
                   italic: undefined,
                   strike: undefined,
                   underline: undefined,
-                }"
-                content-class="tle-content"
-              />
+                }" content-class="tle-content" />
               <div class="button-group q-mt-md">
                 <q-btn color="primary" label="Text" @click="openTLEModal" class="q-mr-sm" />
-                <q-btn
-                  color="primary"
-                  label="Select Schedule"
-                  @click="openScheduleModal"
-                  class="q-mr-sm"
-                />
+                <q-btn color="primary" label="Select Schedule" @click="openScheduleModal" class="q-mr-sm" />
                 <!-- ✅ 다운로드 버튼 추가 -->
-                <q-btn
-                  color="secondary"
-                  label="Download"
-                  icon="download"
-                  @click="downloadRealtimeData"
-                  class="q-mr-sm"
-                />
+                <q-btn color="secondary" label="Download" icon="download" @click="downloadRealtimeData"
+                  class="q-mr-sm" />
               </div>
               <!-- 버튼 그룹 추가 -->
               <div class="button-group q-mt-md">
-                <q-btn
-                  color="positive"
-                  label="Go"
-                  @click="handleEphemerisCommand"
-                  class="q-mr-sm"
-                />
+                <q-btn color="positive" label="Go" @click="handleEphemerisCommand" class="q-mr-sm" />
                 <q-btn color="warning" label="Stop" @click="handleStopCommand" class="q-mr-sm" />
                 <q-btn color="negative" label="Stow" @click="handleStowCommand" />
               </div>
@@ -283,51 +218,24 @@
           2줄 또는 3줄 형식의 TLE 데이터를 입력하세요. 3줄 형식인 경우 첫 번째 줄은 위성 이름으로
           처리됩니다.
           <br />예시:
-          <pre
-            class="q-mt-sm q-pa-sm bg-grey-9 text-white rounded-borders"
-            style="font-size: 0.8rem; white-space: pre-wrap"
-          >
+          <pre class="q-mt-sm q-pa-sm bg-grey-9 text-white rounded-borders"
+            style="font-size: 0.8rem; white-space: pre-wrap">
 ISS (ZARYA)
 1 25544U 98067A   24054.51736111  .00020125  00000+0  36182-3 0  9999
-2 25544  51.6416 142.1133 0003324 324.9821 218.2594 15.49780383446574</pre
-          >
+2 25544  51.6416 142.1133 0003324 324.9821 218.2594 15.49780383446574</pre>
         </div>
         <div class="tle-input-container q-mb-md">
-          <q-input
-            v-model="tempTLEData.line1"
-            type="textarea"
-            filled
-            autogrow
-            class="tle-textarea full-width"
-            style="min-height: 200px; font-family: monospace; font-size: 0.9rem"
-            placeholder="TLE 데이터를 여기에 붙여넣으세요..."
-            :input-style="'white-space: pre;'"
-            spellcheck="false"
-            autofocus
-            :error="tleError !== null"
-            :error-message="tleError || undefined"
-            @keydown.ctrl.enter="addTLEData"
-          />
+          <q-input v-model="tempTLEData.line1" type="textarea" filled autogrow class="tle-textarea full-width"
+            style="min-height: 200px; font-family: monospace; font-size: 0.9rem" placeholder="TLE 데이터를 여기에 붙여넣으세요..."
+            :input-style="'white-space: pre;'" spellcheck="false" autofocus :error="tleError !== null"
+            :error-message="tleError || undefined" @keydown.ctrl.enter="addTLEData" />
         </div>
       </q-card-section>
 
       <q-card-actions align="right" class="q-px-md q-pb-md">
-        <q-btn
-          flat
-          label="추가"
-          color="primary"
-          @click="addTLEData"
-          :loading="isProcessingTLE"
-          :disable="!tempTLEData.line1.trim()"
-        />
-        <q-btn
-          flat
-          label="닫기"
-          color="primary"
-          v-close-popup
-          class="q-ml-sm"
-          :disable="isProcessingTLE"
-        />
+        <q-btn flat label="추가" color="primary" @click="addTLEData" :loading="isProcessingTLE"
+          :disable="!tempTLEData.line1.trim()" />
+        <q-btn flat label="닫기" color="primary" v-close-popup class="q-ml-sm" :disable="isProcessingTLE" />
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -340,19 +248,9 @@ ISS (ZARYA)
       </q-card-section>
 
       <q-card-section class="q-pa-md" style="max-height: 50vh; overflow: auto">
-        <q-table
-          :rows="scheduleData"
-          :columns="scheduleColumns"
-          row-key="No"
-          :loading="loadingSchedule"
-          :pagination="{ rowsPerPage: 10 }"
-          selection="single"
-          v-model:selected="selectedSchedule"
-          class="bg-grey-9 text-white"
-          dark
-          flat
-          bordered
-        >
+        <q-table :rows="scheduleData" :columns="scheduleColumns" row-key="No" :loading="loadingSchedule"
+          :pagination="{ rowsPerPage: 10 }" selection="single" v-model:selected="selectedSchedule"
+          class="bg-grey-9 text-white" dark flat bordered>
           <template v-slot:loading>
             <q-inner-loading showing color="primary">
               <q-spinner size="50px" color="primary" />
@@ -362,13 +260,7 @@ ISS (ZARYA)
       </q-card-section>
 
       <q-card-actions align="right">
-        <q-btn
-          flat
-          label="Select"
-          color="primary"
-          @click="selectSchedule"
-          :disable="selectedSchedule.length === 0"
-        />
+        <q-btn flat label="Select" color="primary" @click="selectSchedule" :disable="selectedSchedule.length === 0" />
         <q-btn flat label="Close" color="primary" v-close-popup class="q-ml-sm" />
       </q-card-actions>
     </q-card>
@@ -1287,7 +1179,7 @@ const updateOffset = async (index: number, value: string) => {
       const timeInputValue = inputs.value[3] || '0.00'
       ephemerisStore.updateOffsetValues('time', timeInputValue)
       try {
-        await ephemerisTrackService.sendTimeOffsetCommand(numValue)
+        await ephemerisStore.sendTimeOffset(numValue)
         ephemerisStore.updateOffsetValues('timeResult', numValue.toFixed(2))
         console.log('Time Result 업데이트:', numValue.toFixed(2))
       } catch (error) {
@@ -1596,7 +1488,7 @@ onUnmounted(() => {
   // ✅ TypeScript Worker 정리
   ephemerisStore.cleanupWorker()
   // 윈도우 이벤트 리스너 정리
-  window.removeEventListener('resize', () => {})
+  window.removeEventListener('resize', () => { })
 })
 </script>
 
@@ -1751,7 +1643,7 @@ onUnmounted(() => {
 }
 
 /* 모달 내부 여백 조정 */
-.q-dialog__inner--minimized > div {
+.q-dialog__inner--minimized>div {
   padding: 16px;
 }
 </style>

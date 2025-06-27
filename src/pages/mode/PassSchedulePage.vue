@@ -19,7 +19,8 @@
                 <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
               </div>
               <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(0)" class="reset-button" />
-              <q-input v-model="outputs[0]" dense outlined readonly class="output-input" label="Output" />
+
+              <q-input v-model="outputs[0]" dense outlined readonly class="output-input-small" label="Output" />
             </div>
           </q-card-section>
         </q-card>
@@ -39,7 +40,8 @@
                 <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
               </div>
               <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(1)" class="reset-button" />
-              <q-input v-model="outputs[1]" dense outlined readonly class="output-input" label="Output" />
+
+              <q-input v-model="outputs[1]" dense outlined readonly class="output-input-small" label="Output" />
             </div>
           </q-card-section>
         </q-card>
@@ -59,7 +61,8 @@
                 <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
               </div>
               <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(2)" class="reset-button" />
-              <q-input v-model="outputs[2]" dense outlined readonly class="output-input" label="Output" />
+
+              <q-input v-model="outputs[2]" dense outlined readonly class="output-input-small" label="Output" />
             </div>
           </q-card-section>
         </q-card>
@@ -79,7 +82,12 @@
                 <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
               </div>
               <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(3)" class="reset-button" />
-              <q-input v-model="outputs[3]" dense outlined readonly class="output-input" label="Output" />
+
+
+              <div class="time-output-section">
+                <q-input v-model="outputs[3]" dense outlined readonly class="output-input" label="Output" />
+                <q-input v-model="formattedCalTime" dense outlined readonly label="Cal Time" class="cal-time-input" />
+              </div>
             </div>
           </q-card-section>
         </q-card>
@@ -237,8 +245,7 @@
                 </div>
 
                 <div class="control-button-row">
-                  <q-btn color="positive" label="Start" @click="handleStartCommand" :disable="!selectedSchedule"
-                    class="control-btn" size="md" />
+                  <q-btn color="positive" label="Start" @click="handleStartCommand" class="control-btn" size="md" />
                   <q-btn color="warning" label="Stop" @click="handleStopCommand" class="control-btn" size="md" />
                   <q-btn color="negative" label="Stow" @click="handleStowCommand" class="control-btn" size="md" />
                 </div>
@@ -252,7 +259,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed,watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { usePassScheduleStore, type ScheduleItem } from '../../stores/mode/passScheduleStore'
 import { useICDStore } from '../../stores/icd/icdStore'
@@ -261,11 +268,12 @@ import type { ECharts } from 'echarts'
 import type { QTableProps } from 'quasar'
 import { openModal } from '../../utils/windowUtils'
 import { formatToLocalTime } from '../../utils/times'
+import { useEphemerisTrackStore } from '../../stores/mode/ephemerisTrackStore'
 
 const $q = useQuasar()
 const passScheduleStore = usePassScheduleStore()
 const icdStore = useICDStore()
-
+const ephemerisStore = useEphemerisTrackStore()
 // 차트 관련 변수
 const chartRef = ref<HTMLElement | null>(null)
 let chart: ECharts | null = null
@@ -632,48 +640,86 @@ const updateOutputs = () => {
   outputs.value = [...inputs.value]
 }
 
-// 오프셋 업데이트 (PassSchedule 독립적 처리)
+// ✅ updateOffset 함수 수정 - Time 처리 분리
 const updateOffset = async (index: number, value: string) => {
   try {
-    const numValue = Number(parseFloat(value).toFixed(2)) || 0
+    // ✅ 디버깅 로그 추가
+    console.log('updateOffset 호출됨:', {
+      index,
+      value,
+      valueType: typeof value,
+      inputs3: inputs.value[3],
+      currentTimeResult: ephemerisStore.offsetValues.timeResult,
+    })
 
-    if (index === 3) {
-      // Time offset 처리 (PassSchedule 전용)
-      console.log('PassSchedule Time offset:', numValue)
+    const numValue = Number(parseFloat(value).toFixed(2)) || 0
+    console.log('계산된 numValue:', numValue)
+
+    const offsetTypes = ['azimuth', 'elevation', 'tilt', 'time'] as const
+    const offsetType = offsetTypes[index]
+
+    if (!offsetType) {
+      console.error('Invalid offset index:', index)
       return
     }
 
-    // Position Offset 처리
-    const azOffset = Number(parseFloat(outputs.value[0] || '0').toFixed(2))
-    const elOffset = Number(parseFloat(outputs.value[1] || '0').toFixed(2))
-    const tiOffset = Number(parseFloat(outputs.value[2] || '0').toFixed(2))
+    if (index === 3) {
+      const timeInputValue = inputs.value[3] || '0.00'
+      ephemerisStore.updateOffsetValues('time', timeInputValue)
+      try {
+        await ephemerisStore.sendTimeOffset(numValue)
+        ephemerisStore.updateOffsetValues('timeResult', numValue.toFixed(2))
+        console.log('Time Result 업데이트:', numValue.toFixed(2))
+      } catch (error) {
+        console.error('Time offset command failed:', error)
+      }
+      return
+    }
+
+    // Position Offset 처리 (azimuth, elevation, tilt)
+    ephemerisStore.updateOffsetValues(offsetType, numValue.toFixed(2))
+
+    const azOffset = Number((parseFloat(ephemerisStore.offsetValues.azimuth) || 0).toFixed(2))
+    const elOffset = Number((parseFloat(ephemerisStore.offsetValues.elevation) || 0).toFixed(2))
+    const tiOffset = Number((parseFloat(ephemerisStore.offsetValues.tilt) || 0).toFixed(2))
 
     await icdStore.sendPositionOffsetCommand(azOffset, elOffset, tiOffset)
   } catch (error) {
     console.error('Error updating offset:', error)
   }
 }
-
-// 명령 핸들러들 - async 제거하고 동기 처리
-const handleStartCommand = () => {
-  if (!selectedSchedule.value) {
+// 명령 핸들러들 - handleStartCommand 수정
+const handleStartCommand = async () => {
+  // 🔧 선택된 스케줄이 아닌 등록된 모든 스케줄을 처리
+  if (scheduleData.value.length === 0) {
     $q.notify({
       type: 'warning',
-      message: '먼저 스케줄을 선택하세요',
+      message: '등록된 스케줄이 없습니다',
     })
     return
   }
 
   try {
-    // PassSchedule 시작 로직 - selectSchedule 메서드 사용 (동기 처리)
-    passScheduleStore.selectSchedule(selectedSchedule.value)
+    console.log('🚀 ACS Start 명령 시작 - 등록된 모든 스케줄:', scheduleData.value.length, '개')
 
-    $q.notify({
-      type: 'positive',
-      message: `스케줄 ${selectedSchedule.value.satelliteName} 시작됨`,
-    })
+    // 🔧 등록된 모든 스케줄을 추적 대상으로 설정
+    const success = await passScheduleStore.setTrackingTargets(scheduleData.value)
+
+    if (success) {
+      $q.notify({
+        type: 'positive',
+        message: `${scheduleData.value.length}개의 스케줄이 추적 대상으로 설정되었습니다`,
+      })
+
+      console.log('✅ ACS Start 명령 완료 - 모든 등록된 스케줄 처리됨')
+    } else {
+      $q.notify({
+        type: 'negative',
+        message: '추적 대상 설정에 실패했습니다',
+      })
+    }
   } catch (error) {
-    console.error('Failed to start schedule:', error)
+    console.error('❌ ACS Start 명령 실패:', error)
     $q.notify({
       type: 'negative',
       message: '스케줄 시작에 실패했습니다',
@@ -769,6 +815,36 @@ onUnmounted(() => {
   }
 
   window.removeEventListener('resize', () => { })
+})
+
+// 서버 시간 포맷팅을 위한 계산된 속성 추가
+const formattedCalTime = computed(() => {
+  const calTime = icdStore.resultTimeOffsetCalTime
+  if (!calTime) return ''
+  try {
+    // 서버 시간 파싱
+    const dateObj = new Date(calTime)
+
+    // 유효한 날짜인지 확인
+    if (isNaN(dateObj.getTime())) {
+      return calTime // 유효하지 않은 날짜면 원본 반환
+    }
+
+    // UTC 기준으로 시간 형식 지정
+    const utcYear = dateObj.getFullYear()
+    const utcMonth = String(dateObj.getMonth() + 1).padStart(2, '0')
+    const utcDay = String(dateObj.getDate()).padStart(2, '0')
+    const utcHours = String(dateObj.getHours()).padStart(2, '0')
+    const utcMinutes = String(dateObj.getMinutes()).padStart(2, '0')
+    const utcSeconds = String(dateObj.getSeconds()).padStart(2, '0')
+    const utcMilliseconds = String(dateObj.getMilliseconds()).padStart(3, '0')
+
+    // YYYY-MM-DD HH:MM:SS.mmm (UTC) 형식
+    return `${utcYear}-${utcMonth}-${utcDay} ${utcHours}:${utcMinutes}:${utcSeconds}.${utcMilliseconds} `
+  } catch (e) {
+    console.error('Error formatting cal time:', e)
+    return calTime
+  }
 })
 </script>
 
@@ -1067,23 +1143,6 @@ onUnmounted(() => {
   /* Tilt - 회색 */
 }
 
-/* 컨트롤 카드 높이 조정 */
-.control-card {
-  height: auto;
-  min-height: 84px;
-  /* 120px에서 30% 감소 (120 * 0.7 = 84) */
-}
-
-.control-card .q-card-section:first-child {
-  padding: 6px 8px;
-  /* 헤더 패딩 줄임 */
-}
-
-.control-card .q-card-section:last-child {
-  padding: 8px;
-  /* 12px에서 8px로 줄임 */
-}
-
 /* 컴팩트 컨트롤 행 스타일 */
 .compact-control-row {
   display: flex;
@@ -1092,40 +1151,77 @@ onUnmounted(() => {
   width: 100%;
 }
 
+/* 🔧 Azimuth, Elevation, Tilt용 Input - 40% 축소 */
 .control-input {
-  flex: 1;
-  min-width: 70px;
+  flex: 0.6;
+  /* 기존 1에서 40% 축소 */
+  min-width: 42px;
+  /* 70px의 60% */
 }
 
 .control-buttons {
   display: flex;
   flex-direction: column;
-
   gap: 1px;
-  /* 2px에서 1px로 줄임 */
   flex-shrink: 0;
 }
 
 .control-buttons .q-btn {
   min-width: 32px;
   width: 32px;
-
   height: 24px;
-  /* 28px에서 24px로 줄임 */
 }
+
 
 .reset-button {
   min-width: 32px;
   width: 32px;
 
-  height: 49px;
-  /* +, - 버튼 합친 높이 (24px + 24px + 1px gap) */
+  height: 48px;
   flex-shrink: 0;
 }
 
-.output-input {
-  flex: 1;
-  min-width: 70px;
+/* 🔧 Azimuth, Elevation, Tilt용 Output - 40% 축소 */
+.output-input-small {
+  flex: 0.6;
+  /* 기존 1에서 40% 축소 */
+  min-width: 42px;
+  /* 70px의 60% */
+}
+
+
+/* 🔧 Time용 Output과 Cal Time을 가로로 배치 */
+.time-output-section {
+
+  flex: 3.2;
+  /* 축소된 비중만큼 확대 (3 + 0.8 = 3.2) */
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+
+/* 🔧 Time용 Input - 2배 확대 */
+.time-output-section .output-input {
+
+
+  flex: 1.2;
+  /* 기존 0.6에서 2배 확대 */
+  min-width: 84px;
+  /* 42px의 2배 */
+}
+
+
+
+/* 🔧 Cal Time 넓이 유지 */
+.time-output-section .cal-time-input {
+
+
+
+  flex: 2.6;
+  /* 기존 비중 유지 */
+  min-width: 180px;
+  /* 더 넓은 공간 확보 */
 }
 </style>
 
@@ -1149,5 +1245,19 @@ onUnmounted(() => {
   width: 45% !important;
   /* Schedule Control 축소 (50% → 45%) */
   padding: 4px;
+}
+
+/* 🔧 Azimuth, Elevation, Tilt 컨트롤 카드 전체 비중 축소 */
+.col-sm-3:not(:last-child) {
+  flex: 0 0 22%;
+  /* 기존 25%에서 22%로 축소 */
+  max-width: 22%;
+}
+
+/* 🔧 Time 컨트롤 카드 비중 확대 */
+.col-sm-3:last-child {
+  flex: 0 0 34%;
+  /* 기존 25%에서 34%로 확대 */
+  max-width: 34%;
 }
 </style>
