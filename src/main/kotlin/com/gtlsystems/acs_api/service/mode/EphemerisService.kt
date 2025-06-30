@@ -627,7 +627,7 @@ class EphemerisService(
         // ✅ 타이머 중지
         stopTimer()
         clearRealtimeTrackingData()
-        dataStoreService.setEphemerisTracking(false)
+        dataStoreService.stopAllTracking()
         logger.info("✅ 위성 추적 및 타이머 중지 완료")
         //dataStoreService.stopAllTracking()
     }
@@ -1418,13 +1418,6 @@ class EphemerisService(
      */
     private fun calculateInitialDataByteSize(dataPointCount: Int): Int {
         return (dataPointCount * 12) + 18 + 3 // 헤더 18바이트 + 각 데이터 포인트 12바이트
-    }
-
-    /**
-     * 추가 데이터 길이 계산
-     */
-    private fun calculateAdditionalDataByteSize(dataPointCount: Int): Int {
-        return 5 + (dataPointCount * 12) // 헤더 5바이트 + 각 데이터 포인트 12바이트
     }
 
     private fun calculateAdditionalDataLength(dataPointCount: Int): Int {

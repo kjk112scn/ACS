@@ -2,8 +2,13 @@ package com.gtlsystems.acs_api.service.mode
 
 import com.gtlsystems.acs_api.algorithm.axislimitangle.LimitAngleCalculator
 import com.gtlsystems.acs_api.algorithm.satellitetracker.impl.OrekitCalculator
+import com.gtlsystems.acs_api.event.ACSEvent
+import com.gtlsystems.acs_api.event.ACSEventBus
+import com.gtlsystems.acs_api.event.subscribeToType
 import com.gtlsystems.acs_api.model.GlobalData
 import com.gtlsystems.acs_api.model.SatelliteTrackingData
+import com.gtlsystems.acs_api.service.datastore.DataStoreService
+import com.gtlsystems.acs_api.service.icd.ICDService
 import com.gtlsystems.acs_api.service.udp.UdpFwICDService
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
@@ -18,6 +23,8 @@ import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 import io.netty.handler.timeout.TimeoutException
+import jakarta.annotation.PreDestroy
+import reactor.core.Disposable
 import java.util.BitSet
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -32,7 +39,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 @Service
 class PassScheduleService(
     private val orekitCalculator: OrekitCalculator,
-    private val udpFwICDService: UdpFwICDService  // 추가
+    private val acsEventBus: ACSEventBus,
+    private val udpFwICDService: UdpFwICDService,
+    private val dataStoreService: DataStoreService  // 추가
 ) {
     private val logger = LoggerFactory.getLogger(PassScheduleService::class.java)
 
@@ -52,9 +61,9 @@ class PassScheduleService(
     // 추적 준비 상태 관리 변수 추가
     private var isPreparingForTracking = AtomicBoolean(false)
     private var lastPreparedSchedule: Map<String, Any?>? = null
-    private var isInStowPosition = AtomicBoolean(true) // 초기에는 Stow 위치에 있다고 가정
+    private var isInStowPosition = AtomicBoolean(false) // 초기에는 Stow 위치에 있다고 가정
     private val PREPARATION_TIME_MINUTES = 2L // 추적 시작 2분 전 준비
-
+    private val subscriptions: MutableList<Disposable> = mutableListOf()
     // ✅ 위성 추적 스케줄 대상 데이터 클래스 추가
     data class TrackingTarget(
         val mstId: UInt,
@@ -75,8 +84,38 @@ class PassScheduleService(
     @PostConstruct
     fun init() {
         logger.info("PassScheduleService 초기화 완료")
+        setupEventSubscriptions()
     }
 
+    private fun setupEventSubscriptions() {
+        // 위성 추적 헤더 이벤트 구독
+        val headerSubscription =
+            acsEventBus.subscribeToType<ACSEvent.ICDEvent.SatelliteTrackHeaderReceived>().subscribe { event ->
+                // 위성 추적 헤더가 수신되면 초기 추적 데이터 전송
+                val currentSchedule = getCurrentSelectedTrackingPassWithTime(GlobalData.Time.calUtcTimeOffsetTime)
+                currentSchedule?.let { schedule ->
+                    val passId = schedule["No"] as? UInt
+                    if (passId != null) {
+                        sendInitialTrackingData(passId)
+                    }
+                }
+            }
+
+        // 위성 추적 데이터 요청 이벤트 구독
+        val dataRequestSubscription =
+            acsEventBus.subscribeToType<ACSEvent.ICDEvent.SatelliteTrackDataRequested>().subscribe { event ->
+                // 데이터 요청에 응답하여 추가 데이터 전송
+                val currentSchedule = getCurrentSelectedTrackingPassWithTime(GlobalData.Time.calUtcTimeOffsetTime)
+                currentSchedule?.let { schedule ->
+                    val passId = schedule["No"] as? UInt
+                    if (passId != null) {
+                        // 요청된 시간 누적치에 따라 적절한 데이터 전송
+                        val requestData = event.requestData as ICDService.SatelliteTrackThree.GetDataFrame
+                        handleTrackingDataRequest(passId, requestData.timeAcc, requestData.requestDataLength)
+                    }
+                }
+            }
+    }
     /**
      * ✅ 기존 메서드들을 활용한 100ms 추적 모니터링 시작
      */
@@ -85,6 +124,7 @@ class PassScheduleService(
             logger.warn("추적 모니터링이 이미 실행 중입니다.")
             return
         }
+        dataStoreService.stopAllTracking()
 
         trackingMonitorExecutor = Executors.newSingleThreadScheduledExecutor(trackingMonitorThreadFactory)
         trackingMonitorTask = trackingMonitorExecutor?.scheduleAtFixedRate(
@@ -93,6 +133,7 @@ class PassScheduleService(
 
         isTrackingMonitorRunning.set(true)
         logger.info("🚀 추적 모니터링 시작 (기존 메서드 활용)")
+
     }
 
 
@@ -105,62 +146,182 @@ class PassScheduleService(
             val currentSchedule = getCurrentSelectedTrackingPassWithTime(calTime)
             val nextSchedule = getNextSelectedTrackingPassWithTime(calTime)
 
-            // 1. 현재 추적 상태 변경 처리 (시작/종료)
-            if (currentSchedule != lastDisplayedSchedule) {
-                handleScheduleChangeUsingExistingMethods(currentSchedule, calTime)
-                lastDisplayedSchedule = currentSchedule
+            // ✅ 처음 몇 번은 상세 로그
+            if (trackingCheckCount < 10) {
+                logger.info("🔍 추적 체크 #${trackingCheckCount}")
+                logger.info("  현재시간: $calTime")
+                logger.info("  현재 스케줄: ${if (currentSchedule != null) "있음" else "없음"}")
+
+                if (nextSchedule != null) {
+                    val nextMstId = nextSchedule["No"] as? UInt
+                    val nextSatName = nextSchedule["SatelliteName"] as? String
+                    val nextStartTime = nextSchedule["StartTime"] as? ZonedDateTime
+
+                    if (nextStartTime != null) {
+                        val timeUntilNext = Duration.between(calTime, nextStartTime)
+                        val minutesUntilNext = timeUntilNext.toMinutes()
+                        val secondsUntilNext = timeUntilNext.seconds
+
+                        logger.info("  다음 스케줄: MST=$nextMstId, Name=$nextSatName")
+                        logger.info("  시작시간: $nextStartTime")
+                        logger.info("  남은시간: ${minutesUntilNext}분 ${secondsUntilNext % 60}초")
+
+                        // ✅ 2분 이내인지 명확히 표시
+                        if (minutesUntilNext <= PREPARATION_TIME_MINUTES) {
+                            logger.info("  🚨 2분 이내! 시작 위치로 이동해야 함")
+                        } else {
+                            logger.info("  ⏳ 2분 이상 남음, Stow 위치 유지")
+                        }
+                    }
+                } else {
+                    logger.info("  다음 스케줄: 없음")
+                }
             }
 
-            // 2. 추적 준비 상태 처리 (Stow 또는 시작 위치로 이동)
-            prepareForTracking(currentSchedule, nextSchedule, calTime)
+            trackingCheckCount++
+
+            // ✅ 1. 추적 시작/종료 상태 변경 처리
+            handleTrackingStateChange(currentSchedule, calTime)
+
+            // ✅ 2. 추적 준비 상태 처리 (현재 추적 중이 아닐 때만)
+            if (currentSchedule == null) {
+                handleTrackingPreparation(nextSchedule, calTime)
+            }
 
         } catch (e: Exception) {
             logger.error("추적 체크 중 오류: ${e.message}", e)
         }
     }
-    private fun prepareForTracking(currentSchedule: Map<String, Any?>?, nextSchedule: Map<String, Any?>?, calTime: ZonedDateTime) {
-        try {
-            // 케이스 1: 현재 추적 중인 경우 - 아무 준비 동작 필요 없음
-            if (currentSchedule != null) {
-                return
+    /**
+     * ✅ 추적 상태 변경 처리 (시작/종료)
+     */
+    private fun handleTrackingStateChange(currentSchedule: Map<String, Any?>?, calTime: ZonedDateTime) {
+        when {
+            // 새로운 추적 시작
+            lastDisplayedSchedule == null && currentSchedule != null -> {
+                logger.info("🚀 새로운 추적 시작 감지")
+                outputCurrentScheduleInfo(currentSchedule, calTime)
+                outputNextScheduleInfo(calTime)
+
+                val mstId = currentSchedule["No"] as? UInt
+                if (mstId != null) {
+                    startTracking(currentSchedule)
+                    dataStoreService.setPassScheduleTracking(true)
+                }
+                lastDisplayedSchedule = currentSchedule
             }
 
-            // 케이스 2: 현재 추적 중이 아니고 다음 스케줄이 있는 경우
+            // 추적 종료
+            lastDisplayedSchedule != null && currentSchedule == null -> {
+                logger.info("🛑 추적 종료 감지")
+                outputTrackingEnd(lastDisplayedSchedule!!, calTime)
+
+                stopTracking(lastDisplayedSchedule!!)
+
+                val nextSchedule = getNextSelectedTrackingPassWithTime(calTime)
+                if (nextSchedule != null) {
+                    outputUpcomingScheduleInfo(nextSchedule, calTime)
+                } else {
+                    outputScheduleFixed(lastDisplayedSchedule!!, calTime)
+                }
+                lastDisplayedSchedule = null
+            }
+
+            // 추적 변경 (한 위성에서 다른 위성으로)
+            lastDisplayedSchedule != null && currentSchedule != null &&
+                    lastDisplayedSchedule!!["No"] != currentSchedule["No"] -> {
+                logger.info("🔄 추적 변경 감지")
+                outputScheduleChange(lastDisplayedSchedule!!, currentSchedule, calTime)
+                outputNextScheduleInfo(calTime)
+
+                // 이전 추적 종료 및 새 추적 시작
+                stopTracking(lastDisplayedSchedule!!)
+                val mstId = currentSchedule["No"] as? UInt
+                if (mstId != null) {
+                    startTracking(currentSchedule)
+                }
+                lastDisplayedSchedule = currentSchedule
+            }
+        }
+    }
+
+    /**
+     * ✅ 추적 준비 상태 처리 (현재 추적 중이 아닐 때만 호출)
+     */
+    private fun handleTrackingPreparation(nextSchedule: Map<String, Any?>?, calTime: ZonedDateTime) {
+        try {
             if (nextSchedule != null) {
                 val nextStartTime = nextSchedule["StartTime"] as? ZonedDateTime ?: return
                 val timeUntilNextStart = Duration.between(calTime, nextStartTime)
                 val minutesUntilStart = timeUntilNextStart.toMinutes()
+                val secondsUntilStart = timeUntilNextStart.seconds % 60  // ✅ 초 단위 추가
                 val nextMstId = nextSchedule["No"] as? UInt ?: return
 
-                // 2-1: 다음 스케줄 시작 2분 이내인 경우 - 추적 시작 위치로 이동
-                if (minutesUntilStart <= PREPARATION_TIME_MINUTES &&
-                    minutesUntilStart >= 0 &&
-                    nextSchedule != lastPreparedSchedule) {
+                when {
+                    // 2분 이내: 추적 시작 위치로 이동
+                    minutesUntilStart <= PREPARATION_TIME_MINUTES && minutesUntilStart >= 0 -> {
+                        if (nextSchedule != lastPreparedSchedule) {
+                            moveToStartPosition(nextMstId)
+                            lastPreparedSchedule = nextSchedule
+                            isInStowPosition.set(false)
+                            logger.info("⏳ 추적 시작 ${minutesUntilStart}분 ${secondsUntilStart}초 전: 시작 위치로 이동 완료")  // ✅ 초 단위 추가
+                        }
+                    }
 
-                    moveToStartPosition(nextMstId)
-                    lastPreparedSchedule = nextSchedule
-                    isInStowPosition.set(false)
-                    logger.info("⏳ 추적 시작 ${minutesUntilStart}분 전: 시작 위치로 이동 완료")
+                    // 2분 이상: Stow 위치로 이동
+                    minutesUntilStart > PREPARATION_TIME_MINUTES -> {
+                        if (!isInStowPosition.get()) {
+                            moveToStowPosition(calTime)
+                            isInStowPosition.set(true)
+                            logger.info("⏳ 추적 시작까지 ${minutesUntilStart}분 ${secondsUntilStart}초 남음: Stow 위치로 이동")  // ✅ 초 단위 추가
+                        }
+                    }
                 }
-                // 2-2: 다음 스케줄 시작까지 2분 이상 남은 경우 - Stow 위치로 이동
-                else if (minutesUntilStart > PREPARATION_TIME_MINUTES &&
-                    !isInStowPosition.get()) {
-
+            } else {
+                // 다음 스케줄이 없는 경우: Stow 위치로 이동
+                if (!isInStowPosition.get()) {
                     moveToStowPosition(calTime)
                     isInStowPosition.set(true)
-                    logger.info("⏳ 추적 시작까지 ${minutesUntilStart}분 남음: Stow 위치로 이동")
+                    lastPreparedSchedule = null
+                    logger.info("🏁 모든 추적 완료: Stow 위치로 이동")
                 }
             }
-            // 케이스 3: 현재 추적 중이 아니고 다음 스케줄도 없는 경우 - 모든 추적 완료, Stow 위치로 이동
-            else if (!isInStowPosition.get()) {
-                moveToStowPosition(calTime)
-                isInStowPosition.set(true)
-                lastPreparedSchedule = null
-                logger.info("🏁 모든 추적 완료: Stow 위치로 이동")
-            }
-        } catch (e: Exception) {
+        }catch (e: Exception) {
             logger.error("추적 준비 중 오류: ${e.message}", e)
         }
+    }
+
+
+    // ✅ 디버깅용 카운터 추가
+    private var trackingCheckCount = 0
+
+    /**
+     * ✅ 추적 시작 (sendHeaderTrackingData 포함)
+     */
+    private fun startTracking(schedule: Map<String, Any?>) {
+        val satelliteName = schedule["SatelliteName"] as? String ?: "Unknown"
+        val mstId = schedule["No"] as? UInt ?: return
+
+        logger.info("🚀 추적 시작: $satelliteName (ID: $mstId)")
+
+        // ✅ 헤더 데이터 전송
+        sendHeaderTrackingData(mstId)
+
+        // 추적 상태 업데이트
+        dataStoreService.setPassScheduleTracking(true)
+    }
+    /**
+     * ✅ 추적 종료
+     */
+    private fun stopTracking(schedule: Map<String, Any?>) {
+        val satelliteName = schedule["SatelliteName"] as? String ?: "Unknown"
+        val mstId = schedule["No"] as? UInt ?: return
+
+        logger.info("🛑 추적 종료: $satelliteName (ID: $mstId)")
+
+        // 추적 중지 명령
+        stopCommand()
+        dataStoreService.stopAllTracking()
     }
 
     /**
@@ -206,72 +367,6 @@ class PassScheduleService(
         lastPreparedSchedule = null
     }
 
-    private fun handleScheduleChangeUsingExistingMethods(
-        currentSchedule: Map<String, Any?>?, calTime: ZonedDateTime
-    ) {
-        when {
-            // 새로운 추적 시작
-            lastDisplayedSchedule == null && currentSchedule != null -> {
-                outputCurrentScheduleInfo(currentSchedule, calTime)
-                outputNextScheduleInfo(calTime)
-
-                // 추적 시작 명령 실행 (실제 위성 추적 시작)
-                val mstId = currentSchedule["No"] as? UInt
-                if (mstId != null) {
-                    startTracking(currentSchedule)
-                }
-            }
-
-            // 추적 종료
-            lastDisplayedSchedule != null && currentSchedule == null -> {
-                outputTrackingEnd(lastDisplayedSchedule!!, calTime)
-
-                // 추적 종료 명령 실행
-                stopTracking(lastDisplayedSchedule!!)
-
-                // 다음 스케줄 정보 출력
-                val nextSchedule = getNextSelectedTrackingPassWithTime(calTime)
-                if (nextSchedule != null) {
-                    outputUpcomingScheduleInfo(nextSchedule, calTime)
-                } else {
-                    outputScheduleFixed(lastDisplayedSchedule!!, calTime)
-                }
-            }
-
-            // 추적 변경 (한 위성에서 다른 위성으로)
-            lastDisplayedSchedule != null && currentSchedule != null &&
-                    lastDisplayedSchedule!!["No"] != currentSchedule["No"] -> {
-                outputScheduleChange(lastDisplayedSchedule!!, currentSchedule, calTime)
-                outputNextScheduleInfo(calTime)
-
-                // 이전 추적 종료 및 새 추적 시작
-                stopTracking(lastDisplayedSchedule!!)
-                startTracking(currentSchedule)
-            }
-        }
-    }
-    private fun startTracking(schedule: Map<String, Any?>) {
-        val satelliteName = schedule["SatelliteName"] as? String ?: "Unknown"
-        val mstId = schedule["No"] as? UInt ?: return
-
-        logger.info("🚀 추적 시작: $satelliteName (ID: $mstId)")
-
-        // 여기서 실제 추적 시작 명령을 실행
-        // 이미 추적 시작 위치로 이동했으므로 추적 명령만 실행
-        // 실제 구현에 맞게 추적 시작 명령 코드 추가 필요
-    }
-
-    private fun stopTracking(schedule: Map<String, Any?>) {
-        val satelliteName = schedule["SatelliteName"] as? String ?: "Unknown"
-        val mstId = schedule["No"] as? UInt ?: return
-
-        logger.info("🛑 추적 종료: $satelliteName (ID: $mstId)")
-
-        // 여기서 실제 추적 종료 명령을 실행
-        // 실제 구현에 맞게 추적 종료 명령 코드 추가 필요
-    }
-
-
     // stopScheduleTracking() 함수 수정 - 추적 준비 상태 초기화 추가
     fun stopScheduleTracking() {
         if (!isTrackingMonitorRunning.get()) {
@@ -303,6 +398,367 @@ class PassScheduleService(
 
         logger.info("🛑 추적 모니터링 중지 완료")
     }
+    /**
+     * 위성 추적 시작 - 헤더 정보 전송
+     * 2.12.1 위성 추적 해더 정보 송신 프로토콜 사용
+     */
+    fun sendHeaderTrackingData(passId: UInt) {
+        try {
+            udpFwICDService.writeNTPCommand()
+
+            // 선택된 패스 ID에 해당하는 마스터 데이터 찾기
+            val selectedPass = getSelectedTrackMstByMstId(passId)
+
+            if (selectedPass == null) {
+                logger.error("선택된 패스 ID($passId)에 해당하는 데이터를 찾을 수 없습니다.")
+                return
+            }
+
+            // 현재 추적 중인 패스 설정
+            val currentTrackingPass = selectedPass
+
+            // 패스 시작 및 종료 시간 가져오기
+            val startTime = (selectedPass["StartTime"] as ZonedDateTime).withZoneSameInstant(ZoneOffset.UTC)
+            val endTime = (selectedPass["EndTime"] as ZonedDateTime).withZoneSameInstant(ZoneOffset.UTC)
+
+            // 시작 시간과 종료 시간을 문자열로 변환 (밀리초 포함)
+            logger.info("위성 추적 시작: ${selectedPass["SatelliteName"]} (패스 ID: $passId)")
+            logger.info("시작 시간: $startTime, 종료 시간: $endTime")
+
+            // 밀리초 추출
+            val startTimeMs = (startTime.nano / 1_000_000).toUShort()
+            val endTimeMs = (endTime.nano / 1_000_000).toUShort()
+
+            // 2.12.1 위성 추적 헤더 정보 송신 프로토콜 생성
+            val headerFrame = ICDService.SatelliteTrackOne.SetDataFrame(
+                cmdOne = 'T',
+                cmdTwo = 'T',
+                dataLen = calculateDataLength(passId).toUShort(), // 전체 데이터 길이 계산
+                aosYear = startTime.year.toUShort(),
+                aosMonth = startTime.monthValue.toByte(),
+                aosDay = startTime.dayOfMonth.toByte(),
+                aosHour = startTime.hour.toByte(),
+                aosMinute = startTime.minute.toByte(),
+                aosSecond = startTime.second.toByte(),
+                aosMs = startTimeMs,
+                losYear = endTime.year.toUShort(),
+                losMonth = endTime.monthValue.toByte(),
+                losDay = endTime.dayOfMonth.toByte(),
+                losHour = endTime.hour.toByte(),
+                losMinute = endTime.minute.toByte(),
+                losSecond = endTime.second.toByte(),
+                losMs = endTimeMs,
+            )
+
+            // UdpFwICDService를 통해 데이터 전송
+            udpFwICDService.sendSatelliteTrackHeader(headerFrame)
+            logger.info("위성 추적 전체 길이 ${calculateDataByteSize(passId).toUShort()}")
+            logger.info("위성 추적 헤더 정보 전송 완료")
+
+        } catch (e: Exception) {
+            logger.error("위성 추적 시작 중 오류 발생: ${e.message}", e)
+        }
+    }
+    /**
+     * 위성 추적 초기 제어 명령 전송
+     * 2.12.2 위성 추적 초기 제어 명령 프로토콜 사용
+     */
+    fun sendInitialTrackingData(passId: UInt) {
+        try {
+            // 선택된 패스가 있는지 확인
+            val selectedPass = getSelectedTrackMstByMstId(passId)
+            if (selectedPass == null) {
+                logger.error("선택된 패스 ID($passId)에 해당하는 데이터를 찾을 수 없습니다.")
+                return
+            }
+
+            var initialTrackingData: List<Triple<UInt, Float, Float>> = emptyList()
+            val passDetails = getSelectedTrackDtlByMstId(passId)
+
+            // 시간 정보 가져오기
+            val startTime = (selectedPass["StartTime"] as ZonedDateTime).withZoneSameInstant(ZoneOffset.UTC)
+            val endTime = (selectedPass["EndTime"] as ZonedDateTime).withZoneSameInstant(ZoneOffset.UTC)
+            val calTime = GlobalData.Time.calUtcTimeOffsetTime
+
+            // 시간 범위 체크 (이미 PassScheduleService에 구현된 기능 활용)
+            val timeStatus = checkTimeInTrackingRange(calTime, startTime, endTime)
+            when (timeStatus) {
+                TimeRangeStatus.IN_RANGE -> {
+                    logger.info("🎯 현재 시간이 추적 범위 내에 있습니다 - 실시간 추적 모드")
+
+                    // 실시간 추적: 현재 시간에 정확히 맞는 데이터 추출
+                    val timeDifferenceMs = Duration.between(startTime, calTime).toMillis()
+                    val calculatedIndex = (timeDifferenceMs / 100).toInt()
+
+                    val totalSize = passDetails.size
+                    val safeStartIndex = when {
+                        calculatedIndex < 0 -> 0
+                        calculatedIndex >= totalSize -> maxOf(0, totalSize - 50)
+                        else -> calculatedIndex
+                    }
+                    val actualCount = minOf(50, totalSize - safeStartIndex)
+                    val progressPercentage = if (totalSize > 0) {
+                        (safeStartIndex.toDouble() / totalSize.toDouble()) * 100.0
+                    } else 0.0
+
+                    logger.info(
+                        "실시간 추적 정보: 진행률=${progressPercentage}%, 인덱스=${safeStartIndex}/${totalSize}, 추출=${actualCount}개"
+                    )
+
+                    initialTrackingData =
+                        passDetails.drop(safeStartIndex).take(actualCount).mapIndexed { index, point ->
+                            Triple(
+                                ((safeStartIndex + index) * 100).toUInt(),
+                                (point["Elevation"] as Double).toFloat(),
+                                (point["Azimuth"] as Double).toFloat()
+                            )
+                        }
+                    // 현재 위치 정보 로깅
+                    val currentPoint = initialTrackingData.firstOrNull()
+                    if (currentPoint != null) {
+                        logger.info("현재 추적 위치: 시간=${currentPoint.first}ms, 고도=${currentPoint.second}°, 방위=${currentPoint.third}°")
+                    }
+                }
+
+                TimeRangeStatus.BEFORE_START -> {
+                    logger.info("추적 시작 전입니다. 대기 중...")
+                    // 대기 로직
+                    val timeUntilStart = Duration.between(calTime, startTime)
+                    val secondsUntilStart = timeUntilStart.seconds
+                    val minutesUntilStart = timeUntilStart.toMinutes()
+
+                    logger.info(
+                        "추적 시작까지: {}분 {}초 (총 {}초)", minutesUntilStart, secondsUntilStart % 60, secondsUntilStart
+                    )
+                    // 대기 모드: 초기 궤도 데이터 미리 준비
+                    initialTrackingData = passDetails.take(50).mapIndexed { index, point ->
+                        Triple(
+                            (index * 100).toUInt(),
+                            (point["Elevation"] as Double).toFloat(),
+                            (point["Azimuth"] as Double).toFloat()
+                        )
+                    }
+                    // 시작 예정 위치 정보
+                    val startPoint = initialTrackingData.firstOrNull()
+                    if (startPoint != null) {
+                        logger.info(
+                            "시작 예정 위치: 고도=${startPoint.second}°, 방위=${startPoint.third}°"
+                        )
+                    }
+                }
+
+                TimeRangeStatus.AFTER_END -> {
+                    logger.warn("추적 종료 후입니다. 추적을 중지합니다")
+                    // 추적 중지 로직
+                    return
+                }
+            }
+
+            if (passDetails.isEmpty()) {
+                logger.error("선택된 패스 ID($passId)에 해당하는 세부 데이터를 찾을 수 없습니다.")
+                dataStoreService.setEphemerisTracking(false)
+                return
+            }
+
+            // 현재 시간 기준으로 NTP 시간 정보 설정
+            val currentTime = GlobalData.Time.utcNow
+
+            // 2.12.2 위성 추적 초기 제어 명령 프로토콜 생성
+            val initialControlFrame = ICDService.SatelliteTrackTwo.SetDataFrame(
+                cmdOne = 'T',
+                cmdTwo = 'M',
+                dataLen = initialTrackingData.size.toUShort(),
+                ntpYear = currentTime.year.toUShort(),
+                ntpMonth = currentTime.monthValue.toByte(),
+                ntpDay = currentTime.dayOfMonth.toByte(),
+                ntpHour = currentTime.hour.toByte(),
+                ntpMinute = currentTime.minute.toByte(),
+                ntpSecond = currentTime.second.toByte(),
+                ntpMs = (currentTime.nano / 1_000_000).toUShort(),
+                timeOffset = GlobalData.Offset.TimeOffset.toInt(), // 전역 시간 오프셋 사용
+                satelliteTrackData = initialTrackingData
+            )
+
+            // UdpFwICDService를 통해 데이터 전송
+            udpFwICDService.sendSatelliteTrackInitialControl(initialControlFrame)
+
+            logger.info("위성 추적 초기 제어 길이 (${calculateInitialDataByteSize(initialTrackingData.size)} 길이)")
+            logger.info("위성 추적 초기 제어 명령 전송 완료 (${initialTrackingData.size}개 데이터 포인트)")
+
+        } catch (e: Exception) {
+            dataStoreService.setEphemerisTracking(false)
+            logger.error("위성 추적 초기 제어 명령 전송 중 오류 발생: ${e.message}", e)
+        }
+    }
+
+    /**
+     * 초기 데이터 길이 계산
+     */
+    private fun calculateInitialDataByteSize(dataPointCount: Int): Int {
+        return (dataPointCount * 12) + 18 + 3 // 헤더 18바이트 + 각 데이터 포인트 12바이트
+    }
+
+    // 열거형 정의 (이미 있다면 생략)
+    enum class TimeRangeStatus {
+        BEFORE_START, IN_RANGE, AFTER_END
+    }
+
+    /**
+     * 시간 범위 체크 함수
+     */
+    private fun checkTimeInTrackingRange(
+        currentTime: ZonedDateTime, startTime: ZonedDateTime, endTime: ZonedDateTime
+    ): TimeRangeStatus {
+        return when {
+            currentTime.isBefore(startTime) -> {
+                val timeUntilStart = Duration.between(currentTime, startTime)
+                logger.debug("추적 시작까지 남은 시간: {}초", timeUntilStart.seconds)
+                TimeRangeStatus.BEFORE_START
+            }
+
+            currentTime.isAfter(endTime) -> {
+                val timeAfterEnd = Duration.between(endTime, currentTime)
+                logger.debug("추적 종료 후 경과 시간: {}초", timeAfterEnd.seconds)
+                TimeRangeStatus.AFTER_END
+            }
+
+            else -> {
+                val timeFromStart = Duration.between(startTime, currentTime)
+                val timeToEnd = Duration.between(currentTime, endTime)
+                logger.debug(
+                    "추적 진행 중 - 시작 후: {}초, 종료까지: {}초", timeFromStart.seconds, timeToEnd.seconds
+                )
+                TimeRangeStatus.IN_RANGE
+            }
+        }
+    }
+    /**
+     * 위성 추적 추가 데이터 요청 처리
+     */
+    fun handleTrackingDataRequest(passId: UInt, timeAcc: UInt, requestDataLength: UShort) {
+        try {
+            logger.info("timeAcc: ${timeAcc}, requestDataLength: ${requestDataLength}")
+
+            // timeAcc를 기반으로 시작 인덱스 계산 (timeAcc는 ms 단위)
+            val startIndex = timeAcc.toInt()
+            logger.info("startIndex: ${startIndex}")
+
+            // 요청된 데이터 길이에 따라 데이터 포인트 수 계산
+            sendAdditionalTrackingData(passId, startIndex, requestDataLength.toInt())
+        } catch (e: Exception) {
+            logger.error("추적 데이터 요청 처리 중 오류 발생: ${e.message}", e)
+        }
+    }
+
+    /**
+     * 위성 추적 추가 데이터 전송
+     */
+    fun sendAdditionalTrackingData(passId: UInt, startIndex: Int, requestDataLength: Int = 25) {
+        try {
+            logger.info("startIndex: ${startIndex}")
+
+            // 선택된 패스 ID에 해당하는 세부 데이터 가져오기
+            val passDetails = getSelectedTrackDtlByMstId(passId)
+
+            if (passDetails.isEmpty()) {
+                logger.error("선택된 패스 ID($passId)에 해당하는 세부 데이터를 찾을 수 없습니다.")
+                return
+            }
+
+            val indexMs = startIndex / 100
+            logger.info("indexMs: ${indexMs}")
+            val totalIndexes = passDetails.size
+            val currentIndex = indexMs
+            val remainingIndexes = maxOf(0, totalIndexes - currentIndex)
+            // 요청된 인덱스부터 추가 데이터 준비
+            val additionalTrackingData = passDetails.drop(indexMs).take(requestDataLength).mapIndexed { index, point ->
+                Triple(
+                    startIndex + index * 100, // 카운트 (누적 인덱스)
+                    (point["Elevation"] as Double).toFloat(),
+                    (point["Azimuth"] as Double).toFloat()
+                )
+            }
+
+            if (additionalTrackingData.isEmpty()) {
+                logger.info("더 이상 전송할 추적 데이터가 없습니다.")
+                return
+            }
+
+            // 2.12.3 위성 추적 추가 데이터 응답 프로토콜 생성
+            val additionalDataFrame = ICDService.SatelliteTrackThree.SetDataFrame(
+                cmdOne = 'T',
+                cmdTwo = 'R',
+                dataLength = additionalTrackingData.size.toUShort(),
+                satelliteTrackData = additionalTrackingData
+            )
+
+            // UdpFwICDService를 통해 데이터 전송
+            udpFwICDService.sendSatelliteTrackAdditionalData(additionalDataFrame)
+            // ✅ 진행률 계산
+            val progressPercentage = if (totalIndexes > 0) {
+                (currentIndex.toDouble() / totalIndexes.toDouble() * 100.0)
+            } else 0.0
+            logger.info("위성 추적 추가 데이터 전송 완료 (${additionalTrackingData.size}개 데이터 포인트 / 시작 인덱스: $currentIndex / 남은 인덱스: $remainingIndexes / 총 인덱스: $totalIndexes) [진행률: ${String.format("%.1f", progressPercentage)}%]")
+
+        } catch (e: Exception) {
+            logger.error("위성 추적 추가 데이터 전송 중 오류 발생: ${e.message}", e)
+        }
+    }
+    /**
+     * 시간 오프셋 명령 - Mono 비동기 처리
+     */
+    fun passScheduleTimeOffsetCommand(inputTimeOffset: Float) {
+        Mono.fromCallable {
+            GlobalData.Offset.TimeOffset = inputTimeOffset
+            udpFwICDService.writeNTPCommand()
+
+            // 현재 추적 중인 패스가 있을 때만 초기 데이터 전송
+            val currentSchedule = getCurrentSelectedTrackingPass()
+            currentSchedule?.let { schedule ->
+                val passId = schedule["No"] as? UInt
+                if (passId != null) {
+                    logger.info("추적 중인 패스 발견, 초기 데이터 전송 시작: passId={}", passId)
+                    sendInitialTrackingData(passId)
+                    logger.info("초기 추적 데이터 전송 완료: passId={}", passId)
+                }
+            }
+
+            // Time Offset 전달
+            udpFwICDService.timeOffsetCommand(inputTimeOffset)
+
+            logger.info("TimeOffset 명령 전송 완료: {}s", inputTimeOffset)
+        }.subscribeOn(Schedulers.boundedElastic()).subscribe({ /* 성공 */ }, { error ->
+            logger.error("시간 오프셋 명령 처리 오류: {}", error.message, error)
+        })
+    }
+    /**
+     * 추적 중지 명령
+     */
+    fun stopCommand() {
+        val multiAxis = BitSet()
+        multiAxis.set(0)
+        multiAxis.set(1)
+        multiAxis.set(2)
+        udpFwICDService.stopCommand(multiAxis)
+        dataStoreService.setPassScheduleTracking(false)
+    }
+    /**
+     * 패스 ID에 해당하는 데이터 길이 계산
+     */
+    private fun calculateDataLength(passId: UInt): Int {
+        val trackDtlData = getSelectedTrackDtlByMstId(passId)
+        return trackDtlData.size
+    }
+
+    /**
+     * 패스 ID에 해당하는 데이터 바이트 크기 계산
+     */
+    private fun calculateDataByteSize(passId: UInt): Int {
+        val trackDtlData = getSelectedTrackDtlByMstId(passId)
+        // 각 데이터 포인트의 바이트 크기 계산 (프로토콜에 따라 조정 필요)
+        return trackDtlData.size * 24 // 예시: 각 포인트가 24바이트라고 가정
+    }
+
     /**
      * ✅ 특정 시간 기준으로 현재 진행 중인 선별된 추적 패스를 조회합니다 (GlobalData.Time 기준)
      */
@@ -662,22 +1118,57 @@ class PassScheduleService(
 
             logger.info("선별된 추적 데이터 생성 시작: ${trackingTargetList.size}개 대상")
 
+            // ✅ 추적 대상 목록 상세 로깅
+            trackingTargetList.forEach { target ->
+                logger.info("🎯 추적 대상: MST=${target.mstId}, SatID=${target.satelliteId}, SatName=${target.satelliteName}")
+            }
+
             // 기존 선별된 데이터 초기화
             selectedTrackMstStorage.clear()
 
-            // 추적 대상의 mstId 목록 추출
-            val targetMstIds = trackingTargetList.map { it.mstId }.toSet()
+            // ✅ MST ID와 위성 ID를 함께 매핑
+            val targetMap = trackingTargetList.associateBy { "${it.mstId}_${it.satelliteId}" }
+            logger.info("🎯 대상 매핑: ${targetMap.keys}")
 
             // 위성별로 필터링
             passScheduleTrackMstStorage.forEach { (satelliteId, allMstData) ->
+                logger.info("🔍 위성 $satelliteId 검사 중 - 전체 패스: ${allMstData.size}개")
+
                 val selectedMstData = allMstData.filter { mstRecord ->
                     val mstId = mstRecord["No"] as? UInt
-                    mstId != null && targetMstIds.contains(mstId)
+                    val recordSatelliteId = mstRecord["SatelliteID"] as? String
+                    val satelliteName = mstRecord["SatelliteName"] as? String
+
+                    // ✅ MST ID와 위성 ID가 모두 일치하는지 확인
+                    val matchKey = "${mstId}_${recordSatelliteId}"
+                    val isSelected = targetMap.containsKey(matchKey)
+
+                    logger.debug("  패스 MST=$mstId, SatID=$recordSatelliteId, SatName=$satelliteName")
+                    logger.debug("  매치키: $matchKey, 선택됨=$isSelected")
+
+                    if (isSelected) {
+                        val target = targetMap[matchKey]
+                        logger.info("  ✅ 매칭 성공: 요청=${target?.satelliteName}(${target?.satelliteId}), 실제=$satelliteName($recordSatelliteId)")
+                    } else {
+                        logger.debug("  ❌ 매칭 실패: $matchKey")
+                    }
+
+                    isSelected
                 }
 
                 if (selectedMstData.isNotEmpty()) {
                     selectedTrackMstStorage[satelliteId] = selectedMstData
                     logger.info("위성 $satelliteId 선별된 패스: ${selectedMstData.size}개")
+
+                    // ✅ 선별된 데이터 상세 로깅
+                    selectedMstData.forEach { mst ->
+                        val mstId = mst["No"] as? UInt
+                        val satelliteName = mst["SatelliteName"] as? String
+                        val recordSatelliteId = mst["SatelliteID"] as? String
+                        val startTime = mst["StartTime"] as? ZonedDateTime
+                        val endTime = mst["EndTime"] as? ZonedDateTime
+                        logger.info("  ✅ 선별됨: MST=$mstId, SatID=$recordSatelliteId, SatName=$satelliteName, 시간=$startTime~$endTime")
+                    }
                 }
             }
 
@@ -685,6 +1176,7 @@ class PassScheduleService(
             logger.info("선별된 추적 데이터 생성 완료: ${selectedTrackMstStorage.size}개 위성, ${totalSelectedPasses}개 패스")
         }
     }
+
 
     /**
      * ✅ 특정 위성의 선별된 마스터 데이터를 조회합니다.
@@ -757,7 +1249,6 @@ class PassScheduleService(
         }
         return null
     }
-
     /**
      * ✅ 다음 선별된 추적 패스를 조회합니다.
      */
@@ -824,13 +1315,50 @@ class PassScheduleService(
      * ✅ 특정 시간 기준으로 다음 선별된 추적 패스를 조회합니다 (GlobalData.Time 기준)
      */
     private fun getNextSelectedTrackingPassWithTime(targetTime: ZonedDateTime): Map<String, Any?>? {
-        return getSelectedTrackingSchedule().filter { mstRecord ->
+        val allSchedules = getSelectedTrackingSchedule()
+
+        // ✅ 디버깅 로그 추가
+        logger.debug("🔍 전체 선별된 스케줄 수: ${allSchedules.size}")
+        allSchedules.forEach { schedule ->
+            val mstId = schedule["No"] as? UInt
+            val startTime = schedule["StartTime"] as? ZonedDateTime
+            val satelliteName = schedule["SatelliteName"] as? String
+            logger.debug("  - MST=$mstId, Name=$satelliteName, 시작=$startTime")
+        }
+
+        val futureSchedules = allSchedules.filter { mstRecord ->
             val startTime = mstRecord["StartTime"] as? ZonedDateTime
-            startTime != null && startTime.isAfter(targetTime)
-        }.minByOrNull { mstRecord ->
+            val isFuture = startTime != null && startTime.isAfter(targetTime)
+
+            if (startTime != null) {
+                val mstId = mstRecord["No"] as? UInt
+                val satelliteName = mstRecord["SatelliteName"] as? String
+                val timeDiff = Duration.between(targetTime, startTime).toMinutes()
+                logger.debug("  검사: MST=$mstId, Name=$satelliteName, 시간차=${timeDiff}분, 미래=${isFuture}")
+            }
+
+            isFuture
+        }
+
+        logger.debug("🔍 미래 스케줄 수: ${futureSchedules.size}")
+
+        val nextSchedule = futureSchedules.minByOrNull { mstRecord ->
             mstRecord["StartTime"] as ZonedDateTime
         }
+
+        if (nextSchedule != null) {
+            val nextMstId = nextSchedule["No"] as? UInt
+            val nextStartTime = nextSchedule["StartTime"] as? ZonedDateTime
+            val nextSatelliteName = nextSchedule["SatelliteName"] as? String
+            val timeDiff = if (nextStartTime != null) Duration.between(targetTime, nextStartTime).toMinutes() else 0
+            logger.debug("✅ 선택된 다음 스케줄: MST=$nextMstId, Name=$nextSatelliteName, 시간차=${timeDiff}분")
+        } else {
+            logger.debug("❌ 다음 스케줄 없음")
+        }
+
+        return nextSchedule
     }
+
     /**
      * ✅ 현재 스케줄 정보 출력 (GlobalData.Time 기준)
      */
@@ -1039,5 +1567,14 @@ class PassScheduleService(
         passScheduleTrackDtlStorage.clear()
         logger.info("TLE 캐시 및 추적 데이터 전체 삭제 완료: ${size}개 항목 삭제")
     }
+    @PreDestroy
+    fun destroy() {
+        // 구독 해제
+        subscriptions.forEach { it.dispose() }
+        subscriptions.clear()
 
+        // 기존 정리 작업
+        stopScheduleTracking()
+        logger.info("PassScheduleService 정리 완료")
+    }
 }
