@@ -172,10 +172,42 @@
                   <span class="text-caption text-grey-5 q-ml-xs">{{ scheduleData.length }}개</span>
                 </div>
               </div>
+              <!-- 🆕 현재 스케줄 상태 표시 (선택사항) -->
+              <div v-if="currentDisplaySchedule" class="q-mb-md">
+                <q-card flat bordered>
+                  <q-card-section class="q-py-sm">
+                    <div class="row items-center q-gutter-md">
+                      <q-icon :name="currentDisplaySchedule.type === 'current' ? 'play_arrow' : 'schedule'"
+                        :color="currentDisplaySchedule.type === 'current' ? 'positive' : 'primary'" size="sm" />
+                      <span class="text-body2">
+                        {{ currentDisplaySchedule.label }}: MstId {{ currentDisplaySchedule.mstId }}
+                      </span>
+                      <q-badge :color="currentDisplaySchedule.type === 'current' ? 'positive' : 'primary'"
+                        :label="currentDisplaySchedule.type === 'current' ? '추적중' : '대기중'" />
+                    </div>
+                  </q-card-section>
+                </q-card>
+              </div>
+              <div class="debug-panel q-mb-md" v-if="true">
+                <q-card flat bordered>
+                  <q-card-section class="q-py-sm">
+                    <div class="text-caption">
+                      <strong>디버깅 정보:</strong>
+                      Current: {{ icdStore.currentTrackingMstId }} |
+                      Next: {{ icdStore.nextTrackingMstId }} |
+                      스케줄 수: {{ sortedScheduleList.length }}
+                    </div>
+                    <div class="text-caption q-mt-xs">
+                      인덱스들: {{sortedScheduleList.map(s => s.index).join(', ')}}
+                    </div>
+                  </q-card-section>
+                </q-card>
+              </div>
               <!-- ✅ 스케줄 테이블 - 체크박스 제거 -->
-              <q-table flat bordered :rows="scheduleData" :columns="scheduleColumns" row-key="no"
-                :pagination="{ rowsPerPage: 0 }" hide-pagination :loading="loading" @row-click="onRowClick"
-                class="schedule-table q-mt-sm" style="height: 300px" :no-data-label="'등록된 스케줄이 없습니다'" virtual-scroll
+              <q-table :key="tableKey" flat bordered :row-class="getSimpleRowClass" :row-style="getRowStyle"
+                :rows="sortedScheduleList" :columns="scheduleColumns" row-key="no" :pagination="{ rowsPerPage: 0 }"
+                hide-pagination :loading="loading" @row-click="onRowClick" class="schedule-table q-mt-sm"
+                style="height: 300px" :no-data-label="'등록된 스케줄이 없습니다'" virtual-scroll
                 :virtual-scroll-sticky-size-start="48">
                 <template v-slot:loading>
                   <q-inner-loading showing color="primary">
@@ -232,6 +264,12 @@
                   </q-td>
                 </template>
               </q-table>
+              <!-- 테스트 버튼에 강제 업데이트 추가 -->
+              <div class="debug-buttons q-mt-md">
+                <q-btn color="primary" label="하이라이트 테스트" @click="testHighlight" size="sm" class="q-mr-sm" />
+                <q-btn color="positive" label="강제 업데이트" @click="forceTableUpdate" size="sm" class="q-mr-sm" />
+                <q-btn color="accent" label="실제 매칭 분석" @click="realMatchTest" size="sm" />
+              </div>
               <!-- 버튼 그룹 섹션 -->
               <div class="button-group q-mt-md">
                 <div class="button-row q-mb-md">
@@ -288,13 +326,266 @@ interface EChartsScatterParam {
   name: string
   color: string
 }
-
-// 스케줄 데이터
+// 🔧 모든 computed를 먼저 정의
 const scheduleData = computed(() => {
-  const data = passScheduleStore.selectedScheduleList
-  console.log('🔍 PassSchedulePage scheduleData:', data.length, '개')
-  return data
+  try {
+    const data = passScheduleStore.selectedScheduleList || []
+    console.log('🔍 PassSchedulePage scheduleData:', data.length, '개')
+    return data
+  } catch (error) {
+    console.error('❌ scheduleData computed 에러:', error)
+    return []
+  }
 })
+
+const sortedScheduleList = computed(() => {
+  try {
+    const schedules = scheduleData.value
+    if (!schedules || !Array.isArray(schedules)) {
+      return []
+    }
+    return schedules
+      .slice()
+      .sort((a, b) => {
+        const timeA = new Date(a.startTime).getTime()
+        const timeB = new Date(b.startTime).getTime()
+        return timeA - timeB
+      })
+  } catch (error) {
+    console.error('❌ sortedScheduleList computed 에러:', error)
+    return []
+  }
+})
+
+const highlightedRows = computed(() => {
+  try {
+    const current = icdStore.currentTrackingMstId
+    const next = icdStore.nextTrackingMstId
+
+    console.log('🎯 highlightedRows computed 실행:', {
+      current,
+      next,
+      currentType: typeof current,
+      nextType: typeof next
+    })
+
+    return { current, next }
+  } catch (error) {
+    console.error('❌ highlightedRows computed 에러:', error)
+    return { current: null, next: null }
+  }
+})
+
+const currentDisplaySchedule = computed(() => {
+  try {
+    if (icdStore.currentTrackingMstId !== null) {
+      return {
+        mstId: icdStore.currentTrackingMstId,
+        type: 'current',
+        label: '현재 추적 중'
+      }
+    }
+    if (icdStore.nextTrackingMstId !== null) {
+      return {
+        mstId: icdStore.nextTrackingMstId,
+        type: 'next',
+        label: '다음 예정'
+      }
+    }
+    return null
+  } catch (error) {
+    console.error('❌ currentDisplaySchedule computed 에러:', error)
+    return null
+  }
+})
+// 🔧 임시로 매칭 로직 수정 (테스트용)
+const getRowStyle = (props: { row: ScheduleItem }) => {
+  try {
+    if (!props || !props.row) {
+      return ''
+    }
+    const schedule = props.row
+    const tableIndex = schedule.index
+    const tableNo = schedule.no // no 값도 확인
+    const { current, next } = highlightedRows.value
+
+    console.log('🎨 getRowStyle 호출:', {
+      scheduleNo: schedule.no,
+      tableIndex,
+      tableNo,
+      current,
+      next,
+      매칭테스트: {
+        indexCurrentMatch: current !== null && Number(tableIndex) === Number(current),
+        indexNextMatch: next !== null && Number(tableIndex) === Number(next),
+        noCurrentMatch: current !== null && Number(tableNo) === Number(current),
+        noNextMatch: next !== null && Number(tableNo) === Number(next)
+      }
+    })
+
+    // index로 매칭 시도
+    if (current !== null && tableIndex !== undefined && Number(tableIndex) === Number(current)) {
+      console.log('✅ 현재 스케줄 매칭 (index) - 녹색 적용:', tableIndex)
+      return 'background-color: #c8e6c9 !important; border-left: 4px solid #4caf50 !important;'
+    }
+    if (next !== null && tableIndex !== undefined && Number(tableIndex) === Number(next)) {
+      console.log('✅ 다음 스케줄 매칭 (index) - 파란색 적용:', tableIndex)
+      return 'background-color: #e3f2fd !important; border-left: 4px solid #2196f3 !important;'
+    }
+
+    // no로 매칭 시도 (fallback)
+    if (current !== null && Number(tableNo) === Number(current)) {
+      console.log('✅ 현재 스케줄 매칭 (no) - 녹색 적용:', tableNo)
+      return 'background-color: #c8e6c9 !important; border-left: 4px solid #4caf50 !important;'
+    }
+    if (next !== null && Number(tableNo) === Number(next)) {
+      console.log('✅ 다음 스케줄 매칭 (no) - 파란색 적용:', tableNo)
+      return 'background-color: #e3f2fd !important; border-left: 4px solid #2196f3 !important;'
+    }
+
+    return ''
+  } catch (error) {
+    console.error('❌ getRowStyle 에러:', error)
+    return ''
+  }
+}
+// 🔧 간단한 첫 번째 행 하이라이트 상태
+const firstRowHighlight = ref(false)
+// 🔧 간단한 테스트 함수
+// 🔧 직접 DOM 조작으로 첫 번째 행 색상 변경
+const testHighlight = () => {
+  console.log('🧪 안전한 DOM 조작 테스트')
+
+  try {
+    // 약간의 지연을 두고 DOM 조작 (테이블이 완전히 렌더링된 후)
+    setTimeout(() => {
+      const firstRow = document.querySelector('.schedule-table tbody tr:first-child') as HTMLElement
+
+      if (firstRow) {
+        const currentBg = getComputedStyle(firstRow).backgroundColor
+        console.log('현재 계산된 배경색:', currentBg)
+
+        const isYellow = currentBg.includes('255, 235, 59') ||
+          firstRow.style.backgroundColor === '#ffeb3b'
+
+        // 행 스타일 변경
+        if (isYellow) {
+          firstRow.style.removeProperty('background-color')
+          firstRow.style.removeProperty('color')
+          console.log('✅ 스타일 제거됨')
+        } else {
+          firstRow.style.setProperty('background-color', '#ffeb3b', 'important')
+          firstRow.style.setProperty('color', '#000', 'important')
+          console.log('✅ 노란색 스타일 적용됨')
+        }
+
+        // 셀 스타일 변경
+        const cells = firstRow.querySelectorAll('td')
+        cells.forEach(cell => {
+          const htmlCell = cell as HTMLElement
+          if (isYellow) {
+            htmlCell.style.removeProperty('background-color')
+            htmlCell.style.removeProperty('color')
+          } else {
+            htmlCell.style.setProperty('background-color', '#ffeb3b', 'important')
+            htmlCell.style.setProperty('color', '#000', 'important')
+          }
+        })
+
+      } else {
+        console.log('❌ 첫 번째 행을 찾을 수 없음')
+      }
+    }, 100)
+
+  } catch (error) {
+    console.error('❌ DOM 조작 에러:', error)
+  }
+}
+
+// 🔧 강제 하이라이트 테스트 함수 수정
+const getSimpleRowClass = (props: { rowIndex: number }): string => {
+  if (props.rowIndex === 0 && firstRowHighlight.value) {
+    return 'highlight-first-row'
+  }
+  return ''
+}
+
+// 🔧 실제 매칭 테스트 함수 추가
+const realMatchTest = () => {
+  try {
+    console.log('🔍 실제 매칭 상황 분석')
+
+    const scheduleList = sortedScheduleList.value
+    const currentMstId = icdStore.currentTrackingMstId
+    const nextMstId = icdStore.nextTrackingMstId
+
+    console.log('📊 Store 상태:', { currentMstId, nextMstId })
+
+    if (scheduleList && scheduleList.length > 0) {
+      console.log('📋 모든 스케줄 분석:')
+      scheduleList.forEach((schedule, idx) => {
+        const isCurrentMatch = currentMstId !== null &&
+          (schedule.index === currentMstId || schedule.no === currentMstId)
+        const isNextMatch = nextMstId !== null &&
+          (schedule.index === nextMstId || schedule.no === nextMstId)
+
+        console.log(`  ${idx + 1}. ${schedule.satelliteName}`)
+        console.log(`     no: ${schedule.no}, index: ${schedule.index}`)
+        console.log(`     Current 매칭: ${isCurrentMatch} (${currentMstId})`)
+        console.log(`     Next 매칭: ${isNextMatch} (${nextMstId})`)
+
+        if (isCurrentMatch || isNextMatch) {
+          const style = getRowStyle({ row: schedule })
+          console.log(`     ✅ 적용될 스타일: ${style ? '있음' : '없음'}`)
+        }
+        console.log('     ---')
+      })
+    }
+  } catch (error) {
+    console.error('❌ realMatchTest 에러:', error)
+  }
+}
+// 🔧 테이블 강제 업데이트를 위한 키
+const tableKey = ref(0)
+// 🔧 watch들을 모든 computed 정의 후에 배치
+// 🔧 강제 리렌더링 함수
+const forceTableUpdate = () => {
+  tableKey.value++
+  console.log('🔄 테이블 강제 업데이트:', tableKey.value)
+}
+
+// 🔧 watch에 강제 업데이트 추가
+watch(
+  [() => icdStore?.currentTrackingMstId, () => icdStore?.nextTrackingMstId],
+  () => {
+    try {
+      console.log('🔄 Store 상태 변경 감지 - 테이블 업데이트 실행')
+
+      // 강제 리렌더링
+      forceTableUpdate()
+
+      // 약간의 지연 후 다시 한 번 (Quasar 테이블 특성상)
+      setTimeout(() => {
+        forceTableUpdate()
+      }, 100)
+
+    } catch (error) {
+      console.error('❌ watch 에러:', error)
+    }
+  },
+  { immediate: true }
+)
+watch(
+  () => passScheduleStore.selectedScheduleList,
+  (newData) => {
+    try {
+      console.log('👀 Store 변경 감지 - 새 데이터:', newData?.length || 0, '개')
+    } catch (error) {
+      console.error('❌ passScheduleStore watch 에러:', error)
+    }
+  },
+  { immediate: true, deep: true }
+)
 
 // 🆕 Store 상태 변경 즉시 감지
 watch(
@@ -706,12 +997,23 @@ const handleStartCommand = async () => {
     const success = await passScheduleStore.setTrackingTargets(scheduleData.value)
 
     if (success) {
-      $q.notify({
-        type: 'positive',
-        message: `${scheduleData.value.length}개의 스케줄이 추적 대상으로 설정되었습니다`,
-      })
+      // 🆕 추적 대상 설정 성공 후 모니터링 시작
+      const monitoringStarted = await passScheduleStore.startTrackingMonitor()
+      if (monitoringStarted) {
+        $q.notify({
+          type: 'positive',
+          message: `${scheduleData.value.length}개의 스케줄 추적이 시작되었습니다`,
+          caption: '모니터링이 활성화되었습니다 (100ms 주기)'
+        })
 
-      console.log('✅ ACS Start 명령 완료 - 모든 등록된 스케줄 처리됨')
+        console.log('✅ ACS Start 명령 완료 - 추적 대상 설정 및 모니터링 시작됨')
+      } else {
+        $q.notify({
+          type: 'warning',
+          message: '추적 대상은 설정되었으나 모니터링 시작에 실패했습니다',
+          caption: '수동으로 모니터링을 시작해주세요'
+        })
+      }
     } else {
       $q.notify({
         type: 'negative',
@@ -729,12 +1031,22 @@ const handleStartCommand = async () => {
 
 const handleStopCommand = async () => {
   try {
-    await icdStore.stopCommand(true, true, true)
+    // 🆕 추적 모니터링 먼저 중지
+    const monitoringStopped = await passScheduleStore.stopTrackingMonitor()
 
-    $q.notify({
-      type: 'positive',
-      message: '정지 명령이 전송되었습니다',
-    })
+    // 기존 ICD 정지 명령
+    await icdStore.stopCommand(true, true, true)
+    if (monitoringStopped) {
+      $q.notify({
+        type: 'positive',
+        message: '추적 모니터링 및 시스템이 정지되었습니다',
+      })
+    } else {
+      $q.notify({
+        type: 'warning',
+        message: '시스템 정지 명령은 전송되었으나 모니터링 중지에 실패했습니다',
+      })
+    }
   } catch (error) {
     console.error('Failed to send stop command:', error)
     $q.notify({
@@ -746,6 +1058,10 @@ const handleStopCommand = async () => {
 
 const handleStowCommand = async () => {
   try {
+    // 🆕 추적 모니터링 중지
+    await passScheduleStore.stopTrackingMonitor()
+
+    // 기존 리셋 로직
     selectedSchedule.value = null
     inputs.value = ['0.00', '0.00', '0.00', '0']
     outputs.value = ['0.00', '0.00', '0.00', '0']
@@ -759,6 +1075,7 @@ const handleStowCommand = async () => {
     $q.notify({
       type: 'info',
       message: 'PassSchedule이 리셋되었습니다',
+      caption: '모니터링이 중지되고 모든 설정이 초기화되었습니다'
     })
   } catch (error) {
     console.error('Failed to reset:', error)
@@ -768,7 +1085,6 @@ const handleStowCommand = async () => {
     })
   }
 }
-
 // 초기화
 const init = async () => {
   console.log('PassSchedulePage 초기화 시작')
@@ -849,22 +1165,28 @@ const formattedCalTime = computed(() => {
 </script>
 
 <style scoped>
+/* ===== 1. 기본 컨테이너 스타일 ===== */
 .pass-schedule-mode {
   height: 100%;
   width: 100%;
+  padding: 0;
+  margin: 0;
 }
 
 .schedule-container {
   padding: 1rem;
   width: 100%;
   height: 100%;
+  box-sizing: border-box;
 }
 
 .section-title {
   font-weight: 500;
   padding-left: 0.5rem;
+  margin-bottom: 1rem;
 }
 
+/* ===== 2. 컨트롤 섹션 기본 스타일 ===== */
 .control-section {
   height: 500px;
   width: 100%;
@@ -872,6 +1194,7 @@ const formattedCalTime = computed(() => {
   border: 1px solid rgba(255, 255, 255, 0.12);
   display: flex;
   flex-direction: column;
+  border-radius: 4px;
 }
 
 .control-section .q-card-section {
@@ -879,8 +1202,10 @@ const formattedCalTime = computed(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding: 1rem;
 }
 
+/* ===== 3. 차트 영역 스타일 ===== */
 .chart-area {
   height: 400px;
   width: 100%;
@@ -888,8 +1213,109 @@ const formattedCalTime = computed(() => {
   align-items: center;
   justify-content: center;
   margin-top: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.2);
 }
 
+/* ===== 4. 컨트롤 카드 스타일 ===== */
+.control-card {
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.control-card .q-card-section {
+  padding: 0.75rem;
+}
+
+/* ===== 5. 컴팩트 컨트롤 행 스타일 ===== */
+.compact-control-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 60px;
+}
+
+/* Input 필드 스타일 */
+.control-input {
+  flex: 0.6;
+  min-width: 50px;
+  max-width: 80px;
+}
+
+.control-input :deep(.q-field__control) {
+  height: 40px;
+}
+
+/* 버튼 그룹 스타일 */
+.control-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.control-buttons .q-btn {
+  min-width: 28px;
+  width: 28px;
+  height: 20px;
+  padding: 0;
+}
+
+/* 리셋 버튼 스타일 */
+.reset-button {
+  min-width: 28px;
+  width: 28px;
+  height: 42px;
+  flex-shrink: 0;
+}
+
+/* Output 필드 스타일 */
+.output-input-small {
+  flex: 0.6;
+  min-width: 50px;
+  max-width: 80px;
+}
+
+.output-input-small :deep(.q-field__control) {
+  height: 40px;
+}
+
+/* ===== 6. Time 컨트롤 특별 스타일 ===== */
+.time-output-section {
+  flex: 2.5;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.time-output-section .output-input {
+  flex: 1;
+  min-width: 70px;
+  max-width: 100px;
+}
+
+.time-output-section .output-input :deep(.q-field__control) {
+  height: 40px;
+}
+
+.time-output-section .cal-time-input {
+  flex: 2;
+  min-width: 150px;
+}
+
+.time-output-section .cal-time-input :deep(.q-field__control) {
+  height: 40px;
+}
+
+.time-output-section .cal-time-input :deep(.q-field__control input) {
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+}
+
+/* ===== 7. 스케줄 정보 섹션 스타일 ===== */
 .schedule-form {
   margin-top: 0.5rem;
   width: 100%;
@@ -905,45 +1331,10 @@ const formattedCalTime = computed(() => {
   height: 100%;
 }
 
-.button-group {
-  margin-top: 0.5rem;
-  width: 100%;
-  flex-shrink: 0;
-}
-
-.button-row {
-  display: flex;
-  gap: 0.5rem;
-  width: 100%;
-  margin-bottom: 1rem;
-}
-
-.control-button-row {
-  display: flex;
-  gap: 0.5rem;
-  width: 100%;
-}
-
-.upload-btn {
-  flex: 1;
-  min-width: 0;
-  height: 48px;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.control-btn {
-  flex: 1;
-  min-width: 0;
-  height: 40px;
-  font-size: 14px;
-  font-weight: 500;
-}
-
 .schedule-info {
   padding: 1rem;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 4px;
+  border-radius: 6px;
   background-color: rgba(255, 255, 255, 0.05);
   flex: 1;
   overflow-y: auto;
@@ -953,7 +1344,7 @@ const formattedCalTime = computed(() => {
   padding: 2rem;
   text-align: center;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 4px;
+  border-radius: 6px;
   background-color: rgba(255, 255, 255, 0.02);
   flex: 1;
   display: flex;
@@ -964,88 +1355,82 @@ const formattedCalTime = computed(() => {
 .info-row {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 0.5rem;
-  padding: 0.25rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .info-label {
   font-weight: 500;
   color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  min-width: 80px;
 }
 
 .info-value {
   font-weight: 600;
   color: white;
+  font-size: 13px;
+  text-align: right;
 }
 
-.schedule-table {
-  background-color: var(--q-dark);
-  color: white;
-  flex: 1;
-}
-
-.control-card {
-  height: 100%;
-}
-
-.control-card .q-card-section {
-  padding: 0.5rem;
-}
-
-/* 반응형 디자인 */
-@media (max-width: 1023px) {
-  .control-section {
-    height: auto;
-    min-height: 400px;
-  }
-
-  /* 태블릿에서는 오프셋 컨트롤을 2x2로 배치 */
-  .row:first-of-type .col-3 {
-    width: 50%;
-  }
-}
-
-@media (max-width: 767px) {
-
-  /* 모바일에서는 오프셋 컨트롤을 세로로 배치 */
-  .row:first-of-type .col-3 {
-    width: 100%;
-  }
-}
-
-/* ✅ 스케줄 헤더 컨테이너 */
+/* ===== 8. 스케줄 헤더 스타일 ===== */
 .schedule-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* ✅ 등록된 스케줄 정보를 헤더 우측에 배치 */
 .registered-schedule-info {
   background-color: rgba(0, 0, 0, 0.8);
-  padding: 6px 10px;
-  border-radius: 4px;
+  padding: 8px 12px;
+  border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .registered-schedule-info .text-body2 {
   margin-bottom: 2px;
   font-weight: 600;
   font-size: 12px;
+  color: #2196f3;
 }
 
 .registered-schedule-info .text-caption {
   font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
 }
 
-/* ✅ Records per page 관련 요소들 숨기기 */
+/* ===== 9. 테이블 기본 스타일 ===== */
+.schedule-table {
+  background-color: var(--q-dark);
+  color: white;
+  flex: 1;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* Quasar 테이블 기본 설정 초기화 */
+.schedule-table :deep(.q-table__container) {
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.schedule-table :deep(.q-table__top) {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
 .schedule-table :deep(.q-table__bottom) {
   display: none !important;
 }
@@ -1054,35 +1439,249 @@ const formattedCalTime = computed(() => {
   display: none !important;
 }
 
-/* 위성 정보 셀 스타일 */
+/* 테이블 헤더 스타일 */
+.schedule-table :deep(.q-table thead th) {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+  font-size: 12px;
+  padding: 12px 8px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+  text-align: center;
+  white-space: pre-line;
+  line-height: 1.3;
+}
+
+/* 테이블 바디 기본 스타일 */
+.schedule-table :deep(.q-table tbody) {
+  background-color: transparent;
+}
+
+/* ===== 10. 테이블 행 기본 스타일 ===== */
+.schedule-table :deep(.q-table tbody tr) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+/* 기본 호버 효과 */
+.schedule-table :deep(.q-table tbody tr:hover) {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* 짝수 행 스타일 제거 (Quasar 기본값 오버라이드) */
+.schedule-table :deep(.q-table tbody tr:nth-child(even)) {
+  background-color: transparent;
+}
+
+/* 테이블 셀 기본 스타일 */
+.schedule-table :deep(.q-table tbody td) {
+  padding: 8px 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  border-right: 1px solid rgba(255, 255, 255, 0.04);
+  vertical-align: middle;
+}
+
+.schedule-table :deep(.q-table tbody td:last-child) {
+  border-right: none;
+}
+
+/* 행 선택 효과 */
+.schedule-table :deep(.q-table tbody tr.selected) {
+  background-color: rgba(33, 150, 243, 0.1) !important;
+  border-left: 3px solid #2196f3;
+}
+
+/* ===== 11. 하이라이트 스타일 (최고 우선순위) ===== */
+
+/* 현재 추적 중인 스케줄 하이라이트 */
+.schedule-table :deep(.q-table tbody tr.current-tracking-row) {
+  background-color: #c8e6c9 !important;
+  border-left: 4px solid #4caf50 !important;
+  color: #2e7d32 !important;
+}
+
+.schedule-table :deep(.q-table tbody tr.current-tracking-row td) {
+  background-color: #c8e6c9 !important;
+  color: #2e7d32 !important;
+  font-weight: 500;
+}
+
+.schedule-table :deep(.q-table tbody tr.current-tracking-row:hover) {
+  background-color: #a5d6a7 !important;
+}
+
+.schedule-table :deep(.q-table tbody tr.current-tracking-row:hover td) {
+  background-color: #a5d6a7 !important;
+}
+
+/* 다음 예정 스케줄 하이라이트 */
+.schedule-table :deep(.q-table tbody tr.next-tracking-row) {
+  background-color: #e3f2fd !important;
+  border-left: 4px solid #2196f3 !important;
+  color: #1565c0 !important;
+}
+
+.schedule-table :deep(.q-table tbody tr.next-tracking-row td) {
+  background-color: #e3f2fd !important;
+  color: #1565c0 !important;
+  font-weight: 500;
+}
+
+.schedule-table :deep(.q-table tbody tr.next-tracking-row:hover) {
+  background-color: #bbdefb !important;
+}
+
+.schedule-table :deep(.q-table tbody tr.next-tracking-row:hover td) {
+  background-color: #bbdefb !important;
+}
+
+/* 테스트용 첫 번째 행 하이라이트 */
+.schedule-table :deep(.q-table tbody tr.highlight-first-row) {
+  background-color: #ffeb3b !important;
+  color: #000 !important;
+  border-left: 4px solid #ffc107 !important;
+}
+
+.schedule-table :deep(.q-table tbody tr.highlight-first-row td) {
+  background-color: #ffeb3b !important;
+  color: #000 !important;
+  font-weight: 600;
+}
+
+.schedule-table :deep(.q-table tbody tr.highlight-first-row:hover) {
+  background-color: #ffc107 !important;
+}
+
+.schedule-table :deep(.q-table tbody tr.highlight-first-row:hover td) {
+  background-color: #ffc107 !important;
+  /* ===== 12. 테이블 컬럼별 특별 스타일 ===== */
+
+  /* 위성 정보 컬럼 */
+  .satellite-info-cell {
+    padding: 8px 6px !important;
+    min-width: 100px;
+  }
+
+  .satellite-container {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    align-items: flex-start;
+  }
+
+  .satellite-id {
+    font-weight: 600;
+    font-size: 11px;
+    color: #2196f3;
+    line-height: 1.2;
+  }
+
+  .satellite-name {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 400;
+    line-height: 1.2;
+    word-break: break-word;
+  }
+
+  /* 시간 범위 컬럼 */
+  .time-range-cell {
+    padding: 8px 6px !important;
+    min-width: 130px;
+  }
+
+  .time-container {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    align-items: flex-start;
+  }
+
+  .start-time,
+  .end-time {
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.2;
+    font-family: 'Courier New', monospace;
+  }
+
+  .start-time {
+    color: #4caf50;
+  }
+
+  .end-time {
+    color: #ff9800;
+  }
+}
+
+/* ===== 12. 테이블 컬럼별 특별 스타일 ===== */
+
+/* 위성 정보 컬럼 */
 .satellite-info-cell {
-  padding: 6px 8px !important;
+  padding: 8px 6px !important;
+  min-width: 100px;
 }
 
 .satellite-container {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
+  align-items: flex-start;
 }
 
-/* ✅ 위성 ID가 위로, 위성 이름이 아래로 */
 .satellite-id {
   font-weight: 600;
-  font-size: 13px;
+  font-size: 11px;
   color: #2196f3;
-  /* 위성 ID 강조 색상 */
+  line-height: 1.2;
 }
 
 .satellite-name {
-  font-size: 11px;
+  font-size: 10px;
   color: rgba(255, 255, 255, 0.8);
-  font-weight: 500;
+  font-weight: 400;
+  line-height: 1.2;
+  word-break: break-word;
 }
 
-/* Azimuth 범위 셀 스타일 */
+/* 시간 범위 컬럼 */
+.time-range-cell {
+  padding: 8px 6px !important;
+  min-width: 130px;
+}
+
+.time-container {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+}
+
+.start-time,
+.end-time {
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.2;
+  font-family: 'Courier New', monospace;
+}
+
+.start-time {
+  color: #4caf50;
+}
+
+.end-time {
+  color: #ff9800;
+}
+
+/* ===== 13. Azimuth/Elevation 컬럼 스타일 ===== */
+
+/* Azimuth 범위 컬럼 */
 .azimuth-range-cell {
-  padding: 6px 8px !important;
+  padding: 8px 6px !important;
   vertical-align: middle !important;
+  min-width: 80px;
 }
 
 .azimuth-container {
@@ -1091,30 +1690,30 @@ const formattedCalTime = computed(() => {
   gap: 3px;
   align-items: center;
   justify-content: center;
-  min-height: 40px;
+  min-height: 35px;
 }
 
 .start-az,
 .end-az {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   line-height: 1.2;
+  font-family: 'Courier New', monospace;
 }
 
 .start-az {
   color: #4caf50;
-  /* 시작 방위각 - 녹색 */
 }
 
 .end-az {
   color: #ff9800;
-  /* 종료 방위각 - 주황색 */
 }
 
-/* Elevation 정보 셀 스타일 */
+/* Elevation 정보 컬럼 */
 .elevation-info-cell {
-  padding: 6px 8px !important;
+  padding: 8px 6px !important;
   vertical-align: middle !important;
+  min-width: 70px;
 }
 
 .elevation-container {
@@ -1123,141 +1722,374 @@ const formattedCalTime = computed(() => {
   gap: 3px;
   align-items: center;
   justify-content: center;
-  min-height: 40px;
+  min-height: 35px;
 }
 
 .max-elevation,
 .tilt {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   line-height: 1.2;
+  font-family: 'Courier New', monospace;
 }
 
 .max-elevation {
   color: #9c27b0;
-  /* 최대 고도각 - 보라색 */
 }
 
 .tilt {
   color: #607d8b;
-  /* Tilt - 회색 */
 }
 
-/* 컴팩트 컨트롤 행 스타일 */
-.compact-control-row {
+/* ===== 14. 버튼 그룹 스타일 ===== */
+.button-group {
+  margin-top: 1rem;
+  width: 100%;
+  flex-shrink: 0;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.button-row {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  gap: 0.75rem;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.control-button-row {
+  display: flex;
+  gap: 0.75rem;
   width: 100%;
 }
 
-/* 🔧 Azimuth, Elevation, Tilt용 Input - 40% 축소 */
-.control-input {
-  flex: 0.6;
-  /* 기존 1에서 40% 축소 */
-  min-width: 42px;
-  /* 70px의 60% */
-}
-
-.control-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  flex-shrink: 0;
-}
-
-.control-buttons .q-btn {
-  min-width: 32px;
-  width: 32px;
-  height: 24px;
-}
-
-
-.reset-button {
-  min-width: 32px;
-  width: 32px;
-
+/* 업로드 버튼 스타일 */
+.upload-btn {
+  flex: 1;
+  min-width: 0;
   height: 48px;
-  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 6px;
+  transition: all 0.2s ease;
 }
 
-/* 🔧 Azimuth, Elevation, Tilt용 Output - 40% 축소 */
-.output-input-small {
-  flex: 0.6;
-  /* 기존 1에서 40% 축소 */
-  min-width: 42px;
-  /* 70px의 60% */
+.upload-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
+/* 컨트롤 버튼 스타일 */
+.control-btn {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
 
-/* 🔧 Time용 Output과 Cal Time을 가로로 배치 */
-.time-output-section {
+.control-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+}
 
-  flex: 3.2;
-  /* 축소된 비중만큼 확대 (3 + 0.8 = 3.2) */
+/* 디버그 버튼 스타일 */
+.debug-buttons {
   display: flex;
-  gap: 4px;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background-color: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.debug-buttons .q-btn {
+  font-size: 11px;
+  height: 28px;
+  padding: 0 8px;
+}
+
+/* ===== 15. 디버그 패널 스타일 ===== */
+.debug-panel {
+  background-color: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 4px;
+}
+
+.debug-panel .q-card-section {
+  padding: 8px 12px;
+}
+
+.debug-panel .text-caption {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+  font-family: 'Courier New', monospace;
+  line-height: 1.4;
+}
+
+.debug-panel .text-caption strong {
+  color: #ffc107;
+  font-weight: 600;
+}
+
+/* 현재 스케줄 상태 표시 */
+.current-schedule-status {
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.current-schedule-status .q-card-section {
+  padding: 12px 16px;
+}
+
+.current-schedule-status .row {
   align-items: center;
 }
 
-
-/* 🔧 Time용 Input - 2배 확대 */
-.time-output-section .output-input {
-
-
-  flex: 1.2;
-  /* 기존 0.6에서 2배 확대 */
-  min-width: 84px;
-  /* 42px의 2배 */
+.current-schedule-status .q-icon {
+  margin-right: 8px;
 }
 
-
-
-/* 🔧 Cal Time 넓이 유지 */
-.time-output-section .cal-time-input {
-
-
-
-  flex: 2.6;
-  /* 기존 비중 유지 */
-  min-width: 180px;
-  /* 더 넓은 공간 확보 */
+.current-schedule-status .text-body2 {
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
 }
-</style>
 
-<style>
-/* 전역 스타일 - 컬럼 비율 조정 */
+.current-schedule-status .q-badge {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* ===== 16. 반응형 디자인 ===== */
+
+/* 태블릿 크기 (1024px 이하) */
+@media (max-width: 1023px) {
+  .control-section {
+    height: auto;
+    min-height: 400px;
+  }
+
+  .chart-area {
+    height: 300px;
+  }
+
+  /* 오프셋 컨트롤을 2x2로 배치 */
+  .row:first-of-type .col-sm-3 {
+    flex: 0 0 50%;
+    max-width: 50%;
+  }
+
+  .schedule-container {
+    padding: 0.5rem;
+  }
+
+  .button-row,
+  .control-button-row {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .upload-btn,
+  .control-btn {
+    width: 100%;
+    height: 44px;
+  }
+}
+
+/* 모바일 크기 (768px 이하) */
+@media (max-width: 767px) {
+  .pass-schedule-mode {
+    padding: 0.25rem;
+  }
+
+  .schedule-container {
+    padding: 0.25rem;
+  }
+
+  /* 오프셋 컨트롤을 세로로 배치 */
+  .row:first-of-type .col-sm-3 {
+    flex: 0 0 100%;
+    max-width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  .control-section {
+    height: auto;
+    min-height: 300px;
+  }
+
+  .chart-area {
+    height: 250px;
+  }
+
+  .schedule-table {
+    font-size: 11px;
+  }
+
+  .schedule-table :deep(.q-table thead th) {
+    font-size: 10px;
+    padding: 8px 4px;
+  }
+
+  .schedule-table :deep(.q-table tbody td) {
+    padding: 6px 4px;
+    font-size: 10px;
+  }
+
+  .compact-control-row {
+    flex-direction: column;
+    gap: 4px;
+    align-items: stretch;
+  }
+
+  .control-input,
+  .output-input-small {
+    flex: none;
+    width: 100%;
+    max-width: none;
+  }
+
+  .time-output-section {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .time-output-section .output-input,
+  .time-output-section .cal-time-input {
+    flex: none;
+    width: 100%;
+    max-width: none;
+  }
+}
+
+/* 작은 모바일 크기 (480px 이하) */
+@media (max-width: 479px) {
+  .section-title {
+    font-size: 1.2rem;
+    padding-left: 0.25rem;
+  }
+
+  .control-section .q-card-section {
+    padding: 0.5rem;
+  }
+
+  .schedule-info {
+    padding: 0.5rem;
+  }
+
+  .info-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .info-label,
+  .info-value {
+    font-size: 12px;
+  }
+
+  .registered-schedule-info {
+    padding: 6px 8px;
+  }
+
+  .registered-schedule-info .text-body2 {
+    font-size: 11px;
+  }
+
+  .registered-schedule-info .text-caption {
+    font-size: 10px;
+  }
+}
+
+/* ===== 17. 전역 스타일 (Quasar 오버라이드) ===== */
+
+/* 컬럼 비율 조정 */
 .col-md-2 {
-
   width: 21.6667% !important;
-  /* Schedule Information 확대 (16.6667% → 21.6667%) */
   padding: 4px;
 }
 
 .col-md-4 {
   width: 33.3333% !important;
-  /* Position View 유지 */
   padding: 4px;
 }
 
 .col-md-6 {
-
   width: 45% !important;
-  /* Schedule Control 축소 (50% → 45%) */
   padding: 4px;
 }
 
-/* 🔧 Azimuth, Elevation, Tilt 컨트롤 카드 전체 비중 축소 */
+/* 오프셋 컨트롤 카드 비중 조정 */
 .col-sm-3:not(:last-child) {
   flex: 0 0 22%;
-  /* 기존 25%에서 22%로 축소 */
   max-width: 22%;
 }
 
-/* 🔧 Time 컨트롤 카드 비중 확대 */
 .col-sm-3:last-child {
   flex: 0 0 34%;
-  /* 기존 25%에서 34%로 확대 */
   max-width: 34%;
+}
+
+/* Quasar 테이블 강제 스타일 오버라이드 */
+.schedule-table .q-table tbody tr.highlight-first-row {
+  background-color: #ffeb3b !important;
+  color: #000 !important;
+  border-left: 4px solid #ffc107 !important;
+}
+
+.schedule-table .q-table tbody tr.highlight-first-row td {
+  background-color: #ffeb3b !important;
+  color: #000 !important;
+}
+
+.schedule-table .q-table tbody tr.current-tracking-row {
+  background-color: #c8e6c9 !important;
+  color: #2e7d32 !important;
+  border-left: 4px solid #4caf50 !important;
+}
+
+.schedule-table .q-table tbody tr.current-tracking-row td {
+  background-color: #c8e6c9 !important;
+  color: #2e7d32 !important;
+}
+
+.schedule-table .q-table tbody tr.next-tracking-row {
+  background-color: #e3f2fd !important;
+  color: #1565c0 !important;
+  border-left: 4px solid #2196f3 !important;
+}
+
+.schedule-table .q-table tbody tr.next-tracking-row td {
+  background-color: #e3f2fd !important;
+  color: #1565c0 !important;
+}
+
+/* 스크롤바 스타일링 */
+.schedule-table .q-table__container {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.schedule-table .q-table__container::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.schedule-table .q-table__container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.schedule-table .q-table__container::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.schedule-table .q-table__container::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.5);
 }
 </style>

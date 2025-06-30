@@ -115,6 +115,7 @@ export interface PassScheduleMasterData {
   OriginalEndAzimuth: number
 }
 export interface TrackingTarget {
+  no: number
   mstId: number
   satelliteId: string
   satelliteName: string
@@ -566,7 +567,6 @@ class PassScheduleService {
           message: response.data.message || '서버에서 실패 응답을 받았습니다',
         }
       }
-
     } catch (error) {
       console.error('❌ Service API 호출 실패:', error)
 
@@ -592,6 +592,121 @@ class PassScheduleService {
         success: false,
         message: '서버 연결에 실패했습니다',
       }
+    }
+  }
+  /**
+   * 추적 모니터링 시작 (100ms 주기)
+   */
+  async startScheduleTracking(): Promise<{
+    success: boolean
+    message: string
+    data?: {
+      monitoringInterval: string
+      timeReference: string
+      threadName: string
+      isRunning: boolean
+    }
+    timestamp: number
+  }> {
+    try {
+      console.log('🚀 추적 모니터링 시작 API 호출')
+
+      const response = await api.post('/pass-schedule/tracking/start')
+
+      console.log('✅ 추적 모니터링 시작 응답:', response.data)
+
+      return response.data
+    } catch (error) {
+      console.error('❌ 추적 모니터링 시작 실패:', error)
+      return this.handleApiError(error, '추적 모니터링 시작에 실패했습니다') as Promise<{
+        success: boolean
+        message: string
+        data?: {
+          monitoringInterval: string
+          timeReference: string
+          threadName: string
+          isRunning: boolean
+        }
+        timestamp: number
+      }>
+    }
+  }
+
+  /**
+   * 추적 모니터링 중지
+   */
+  async stopScheduleTracking(): Promise<{
+    success: boolean
+    message: string
+    data?: {
+      isRunning: boolean
+      stoppedAt: number
+      resourcesCleaned: boolean
+    }
+    timestamp: number
+  }> {
+    try {
+      console.log('🛑 추적 모니터링 중지 API 호출')
+
+      const response = await api.post('/pass-schedule/tracking/stop')
+
+      console.log('✅ 추적 모니터링 중지 응답:', response.data)
+
+      return response.data
+    } catch (error) {
+      console.error('❌ 추적 모니터링 중지 실패:', error)
+      return this.handleApiError(error, '추적 모니터링 중지에 실패했습니다') as Promise<{
+        success: boolean
+        message: string
+        data?: {
+          isRunning: boolean
+          stoppedAt: number
+          resourcesCleaned: boolean
+        }
+        timestamp: number
+      }>
+    }
+  }
+
+  /**
+   * 추적 모니터링 상태 조회
+   */
+  async getTrackingMonitorStatus(): Promise<{
+    success: boolean
+    message: string
+    data?: {
+      isRunning: boolean
+      monitoringInterval?: string
+      timeReference?: string
+      threadName?: string
+      startedAt?: number
+      uptime?: number
+    }
+    timestamp: number
+  }> {
+    try {
+      console.log('📊 추적 모니터링 상태 조회 API 호출')
+
+      const response = await api.get('/pass-schedule/tracking/status')
+
+      console.log('✅ 추적 모니터링 상태 응답:', response.data)
+
+      return response.data
+    } catch (error) {
+      console.error('❌ 추적 모니터링 상태 조회 실패:', error)
+      return this.handleApiError(error, '추적 모니터링 상태 조회에 실패했습니다') as Promise<{
+        success: boolean
+        message: string
+        data?: {
+          isRunning: boolean
+          monitoringInterval?: string
+          timeReference?: string
+          threadName?: string
+          startedAt?: number
+          uptime?: number
+        }
+        timestamp: number
+      }>
     }
   }
 
@@ -627,7 +742,9 @@ class PassScheduleService {
   /**
    * 위성 추적 스케줄 대상 목록을 설정합니다
    */
-  async setTrackingTargets(request: SetTrackingTargetsRequest): Promise<SetTrackingTargetsResponse> {
+  async setTrackingTargets(
+    request: SetTrackingTargetsRequest,
+  ): Promise<SetTrackingTargetsResponse> {
     try {
       if (!request.targets || request.targets.length === 0) {
         throw new Error('추적 대상 목록이 비어있습니다')
@@ -635,14 +752,14 @@ class PassScheduleService {
 
       console.log('🚀 추적 대상 설정 API 호출:', {
         targetCount: request.targets.length,
-        targets: request.targets.map(t => ({
+        targets: request.targets.map((t) => ({
           mstId: t.mstId,
           satelliteId: t.satelliteId,
           satelliteName: t.satelliteName,
           startTime: t.startTime,
           endTime: t.endTime,
-          maxElevation: t.maxElevation
-        }))
+          maxElevation: t.maxElevation,
+        })),
       })
 
       const response = await api.post('/pass-schedule/tracking-targets', request)
@@ -654,7 +771,7 @@ class PassScheduleService {
       console.error('❌ 추적 대상 설정 실패:', error)
       return this.handleApiError(
         error,
-        '추적 대상 설정에 실패했습니다'
+        '추적 대상 설정에 실패했습니다',
       ) as Promise<SetTrackingTargetsResponse>
     }
   }
@@ -685,10 +802,7 @@ class PassScheduleService {
       return response.data
     } catch (error) {
       console.error('❌ 전체 추적 데이터 삭제 실패:', error)
-      return this.handleApiError(
-        error,
-        '전체 추적 데이터 삭제에 실패했습니다'
-      ) as Promise<{
+      return this.handleApiError(error, '전체 추적 데이터 삭제에 실패했습니다') as Promise<{
         success: boolean
         message: string
         data?: {

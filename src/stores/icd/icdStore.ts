@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, onScopeDispose } from 'vue'
+import { ref, computed, onScopeDispose, readonly } from 'vue'
 import { icdService, type MessageData, type MultiControlCommand } from '../../services/icdService'
 
 // 값을 안전하게 문자열로 변환하는 헬퍼 함수
@@ -209,6 +209,10 @@ export const useICDStore = defineStore('icd', () => {
   const passScheduleStatus = ref<boolean | null>(null)
   const sunTrackStatus = ref<boolean | null>(null)
   const communicationStatus = ref('')
+  const currentTrackingMstId = ref<number | null>(null)
+  const nextTrackingMstId = ref<number | null>(null)
+  const udpConnected = ref<boolean>(false)
+  const lastUdpUpdateTime = ref<string>('')
 
   // 비트 문자열을 개별 boolean으로 파싱하는 헬퍼 함수
   const parseProtocolStatusBits = (bitString: string) => {
@@ -1013,6 +1017,24 @@ export const useICDStore = defineStore('icd', () => {
     messageDelay: messageDelay.value,
     bufferAge: bufferUpdateTime.value ? Date.now() - bufferUpdateTime.value : 0,
   }))
+  // 🆕 추적 스케줄 정보를 위한 computed 속성
+  const trackingScheduleInfo = computed(() => ({
+    currentMstId: currentTrackingMstId.value,
+    nextMstId: nextTrackingMstId.value,
+    hasCurrentSchedule: currentTrackingMstId.value !== null,
+    hasNextSchedule: nextTrackingMstId.value !== null,
+    udpConnectionStatus: udpConnected.value,
+    lastUdpUpdate: lastUdpUpdateTime.value,
+    // 스케줄 상태 요약
+    scheduleStatus: {
+      isTracking: currentTrackingMstId.value !== null,
+      hasUpcoming: nextTrackingMstId.value !== null,
+      statusText:
+        currentTrackingMstId.value !== null
+          ? `현재: ${currentTrackingMstId.value}${nextTrackingMstId.value ? `, 다음: ${nextTrackingMstId.value}` : ''}`
+          : '대기 중',
+    },
+  }))
   // 메시지 지연 통계 관련 상태 추가
   const messageDelayStats = ref({
     min: Number.MAX_VALUE,
@@ -1184,7 +1206,22 @@ export const useICDStore = defineStore('icd', () => {
       if (message.cmdTiltAngle !== undefined) {
         cmdTiltAngle.value = safeToString(message.cmdTiltAngle)
       }
+      // 🆕 추적 스케줄 정보 업데이트
+      if (message.currentTrackingMstId !== undefined) {
+        const newCurrentMstId = message.currentTrackingMstId as number | null
+        if (currentTrackingMstId.value !== newCurrentMstId) {
+          console.log(`📋 현재 추적 MstId 변경: ${currentTrackingMstId.value} → ${newCurrentMstId}`)
+          currentTrackingMstId.value = newCurrentMstId
+        }
+      }
 
+      if (message.nextTrackingMstId !== undefined) {
+        const newNextMstId = message.nextTrackingMstId as number | null
+        if (nextTrackingMstId.value !== newNextMstId) {
+          console.log(`📋 다음 추적 MstId 변경: ${nextTrackingMstId.value} → ${newNextMstId}`)
+          nextTrackingMstId.value = newNextMstId
+        }
+      }
       // 안테나 데이터 업데이트
       if (message.data && typeof message.data === 'object') {
         updataAntennaData(message.data)
@@ -2065,6 +2102,8 @@ export const useICDStore = defineStore('icd', () => {
     hasActiveConnection,
     lastUpdateTimeFormatted,
     connectionStatus,
+    trackingScheduleInfo,
+
     //비트처리
     mainBoardStatusInfo,
     protocolStatusInfo,
@@ -2083,10 +2122,15 @@ export const useICDStore = defineStore('icd', () => {
     sunTrackStatusInfo,
     //펌웨어 UDP 상태
     communicationStatus,
-
     adaptiveInterval,
     driftCorrection,
     timerStats,
+
+    // 🔧 readonly로 감싸서 외부 수정 방지
+    currentTrackingMstId: readonly(currentTrackingMstId),
+    nextTrackingMstId: readonly(nextTrackingMstId),
+    udpConnected: readonly(udpConnected),
+    lastUdpUpdateTime: readonly(lastUdpUpdateTime),
 
     // 메서드
     initialize,

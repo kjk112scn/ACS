@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed, readonly } from 'vue' // computed, readonly import 추가
 import { useQuasar } from 'quasar'
 import {
   passScheduleService,
@@ -12,6 +12,7 @@ import {
 
 export interface ScheduleItem {
   no: number
+  index?: number // 🔧 index 필드 확인/추가
   satelliteId?: string
   satelliteName: string
   startTime: string
@@ -84,6 +85,208 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
   const uploadProgress = ref(0)
   const uploadStatus = ref('')
 
+  // 🆕 추적 모니터링 관련 상태 - 타입 수정
+  const isTrackingMonitorActive = ref(false)
+  const trackingMonitorStatus = ref<{
+    monitoringInterval?: string | undefined
+    timeReference?: string | undefined
+    threadName?: string | undefined
+    startedAt?: number | undefined
+    uptime?: number | undefined
+  }>({})
+
+  // 🆕 추적 모니터링 시작 - 타입 안전성 개선
+  const startTrackingMonitor = async (): Promise<boolean> => {
+    try {
+      loading.value = true
+      console.log('🚀 Store: 추적 모니터링 시작')
+
+      const response = await passScheduleService.startScheduleTracking()
+
+      if (response.success) {
+        isTrackingMonitorActive.value = true
+
+        // 🔧 타입 안전한 할당
+        trackingMonitorStatus.value = {
+          monitoringInterval: response.data?.monitoringInterval || undefined,
+          timeReference: response.data?.timeReference || undefined,
+          threadName: response.data?.threadName || undefined,
+          startedAt: Date.now(),
+          uptime: undefined,
+        }
+
+        $q.notify({
+          type: 'positive',
+          message: '추적 모니터링이 시작되었습니다',
+          caption: `주기: ${response.data?.monitoringInterval || '100ms'}`,
+        })
+
+        console.log('✅ Store: 추적 모니터링 시작 성공')
+        return true
+      } else {
+        throw new Error(response.message || '추적 모니터링 시작 실패')
+      }
+    } catch (error) {
+      console.error('❌ Store: 추적 모니터링 시작 실패:', error)
+
+      $q.notify({
+        type: 'negative',
+        message: '추적 모니터링 시작에 실패했습니다',
+        caption: error instanceof Error ? error.message : '알 수 없는 오류',
+      })
+
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 🆕 추적 모니터링 중지
+  const stopTrackingMonitor = async (): Promise<boolean> => {
+    try {
+      loading.value = true
+      console.log('🛑 Store: 추적 모니터링 중지')
+
+      const response = await passScheduleService.stopScheduleTracking()
+
+      if (response.success) {
+        isTrackingMonitorActive.value = false
+        trackingMonitorStatus.value = {}
+
+        $q.notify({
+          type: 'positive',
+          message: '추적 모니터링이 중지되었습니다',
+          caption: '리소스가 정리되었습니다',
+        })
+
+        console.log('✅ Store: 추적 모니터링 중지 성공')
+        return true
+      } else {
+        throw new Error(response.message || '추적 모니터링 중지 실패')
+      }
+    } catch (error) {
+      console.error('❌ Store: 추적 모니터링 중지 실패:', error)
+
+      $q.notify({
+        type: 'negative',
+        message: '추적 모니터링 중지에 실패했습니다',
+        caption: error instanceof Error ? error.message : '알 수 없는 오류',
+      })
+
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 🆕 추적 모니터링 토글
+  const toggleTrackingMonitor = async (): Promise<boolean> => {
+    if (isTrackingMonitorActive.value) {
+      return await stopTrackingMonitor()
+    } else {
+      return await startTrackingMonitor()
+    }
+  }
+
+  // 🆕 추적 모니터링 상태 조회 - 타입 안전성 개선
+  const getTrackingMonitorStatus = async (): Promise<boolean> => {
+    try {
+      console.log('📊 Store: 추적 모니터링 상태 조회')
+
+      const response = await passScheduleService.getTrackingMonitorStatus()
+
+      if (response.success && response.data) {
+        isTrackingMonitorActive.value = response.data.isRunning || false
+
+        // 🔧 타입 안전한 할당
+        trackingMonitorStatus.value = {
+          monitoringInterval: response.data.monitoringInterval || undefined,
+          timeReference: response.data.timeReference || undefined,
+          threadName: response.data.threadName || undefined,
+          startedAt: response.data.startedAt || undefined,
+          uptime: response.data.uptime || undefined,
+        }
+
+        console.log('✅ Store: 추적 모니터링 상태 조회 성공')
+        return true
+      } else {
+        throw new Error(response.message || '상태 조회 실패')
+      }
+    } catch (error) {
+      console.error('❌ Store: 추적 모니터링 상태 조회 실패:', error)
+
+      // 에러 시 기본값으로 설정
+      isTrackingMonitorActive.value = false
+      trackingMonitorStatus.value = {}
+
+      return false
+    }
+  }
+
+  // 🆕 추적 모니터링 재시작
+  const restartTrackingMonitor = async (): Promise<boolean> => {
+    try {
+      console.log('🔄 Store: 추적 모니터링 재시작 시작')
+
+      // 1. 중지
+      const stopSuccess = await stopTrackingMonitor()
+      if (!stopSuccess) {
+        throw new Error('중지 단계에서 실패')
+      }
+
+      // 2. 잠시 대기 (리소스 정리)
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      // 3. 시작
+      const startSuccess = await startTrackingMonitor()
+      if (!startSuccess) {
+        throw new Error('시작 단계에서 실패')
+      }
+
+      $q.notify({
+        type: 'positive',
+        message: '추적 모니터링이 재시작되었습니다',
+        caption: '시스템이 초기화되었습니다',
+      })
+
+      console.log('✅ Store: 추적 모니터링 재시작 성공')
+      return true
+    } catch (error) {
+      console.error('❌ Store: 추적 모니터링 재시작 실패:', error)
+
+      $q.notify({
+        type: 'negative',
+        message: '추적 모니터링 재시작에 실패했습니다',
+        caption: error instanceof Error ? error.message : '알 수 없는 오류',
+      })
+
+      return false
+    }
+  }
+
+  // 🆕 computed - 추적 모니터링 정보
+  const trackingMonitorInfo = computed(() => {
+    const startedAt = trackingMonitorStatus.value.startedAt
+    const uptime = startedAt ? Date.now() - startedAt : 0
+
+    return {
+      isActive: isTrackingMonitorActive.value,
+      status: trackingMonitorStatus.value,
+      uptime,
+      formattedUptime: formatDuration(uptime),
+    }
+  })
+
+  // 🆕 유틸리티 함수 - 시간 포맷팅
+  const formatDuration = (ms: number): string => {
+    const seconds = Math.floor(ms / 1000)
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const remainingSeconds = seconds % 60
+
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`
+  }
+
   // 스케줄 데이터 가져오기
   const fetchScheduleData = async () => {
     // 서버에서 실제 데이터를 가져오도록 변경
@@ -145,7 +348,7 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     try {
       console.log('🔄 선택된 스케줄 목록 교체 시작:', {
         기존개수: selectedScheduleList.value.length,
-        새로운개수: schedules.length
+        새로운개수: schedules.length,
       })
 
       // 🔧 명시적으로 배열 초기화
@@ -159,7 +362,7 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
 
       if (success) {
         // 🔧 Vue의 반응성을 보장하는 방식으로 추가
-        schedules.forEach(schedule => {
+        schedules.forEach((schedule) => {
           selectedScheduleList.value.push(schedule)
         })
 
@@ -168,10 +371,10 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
 
         console.log('✅ 새 스케줄 목록 설정 완료:', {
           설정된개수: selectedScheduleList.value.length,
-          목록: selectedScheduleList.value.map(s => ({
+          목록: selectedScheduleList.value.map((s) => ({
             no: s.no,
-            name: s.satelliteName
-          }))
+            name: s.satelliteName,
+          })),
         })
 
         // 🔧 강제 반응성 트리거 (필요한 경우)
@@ -854,22 +1057,40 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
   }
 
   // 추적 대상 설정 함수 추가
+  // 🔧 간단한 버전 - 기본값 보장
   const setTrackingTargets = async (schedules: ScheduleItem[]): Promise<boolean> => {
     try {
       loading.value = true
       console.log('🚀 추적 대상 설정 시작:', schedules.length, '개')
 
-      // ScheduleItem을 TrackingTarget으로 변환
-      const trackingTargets: TrackingTarget[] = schedules.map((schedule) => ({
-        mstId: schedule.no, // store에서 받아온 원본 no 값을 mstId로 사용
-        satelliteId: schedule.satelliteId || '',
-        satelliteName: schedule.satelliteName,
-        startTime: schedule.startTime,
-        endTime: schedule.endTime,
-        maxElevation: schedule.maxElevation || 0,
-      }))
+      const trackingTargets: TrackingTarget[] = schedules.map((schedule, arrayIndex) => {
+        // 🔧 안전한 mstId 결정 - 항상 유효한 number 반환
+        const mstId = schedule.index || schedule.no || arrayIndex + 1
 
-      console.log('🔄 변환된 추적 대상:', trackingTargets)
+        console.log(
+          `🔍 스케줄 ${arrayIndex}: mstId=${mstId}, index=${schedule.index}, no=${schedule.no}`,
+        )
+
+        return {
+          mstId: Number(mstId), // 🔧 명시적 number 변환
+          no: schedule.no,
+          satelliteId: schedule.satelliteId || '',
+          satelliteName: schedule.satelliteName,
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+          maxElevation: schedule.maxElevation || 0,
+        }
+      })
+
+      console.log(
+        '🔄 변환된 추적 대상:',
+        trackingTargets.map((t) => ({
+          mstId: t.mstId,
+          no: t.no,
+          satelliteId: t.satelliteId,
+          satelliteName: t.satelliteName,
+        })),
+      )
 
       const request: SetTrackingTargetsRequest = {
         targets: trackingTargets,
@@ -882,7 +1103,7 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
 
         $q.notify({
           type: 'positive',
-          message: `${response.data?.totalTargets || schedules.length}개의 추적 대상이 설정되었습니다`,
+          message: `${response.data?.totalTargets || trackingTargets.length}개의 추적 대상이 설정되었습니다`,
         })
 
         return true
@@ -931,7 +1152,7 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
         $q.notify({
           type: 'positive',
           message: `전체 추적 데이터가 삭제되었습니다. (${response.data?.deletedSatelliteCount || 0}개 위성, ${response.data?.deletedPassCount || 0}개 패스)`,
-          timeout: 3000
+          timeout: 3000,
         })
 
         return true
@@ -976,6 +1197,11 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     uploadProgress,
     uploadStatus,
 
+    // 🆕 추적 모니터링 상태
+    isTrackingMonitorActive: readonly(isTrackingMonitorActive),
+    trackingMonitorStatus: readonly(trackingMonitorStatus),
+    trackingMonitorInfo,
+
     // 액션
     fetchScheduleData,
     fetchScheduleDataFromServer,
@@ -1004,5 +1230,12 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     init,
     setTrackingTargets,
     deleteAllTrackingData, // 🆕 추가
+
+    // 🆕 추적 모니터링 액션들
+    startTrackingMonitor,
+    stopTrackingMonitor,
+    toggleTrackingMonitor,
+    getTrackingMonitorStatus,
+    restartTrackingMonitor,
   }
 })
