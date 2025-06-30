@@ -20,7 +20,7 @@ class PushDataService(
     private val activeClients = AtomicInteger(0)
 
     /**
-     * ✅ 실시간 데이터 생성 (Controller에서 호출)
+     * ✅ 실시간 데이터 생성 (mstId 포함)
      */
     fun generateRealtimeData(): String {
         return try {
@@ -38,7 +38,10 @@ class PushDataService(
                 "cmdElevationAngle" to PushData.CMD.cmdElevationAngle,
                 "cmdTiltAngle" to PushData.CMD.cmdTiltAngle,
                 "udpConnected" to isUdpConnected,
-                "lastUdpUpdateTime" to dataStoreService.getLastUdpUpdateTime().toString()
+                "lastUdpUpdateTime" to dataStoreService.getLastUdpUpdateTime().toString(),
+                // ✅ mstId 정보 추가
+                "currentTrackingMstId" to dataStoreService.getCurrentTrackingMstId(),
+                "nextTrackingMstId" to dataStoreService.getNextTrackingMstId()
             )
 
             val jsonData = objectMapper.writeValueAsString(dataWithInfo)

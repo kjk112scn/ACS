@@ -170,6 +170,39 @@ class DataStoreService {
             "trackingActualTiltAngle" to data.trackingActualTiltAngle
         )
     }
+    private val currentTrackingMstId = AtomicReference<UInt?>(null)
+    private val nextTrackingMstId = AtomicReference<UInt?>(null)
+
+    /**
+     * ✅ 현재 추적 중인 mstId 설정
+     */
+    fun setCurrentTrackingMstId(mstId: UInt?) {
+        currentTrackingMstId.set(mstId)
+        dataVersion.incrementAndGet()
+    }
+
+    /**
+     * ✅ 다음 추적 예정 mstId 설정
+     */
+    fun setNextTrackingMstId(mstId: UInt?) {
+        nextTrackingMstId.set(mstId)
+        dataVersion.incrementAndGet()
+    }
+
+    /**
+     * ✅ mstId 조회 메서드들
+     */
+    fun getCurrentTrackingMstId(): UInt? = currentTrackingMstId.get()
+    fun getNextTrackingMstId(): UInt? = nextTrackingMstId.get()
+
+    /**
+     * ✅ 추적 mstId 초기화
+     */
+    fun clearTrackingMstIds() {
+        currentTrackingMstId.set(null)
+        nextTrackingMstId.set(null)
+        dataVersion.incrementAndGet()
+    }
     /**
      * ✅ TrackingStatus 업데이트
      */
