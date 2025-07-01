@@ -326,7 +326,6 @@ const icdStore = useICDStore()
 const ephemerisStore = useEphemerisTrackStore()
 // 차트 관련 변수
 const chartRef = ref<HTMLElement | null>(null)
-let chart: ECharts | null = null
 let updateTimer: number | null = null
 
 // ECharts 매개변수 타입 정의
@@ -337,7 +336,58 @@ interface EChartsScatterParam {
   seriesName: string
   name: string
   color: string
+  borderColor: string
+  dimensionNames: string[]
+  encode: Record<string, number[]>
+  marker: string
+  data: [number, number]
+  dimensionIndex: number
 }
+
+// PassSchedule 전용 차트 데이터와 상태
+const currentPosition = ref({ azimuth: 0, elevation: 0 })
+let passChart: ECharts | null = null
+
+// 🆕 PassSchedule 전용 차트 업데이트 풀 (EphemerisDesignationPage와 동일한 최적화)
+class PassChartUpdatePool {
+  private positionData: [number, number][] = [[0, 0]]
+  private trackingData: [number, number][] = []
+  private updateOption: {
+    series: Array<{ data?: [number, number][] }>
+  }
+
+  constructor() {
+    this.updateOption = {
+      series: [{ data: this.positionData }, {}, { data: this.trackingData }, {}],
+    }
+  }
+
+  updatePosition(elevation: number, azimuth: number) {
+    // 배열 존재 확인
+    if (this.positionData.length > 0 && this.positionData[0]) {
+      this.positionData[0][0] = elevation
+      this.positionData[0][1] = azimuth
+    } else {
+      this.positionData = [[elevation, azimuth]]
+      // 시리즈 데이터 참조 업데이트
+      if (this.updateOption.series[0]) {
+        this.updateOption.series[0].data = this.positionData
+      }
+    }
+    return this.updateOption
+  }
+
+  updateTrackingPath(newPath: [number, number][]) {
+    // 안전한 배열 업데이트
+    this.trackingData.length = 0
+    if (Array.isArray(newPath)) {
+      this.trackingData.push(...newPath)
+    }
+    return this.updateOption
+  }
+}
+
+const passChartPool = new PassChartUpdatePool()
 // 🔧 모든 computed를 먼저 정의
 const scheduleData = computed(() => {
   try {
@@ -884,8 +934,12 @@ watch(displaySchedule, (newSchedule) => {
   updateTimeRemaining()
   if (newSchedule) {
     startTimeTimer()
+    // 🆕 스케줄이 선택되면 자동으로 추적 경로 로드
+    void loadSelectedScheduleTrackingPath()
   } else {
     stopTimeTimer()
+    // 🆕 스케줄이 해제되면 추적 경로 초기화
+    passScheduleStore.clearTrackingPaths()
   }
 }, { immediate: true })
 const loading = passScheduleStore.loading
@@ -995,18 +1049,25 @@ const handleTLEUpload = async () => {
   }
 }
 
-// 차트 초기화
+// 🆕 PassSchedule 전용 차트 초기화
 const initChart = () => {
   if (!chartRef.value) return
 
-  if (chart) {
-    chart.dispose()
+  // 기존 차트 인스턴스가 있으면 제거
+  if (passChart) {
+    passChart.dispose()
   }
 
-  chart = echarts.init(chartRef.value)
+  // 차트 인스턴스 생성
+  passChart = echarts.init(chartRef.value)
+  console.log('PassSchedule 차트 인스턴스 생성됨')
 
+  // 차트 옵션 설정 (Ephemeris와 동일한 스타일)
   const option = {
     backgroundColor: 'transparent',
+    grid: {
+      containLabel: true,
+    },
     polar: {
       radius: ['0%', '80%'],
       center: ['50%', '50%'],
@@ -1017,8 +1078,20 @@ const initChart = () => {
       clockwise: true,
       min: 0,
       max: 360,
-      axisLine: { show: true, lineStyle: { color: '#555' } },
-      axisTick: { show: true, interval: 30, lineStyle: { color: '#555' } },
+      animation: false,
+      axisLine: {
+        show: true,
+        lineStyle: {
+          color: '#555',
+        },
+      },
+      axisTick: {
+        show: true,
+        interval: 30,
+        lineStyle: {
+          color: '#555',
+        },
+      },
       axisLabel: {
         interval: 30,
         formatter: function (value: number) {
@@ -1035,11 +1108,16 @@ const initChart = () => {
         },
         color: '#999',
         fontSize: 10,
+        distance: 10,
       },
       splitLine: {
         show: true,
         interval: 30,
-        lineStyle: { color: '#555', type: 'dashed', width: 1 },
+        lineStyle: {
+          color: '#555',
+          type: 'dashed',
+          width: 1,
+        },
       },
     },
     radiusAxis: {
@@ -1047,21 +1125,44 @@ const initChart = () => {
       min: 0,
       max: 90,
       inverse: true,
-      axisLine: { show: false },
-      axisTick: { show: false },
-      axisLabel: { formatter: '{value}°', color: '#999' },
-      splitLine: { show: true, lineStyle: { color: '#555', type: 'dashed' } },
+      animation: false,
+      axisLine: {
+        show: false,
+      },
+      axisTick: {
+        show: false,
+      },
+      axisLabel: {
+        formatter: '{value}°',
+        color: '#999',
+      },
+      splitLine: {
+        show: true,
+        lineStyle: {
+          color: '#555',
+          type: 'dashed',
+        },
+      },
     },
     series: [
       {
-        name: '현재 위치',
+        name: '실시간 추적 위치',
         type: 'scatter',
         coordinateSystem: 'polar',
         symbol: 'circle',
         symbolSize: 15,
         animation: false,
-        itemStyle: { color: '#ff5722' },
+        itemStyle: {
+          color: '#ff5722',
+        },
         data: [[0, 0]],
+        emphasis: {
+          itemStyle: {
+            color: '#ff9800',
+            borderColor: '#fff',
+            borderWidth: 2,
+          },
+        },
         label: {
           show: true,
           formatter: function (params: EChartsScatterParam) {
@@ -1077,49 +1178,143 @@ const initChart = () => {
         },
         zlevel: 3,
       },
+
       {
-        name: '스케줄 경로',
+        name: '실시간 추적 경로',
         type: 'line',
         coordinateSystem: 'polar',
         symbol: 'none',
         animation: false,
-        lineStyle: { color: '#2196f3', width: 2 },
+        lineStyle: {
+          color: '#ffffff',
+          width: 2,
+          opacity: 0.8,
+        },
+        data: [],
+        zlevel: 2,
+      },
+      {
+        name: '예정 위성 궤적',
+        type: 'line',
+        coordinateSystem: 'polar',
+        symbol: 'none',
+        animation: false,
+        lineStyle: {
+          color: '#2196f3',
+          width: 2,
+        },
         data: [],
         zlevel: 1,
       },
     ],
   }
 
-  chart.setOption(option)
+  // 차트 옵션 적용
+  passChart.setOption(option)
+  console.log('PassSchedule 차트 옵션 적용됨')
 
+  // 명시적으로 리사이즈 호출
   setTimeout(() => {
-    chart?.resize()
+    passChart?.resize()
   }, 0)
+
+  // 윈도우 리사이즈 이벤트에 대응
+  window.addEventListener('resize', () => {
+    passChart?.resize()
+  })
 }
 
-// 차트 업데이트
+// 🆕 선택된 스케줄의 추적 경로 로드
+const loadSelectedScheduleTrackingPath = async () => {
+  try {
+    const schedule = displaySchedule.value
+    if (!schedule) {
+      console.log('⚠️ 로드할 스케줄이 없음')
+      return
+    }
+
+    const satelliteId = schedule.satelliteId || schedule.satelliteName
+    const passId = schedule.index || schedule.no
+
+    if (!satelliteId || !passId) {
+      console.log('⚠️ 위성 ID 또는 패스 ID가 없음')
+      return
+    }
+
+    console.log('🚀 스케줄 추적 경로 로드 시작:', {
+      satelliteName: schedule.satelliteName,
+      satelliteId,
+      passId
+    })
+
+    const success = await passScheduleStore.loadTrackingDetailData(
+      satelliteId,
+      passId
+    )
+
+    if (success) {
+      console.log('✅ 추적 경로 로드 완료, 차트 업데이트')
+      // 차트가 초기화되어 있다면 즉시 업데이트
+      if (passChart) {
+        updateChart()
+      }
+    } else {
+      console.warn('⚠️ 추적 경로 로드 실패')
+    }
+  } catch (error) {
+    console.error('❌ 추적 경로 로드 중 오류:', error)
+  }
+}
+
+// 🆕 PassSchedule 차트 업데이트
 const updateChart = () => {
-  if (!chart) return
+  if (!passChart) return
 
   try {
     const azimuth = parseFloat(icdStore.azimuthAngle) || 0
     const elevation = parseFloat(icdStore.elevationAngle) || 0
 
-    const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
+    const normalizedAz = azimuth
     const normalizedEl = Math.max(0, Math.min(90, elevation))
 
+    // 현재 위치 업데이트
+    currentPosition.value = { azimuth: normalizedAz, elevation: normalizedEl }
+
+    // 🆕 passScheduleStatus가 true일 때만 추적 경로 업데이트 (EphemerisDesignationPage와 동일)
+    if (icdStore.passScheduleStatusInfo?.isActive === true) {
+      passScheduleStore.updateActualTrackingPath(normalizedAz, normalizedEl)
+    }
+
+    // 🆕 최적화된 차트 업데이트 (EphemerisDesignationPage와 동일)
+    const actualPath = passScheduleStore.actualTrackingPath
+    const predictedPath = passScheduleStore.predictedTrackingPath
+
+    // passScheduleStatus가 true일 때만 추적 경로 표시 (EphemerisDesignationPage와 동일)
+    if (icdStore.passScheduleStatusInfo?.isActive === true && actualPath && actualPath.length > 0) {
+      passChartPool.updateTrackingPath(actualPath as [number, number][])
+    }
+
+    // 예정 궤적 추가 (위치 선 제거됨)
     const updateOption = {
       series: [
         {
-          data: [[normalizedEl, normalizedAz]],
+          data: [[normalizedEl, normalizedAz]], // 현재 위치
         },
-        {},
+        {
+          data: icdStore.passScheduleStatusInfo?.isActive === true ? actualPath : [], // passScheduleStatus가 true일 때만 실시간 추적 경로 표시
+        },
+        {
+          data: predictedPath, // 예정 위성 궤적
+        },
       ],
     }
 
-    chart.setOption(updateOption)
+    // 차트가 여전히 존재하는지 확인
+    if (passChart && !passChart.isDisposed()) {
+      passChart.setOption(updateOption, false, true)
+    }
   } catch (error) {
-    console.error('차트 업데이트 중 오류 발생:', error)
+    console.error('PassSchedule 차트 업데이트 오류:', error)
   }
 }
 
@@ -1163,7 +1358,7 @@ const selectScheduleData = async () => {
 const onRowClick = (evt: Event, row: ScheduleItem) => {
   selectedSchedule.value = row
   passScheduleStore.selectSchedule(row) // Store에도 선택 상태 저장
-  updateScheduleChart()
+  void updateScheduleChart() // 비동기 함수를 명시적으로 무시
 
   console.log('스케줄 선택됨:', {
     no: row.no,
@@ -1172,12 +1367,69 @@ const onRowClick = (evt: Event, row: ScheduleItem) => {
   })
 }
 
-// 선택된 스케줄에 따른 차트 업데이트
-const updateScheduleChart = () => {
-  if (!chart || !selectedSchedule.value) return
+// 🆕 선택된 스케줄에 따른 차트 업데이트 (사용하지 않음 - loadSelectedScheduleTrackingPath로 대체)
+const updateScheduleChart = async () => {
+  if (!passChart || !selectedSchedule.value) return
 
-  // 여기에 선택된 스케줄의 궤적 데이터를 차트에 표시하는 로직 추가
-  console.log('스케줄 차트 업데이트:', selectedSchedule.value)
+  try {
+    // Store의 추적 경로 초기화
+    passScheduleStore.clearTrackingPaths()
+
+    // 선택된 스케줄에서 satelliteId와 passId 추출
+    const satelliteId = selectedSchedule.value.satelliteId || selectedSchedule.value.satelliteName
+    const passId = selectedSchedule.value.index || selectedSchedule.value.no
+
+    if (satelliteId && passId) {
+      console.log(`🛰️ 스케줄 선택 - 추적 경로 조회: ${satelliteId}, 패스: ${passId}`)
+
+      // Store를 통해 추적 경로 세부 데이터 조회
+      const success = await passScheduleStore.loadTrackingDetailData(satelliteId, passId)
+
+      if (success) {
+        console.log('✅ 추적 경로 데이터 로드 성공')
+        updateChart()
+      } else {
+        console.warn('❌ 추적 경로 데이터 로드 실패')
+        // 백업용 더미 경로 설정
+        const dummyTrajectory = [
+          { azimuth: 0, elevation: 10 },
+          { azimuth: 30, elevation: 20 },
+          { azimuth: 60, elevation: 35 },
+          { azimuth: 90, elevation: 45 },
+          { azimuth: 120, elevation: 35 },
+          { azimuth: 150, elevation: 20 },
+          { azimuth: 180, elevation: 10 }
+        ]
+        setPredictedPath(dummyTrajectory)
+      }
+    } else {
+      console.warn('❌ 스케줄에서 필요한 정보를 찾을 수 없음:', selectedSchedule.value)
+    }
+
+  } catch (error) {
+    console.error('스케줄 차트 업데이트 오류:', error)
+  }
+}
+
+// 🆕 예상 경로 설정 함수 (Store 통해서)
+const setPredictedPath = (trajectoryData: Array<{ azimuth: number, elevation: number }>) => {
+  try {
+    const predictedPath: [number, number][] = trajectoryData.map(point => [
+      Math.max(0, Math.min(90, point.elevation)),
+      point.azimuth < 0 ? point.azimuth + 360 : point.azimuth
+    ])
+
+    passScheduleStore.setPredictedTrackingPath(predictedPath)
+    updateChart()
+  } catch (error) {
+    console.error('예상 경로 설정 오류:', error)
+  }
+}
+
+// 🆕 실제 추적 경로 초기화 (Store 통해서)
+const clearActualPath = () => {
+  passScheduleStore.clearTrackingPaths()
+  updateChart()
 }
 
 // 입력값 변경 핸들러
@@ -1372,6 +1624,9 @@ const handleStowCommand = async () => {
     // 🔧 선택된 스케줄 목록도 초기화
     passScheduleStore.clearSelectedSchedules()
 
+    // 🆕 추적 경로 초기화 (Store 통해서)
+    clearActualPath()
+
     // 모든 오프셋 리셋
     await icdStore.sendPositionOffsetCommand(0, 0, 0)
 
@@ -1413,6 +1668,9 @@ onMounted(async () => {
   console.log('PassSchedulePage 컴포넌트 마운트됨')
   await init()
 
+  // 🆕 PassSchedule 차트 초기화
+  initChart()
+
   // 차트 업데이트 타이머 시작 (PassSchedule 독립적)
   updateTimer = window.setInterval(() => {
     updateChart()
@@ -1423,18 +1681,23 @@ onMounted(async () => {
 onUnmounted(() => {
   console.log('PassSchedulePage 컴포넌트 언마운트됨')
 
+  // 차트 업데이트 타이머 정리
   if (updateTimer) {
     clearInterval(updateTimer)
     updateTimer = null
   }
 
-  if (chart) {
-    chart.dispose()
-    chart = null
+  // 🆕 PassSchedule 차트 인스턴스 정리
+  if (passChart) {
+    passChart.dispose()
+    passChart = null
   }
 
-  // 남은 시간 타이머 정리
+  // 시간 업데이트 타이머 정리
   stopTimeTimer()
+
+  // 🆕 추적 경로 데이터 정리 (Store 통해서)
+  passScheduleStore.clearTrackingPaths()
 
   window.removeEventListener('resize', () => { })
 })
@@ -1480,7 +1743,7 @@ const formattedCalTime = computed(() => {
 }
 
 .schedule-container {
-  padding: 1rem;
+  padding: 0.5rem 1rem 1rem 1rem;
   width: 100%;
   height: 100%;
   box-sizing: border-box;

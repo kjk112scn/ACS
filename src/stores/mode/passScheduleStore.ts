@@ -8,6 +8,7 @@ import {
   type PassScheduleMasterData,
   type SetTrackingTargetsRequest,
   type TrackingTarget,
+  type TrackingDetailItem,
 } from '../../services/mode/passScheduleService'
 
 export interface ScheduleItem {
@@ -94,6 +95,48 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     startedAt?: number | undefined
     uptime?: number | undefined
   }>({})
+
+  // 🆕 추적 경로 관련 상태 추가
+  const trackingDetailData = ref<TrackingDetailItem[]>([])
+  const predictedTrackingPath = ref<[number, number][]>([])
+  const actualTrackingPath = ref<[number, number][]>([])
+  const currentTrackingPosition = ref<{ azimuth: number, elevation: number }>({ azimuth: 0, elevation: 0 })
+  const trackingPathLoading = ref(false)
+  
+  // 🆕 현재 로드된 추적 경로 정보
+  const currentTrackingPathInfo = ref<{
+    satelliteId: string | null
+    passId: number | null
+    pointCount: number
+    lastUpdated: number | null
+  }>({
+    satelliteId: null,
+    passId: null,
+    pointCount: 0,
+    lastUpdated: null
+  })
+
+  // 🆕 Worker 관련 상태 (EphemerisTrackStore와 동일한 성능 최적화)
+  let passScheduleWorker: Worker | null = null
+  let workerInitialized = false
+  const workerStats = ref({
+    totalJobs: 0,
+    successfulJobs: 0,
+    failedJobs: 0,
+    averageProcessingTime: 0,
+    currentPathPoints: 0,
+    lastProcessingTime: 0,
+    lastErrorMessage: null as string | null,
+  })
+
+  // 🆕 추적 경로 통계
+  const trackingPath = computed(() => ({
+    sampledPath: actualTrackingPath.value,
+    currentPosition: currentTrackingPosition.value,
+    pathLength: actualTrackingPath.value.length,
+    isActive: actualTrackingPath.value.length > 0,
+    lastUpdated: currentTrackingPathInfo.value.lastUpdated,
+  }))
 
   // 🆕 추적 모니터링 시작 - 타입 안전성 개선
   const startTrackingMonitor = async (): Promise<boolean> => {
@@ -285,6 +328,236 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     const remainingSeconds = seconds % 60
 
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`
+  }
+
+  // ===== Worker-related 메서드들 (EphemerisTrackStore와 동일한 성능 최적화) =====
+
+  /**
+   * 🆕 인라인 Worker 생성 (PassSchedule용)
+   */
+  const createPassScheduleWorker = (): Worker => {
+    const workerScript = `
+      self.onmessage = function(e) {
+        const startTime = performance.now()
+
+        try {
+          const { azimuth, elevation, currentPath, maxPoints, threshold } = e.data
+
+          // 입력 데이터 검증
+          if (typeof azimuth !== 'number' || isNaN(azimuth) || !isFinite(azimuth)) {
+            throw new Error('Invalid azimuth value: ' + azimuth)
+          }
+
+          if (typeof elevation !== 'number' || isNaN(elevation) || !isFinite(elevation)) {
+            throw new Error('Invalid elevation value: ' + elevation)
+          }
+
+          if (!Array.isArray(currentPath)) {
+            throw new Error('currentPath is not an array: ' + typeof currentPath)
+          }
+
+          // 배열 데이터 정제
+          const safePath = currentPath.filter(point => {
+            return Array.isArray(point) &&
+                   point.length === 2 &&
+                   typeof point[0] === 'number' &&
+                   typeof point[1] === 'number' &&
+                   !isNaN(point[0]) && !isNaN(point[1]) &&
+                   isFinite(point[0]) && isFinite(point[1])
+          })
+
+          // 정규화
+          const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
+          const normalizedEl = Math.max(0, Math.min(90, elevation))
+          const newPoint = [normalizedEl, normalizedAz]
+
+          // 경로 업데이트
+          const updatedPath = [...safePath]
+
+          // 중복 체크
+          if (updatedPath.length > 0) {
+            const lastPoint = updatedPath[updatedPath.length - 1]
+            const distance = Math.sqrt(
+              Math.pow(newPoint[0] - lastPoint[0], 2) +
+              Math.pow(newPoint[1] - lastPoint[1], 2)
+            )
+
+            if (distance < (threshold || 0.1)) {
+              // 중복 포인트는 추가하지 않음
+              const endTime = performance.now()
+              self.postMessage({
+                success: true,
+                updatedPath: updatedPath,
+                pointsAdded: 0,
+                processingTime: endTime - startTime,
+                pathLength: updatedPath.length,
+                reason: 'duplicate_point_skipped'
+              })
+              return
+            }
+          }
+
+          // 새 포인트 추가
+          updatedPath.push(newPoint)
+
+          // 최대 포인트 수 제한
+          const maxPointsLimit = maxPoints || 500
+          if (updatedPath.length > maxPointsLimit) {
+            const removeCount = updatedPath.length - maxPointsLimit
+            updatedPath.splice(0, removeCount)
+          }
+
+          const endTime = performance.now()
+
+          self.postMessage({
+            success: true,
+            updatedPath: updatedPath,
+            pointsAdded: 1,
+            processingTime: endTime - startTime,
+            pathLength: updatedPath.length,
+            reason: 'point_added'
+          })
+
+        } catch (error) {
+          const endTime = performance.now()
+          self.postMessage({
+            success: false,
+            error: error.message || 'Unknown worker error',
+            processingTime: endTime - startTime,
+            pathLength: 0
+          })
+        }
+      }
+    `
+
+    const blob = new Blob([workerScript], { type: 'application/javascript' })
+    const workerUrl = URL.createObjectURL(blob)
+    
+    try {
+      const worker = new Worker(workerUrl)
+      console.log('✅ PassSchedule 인라인 Worker 생성 성공')
+      return worker
+    } finally {
+      URL.revokeObjectURL(workerUrl)
+    }
+  }
+
+  /**
+   * 🆕 Worker 초기화
+   */
+  const initializePassScheduleWorker = (): boolean => {
+    try {
+      if (passScheduleWorker) {
+        passScheduleWorker.terminate()
+      }
+
+      passScheduleWorker = createPassScheduleWorker()
+      workerInitialized = true
+
+      console.log('✅ PassSchedule Worker 초기화 완료')
+      return true
+    } catch (error) {
+      console.error('❌ PassSchedule Worker 초기화 실패:', error)
+      workerInitialized = false
+      return false
+    }
+  }
+
+  /**
+   * 🆕 Worker 정리
+   */
+  const cleanupPassScheduleWorker = () => {
+    if (passScheduleWorker) {
+      passScheduleWorker.terminate()
+      passScheduleWorker = null
+    }
+    workerInitialized = false
+    console.log('✅ PassSchedule Worker 정리 완료')
+  }
+
+  /**
+   * 🆕 실시간 추적 경로 업데이트 (Worker 사용)
+   */
+  const updateActualTrackingPath = async (azimuth: number, elevation: number): Promise<void> => {
+    try {
+      // Worker 초기화 확인
+      if (!workerInitialized || !passScheduleWorker) {
+        const initSuccess = initializePassScheduleWorker()
+        if (!initSuccess) {
+          throw new Error('PassSchedule Worker 초기화 실패')
+        }
+      }
+
+      workerStats.value.totalJobs++
+
+      return new Promise<void>((resolve, reject) => {
+        if (!passScheduleWorker) {
+          reject(new Error('Worker가 초기화되지 않음'))
+          return
+        }
+
+        const timeout = setTimeout(() => {
+          workerStats.value.failedJobs++
+          workerStats.value.lastErrorMessage = 'Worker 응답 시간 초과'
+          reject(new Error('Worker 응답 시간 초과'))
+        }, 1000)
+
+        passScheduleWorker.onmessage = (event) => {
+          clearTimeout(timeout)
+
+          try {
+            const response = event.data
+
+            if (response.success) {
+              // 성공적인 경로 업데이트
+              actualTrackingPath.value = response.updatedPath
+              currentTrackingPosition.value = { azimuth, elevation }
+              currentTrackingPathInfo.value.lastUpdated = Date.now()
+
+              // 통계 업데이트
+              workerStats.value.successfulJobs++
+              workerStats.value.currentPathPoints = response.pathLength
+              workerStats.value.lastProcessingTime = response.processingTime
+              
+              // 평균 처리 시간 계산
+              workerStats.value.averageProcessingTime =
+                (workerStats.value.averageProcessingTime * (workerStats.value.successfulJobs - 1) +
+                 response.processingTime) / workerStats.value.successfulJobs
+
+              resolve()
+            } else {
+              workerStats.value.failedJobs++
+              workerStats.value.lastErrorMessage = response.error || 'Unknown error'
+              reject(new Error(response.error || 'Worker 처리 실패'))
+            }
+          } catch (error) {
+            workerStats.value.failedJobs++
+            workerStats.value.lastErrorMessage = error instanceof Error ? error.message : 'Parse error'
+            reject(error instanceof Error ? error : new Error('Parse error'))
+          }
+        }
+
+        passScheduleWorker.onerror = (error) => {
+          clearTimeout(timeout)
+          workerStats.value.failedJobs++
+          workerStats.value.lastErrorMessage = 'Worker 오류'
+          reject(new Error('Worker 오류: ' + error.message))
+        }
+
+        // Worker로 작업 전송
+        passScheduleWorker.postMessage({
+          azimuth,
+          elevation,
+          currentPath: actualTrackingPath.value,
+          maxPoints: 500,
+          threshold: 0.1,
+        })
+      })
+    } catch (error) {
+      console.error('❌ PassSchedule 추적 경로 업데이트 실패:', error)
+      workerStats.value.failedJobs++
+      workerStats.value.lastErrorMessage = error instanceof Error ? error.message : 'Unknown error'
+    }
   }
 
   // 스케줄 데이터 가져오기
@@ -1180,6 +1453,119 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     }
   }
 
+  // 🆕 추적 경로 세부 데이터 조회 (개선된 버전)
+  async function loadTrackingDetailData(satelliteId: string, passId: number): Promise<boolean> {
+    try {
+      // 이미 같은 데이터가 로드되어 있는지 확인
+      if (
+        currentTrackingPathInfo.value.satelliteId === satelliteId &&
+        currentTrackingPathInfo.value.passId === passId &&
+        predictedTrackingPath.value.length > 0
+      ) {
+        console.log('✅ 이미 로드된 추적 경로 데이터 사용')
+        return true
+      }
+
+      trackingPathLoading.value = true
+      console.log(`📡 Store: 추적 경로 세부 데이터 조회 - 위성: ${satelliteId}, 패스: ${passId}`)
+
+      // 🔧 새로운 API 사용
+      const response = await passScheduleService.getTrackingDetailByPass(satelliteId, passId)
+
+      if (response.success && response.data?.trackingPoints) {
+        const trackingPoints = response.data.trackingPoints
+        
+        // 원본 상세 데이터 저장
+        trackingDetailData.value = trackingPoints
+        
+        // 차트용 좌표 데이터 변환 (서비스의 변환 함수 사용)
+        const chartData = passScheduleService.convertToChartData(trackingPoints)
+        predictedTrackingPath.value = chartData
+        
+        // 추적 경로 정보 업데이트
+        currentTrackingPathInfo.value = {
+          satelliteId,
+          passId,
+          pointCount: trackingPoints.length,
+          lastUpdated: Date.now()
+        }
+
+        console.log(`✅ Store: 추적 경로 데이터 로드 완료:`, {
+          rawPointCount: trackingPoints.length,
+          chartPointCount: chartData.length,
+          satelliteId,
+          passId
+        })
+
+        $q.notify({
+          type: 'positive',
+          message: '추적 경로를 로드했습니다',
+          caption: `${trackingPoints.length}개 포인트`
+        })
+
+        return true
+      } else {
+        console.warn('❌ Store: 추적 경로 데이터 조회 실패:', response.message)
+        
+        // 데이터 초기화
+        clearTrackingPaths()
+        
+        $q.notify({
+          type: 'warning',
+          message: '추적 경로 데이터가 없습니다',
+          caption: response.message
+        })
+
+        return false
+      }
+    } catch (error) {
+      console.error('❌ Store: 추적 경로 데이터 조회 중 오류:', error)
+      
+      // 오류 시 데이터 초기화
+      clearTrackingPaths()
+      
+      $q.notify({
+        type: 'negative',
+        message: '추적 경로 로드에 실패했습니다',
+        caption: error instanceof Error ? error.message : '알 수 없는 오류'
+      })
+
+      return false
+    } finally {
+      trackingPathLoading.value = false
+    }
+  }
+
+  // 🆕 예상 경로 설정
+  function setPredictedTrackingPath(path: [number, number][]) {
+    predictedTrackingPath.value = [...path]
+    console.log(`📍 Store: 예상 경로 설정 완료 - ${path.length}개 포인트`)
+  }
+
+  // 🆕 추적 경로 데이터 정리
+  const clearTrackingPaths = () => {
+    actualTrackingPath.value = []
+    predictedTrackingPath.value = []
+    trackingDetailData.value = []
+    currentTrackingPosition.value = { azimuth: 0, elevation: 0 }
+    currentTrackingPathInfo.value = {
+      satelliteId: null,
+      passId: null,
+      pointCount: 0,
+      lastUpdated: null,
+    }
+    console.log('✅ PassSchedule 추적 경로 데이터 정리 완료')
+  }
+
+
+
+  // 🆕 현재 위치 업데이트
+  function updateCurrentPosition(azimuth: number, elevation: number) {
+    const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
+    const normalizedEl = Math.max(0, Math.min(90, elevation))
+    currentTrackingPosition.value = { azimuth: normalizedAz, elevation: normalizedEl }
+  }
+
   return {
     // 상태
     scheduleData, // 전체 스케줄 (모달용)
@@ -1201,6 +1587,14 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     isTrackingMonitorActive: readonly(isTrackingMonitorActive),
     trackingMonitorStatus: readonly(trackingMonitorStatus),
     trackingMonitorInfo,
+
+    // 🆕 추적 경로 상태
+    trackingDetailData: readonly(trackingDetailData),
+    predictedTrackingPath: readonly(predictedTrackingPath),
+    actualTrackingPath: readonly(actualTrackingPath),
+    currentTrackingPosition: readonly(currentTrackingPosition),
+    trackingPathLoading: readonly(trackingPathLoading),
+    currentTrackingPathInfo: readonly(currentTrackingPathInfo),
 
     // 액션
     fetchScheduleData,
@@ -1237,5 +1631,19 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     toggleTrackingMonitor,
     getTrackingMonitorStatus,
     restartTrackingMonitor,
+
+    // 🆕 추적 경로 액션들
+    loadTrackingDetailData,
+    setPredictedTrackingPath,
+    updateActualTrackingPath,
+    clearTrackingPaths,
+    updateCurrentPosition,
+
+    // 🆕 Worker 관련 메서드들
+    initializePassScheduleWorker,
+    cleanupPassScheduleWorker,
+
+    // 🆕 computed 속성들
+    trackingPath,
   }
 })

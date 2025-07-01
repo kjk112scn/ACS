@@ -146,6 +146,26 @@ export interface GetAllTrackingMasterResponse {
   satellites: Record<string, PassScheduleMasterData[]>
 }
 
+// 추적 경로 데이터 인터페이스 추가
+export interface TrackingDetailItem {
+  Time: string
+  Azimuth: number
+  Elevation: number
+  [key: string]: string | number | boolean | null | undefined
+}
+
+export interface TrackingDetailResponse {
+  success: boolean
+  message: string
+  data?: {
+    satelliteId: string
+    passId: number
+    trackingPointCount: number
+    trackingPoints: TrackingDetailItem[]
+  }
+  timestamp?: number
+}
+
 // 에러 클래스들
 export class TLEApiError extends Error {
   status: number
@@ -815,6 +835,119 @@ class PassScheduleService {
         }
         timestamp: number
       }>
+    }
+  }
+
+  /**
+   * 특정 위성의 특정 패스에 대한 추적 경로 세부 데이터 조회
+   */
+  async fetchTrackingDetailData(
+    satelliteId: string,
+    passId: number,
+  ): Promise<TrackingDetailResponse> {
+    try {
+      console.log(`🛰️ 추적 경로 세부 데이터 조회 - 위성: ${satelliteId}, 패스: ${passId}`)
+
+      const response = await api.get<TrackingDetailResponse>(
+        `/pass-schedule/tracking/detail/${satelliteId}/pass/${passId}`,
+      )
+
+      console.log('✅ 추적 경로 세부 데이터 조회 성공:', response.data)
+
+      return response.data
+    } catch (error) {
+      console.error('❌ 추적 경로 세부 데이터 조회 실패:', error)
+
+      return {
+        success: false,
+        message: '추적 경로 세부 데이터 조회에 실패했습니다',
+        timestamp: Date.now(),
+      }
+    }
+  }
+
+  // ===== Pass Schedule 추적 경로 API 메서드들 =====
+
+  /**
+   * 특정 위성의 특정 패스에 대한 세부 추적 데이터 조회
+   * 백엔드 API: GET /tracking/detail/{satelliteId}/pass/{passId}
+   */
+  async getTrackingDetailByPass(
+    satelliteId: string,
+    passId: number,
+  ): Promise<{
+    success: boolean
+    message: string
+    data?: {
+      satelliteId: string
+      passId: number
+      trackingPointCount: number
+      trackingPoints: TrackingDetailItem[]
+    }
+    timestamp?: number
+  }> {
+    try {
+      console.log(`📡 추적 세부 데이터 조회 요청: satelliteId=${satelliteId}, passId=${passId}`)
+
+      const response = await api.get(`/pass-schedule/tracking/detail/${satelliteId}/pass/${passId}`)
+
+      console.log('✅ 추적 세부 데이터 응답:', {
+        success: response.data.success,
+        pointCount: response.data.data?.trackingPointCount,
+        message: response.data.message,
+      })
+
+      return response.data
+    } catch (error) {
+      console.error('❌ 추적 세부 데이터 조회 실패:', error)
+      return this.handleApiError(error, '추적 세부 데이터 조회에 실패했습니다')
+    }
+  }
+
+  /**
+   * 추적 경로 데이터를 Position View 차트용 좌표로 변환
+   */
+  convertToChartData(trackingPoints: TrackingDetailItem[]): [number, number][] {
+    try {
+      if (!Array.isArray(trackingPoints) || trackingPoints.length === 0) {
+        console.warn('⚠️ 변환할 추적 포인트가 없음')
+        return []
+      }
+
+      const chartData: [number, number][] = trackingPoints
+        .filter((point) => {
+          // 유효한 데이터만 필터링
+          return (
+            point.Azimuth !== null &&
+            point.Azimuth !== undefined &&
+            point.Elevation !== null &&
+            point.Elevation !== undefined &&
+            !isNaN(Number(point.Azimuth)) &&
+            !isNaN(Number(point.Elevation))
+          )
+        })
+        .map((point) => {
+          // [elevation, azimuth] 순서로 변환 (polar 차트 좌표계)
+          const elevation = Math.max(0, Math.min(90, Number(point.Elevation)))
+          const azimuth =
+            Number(point.Azimuth) < 0 ? Number(point.Azimuth) + 360 : Number(point.Azimuth)
+          return [elevation, azimuth] as [number, number]
+        })
+
+      console.log(`✅ 차트 데이터 변환 완료: ${chartData.length}개 포인트`)
+
+      // 샘플링 (성능 최적화)
+      if (chartData.length > 200) {
+        const step = Math.ceil(chartData.length / 200)
+        const sampledData = chartData.filter((_, index) => index % step === 0)
+        console.log(`📊 데이터 샘플링: ${chartData.length} → ${sampledData.length}개 포인트`)
+        return sampledData
+      }
+
+      return chartData
+    } catch (error) {
+      console.error('❌ 차트 데이터 변환 실패:', error)
+      return []
     }
   }
 }

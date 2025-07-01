@@ -703,61 +703,61 @@ interface EChartsScatterParam {
   dimensionIndex: number
 }
 
-// ✅ 조건부 데이터 computed 속성들
+// ✅ 조건부 데이터 computed 속성들 (ephemeris 또는 passSchedule 추적 상태 확인)
 const azimuthCmdValue = computed(() => {
-  return icdStore.ephemerisStatusInfo.isActive
+  return (icdStore.ephemerisStatusInfo.isActive || icdStore.passScheduleStatusInfo.isActive)
     ? displayValue(icdStore.trackingCMDAzimuthAngle)
     : displayValue(icdStore.cmdAzimuthAngle)
 })
 
 const azimuthActualValue = computed(() => {
-  return icdStore.ephemerisStatusInfo.isActive
+  return (icdStore.ephemerisStatusInfo.isActive || icdStore.passScheduleStatusInfo.isActive)
     ? displayValue(icdStore.trackingActualAzimuthAngle)
     : displayValue(icdStore.azimuthAngle)
 })
 
 const elevationCmdValue = computed(() => {
-  return icdStore.ephemerisStatusInfo.isActive
+  return (icdStore.ephemerisStatusInfo.isActive || icdStore.passScheduleStatusInfo.isActive)
     ? displayValue(icdStore.trackingCMDElevationAngle)
     : displayValue(icdStore.cmdElevationAngle)
 })
 
 const elevationActualValue = computed(() => {
-  return icdStore.ephemerisStatusInfo.isActive
+  return (icdStore.ephemerisStatusInfo.isActive || icdStore.passScheduleStatusInfo.isActive)
     ? displayValue(icdStore.trackingActualElevationAngle)
     : displayValue(icdStore.elevationAngle)
 })
 
 const tiltCmdValue = computed(() => {
-  return icdStore.ephemerisStatusInfo.isActive
+  return (icdStore.ephemerisStatusInfo.isActive || icdStore.passScheduleStatusInfo.isActive)
     ? displayValue(icdStore.trackingCMDTiltAngle)
     : displayValue(icdStore.cmdTiltAngle)
 })
 
 const tiltActualValue = computed(() => {
-  return icdStore.ephemerisStatusInfo.isActive
+  return (icdStore.ephemerisStatusInfo.isActive || icdStore.passScheduleStatusInfo.isActive)
     ? displayValue(icdStore.trackingActualTiltAngle)
     : displayValue(icdStore.tiltAngle)
 })
 
-// ✅ 차트에서 사용할 실제 값들을 computed로 변경
+// ✅ 차트에서 사용할 실제 값들을 computed로 변경 (ephemeris 또는 passSchedule 추적 상태 확인)
 const getCurrentAzimuthActualValue = computed((): number => {
-  const isEphemerisActive = icdStore.ephemerisStatusInfo.isActive
-  const value = isEphemerisActive ? icdStore.trackingActualAzimuthAngle : icdStore.azimuthAngle
+  const isTrackingActive = icdStore.ephemerisStatusInfo.isActive || icdStore.passScheduleStatusInfo.isActive
+  const value = isTrackingActive ? icdStore.trackingActualAzimuthAngle : icdStore.azimuthAngle
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
 const getCurrentElevationActualValue = computed((): number => {
-  const isEphemerisActive = icdStore.ephemerisStatusInfo.isActive
-  const value = isEphemerisActive ? icdStore.trackingActualElevationAngle : icdStore.elevationAngle
+  const isTrackingActive = icdStore.ephemerisStatusInfo.isActive || icdStore.passScheduleStatusInfo.isActive
+  const value = isTrackingActive ? icdStore.trackingActualElevationAngle : icdStore.elevationAngle
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
 const getCurrentTiltActualValue = computed((): number => {
-  const isEphemerisActive = icdStore.ephemerisStatusInfo.isActive
-  const value = isEphemerisActive ? icdStore.trackingActualTiltAngle : icdStore.tiltAngle
+  const isTrackingActive = icdStore.ephemerisStatusInfo.isActive || icdStore.passScheduleStatusInfo.isActive
+  const value = isTrackingActive ? icdStore.trackingActualTiltAngle : icdStore.tiltAngle
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
