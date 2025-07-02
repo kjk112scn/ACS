@@ -65,7 +65,7 @@ class UdpFwICDService(
     private val udpReceiveThreadFactory = ThreadFactory { r ->
         Thread(r, "udp-receive-realtime").apply {
             isDaemon = true
-            priority = Thread.MAX_PRIORITY
+            priority = Thread.MAX_PRIORITY - 1
             uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { thread, ex ->
                 logger.error("UDP Receive 스레드 오류", ex)
             }
