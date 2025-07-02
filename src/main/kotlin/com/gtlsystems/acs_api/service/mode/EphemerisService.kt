@@ -865,8 +865,6 @@ class EphemerisService(
                 "timestamp" to currentTime,
                 "cmdAz" to cmdAzimuth,
                 "cmdEl" to cmdElevation,
-                "actualAz" to currentData.azimuthAngle,
-                "actualEl" to currentData.elevationAngle,
                 "elapsedTimeSeconds" to elapsedTimeSeconds,
                 "trackingAzimuthTime" to trackingCmdAzimuthTime,
                 "trackingCMDAzimuthAngle" to trackingCmdAzimuth,
