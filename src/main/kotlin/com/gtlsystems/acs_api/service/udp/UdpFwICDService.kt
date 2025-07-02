@@ -20,6 +20,7 @@ import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
 import java.time.Duration
+import java.time.ZonedDateTime
 import java.util.BitSet
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -65,7 +66,7 @@ class UdpFwICDService(
     private val udpReceiveThreadFactory = ThreadFactory { r ->
         Thread(r, "udp-receive-realtime").apply {
             isDaemon = true
-            priority = Thread.MAX_PRIORITY
+            priority = Thread.MAX_PRIORITY - 1
             uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { thread, ex ->
                 logger.error("UDP Receive 스레드 오류", ex)
             }
@@ -1085,10 +1086,5 @@ class UdpFwICDService(
         - 안정성: 각 명령의 독립적 처리로 상호 영향 최소화
         - 가독성: 명확하고 이해하기 쉬운 코드 구조
         """.trimIndent()
-    }
-
-    // === 안정화 시간 추적 클래스 (기존 호환성) ===
-    private class StableTimeTracker {
-        var startTime: Long? = null
     }
 }
