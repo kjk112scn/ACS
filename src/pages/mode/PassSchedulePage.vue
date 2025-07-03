@@ -318,12 +318,10 @@ import type { ECharts } from 'echarts'
 import type { QTableProps } from 'quasar'
 import { openModal } from '../../utils/windowUtils'
 import { formatToLocalTime, formatTimeRemaining, getCalTimeTimestamp } from '../../utils/times'
-import { useEphemerisTrackStore } from '../../stores/mode/ephemerisTrackStore'
 
 const $q = useQuasar()
 const passScheduleStore = usePassScheduleStore()
 const icdStore = useICDStore()
-const ephemerisStore = useEphemerisTrackStore()
 // 차트 관련 변수
 const chartRef = ref<HTMLElement | null>(null)
 let updateTimer: number | null = null
@@ -352,13 +350,18 @@ let passChart: ECharts | null = null
 class PassChartUpdatePool {
   private positionData: [number, number][] = [[0, 0]]
   private trackingData: [number, number][] = []
+  private predictedData: [number, number][] = []
   private updateOption: {
     series: Array<{ data?: [number, number][] }>
   }
 
   constructor() {
     this.updateOption = {
-      series: [{ data: this.positionData }, {}, { data: this.trackingData }, {}],
+      series: [
+        { data: this.positionData }, // 현재 위치
+        { data: this.trackingData }, // 실시간 추적 경로
+        { data: this.predictedData }, // 예측 경로
+      ],
     }
   }
 
@@ -385,9 +388,20 @@ class PassChartUpdatePool {
     }
     return this.updateOption
   }
+
+  updatePredictedPath(newPath: [number, number][]) {
+    // 안전한 배열 업데이트
+    this.predictedData.length = 0
+    if (Array.isArray(newPath)) {
+      this.predictedData.push(...newPath)
+    }
+    return this.updateOption
+  }
 }
 
+// 🆕 PassChartUpdatePool 인스턴스 생성
 const passChartPool = new PassChartUpdatePool()
+
 // 🔧 모든 computed를 먼저 정의
 const scheduleData = computed(() => {
   try {
@@ -421,6 +435,17 @@ const sortedScheduleList = computed(() => {
 
 // 🔧 반응성 트리거
 const reactivityTrigger = ref(0)
+
+// 🆕 Store 값 변경 감지
+watch(() => icdStore.currentTrackingMstId, (newVal, oldVal) => {
+  console.log(`🔄 currentTrackingMstId 변경 감지: ${oldVal} → ${newVal}`)
+  reactivityTrigger.value++
+}, { immediate: true })
+
+watch(() => icdStore.nextTrackingMstId, (newVal, oldVal) => {
+  console.log(`🔄 nextTrackingMstId 변경 감지: ${oldVal} → ${newVal}`)
+  reactivityTrigger.value++
+}, { immediate: true })
 
 const highlightedRows = computed(() => {
   try {
@@ -1266,57 +1291,154 @@ const loadSelectedScheduleTrackingPath = async () => {
   }
 }
 
-// 🆕 PassSchedule 차트 업데이트
-const updateChart = () => {
+// 🆕 성능 최적화를 위한 변수들
+const lastUpdateTime = ref(0)
+const updateThrottle = 200 // 200ms로 업데이트 간격 증가
+const lastPathLength = ref(0)
+const pathUpdateThreshold = 5 // 경로 포인트가 5개 이상 변경될 때만 업데이트
+
+// 🆕 성능 모니터링 및 적응형 해상도 조정
+const performanceMonitor = {
+  lastFrameTime: 0,
+  frameCount: 0,
+  averageFrameTime: 0,
+  performanceThreshold: 16.67, // 60fps 기준 (16.67ms)
+  slowFrameThreshold: 33.33, // 30fps 기준 (33.33ms)
+  currentResolution: 1, // 1 = 모든 포인트 표시, 10 = 1/10 표시
+  maxResolution: 1,
+  minResolution: 10,
+}
+
+// 🆕 적응형 해상도 조정 함수
+const adjustDisplayResolution = (pathLength: number, frameTime: number) => {
+  const currentRes = performanceMonitor.currentResolution
+
+  // 성능이 좋으면 해상도 높이기
+  if (frameTime < performanceMonitor.performanceThreshold && currentRes > performanceMonitor.maxResolution) {
+    performanceMonitor.currentResolution = Math.max(performanceMonitor.maxResolution, currentRes - 1)
+    console.log(`🟢 성능 개선 - 해상도 증가: 1/${currentRes} → 1/${performanceMonitor.currentResolution}`)
+  }
+
+  // 성능이 나쁘면 해상도 낮추기
+  if (frameTime > performanceMonitor.slowFrameThreshold && currentRes < performanceMonitor.minResolution) {
+    performanceMonitor.currentResolution = Math.min(performanceMonitor.minResolution, currentRes + 1)
+    console.log(`🔴 성능 저하 - 해상도 감소: 1/${currentRes} → 1/${performanceMonitor.currentResolution}`)
+  }
+
+  // 포인트 수 기반 자동 조정
+  if (pathLength > 1000 && currentRes === 1) {
+    performanceMonitor.currentResolution = 10
+    console.log(`📊 포인트 수 초과 - 자동 해상도 조정: 1/1 → 1/10`)
+  }
+
+  return performanceMonitor.currentResolution
+}
+
+// 🆕 적응형 경로 최적화 함수
+const optimizePathAdaptive = (path: [number, number][], resolution: number): [number, number][] => {
+  if (!path || path.length === 0) return []
+
+  // 해상도에 따라 포인트 샘플링
+  const optimizedPath: [number, number][] = []
+
+  for (let i = 0; i < path.length; i += resolution) {
+    const point = path[i]
+    if (point && Array.isArray(point) && point.length === 2) {
+      optimizedPath.push(point)
+    }
+  }
+
+  // 마지막 포인트는 항상 포함
+  const lastPoint = path[path.length - 1]
+  if (lastPoint && Array.isArray(lastPoint) && lastPoint.length === 2 &&
+    optimizedPath[optimizedPath.length - 1] !== lastPoint) {
+    optimizedPath.push(lastPoint)
+  }
+
+  return optimizedPath
+}
+
+// 🆕 성능 모니터링이 포함된 차트 업데이트
+const updateChartWithPerformanceMonitoring = () => {
   if (!passChart) return
 
+  const startTime = performance.now()
+
   try {
+    const now = Date.now()
+
+    // 스로틀링
+    if (now - lastUpdateTime.value < updateThrottle) {
+      return
+    }
+
     const azimuth = parseFloat(icdStore.azimuthAngle) || 0
     const elevation = parseFloat(icdStore.elevationAngle) || 0
 
     const normalizedAz = azimuth
     const normalizedEl = Math.max(0, Math.min(90, elevation))
 
-    // 현재 위치 업데이트
     currentPosition.value = { azimuth: normalizedAz, elevation: normalizedEl }
 
-    // 🆕 passScheduleStatus가 true일 때만 추적 경로 업데이트 (EphemerisDesignationPage와 동일)
-    if (icdStore.passScheduleStatusInfo?.isActive === true) {
-      passScheduleStore.updateActualTrackingPath(normalizedAz, normalizedEl)
+    // 경로 업데이트 조건
+    const shouldUpdatePath = icdStore.passScheduleStatusInfo?.isActive === true ||
+      icdStore.currentTrackingMstId !== null ||
+      icdStore.nextTrackingMstId !== null
+
+    // 🆕 actualPath 선언
+    const actualPath = passScheduleStore.actualTrackingPath
+
+    if (shouldUpdatePath) {
+      const currentPathLength = actualPath?.length || 0
+
+      if (Math.abs(currentPathLength - lastPathLength.value) >= pathUpdateThreshold) {
+        console.log('✅ 추적 경로 업데이트 시작 (적응형 해상도)')
+        void passScheduleStore.updateActualTrackingPath(normalizedAz, normalizedEl)
+        lastPathLength.value = currentPathLength
+      }
     }
 
-    // 🆕 최적화된 차트 업데이트 (EphemerisDesignationPage와 동일)
-    const actualPath = passScheduleStore.actualTrackingPath
+    // 🆕 적응형 해상도 조정
     const predictedPath = passScheduleStore.predictedTrackingPath
 
-    // passScheduleStatus가 true일 때만 추적 경로 표시 (EphemerisDesignationPage와 동일)
-    if (icdStore.passScheduleStatusInfo?.isActive === true && actualPath && actualPath.length > 0) {
-      passChartPool.updateTrackingPath(actualPath as [number, number][])
-    }
+    const shouldShowTrackingPath = icdStore.passScheduleStatusInfo?.isActive === true &&
+      actualPath && actualPath.length > 0
 
-    // 예정 궤적 추가 (위치 선 제거됨)
-    const updateOption = {
-      series: [
-        {
-          data: [[normalizedEl, normalizedAz]], // 현재 위치
-        },
-        {
-          data: icdStore.passScheduleStatusInfo?.isActive === true ? actualPath : [], // passScheduleStatus가 true일 때만 실시간 추적 경로 표시
-        },
-        {
-          data: predictedPath, // 예정 위성 궤적
-        },
-      ],
-    }
+    // 성능 모니터링 및 해상도 조정
+    const frameTime = performance.now() - startTime
+    const resolution = adjustDisplayResolution(actualPath?.length || 0, frameTime)
 
-    // 차트가 여전히 존재하는지 확인
+    // 적응형 경로 최적화
+    const displayPath = shouldShowTrackingPath ?
+      optimizePathAdaptive(actualPath as [number, number][], resolution) : []
+
+    // 🆕 PassChartUpdatePool을 사용한 차트 업데이트
+    const updateOption = passChartPool.updatePosition(normalizedEl, normalizedAz)
+    passChartPool.updateTrackingPath(displayPath)
+    passChartPool.updatePredictedPath((predictedPath || []).map((point: readonly [number, number]) => [...point]))
+
     if (passChart && !passChart.isDisposed()) {
       passChart.setOption(updateOption, false, true)
+      lastUpdateTime.value = now
+
+      // 성능 통계 업데이트
+      performanceMonitor.frameCount++
+      performanceMonitor.averageFrameTime =
+        (performanceMonitor.averageFrameTime * (performanceMonitor.frameCount - 1) + frameTime) /
+        performanceMonitor.frameCount
+
+      // 성능 로그 (10프레임마다)
+      if (performanceMonitor.frameCount % 10 === 0) {
+        console.log(`📊 성능 통계: 평균 ${performanceMonitor.averageFrameTime.toFixed(2)}ms, 해상도: 1/${resolution}, 포인트: ${displayPath.length}/${actualPath?.length || 0}`)
+      }
     }
   } catch (error) {
     console.error('PassSchedule 차트 업데이트 오류:', error)
   }
 }
+
+// 🆕 기존 updateChart 함수를 성능 모니터링 버전으로 교체
+const updateChart = updateChartWithPerformanceMonitoring
 
 const selectScheduleData = async () => {
   try {
@@ -1425,13 +1547,13 @@ const setPredictedPath = (trajectoryData: Array<{ azimuth: number, elevation: nu
     console.error('예상 경로 설정 오류:', error)
   }
 }
-
+/*
 // 🆕 실제 추적 경로 초기화 (Store 통해서)
 const clearActualPath = () => {
   passScheduleStore.clearTrackingPaths()
   updateChart()
 }
-
+ */
 // 입력값 변경 핸들러
 const onInputChange = (index: number, value: string) => {
   inputs.value[index] = value
@@ -1479,7 +1601,7 @@ const updateOffset = async (index: number, value: string) => {
       value,
       valueType: typeof value,
       inputs3: inputs.value[3],
-      currentTimeResult: ephemerisStore.offsetValues.timeResult,
+      currentTimeResult: passScheduleStore.offsetValues.timeResult,
     })
 
     const numValue = Number(parseFloat(value).toFixed(2)) || 0
@@ -1495,10 +1617,10 @@ const updateOffset = async (index: number, value: string) => {
 
     if (index === 3) {
       const timeInputValue = inputs.value[3] || '0.00'
-      ephemerisStore.updateOffsetValues('time', timeInputValue)
+      passScheduleStore.updateOffsetValues('time', timeInputValue)
       try {
-        await ephemerisStore.sendTimeOffset(numValue)
-        ephemerisStore.updateOffsetValues('timeResult', numValue.toFixed(2))
+        await passScheduleStore.sendTimeOffset(numValue)
+        passScheduleStore.updateOffsetValues('timeResult', numValue.toFixed(2))
         console.log('Time Result 업데이트:', numValue.toFixed(2))
       } catch (error) {
         console.error('Time offset command failed:', error)
@@ -1507,11 +1629,11 @@ const updateOffset = async (index: number, value: string) => {
     }
 
     // Position Offset 처리 (azimuth, elevation, tilt)
-    ephemerisStore.updateOffsetValues(offsetType, numValue.toFixed(2))
+    passScheduleStore.updateOffsetValues(offsetType, numValue.toFixed(2))
 
-    const azOffset = Number((parseFloat(ephemerisStore.offsetValues.azimuth) || 0).toFixed(2))
-    const elOffset = Number((parseFloat(ephemerisStore.offsetValues.elevation) || 0).toFixed(2))
-    const tiOffset = Number((parseFloat(ephemerisStore.offsetValues.tilt) || 0).toFixed(2))
+    const azOffset = Number((parseFloat(passScheduleStore.offsetValues.azimuth) || 0).toFixed(2))
+    const elOffset = Number((parseFloat(passScheduleStore.offsetValues.elevation) || 0).toFixed(2))
+    const tiOffset = Number((parseFloat(passScheduleStore.offsetValues.tilt) || 0).toFixed(2))
 
     await icdStore.sendPositionOffsetCommand(azOffset, elOffset, tiOffset)
   } catch (error) {
@@ -1542,6 +1664,29 @@ const handleStartCommand = async () => {
     if (success) {
       console.log('✅ 추적 대상 설정 성공')
 
+      // 🆕 예측 경로 로드 (첫 번째 스케줄 기준)
+      if (scheduleData.value.length > 0) {
+        const firstSchedule = scheduleData.value[0]
+        if (firstSchedule) {
+          const satelliteId = firstSchedule.satelliteId || firstSchedule.satelliteName
+          const passId = firstSchedule.index || firstSchedule.no
+
+          if (satelliteId && passId) {
+            console.log('🛰️ 예측 경로 로드 시작:', satelliteId, passId)
+            try {
+              const pathLoaded = await passScheduleStore.loadTrackingDetailData(satelliteId, passId)
+              if (pathLoaded) {
+                console.log('✅ 예측 경로 로드 성공')
+              } else {
+                console.warn('⚠️ 예측 경로 로드 실패')
+              }
+            } catch (error) {
+              console.error('❌ 예측 경로 로드 중 오류:', error)
+            }
+          }
+        }
+      }
+
       // Store 값 변경 확인을 위한 지연된 체크
       setTimeout(() => {
         console.log('🔍 Start 후 Store 상태:', {
@@ -1562,6 +1707,33 @@ const handleStartCommand = async () => {
         })
 
         console.log('✅ ACS Start 명령 완료 - 추적 대상 설정 및 모니터링 시작됨')
+
+        // 🆕 테이블 하이라이트 디버깅
+        setTimeout(() => {
+          console.log('🔍 Start 후 하이라이트 상태 확인:')
+          console.log('  - currentTrackingMstId:', icdStore.currentTrackingMstId)
+          console.log('  - nextTrackingMstId:', icdStore.nextTrackingMstId)
+          console.log('  - scheduleData:', scheduleData.value.length, '개')
+
+          // WebSocket 데이터 확인
+          console.log('📡 WebSocket 데이터 확인:')
+          console.log('  - icdStore.currentTrackingMstId:', icdStore.currentTrackingMstId)
+          console.log('  - icdStore.nextTrackingMstId:', icdStore.nextTrackingMstId)
+
+          // 강제 반응성 트리거
+          reactivityTrigger.value++
+
+          // DOM 직접 조작으로 하이라이트 적용
+          applyRowColors()
+        }, 2000)
+
+        // 5초 후 최종 상태 확인
+        setTimeout(() => {
+          console.log('⏰ 5초 후 최종 상태 확인:')
+          console.log('  - icdStore.currentTrackingMstId:', icdStore.currentTrackingMstId)
+          console.log('  - icdStore.nextTrackingMstId:', icdStore.nextTrackingMstId)
+          console.log('  - scheduleData:', scheduleData.value.length, '개')
+        }, 5000)
       } else {
         $q.notify({
           type: 'warning',
@@ -1610,11 +1782,28 @@ const handleStopCommand = async () => {
     })
   }
 }
-
 const handleStowCommand = async () => {
   try {
-    // 🆕 추적 모니터링 중지
+    // 🆕 추적 중지
     await passScheduleStore.stopTrackingMonitor()
+    await icdStore.stowCommand()
+
+    $q.notify({
+      type: 'positive',
+      message: 'Stow 명령이 전송되었습니다',
+    })
+  } catch (error) {
+    console.error('Failed to send stow command:', error)
+    $q.notify({
+      type: 'negative',
+      message: 'Stow 명령 전송에 실패했습니다',
+    })
+  }
+}
+/*
+const handleReset = async () => {
+  try {
+
 
     // 기존 리셋 로직
     selectedSchedule.value = null
@@ -1642,7 +1831,7 @@ const handleStowCommand = async () => {
       message: '리셋에 실패했습니다',
     })
   }
-}
+} */
 // 초기화
 const init = async () => {
   console.log('PassSchedulePage 초기화 시작')

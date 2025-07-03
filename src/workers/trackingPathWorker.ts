@@ -8,10 +8,12 @@ interface WorkerMessage {
 }
 
 interface WorkerResponse {
+  success: boolean
   updatedPath: [number, number][]
   processingTime: number
   pointsAdded: number
   totalPoints: number
+  pathLength: number
   error?: string
 }
 
@@ -22,13 +24,30 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
   try {
     const { azimuth, elevation, currentPath, maxPoints, threshold } = e.data
 
+    // 🔧 입력 데이터 검증
+    if (typeof azimuth !== 'number' || typeof elevation !== 'number') {
+      throw new Error('Invalid azimuth or elevation values')
+    }
+
     // 정규화
     const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
     const normalizedEl = Math.max(0, Math.min(90, elevation))
     const newPoint: [number, number] = [normalizedEl, normalizedAz]
 
-    // 경로 업데이트
-    const updatedPath = [...currentPath]
+    // 🔧 경로 데이터 검증 및 정리
+    const updatedPath: [number, number][] = []
+
+    if (Array.isArray(currentPath)) {
+      currentPath.forEach((point) => {
+        if (Array.isArray(point) && point.length >= 2) {
+          const el = Number(point[0])
+          const az = Number(point[1])
+          if (!isNaN(el) && !isNaN(az)) {
+            updatedPath.push([el, az])
+          }
+        }
+      })
+    }
 
     // 중복 체크
     if (updatedPath.length > 0) {
@@ -41,10 +60,12 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
           // 변화가 작으면 추가하지 않음
           const processingTime = performance.now() - startTime
           self.postMessage({
+            success: true,
             updatedPath,
             processingTime,
             pointsAdded: 0,
             totalPoints: updatedPath.length,
+            pathLength: updatedPath.length,
           })
           return
         }
@@ -62,19 +83,22 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
     const processingTime = performance.now() - startTime
 
     self.postMessage({
+      success: true,
       updatedPath,
       processingTime,
       pointsAdded: 1,
       totalPoints: updatedPath.length,
+      pathLength: updatedPath.length,
     })
-
   } catch (error) {
     const processingTime = performance.now() - startTime
     self.postMessage({
+      success: false,
       updatedPath: [],
       processingTime,
       pointsAdded: 0,
       totalPoints: 0,
+      pathLength: 0,
       error: error instanceof Error ? error.message : 'Unknown error',
     })
   }

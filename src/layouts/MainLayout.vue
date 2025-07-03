@@ -77,7 +77,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import EssentialLink, { type EssentialLinkProps } from 'components/EssentialLink.vue'
-import SettingsModal from 'src/components/modal/Settings/SettingsModal.vue'
+import SettingsModal from 'src/components/modals/Settings/SettingsModal.vue'
 import { openComponent } from '../utils/windowUtils' // ✅ windowUtils import 추가
 import { useQuasar } from 'quasar'
 

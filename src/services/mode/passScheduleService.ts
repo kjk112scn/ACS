@@ -687,7 +687,19 @@ class PassScheduleService {
       }>
     }
   }
-
+  async sendTimeOffsetCommand(timeOffset: number) {
+    if (typeof timeOffset !== 'number' || isNaN(timeOffset)) {
+      throw new Error('유효하지 않은 timeOffset 값입니다.')
+    }
+    try {
+      const response = await api.post('/pass-schedule/time-offset-command', null, {
+        params: { inputTimeOffset: timeOffset },
+      })
+      return response.data
+    } catch (error) {
+      this.handleApiError(error, '시간 오프셋 명령 전송에 실패했습니다.')
+    }
+  }
   /**
    * 추적 모니터링 상태 조회
    */

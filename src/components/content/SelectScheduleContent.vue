@@ -379,20 +379,24 @@ const showOverlapWarning = (row: ScheduleItem) => {
     })
   }
 
-  $q.notify({
-    type: 'warning',
-    message,
-    timeout: 5000,
-    position: 'top',
-    multiLine: true,
-    actions: [
-      {
-        label: '확인',
-        color: 'white',
-        handler: () => { }
-      }
-    ]
-  })
+  if ($q && typeof $q.notify === 'function') {
+    $q.notify({
+      type: 'warning',
+      message,
+      timeout: 5000,
+      position: 'top',
+      multiLine: true,
+      actions: [
+        {
+          label: '확인',
+          color: 'white',
+          handler: () => { }
+        }
+      ]
+    })
+  } else {
+    console.warn('$q.notify is not available:', message)
+  }
 }
 
 // ✅ 체크박스 관련 모든 이벤트 통합 처리 (완전 차단)
@@ -527,11 +531,13 @@ const getRowClass = (row: ScheduleItem): string => {
 const handleSelect = async () => {
   try {
     if (selectedRows.value.length === 0) {
-      if ($q && $q.notify) {
+      if ($q && typeof $q.notify === 'function') {
         $q.notify({
           type: 'warning',
           message: '패스 스케줄을 선택하세요',
         })
+      } else {
+        console.warn('패스 스케줄을 선택하세요')
       }
       return
     }
@@ -552,11 +558,13 @@ const handleSelect = async () => {
         }))
       })
 
-      if ($q && $q.notify) {
+      if ($q && typeof $q.notify === 'function') {
         $q.notify({
           type: 'positive',
           message: `기존 목록을 초기화하고 ${selectedRows.value.length}개의 새 스케줄이 추적 대상으로 설정되었습니다`,
         })
+      } else {
+        console.log(`기존 목록을 초기화하고 ${selectedRows.value.length}개의 새 스케줄이 추적 대상으로 설정되었습니다`)
       }
 
       // 선택 완료 후 창 닫기
@@ -569,22 +577,26 @@ const handleSelect = async () => {
       }, 100) // 성공 메시지를 볼 시간 제공
 
     } else {
-      if ($q && $q.notify) {
+      if ($q && typeof $q.notify === 'function') {
         $q.notify({
           type: 'negative',
           message: '스케줄 선택에 실패했습니다',
         })
+      } else {
+        console.error('스케줄 선택에 실패했습니다')
       }
     }
 
   } catch (error) {
     console.error('❌ 스케줄 선택 처리 중 오류:', error)
 
-    if ($q && $q.notify) {
+    if ($q && typeof $q.notify === 'function') {
       $q.notify({
         type: 'negative',
         message: '스케줄 선택 처리 중 오류가 발생했습니다',
       })
+    } else {
+      console.error('스케줄 선택 처리 중 오류가 발생했습니다')
     }
   }
 }
