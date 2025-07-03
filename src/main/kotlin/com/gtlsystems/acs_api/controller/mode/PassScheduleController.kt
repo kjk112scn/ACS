@@ -16,7 +16,23 @@ class PassScheduleController(
     private val passScheduleService: PassScheduleService
 ) {
     private val logger = LoggerFactory.getLogger(PassScheduleController::class.java)
-
+    @PostMapping("/time-offset-command")
+    fun timeOffsetCommand(@RequestParam inputTimeOffset: Float): ResponseEntity<Map<String, String>> {
+        return try {
+            passScheduleService.passScheduleTimeOffsetCommand(inputTimeOffset)
+            ResponseEntity.ok(mapOf(
+                "status" to "success",
+                "message" to "TimeOffset 명령이 성공적으로 전송되었습니다",
+                "command" to "TimeOffset",
+                "timeOffset" to inputTimeOffset.toString()
+            ))
+        } catch (e: Exception) {
+            ResponseEntity.internalServerError().body(mapOf(
+                "status" to "error",
+                "message" to "TimeOffset 명령 전송 실패: ${e.message}"
+            ))
+        }
+    }
     /**
      * TLE 데이터 추가
      */
