@@ -225,7 +225,7 @@ ISS (ZARYA)
 2 25544  51.6416 142.1133 0003324 324.9821 218.2594 15.49780383446574</pre>
         </div>
         <div class="tle-input-container q-mb-md">
-          <q-input v-model="tempTLEData.line1" type="textarea" filled autogrow class="tle-textarea full-width"
+          <q-input v-model="tempTLEData.tleText" type="textarea" filled autogrow class="tle-textarea full-width"
             style="min-height: 200px; font-family: monospace; font-size: 0.9rem" placeholder="TLE 데이터를 여기에 붙여넣으세요..."
             :input-style="'white-space: pre;'" spellcheck="false" autofocus :error="tleError !== null"
             :error-message="tleError || undefined" @keydown.ctrl.enter="addTLEData" />
@@ -234,7 +234,7 @@ ISS (ZARYA)
 
       <q-card-actions align="right" class="q-px-md q-pb-md">
         <q-btn flat label="추가" color="primary" @click="addTLEData" :loading="isProcessingTLE"
-          :disable="!tempTLEData.line1.trim()" />
+          :disable="!tempTLEData.tleText.trim()" />
         <q-btn flat label="닫기" color="primary" v-close-popup class="q-ml-sm" :disable="isProcessingTLE" />
       </q-card-actions>
     </q-card>
@@ -338,7 +338,7 @@ const loadingSchedule = ref(false)
 // TLE 모달 관련 상태
 const showTLEModal = ref(false)
 const tempTLEData = ref({
-  line1: '',
+  tleText: '', // 전체 TLE 텍스트를 저장
 })
 
 // TLE 관련 상태
@@ -1240,12 +1240,44 @@ const formattedCalTime = computed(() => {
 // TLE 관련 함수들
 const openTLEModal = () => {
   showTLEModal.value = true
-  tempTLEData.value.line1 = ''
+  tempTLEData.value.tleText = ''
   tleError.value = null
 }
 
+// 정지궤도 판별 함수 (평균운동만 사용)
+const isGeostationaryOrbit = (tleText: string): boolean => {
+  try {
+    const lines = tleText.trim().split('\n').filter(line => line.trim() !== '')
+
+    if (lines.length < 2) return false
+
+    // TLE Line 2 추출 (평균운동이 있는 라인)
+    const tleLine2 = lines.length >= 3 ? lines[2] : lines[1]
+
+    if (!tleLine2 || tleLine2.length < 63) return false
+
+    // 평균운동(Mean Motion) 추출 (Line 2의 52-63번째 문자)
+    const meanMotionStr = tleLine2.substring(52, 63).trim()
+    const meanMotion = parseFloat(meanMotionStr)
+
+    // 정지궤도 판별: 평균운동이 1.0027 rev/day에 가까운지 확인
+    const isGEO = Math.abs(meanMotion - 1.0027) <= 0.1
+
+    console.log('정지궤도 판별:', {
+      meanMotion,
+      isGEO,
+      tleLine2: tleLine2.substring(52, 63)
+    })
+
+    return isGEO
+  } catch (error) {
+    console.error('정지궤도 판별 중 오류:', error)
+    return false
+  }
+}
+
 const addTLEData = async () => {
-  if (!tempTLEData.value.line1.trim()) {
+  if (!tempTLEData.value.tleText.trim()) {
     tleError.value = 'TLE 데이터를 입력하세요'
     return
   }
@@ -1254,12 +1286,34 @@ const addTLEData = async () => {
   tleError.value = null
 
   try {
-    // TLE 데이터 직접 처리
-    await ephemerisStore.processTLEData(tempTLEData.value.line1)
+    // 정지궤도 여부 확인 - 전체 TLE 텍스트 전달
+    const isGEO = isGeostationaryOrbit(tempTLEData.value.tleText)
+
+    if (isGEO) {
+      console.log('정지궤도 TLE 감지됨 - 정지궤도 추적 시작')
+
+      // TLE 파싱
+      const lines = tempTLEData.value.tleText.trim().split('\n').filter(line => line.trim() !== '')
+
+      // TLE 라인 추출 (3줄 형식인 경우 위성 이름 제외)
+      const tleLine1 = lines.length >= 3 ? lines[1] : lines[0]
+      const tleLine2 = lines.length >= 3 ? lines[2] : lines[1]
+
+      // TLE 라인이 유효한지 확인
+      if (!tleLine1 || !tleLine2) {
+        throw new Error('유효하지 않은 TLE 데이터입니다')
+      }
+
+      // 정지궤도 추적 시작
+      await ephemerisStore.startGeostationaryTracking(tleLine1, tleLine2)
+    }
+    else {
+      await ephemerisStore.processTLEData(tempTLEData.value.tleText)
+    }
 
     $q.notify({
       type: 'positive',
-      message: 'TLE 데이터가 성공적으로 처리되었습니다',
+      message: `TLE 데이터가 성공적으로 처리되었습니다${isGEO ? ' (정지궤도)' : ''}`,
     })
 
     showTLEModal.value = false

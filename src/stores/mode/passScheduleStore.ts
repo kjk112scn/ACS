@@ -10,6 +10,7 @@ import {
   type TrackingTarget,
   type TrackingDetailItem,
 } from '../../services/mode/passScheduleService'
+import { useICDStore } from '../icd/icdStore'
 
 export interface ScheduleItem {
   no: number
@@ -1460,17 +1461,14 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
   }))
 
   /**
-   * 🆕 시간 오프셋 전송
+   * 시간 오프셋 명령 전송
    */
-  const sendTimeOffset = async (timeOffset: number): Promise<boolean> => {
+  const sendTimeOffset = async (timeOffset: number) => {
     try {
-      console.log('⏰ 시간 오프셋 전송:', timeOffset)
-      // TODO: 실제 시간 오프셋 API 호출 구현
-      await new Promise((resolve) => setTimeout(resolve, 100)) // 임시 대기
-      return true
-    } catch (error) {
-      console.error('❌ 시간 오프셋 전송 실패:', error)
-      return false
+      return await useICDStore().sendTimeOffsetCommand(timeOffset)
+    } catch (err) {
+      error.value = 'Failed to send time offset'
+      throw err
     }
   }
 
@@ -1583,6 +1581,63 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     }
   }
 
+  /**
+   * 🆕 백엔드 추적 시작 API 호출 메서드 추가
+   */
+  const startScheduleTracking = async () => {
+    try {
+      console.log('🚀 백엔드 추적 시작 API 호출')
+      const result = await passScheduleService.startScheduleTracking()
+      console.log('✅ 백엔드 추적 시작 응답:', result)
+      return result
+    } catch (error) {
+      console.error('❌ 백엔드 추적 시작 실패:', error)
+      return {
+        success: false,
+        message: '백엔드 추적 시작에 실패했습니다',
+        timestamp: Date.now(),
+      }
+    }
+  }
+
+  /**
+   * 🆕 백엔드 추적 중지 API 호출 메서드 추가
+   */
+  const stopScheduleTracking = async () => {
+    try {
+      console.log('🛑 백엔드 추적 중지 API 호출')
+      const result = await passScheduleService.stopScheduleTracking()
+      console.log('✅ 백엔드 추적 중지 응답:', result)
+      return result
+    } catch (error) {
+      console.error('❌ 백엔드 추적 중지 실패:', error)
+      return {
+        success: false,
+        message: '백엔드 추적 중지에 실패했습니다',
+        timestamp: Date.now(),
+      }
+    }
+  }
+
+  /**
+   * 🆕 백엔드 추적 상태 조회 API 호출 메서드 추가
+   */
+  const getScheduleTrackingStatus = async () => {
+    try {
+      console.log('📊 백엔드 추적 상태 조회 API 호출')
+      const result = await passScheduleService.getTrackingMonitorStatus()
+      console.log('✅ 백엔드 추적 상태 응답:', result)
+      return result
+    } catch (error) {
+      console.error('❌ 백엔드 추적 상태 조회 실패:', error)
+      return {
+        success: false,
+        message: '백엔드 추적 상태 조회에 실패했습니다',
+        timestamp: Date.now(),
+      }
+    }
+  }
+
   return {
     // 상태
     scheduleData, // 전체 스케줄 (모달용)
@@ -1650,6 +1705,11 @@ export const usePassScheduleStore = defineStore('passSchedule', () => {
     toggleTrackingMonitor,
     getTrackingMonitorStatus,
     restartTrackingMonitor,
+
+    // 🆕 백엔드 추적 API 메서드들
+    startScheduleTracking,
+    stopScheduleTracking,
+    getScheduleTrackingStatus,
 
     // 🆕 추적 경로 액션들
     loadTrackingDetailData,

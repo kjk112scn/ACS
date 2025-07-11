@@ -5,6 +5,8 @@ import {
   type ScheduleItem,
   type ScheduleDetailItem,
   type EphemerisTrackRequest,
+  type GeostationaryTrackingRequest,
+  type GeostationaryTrackingResponse,
 } from '../../services/mode/ephemerisTrackService'
 
 // ✅ 기본값 상수 정의 (파일 상단에 추가)
@@ -668,6 +670,24 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
   }
 
   /**
+   * 정지궤도 위성 추적 시작
+   */
+  const startGeostationaryTracking = async (tleLine1: string, tleLine2: string) => {
+    try {
+      const request = { tleLine1, tleLine2 }
+      const response = await ephemerisTrackService.startGeostationaryTracking(request)
+
+      // 성공 시 알림
+      console.log('정지궤도 추적 시작:', response)
+
+      return response
+    } catch (err) {
+      error.value = '정지궤도 위성 추적 시작에 실패했습니다'
+      throw err
+    }
+  }
+
+  /**
    * 상태 초기화 (전체 리셋)
    */
   const reset = () => {
@@ -758,6 +778,7 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
     cleanupWorker,
     updateOffsetValues,
     updateTLEDisplayData,
+    startGeostationaryTracking,
   }
 })
 
@@ -766,6 +787,8 @@ export type {
   ScheduleItem,
   ScheduleDetailItem,
   EphemerisTrackRequest,
+  GeostationaryTrackingRequest,
+  GeostationaryTrackingResponse,
   TLEData,
   TrackingPath,
   WorkerMessage,

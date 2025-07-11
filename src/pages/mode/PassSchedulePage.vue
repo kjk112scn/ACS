@@ -185,7 +185,7 @@
                     <q-icon :name="currentDisplaySchedule.type === 'current' ? 'play_arrow' : 'schedule'"
                       :color="currentDisplaySchedule.type === 'current' ? 'positive' : 'primary'" size="sm" />
                     <span class="text-body2 q-ml-xs">
-                      {{ currentDisplaySchedule.label }}: MstId {{ currentDisplaySchedule.mstId }}
+                      {{ currentDisplaySchedule.label }}: Index {{ currentDisplaySchedule.mstId }}
                     </span>
                     <q-badge :color="currentDisplaySchedule.type === 'current' ? 'positive' : 'primary'"
                       :label="currentDisplaySchedule.type === 'current' ? '추적중' : '대기중'" class="q-ml-sm" />
@@ -309,7 +309,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, onActivated, onDeactivated } from 'vue'
 import { useQuasar } from 'quasar'
 import { usePassScheduleStore, type ScheduleItem } from '../../stores/mode/passScheduleStore'
 import { useICDStore } from '../../stores/icd/icdStore'
@@ -811,8 +811,10 @@ watch(
         next: icdStore.nextTrackingMstId
       })
 
-      // DOM 직접 조작으로 색상 적용
-      applyRowColors()
+      // 🆕 지연된 DOM 직접 조작으로 색상 적용
+      setTimeout(() => {
+        applyRowColors()
+      }, 100)
 
     } catch (error) {
       console.error('❌ Store watch 에러:', error)
@@ -820,11 +822,27 @@ watch(
   },
   { immediate: true, deep: true }
 )
+
+// 🆕 Store 데이터 변경 감지 개선
 watch(
   () => passScheduleStore.selectedScheduleList,
-  (newData) => {
+  (newData, oldData) => {
     try {
-      console.log('👀 Store 변경 감지 - 새 데이터:', newData?.length || 0, '개')
+      console.log('👀 Store 변경 감지 - 새 데이터:', {
+        newCount: newData?.length || 0,
+        oldCount: oldData?.length || 0,
+        hasData: newData && newData.length > 0
+      })
+
+      // 🆕 데이터가 변경되면 차트 업데이트 강제 실행
+      if (newData && newData.length > 0) {
+        setTimeout(() => {
+          if (passChart && !passChart.isDisposed()) {
+            updateChart()
+            console.log('✅ 데이터 변경으로 차트 업데이트 실행')
+          }
+        }, 200)
+      }
     } catch (error) {
       console.error('❌ passScheduleStore watch 에러:', error)
     }
@@ -832,14 +850,53 @@ watch(
   { immediate: true, deep: true }
 )
 
-// 🆕 Store 상태 변경 즉시 감지
-watch(
-  () => passScheduleStore.selectedScheduleList,
-  (newData) => {
-    console.log('👀 Store 변경 감지 - 새 데이터:', newData.length, '개')
-  },
-  { immediate: true, deep: true } // immediate: true가 중요!
-)
+// 🆕 컴포넌트 활성화 시 데이터 복원
+const handleActivated = () => {
+  console.log('🔄 PassSchedulePage 활성화됨')
+
+  // 🆕 WebSocket 연결 상태 확인
+  if (!icdStore.isConnected) {
+    console.log('WebSocket 재연결 시도...')
+    void icdStore.connectWebSocket()
+  }
+
+  // 🆕 차트가 없으면 재초기화
+  if (!passChart || passChart.isDisposed()) {
+    setTimeout(() => {
+      initChart()
+      console.log('✅ 차트 재초기화 완료')
+    }, 100)
+  }
+
+  // 🆕 타이머 재시작
+  if (!updateTimer) {
+    updateTimer = window.setInterval(() => {
+      updateChart()
+    }, 100)
+    console.log('✅ 차트 업데이트 타이머 재시작')
+  }
+
+  // 🆕 DOM 하이라이트 강제 적용
+  setTimeout(() => {
+    applyRowColors()
+  }, 200)
+}
+
+// 🆕 컴포넌트 비활성화 시 정리
+const handleDeactivated = () => {
+  console.log('🔄 PassSchedulePage 비활성화됨')
+
+  // 🆕 타이머만 정리 (차트는 유지)
+  if (updateTimer) {
+    clearInterval(updateTimer)
+    updateTimer = null
+    console.log('✅ 차트 업데이트 타이머 정리됨')
+  }
+}
+
+// 🆕 Vue 생명주기 훅 등록
+onActivated(handleActivated)
+onDeactivated(handleDeactivated)
 
 const selectedSchedule = ref<ScheduleItem | null>(null)
 
@@ -1664,6 +1721,30 @@ const handleStartCommand = async () => {
     if (success) {
       console.log('✅ 추적 대상 설정 성공')
 
+      // 🆕 백엔드 추적 시작 API 호출 추가
+      try {
+        console.log('🚀 백엔드 추적 시작 API 호출')
+        const trackingStartResult = await passScheduleStore.startScheduleTracking()
+
+        if (trackingStartResult.success) {
+          console.log('✅ 백엔드 추적 시작 성공:', trackingStartResult)
+        } else {
+          console.warn('⚠️ 백엔드 추적 시작 실패:', trackingStartResult.message)
+          $q.notify({
+            type: 'warning',
+            message: '추적 대상은 설정되었으나 백엔드 추적 시작에 실패했습니다',
+            caption: trackingStartResult.message
+          })
+        }
+      } catch (error) {
+        console.error('❌ 백엔드 추적 시작 API 호출 실패:', error)
+        $q.notify({
+          type: 'warning',
+          message: '추적 대상은 설정되었으나 백엔드 추적 시작에 실패했습니다',
+          caption: 'API 연결 오류'
+        })
+      }
+
       // 🆕 예측 경로 로드 (첫 번째 스케줄 기준)
       if (scheduleData.value.length > 0) {
         const firstSchedule = scheduleData.value[0]
@@ -1758,11 +1839,26 @@ const handleStartCommand = async () => {
 
 const handleStopCommand = async () => {
   try {
+    // 🆕 백엔드 추적 중지 API 호출 추가
+    try {
+      console.log('🛑 백엔드 추적 중지 API 호출')
+      const trackingStopResult = await passScheduleStore.stopScheduleTracking()
+
+      if (trackingStopResult.success) {
+        console.log('✅ 백엔드 추적 중지 성공:', trackingStopResult)
+      } else {
+        console.warn('⚠️ 백엔드 추적 중지 실패:', trackingStopResult.message)
+      }
+    } catch (error) {
+      console.error('❌ 백엔드 추적 중지 API 호출 실패:', error)
+    }
+
     // 🆕 추적 모니터링 먼저 중지
     const monitoringStopped = await passScheduleStore.stopTrackingMonitor()
 
     // 기존 ICD 정지 명령
     await icdStore.stopCommand(true, true, true)
+
     if (monitoringStopped) {
       $q.notify({
         type: 'positive',
@@ -1832,63 +1928,90 @@ const handleReset = async () => {
     })
   }
 } */
-// 초기화
-const init = async () => {
-  console.log('PassSchedulePage 초기화 시작')
-
-  setTimeout(() => {
-    initChart()
-  }, 100)
-
-  // Store 초기화 호출
-  try {
-    await passScheduleStore.init() // 🔧 Store의 init 메서드 직접 호출
-    console.log('✅ 스케줄 데이터 로드 완료:', passScheduleStore.scheduleData.length, '개')
-  } catch (error) {
-    console.error('스케줄 데이터 로드 실패:', error)
-    $q.notify({
-      type: 'negative',
-      message: '스케줄 데이터를 불러오는데 실패했습니다',
-    })
-  }
-}
+// 초기화 함수 (사용하지 않음 - onMounted에서 직접 처리)
+// const init = async () => {
+//   console.log('PassSchedulePage 초기화 시작')
+//   // ... 기존 코드
+// }
 // 컴포넌트 마운트
 onMounted(async () => {
   console.log('PassSchedulePage 컴포넌트 마운트됨')
-  await init()
 
-  // 🆕 PassSchedule 차트 초기화
-  initChart()
+  // 🆕 기존 데이터 복원 확인
+  const hasExistingData = passScheduleStore.selectedScheduleList.length > 0
+  console.log('기존 데이터 확인:', {
+    hasExistingData,
+    scheduleCount: passScheduleStore.selectedScheduleList.length,
+    currentTrackingMstId: icdStore.currentTrackingMstId,
+    nextTrackingMstId: icdStore.nextTrackingMstId
+  })
 
-  // 차트 업데이트 타이머 시작 (PassSchedule 독립적)
-  updateTimer = window.setInterval(() => {
-    updateChart()
-  }, 100)
+  // 🆕 WebSocket 연결 상태 확인 및 재연결
+  if (!icdStore.isConnected) {
+    console.log('WebSocket 재연결 시도...')
+    void icdStore.connectWebSocket()
+  }
+
+  // 🆕 Store 초기화 (기존 데이터가 있으면 건너뛰기)
+  if (!hasExistingData) {
+    try {
+      await passScheduleStore.init()
+      console.log('✅ 스케줄 데이터 로드 완료:', passScheduleStore.scheduleData.length, '개')
+    } catch (error) {
+      console.error('스케줄 데이터 로드 실패:', error)
+      $q.notify({
+        type: 'negative',
+        message: '스케줄 데이터를 불러오는데 실패했습니다',
+      })
+    }
+  } else {
+    console.log('✅ 기존 스케줄 데이터 사용:', passScheduleStore.selectedScheduleList.length, '개')
+  }
+
+  // 🆕 PassSchedule 차트 초기화 (지연 시간 증가)
+  setTimeout(() => {
+    initChart()
+
+    // 🆕 차트 업데이트 타이머 시작 (기존 타이머 정리 후 시작)
+    if (updateTimer) {
+      clearInterval(updateTimer)
+    }
+    updateTimer = window.setInterval(() => {
+      updateChart()
+    }, 100)
+
+    console.log('✅ PassSchedule 차트 및 타이머 초기화 완료')
+  }, 200) // 지연 시간을 200ms로 증가
 })
 
 // 컴포넌트 언마운트
 onUnmounted(() => {
   console.log('PassSchedulePage 컴포넌트 언마운트됨')
 
-  // 차트 업데이트 타이머 정리
+  // 🆕 차트 업데이트 타이머 정리 (기존 타이머가 있을 때만)
   if (updateTimer) {
     clearInterval(updateTimer)
     updateTimer = null
+    console.log('✅ 차트 업데이트 타이머 정리됨')
   }
 
-  // 🆕 PassSchedule 차트 인스턴스 정리
-  if (passChart) {
+  // 🆕 PassSchedule 차트 인스턴스 정리 (기존 인스턴스가 있을 때만)
+  if (passChart && !passChart.isDisposed()) {
     passChart.dispose()
     passChart = null
+    console.log('✅ PassSchedule 차트 인스턴스 정리됨')
   }
 
-  // 시간 업데이트 타이머 정리
+  // 🆕 시간 업데이트 타이머 정리
   stopTimeTimer()
 
-  // 🆕 추적 경로 데이터 정리 (Store 통해서)
-  passScheduleStore.clearTrackingPaths()
+  // 🆕 추적 경로 데이터는 유지 (Store에서 관리)
+  // passScheduleStore.clearTrackingPaths() 제거
 
+  // 🆕 이벤트 리스너 정리
   window.removeEventListener('resize', () => { })
+
+  console.log('✅ PassSchedulePage 정리 완료')
 })
 
 // 서버 시간 포맷팅을 위한 계산된 속성 추가

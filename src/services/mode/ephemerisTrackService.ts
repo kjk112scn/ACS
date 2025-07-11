@@ -58,6 +58,17 @@ export interface RealtimeTrackingResponse {
   statistics: Record<string, unknown>
 }
 
+export interface GeostationaryTrackingRequest {
+  tleLine1: string
+  tleLine2: string
+}
+
+export interface GeostationaryTrackingResponse {
+  message: string
+  satelliteId: string
+  trackingType: string
+}
+
 // 에러 클래스들
 export class TLEParseError extends Error {
   constructor(message: string) {
@@ -253,6 +264,23 @@ class EphemerisTrackService {
         error,
         '실시간 추적 데이터 조회에 실패했습니다',
       ) as Promise<RealtimeTrackingResponse>
+    }
+  }
+
+  async startGeostationaryTracking(
+    request: GeostationaryTrackingRequest,
+  ): Promise<GeostationaryTrackingResponse> {
+    try {
+      const response = await api.post<GeostationaryTrackingResponse>(
+        '/ephemeris/tracking/geostationary/start',
+        request,
+      )
+      return response.data
+    } catch (error) {
+      return this.handleApiError(
+        error,
+        '정지궤도 위성 추적 시작에 실패했습니다',
+      ) as Promise<GeostationaryTrackingResponse>
     }
   }
 }
