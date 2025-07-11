@@ -24,6 +24,25 @@ class EphemerisController(
 {
     private val logger = LoggerFactory.getLogger(EphemerisController::class.java)
 
+    @PostMapping("/tracking/geostationary/start")
+    fun startGeostationaryTracking(@RequestBody request: GeostationaryTrackingRequest): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            try {
+                ephemerisService.startGeostationaryTracking(request.tleLine1, request.tleLine2)
+                
+                mapOf(
+                    "message" to "정지궤도 위성 추적이 시작되었습니다.",
+                    "satelliteId" to request.tleLine1.substring(2, 7).trim(),
+                    "trackingType" to "geostationary"
+                )
+            } catch (e: Exception) {
+                mapOf(
+                    "message" to "정지궤도 위성 추적 시작 실패: ${e.message}",
+                    "error" to (e.message ?: "알 수 없는 오류")
+                )
+            }
+        }
+    }
     /**
      * 실시간 추적 데이터 조회 (JSON)
      */
@@ -386,4 +405,11 @@ data class EphemerisTrackRequest(
     val tleLine1: String,
     val tleLine2: String,
     val satelliteName: String? = null
+)
+/**
+ * 정지궤도 위성 추적 요청 모델
+ */
+data class GeostationaryTrackingRequest(
+    val tleLine1: String,
+    val tleLine2: String
 )
