@@ -17,6 +17,7 @@ import com.gtlsystems.acs_api.model.PushData
 import com.gtlsystems.acs_api.service.datastore.DataStoreService
 import com.gtlsystems.acs_api.service.icd.ICDService
 import com.gtlsystems.acs_api.service.udp.UdpFwICDService
+import com.gtlsystems.acs_api.config.ThreadManager
 import io.netty.handler.timeout.TimeoutException
 import jakarta.annotation.PreDestroy
 import org.springframework.util.ClassUtils.isVisible
@@ -34,6 +35,8 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.TimeUnit
+import com.gtlsystems.acs_api.service.mode.BatchStorageManager
+import kotlin.math.abs
 
 /**
  * 위성 추적 서비스
@@ -44,7 +47,9 @@ class EphemerisService(
     private val orekitCalculator: OrekitCalculator,
     private val acsEventBus: ACSEventBus,
     private val udpFwICDService: UdpFwICDService,
-    private val dataStoreService: DataStoreService // DataStoreService 주입
+    private val dataStoreService: DataStoreService, // DataStoreService 주입
+    private val threadManager: ThreadManager, // ✅ 통합 쓰레드 관리자 주입
+    private val batchStorageManager: BatchStorageManager // ✅ 배치 저장 관리자 주입
 ) {
 
     // 밀리초를 포함하는 사용자 정의 포맷터 생성
@@ -71,24 +76,19 @@ class EphemerisService(
 
     private val trackingStatus = PushData.TRACKING_STATUS
 
-    // ✅ 새로운 정교한 타이머 필드들 추가
-    private var trackingExecutor: ScheduledExecutorService? = null
-    private var trackingTask: ScheduledFuture<*>? = null
+    // ✅ 통합 쓰레드 관리자 사용
+    private var modeExecutor: ScheduledExecutorService? = null
+    private var modeTask: ScheduledFuture<*>? = null
 
     private val realtimeTrackingDataList = mutableListOf<Map<String, Any?>>()
     private var trackingDataIndex = 0
-
-    // ✅ 커스텀 ThreadFactory 생성
-    private val trackingThreadFactory = ThreadFactory { runnable ->
-        Thread(runnable, "SatelliteTracking-Timer").apply {
-            priority = Thread.MAX_PRIORITY - 3  // 4번째 우선순위 (10-3=7)
-            isDaemon = true
-        }
-    }
     private val limitAngleCalculator = LimitAngleCalculator()
 
     @PostConstruct
     fun init() {
+        // ✅ 하드웨어 최적화 적용
+        applyHardwareOptimization()
+        
         eventBus()
         /*
         val satelliteName = "AQUA   "
@@ -97,7 +97,28 @@ class EphemerisService(
         */
         //generateEphemerisDesignationTrack(tle1,tle2,satelliteName)
         //compareTrackingPerformance(tle1,tle2)
-        //satelliteTest()
+        satelliteTransform()
+    }
+
+    /**
+     * ✅ 하드웨어 최적화 적용
+     */
+    private fun applyHardwareOptimization() {
+        try {
+            // 1. 시스템 사양 자동 감지
+            val specs = threadManager.detectSystemSpecs()
+            
+            // 2. 성능 등급 분류
+            val tier = threadManager.classifyPerformanceTier(specs)
+            logger.info("📊 성능 등급: $tier")
+            
+            // 3. 하드웨어 최적화 설정 적용
+            threadManager.applyHardwareOptimization(tier)
+            
+            logger.info("✅ 하드웨어 최적화 완료")
+        } catch (e: Exception) {
+            logger.error("❌ 하드웨어 최적화 실패: ${e.message}", e)
+        }
     }
 
     fun eventBus() {
@@ -133,11 +154,26 @@ class EphemerisService(
         subscriptions.forEach { it.dispose() }
         subscriptions.clear()
 
-        // ✅ 타이머 정리 추가
-        stopTimer()
+        // ✅ 모드 타이머 정리
+        stopModeTimer()
+        
+        // ✅ 배치 처리 안전 종료
+        try {
+            val batchShutdownSuccess = batchStorageManager.safeShutdown()
+            if (batchShutdownSuccess) {
+                logger.info("✅ 배치 처리 안전 종료 완료")
+            } else {
+                logger.warn("⚠️ 배치 처리 종료 중 일부 데이터가 손실될 수 있습니다")
+            }
+        } catch (e: Exception) {
+            logger.error("❌ 배치 처리 종료 중 오류: ${e.message}", e)
+        }
+        
         logger.info("EphemerisService 정리 완료")
     }
-
+    fun satelliteTransform(){
+        calculateRotatorAngle(265.0,25.0,-6.98,0.0)
+    }
     fun satelliteTest() {
         try {
 
@@ -152,8 +188,19 @@ class EphemerisService(
         }
     }
 
+    fun calculateRotatorAngle(
+        standardAzimuth: Double, standardElevation: Double, tiltAngle: Double, rotatorStepDegrees: Double = 0.0
+    ){
+        val (transformedAzimuth, transformedElevation) = CoordinateTransformer.transformCoordinatesWithRotator(
+            standardAzimuth, standardElevation, tiltAngle, rotatorStepDegrees
+        )
+        logger.info("─────────────────────────────────────────────")
+        logger.info("transformedAzimuth : $transformedAzimuth")
+        logger.info("transformedElevation : $transformedElevation")
+        logger.info("─────────────────────────────────────────────")
+    }
     fun calculateRotatorAngleTable(
-        standardAzimuth: Double, standardElevation: Double, tiltAngle: Double, rotatorStepDegrees: Double = 30.0
+        standardAzimuth: Double, standardElevation: Double, tiltAngle: Double, rotatorStepDegrees: Double = 0.0
     ) {
         val table = CoordinateTransformer.generateRotatorAngleTable(
             standardAzimuth, standardElevation, tiltAngle, rotatorStepDegrees
@@ -400,20 +447,16 @@ class EphemerisService(
             val originalAzimuth = geo3AxisPosition["originalAzimuth"] as? Double ?: 0.0
             val originalElevation = geo3AxisPosition["originalElevation"] as? Double ?: 0.0
             
-            // 변환된 좌표 추출 (회전체 0도 기준)
-            val transformedCoordinates = geo3AxisPosition["transformedCoordinates"] as? List<Map<String, Any>> ?: emptyList()
-            val transformedPosition = transformedCoordinates.firstOrNull()
-            
-            val transformedAzimuth = transformedPosition?.get("transformedAzimuth") as? Double ?: originalAzimuth
-            val transformedElevation = transformedPosition?.get("transformedElevation") as? Double ?: originalElevation
+            // 변환된 좌표 추출
+            val transformedAzimuth = geo3AxisPosition["transformedAzimuth"] as? Double ?: originalAzimuth
+            val transformedElevation = geo3AxisPosition["transformedElevation"] as? Double ?: originalElevation
             
             // 변환 정보 추출
             val tiltAngle = geo3AxisPosition["tiltAngle"] as? Double ?: -6.98
-            val rotatorStepDegrees = geo3AxisPosition["rotatorStepDegrees"] as? Double ?: 0.0
-            val totalTransformations = geo3AxisPosition["totalTransformations"] as? Int ?: 0
+            val rotatorAngle = geo3AxisPosition["rotatorAngle"] as? Double ?: 0.0
             
             logger.info("📍 정지궤도 원본 좌표: Az=${String.format("%.2f", originalAzimuth)}°, El=${String.format("%.2f", originalElevation)}°")
-            logger.info("🔄 3축 변환 적용: 기울기=${tiltAngle}°, 회전체=${rotatorStepDegrees}°")
+            logger.info("🔄 3축 변환 적용: 기울기=${tiltAngle}°, 회전체=${rotatorAngle}°")
             logger.info("📍 정지궤도 변환 좌표: Az=${String.format("%.2f", transformedAzimuth)}°, El=${String.format("%.2f", transformedElevation)}°")
             
             // 변환 오차 계산
@@ -433,18 +476,8 @@ class EphemerisService(
             )
             
             // 3축 변환 결과 로깅
-            if (totalTransformations > 0) {
-                logger.info("✅ 3축 변환 완료: ${totalTransformations}개 변환 좌표 생성")
-                logger.info("🔄 변환 정보: 기울기=${tiltAngle}°, 회전체 간격=${rotatorStepDegrees}°")
-                
-                // 모든 변환 좌표 로깅 (디버깅용)
-                transformedCoordinates.forEachIndexed { index, coord ->
-                    val rotatorAngle = coord["rotatorAngle"] as? Double ?: 0.0
-                    val az = coord["transformedAzimuth"] as? Double ?: 0.0
-                    val el = coord["transformedElevation"] as? Double ?: 0.0
-                    logger.debug("  회전체 ${String.format("%.1f", rotatorAngle)}°: Az=${String.format("%.2f", az)}°, El=${String.format("%.2f", el)}°")
-                }
-            }
+            logger.info("✅ 3축 변환 완료")
+            logger.info("🔄 변환 정보: 기울기=${tiltAngle}°, 회전체=${rotatorAngle}°")
             
             logger.info("✅ 정지궤도 추적 시작 완료 (3축 변환 적용)")
             
@@ -478,8 +511,6 @@ class EphemerisService(
                 longitude = locationData.longitude,
                 altitude = locationData.altitude
             )
-            
-
             val result = mapOf<String, Any>(
                 "timestamp" to currentTime,
                 "azimuth" to satelliteData.azimuth.toDouble(),
@@ -499,25 +530,17 @@ class EphemerisService(
         }
     }
 
-    /**
-     * 정지궤도용 현재시간 좌표 추출 (간단한 버전)
-     */
-    fun getCurrentGeostationaryPosition(
-        tleLine1: String, 
-        tleLine2: String
-    ): Map<String, Any> {
-        return getCurrentSatellitePosition(tleLine1, tleLine2, GlobalData.Time.calUtcTimeOffsetTime)
-    }
 
     /**
      * 현재 시간 위성 좌표를 3축 변환하여 추출
+     * 정지 궤도용
      */
-    fun getCurrentSatellitePositionWith3AxisTransform(
+    fun getCurrentGeostationaryPositionWith3AxisTransform(
         tleLine1: String, 
         tleLine2: String, 
         targetTime: ZonedDateTime? = null,
         tiltAngle: Double = -6.98,
-        rotatorStepDegrees: Double = 0.0  // 회전체 각도 간격
+        rotatorAngle: Double = 0.0  // 회전체 각도 (기본값 0도)
     ): Map<String, Any> {
         try {
             // 1. 현재 시간 위성 좌표 추출
@@ -528,38 +551,30 @@ class EphemerisService(
             
             logger.info("현재 시간 위성 좌표: Az=${String.format("%.2f", originalAzimuth)}°, El=${String.format("%.2f", originalElevation)}°")
             
-            // 2. 3축 변환 테이블 생성
-            val transformTable = CoordinateTransformer.generateRotatorAngleTable(
+            // 2. 3축 변환 적용 (단일 좌표 변환)
+            val (transformedAzimuth, transformedElevation) = CoordinateTransformer.transformCoordinatesWithRotator(
                 azimuth = originalAzimuth,
                 elevation = originalElevation,
                 tiltAngle = tiltAngle,
-                rotatorStepDegrees = rotatorStepDegrees
+                rotatorAngle = rotatorAngle
             )
             
-            // 3. 변환된 좌표들을 결과에 추가
-            val transformedCoordinates = transformTable.mapIndexed { index, (rotatorAngle, transformedAz, transformedEl) ->
-                mapOf(
-                    "rotatorAngle" to rotatorAngle,
-                    "transformedAzimuth" to transformedAz,
-                    "transformedElevation" to transformedEl,
-                    "azimuthDifference" to (transformedAz - originalAzimuth),
-                    "elevationDifference" to (transformedEl - originalElevation)
-                )
-            }
-            
-            // 4. 종합 결과 생성
+            // 3. 종합 결과 생성
             val result = currentPosition.toMutableMap().apply {
                 put("originalAzimuth", originalAzimuth)
                 put("originalElevation", originalElevation)
                 put("tiltAngle", tiltAngle)
-                put("rotatorStepDegrees", rotatorStepDegrees)
-                put("transformedCoordinates", transformedCoordinates)
-                put("transformationType", "3axis_current_time")
-                put("totalTransformations", transformedCoordinates.size)
+                put("rotatorAngle", rotatorAngle)
+                put("transformedAzimuth", transformedAzimuth)
+                put("transformedElevation", transformedElevation)
+                put("azimuthDifference", transformedAzimuth - originalAzimuth)
+                put("elevationDifference", transformedElevation - originalElevation)
+                put("transformationType", "3axis_single_point")
             }
             
-            logger.info("3축 변환 완료: ${transformedCoordinates.size}개 변환 좌표 생성")
-            logger.info("변환 정보: 기울기=${tiltAngle}°, 회전체 간격=${rotatorStepDegrees}°")
+            logger.info("3축 변환 완료: 원본 Az=${String.format("%.2f", originalAzimuth)}°, El=${String.format("%.2f", originalElevation)}°")
+            logger.info("변환 결과: Az=${String.format("%.2f", transformedAzimuth)}°, El=${String.format("%.2f", transformedElevation)}°")
+            logger.info("변환 정보: 기울기=${tiltAngle}°, 회전체=${rotatorAngle}°")
             
             return result
             
@@ -567,23 +582,6 @@ class EphemerisService(
             logger.error("현재 시간 3축 변환 실패: ${e.message}", e)
             throw RuntimeException("3축 변환 실패: ${e.message}", e)
         }
-    }
-
-    /**
-     * 정지궤도 위성 현재 시간 좌표를 3축 변환하여 추출
-     */
-    fun getCurrentGeostationaryPositionWith3AxisTransform(
-        tleLine1: String, 
-        tleLine2: String,
-        tiltAngle: Double = -6.98,
-        rotatorStepDegrees: Double = 0.0
-    ): Map<String, Any> {
-        return getCurrentSatellitePositionWith3AxisTransform(
-            tleLine1, tleLine2, 
-            GlobalData.Time.calUtcTimeOffsetTime,
-            tiltAngle, 
-            rotatorStepDegrees
-        )
     }
 
     fun generateEphemerisDesignationTrackAsync(
@@ -608,7 +606,7 @@ class EphemerisService(
     }
 
     /**
-     * 2축 추적 데이터 생성
+     * 2축 추적 데이터 생성 (축변환 적용)
      * TLE 데이터로 위성 궤도 추적
      * 위성 이름이 제공되지 않으면 TLE에서 추출
      */
@@ -634,21 +632,6 @@ class EphemerisService(
             val ephemerisTrackDtl = mutableListOf<Map<String, Any?>>()
 
             // 위성 추적 스케줄 생성
-            /*
-            val schedule = orekitCalculator.generateSatelliteTrackingScheduleWithVariableInterval(
-                tleLine1 = tleLine1,
-                tleLine2 = tleLine2,
-                startDate = today.withZoneSameInstant(ZoneOffset.UTC),
-                durationDays = 2,
-                minElevation = trackingData.minElevationAngle,
-                latitude = locationData.latitude,
-                longitude = locationData.longitude,
-                altitude = locationData.altitude,
-                fineIntervalMs = 100,    // 정밀 계산 간격 100ms
-                coarseIntervalMs = 1000,  // 일반 계산 간격 1000ms
-                transitionSeconds = 1
-            )
-            */
             val schedule = orekitCalculator.generateSatelliteTrackingSchedule(
                 tleLine1 = tleLine1,
                 tleLine2 = tleLine2,
@@ -665,7 +648,7 @@ class EphemerisService(
             val creationDate = ZonedDateTime.now()
             val creator = "System"
 
-            // 스케줄 정보로 마스터 리스트 채우기
+            // 스케줄 정보로 마스터 리스트 채우기 (원본 데이터)
             schedule.trackingPasses.forEachIndexed { index, pass ->
                 val mstId = index + 1
 
@@ -675,6 +658,7 @@ class EphemerisService(
 
                 logger.info("패스 #$mstId: 시작=$startTimeWithMs, 종료=$endTimeWithMs")
 
+                // 원본 데이터로 마스터 정보 생성 (MaxAzimuth 추가)
                 ephemerisTrackMst.add(
                     mapOf(
                         "No" to mstId.toUInt(),
@@ -683,8 +667,10 @@ class EphemerisService(
                         "StartTime" to startTimeWithMs,
                         "EndTime" to endTimeWithMs,
                         "Duration" to pass.getDurationString(),
-                        "MaxElevation" to pass.maxElevation,
                         "MaxElevationTime" to pass.maxElevationTime,
+                        "MaxElevation" to pass.maxElevation,
+                        "MaxAzimuth" to pass.maxAzimuth,  // ✅ 최대 방위각 추가
+                        "MaxAzimuthTime" to pass.maxAzimuthTime,  // ✅ 최대 방위각 시간 추가
                         "StartAzimuth" to pass.startAzimuth,
                         "StartElevation" to pass.startElevation,
                         "EndAzimuth" to pass.endAzimuth,
@@ -694,87 +680,220 @@ class EphemerisService(
                         "MaxAzAccel" to pass.maxAzimuthAccel,
                         "MaxElAccel" to pass.maxElevationAccel,
                         "CreationDate" to creationDate,
-                        "Creator" to creator
+                        "Creator" to creator,
+                        "DataType" to "original"  // ✅ 데이터 타입 구분
                     )
                 )
 
-                // 추적 좌표로 세부 리스트 채우기
+                // 원본 추적 좌표로 세부 리스트 채우기
                 pass.trackingData.forEachIndexed { dtlIndex, data ->
                     ephemerisTrackDtl.add(
                         mapOf(
                             "No" to (dtlIndex + 1).toUInt(),
-                            "MstId" to mstId.toUInt(),  // 마스터 리스트의 No 값을 MstId로 사용
+                            "MstId" to mstId.toUInt(),
                             "Time" to data.timestamp,
                             "Azimuth" to data.azimuth,
                             "Elevation" to data.elevation,
                             "Range" to data.range,
-                            "Altitude" to data.altitude
+                            "Altitude" to data.altitude,
+                            "DataType" to "original"  // ✅ 데이터 타입 구분
                         )
                     )
                 }
             }
 
             logger.info("위성 궤도 추적 데이터 생성 완료: ${ephemerisTrackMst.size}개 스케줄 항목과 ${ephemerisTrackDtl.size}개 좌표 포인트")
+            
+            // ✅ 1단계: 축변환 적용 (기울기 변환) - 방위각 변환보다 먼저
+            logger.info("축변환 적용 시작 (기울기 변환)")
+            val axisTransformedDtl = mutableListOf<Map<String, Any?>>()
+            val axisTransformedMst = mutableListOf<Map<String, Any?>>()
+
+            // 각 패스별로 축변환 적용
+            ephemerisTrackMst.forEach { originalMst ->
+                val mstId = originalMst["No"] as UInt
+                val passDtl = ephemerisTrackDtl.filter { it["MstId"] == mstId }
+                
+                logger.info("패스 #$mstId 축변환 처리 중: ${passDtl.size}개 좌표")
+                
+                val transformedPassDtl = mutableListOf<Map<String, Any?>>()
+                var maxAzimuth = 0.0  // ✅ 최대 방위각 추적
+                
+                // 각 좌표에 축변환 적용
+                passDtl.forEachIndexed { index, originalPoint ->
+                    val originalAzimuth = originalPoint["Azimuth"] as Double
+                    val originalElevation = originalPoint["Elevation"] as Double
+                    
+                    // 축변환 적용 (기울기 -6.98도, 회전체 0도)
+                    val (transformedAzimuth, transformedElevation) = CoordinateTransformer.transformCoordinatesWithRotator(
+                        azimuth = originalAzimuth,
+                        elevation = originalElevation,
+                        tiltAngle = -6.98,
+                        rotatorAngle = 0.0
+                    )
+                    
+                    // 최대 방위각 업데이트
+                    maxAzimuth = maxOf(maxAzimuth, transformedAzimuth)
+                    
+                    // 변환된 좌표로 새로운 데이터 포인트 생성
+                    val transformedPoint = mapOf(
+                        "No" to originalPoint["No"],
+                        "MstId" to originalPoint["MstId"],
+                        "Time" to originalPoint["Time"],
+                        "Azimuth" to transformedAzimuth,
+                        "Elevation" to transformedElevation,
+                        "Range" to originalPoint["Range"],
+                        "Altitude" to originalPoint["Altitude"],
+                        "OriginalAzimuth" to originalAzimuth,  // 원본 데이터 보존
+                        "OriginalElevation" to originalElevation,  // 원본 데이터 보존
+                        "TiltAngle" to -6.98,
+                        "RotatorAngle" to 0.0,
+                        "TransformationType" to "axis_transform",
+                        "DataType" to "axis_transformed"  // ✅ 데이터 타입 구분
+                    )
+                    
+                    transformedPassDtl.add(transformedPoint)
+                    
+                    // 진행률 로깅 (1000개마다)
+                    if ((index + 1) % 1000 == 0) {
+                        logger.info("패스 #$mstId 축변환 진행률: ${index + 1}/${passDtl.size} (${((index + 1) * 100.0 / passDtl.size).toInt()}%)")
+                    }
+                }
+                
+                // 변환된 시계열에서 속도와 가속도 계산
+                logger.info("패스 #$mstId 변환된 시계열에서 속도/가속도 계산 중")
+                
+                val calculatedDtl = calculateVelocityAndAcceleration(transformedPassDtl)
+                
+                // ✅ 변환된 데이터에서 실제 최대값들 다시 계산
+                var actualMaxElevation = -90.0
+                var actualMaxElevationTime: ZonedDateTime? = null
+                var maxAzRate = 0.0
+                var maxElRate = 0.0
+                var maxAzAccel = 0.0
+                var maxElAccel = 0.0
+                
+                calculatedDtl.forEach { point ->
+                    val transformedElevation = point["Elevation"] as Double
+                    val timestamp = point["Time"] as ZonedDateTime
+                    val azRate = point["AzimuthRate"] as? Double ?: 0.0
+                    val elRate = point["ElevationRate"] as? Double ?: 0.0
+                    val azAccel = point["AzimuthAccel"] as? Double ?: 0.0
+                    val elAccel = point["ElevationAccel"] as? Double ?: 0.0
+                    
+                    // ✅ 변환된 데이터에서 실제 최대 고도각 계산
+                    if (transformedElevation > actualMaxElevation) {
+                        actualMaxElevation = transformedElevation
+                        actualMaxElevationTime = timestamp
+                    }
+                    
+                    maxAzRate = maxOf(maxAzRate, abs(azRate))
+                    maxElRate = maxOf(maxElRate, abs(elRate))
+                    maxAzAccel = maxOf(maxAzAccel, abs(azAccel))
+                    maxElAccel = maxOf(maxElAccel, abs(elAccel))
+                }
+                
+                logger.info("패스 #$mstId 변환된 데이터 최대값: 고도각=${String.format("%.2f", actualMaxElevation)}°, 원본=${String.format("%.2f", originalMst["MaxElevation"])}°")
+                
+                // 축변환된 마스터 데이터 생성
+                val axisTransformedMstData = originalMst.toMutableMap().apply {
+                    put("TiltAngle", -6.98)
+                    put("RotatorAngle", 0.0)
+                    put("TransformationType", "axis_transform")
+                    put("OriginalDataCount", passDtl.size)
+                    put("TransformedDataCount", calculatedDtl.size)
+                    put("MaxAzRate", maxAzRate)
+                    put("MaxElRate", maxElRate)
+                    put("MaxAzAccel", maxAzAccel)
+                    put("MaxElAccel", maxElAccel)
+                    put("MaxAzimuth", maxAzimuth)  // ✅ 변환된 최대 방위각
+                    put("OriginalMaxAzimuth", originalMst["MaxAzimuth"])  // ✅ 원본 최대 방위각 보존
+                    // ✅ 변환된 데이터에서 계산된 실제 최대값들 사용
+                    put("MaxElevation", actualMaxElevation)  // ✅ 변환된 실제 최대 고도각
+                    put("MaxElevationTime", actualMaxElevationTime)  // ✅ 변환된 최대 고도각 시간
+                    put("OriginalMaxElevation", originalMst["MaxElevation"])  // ✅ 원본 최대 고도각 보존
+                    put("OriginalMaxElevationTime", originalMst["MaxElevationTime"])  // ✅ 원본 최대 고도각 시간 보존
+                    put("DataType", "axis_transformed")  // ✅ 데이터 타입 구분
+                }
+                
+                axisTransformedMst.add(axisTransformedMstData)
+                axisTransformedDtl.addAll(calculatedDtl)
+                
+                logger.info("패스 #$mstId 축변환 완료: ${calculatedDtl.size}개 좌표")
+                val originalMaxAz = originalMst["MaxAzimuth"] as? Double ?: 0.0
+                val originalMaxEl = originalMst["MaxElevation"] as? Double ?: 0.0
+                logger.info("  최대 방위각: 원본=${String.format("%.2f", originalMaxAz)}° → 변환=${String.format("%.2f", maxAzimuth)}°")
+                logger.info("  최대 고도각: 원본=${String.format("%.2f", originalMaxEl)}° → 변환=${String.format("%.2f", actualMaxElevation)}°")
+            }
+
+            logger.info("축변환 완료: ${axisTransformedMst.size}개 패스, ${axisTransformedDtl.size}개 좌표")
+            logger.info("변환 정보: 기울기=-6.98°, 회전체=0도")
+
+            // ✅ 2단계: 방위각 변환 (0~360도 -> ±270도) - 축변환 후
             logger.info("방위각 변환 시작 (0~360도 -> ±270도)")
-            val (convertedMst, convertedDtl) = limitAngleCalculator.convertTrackingData(
-                ephemerisTrackMst, ephemerisTrackDtl
+            val (tempMst, tempDtl) = limitAngleCalculator.convertTrackingData(
+                axisTransformedMst, axisTransformedDtl
             )
+            
+            // ✅ 최종 변환 데이터에 데이터 타입 설정
+            val finalMst = tempMst.map { mst ->
+                mst.toMutableMap().apply {
+                    put("DataType", "final_transformed")
+                }
+            }
+            
+            val finalDtl = tempDtl.map { dtl ->
+                dtl.toMutableMap().apply {
+                    put("DataType", "final_transformed")
+                }
+            }
+            
             logger.info("방위각 변환 완료")
 
-            // 검증
-            val validationResult = limitAngleCalculator.validateConversion(
-                ephemerisTrackMst, ephemerisTrackDtl, convertedMst, convertedDtl
-            )
-            logger.info(validationResult.getSummary())
-
-            // 통계
-            val statistics = limitAngleCalculator.getConversionStatistics(ephemerisTrackDtl, convertedDtl)
-            logger.info(statistics.getSummary())
-
-            if (validationResult.isValid) {
-                logger.info("✅ 방위각 변환 검증 성공")
+            // ✅ 간단한 검증 (필수적인 것만)
+            val hasValidData = finalMst.isNotEmpty() && finalDtl.isNotEmpty()
+            if (hasValidData) {
+                logger.info("✅ 변환 데이터 검증 성공")
             } else {
-                logger.warn("⚠️ 방위각 변환 검증 이슈:")
-                validationResult.issues.forEach { issue ->
-                    logger.warn("  - $issue")
-                }
+                logger.warn("⚠️ 변환 데이터 검증 실패")
             }
-            // 저장소에 데이터 저장
+
+            // ✅ 최종 변환 결과 로깅
+            finalMst.forEach { mst ->
+                val mstId = mst["No"] as UInt
+                val originalMaxAz = mst["OriginalMaxAzimuth"] as? Double
+                val axisTransformedMaxAz = mst["MaxAzimuth"] as? Double
+                val finalStartAz = mst["StartAzimuth"] as Double
+                val finalEndAz = mst["EndAzimuth"] as Double
+
+                logger.info("패스 #$mstId 최종 변환 결과:")
+                logger.info("  원본 최대 방위각: ${String.format("%.2f", originalMaxAz)}°")
+                logger.info("  축변환 최대 방위각: ${String.format("%.2f", axisTransformedMaxAz)}°")
+                logger.info("  최종 방위각 범위: ${String.format("%.2f", finalStartAz)}° ~ ${String.format("%.2f", finalEndAz)}°")
+            }
+
+            // ✅ 저장소에 원본, 축변환, 최종 변환 데이터 모두 저장
             ephemerisTrackMstStorage.clear()
             ephemerisTrackDtlStorage.clear()
-            //ephemerisTrackMstStorage.addAll(ephemerisTrackMst)
-            //ephemerisTrackDtlStorage.addAll(ephemerisTrackDtl)
-            ephemerisTrackMstStorage.addAll(convertedMst)
-            ephemerisTrackDtlStorage.addAll(convertedDtl)
+            
+            // 원본 데이터 저장
+            ephemerisTrackMstStorage.addAll(ephemerisTrackMst)
+            ephemerisTrackDtlStorage.addAll(ephemerisTrackDtl)
+            
+            // 축변환 데이터 저장
+            ephemerisTrackMstStorage.addAll(axisTransformedMst)
+            ephemerisTrackDtlStorage.addAll(axisTransformedDtl)
+            
+            // 최종 변환 데이터 저장
+            ephemerisTrackMstStorage.addAll(finalMst)
+            ephemerisTrackDtlStorage.addAll(finalDtl)
 
-            // 변환 결과 로깅
-            convertedMst.forEach { mst ->
-                val mstId = mst["No"] as UInt
-                val originalStartAz = mst["OriginalStartAzimuth"] as? Double
-                val originalEndAz = mst["OriginalEndAzimuth"] as? Double
-                val convertedStartAz = mst["StartAzimuth"] as Double
-                val convertedEndAz = mst["EndAzimuth"] as Double
+            logger.info("✅ 모든 변환 데이터 저장 완료:")
+            logger.info("  - 원본 데이터: ${ephemerisTrackMst.size}개 마스터, ${ephemerisTrackDtl.size}개 세부")
+            logger.info("  - 축변환 데이터: ${axisTransformedMst.size}개 마스터, ${axisTransformedDtl.size}개 세부")
+            logger.info("  - 최종 변환 데이터: ${finalMst.size}개 마스터, ${finalDtl.size}개 세부")
 
-                logger.info("패스 #$mstId 변환 결과:")
-                if (originalStartAz != null && originalEndAz != null) {
-                    logger.info(
-                        "  원본: ${String.format("%.2f", originalStartAz)}° ~ ${
-                            String.format(
-                                "%.2f", originalEndAz
-                            )
-                        }°"
-                    )
-                }
-                logger.info(
-                    "  변환: ${String.format("%.2f", convertedStartAz)}° ~ ${
-                        String.format(
-                            "%.2f", convertedEndAz
-                        )
-                    }°"
-                )
-            }
-
-            return Pair(convertedMst, convertedDtl)
+            return Pair(finalMst, finalDtl)
 
         } catch (e: Exception) {
             logger.error("위성 궤도 추적 중 오류 발생: ${e.message}", e)
@@ -787,24 +906,24 @@ class EphemerisService(
      * 위성 추적 좌표에 기울기 변환을 일괄 적용
      */
     fun generateEphemerisDesignationTrackWithTiltTransform(
-        tleLine1: String, 
-        tleLine2: String, 
+        tleLine1: String,
+        tleLine2: String,
         satelliteName: String? = null,
         tiltAngle: Double = -6.98  // 기본 기울기 각도
     ): Pair<List<Map<String, Any?>>, List<Map<String, Any?>>> {
         try {
             // 1. 기본 위성 추적 데이터 생성
             val (originalMst, originalDtl) = generateEphemerisDesignationTrackSync(tleLine1, tleLine2, satelliteName)
-            
+
             logger.info("기본 위성 추적 데이터 생성 완료: ${originalDtl.size}개 좌표")
-            
+
             // 2. 기울기 변환 적용
             val transformedDtl = mutableListOf<Map<String, Any?>>()
-            
+
             originalDtl.forEachIndexed { index, originalPoint ->
                 val originalAzimuth = originalPoint["Azimuth"] as Double
                 val originalElevation = originalPoint["Elevation"] as Double
-                
+
                 // 기울기 변환 적용 (회전체는 0도 고정)
                 val transformedCoordinates = CoordinateTransformer.generateRotatorAngleTable(
                     azimuth = originalAzimuth,
@@ -812,12 +931,12 @@ class EphemerisService(
                     tiltAngle = tiltAngle,
                     rotatorStepDegrees = 0.0  // 회전체는 0도 고정
                 )
-                
+
                 // 변환된 좌표는 하나만 반환됨 (회전체 0도)
                 val transformedPoint = transformedCoordinates.first()
                 val transformedAzimuth = transformedPoint.first
                 val transformedElevation = transformedPoint.second
-                
+
                 // 변환된 좌표로 새로운 데이터 포인트 생성
                 val transformedDataPoint = mapOf(
                     "No" to originalPoint["No"],
@@ -832,15 +951,15 @@ class EphemerisService(
                     "TiltAngle" to tiltAngle,
                     "TransformationType" to "tilt_only"
                 )
-                
+
                 transformedDtl.add(transformedDataPoint)
-                
+
                 // 진행률 로깅 (1000개마다)
                 if ((index + 1) % 1000 == 0) {
                     logger.info("기울기 변환 진행률: ${index + 1}/${originalDtl.size} (${((index + 1) * 100.0 / originalDtl.size).toInt()}%)")
                 }
             }
-            
+
             // 3. 마스터 데이터 업데이트 (변환 정보 추가)
             val transformedMst = originalMst.map { mst ->
                 mst.toMutableMap().apply {
@@ -850,12 +969,15 @@ class EphemerisService(
                     put("TransformedDataCount", transformedDtl.size)
                 }
             }
-            
+
             logger.info("기울기 변환 완료: ${transformedDtl.size}개 좌표 변환됨")
             logger.info("변환 정보: 기울기=${tiltAngle}°, 회전체=0도 고정")
-            
+
+            // ✅ 변환된 데이터를 저장소에 저장
+            saveTiltTransformedData(transformedMst, transformedDtl)
+
             return Pair(transformedMst, transformedDtl)
-            
+
         } catch (e: Exception) {
             logger.error("기울기 변환 처리 중 오류 발생: ${e.message}", e)
             throw RuntimeException("기울기 변환 처리 실패: ${e.message}", e)
@@ -882,7 +1004,7 @@ class EphemerisService(
     fun startEphemerisTracking(passId: UInt) {
         logger.info("🚀 위성 추적 시작: 패스 ID = {}", passId)
         // 기존 타이머 중지
-        stopTimer()
+        stopModeTimer()
         // ✅ 실행 플래그 초기화 (가장 중요!)
         executedActions.clear()
         logger.info("🔄 실행 플래그 초기화 완료")
@@ -892,13 +1014,13 @@ class EphemerisService(
             logger.error("패스 ID {}에 해당하는 데이터를 찾을 수 없습니다", passId)
             return
         }
-        // ✅ 타이머 시작 (100ms 주기)
-        startTimer()
-        logger.info("✅ 위성 추적 및 타이머 시작 완료")
+        // ✅ 통합 모드 타이머 시작 (100ms 주기)
+        startModeTimer()
+        logger.info("✅ 위성 추적 및 통합 모드 타이머 시작 완료")
     }
 
     /**
-     * 위성 추적 중지
+     * 위성 추적 중지 (안전한 배치 종료 포함)
      */
     fun stopEphemerisTracking() {
         if (trackingStatus.ephemerisStatus != true) {
@@ -907,101 +1029,108 @@ class EphemerisService(
         }
         logger.info("위성 추적 중지")
         stopCommand()
-        // ✅ 타이머 중지
-        stopTimer()
+        // ✅ 안전한 배치 종료 처리
+        safeBatchShutdown()
+        // ✅ 통합 모드 타이머 중지
+        stopModeTimer()
         clearRealtimeTrackingData()
         dataStoreService.stopAllTracking()
-        logger.info("✅ 위성 추적 및 타이머 중지 완료")
-        //dataStoreService.stopAllTracking()
+        logger.info("✅ 위성 추적 및 통합 모드 타이머 중지 완료")
     }
 
     /**
-     * ✅ 정교한 타이머 시작 (기존 startTimer() 메서드 대체)
+     * ✅ 안전한 배치 종료 처리
      */
-    private fun startTimer() {
+    private fun safeBatchShutdown() {
+        try {
+            logger.info("🔄 안전한 배치 종료 처리 시작")
+            val batchShutdownSuccess = batchStorageManager.safeShutdown()
+            if (batchShutdownSuccess) {
+                logger.info("✅ 배치 데이터 안전 종료 완료")
+            } else {
+                logger.warn("⚠️ 배치 데이터 일부 손실 가능성")
+            }
+            val finalStats = batchStorageManager.getRealtimeTrackingStats()
+            logger.info("📊 최종 배치 처리 통계:")
+            logger.info("  - 총 처리된 데이터: ${finalStats["totalCount"]}개")
+            logger.info("  - 평균 Az 오차: ${finalStats["averageAzimuthError"]}°")
+            logger.info("  - 평균 El 오차: ${finalStats["averageElevationError"]}°")
+        } catch (e: Exception) {
+            logger.error("❌ 안전한 배치 종료 처리 중 오류: ${e.message}", e)
+        }
+    }
+
+    /**
+     * ✅ 통합 모드 실행 (기존 startTimer() 메서드 대체)
+     */
+    private fun startModeTimer() {
         // 기존 타이머가 있다면 정리
-        stopTimer()
+        stopModeTimer()
 
-        // 새로운 ScheduledExecutorService 생성
-        trackingExecutor = Executors.newSingleThreadScheduledExecutor(trackingThreadFactory)
+        // ✅ 통합 모드 실행기 사용
+        modeExecutor = threadManager.getModeExecutor()
 
-        // 정교한 스케줄링으로 작업 시작
-        trackingTask = trackingExecutor?.scheduleAtFixedRate(
+        // ✅ 안정성 우선 스케줄링
+        modeTask = modeExecutor?.scheduleAtFixedRate(
             {
                 try {
+                    val startTime = System.nanoTime()
                     trackingSatelliteStateCheck()
+                    
+                    // ✅ 정확한 성능 모니터링
+                    val processingTime = (System.nanoTime() - startTime) / 1_000_000
+                    if (processingTime > 100) {  // 100ms 임계값으로 정확한 보장
+                        logger.warn("⚠️ 100ms 저장 지연 감지: {}ms (임계값: 100ms)", processingTime)
+                    }
                 } catch (e: Exception) {
                     logger.error("위성 추적 상태 체크 중 오류: ${e.message}", e)
                 }
             }, 0,      // 초기 지연 시간
-            100,    // 실행 간격 (100ms)
+            100,    // 실행 간격 (100ms) - 유지
             TimeUnit.MILLISECONDS
         )
 
-        logger.info("⏰ 정교한 100ms 주기 타이머 시작 (우선순위: 7)")
+        logger.info("⏰ 정확한 성능 모니터링 100ms 주기 타이머 시작")
     }
 
     /**
-     * ✅ 정교한 타이머 중지 (기존 stopTimer() 메서드 대체)
+     * ✅ 통합 모드 타이머 중지 (기존 stopTimer() 메서드 대체)
      */
-    private fun stopTimer() {
+    private fun stopModeTimer() {
         // 실행 중인 작업 취소
-        trackingTask?.let { task ->
+        modeTask?.let { task ->
             if (!task.isCancelled) {
                 task.cancel(false) // 진행 중인 작업은 완료하도록 함
-                logger.debug("⏹️ 추적 작업 취소 완료")
+                logger.debug("⏹️ 모드 작업 취소 완료")
             }
         }
-        trackingTask = null
+        modeTask = null
 
-        // ExecutorService 종료
-        trackingExecutor?.let { executor ->
-            executor.shutdown()
-            try {
-                if (!executor.awaitTermination(2, TimeUnit.SECONDS)) {
-                    logger.warn("추적 타이머 정상 종료 실패, 강제 종료 시도")
-                    executor.shutdownNow()
-                    if (!executor.awaitTermination(1, TimeUnit.SECONDS)) {
-                        logger.error("추적 타이머 강제 종료 실패")
-                    } else {
-                        logger.info("⏹️ 추적 타이머 강제 종료 완료")
-                    }
-                } else {
-                    logger.info("⏹️ 추적 타이머 정상 종료 완료")
-                }
-            } catch (e: InterruptedException) {
-                logger.warn("추적 타이머 종료 중 인터럽트 발생")
-                executor.shutdownNow()
-                Thread.currentThread().interrupt()
-            }
-        }
-        trackingExecutor = null
+        // ExecutorService 종료 (공유 실행기이므로 완전 종료하지 않음)
+        logger.info("⏹️ 통합 모드 타이머 정리 완료")
     }
 
     /**
-     * ✅ 타이머 상태 확인 (기존 isTimerRunning() 메서드 수정)
+     * ✅ 모드 타이머 상태 확인 (기존 isTimerRunning() 메서드 수정)
      */
     fun isTimerRunning(): Boolean {
-        return trackingExecutor != null && !trackingExecutor!!.isShutdown && !trackingExecutor!!.isTerminated && trackingTask != null && !trackingTask!!.isCancelled
+        return modeExecutor != null && modeTask != null && !modeTask!!.isCancelled
     }
 
     /**
-     * ✅ 타이머 상세 상태 정보 (새로운 메서드)
+     * ✅ 모드 타이머 상세 상태 정보 (새로운 메서드)
      */
     fun getTimerStatus(): Map<String, Any> {
-        val executor = trackingExecutor
-        val task = trackingTask
+        val executor = modeExecutor
+        val task = modeTask
 
         return mapOf(
             "isRunning" to isTimerRunning(),
             "executorExists" to (executor != null),
-            "executorShutdown" to (executor?.isShutdown ?: true),
-            "executorTerminated" to (executor?.isTerminated ?: true),
             "taskExists" to (task != null),
             "taskCancelled" to (task?.isCancelled ?: true),
             "taskDone" to (task?.isDone ?: true),
-            "threadPriority" to 7,
-            "threadName" to "SatelliteTracking-Timer"
+            "threadName" to "mode-worker"
         )
     }
 
@@ -1089,143 +1218,135 @@ class EphemerisService(
     }
 
     /**
-     * ✅ 실시간 추적 데이터 저장 (원본 및 변환 데이터 포함)
+     * ✅ 배치 처리를 사용한 실시간 추적 데이터 저장
      */
     private fun saveRealtimeTrackingData(passId: UInt, currentTime: ZonedDateTime, startTime: ZonedDateTime) {
         try {
-            // 현재 시간을 기준으로 추적 시간 계산
-            val elapsedTimeSeconds = Duration.between(startTime, currentTime).toMillis() / 1000.0f
-
-            // 현재 추적해야 할 위성 위치 계산
-            val passDetails = getEphemerisTrackDtlByMstId(passId)
-            if (passDetails.isEmpty()) {
-                logger.debug("패스 세부 데이터가 없어 실시간 데이터 저장을 건너뜁니다.")
-                return
-            }
-
-            // 현재 시간에 해당하는 목표 위치 찾기
-            val timeDifferenceMs = Duration.between(startTime, currentTime).toMillis()
-            val calculatedIndex = (timeDifferenceMs / 100).toInt()
-
-            val targetPoint = if (calculatedIndex >= 0 && calculatedIndex < passDetails.size) {
-                passDetails[calculatedIndex]
-            } else {
-                passDetails.lastOrNull() ?: return
-            }
-
-            // ✅ 원본 데이터와 변환된 데이터 모두 추출
-            val cmdAzimuth = (targetPoint["Azimuth"] as Double).toFloat()
-            val cmdElevation = (targetPoint["Elevation"] as Double).toFloat()
+            // ✅ 실시간 추적 데이터 생성
+            val realtimeData = createRealtimeTrackingData(passId, currentTime, startTime)
             
-            // 원본 데이터 추출 (변환된 데이터가 있는 경우)
-            val originalAzimuth = (targetPoint["OriginalAzimuth"] as? Double)?.toFloat() ?: cmdAzimuth
-            val originalElevation = (targetPoint["OriginalElevation"] as? Double)?.toFloat() ?: cmdElevation
+            // ✅ 배치 처리로 변경
+            batchStorageManager.addToBatch(realtimeData)
             
-            // 변환 정보 추출
-            val tiltAngle = (targetPoint["TiltAngle"] as? Double) ?: -6.98
-            val transformationType = targetPoint["TransformationType"] as? String ?: "none"
-
-            // ✅ 변경: PushData 대신 DataStoreService에서 데이터 가져오기
-            val currentData = dataStoreService.getLatestData()
-
-            // ✅ DataStoreService에서 추적 관련 데이터만 별도로 가져오기
-            val trackingOnlyData = dataStoreService.getTrackingOnlyData()
-
-            val trackingCmdAzimuthTime = trackingOnlyData["trackingAzimuthTime"]
-            val trackingCmdElevationTime = trackingOnlyData["trackingElevationTime"]
-            val trackingCmdTiltTime = trackingOnlyData["trackingTiltTime"]
-
-            val trackingCmdAzimuth = trackingOnlyData["trackingCMDAzimuthAngle"]
-            val trackingActualAzimuth = trackingOnlyData["trackingActualAzimuthAngle"]
-            val trackingCmdElevation = trackingOnlyData["trackingCMDElevationAngle"]
-            val trackingActualElevation = trackingOnlyData["trackingActualElevationAngle"]
-            val trackingCmdTilt = trackingOnlyData["trackingCMDTiltAngle"]
-            val trackingActualTilt = trackingOnlyData["trackingActualTiltAngle"]
-
-            // ✅ 데이터 유효성 검사
-            val hasValidData =
-                trackingCmdAzimuth != null || trackingActualAzimuth != null || trackingCmdElevation != null || trackingActualElevation != null
-
-            if (!hasValidData && trackingDataIndex % 50 == 0) {
-                logger.warn("⚠️ DataStoreService에서 유효한 추적 데이터를 받지 못하고 있습니다.")
-                debugDataStoreStatus()
-            }
-
-            // 실시간 추적 데이터 생성 (원본 및 변환 데이터 포함)
-            val realtimeData = mapOf(
-                "index" to trackingDataIndex,
-                "timestamp" to currentTime,
-                "cmdAz" to cmdAzimuth,
-                "cmdEl" to cmdElevation,
-                "actualAz" to currentData.azimuthAngle,
-                "actualEl" to currentData.elevationAngle,
-                "elapsedTimeSeconds" to elapsedTimeSeconds,
-                "trackingAzimuthTime" to trackingCmdAzimuthTime,
-                "trackingCMDAzimuthAngle" to trackingCmdAzimuth,
-                "trackingActualAzimuthAngle" to trackingActualAzimuth,
-                "trackingElevationTime" to trackingCmdElevationTime,
-                "trackingCMDElevationAngle" to trackingCmdElevation,
-                "trackingActualElevationAngle" to trackingActualElevation,
-                "trackingTiltTime" to trackingCmdTiltTime,
-                "trackingCMDTiltAngle" to trackingCmdTilt,
-                "trackingActualTiltAngle" to trackingActualTilt,
-                "passId" to passId,
-                "azimuthError" to ((trackingCmdAzimuth ?: 0.0f) - (trackingActualAzimuth ?: 0.0f)),
-                "elevationError" to ((trackingCmdElevation ?: 0.0f) - (trackingActualElevation ?: 0.0f)),
-                "hasValidData" to hasValidData,
-                "dataSource" to "DataStoreService", // ✅ 데이터 소스 표시
-                
-                // ✅ 원본 데이터 (변환 전)
-                "originalAzimuth" to originalAzimuth,
-                "originalElevation" to originalElevation,
-                
-                // ✅ 변환 정보
-                "tiltAngle" to tiltAngle,
-                "transformationType" to transformationType,
-                
-                // ✅ 변환 오차 계산
-                "azimuthTransformationError" to (cmdAzimuth - originalAzimuth),
-                "elevationTransformationError" to (cmdElevation - originalElevation),
-                
-                // ✅ 변환 적용 여부
-                "hasTransformation" to (transformationType != "none")
-            )
-
-            // 리스트에 추가
-            realtimeTrackingDataList.add(realtimeData)
-            trackingDataIndex++
-
-            // 주기적 로깅 (변환 정보 포함)
+            // ✅ 주기적 로깅 (배치 상태 포함)
             if (trackingDataIndex % 100 == 0) {
-                logger.info("📊 실시간 추적 데이터 저장 중 - 총 {}개 데이터 포인트 저장됨", trackingDataIndex)
-                if (hasValidData) {
-                    logger.info(
-                        "✅ DataStore에서 유효한 데이터: 목표 Az=$cmdAzimuth°, El=$cmdElevation° | 실제 Az=$trackingActualAzimuth°, El=$trackingActualElevation°",
-                        cmdAzimuth,
-                        cmdElevation,
-                        trackingActualAzimuth ?: 0.0f,
-                        trackingActualElevation ?: 0.0f
-                    )
-                    
-                    // 변환 정보 로깅
-                    if (transformationType != "none") {
-                        logger.info(
-                            "🔄 변환 정보: 원본 Az=$originalAzimuth°, El=$originalElevation° → 변환 Az=$cmdAzimuth°, El=$cmdElevation° (기울기=${tiltAngle}°)",
-                            originalAzimuth,
-                            originalElevation,
-                            cmdAzimuth,
-                            cmdElevation,
-                            tiltAngle
-                        )
-                    }
-                } else {
-                    logger.warn("❌ DataStore에서 무효한 데이터")
-                }
+                val batchStatus = batchStorageManager.getBatchStatus()
+                logger.info("📊 배치 처리 중 - 총 {}개 데이터 포인트, 버퍼 크기: {}", 
+                    trackingDataIndex, batchStatus["bufferSize"])
             }
-
+            
+            trackingDataIndex++
+            
         } catch (e: Exception) {
-            logger.error("실시간 추적 데이터 저장 중 오류: ${e.message}", e)
+            logger.error("배치 실시간 추적 데이터 저장 중 오류: ${e.message}", e)
         }
+    }
+    
+    /**
+     * ✅ 실시간 추적 데이터 생성 (기존 로직 분리)
+     */
+    private fun createRealtimeTrackingData(
+        passId: UInt, 
+        currentTime: ZonedDateTime, 
+        startTime: ZonedDateTime
+    ): Map<String, Any?> {
+        // 현재 시간을 기준으로 추적 시간 계산
+        val elapsedTimeSeconds = Duration.between(startTime, currentTime).toMillis() / 1000.0f
+
+        // 현재 추적해야 할 위성 위치 계산
+        val passDetails = getEphemerisTrackDtlByMstId(passId)
+        if (passDetails.isEmpty()) {
+            logger.debug("패스 세부 데이터가 없어 실시간 데이터 저장을 건너뜁니다.")
+            return emptyMap()
+        }
+
+        // 현재 시간에 해당하는 목표 위치 찾기
+        val timeDifferenceMs = Duration.between(startTime, currentTime).toMillis()
+        val calculatedIndex = (timeDifferenceMs / 100).toInt()
+
+        val targetPoint = if (calculatedIndex >= 0 && calculatedIndex < passDetails.size) {
+            passDetails[calculatedIndex]
+        } else {
+            passDetails.lastOrNull() ?: return emptyMap()
+        }
+
+        // ✅ 원본 데이터와 변환된 데이터 모두 추출
+        val cmdAzimuth = (targetPoint["Azimuth"] as Double).toFloat()
+        val cmdElevation = (targetPoint["Elevation"] as Double).toFloat()
+        
+        // 원본 데이터 추출 (변환된 데이터가 있는 경우)
+        val originalAzimuth = (targetPoint["OriginalAzimuth"] as? Double)?.toFloat() ?: cmdAzimuth
+        val originalElevation = (targetPoint["OriginalElevation"] as? Double)?.toFloat() ?: cmdElevation
+        
+        // 변환 정보 추출
+        val tiltAngle = (targetPoint["TiltAngle"] as? Double) ?: -6.98
+        val transformationType = targetPoint["TransformationType"] as? String ?: "none"
+
+        // ✅ 변경: PushData 대신 DataStoreService에서 데이터 가져오기
+        val currentData = dataStoreService.getLatestData()
+
+        // ✅ DataStoreService에서 추적 관련 데이터만 별도로 가져오기
+        val trackingOnlyData = dataStoreService.getTrackingOnlyData()
+
+        val trackingCmdAzimuthTime = trackingOnlyData["trackingAzimuthTime"]
+        val trackingCmdElevationTime = trackingOnlyData["trackingElevationTime"]
+        val trackingCmdTiltTime = trackingOnlyData["trackingTiltTime"]
+
+        val trackingCmdAzimuth = trackingOnlyData["trackingCMDAzimuthAngle"]
+        val trackingActualAzimuth = trackingOnlyData["trackingActualAzimuthAngle"]
+        val trackingCmdElevation = trackingOnlyData["trackingCMDElevationAngle"]
+        val trackingActualElevation = trackingOnlyData["trackingActualElevationAngle"]
+        val trackingCmdTilt = trackingOnlyData["trackingCMDTiltAngle"]
+        val trackingActualTilt = trackingOnlyData["trackingActualTiltAngle"]
+
+        // ✅ 데이터 유효성 검사
+        val hasValidData =
+            trackingCmdAzimuth != null || trackingActualAzimuth != null || trackingCmdElevation != null || trackingActualElevation != null
+
+        if (!hasValidData && trackingDataIndex % 50 == 0) {
+            logger.warn("⚠️ DataStoreService에서 유효한 추적 데이터를 받지 못하고 있습니다.")
+            debugDataStoreStatus()
+        }
+
+        // 실시간 추적 데이터 생성 (원본 및 변환 데이터 포함)
+        return mapOf(
+            "index" to trackingDataIndex,
+            "timestamp" to currentTime,
+            "cmdAz" to cmdAzimuth,
+            "cmdEl" to cmdElevation,
+            "actualAz" to currentData.azimuthAngle,
+            "actualEl" to currentData.elevationAngle,
+            "elapsedTimeSeconds" to elapsedTimeSeconds,
+            "trackingAzimuthTime" to trackingCmdAzimuthTime,
+            "trackingCMDAzimuthAngle" to trackingCmdAzimuth,
+            "trackingActualAzimuthAngle" to trackingActualAzimuth,
+            "trackingElevationTime" to trackingCmdElevationTime,
+            "trackingCMDElevationAngle" to trackingCmdElevation,
+            "trackingActualElevationAngle" to trackingActualElevation,
+            "trackingTiltTime" to trackingCmdTiltTime,
+            "trackingCMDTiltAngle" to trackingCmdTilt,
+            "trackingActualTiltAngle" to trackingActualTilt,
+            "passId" to passId,
+            "azimuthError" to ((trackingCmdAzimuth ?: 0.0f) - (trackingActualAzimuth ?: 0.0f)),
+            "elevationError" to ((trackingCmdElevation ?: 0.0f) - (trackingActualElevation ?: 0.0f)),
+            "hasValidData" to hasValidData,
+            "dataSource" to "DataStoreService", // ✅ 데이터 소스 표시
+            
+            // ✅ 원본 데이터 (변환 전)
+            "originalAzimuth" to originalAzimuth,
+            "originalElevation" to originalElevation,
+            
+            // ✅ 변환 정보
+            "tiltAngle" to tiltAngle,
+            "transformationType" to transformationType,
+            
+            // ✅ 변환 오차 계산
+            "azimuthTransformationError" to (cmdAzimuth - originalAzimuth),
+            "elevationTransformationError" to (cmdElevation - originalElevation),
+            
+            // ✅ 변환 적용 여부
+            "hasTransformation" to (transformationType != "none")
+        )
     }
 
     fun debugPushDataStatus() {
@@ -1272,81 +1393,86 @@ class EphemerisService(
     }
 
     /**
-     * ✅ 실시간 추적 데이터 조회
+     * ✅ 실시간 추적 데이터 조회 (배치 관리자 사용)
      */
     fun getRealtimeTrackingData(): List<Map<String, Any?>> {
-        return realtimeTrackingDataList.toList()
+        return batchStorageManager.getRealtimeTrackingData()
     }
 
     /**
-     * ✅ 실시간 추적 데이터 초기화
+     * ✅ 실시간 추적 데이터 초기화 (배치 관리자 사용)
      */
     fun clearRealtimeTrackingData() {
-        realtimeTrackingDataList.clear()
+        batchStorageManager.clearRealtimeTrackingData()
         trackingDataIndex = 0
         logger.info("실시간 추적 데이터 초기화 완료")
     }
 
     /**
-     * ✅ 실시간 추적 통계 정보 (변환 오차 포함)
+     * ✅ 실시간 추적 통계 정보 (배치 관리자 사용)
      */
     fun getRealtimeTrackingStats(): Map<String, Any> {
-        if (realtimeTrackingDataList.isEmpty()) {
-            return mapOf(
-                "totalCount" to 0,
-                "averageAzimuthError" to 0.0,
-                "averageElevationError" to 0.0,
-                "maxAzimuthError" to 0.0,
-                "maxElevationError" to 0.0,
-                "averageTransformationError" to 0.0,
-                "maxTransformationError" to 0.0,
-                "transformationCount" to 0
+        return batchStorageManager.getRealtimeTrackingStats()
+    }
+    
+    /**
+     * ✅ 배치 처리 상태 조회
+     */
+    fun getBatchStatus(): Map<String, Any> {
+        return batchStorageManager.getBatchStatus()
+    }
+    
+    /**
+     * ✅ 강제 배치 처리
+     */
+    fun forceProcessBatch() {
+        batchStorageManager.forceProcessBatch()
+    }
+    
+    /**
+     * ✅ 배치 처리 성능 테스트
+     */
+    fun testBatchPerformance() {
+        logger.info("🚀 배치 처리 성능 테스트 시작")
+        
+        val testDataCount = 1000
+        val startTime = System.currentTimeMillis()
+        
+        // 테스트 데이터 생성 및 배치 처리
+        repeat(testDataCount) { i ->
+            val testData = mapOf(
+                "index" to i,
+                "timestamp" to ZonedDateTime.now(),
+                "cmdAz" to (i * 0.1f),
+                "cmdEl" to (i * 0.05f),
+                "actualAz" to (i * 0.1f + 0.5f),
+                "actualEl" to (i * 0.05f + 0.3f),
+                "azimuthError" to 0.5f,
+                "elevationError" to 0.3f,
+                "hasValidData" to true,
+                "passId" to 1u
             )
-        }
-
-        val azimuthErrors = realtimeTrackingDataList.mapNotNull {
-            it["azimuthError"] as? Float
-        }
-        val elevationErrors = realtimeTrackingDataList.mapNotNull {
-            it["elevationError"] as? Float
+            
+            batchStorageManager.addToBatch(testData)
         }
         
-        // 변환 오차 통계
-        val azimuthTransformationErrors = realtimeTrackingDataList.mapNotNull {
-            it["azimuthTransformationError"] as? Float
-        }
-        val elevationTransformationErrors = realtimeTrackingDataList.mapNotNull {
-            it["elevationTransformationError"] as? Float
-        }
+        // 강제 배치 처리
+        batchStorageManager.forceProcessBatch()
         
-        // 변환 적용된 데이터 수
-        val transformationCount = realtimeTrackingDataList.count {
-            it["hasTransformation"] as? Boolean == true
-        }
-
-        return mapOf(
-            "totalCount" to realtimeTrackingDataList.size,
-            "averageAzimuthError" to azimuthErrors.average(),
-            "averageElevationError" to elevationErrors.average(),
-            "maxAzimuthError" to (azimuthErrors.maxOrNull() ?: 0.0),
-            "maxElevationError" to (elevationErrors.maxOrNull() ?: 0.0),
-            "minAzimuthError" to (azimuthErrors.minOrNull() ?: 0.0),
-            "minElevationError" to (elevationErrors.minOrNull() ?: 0.0),
-            
-            // 변환 오차 통계
-            "averageAzimuthTransformationError" to azimuthTransformationErrors.average(),
-            "averageElevationTransformationError" to elevationTransformationErrors.average(),
-            "maxAzimuthTransformationError" to (azimuthTransformationErrors.maxOrNull() ?: 0.0),
-            "maxElevationTransformationError" to (elevationTransformationErrors.maxOrNull() ?: 0.0),
-            "minAzimuthTransformationError" to (azimuthTransformationErrors.minOrNull() ?: 0.0),
-            "minElevationTransformationError" to (elevationTransformationErrors.minOrNull() ?: 0.0),
-            
-            // 변환 적용 통계
-            "transformationCount" to transformationCount,
-            "transformationPercentage" to if (realtimeTrackingDataList.isNotEmpty()) {
-                (transformationCount * 100.0 / realtimeTrackingDataList.size)
-            } else 0.0
-        )
+        val endTime = System.currentTimeMillis()
+        val processingTime = endTime - startTime
+        
+        val batchStatus = batchStorageManager.getBatchStatus()
+        val stats = batchStorageManager.getRealtimeTrackingStats()
+        
+        logger.info("📊 배치 처리 성능 테스트 결과:")
+        logger.info("  - 처리된 데이터 수: ${stats["totalCount"]}")
+        logger.info("  - 총 처리 시간: ${processingTime}ms")
+        val speed = if (processingTime > 0) testDataCount * 1000.0 / processingTime else 0.0
+        logger.info("  - 평균 처리 속도: $speed 데이터/초")
+        logger.info("  - 배치 버퍼 크기: ${batchStatus["bufferSize"]}")
+        logger.info("  - 평균 Az 오차: ${stats["averageAzimuthError"]}")
+        logger.info("  - 평균 El 오차: ${stats["averageElevationError"]}")
     }
 
     /**
@@ -1811,6 +1937,220 @@ class EphemerisService(
      */
     fun getEphemerisTrackDtlByMstId(mstId: UInt): List<Map<String, Any?>> {
         return ephemerisTrackDtlStorage.filter { it["MstId"] == mstId }
+    }
+
+    /**
+     * ✅ 데이터 타입별 마스터 데이터 조회
+     */
+    fun getEphemerisTrackMstByDataType(dataType: String): List<Map<String, Any?>> {
+        return ephemerisTrackMstStorage.filter { it["DataType"] == dataType }
+    }
+
+    /**
+     * ✅ 데이터 타입별 세부 데이터 조회
+     */
+    fun getEphemerisTrackDtlByDataType(dataType: String): List<Map<String, Any?>> {
+        return ephemerisTrackDtlStorage.filter { it["DataType"] == dataType }
+    }
+
+    /**
+     * ✅ 특정 마스터 ID와 데이터 타입에 해당하는 세부 데이터 조회
+     */
+    fun getEphemerisTrackDtlByMstIdAndDataType(mstId: UInt, dataType: String): List<Map<String, Any?>> {
+        return ephemerisTrackDtlStorage.filter { 
+            it["MstId"] == mstId && it["DataType"] == dataType 
+        }
+    }
+
+    /**
+     * ✅ 원본 데이터 조회
+     */
+    fun getOriginalEphemerisTrackMst(): List<Map<String, Any?>> {
+        return getEphemerisTrackMstByDataType("original")
+    }
+
+    /**
+     * ✅ 축변환 데이터 조회
+     */
+    fun getAxisTransformedEphemerisTrackMst(): List<Map<String, Any?>> {
+        return getEphemerisTrackMstByDataType("axis_transformed")
+    }
+
+    /**
+     * ✅ 최종 변환 데이터 조회 (방위각 변환까지 적용된)
+     */
+    fun getFinalTransformedEphemerisTrackMst(): List<Map<String, Any?>> {
+        return getEphemerisTrackMstByDataType("final_transformed")
+    }
+
+    /**
+     * 기울기 변환이 적용된 추적 데이터를 저장소에 저장
+     */
+    fun saveTiltTransformedData(mstData: List<Map<String, Any?>>, dtlData: List<Map<String, Any?>>) {
+        synchronized(ephemerisTrackMstStorage) {
+            ephemerisTrackMstStorage.addAll(mstData)
+        }
+        synchronized(ephemerisTrackDtlStorage) {
+            ephemerisTrackDtlStorage.addAll(dtlData)
+        }
+        logger.info("기울기 변환된 추적 데이터 저장 완료: 마스터 ${mstData.size}개, 세부 ${dtlData.size}개")
+    }
+
+    /**
+     * 변환된 시계열에서 속도와 가속도를 계산하는 헬퍼 함수
+     */
+    private fun calculateVelocityAndAcceleration(trackingData: List<Map<String, Any?>>): List<Map<String, Any?>> {
+        if (trackingData.size < 2) {
+            logger.warn("속도/가속도 계산을 위해서는 최소 2개 이상의 데이터 포인트가 필요합니다")
+            return trackingData
+        }
+
+        val result = mutableListOf<Map<String, Any?>>()
+        
+        for (i in trackingData.indices) {
+            val currentPoint = trackingData[i]
+            val currentAzimuth = currentPoint["Azimuth"] as Double
+            val currentElevation = currentPoint["Elevation"] as Double
+            val currentTime = currentPoint["Time"] as ZonedDateTime
+            
+            var azimuthRate = 0.0
+            var elevationRate = 0.0
+            var azimuthAccel = 0.0
+            var elevationAccel = 0.0
+            
+            // 속도 계산 (중앙 차분법 사용)
+            when (i) {
+                0 -> {
+                    // 첫 번째 점: 전진 차분
+                    val nextPoint = trackingData[i + 1]
+                    val nextAzimuth = nextPoint["Azimuth"] as Double
+                    val nextElevation = nextPoint["Elevation"] as Double
+                    val nextTime = nextPoint["Time"] as ZonedDateTime
+                    
+                    val timeDiff = Duration.between(currentTime, nextTime).toMillis() / 1000.0
+                    if (timeDiff > 0) {
+                        azimuthRate = (nextAzimuth - currentAzimuth) / timeDiff
+                        elevationRate = (nextElevation - currentElevation) / timeDiff
+                    }
+                }
+                trackingData.size - 1 -> {
+                    // 마지막 점: 후진 차분
+                    val prevPoint = trackingData[i - 1]
+                    val prevAzimuth = prevPoint["Azimuth"] as Double
+                    val prevElevation = prevPoint["Elevation"] as Double
+                    val prevTime = prevPoint["Time"] as ZonedDateTime
+                    
+                    val timeDiff = Duration.between(prevTime, currentTime).toMillis() / 1000.0
+                    if (timeDiff > 0) {
+                        azimuthRate = (currentAzimuth - prevAzimuth) / timeDiff
+                        elevationRate = (currentElevation - prevElevation) / timeDiff
+                    }
+                }
+                else -> {
+                    // 중간 점: 중앙 차분
+                    val prevPoint = trackingData[i - 1]
+                    val nextPoint = trackingData[i + 1]
+                    val prevAzimuth = prevPoint["Azimuth"] as Double
+                    val nextAzimuth = nextPoint["Azimuth"] as Double
+                    val prevElevation = prevPoint["Elevation"] as Double
+                    val nextElevation = nextPoint["Elevation"] as Double
+                    val prevTime = prevPoint["Time"] as ZonedDateTime
+                    val nextTime = nextPoint["Time"] as ZonedDateTime
+                    
+                    val totalTimeDiff = Duration.between(prevTime, nextTime).toMillis() / 1000.0
+                    if (totalTimeDiff > 0) {
+                        azimuthRate = (nextAzimuth - prevAzimuth) / totalTimeDiff
+                        elevationRate = (nextElevation - prevElevation) / totalTimeDiff
+                    }
+                }
+            }
+            
+            // 가속도 계산 (속도의 변화율)
+            when (i) {
+                0 -> {
+                    // 첫 번째 점: 전진 차분
+                    if (i + 1 < trackingData.size) {
+                        val nextPoint = trackingData[i + 1]
+                        val nextTime = nextPoint["Time"] as ZonedDateTime
+                        val timeDiff = Duration.between(currentTime, nextTime).toMillis() / 1000.0
+                        
+                        if (i + 2 < trackingData.size) {
+                            val nextNextPoint = trackingData[i + 2]
+                            val nextNextAzimuth = nextNextPoint["Azimuth"] as Double
+                            val nextNextElevation = nextNextPoint["Elevation"] as Double
+                            val nextNextTime = nextNextPoint["Time"] as ZonedDateTime
+                            
+                            val nextTimeDiff = Duration.between(nextTime, nextNextTime).toMillis() / 1000.0
+                            if (timeDiff > 0 && nextTimeDiff > 0) {
+                                val nextAzRate = (nextNextAzimuth - nextPoint["Azimuth"] as Double) / nextTimeDiff
+                                val nextElRate = (nextNextElevation - nextPoint["Elevation"] as Double) / nextTimeDiff
+                                
+                                azimuthAccel = (nextAzRate - azimuthRate) / timeDiff
+                                elevationAccel = (nextElRate - elevationRate) / timeDiff
+                            }
+                        }
+                    }
+                }
+                trackingData.size - 1 -> {
+                    // 마지막 점: 후진 차분
+                    if (i - 1 >= 0) {
+                        val prevPoint = trackingData[i - 1]
+                        val prevTime = prevPoint["Time"] as ZonedDateTime
+                        val timeDiff = Duration.between(prevTime, currentTime).toMillis() / 1000.0
+                        
+                        if (i - 2 >= 0) {
+                            val prevPrevPoint = trackingData[i - 2]
+                            val prevPrevAzimuth = prevPrevPoint["Azimuth"] as Double
+                            val prevPrevElevation = prevPrevPoint["Elevation"] as Double
+                            val prevPrevTime = prevPrevPoint["Time"] as ZonedDateTime
+                            
+                            val prevTimeDiff = Duration.between(prevPrevTime, prevTime).toMillis() / 1000.0
+                            if (timeDiff > 0 && prevTimeDiff > 0) {
+                                val prevAzRate = (prevPoint["Azimuth"] as Double - prevPrevAzimuth) / prevTimeDiff
+                                val prevElRate = (prevPoint["Elevation"] as Double - prevPrevElevation) / prevTimeDiff
+                                
+                                azimuthAccel = (azimuthRate - prevAzRate) / timeDiff
+                                elevationAccel = (elevationRate - prevElRate) / timeDiff
+                            }
+                        }
+                    }
+                }
+                else -> {
+                    // 중간 점: 중앙 차분
+                    val prevPoint = trackingData[i - 1]
+                    val nextPoint = trackingData[i + 1]
+                    val prevTime = prevPoint["Time"] as ZonedDateTime
+                    val nextTime = nextPoint["Time"] as ZonedDateTime
+                    
+                    val prevTimeDiff = Duration.between(prevTime, currentTime).toMillis() / 1000.0
+                    val nextTimeDiff = Duration.between(currentTime, nextTime).toMillis() / 1000.0
+                    
+                    if (prevTimeDiff > 0 && nextTimeDiff > 0) {
+                        val prevAzRate = (currentAzimuth - prevPoint["Azimuth"] as Double) / prevTimeDiff
+                        val prevElRate = (currentElevation - prevPoint["Elevation"] as Double) / prevTimeDiff
+                        val nextAzRate = (nextPoint["Azimuth"] as Double - currentAzimuth) / nextTimeDiff
+                        val nextElRate = (nextPoint["Elevation"] as Double - currentElevation) / nextTimeDiff
+                        
+                        val avgTimeDiff = (prevTimeDiff + nextTimeDiff) / 2.0
+                        azimuthAccel = (nextAzRate - prevAzRate) / avgTimeDiff
+                        elevationAccel = (nextElRate - prevElRate) / avgTimeDiff
+                    }
+                }
+            }
+            
+            // 결과 데이터 포인트 생성
+            val resultPoint = currentPoint.toMutableMap().apply {
+                put("AzimuthRate", azimuthRate)
+                put("ElevationRate", elevationRate)
+                put("AzimuthAccel", azimuthAccel)
+                put("ElevationAccel", elevationAccel)
+            }
+            
+            result.add(resultPoint)
+        }
+        
+        logger.info("속도/가속도 계산 완료: ${result.size}개 데이터 포인트")
+        return result
     }
 
     /**

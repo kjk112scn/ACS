@@ -24,7 +24,7 @@ class EphemerisController(
 {
     private val logger = LoggerFactory.getLogger(EphemerisController::class.java)
 
-    @PostMapping("/tracking/geostationary/start")
+    @PostMapping("/3axis/tracking/geostationary/start")
     fun startGeostationaryTracking(@RequestBody request: GeostationaryTrackingRequest): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             try {
@@ -43,6 +43,75 @@ class EphemerisController(
             }
         }
     }
+    /**
+     * TLE 데이터로 기울기 변환이 적용된 위성 궤도 추적 데이터를 생성합니다.
+     */
+    @PostMapping("/3axis/tracking/generate-with-tilt-transform")
+    fun generateEphemerisTrackWithTiltTransform(@RequestBody request: EphemerisTrackWithTiltRequest): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            try {
+                val (mstData, dtlData) = ephemerisService.generateEphemerisDesignationTrackWithTiltTransform(
+                    request.tleLine1,
+                    request.tleLine2,
+                    request.satelliteName,
+                    request.tiltAngle
+                )
+
+                mapOf<String, Any>(
+                    "message" to "기울기 변환이 적용된 위성 궤도 추적 데이터 생성 완료",
+                    "mstCount" to mstData.size,
+                    "dtlCount" to dtlData.size,
+                    "tiltAngle" to request.tiltAngle,
+                    "transformationType" to "tilt_only"
+                )
+            } catch (e: Exception) {
+                mapOf<String, Any>(
+                    "message" to "기울기 변환이 적용된 위성 궤도 추적 데이터 생성 실패",
+                    "error" to (e.message ?: "계산 중 오류가 발생했습니다"),
+                    "tiltAngle" to request.tiltAngle
+                )
+            }
+        }
+    }
+
+    /**
+     * TLE 데이터로 축변환이 적용된 위성 궤도 추적 데이터를 생성합니다.
+     * 방위각 변환 + 축변환 + 변환된 시계열에서 속도/가속도 계산
+     */
+    @PostMapping("/3axis/tracking/generate-with-axis-transform")
+    fun generateEphemerisDesignationTrackWithTiltTransform(@RequestBody request: EphemerisTrackRequest): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            try {
+                val (mstData, dtlData) = ephemerisService.generateEphemerisDesignationTrackSync(
+                    request.tleLine1,
+                    request.tleLine2,
+                    request.satelliteName
+                )
+
+                mapOf<String, Any>(
+                    "message" to "축변환이 적용된 위성 궤도 추적 데이터 생성 완료",
+                    "mstCount" to mstData.size,
+                    "dtlCount" to dtlData.size,
+                    "tiltAngle" to -6.98,
+                    "rotatorAngle" to 0.0,
+                    "transformationType" to "axis_transform",
+                    "processingSteps" to listOf(
+                        "방위각 변환 (0~360도 -> ±270도)",
+                        "축변환 (기울기 -6.98도, 회전체 0도)",
+                        "변환된 시계열에서 속도/가속도 계산"
+                    )
+                )
+            } catch (e: Exception) {
+                mapOf<String, Any>(
+                    "message" to "축변환이 적용된 위성 궤도 추적 데이터 생성 실패",
+                    "error" to (e.message ?: "계산 중 오류가 발생했습니다"),
+                    "tiltAngle" to -6.98,
+                    "rotatorAngle" to 0.0
+                )
+            }
+        }
+    }
+
     /**
      * 실시간 추적 데이터 조회 (JSON)
      */
@@ -183,6 +252,7 @@ class EphemerisController(
             )
     }
 
+
     /**
      * 모든 위성 추적 마스터 데이터를 조회합니다.
      */
@@ -202,6 +272,7 @@ class EphemerisController(
             ephemerisService.getEphemerisTrackDtlByMstId(mstId)
         }
     }
+
     /**
      * 위성 추적을 시작합니다.
      * 헤더 정보 전송 및 초기 추적 데이터 전송을 수행합니다.
@@ -406,6 +477,17 @@ data class EphemerisTrackRequest(
     val tleLine2: String,
     val satelliteName: String? = null
 )
+
+/**
+ * 기울기 변환이 적용된 위성 궤도 추적 요청 모델
+ */
+data class EphemerisTrackWithTiltRequest(
+    val tleLine1: String,
+    val tleLine2: String,
+    val satelliteName: String? = null,
+    val tiltAngle: Double = -6.98  // 기본 기울기 각도
+)
+
 /**
  * 정지궤도 위성 추적 요청 모델
  */

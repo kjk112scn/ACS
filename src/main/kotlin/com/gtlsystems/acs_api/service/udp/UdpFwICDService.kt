@@ -7,6 +7,7 @@ import com.gtlsystems.acs_api.model.PushData
 import com.gtlsystems.acs_api.service.datastore.DataStoreService
 import com.gtlsystems.acs_api.service.icd.ICDService
 import com.gtlsystems.acs_api.util.JKUtil
+import com.gtlsystems.acs_api.config.ThreadManager
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
@@ -33,7 +34,8 @@ import java.util.concurrent.atomic.AtomicLong
 class UdpFwICDService(
     private val dataStoreService: DataStoreService,
     private val environment: Environment,
-    private val eventBus: ACSEventBus
+    private val eventBus: ACSEventBus,
+    private val threadManager: ThreadManager // ✅ 통합 쓰레드 관리자 주입
 ) {
 
     private val logger = LoggerFactory.getLogger(UdpFwICDService::class.java)
@@ -62,29 +64,8 @@ class UdpFwICDService(
 
     var firmwareAddress = InetSocketAddress("127.0.0.1", 8080)
 
-    // 실시간 통신용 Thread 팩토리들
-    private val udpReceiveThreadFactory = ThreadFactory { r ->
-        Thread(r, "udp-receive-realtime").apply {
-            isDaemon = true
-            priority = Thread.MAX_PRIORITY - 1
-            uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { thread, ex ->
-                logger.error("UDP Receive 스레드 오류", ex)
-            }
-        }
-    }
-
-    private val udpSendThreadFactory = ThreadFactory { r ->
-        Thread(r, "udp-send-periodic").apply {
-            isDaemon = true
-            priority = Thread.MAX_PRIORITY - 1
-        }
-    }
-
-    // 실시간 통신용 Executor들
-    private val udpReceiveExecutor: ScheduledExecutorService =
-        Executors.newSingleThreadScheduledExecutor(udpReceiveThreadFactory)
-    private val udpSendExecutor: ScheduledExecutorService =
-        Executors.newSingleThreadScheduledExecutor(udpSendThreadFactory)
+    // ✅ 통합 쓰레드 관리자 사용
+    private var realtimeExecutor: ScheduledExecutorService? = null
 
     // 통신 상태 관리
     private val isUdpRunning = AtomicBoolean(false)
@@ -128,41 +109,51 @@ class UdpFwICDService(
     }
 
     /**
-     * 실시간 UDP 통신 시작
+     * ✅ 실시간 UDP 통신 시작 (통합 쓰레드 관리자 사용)
      */
     private fun startRealtimeCommunication() {
         if (isUdpRunning.compareAndSet(false, true)) {
             logger.info("실시간 UDP 통신 시작")
-            logger.debug("Send 간격: 10ms, Receive 간격: 20ms")
+            logger.debug("Send 간격: 30ms, Receive 간격: 10ms")
 
-            // UDP Receive (최고 우선순위, 20ms 간격)
-            udpReceiveExecutor.scheduleAtFixedRate({
+            // ✅ 통합 실시간 실행기 사용
+            realtimeExecutor = threadManager.getRealtimeExecutor()
+
+            // ✅ UDP Receive (안정성 보장, 10ms 간격)
+            realtimeExecutor?.scheduleAtFixedRate({
                 try {
                     val startTime = System.nanoTime()
                     receiveUdpData()
                     receiveCount.incrementAndGet()
 
-                    // 성능 모니터링
+                    // ✅ 안정성 우선 모니터링
                     val processingTime = (System.nanoTime() - startTime) / 1_000_000
-                    if (processingTime > 15) {
-                        logger.warn("UDP Receive 지연 감지: {}ms", processingTime)
+                    if (processingTime > 15) {  // 15ms 임계값으로 안정성 보장
+                        logger.warn("⚠️ UDP Receive 지연 감지: {}ms (임계값: 15ms)", processingTime)
                     }
                 } catch (e: Exception) {
                     logger.debug("UDP Receive 오류: {}", e.message)
                 }
-            }, 0, 10, TimeUnit.MILLISECONDS)
+            }, 0, 10, TimeUnit.MILLISECONDS)  // 10ms로 안정성 보장
 
-            // UDP Send (높은 우선순위, 10ms 간격)
-            udpSendExecutor.scheduleAtFixedRate({
+            // ✅ UDP Send (안정성 보장, 30ms 간격)
+            realtimeExecutor?.scheduleAtFixedRate({
                 try {
+                    val startTime = System.nanoTime()
                     sendReadStatusCommand()
                     sendCount.incrementAndGet()
+                    
+                    // ✅ 안정성 우선 모니터링
+                    val processingTime = (System.nanoTime() - startTime) / 1_000_000
+                    if (processingTime > 10) {  // 10ms 임계값으로 안정성 보장
+                        logger.warn("⚠️ UDP Send 지연 감지: {}ms (임계값: 10ms)", processingTime)
+                    }
                 } catch (e: Exception) {
                     logger.debug("UDP Send 오류: {}", e.message)
                 }
-            }, 0, 30, TimeUnit.MILLISECONDS)
+            }, 0, 30, TimeUnit.MILLISECONDS)  // 30ms로 안정성 보장
 
-            logger.info("실시간 UDP 통신 시작 완료")
+            logger.info("✅ 실시간 UDP 통신 시작 완료")
         }
     }
 
@@ -908,7 +899,7 @@ class UdpFwICDService(
             "sendHealth" to (sendRate > 50), // 50% 이상이면 건강
             "receiveHealth" to (receiveRate > 25), // 50% 이상이면 건강
             "channelOpen" to (::channel.isInitialized && channel.isOpen),
-            "executorsRunning" to (!udpSendExecutor.isShutdown && !udpReceiveExecutor.isShutdown)
+            "executorsRunning" to (realtimeExecutor != null)
         )
     }
 
@@ -933,41 +924,8 @@ class UdpFwICDService(
         // 3. 실시간 Thread 통신 중단
         logger.info("실시간 Thread 통신 중단 중...")
 
-        // Receive Executor 종료
-        udpReceiveExecutor.shutdown()
-        try {
-            if (!udpReceiveExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
-                logger.warn("UDP Receive Executor 강제 종료")
-                udpReceiveExecutor.shutdownNow()
-                if (!udpReceiveExecutor.awaitTermination(1, TimeUnit.SECONDS)) {
-                    logger.error("UDP Receive Executor 종료 실패")
-                }
-            } else {
-                logger.info("UDP Receive Executor 정상 종료")
-            }
-        } catch (e: InterruptedException) {
-            logger.warn("UDP Receive Executor 종료 중 인터럽트")
-            udpReceiveExecutor.shutdownNow()
-            Thread.currentThread().interrupt()
-        }
-
-        // Send Executor 종료
-        udpSendExecutor.shutdown()
-        try {
-            if (!udpSendExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
-                logger.warn("UDP Send Executor 강제 종료")
-                udpSendExecutor.shutdownNow()
-                if (!udpSendExecutor.awaitTermination(1, TimeUnit.SECONDS)) {
-                    logger.error("UDP Send Executor 종료 실패")
-                }
-            } else {
-                logger.info("UDP Send Executor 정상 종료")
-            }
-        } catch (e: InterruptedException) {
-            logger.warn("UDP Send Executor 종료 중 인터럽트")
-            udpSendExecutor.shutdownNow()
-            Thread.currentThread().interrupt()
-        }
+        // ✅ 통합 쓰레드 관리자 사용 (개별 종료 불필요)
+        logger.info("✅ 통합 쓰레드 관리자 사용으로 개별 종료 불필요")
 
         // 4. UDP 채널 닫기
         try {

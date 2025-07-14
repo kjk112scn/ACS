@@ -142,7 +142,7 @@ class CoordinateTransformer {
             azimuth: Double,
             elevation: Double,
             tiltAngle: Double,
-            rotatorStepDegrees: Double = 10.0
+            rotatorStepDegrees: Double = 0.0
         ): List<Triple<Double, Double, Double>> {
             val result = mutableListOf<Triple<Double, Double, Double>>()
 

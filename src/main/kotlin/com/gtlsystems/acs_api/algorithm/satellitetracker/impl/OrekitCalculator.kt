@@ -1359,6 +1359,8 @@ class OrekitCalculator(
         val endTime: ZonedDateTime,
         val maxElevation: Double,  // Float에서 Double로 변경
         val maxElevationTime: ZonedDateTime?,
+        val maxAzimuth: Double = 0.0,  // ✅ 최대 방위각 추가
+        val maxAzimuthTime: ZonedDateTime? = null,  // ✅ 최대 방위각 시간 추가
         val duration: Duration,
         val trackingData: List<SatelliteTrackData>,
         val maxAzimuthRate: Double = 0.0,         // 최대 방위각 속도 (도/초)
@@ -1391,6 +1393,7 @@ class OrekitCalculator(
                             maxElevation
                         )
                     }° (${maxElevationTime?.format(DateTimeFormatter.ISO_LOCAL_TIME)})\n" +
+                    "- 최대 방위각: ${String.format("%.2f", maxAzimuth)}° (${maxAzimuthTime?.format(DateTimeFormatter.ISO_LOCAL_TIME)})\n" +
                     "- 지속 시간: ${getDurationString()}\n" +
                     "- 데이터 포인트: $dataPointCount\n" +
                     "- 최대 방위각 각속도: ${String.format("%.2f", maxAzimuthRate)}°/s\n" +
@@ -1451,6 +1454,8 @@ class OrekitCalculator(
         var visibilityStart: ZonedDateTime? = null
         var maxElevationInPass: Double = -90.0
         var maxElevationTime: ZonedDateTime? = null
+        var maxAzimuthInPass: Double = 0.0  // ✅ 최대 방위각 추적
+        var maxAzimuthTime: ZonedDateTime? = null  // ✅ 최대 방위각 시간 추적
 
         // 속도 및 가속도 계산을 위한 변수들
         var maxAzimuthRate: Double = 0.0
@@ -1544,6 +1549,8 @@ class OrekitCalculator(
                         visibilityStart = currentTime
                         maxElevationInPass = elevation
                         maxElevationTime = currentTime
+                        maxAzimuthInPass = azimuth  // ✅ 최대 방위각 초기화
+                        maxAzimuthTime = currentTime  // ✅ 최대 방위각 시간 초기화
 
                         // 새로운 가시성 기간이 시작될 때 최대값 초기화
                         maxAzimuthRate = 0.0
@@ -1551,7 +1558,7 @@ class OrekitCalculator(
                         maxAzimuthAccel = 0.0
                         maxElevationAccel = 0.0
 
-                        logger.debug("가시성 기간 시작: ${currentTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}, 고도각: ${elevation}°")
+                        logger.debug("가시성 기간 시작: ${currentTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}, 고도각: ${elevation}°, 방위각: ${azimuth}°")
 
                         // 정밀 간격 유지 (시작 부근)
                         currentTimeStep = fineTimeStepMs
@@ -1561,6 +1568,12 @@ class OrekitCalculator(
                     if (elevation > maxElevationInPass) {
                         maxElevationInPass = elevation
                         maxElevationTime = currentTime
+                    }
+
+                    // ✅ 최대 방위각 업데이트
+                    if (azimuth > maxAzimuthInPass) {
+                        maxAzimuthInPass = azimuth
+                        maxAzimuthTime = currentTime
                     }
 
                     // 가시성 중간 부분에서는 큰 간격으로 전환
@@ -1584,6 +1597,8 @@ class OrekitCalculator(
                                     currentTime,
                                     maxElevationInPass,
                                     maxElevationTime,
+                                    maxAzimuthInPass,  // ✅ 최대 방위각 전달
+                                    maxAzimuthTime,    // ✅ 최대 방위각 시간 전달
                                     maxAzimuthRate,
                                     maxElevationRate,
                                     maxAzimuthAccel,
@@ -1660,6 +1675,8 @@ class OrekitCalculator(
                         currentTime,
                         maxElevationInPass,
                         maxElevationTime,
+                        maxAzimuthInPass,  // ✅ 최대 방위각 전달
+                        maxAzimuthTime,    // ✅ 최대 방위각 시간 전달
                         maxAzimuthRate,
                         maxElevationRate,
                         maxAzimuthAccel,
@@ -1692,6 +1709,8 @@ class OrekitCalculator(
         val endTime: ZonedDateTime,
         val maxElevation: Double,
         val maxElevationTime: ZonedDateTime? = null,
+        val maxAzimuth: Double = 0.0,  // ✅ 최대 방위각 추가
+        val maxAzimuthTime: ZonedDateTime? = null,  // ✅ 최대 방위각 시간 추가
         val maxAzimuthRate: Double = 0.0,         // 최대 방위각 속도 (도/초)
         val maxElevationRate: Double = 0.0,       // 최대 고도각 속도 (도/초)
         val maxAzimuthAccel: Double = 0.0,        // 최대 방위각 가속도 (도/초²)
