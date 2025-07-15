@@ -15,6 +15,29 @@ java {
 	}
 }
 
+// JVM 버전 명시적 설정
+tasks.withType<JavaCompile> {
+	sourceCompatibility = "17"
+	targetCompatibility = "17"
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+	kotlinOptions {
+		jvmTarget = "17"
+		freeCompilerArgs += "-Xjsr305=strict"
+	}
+}
+
+// 디버깅을 위한 JVM 옵션 설정
+tasks.withType<org.springframework.boot.gradle.tasks.run.BootRun> {
+	jvmArgs = listOf(
+		"-Djava.version=17",
+		"-Dfile.encoding=UTF-8",
+		"-Duser.language=ko",
+		"-Duser.country=KR"
+	)
+}
+
 repositories {
 	mavenCentral()
 }

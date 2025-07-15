@@ -669,8 +669,7 @@ class EphemerisService(
                         "Duration" to pass.getDurationString(),
                         "MaxElevationTime" to pass.maxElevationTime,
                         "MaxElevation" to pass.maxElevation,
-                        "MaxAzimuth" to pass.maxAzimuth,  // ✅ 최대 방위각 추가
-                        "MaxAzimuthTime" to pass.maxAzimuthTime,  // ✅ 최대 방위각 시간 추가
+                        "MaxAzimuth" to pass.maxElevationAzimuth,  // ✅ MaxElevation 시점의 방위각
                         "StartAzimuth" to pass.startAzimuth,
                         "StartElevation" to pass.startElevation,
                         "EndAzimuth" to pass.endAzimuth,
@@ -717,7 +716,7 @@ class EphemerisService(
                 logger.info("패스 #$mstId 축변환 처리 중: ${passDtl.size}개 좌표")
                 
                 val transformedPassDtl = mutableListOf<Map<String, Any?>>()
-                var maxAzimuth = 0.0  // ✅ 최대 방위각 추적
+
                 
                 // 각 좌표에 축변환 적용
                 passDtl.forEachIndexed { index, originalPoint ->
@@ -731,9 +730,6 @@ class EphemerisService(
                         tiltAngle = -6.98,
                         rotatorAngle = 0.0
                     )
-                    
-                    // 최대 방위각 업데이트
-                    maxAzimuth = maxOf(maxAzimuth, transformedAzimuth)
                     
                     // 변환된 좌표로 새로운 데이터 포인트 생성
                     val transformedPoint = mapOf(
@@ -768,6 +764,7 @@ class EphemerisService(
                 // ✅ 변환된 데이터에서 실제 최대값들 다시 계산
                 var actualMaxElevation = -90.0
                 var actualMaxElevationTime: ZonedDateTime? = null
+                var maxElevationAzimuth = 0.0 // ✅ MaxElevation 시점의 방위각
                 var maxAzRate = 0.0
                 var maxElRate = 0.0
                 var maxAzAccel = 0.0
@@ -780,13 +777,13 @@ class EphemerisService(
                     val elRate = point["ElevationRate"] as? Double ?: 0.0
                     val azAccel = point["AzimuthAccel"] as? Double ?: 0.0
                     val elAccel = point["ElevationAccel"] as? Double ?: 0.0
-                    
+                    val azimuth = point["Azimuth"] as Double
                     // ✅ 변환된 데이터에서 실제 최대 고도각 계산
                     if (transformedElevation > actualMaxElevation) {
                         actualMaxElevation = transformedElevation
                         actualMaxElevationTime = timestamp
+                        maxElevationAzimuth = azimuth // ✅ MaxElevation 시점의 방위각 저장
                     }
-                    
                     maxAzRate = maxOf(maxAzRate, abs(azRate))
                     maxElRate = maxOf(maxElRate, abs(elRate))
                     maxAzAccel = maxOf(maxAzAccel, abs(azAccel))
@@ -806,7 +803,7 @@ class EphemerisService(
                     put("MaxElRate", maxElRate)
                     put("MaxAzAccel", maxAzAccel)
                     put("MaxElAccel", maxElAccel)
-                    put("MaxAzimuth", maxAzimuth)  // ✅ 변환된 최대 방위각
+                    put("MaxAzimuth", maxElevationAzimuth)  // ✅ MaxElevation 시점의 방위각
                     put("OriginalMaxAzimuth", originalMst["MaxAzimuth"])  // ✅ 원본 최대 방위각 보존
                     // ✅ 변환된 데이터에서 계산된 실제 최대값들 사용
                     put("MaxElevation", actualMaxElevation)  // ✅ 변환된 실제 최대 고도각
@@ -822,7 +819,7 @@ class EphemerisService(
                 logger.info("패스 #$mstId 축변환 완료: ${calculatedDtl.size}개 좌표")
                 val originalMaxAz = originalMst["MaxAzimuth"] as? Double ?: 0.0
                 val originalMaxEl = originalMst["MaxElevation"] as? Double ?: 0.0
-                logger.info("  최대 방위각: 원본=${String.format("%.2f", originalMaxAz)}° → 변환=${String.format("%.2f", maxAzimuth)}°")
+                logger.info("  최대 방위각: 원본=${String.format("%.2f", originalMaxAz)}° → 변환=${String.format("%.2f", maxElevationAzimuth)}°")
                 logger.info("  최대 고도각: 원본=${String.format("%.2f", originalMaxEl)}° → 변환=${String.format("%.2f", actualMaxElevation)}°")
             }
 
