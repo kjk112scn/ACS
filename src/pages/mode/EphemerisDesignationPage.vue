@@ -197,7 +197,9 @@
               <div class="button-group q-mt-md">
                 <q-btn color="positive" label="Go" @click="handleEphemerisCommand" class="q-mr-sm" />
                 <q-btn color="warning" label="Stop" @click="handleStopCommand" class="q-mr-sm" />
-                <q-btn color="negative" label="Stow" @click="handleStowCommand" />
+                <q-btn color="negative" label="Stow" @click="handleStowCommand" class="q-mr-sm" />
+                <!-- ATC 버튼 추가 -->
+                <q-btn color="info" label="ATC" icon="calculate" @click="openAxisTransformCalculator" />
               </div>
             </q-card-section>
           </q-card>
@@ -282,6 +284,7 @@ import {
   type ScheduleItem,
   type RealtimeTrackingDataItem,
 } from '../../services/mode/ephemerisTrackService'
+import { openPopup } from '../../utils/windowUtils'
 // ✅ 스토어 연동 추가
 const ephemerisStore = useEphemerisTrackStore()
 
@@ -1393,6 +1396,24 @@ const handleStowCommand = async () => {
     $q.notify({
       type: 'negative',
       message: 'Stow 명령 전송에 실패했습니다',
+    })
+  }
+}
+
+// ATC 팝업 열기
+const openAxisTransformCalculator = () => {
+  try {
+    openPopup('axis-transform-calculator', {
+      width: 800,
+      height: 600,
+      title: '3축 변환 계산기'
+    })
+  } catch (error) {
+    console.error('ATC 팝업 열기 실패:', error)
+    $q.notify({
+      type: 'negative',
+      message: 'ATC 팝업을 열 수 없습니다',
+      timeout: 3000
     })
   }
 }

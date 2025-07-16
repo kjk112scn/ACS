@@ -47,6 +47,15 @@ export const POPUP_COMPONENTS: Record<string, ComponentConfig> = {
     defaultHeight: 600,
     component: () => import('../components/content/SelectScheduleContent.vue'),
   },
+  'axis-transform-calculator': {
+    name: 'axis-transform-calculator',
+    title: '3축 변환 계산기',
+    icon: '🔄',
+    description: '입력 좌표를 3축 변환하여 새로운 좌표를 계산합니다',
+    defaultWidth: 800,
+    defaultHeight: 600,
+    component: () => import('../components/content/AxisTransformCalculator.vue'),
+  },
 }
 
 export type ComponentName = keyof typeof POPUP_COMPONENTS

@@ -272,7 +272,7 @@ class EphemerisTrackService {
   ): Promise<GeostationaryTrackingResponse> {
     try {
       const response = await api.post<GeostationaryTrackingResponse>(
-        '/ephemeris/tracking/geostationary/start',
+        '/ephemeris/3axis/tracking/geostationary/start',
         request,
       )
       return response.data
@@ -281,6 +281,30 @@ class EphemerisTrackService {
         error,
         '정지궤도 위성 추적 시작에 실패했습니다',
       ) as Promise<GeostationaryTrackingResponse>
+    }
+  }
+
+  /**
+   * 3축 변환 계산 API
+   */
+  async calculateAxisTransform(params: {
+    azimuth: number
+    elevation: number
+    tilt: number
+    rotator: number
+  }): Promise<{
+    success: boolean
+    input: { azimuth: number; elevation: number; tilt: number; rotator: number }
+    output: { azimuth: number; elevation: number }
+    message?: string
+    error?: string
+  }> {
+    try {
+      const response = await api.post('/ephemeris/calculate-axis-transform', params)
+      return response.data
+    } catch (error) {
+      console.error('3축 변환 계산 API 호출 실패:', error)
+      throw error
     }
   }
 }

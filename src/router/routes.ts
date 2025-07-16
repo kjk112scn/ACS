@@ -15,6 +15,11 @@ const routes: RouteRecordRaw[] = [
         name: 'PopupSystemInfo',
         component: () => import('../components/content/SystemInfoContent.vue'),
       },
+      {
+        path: 'axis-transform-calculator',
+        name: 'PopupAxisTransformCalculator',
+        component: () => import('../components/content/AxisTransformCalculator.vue'),
+      },
     ],
   },
   {
