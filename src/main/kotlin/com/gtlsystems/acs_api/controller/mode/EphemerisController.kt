@@ -43,74 +43,6 @@ class EphemerisController(
             }
         }
     }
-    /**
-     * TLE 데이터로 기울기 변환이 적용된 위성 궤도 추적 데이터를 생성합니다.
-     */
-    @PostMapping("/3axis/tracking/generate-with-tilt-transform")
-    fun generateEphemerisTrackWithTiltTransform(@RequestBody request: EphemerisTrackWithTiltRequest): Mono<Map<String, Any>> {
-        return Mono.fromCallable {
-            try {
-                val (mstData, dtlData) = ephemerisService.generateEphemerisDesignationTrackWithTiltTransform(
-                    request.tleLine1,
-                    request.tleLine2,
-                    request.satelliteName,
-                    request.tiltAngle
-                )
-
-                mapOf<String, Any>(
-                    "message" to "기울기 변환이 적용된 위성 궤도 추적 데이터 생성 완료",
-                    "mstCount" to mstData.size,
-                    "dtlCount" to dtlData.size,
-                    "tiltAngle" to request.tiltAngle,
-                    "transformationType" to "tilt_only"
-                )
-            } catch (e: Exception) {
-                mapOf<String, Any>(
-                    "message" to "기울기 변환이 적용된 위성 궤도 추적 데이터 생성 실패",
-                    "error" to (e.message ?: "계산 중 오류가 발생했습니다"),
-                    "tiltAngle" to request.tiltAngle
-                )
-            }
-        }
-    }
-
-    /**
-     * TLE 데이터로 축변환이 적용된 위성 궤도 추적 데이터를 생성합니다.
-     * 방위각 변환 + 축변환 + 변환된 시계열에서 속도/가속도 계산
-     */
-    @PostMapping("/3axis/tracking/generate-with-axis-transform")
-    fun generateEphemerisDesignationTrackWithTiltTransform(@RequestBody request: EphemerisTrackRequest): Mono<Map<String, Any>> {
-        return Mono.fromCallable {
-            try {
-                val (mstData, dtlData) = ephemerisService.generateEphemerisDesignationTrackSync(
-                    request.tleLine1,
-                    request.tleLine2,
-                    request.satelliteName
-                )
-
-                mapOf<String, Any>(
-                    "message" to "축변환이 적용된 위성 궤도 추적 데이터 생성 완료",
-                    "mstCount" to mstData.size,
-                    "dtlCount" to dtlData.size,
-                    "tiltAngle" to -6.98,
-                    "rotatorAngle" to 0.0,
-                    "transformationType" to "axis_transform",
-                    "processingSteps" to listOf(
-                        "방위각 변환 (0~360도 -> ±270도)",
-                        "축변환 (기울기 -6.98도, 회전체 0도)",
-                        "변환된 시계열에서 속도/가속도 계산"
-                    )
-                )
-            } catch (e: Exception) {
-                mapOf<String, Any>(
-                    "message" to "축변환이 적용된 위성 궤도 추적 데이터 생성 실패",
-                    "error" to (e.message ?: "계산 중 오류가 발생했습니다"),
-                    "tiltAngle" to -6.98,
-                    "rotatorAngle" to 0.0
-                )
-            }
-        }
-    }
 
     /**
      * 실시간 추적 데이터 조회 (JSON)
@@ -259,7 +191,7 @@ class EphemerisController(
     @GetMapping("/master")
     fun getAllEphemerisTrackMst(): Mono<List<Map<String, Any?>>> {
         return Mono.fromCallable {
-            ephemerisService.getAllEphemerisTrackMst()
+            ephemerisService.getFinalTransformedEphemerisTrackMst()
         }
     }
 
@@ -329,6 +261,227 @@ class EphemerisController(
                     "status" to "idle"
                 )
             }
+        }
+    }
+
+    /**
+     * 3축 변환 계산 API
+     */
+    @PostMapping("/calculate-axis-transform")
+    fun calculateAxisTransform(@RequestBody request: Map<String, Double>): ResponseEntity<Map<String, Any>> {
+        try {
+            val azimuth = request["azimuth"] ?: 0.0
+            val elevation = request["elevation"] ?: 0.0
+            val tilt = request["tilt"] ?: 0.0
+            val rotator = request["rotator"] ?: 0.0
+
+            val result = ephemerisService.calculateAxisTransform(azimuth, elevation, tilt, rotator)
+            
+            return ResponseEntity.ok(result)
+        } catch (error: Exception) {
+            logger.error("3축 변환 계산 API 오류: ${error.message}")
+            return ResponseEntity.badRequest().body(mapOf(
+                "success" to false,
+                "error" to (error.message ?: "알 수 없는 오류"),
+                "message" to "3축 변환 계산 API 호출에 실패했습니다"
+            ))
+        }
+    }
+
+    // ✅ 새로운 데이터 타입별 조회 API들 추가
+
+    /**
+     * 원본 데이터 마스터 조회 API
+     * 변환 전 원본 위성 추적 데이터를 조회합니다.
+     */
+    @GetMapping("/master/original")
+    fun getOriginalEphemerisTrackMst(): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            val originalMst = ephemerisService.getOriginalEphemerisTrackMst()
+            mapOf(
+                "dataType" to "original",
+                "description" to "변환 전 원본 위성 추적 데이터",
+                "count" to originalMst.size,
+                "data" to originalMst
+            )
+        }
+    }
+
+    /**
+     * 축변환 데이터 마스터 조회 API
+     * 기울기 변환이 적용된 위성 추적 데이터를 조회합니다.
+     */
+    @GetMapping("/master/axis-transformed")
+    fun getAxisTransformedEphemerisTrackMst(): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            val axisTransformedMst = ephemerisService.getAxisTransformedEphemerisTrackMst()
+            mapOf(
+                "dataType" to "axis_transformed",
+                "description" to "기울기 변환이 적용된 위성 추적 데이터",
+                "count" to axisTransformedMst.size,
+                "data" to axisTransformedMst,
+                "transformationInfo" to mapOf(
+                    "tiltAngle" to -6.98,
+                    "rotatorAngle" to 0.0,
+                    "transformationType" to "axis_transform"
+                )
+            )
+        }
+    }
+
+    /**
+     * 최종 변환 데이터 마스터 조회 API
+     * 방위각 변환까지 적용된 최종 위성 추적 데이터를 조회합니다.
+     */
+    @GetMapping("/master/final-transformed")
+    fun getFinalTransformedEphemerisTrackMst(): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            val finalTransformedMst = ephemerisService.getFinalTransformedEphemerisTrackMst()
+            mapOf(
+                "dataType" to "final_transformed",
+                "description" to "방위각 변환까지 적용된 최종 위성 추적 데이터",
+                "count" to finalTransformedMst.size,
+                "data" to finalTransformedMst,
+                "transformationInfo" to mapOf(
+                    "tiltAngle" to -6.98,
+                    "rotatorAngle" to 0.0,
+                    "transformationType" to "final_transform",
+                    "angleLimit" to "±270도"
+                )
+            )
+        }
+    }
+
+    /**
+     * 특정 마스터 ID의 원본 세부 데이터 조회 API
+     */
+    @GetMapping("/detail/{mstId}/original")
+    fun getOriginalEphemerisTrackDtlByMstId(@PathVariable mstId: UInt): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            val originalDtl = ephemerisService.getEphemerisTrackDtlByMstIdAndDataType(mstId, "original")
+            mapOf(
+                "mstId" to mstId,
+                "dataType" to "original",
+                "description" to "변환 전 원본 위성 추적 세부 데이터",
+                "count" to originalDtl.size,
+                "data" to originalDtl
+            )
+        }
+    }
+
+    /**
+     * 특정 마스터 ID의 축변환 세부 데이터 조회 API
+     */
+    @GetMapping("/detail/{mstId}/axis-transformed")
+    fun getAxisTransformedEphemerisTrackDtlByMstId(@PathVariable mstId: UInt): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            val axisTransformedDtl = ephemerisService.getEphemerisTrackDtlByMstIdAndDataType(mstId, "axis_transformed")
+            mapOf(
+                "mstId" to mstId,
+                "dataType" to "axis_transformed",
+                "description" to "기울기 변환이 적용된 위성 추적 세부 데이터",
+                "count" to axisTransformedDtl.size,
+                "data" to axisTransformedDtl,
+                "transformationInfo" to mapOf(
+                    "tiltAngle" to -6.98,
+                    "rotatorAngle" to 0.0,
+                    "transformationType" to "axis_transform"
+                )
+            )
+        }
+    }
+
+    /**
+     * 특정 마스터 ID의 최종 변환 세부 데이터 조회 API
+     */
+    @GetMapping("/detail/{mstId}/final-transformed")
+    fun getFinalTransformedEphemerisTrackDtlByMstId(@PathVariable mstId: UInt): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            val finalTransformedDtl = ephemerisService.getEphemerisTrackDtlByMstIdAndDataType(mstId, "final_transformed")
+            mapOf(
+                "mstId" to mstId,
+                "dataType" to "final_transformed",
+                "description" to "방위각 변환까지 적용된 최종 위성 추적 세부 데이터",
+                "count" to finalTransformedDtl.size,
+                "data" to finalTransformedDtl,
+                "transformationInfo" to mapOf(
+                    "tiltAngle" to -6.98,
+                    "rotatorAngle" to 0.0,
+                    "transformationType" to "final_transform",
+                    "angleLimit" to "±270도"
+                )
+            )
+        }
+    }
+
+    /**
+     * 데이터 타입별 마스터 데이터 조회 API (범용)
+     */
+    @GetMapping("/master/by-type/{dataType}")
+    fun getEphemerisTrackMstByDataType(@PathVariable dataType: String): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            val mstData = ephemerisService.getEphemerisTrackMstByDataType(dataType)
+            mapOf(
+                "dataType" to dataType,
+                "count" to mstData.size,
+                "data" to mstData,
+                "availableDataTypes" to listOf("original", "axis_transformed", "final_transformed")
+            )
+        }
+    }
+
+    /**
+     * 데이터 타입별 세부 데이터 조회 API (범용)
+     */
+    @GetMapping("/detail/by-type/{dataType}")
+    fun getEphemerisTrackDtlByDataType(@PathVariable dataType: String): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            val dtlData = ephemerisService.getEphemerisTrackDtlByDataType(dataType)
+            mapOf(
+                "dataType" to dataType,
+                "count" to dtlData.size,
+                "data" to dtlData,
+                "availableDataTypes" to listOf("original", "axis_transformed", "final_transformed")
+            )
+        }
+    }
+
+    /**
+     * 모든 변환 단계별 데이터 요약 조회 API
+     */
+    @GetMapping("/summary/all-transformations")
+    fun getAllTransformationSummary(): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            val originalMst = ephemerisService.getOriginalEphemerisTrackMst()
+            val axisTransformedMst = ephemerisService.getAxisTransformedEphemerisTrackMst()
+            val finalTransformedMst = ephemerisService.getFinalTransformedEphemerisTrackMst()
+
+            mapOf(
+                "summary" to mapOf(
+                    "original" to mapOf(
+                        "mstCount" to originalMst.size,
+                        "description" to "변환 전 원본 데이터"
+                    ),
+                    "axisTransformed" to mapOf(
+                        "mstCount" to axisTransformedMst.size,
+                        "description" to "기울기 변환 적용 데이터",
+                        "tiltAngle" to -6.98,
+                        "rotatorAngle" to 0.0
+                    ),
+                    "finalTransformed" to mapOf(
+                        "mstCount" to finalTransformedMst.size,
+                        "description" to "방위각 변환까지 적용된 최종 데이터",
+                        "angleLimit" to "±270도"
+                    )
+                ),
+                "totalMstCount" to (originalMst.size + axisTransformedMst.size + finalTransformedMst.size),
+                "transformationSteps" to listOf(
+                    "1. 원본 데이터 생성",
+                    "2. 축변환 적용 (기울기 -6.98도)",
+                    "3. 방위각 변환 (±270도 제한)",
+                    "4. 최종 데이터 저장"
+                )
+            )
         }
     }
 }

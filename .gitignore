@@ -42,3 +42,7 @@ out/
 ### Logs ###
 logs/
 *.log
+
+### CSV ###
+csv_exports/
+*.csv
