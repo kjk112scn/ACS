@@ -46,3 +46,6 @@ logs/
 ### CSV ###
 csv_exports/
 *.csv
+
+### Local Properties ###
+gradle.properties.local

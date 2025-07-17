@@ -105,7 +105,7 @@ object GlobalData {
             0, 0, 0, 0,
             utcZoneId
         )
-        val minElevationAngle: Float = 0.0f
+        val minElevationAngle: Float = 0.005f//0.0f로 설정하면 미세한 음수값 추출가능하여 양수로 설정
     }
 
     /**

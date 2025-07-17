@@ -942,7 +942,7 @@ class EphemerisService(
                 val originalPointTime = passDtl[originalMaxElevationIndex]["Time"] as ZonedDateTime
                 
                 logger.info(
-                    "  MaxElevation 시점 매칭 [인덱스 $originalMaxElevationIndex]: 원본 Az=${String.format("%.2f", originalMaxElevationAz)}° El=${String.format("%.2f", originalMaxElevationEl)}° → 변환 Az=${String.format("%.2f", transformedMaxElevationAz)}° El=${String.format("%.2f", transformedMaxElevationEl)}°"
+                    "  MaxElevation 시점 매칭 [인덱스 $originalMaxElevationIndex]: 원본 Az=${String.format("%.4f", originalMaxElevationAz)}° El=${String.format("%.4f", originalMaxElevationEl)}° → 변환 Az=${String.format("%.4f", transformedMaxElevationAz)}° El=${String.format("%.4f", transformedMaxElevationEl)}°"
                 )
                 logger.info(
                     "  매칭 시간: ${originalPointTime.format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))} (MaxElevation 값: ${String.format("%.6f", originalMaxElevation)}°)"
@@ -1805,11 +1805,21 @@ class EphemerisService(
             val startTimeMs = (startTime.nano / 1_000_000).toUShort()
             val endTimeMs = (endTime.nano / 1_000_000).toUShort()
 
+            // 전체 데이터 길이 검증
+            val totalLength = calculateDataLength(passId)
+            val actualDataCount = getEphemerisTrackDtlByMstId(passId).size
+            logger.info("전체 데이터 길이: ${totalLength}개")
+            logger.info("실제 데이터 개수: ${actualDataCount}개")
+            
+            if (totalLength != actualDataCount) {
+                logger.warn("데이터 길이 불일치: 계산된 길이=${totalLength}, 실제 길이=${actualDataCount}")
+            }
+
             // 2.12.1 위성 추적 헤더 정보 송신 프로토콜 생성
             val headerFrame = ICDService.SatelliteTrackOne.SetDataFrame(
                 cmdOne = 'T',
                 cmdTwo = 'T',
-                dataLen = calculateDataLength(passId).toUShort(), // 전체 데이터 길이 계산
+                dataLen = totalLength.toUShort(), // 검증된 전체 데이터 길이 사용
                 aosYear = startTime.year.toUShort(),
                 aosMonth = startTime.monthValue.toByte(),
                 aosDay = startTime.dayOfMonth.toByte(),
@@ -2009,16 +2019,16 @@ class EphemerisService(
             logger.error("위성 추적이 활성화되어 있지 않습니다.")
             return
         }
-        logger.info("timeAcc :${timeAcc}.")
-        logger.info("requestDataLength :${requestDataLength}.")
+        logger.info("timeAcc: ${timeAcc}ms")
+        logger.info("requestDataLength: ${requestDataLength}")
         val passId = currentTrackingPass!!["No"] as UInt
 
-        // timeAcc를 기반으로 시작 인덱스 계산 (timeAcc는 ms 단위)
-        val startIndex = (timeAcc.toInt()) //
-        logger.info("startIndex :${startIndex}.")
+        // timeAcc를 실제 데이터 인덱스로 변환 (timeAcc는 ms 단위, 100ms 간격으로 변환)
+        val startIndex = (timeAcc.toInt() / 100).toInt()
+        logger.info("timeAcc: ${timeAcc}ms, startIndex: ${startIndex}")
+        
         // 요청된 데이터 길이에 따라 데이터 포인트 수 계산
         sendAdditionalTrackingData(passId, startIndex, requestDataLength.toInt())
-        //dataStoreService.setEphemerisTracking(true)
     }
 
     /**
@@ -2031,7 +2041,8 @@ class EphemerisService(
                 logger.error("위성 추적이 시작되지 않았습니다. 먼저 startSatelliteTracking을 호출하세요.")
                 return
             }
-            logger.info("startIndex :${startIndex}.")
+            logger.info("요청: startIndex=${startIndex}, requestLength=${requestDataLength}")
+            
             // 선택된 패스 ID에 해당하는 세부 데이터 가져오기
             val passDetails = getEphemerisTrackDtlByMstId(passId)
 
@@ -2039,20 +2050,30 @@ class EphemerisService(
                 logger.error("선택된 패스 ID($passId)에 해당하는 세부 데이터를 찾을 수 없습니다.")
                 return
             }
-            val indexMs = startIndex / 100
-            logger.info("indexMs :${indexMs}.")
+            
+            // 안전한 인덱스 범위 확인
+            val safeStartIndex = when {
+                startIndex < 0 -> 0
+                startIndex >= passDetails.size -> passDetails.size - 1
+                else -> startIndex
+            }
+            
+            val actualCount = minOf(requestDataLength, passDetails.size - safeStartIndex)
+            
+            logger.info("실제: safeStartIndex=${safeStartIndex}, actualCount=${actualCount}, totalSize=${passDetails.size}")
+            
             // 요청된 인덱스부터 추가 데이터 준비
-            val additionalTrackingData = passDetails.drop(indexMs).take(requestDataLength).mapIndexed { index, point ->
+            val additionalTrackingData = passDetails.drop(safeStartIndex).take(actualCount).mapIndexed { index, point ->
+                val actualIndex = safeStartIndex + index
                 Triple(
-                    startIndex + index * 100, // 카운트 (누적 인덱스)
-                    (point["Elevation"] as Double).toFloat(), (point["Azimuth"] as Double).toFloat()
+                    (actualIndex * 100).toUInt(), // 실제 시간 (ms)
+                    (point["Elevation"] as Double).toFloat(), 
+                    (point["Azimuth"] as Double).toFloat()
                 )
             }
 
             if (additionalTrackingData.isEmpty()) {
                 logger.info("더 이상 전송할 추적 데이터가 없습니다.")
-
-
                 return
             }
 
@@ -2067,7 +2088,7 @@ class EphemerisService(
             // UdpFwICDService를 통해 데이터 전송
             udpFwICDService.sendSatelliteTrackAdditionalData(additionalDataFrame)
 
-            logger.info("위성 추적 추가 데이터 전송 완료 (${additionalTrackingData.size}개 데이터 포인트, 시작 인덱스: $startIndex)")
+            logger.info("전송: ${additionalTrackingData.size}개 데이터, 시작 인덱스: ${safeStartIndex}, 시작 시간: ${(safeStartIndex * 100)}ms")
 
         } catch (e: Exception) {
             logger.error("위성 추적 추가 데이터 전송 중 오류 발생: ${e.message}", e)

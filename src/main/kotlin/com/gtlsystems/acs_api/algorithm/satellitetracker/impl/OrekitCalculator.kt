@@ -950,6 +950,7 @@ class OrekitCalculator(
             var pointsCalculated = 0
             var pointsAdded = 0
             var pointsFiltered = 0
+            val filteredData = mutableListOf<Triple<ZonedDateTime, Double, Double>>() // 필터링된 데이터 저장용
 
             while (!currentTime.isAfter(endTime)) {
                 pointsCalculated++
@@ -995,6 +996,12 @@ class OrekitCalculator(
                     )
                     pointsAdded++
                 } else {
+                    // 방위각 계산 (필터링된 데이터에도 방위각 정보 포함)
+                    val azimuth = FastMath.toDegrees(FastMath.atan2(x, y))
+                    val normalizedAzimuth = if (azimuth < 0) azimuth + 360.0 else azimuth
+                    
+                    // 필터링된 데이터 저장 (시간, 고도각, 방위각)
+                    filteredData.add(Triple(currentTime, elevation, normalizedAzimuth))
                     pointsFiltered++
                 }
 
@@ -1006,6 +1013,14 @@ class OrekitCalculator(
             logger.info("- 계산된 포인트: $pointsCalculated")
             logger.info("- 추가된 포인트: $pointsAdded")
             logger.info("- 필터링된 포인트: $pointsFiltered (최소 고도각 미만)")
+            
+            // 필터링된 데이터 상세 정보 출력
+            if (filteredData.isNotEmpty()) {
+                logger.info("🔍 필터링된 데이터 상세 정보:")
+                filteredData.forEachIndexed { index, (time, elevation, azimuth) ->
+                    logger.info("  필터링 #${index + 1}: 시간=${time.format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))}, 고도각=${String.format("%.4f", elevation)}°, 방위각=${String.format("%.4f", azimuth)}°")
+                }
+            }
 
             // 데이터가 없는 경우 로그 출력
             if (trackingData.isEmpty()) {
@@ -1084,6 +1099,8 @@ class OrekitCalculator(
             val utcScale = TimeScalesFactory.getUTC()
             var pointsCalculated = 0
             var pointsAdded = 0
+            var pointsFiltered = 0
+            val filteredData = mutableListOf<Triple<ZonedDateTime, Double, Double>>() // 필터링된 데이터 저장용
 
             // 전환 시간 계산
             val startTransitionEnd = startTime.plusSeconds(transitionSeconds.toLong())
@@ -1143,13 +1160,29 @@ class OrekitCalculator(
                         )
                     )
                     pointsAdded++
+                } else {
+                    // 방위각 계산 (필터링된 데이터에도 방위각 정보 포함)
+                    val azimuth = FastMath.toDegrees(FastMath.atan2(x, y))
+                    val normalizedAzimuth = if (azimuth < 0) azimuth + 360.0 else azimuth
+                    
+                    // 필터링된 데이터 저장 (시간, 고도각, 방위각)
+                    filteredData.add(Triple(currentTime, elevation, normalizedAzimuth))
+                    pointsFiltered++
                 }
 
                 // 다음 시간으로 이동 (현재 간격 사용)
                 currentTime = currentTime.plus(currentInterval.toLong(), ChronoUnit.MILLIS)
             }
 
-            logger.info("상세 추적 데이터 생성 완료: 계산된 포인트 ${pointsCalculated}개, 추가된 포인트 ${pointsAdded}개")
+            logger.info("상세 추적 데이터 생성 완료: 계산된 포인트 ${pointsCalculated}개, 추가된 포인트 ${pointsAdded}개, 필터링된 포인트 ${pointsFiltered}개")
+            
+            // 필터링된 데이터 상세 정보 출력
+            if (filteredData.isNotEmpty()) {
+                logger.info("🔍 필터링된 데이터 상세 정보:")
+                filteredData.forEachIndexed { index, (time, elevation, azimuth) ->
+                    logger.info("  필터링 #${index + 1}: 시간=${time.format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))}, 고도각=${String.format("%.4f", elevation)}°, 방위각=${String.format("%.4f", azimuth)}°")
+                }
+            }
 
             // 데이터가 없는 경우 로그 출력
             if (trackingData.isEmpty()) {
