@@ -198,8 +198,13 @@
                 <q-btn color="positive" label="Go" @click="handleEphemerisCommand" class="q-mr-sm" />
                 <q-btn color="warning" label="Stop" @click="handleStopCommand" class="q-mr-sm" />
                 <q-btn color="negative" label="Stow" @click="handleStowCommand" class="q-mr-sm" />
-                <!-- ATC 버튼 추가 -->
-                <q-btn color="info" label="ATC" icon="calculate" @click="openAxisTransformCalculator" />
+              </div>
+              <!-- 새로운 버튼 그룹 추가 -->
+              <div class="button-group q-mt-md">
+                <q-btn color="info" label="Axis Calculator" icon="calculate" @click="openAxisTransformCalculator"
+                  class="q-mr-sm" />
+                <q-btn color="secondary" label="이론치 다운로드" icon="download" @click="exportAllMstDataToCsv"
+                  :loading="isExportingCsv" />
               </div>
             </q-card-section>
           </q-card>
@@ -347,6 +352,9 @@ const tempTLEData = ref({
 // TLE 관련 상태
 const tleError = ref<string | null>(null)
 const isProcessingTLE = ref(false)
+
+// CSV 내보내기 관련 상태
+const isExportingCsv = ref(false)
 
 // QTable 컬럼 타입 정의
 type QTableColumn = NonNullable<QTableProps['columns']>[0]
@@ -1415,6 +1423,48 @@ const openAxisTransformCalculator = () => {
       message: 'ATC 팝업을 열 수 없습니다',
       timeout: 3000
     })
+  }
+}
+
+// 모든 MST 데이터를 CSV로 내보내기
+const exportAllMstDataToCsv = async () => {
+  if (isExportingCsv.value) return
+
+  isExportingCsv.value = true
+
+  try {
+    $q.notify({
+      type: 'info',
+      message: '이론치 데이터를 CSV로 내보내는 중...',
+      timeout: 2000
+    })
+
+    const response = await ephemerisTrackService.exportAllMstDataToCsv()
+
+    if (response.success) {
+      $q.notify({
+        type: 'positive',
+        message: `이론치 데이터 내보내기 완료! 총 ${response.totalMstCount}개 MST, ${response.successCount}개 성공`,
+        timeout: 5000
+      })
+
+      console.log('CSV 내보내기 결과:', response)
+    } else {
+      $q.notify({
+        type: 'negative',
+        message: `이론치 데이터 내보내기 실패: ${response.error || '알 수 없는 오류'}`,
+        timeout: 5000
+      })
+    }
+  } catch (error) {
+    console.error('CSV 내보내기 실패:', error)
+    $q.notify({
+      type: 'negative',
+      message: '이론치 데이터 내보내기 중 오류가 발생했습니다',
+      timeout: 5000
+    })
+  } finally {
+    isExportingCsv.value = false
   }
 }
 // ✅ 메인 스레드 블로킹 감지

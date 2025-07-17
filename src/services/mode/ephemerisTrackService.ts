@@ -307,6 +307,58 @@ class EphemerisTrackService {
       throw error
     }
   }
+
+  /**
+   * 모든 MST 데이터를 CSV 파일로 내보내기
+   */
+  async exportAllMstDataToCsv(outputDirectory: string = 'csv_exports'): Promise<{
+    success: boolean
+    message: string
+    totalMstCount?: number
+    successCount?: number
+    errorCount?: number
+    createdFiles?: string[]
+    outputDirectory?: string
+    error?: string
+  }> {
+    try {
+      const response = await api.post('/ephemeris/export/csv/all', null, {
+        params: { outputDirectory },
+      })
+      return response.data
+    } catch (error) {
+      console.error('CSV 내보내기 API 호출 실패:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 특정 MST ID의 데이터를 CSV 파일로 내보내기
+   */
+  async exportMstDataToCsv(
+    mstId: number,
+    outputDirectory: string = 'csv_exports',
+  ): Promise<{
+    success: boolean
+    message: string
+    filename?: string
+    filePath?: string
+    satelliteName?: string
+    originalDataCount?: number
+    axisTransformedDataCount?: number
+    finalTransformedDataCount?: number
+    error?: string
+  }> {
+    try {
+      const response = await api.post(`/ephemeris/export/csv/${mstId}`, null, {
+        params: { outputDirectory },
+      })
+      return response.data
+    } catch (error) {
+      console.error('특정 MST CSV 내보내기 API 호출 실패:', error)
+      throw error
+    }
+  }
 }
 
 export const ephemerisTrackService = new EphemerisTrackService()
