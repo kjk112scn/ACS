@@ -94,7 +94,6 @@ class OrekitCalculator(
             var passStartTime: ZonedDateTime? = null
             var maxElevationInPass = -90.0
             var maxElevationTime: ZonedDateTime? = null
-            var maxElevationAzimuth = 0.0  // ✅ MaxElevation 시점의 방위각
             var maxAzimuthRate = 0.0
             var maxElevationRate = 0.0
             var maxAzimuthAccel = 0.0
@@ -152,7 +151,6 @@ class OrekitCalculator(
                     currentPassData.clear()
                     maxElevationInPass = elevation
                     maxElevationTime = currentTime
-                    maxElevationAzimuth = azimuth  // ✅ 가시성 시작 시 방위각 초기화
                     maxAzimuthRate = 0.0
                     maxElevationRate = 0.0
                     maxAzimuthAccel = 0.0
@@ -167,7 +165,6 @@ class OrekitCalculator(
                     if (elevation > maxElevationInPass) {
                         maxElevationInPass = elevation
                         maxElevationTime = currentTime
-                        maxElevationAzimuth = azimuth  // ✅ MaxElevation 시점의 방위각 저장
                     }
 
                     // 추적 데이터 추가
@@ -229,7 +226,6 @@ class OrekitCalculator(
                         endTime = currentTime,
                         maxElevation = maxElevationInPass,
                         maxElevationTime = maxElevationTime,
-                        maxElevationAzimuth = maxElevationAzimuth,  // ✅ 추가
                         duration = Duration.between(passStartTime, currentTime),
                         trackingData = currentPassData.toList(), // 복사본 생성
                         maxAzimuthRate = maxAzimuthRate,
@@ -274,7 +270,6 @@ class OrekitCalculator(
                     endTime = currentTime,
                     maxElevation = maxElevationInPass,
                     maxElevationTime = maxElevationTime,
-                    maxElevationAzimuth = maxElevationAzimuth,  // ✅ 추가
                     duration = Duration.between(passStartTime, currentTime),
                     trackingData = currentPassData.toList(),
                     maxAzimuthRate = maxAzimuthRate,
@@ -885,7 +880,6 @@ class OrekitCalculator(
                     endTime = period.endTime,
                     maxElevation = period.maxElevation,
                     maxElevationTime = period.maxElevationTime,
-                    maxElevationAzimuth = period.maxElevationAzimuth,  // ✅ 추가
                     duration = period.duration,
                     trackingData = detailedTrackingData,
                     maxAzimuthRate = period.maxAzimuthRate,
@@ -1235,7 +1229,6 @@ class OrekitCalculator(
                                 endTime = endTime,
                                 maxElevation = period.maxElevation,
                                 maxElevationTime = period.maxElevationTime,
-                                maxElevationAzimuth = period.maxElevationAzimuth,  // ✅ 추가
                                 duration = period.duration,
                                 trackingData = detailedTrackingData,
                                 maxAzimuthRate = period.maxAzimuthRate,
@@ -1274,7 +1267,6 @@ class OrekitCalculator(
                         endTime = endTime,
                         maxElevation = period.maxElevation,
                         maxElevationTime = period.maxElevationTime,
-                        maxElevationAzimuth = period.maxElevationAzimuth,  // ✅ 추가
                         duration = period.duration,
                         trackingData = detailedTrackingData,
                         maxAzimuthRate = period.maxAzimuthRate,
@@ -1367,7 +1359,6 @@ class OrekitCalculator(
         val endTime: ZonedDateTime,
         val maxElevation: Double,  // Float에서 Double로 변경
         val maxElevationTime: ZonedDateTime?,
-        val maxElevationAzimuth: Double = 0.0,    // ✅ MaxElevation 시점의 방위각
         val duration: Duration,
         val trackingData: List<SatelliteTrackData>,
         val maxAzimuthRate: Double = 0.0,         // 최대 방위각 속도 (도/초)
@@ -1460,7 +1451,6 @@ class OrekitCalculator(
         var visibilityStart: ZonedDateTime? = null
         var maxElevationInPass: Double = -90.0
         var maxElevationTime: ZonedDateTime? = null
-        var maxElevationAzimuth: Double = 0.0  // ✅ MaxElevation 시점의 방위각 저장
 
         // 속도 및 가속도 계산을 위한 변수들
         var maxAzimuthRate: Double = 0.0
@@ -1554,7 +1544,6 @@ class OrekitCalculator(
                         visibilityStart = currentTime
                         maxElevationInPass = elevation
                         maxElevationTime = currentTime
-                        maxElevationAzimuth = azimuth  // ✅ 가시성 시작 시 방위각 초기화
 
                         // 새로운 가시성 기간이 시작될 때 최대값 초기화
                         maxAzimuthRate = 0.0
@@ -1572,7 +1561,7 @@ class OrekitCalculator(
                     if (elevation > maxElevationInPass) {
                         maxElevationInPass = elevation
                         maxElevationTime = currentTime
-                        maxElevationAzimuth = azimuth  // ✅ MaxElevation 시점의 방위각 저장
+
                     }
 
                     // 가시성 중간 부분에서는 큰 간격으로 전환
@@ -1596,7 +1585,6 @@ class OrekitCalculator(
                                     currentTime,
                                     maxElevationInPass,
                                     maxElevationTime,
-                                    maxElevationAzimuth, // ✅ 추가
                                     maxAzimuthRate,
                                     maxElevationRate,
                                     maxAzimuthAccel,
@@ -1608,7 +1596,6 @@ class OrekitCalculator(
                         visibilityStart = null
                         maxElevationInPass = -90.0
                         maxElevationTime = null
-                        maxElevationAzimuth = 0.0  // ✅ 가시성 종료 시 방위각 초기화
 
                         // 가시성 종료 후에는 큰 간격으로 전환
                         currentTimeStep = coarseTimeStepMs
@@ -1674,7 +1661,6 @@ class OrekitCalculator(
                         currentTime,
                         maxElevationInPass,
                         maxElevationTime,
-                        maxElevationAzimuth, // ✅ 추가
                         maxAzimuthRate,
                         maxElevationRate,
                         maxAzimuthAccel,
@@ -1707,7 +1693,6 @@ class OrekitCalculator(
         val endTime: ZonedDateTime,
         val maxElevation: Double,
         val maxElevationTime: ZonedDateTime? = null,
-        val maxElevationAzimuth: Double = 0.0,    // ✅ MaxElevation 시점의 방위각
         val maxAzimuthRate: Double = 0.0,         // 최대 방위각 속도 (도/초)
         val maxElevationRate: Double = 0.0,       // 최대 고도각 속도 (도/초)
         val maxAzimuthAccel: Double = 0.0,        // 최대 방위각 가속도 (도/초²)

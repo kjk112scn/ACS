@@ -464,7 +464,7 @@ class EphemerisController(
                     ),
                     "axisTransformed" to mapOf(
                         "mstCount" to axisTransformedMst.size,
-                        "description" to "기울기 변환 적용 데이터",
+                        "description" to "기울기 변환이 적용된 데이터",
                         "tiltAngle" to -6.98,
                         "rotatorAngle" to 0.0
                     ),
@@ -482,6 +482,82 @@ class EphemerisController(
                     "4. 최종 데이터 저장"
                 )
             )
+        }
+    }
+
+    /**
+     * 모든 MST 데이터를 CSV 파일로 내보내기 API
+     */
+    @PostMapping("/export/csv/all")
+    fun exportAllMstDataToCsv(@RequestParam(defaultValue = "csv_exports") outputDirectory: String): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            try {
+                val result = ephemerisService.exportAllMstDataToCsv(outputDirectory)
+                
+                if (result["success"] == true) {
+                    mapOf(
+                        "success" to true,
+                        "message" to "모든 MST 데이터가 CSV 파일로 성공적으로 내보내졌습니다.",
+                        "totalMstCount" to (result["totalMstCount"] ?: 0),
+                        "successCount" to (result["successCount"] ?: 0),
+                        "errorCount" to (result["errorCount"] ?: 0),
+                        "createdFiles" to (result["createdFiles"] ?: emptyList<String>()),
+                        "outputDirectory" to (result["outputDirectory"] ?: outputDirectory)
+                    )
+                } else {
+                    mapOf(
+                        "success" to false,
+                        "message" to "CSV 내보내기 실패: ${result["error"] ?: "알 수 없는 오류"}",
+                        "error" to (result["error"] ?: "알 수 없는 오류")
+                    )
+                }
+            } catch (e: Exception) {
+                mapOf(
+                    "success" to false,
+                    "message" to "CSV 내보내기 중 오류 발생: ${e.message ?: "알 수 없는 오류"}",
+                    "error" to (e.message ?: "알 수 없는 오류")
+                )
+            }
+        }
+    }
+
+    /**
+     * 특정 MST ID의 데이터를 CSV 파일로 내보내기 API
+     */
+    @PostMapping("/export/csv/{mstId}")
+    fun exportMstDataToCsv(
+        @PathVariable mstId: Int,
+        @RequestParam(defaultValue = "csv_exports") outputDirectory: String
+    ): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            try {
+                val result = ephemerisService.exportMstDataToCsv(mstId, outputDirectory)
+                
+                if (result["success"] == true) {
+                    mapOf(
+                        "success" to true,
+                        "message" to "MST ID $mstId 데이터가 CSV 파일로 성공적으로 내보내졌습니다.",
+                        "filename" to (result["filename"] ?: ""),
+                        "filePath" to (result["filePath"] ?: ""),
+                        "satelliteName" to (result["satelliteName"] ?: ""),
+                        "originalDataCount" to (result["originalDataCount"] ?: 0),
+                        "axisTransformedDataCount" to (result["axisTransformedDataCount"] ?: 0),
+                        "finalTransformedDataCount" to (result["finalTransformedDataCount"] ?: 0)
+                    )
+                } else {
+                    mapOf(
+                        "success" to false,
+                        "message" to "CSV 내보내기 실패: ${result["error"] ?: "알 수 없는 오류"}",
+                        "error" to (result["error"] ?: "알 수 없는 오류")
+                    )
+                }
+            } catch (e: Exception) {
+                mapOf(
+                    "success" to false,
+                    "message" to "CSV 내보내기 중 오류 발생: ${e.message ?: "알 수 없는 오류"}",
+                    "error" to (e.message ?: "알 수 없는 오류")
+                )
+            }
         }
     }
 }

@@ -743,7 +743,9 @@ class EphemerisService(
             val endTimeWithMs = pass.endTime.withZoneSameInstant(ZoneOffset.UTC)
 
             logger.info("패스 #$mstId: 시작=$startTimeWithMs, 종료=$endTimeWithMs")
-
+            
+            val maxElevationAzimuth = pass.trackingData
+            .maxByOrNull { it.elevation }?.azimuth ?: 0.0
             // 원본 데이터로 마스터 정보 생성
             ephemerisTrackMst.add(
                 mapOf(
@@ -755,7 +757,7 @@ class EphemerisService(
                     "Duration" to pass.getDurationString(),
                     "MaxElevationTime" to pass.maxElevationTime,
                     "MaxElevation" to pass.maxElevation,
-                    "MaxAzimuth" to pass.maxElevationAzimuth,
+                    "MaxAzimuth" to maxElevationAzimuth,
                     "StartAzimuth" to pass.startAzimuth,
                     "StartElevation" to pass.startElevation,
                     "EndAzimuth" to pass.endAzimuth,
@@ -915,9 +917,43 @@ class EphemerisService(
             axisTransformedMst.add(axisTransformedMstData)
             axisTransformedDtl.addAll(calculatedDtl)
 
+            // ✅ 원본 데이터의 MaxElevation 시점 인덱스 찾기 (MaxElevation 값으로 직접 찾기)
+            val originalMaxElevation = originalMstData["MaxElevation"] as? Double
+            val originalMaxElevationIndex = if (originalMaxElevation != null) {
+                passDtl.mapIndexed { index, point ->
+                    val elevation = point["Elevation"] as Double
+                    val diff = abs(elevation - originalMaxElevation)
+                    Triple(index, elevation, diff)
+                }.minByOrNull { it.third }?.first ?: -1
+            } else {
+                -1
+            }
+            
             logger.info("패스 #$mstId 축변환 완료: ${calculatedDtl.size}개 좌표")
             val originalMaxAz = originalMstData["MaxAzimuth"] as? Double ?: 0.0
             val originalMaxEl = originalMstData["MaxElevation"] as? Double ?: 0.0
+            
+            // ✅ 정확한 매칭 로그 출력 (인덱스 포함)
+            if (originalMaxElevationIndex >= 0 && originalMaxElevationIndex < calculatedDtl.size) {
+                val originalMaxElevationAz = passDtl[originalMaxElevationIndex]["Azimuth"] as Double
+                val originalMaxElevationEl = passDtl[originalMaxElevationIndex]["Elevation"] as Double
+                val transformedMaxElevationAz = calculatedDtl[originalMaxElevationIndex]["Azimuth"] as Double
+                val transformedMaxElevationEl = calculatedDtl[originalMaxElevationIndex]["Elevation"] as Double
+                val originalPointTime = passDtl[originalMaxElevationIndex]["Time"] as ZonedDateTime
+                
+                logger.info(
+                    "  MaxElevation 시점 매칭 [인덱스 $originalMaxElevationIndex]: 원본 Az=${String.format("%.2f", originalMaxElevationAz)}° El=${String.format("%.2f", originalMaxElevationEl)}° → 변환 Az=${String.format("%.2f", transformedMaxElevationAz)}° El=${String.format("%.2f", transformedMaxElevationEl)}°"
+                )
+                logger.info(
+                    "  매칭 시간: ${originalPointTime.format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))} (MaxElevation 값: ${String.format("%.6f", originalMaxElevation)}°)"
+                )
+            } else {
+                logger.warn("  MaxElevation 시점 매칭 실패: 인덱스 $originalMaxElevationIndex")
+                if (originalMaxElevation != null) {
+                    logger.warn("  원본 MaxElevation 값: ${String.format("%.6f", originalMaxElevation)}°")
+                }
+            }
+            
             logger.info(
                 "  최대 방위각: 원본=${String.format("%.2f", originalMaxAz)}° → 변환=${
                     String.format(
