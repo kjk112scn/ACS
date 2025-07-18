@@ -449,39 +449,8 @@ const selectedScheduleInfo = computed(() => {
     endElevation: 0,
   }
 })
-const downloadRealtimeData = async () => {
-  try {
-    // Loading 대신 notify로 시작 알림
-    $q.notify({
-      type: 'info',
-      message: '실시간 추적 데이터를 조회하고 있습니다...',
-      timeout: 1000,
-    })
-
-    const response = await ephemerisTrackService.fetchRealtimeTrackingData()
-
-    if (response.data && response.data.length > 0) {
-      downloadCSV(response.data)
-
-      $q.notify({
-        type: 'positive',
-        message: `${response.totalCount}개의 실시간 추적 데이터를 다운로드했습니다`,
-      })
-    } else {
-      $q.notify({
-        type: 'warning',
-        message: '다운로드할 실시간 추적 데이터가 없습니다',
-      })
-    }
-  } catch (error) {
-    console.error('실시간 추적 데이터 다운로드 실패:', error)
-    $q.notify({
-      type: 'negative',
-      message: '실시간 추적 데이터 다운로드에 실패했습니다',
-    })
-  }
-}
-const downloadCSV = (data: RealtimeTrackingDataItem[]) => {
+// ✅ 개선된 RealtimeTrackingDataItem 타입을 사용하는 CSV 다운로드 함수
+const downloadCSVWithTransformations = (data: RealtimeTrackingDataItem[]) => {
   // 안전한 숫자 포맷팅 함수
   const safeToFixed = (value: number | null | undefined, digits: number = 4): string => {
     if (value === null || value === undefined || isNaN(Number(value))) {
@@ -490,25 +459,35 @@ const downloadCSV = (data: RealtimeTrackingDataItem[]) => {
     return Number(value).toFixed(digits)
   }
 
-  // CSV 헤더 정의
+  // CSV 헤더 정의 - 원본/축변환/최종 데이터 포함
   const headers = [
-    'Index',
-    'Timestamp',
-    'CMD Azimuth (°)',
-    'CMD Elevation (°)',
-    'Elapsed Time (s)',
-    'Tracking Azimuth Time (s)',
-    'Tracking CMD Azimuth Angle (°)',
-    'Tracking Actual Azimuth Angle (°)',
-    'Tracking Elevation Time (s)',
-    'Tracking CMD Elevation Angle (°)',
-    'Tracking Actual Elevation Angle (°)',
-    'Tracking Tilt Time (s)',
-    'Tracking CMD Tilt Angle (°)',
-    'Tracking Actual Tilt Angle (°)',
-    'Pass ID',
-    'Azimuth Error (°)',
-    'Elevation Error (°)',
+    'Index', 'Timestamp', 'PassId', 'ElapsedTime(s)',
+
+    // 원본 데이터 (변환 전)
+    'OriginalAzimuth(°)', 'OriginalElevation(°)', 'OriginalRange(km)', 'OriginalAltitude(km)',
+
+    // 축변환 데이터 (기울기 변환 적용)
+    'AxisTransformedAzimuth(°)', 'AxisTransformedElevation(°)', 'AxisTransformedRange(km)', 'AxisTransformedAltitude(km)',
+
+    // 최종 변환 데이터 (±270도 제한 적용)
+    'FinalTransformedAzimuth(°)', 'FinalTransformedElevation(°)', 'FinalTransformedRange(km)', 'FinalTransformedAltitude(km)',
+
+    // 명령 및 실제 추적 데이터
+    'CmdAzimuth(°)', 'CmdElevation(°)', 'ActualAzimuth(°)', 'ActualElevation(°)',
+    'TrackingAzimuthTime(s)', 'TrackingCMDAzimuth(°)', 'TrackingActualAzimuth(°)',
+    'TrackingElevationTime(s)', 'TrackingCMDElevation(°)', 'TrackingActualElevation(°)',
+    'TrackingTiltTime(s)', 'TrackingCMDTilt(°)', 'TrackingActualTilt(°)',
+
+    // 오차 분석
+    'AzimuthError(°)', 'ElevationError(°)',
+    'OriginalToAxisTransformationError(°)', 'AxisToFinalTransformationError(°)', 'TotalTransformationError(°)',
+
+    // 정확도 분석 (새로 추가된 필드들)
+    '시간정확도(s)', 'Az_CMD정확도(°)', 'Az_Act정확도(°)', 'Az_최종정확도(°)',
+    'El_CMD정확도(°)', 'El_Act정확도(°)', 'El_최종정확도(°)',
+
+    // 변환 정보
+    'TiltAngle(°)', 'TransformationType', 'HasTransformation', 'InterpolationMethod', 'InterpolationAccuracy'
   ]
 
   // CSV 데이터 생성 (안전한 처리 적용)
@@ -518,21 +497,64 @@ const downloadCSV = (data: RealtimeTrackingDataItem[]) => {
       [
         item.index || 0,
         `"${item.timestamp ? formatToLocalTime(item.timestamp) : new Date().toISOString()}"`,
-        safeToFixed(item.cmdAz, 4),
-        safeToFixed(item.cmdEl, 4),
-        safeToFixed(item.elapsedTimeSeconds, 2),
-        safeToFixed(item.trackingAzimuthTime, 2),
-        safeToFixed(item.trackingCMDAzimuthAngle, 4),
-        safeToFixed(item.trackingActualAzimuthAngle, 4),
-        safeToFixed(item.trackingElevationTime, 2),
-        safeToFixed(item.trackingCMDElevationAngle, 4),
-        safeToFixed(item.trackingActualElevationAngle, 4),
-        safeToFixed(item.trackingTiltTime, 2),
-        safeToFixed(item.trackingCMDTiltAngle, 4),
-        safeToFixed(item.trackingActualTiltAngle, 4),
         item.passId || 0,
-        safeToFixed(item.azimuthError, 4),
-        safeToFixed(item.elevationError, 4),
+        safeToFixed(item.elapsedTimeSeconds, 3),
+
+        // 원본 데이터 (변환 전)
+        safeToFixed(item.originalAzimuth, 6),
+        safeToFixed(item.originalElevation, 6),
+        safeToFixed(item.originalRange, 6),
+        safeToFixed(item.originalAltitude, 6),
+
+        // 축변환 데이터 (기울기 변환 적용)
+        safeToFixed(item.axisTransformedAzimuth, 6),
+        safeToFixed(item.axisTransformedElevation, 6),
+        safeToFixed(item.axisTransformedRange, 6),
+        safeToFixed(item.axisTransformedAltitude, 6),
+
+        // 최종 변환 데이터 (±270도 제한 적용)
+        safeToFixed(item.finalTransformedAzimuth, 6),
+        safeToFixed(item.finalTransformedElevation, 6),
+        safeToFixed(item.finalTransformedRange, 6),
+        safeToFixed(item.finalTransformedAltitude, 6),
+
+        // 명령 및 실제 추적 데이터
+        safeToFixed(item.cmdAz, 6),
+        safeToFixed(item.cmdEl, 6),
+        safeToFixed(item.actualAz, 6),
+        safeToFixed(item.actualEl, 6),
+        safeToFixed(item.trackingAzimuthTime, 2),
+        safeToFixed(item.trackingCMDAzimuthAngle, 6),
+        safeToFixed(item.trackingActualAzimuthAngle, 6),
+        safeToFixed(item.trackingElevationTime, 2),
+        safeToFixed(item.trackingCMDElevationAngle, 6),
+        safeToFixed(item.trackingActualElevationAngle, 6),
+        safeToFixed(item.trackingTiltTime, 2),
+        safeToFixed(item.trackingCMDTiltAngle, 6),
+        safeToFixed(item.trackingActualTiltAngle, 6),
+
+        // 오차 분석
+        safeToFixed(item.azimuthError, 6),
+        safeToFixed(item.elevationError, 6),
+        safeToFixed(item.originalToAxisTransformationError, 6),
+        safeToFixed(item.axisToFinalTransformationError, 6),
+        safeToFixed(item.totalTransformationError, 6),
+
+        // 정확도 분석 (새로 추가된 필드들)
+        safeToFixed(item.timeAccuracy, 6),
+        safeToFixed(item.azCmdAccuracy, 6),
+        safeToFixed(item.azActAccuracy, 6),
+        safeToFixed(item.azFinalAccuracy, 6),
+        safeToFixed(item.elCmdAccuracy, 6),
+        safeToFixed(item.elActAccuracy, 6),
+        safeToFixed(item.elFinalAccuracy, 6),
+
+        // 변환 정보
+        safeToFixed(item.tiltAngle, 6),
+        `"${item.transformationType || 'none'}"`,
+        item.hasTransformation ? 'true' : 'false',
+        `"${item.interpolationMethod || 'linear'}"`,
+        safeToFixed(item.interpolationAccuracy, 6)
       ].join(','),
     ),
   ].join('\n')
@@ -544,7 +566,7 @@ const downloadCSV = (data: RealtimeTrackingDataItem[]) => {
   // 파일명 생성 (현재 시간 포함)
   const now = new Date()
   const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19)
-  const filename = `realtime_tracking_data_${timestamp}.csv`
+  const filename = `realtime_tracking_data_with_transformations_${timestamp}.csv`
 
   // 다운로드 실행
   const link = document.createElement('a')
@@ -557,6 +579,47 @@ const downloadCSV = (data: RealtimeTrackingDataItem[]) => {
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
 }
+
+const downloadRealtimeData = async () => {
+  try {
+    // Loading 대신 notify로 시작 알림
+    $q.notify({
+      type: 'info',
+      message: '실시간 추적 데이터를 조회하고 있습니다...',
+      timeout: 2000,
+    })
+
+    // ✅ 기존 API 호출 - generateRealtimeTrackingCsv와 연계
+    const response = await ephemerisTrackService.fetchRealtimeTrackingData()
+
+    if (response.data && response.data.length > 0) {
+      // ✅ 클라이언트에서 CSV 생성 및 다운로드
+      downloadCSVWithTransformations(response.data)
+
+      $q.notify({
+        type: 'positive',
+        message: `${response.totalCount || 0}개의 실시간 추적 데이터를 다운로드했습니다`,
+        timeout: 5000,
+      })
+
+      console.log('실시간 추적 데이터 다운로드 결과:', response)
+    } else {
+      $q.notify({
+        type: 'warning',
+        message: '다운로드할 실시간 추적 데이터가 없습니다',
+        timeout: 3000,
+      })
+    }
+  } catch (error) {
+    console.error('실시간 추적 데이터 다운로드 실패:', error)
+    $q.notify({
+      type: 'negative',
+      message: '실시간 추적 데이터 다운로드에 실패했습니다',
+      timeout: 5000,
+    })
+  }
+}
+
 
 // 남은 시간 계산을 위한 상태
 const timeRemaining = ref(0)

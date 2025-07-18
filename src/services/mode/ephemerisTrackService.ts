@@ -34,9 +34,32 @@ export interface EphemerisTrackRequest {
 export interface RealtimeTrackingDataItem {
   index: number
   timestamp: string
+  passId: number
+  elapsedTimeSeconds: number
+
+  // 원본 데이터 (변환 전)
+  originalAzimuth?: number
+  originalElevation?: number
+  originalRange?: number
+  originalAltitude?: number
+
+  // 축변환 데이터 (기울기 변환 적용)
+  axisTransformedAzimuth?: number
+  axisTransformedElevation?: number
+  axisTransformedRange?: number
+  axisTransformedAltitude?: number
+
+  // 최종 변환 데이터 (±270도 제한 적용)
+  finalTransformedAzimuth?: number
+  finalTransformedElevation?: number
+  finalTransformedRange?: number
+  finalTransformedAltitude?: number
+
+  // 명령 및 실제 추적 데이터
   cmdAz: number
   cmdEl: number
-  elapsedTimeSeconds: number
+  actualAz?: number
+  actualEl?: number
   trackingAzimuthTime: number
   trackingCMDAzimuthAngle: number
   trackingActualAzimuthAngle: number
@@ -46,9 +69,33 @@ export interface RealtimeTrackingDataItem {
   trackingTiltTime: number
   trackingCMDTiltAngle: number
   trackingActualTiltAngle: number
-  passId: number
+
+  // 오차 분석
   azimuthError: number
   elevationError: number
+  originalToAxisTransformationError?: number
+  axisToFinalTransformationError?: number
+  totalTransformationError?: number
+
+  // 정확도 분석 (새로 추가된 필드들)
+  timeAccuracy?: number
+  azCmdAccuracy?: number
+  azActAccuracy?: number
+  azFinalAccuracy?: number
+  elCmdAccuracy?: number
+  elActAccuracy?: number
+  elFinalAccuracy?: number
+
+  // 변환 정보
+  tiltAngle?: number
+  transformationType?: string
+  hasTransformation?: boolean
+  interpolationMethod?: string
+  interpolationAccuracy?: number
+
+  // 데이터 유효성 및 소스
+  hasValidData?: boolean
+  dataSource?: string
 }
 
 export interface RealtimeTrackingResponse {
@@ -356,6 +403,74 @@ class EphemerisTrackService {
       return response.data
     } catch (error) {
       console.error('특정 MST CSV 내보내기 API 호출 실패:', error)
+      throw error
+    }
+  }
+
+  /**
+   * ✅ 실시간 추적 데이터를 가져오기 (원본/축변환/최종 데이터 포함)
+   */
+  async fetchRealtimeTrackingDataWithTransformations(): Promise<{
+    success: boolean
+    message: string
+    data: Array<{
+      index: number
+      timestamp: string
+      passId: number
+      elapsedTimeSeconds: number
+
+      // 원본 데이터 (변환 전)
+      originalAzimuth: number
+      originalElevation: number
+      originalRange: number
+      originalAltitude: number
+
+      // 축변환 데이터 (기울기 변환 적용)
+      axisTransformedAzimuth: number
+      axisTransformedElevation: number
+      axisTransformedRange: number
+      axisTransformedAltitude: number
+
+      // 최종 변환 데이터 (±270도 제한 적용)
+      finalTransformedAzimuth: number
+      finalTransformedElevation: number
+      finalTransformedRange: number
+      finalTransformedAltitude: number
+
+      // 명령 및 실제 추적 데이터
+      cmdAz: number
+      cmdEl: number
+      trackingAzimuthTime: number
+      trackingCMDAzimuthAngle: number
+      trackingActualAzimuthAngle: number
+      trackingElevationTime: number
+      trackingCMDElevationAngle: number
+      trackingActualElevationAngle: number
+      trackingTiltTime: number
+      trackingCMDTiltAngle: number
+      trackingActualTiltAngle: number
+
+      // 오차 분석
+      azimuthError: number
+      elevationError: number
+      originalToAxisTransformationError: number
+      axisToFinalTransformationError: number
+      totalTransformationError: number
+
+      // 변환 정보
+      tiltAngle: number
+      transformationType: string
+      hasTransformation: boolean
+      interpolationAccuracy: number
+    }>
+    totalCount?: number
+    error?: string
+  }> {
+    try {
+      const response = await api.get('/ephemeris/realtime-tracking-data-with-transformations')
+      return response.data
+    } catch (error) {
+      console.error('실시간 추적 데이터 조회 API 호출 실패:', error)
       throw error
     }
   }
