@@ -49,3 +49,7 @@ csv_exports/
 
 ### Local Properties ###
 gradle.properties.local
+
+### ETL Files ###
+*.etl
+udp_capture.etl
