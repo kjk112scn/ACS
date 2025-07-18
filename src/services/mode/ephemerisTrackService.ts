@@ -33,6 +33,7 @@ export interface EphemerisTrackRequest {
 // 기존 인터페이스들 뒤에 추가
 export interface RealtimeTrackingDataItem {
   index: number
+  theoreticalIndex?: number // ✅ 이론치 데이터 인덱스 추가
   timestamp: string
   passId: number
   elapsedTimeSeconds: number
@@ -415,6 +416,7 @@ class EphemerisTrackService {
     message: string
     data: Array<{
       index: number
+      theoreticalIndex?: number // ✅ 이론치 데이터 인덱스 추가
       timestamp: string
       passId: number
       elapsedTimeSeconds: number

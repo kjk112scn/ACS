@@ -461,7 +461,7 @@ const downloadCSVWithTransformations = (data: RealtimeTrackingDataItem[]) => {
 
   // CSV 헤더 정의 - 원본/축변환/최종 데이터 포함
   const headers = [
-    'Index', 'Timestamp', 'PassId', 'ElapsedTime(s)',
+    'Index', 'TheoreticalIndex', 'Timestamp', 'PassId', 'ElapsedTime(s)',
 
     // 원본 데이터 (변환 전)
     'OriginalAzimuth(°)', 'OriginalElevation(°)', 'OriginalRange(km)', 'OriginalAltitude(km)',
@@ -496,6 +496,7 @@ const downloadCSVWithTransformations = (data: RealtimeTrackingDataItem[]) => {
     ...data.map((item) =>
       [
         item.index || 0,
+        item.theoreticalIndex || 0,  // ✅ 이론치 데이터 인덱스 추가
         `"${item.timestamp ? formatToLocalTime(item.timestamp) : new Date().toISOString()}"`,
         item.passId || 0,
         safeToFixed(item.elapsedTimeSeconds, 3),
