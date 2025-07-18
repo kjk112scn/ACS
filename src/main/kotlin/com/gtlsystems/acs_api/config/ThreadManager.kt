@@ -1,5 +1,6 @@
 package com.gtlsystems.acs_api.config
 
+import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -19,6 +20,17 @@ import java.util.concurrent.TimeUnit
 class ThreadManager {
     
     private val logger = LoggerFactory.getLogger(ThreadManager::class.java)
+    
+    @PostConstruct
+    fun initialize() {
+        logger.info("🚀 ThreadManager 초기화 시작")
+        
+        val specs = detectSystemSpecs()
+        val tier = classifyPerformanceTier(specs)
+        applyHardwareOptimization(tier)
+        
+        logger.info("✅ ThreadManager 초기화 완료 (성능 등급: {})", tier)
+    }
     
     // ✅ 시스템 사양 자동 감지
     data class SystemSpecs(

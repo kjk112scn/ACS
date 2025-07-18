@@ -1441,6 +1441,15 @@ class EphemerisService(
             "azimuthError" to ((trackingCmdAzimuth ?: 0.0f) - (trackingActualAzimuth ?: 0.0f)),
             "elevationError" to ((trackingCmdElevation ?: 0.0f) - (trackingActualElevation ?: 0.0f)),
             
+            // ✅ 정확도 분석 (새로 추가된 필드들)
+            "timeAccuracy" to (elapsedTimeSeconds - (trackingCmdAzimuthTime as? Float ?: 0.0f)),
+            "azCmdAccuracy" to (finalTransformedAzimuth - (trackingCmdAzimuth as? Float ?: 0.0f)),
+            "azActAccuracy" to ((trackingCmdAzimuth as? Float ?: 0.0f) - (trackingActualAzimuth as? Float ?: 0.0f)),
+            "azFinalAccuracy" to (finalTransformedAzimuth - (trackingActualAzimuth as? Float ?: 0.0f)),
+            "elCmdAccuracy" to (finalTransformedElevation - (trackingCmdElevation as? Float ?: 0.0f)),
+            "elActAccuracy" to ((trackingCmdElevation as? Float ?: 0.0f) - (trackingActualElevation as? Float ?: 0.0f)),
+            "elFinalAccuracy" to (finalTransformedElevation - (trackingActualElevation as? Float ?: 0.0f)),
+            
             "hasValidData" to hasValidData,
             "dataSource" to "DataStoreService", // ✅ 데이터 소스 표시
 
@@ -1451,10 +1460,6 @@ class EphemerisService(
             // ✅ 변환 적용 여부
             "hasTransformation" to (transformationType != "none"),
             
-            // ✅ 보간 정보
-            "interpolationMethod" to "linear",
-             // ✅ 보간 정보
-             "interpolationMethod" to "linear",
             // ✅ 보간 정보
             "interpolationMethod" to "linear",
             "interpolationAccuracy" to when (val accuracy = interpolatedPosition["interpolationAccuracy"]) {
@@ -2009,11 +2014,11 @@ class EphemerisService(
             }
         }
     }
-
-    /**
+/*
+    *//**
      * 위성 추적 데이터 요청 처리 (ACU F/W로부터 요청 수신 시)
      * 2.12.3 위성 추적 추가 데이터 요청에 대한 응답
-     */
+     *//*
     fun handleEphemerisTrackingDataRequest(timeAcc: UInt, requestDataLength: UShort) {
         if (trackingStatus.ephemerisStatus != true || currentTrackingPass == null) {
             logger.error("위성 추적이 활성화되어 있지 않습니다.")
@@ -2026,9 +2031,89 @@ class EphemerisService(
         // timeAcc를 실제 데이터 인덱스로 변환 (timeAcc는 ms 단위, 100ms 간격으로 변환)
         val startIndex = (timeAcc.toInt() / 100).toInt()
         logger.info("timeAcc: ${timeAcc}ms, startIndex: ${startIndex}")
-        
+
         // 요청된 데이터 길이에 따라 데이터 포인트 수 계산
         sendAdditionalTrackingData(passId, startIndex, requestDataLength.toInt())
+    }
+
+    *//**
+     * 위성 추적 추가 데이터 전송
+     * 2.12.3 위성 추적 추가 데이터 요청에 대한 응답으로 사용
+     *//*
+    fun sendAdditionalTrackingData(passId: UInt, startIndex: Int, requestDataLength: Int = 25) {
+        try {
+            if (currentTrackingPass == null || trackingStatus.ephemerisStatus != true) {
+                logger.error("위성 추적이 시작되지 않았습니다. 먼저 startSatelliteTracking을 호출하세요.")
+                return
+            }
+            logger.info("startIndex :${startIndex}.")
+
+            val passDetails = getEphemerisTrackDtlByMstId(passId)
+            if (passDetails.isEmpty()) {
+                logger.error("선택된 패스 ID($passId)에 해당하는 세부 데이터를 찾을 수 없습니다.")
+                return
+            }
+
+            // 최적화된 인덱스 계산 (참고 코드와 동일한 로직)
+            val indexMs = startIndex / 100
+            logger.info("indexMs :${indexMs}.")
+
+            // 안전한 인덱스 범위 확인
+            val safeStartIndex = indexMs.coerceIn(0, passDetails.size - 1)
+            val actualCount = minOf(requestDataLength, passDetails.size - safeStartIndex)
+
+            if (actualCount <= 0) {
+                logger.info("더 이상 전송할 추적 데이터가 없습니다.")
+                return
+            }
+
+            // 직접 인덱스 접근으로 메모리 효율성 개선 (누적 시간 유지)
+            val additionalTrackingData = mutableListOf<Triple<Int, Float, Float>>()
+            for (i in 0 until actualCount) {
+                val point = passDetails[safeStartIndex + i]
+                additionalTrackingData.add(
+                    Triple(
+                        startIndex + i * 100, // 누적 시간 유지 (참고 코드와 동일)
+                        (point["Elevation"] as Double).toFloat(),
+                        (point["Azimuth"] as Double).toFloat()
+                    )
+                )
+            }
+
+            val additionalDataFrame = ICDService.SatelliteTrackThree.SetDataFrame(
+                cmdOne = 'T',
+                cmdTwo = 'R',
+                dataLength = additionalTrackingData.size.toUShort(),
+                satelliteTrackData = additionalTrackingData
+            )
+
+            udpFwICDService.sendSatelliteTrackAdditionalData(additionalDataFrame)
+            logger.info("위성 추적 추가 데이터 전송 완료 (${additionalTrackingData.size}개 데이터 포인트, 시작 인덱스: $startIndex)")
+
+        } catch (e: Exception) {
+            logger.error("위성 추적 추가 데이터 전송 중 오류 발생: ${e.message}", e)
+        }
+    }*/
+
+    /**
+     * 위성 추적 데이터 요청 처리 (ACU F/W로부터 요청 수신 시)
+     * 2.12.3 위성 추적 추가 데이터 요청에 대한 응답
+     */
+    fun handleEphemerisTrackingDataRequest(timeAcc: UInt, requestDataLength: UShort) {
+        if (trackingStatus.ephemerisStatus != true || currentTrackingPass == null) {
+            logger.error("위성 추적이 활성화되어 있지 않습니다.")
+            return
+        }
+        logger.info("timeAcc :${timeAcc}.")
+        logger.info("requestDataLength :${requestDataLength}.")
+        val passId = currentTrackingPass!!["No"] as UInt
+
+        // timeAcc를 기반으로 시작 인덱스 계산 (timeAcc는 ms 단위)
+        val startIndex = (timeAcc.toInt()) //
+        logger.info("startIndex :${startIndex}.")
+        // 요청된 데이터 길이에 따라 데이터 포인트 수 계산
+        sendAdditionalTrackingData(passId, startIndex, requestDataLength.toInt())
+        //dataStoreService.setEphemerisTracking(true)
     }
 
     /**
@@ -2041,8 +2126,7 @@ class EphemerisService(
                 logger.error("위성 추적이 시작되지 않았습니다. 먼저 startSatelliteTracking을 호출하세요.")
                 return
             }
-            logger.info("요청: startIndex=${startIndex}, requestLength=${requestDataLength}")
-            
+            logger.info("startIndex :${startIndex}.")
             // 선택된 패스 ID에 해당하는 세부 데이터 가져오기
             val passDetails = getEphemerisTrackDtlByMstId(passId)
 
@@ -2050,30 +2134,20 @@ class EphemerisService(
                 logger.error("선택된 패스 ID($passId)에 해당하는 세부 데이터를 찾을 수 없습니다.")
                 return
             }
-            
-            // 안전한 인덱스 범위 확인
-            val safeStartIndex = when {
-                startIndex < 0 -> 0
-                startIndex >= passDetails.size -> passDetails.size - 1
-                else -> startIndex
-            }
-            
-            val actualCount = minOf(requestDataLength, passDetails.size - safeStartIndex)
-            
-            logger.info("실제: safeStartIndex=${safeStartIndex}, actualCount=${actualCount}, totalSize=${passDetails.size}")
-            
+            val indexMs = startIndex / 100
+            logger.info("indexMs :${indexMs}.")
             // 요청된 인덱스부터 추가 데이터 준비
-            val additionalTrackingData = passDetails.drop(safeStartIndex).take(actualCount).mapIndexed { index, point ->
-                val actualIndex = safeStartIndex + index
+            val additionalTrackingData = passDetails.drop(indexMs).take(requestDataLength).mapIndexed { index, point ->
                 Triple(
-                    (actualIndex * 100).toUInt(), // 실제 시간 (ms)
-                    (point["Elevation"] as Double).toFloat(), 
-                    (point["Azimuth"] as Double).toFloat()
+                    startIndex + index * 100, // 카운트 (누적 인덱스)
+                    (point["Elevation"] as Double).toFloat(), (point["Azimuth"] as Double).toFloat()
                 )
             }
 
             if (additionalTrackingData.isEmpty()) {
                 logger.info("더 이상 전송할 추적 데이터가 없습니다.")
+
+
                 return
             }
 
@@ -2088,7 +2162,7 @@ class EphemerisService(
             // UdpFwICDService를 통해 데이터 전송
             udpFwICDService.sendSatelliteTrackAdditionalData(additionalDataFrame)
 
-            logger.info("전송: ${additionalTrackingData.size}개 데이터, 시작 인덱스: ${safeStartIndex}, 시작 시간: ${(safeStartIndex * 100)}ms")
+            logger.info("위성 추적 추가 데이터 전송 완료 (${additionalTrackingData.size}개 데이터 포인트, 시작 인덱스: $startIndex)")
 
         } catch (e: Exception) {
             logger.error("위성 추적 추가 데이터 전송 중 오류 발생: ${e.message}", e)

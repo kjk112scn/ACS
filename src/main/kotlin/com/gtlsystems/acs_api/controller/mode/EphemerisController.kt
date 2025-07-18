@@ -562,7 +562,7 @@ class EphemerisController(
     }
 }
 /**
- * CSV 데이터 생성 헬퍼 메서드
+ * CSV 데이터 생성 헬퍼 메서드 (개선된 버전 - createRealtimeTrackingData와 연계)
  */
 private fun generateRealtimeTrackingCsv(data: List<Map<String, Any?>>): ByteArray {
     val outputStream = ByteArrayOutputStream()
@@ -574,14 +574,38 @@ private fun generateRealtimeTrackingCsv(data: List<Map<String, Any?>>): ByteArra
         outputStream.write(0xBB)
         outputStream.write(0xBF)
 
-        // CSV 헤더 작성
+        // CSV 헤더 작성 (createRealtimeTrackingData의 모든 필드 포함)
         val headers = listOf(
             "Index", "Timestamp", "PassId", "ElapsedTime(s)",
-            "CmdAzimuth(°)", "CmdElevation(°)",
+            
+            // 원본 데이터 (변환 전)
+            "OriginalAzimuth(°)", "OriginalElevation(°)", "OriginalRange(km)", "OriginalAltitude(km)",
+            
+            // 축변환 데이터 (기울기 변환 적용)
+            "AxisTransformedAzimuth(°)", "AxisTransformedElevation(°)", "AxisTransformedRange(km)", "AxisTransformedAltitude(km)",
+            
+            // 최종 변환 데이터 (±270도 제한 적용)
+            "FinalTransformedAzimuth(°)", "FinalTransformedElevation(°)", "FinalTransformedRange(km)", "FinalTransformedAltitude(km)",
+            
+            // 명령 및 실제 데이터
+            "CmdAzimuth(°)", "CmdElevation(°)", "ActualAzimuth(°)", "ActualElevation(°)",
+            
+            // 추적 관련 데이터
             "TrackingAzimuthTime", "TrackingCMDAzimuth(°)", "TrackingActualAzimuth(°)",
             "TrackingElevationTime", "TrackingCMDElevation(°)", "TrackingActualElevation(°)",
             "TrackingTiltTime", "TrackingCMDTilt(°)", "TrackingActualTilt(°)",
-            "AzimuthError(°)", "ElevationError(°)"
+            
+            // 오차 분석
+            "AzimuthError(°)", "ElevationError(°)",
+            "OriginalToAxisTransformationError(°)", "AxisToFinalTransformationError(°)", "TotalTransformationError(°)",
+            
+            // 정확도 분석 (새로 추가된 필드들)
+            "시간정확도(s)", "Az_CMD정확도(°)", "Az_Act정확도(°)", "Az_최종정확도(°)",
+            "El_CMD정확도(°)", "El_Act정확도(°)", "El_최종정확도(°)",
+            
+            // 변환 정보
+            "TiltAngle(°)", "TransformationType", "HasTransformation", "InterpolationMethod", "InterpolationAccuracy",
+            "HasValidData", "DataSource"
         )
 
         writer.write(headers.joinToString(","))
@@ -596,8 +620,32 @@ private fun generateRealtimeTrackingCsv(data: List<Map<String, Any?>>): ByteArra
                 (record["timestamp"] as? ZonedDateTime)?.format(dateFormatter) ?: "",
                 record["passId"]?.toString() ?: "",
                 String.format("%.3f", record["elapsedTimeSeconds"] as? Float ?: 0.0f),
+                
+                // 원본 데이터
+                String.format("%.6f", record["originalAzimuth"] as? Float ?: 0.0f),
+                String.format("%.6f", record["originalElevation"] as? Float ?: 0.0f),
+                String.format("%.6f", record["originalRange"] as? Float ?: 0.0f),
+                String.format("%.6f", record["originalAltitude"] as? Float ?: 0.0f),
+                
+                // 축변환 데이터
+                String.format("%.6f", record["axisTransformedAzimuth"] as? Float ?: 0.0f),
+                String.format("%.6f", record["axisTransformedElevation"] as? Float ?: 0.0f),
+                String.format("%.6f", record["axisTransformedRange"] as? Float ?: 0.0f),
+                String.format("%.6f", record["axisTransformedAltitude"] as? Float ?: 0.0f),
+                
+                // 최종 변환 데이터
+                String.format("%.6f", record["finalTransformedAzimuth"] as? Float ?: 0.0f),
+                String.format("%.6f", record["finalTransformedElevation"] as? Float ?: 0.0f),
+                String.format("%.6f", record["finalTransformedRange"] as? Float ?: 0.0f),
+                String.format("%.6f", record["finalTransformedAltitude"] as? Float ?: 0.0f),
+                
+                // 명령 및 실제 데이터
                 String.format("%.6f", record["cmdAz"] as? Float ?: 0.0f),
                 String.format("%.6f", record["cmdEl"] as? Float ?: 0.0f),
+                String.format("%.6f", record["actualAz"] as? Float ?: 0.0f),
+                String.format("%.6f", record["actualEl"] as? Float ?: 0.0f),
+                
+                // 추적 관련 데이터
                 record["trackingAzimuthTime"]?.toString() ?: "",
                 String.format("%.6f", record["trackingCMDAzimuthAngle"] as? Float ?: 0.0f),
                 String.format("%.6f", record["trackingActualAzimuthAngle"] as? Float ?: 0.0f),
@@ -607,8 +655,31 @@ private fun generateRealtimeTrackingCsv(data: List<Map<String, Any?>>): ByteArra
                 record["trackingTiltTime"]?.toString() ?: "",
                 String.format("%.6f", record["trackingCMDTiltAngle"] as? Float ?: 0.0f),
                 String.format("%.6f", record["trackingActualTiltAngle"] as? Float ?: 0.0f),
+                
+                // 오차 분석
                 String.format("%.6f", record["azimuthError"] as? Float ?: 0.0f),
-                String.format("%.6f", record["elevationError"] as? Float ?: 0.0f)
+                String.format("%.6f", record["elevationError"] as? Float ?: 0.0f),
+                String.format("%.6f", record["originalToAxisTransformationError"] as? Float ?: 0.0f),
+                String.format("%.6f", record["axisToFinalTransformationError"] as? Float ?: 0.0f),
+                String.format("%.6f", record["totalTransformationError"] as? Float ?: 0.0f),
+                
+                // 정확도 분석 (새로 추가된 필드들)
+                String.format("%.6f", record["timeAccuracy"] as? Float ?: 0.0f),
+                String.format("%.6f", record["azCmdAccuracy"] as? Float ?: 0.0f),
+                String.format("%.6f", record["azActAccuracy"] as? Float ?: 0.0f),
+                String.format("%.6f", record["azFinalAccuracy"] as? Float ?: 0.0f),
+                String.format("%.6f", record["elCmdAccuracy"] as? Float ?: 0.0f),
+                String.format("%.6f", record["elActAccuracy"] as? Float ?: 0.0f),
+                String.format("%.6f", record["elFinalAccuracy"] as? Float ?: 0.0f),
+                
+                // 변환 정보
+                String.format("%.6f", record["tiltAngle"] as? Double ?: 0.0),
+                "\"${record["transformationType"] ?: ""}\"",
+                (record["hasTransformation"] as? Boolean ?: false).toString(),
+                "\"${record["interpolationMethod"] ?: ""}\"",
+                String.format("%.6f", record["interpolationAccuracy"] as? Double ?: 0.0),
+                (record["hasValidData"] as? Boolean ?: false).toString(),
+                "\"${record["dataSource"] ?: ""}\""
             )
 
             writer.write(row.joinToString(","))

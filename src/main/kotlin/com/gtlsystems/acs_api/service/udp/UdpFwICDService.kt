@@ -119,6 +119,17 @@ class UdpFwICDService(
             // ✅ 통합 실시간 실행기 사용
             realtimeExecutor = threadManager.getRealtimeExecutor()
 
+            // ✅ ThreadManager가 null인 경우 대체 타이머 생성
+            if (realtimeExecutor == null) {
+                logger.warn("⚠️ ThreadManager의 realtimeExecutor가 null입니다. 대체 타이머를 생성합니다.")
+                realtimeExecutor = Executors.newScheduledThreadPool(2) { r ->
+                    Thread(r, "udp-fallback").apply {
+                        priority = Thread.MAX_PRIORITY
+                        isDaemon = true
+                    }
+                }
+            }
+
             // ✅ UDP Receive (안정성 보장, 10ms 간격)
             realtimeExecutor?.scheduleAtFixedRate({
                 try {
@@ -136,10 +147,11 @@ class UdpFwICDService(
                 }
             }, 0, 10, TimeUnit.MILLISECONDS)  // 10ms로 안정성 보장
 
-            // ✅ UDP Send (안정성 보장, 30ms 간격)
+            // ✅ UDP Send (안정성 보장, 30ms 간격) - 디버깅 로그 추가
             realtimeExecutor?.scheduleAtFixedRate({
                 try {
                     val startTime = System.nanoTime()
+                    logger.debug("🔄 UDP Send 명령 실행 중... (카운트: {})", sendCount.get())
                     sendReadStatusCommand()
                     sendCount.incrementAndGet()
                     
@@ -149,11 +161,12 @@ class UdpFwICDService(
                         logger.warn("⚠️ UDP Send 지연 감지: {}ms (임계값: 10ms)", processingTime)
                     }
                 } catch (e: Exception) {
-                    logger.debug("UDP Send 오류: {}", e.message)
+                    logger.error("❌ UDP Send 오류: {}", e.message, e)
                 }
             }, 0, 30, TimeUnit.MILLISECONDS)  // 30ms로 안정성 보장
 
-            logger.info("✅ 실시간 UDP 통신 시작 완료")
+            logger.info("✅ 실시간 UDP 통신 시작 완료 (Send 카운트: {}, Receive 카운트: {})", 
+                sendCount.get(), receiveCount.get())
         }
     }
 
@@ -188,15 +201,22 @@ class UdpFwICDService(
     }
 
     /**
-     * 주기적 상태 요청 전송
+     * 주기적 상태 요청 전송 - 디버깅 로그 추가
      */
     private fun sendReadStatusCommand() {
         try {
+            logger.debug("📤 Read Status 명령 전송 시작...")
             val setDataFrameInstance = ICDService.ReadStatus.SetDataFrame()
             val dataToSend = setDataFrameInstance.setDataFrame()
-            channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
+            
+            logger.debug("📤 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
+            logger.debug("📤 펌웨어 주소: {}", firmwareAddress)
+            
+            val bytesSent = channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
+            logger.debug("📤 전송 완료: {} bytes", bytesSent)
+            
         } catch (e: Exception) {
-            // 주기적 전송 실패는 로그 생략
+            logger.error("❌ Read Status 명령 전송 실패: {}", e.message, e)
         }
     }
 
