@@ -576,7 +576,7 @@ private fun generateRealtimeTrackingCsv(data: List<Map<String, Any?>>): ByteArra
 
         // CSV 헤더 작성 (createRealtimeTrackingData의 모든 필드 포함)
         val headers = listOf(
-            "Index", "Timestamp", "PassId", "ElapsedTime(s)",
+            "Index", "TheoreticalIndex", "Timestamp", "PassId", "ElapsedTime(s)",
             
             // 원본 데이터 (변환 전)
             "OriginalAzimuth(°)", "OriginalElevation(°)", "OriginalRange(km)", "OriginalAltitude(km)",
@@ -617,6 +617,7 @@ private fun generateRealtimeTrackingCsv(data: List<Map<String, Any?>>): ByteArra
         data.forEach { record ->
             val row = listOf(
                 record["index"]?.toString() ?: "",
+                record["theoreticalIndex"]?.toString() ?: "",  // ✅ 이론치 데이터 인덱스 추가
                 (record["timestamp"] as? ZonedDateTime)?.format(dateFormatter) ?: "",
                 record["passId"]?.toString() ?: "",
                 String.format("%.3f", record["elapsedTimeSeconds"] as? Float ?: 0.0f),

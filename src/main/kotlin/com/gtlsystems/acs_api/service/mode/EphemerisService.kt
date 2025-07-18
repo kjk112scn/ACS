@@ -942,13 +942,13 @@ class EphemerisService(
                 val originalPointTime = passDtl[originalMaxElevationIndex]["Time"] as ZonedDateTime
                 
                 logger.info(
-                    "  MaxElevation 시점 매칭 [인덱스 $originalMaxElevationIndex]: 원본 Az=${String.format("%.4f", originalMaxElevationAz)}° El=${String.format("%.4f", originalMaxElevationEl)}° → 변환 Az=${String.format("%.4f", transformedMaxElevationAz)}° El=${String.format("%.4f", transformedMaxElevationEl)}°"
+                    "  MaxElevation 시점 매칭 [이론치 인덱스 $originalMaxElevationIndex]: 원본 Az=${String.format("%.4f", originalMaxElevationAz)}° El=${String.format("%.4f", originalMaxElevationEl)}° → 변환 Az=${String.format("%.4f", transformedMaxElevationAz)}° El=${String.format("%.4f", transformedMaxElevationEl)}°"
                 )
                 logger.info(
                     "  매칭 시간: ${originalPointTime.format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))} (MaxElevation 값: ${String.format("%.6f", originalMaxElevation)}°)"
                 )
             } else {
-                logger.warn("  MaxElevation 시점 매칭 실패: 인덱스 $originalMaxElevationIndex")
+                logger.warn("  MaxElevation 시점 매칭 실패: 이론치 인덱스 $originalMaxElevationIndex")
                 if (originalMaxElevation != null) {
                     logger.warn("  원본 MaxElevation 값: ${String.format("%.6f", originalMaxElevation)}°")
                 }
@@ -1319,51 +1319,67 @@ class EphemerisService(
     }
 
     /**
-     * ✅ 실시간 추적 데이터 생성 (개선된 버전 - 보간법 적용)
+     * ✅ 실시간 추적 데이터 생성 (개선된 버전 - 시간 기반 인덱스 매칭)
      */
     private fun createRealtimeTrackingData(
         passId: UInt,
         currentTime: ZonedDateTime,
         startTime: ZonedDateTime
     ): Map<String, Any?> {
-        // 현재 시간을 기준으로 추적 시간 계산
         val elapsedTimeSeconds = Duration.between(startTime, currentTime).toMillis() / 1000.0f
 
-        // 현재 추적해야 할 위성 위치 계산
-        val passDetails = getEphemerisTrackDtlByMstId(passId)
-        if (passDetails.isEmpty()) {
-            logger.debug("패스 세부 데이터가 없어 실시간 데이터 저장을 건너뜁니다.")
+        // 1. 이론치 데이터 타입별로 분리해서 가져오기
+        val originalPassDetails = getEphemerisTrackDtlByMstIdAndDataType(passId, "original")
+        val axisTransformedPassDetails = getEphemerisTrackDtlByMstIdAndDataType(passId, "axis_transformed")
+        val finalTransformedPassDetails = getEphemerisTrackDtlByMstIdAndDataType(passId, "final_transformed")
+
+        if (originalPassDetails.isEmpty()) {
+            logger.debug("원본 이론치 데이터가 없어 실시간 데이터 저장을 건너뜁니다.")
             return emptyMap()
         }
 
-        // ✅ 선형 보간법으로 정확한 위치 계산
-        val interpolatedPosition = calculateInterpolatedPosition(passDetails, currentTime, startTime)
-        if (interpolatedPosition.isEmpty()) {
-            logger.debug("보간된 위치를 계산할 수 없어 실시간 데이터 저장을 건너뜁니다.")
-            return emptyMap()
+        // 2. ✅ 시간 기반으로 정확한 이론치 인덱스 계산
+        val timeDifferenceMs = Duration.between(startTime, currentTime).toMillis()
+        val theoreticalIndex = (timeDifferenceMs / 100.0).toInt().coerceIn(0, originalPassDetails.size - 1)
+        
+        // 3. ✅ 해당 인덱스의 실제 이론치 데이터 가져오기 (보간 없이 직접 매칭)
+        val theoreticalPoint = if (theoreticalIndex < originalPassDetails.size) {
+            originalPassDetails[theoreticalIndex]
+        } else {
+            originalPassDetails.last()
+        }
+        
+        val theoreticalAxisPoint = if (theoreticalIndex < axisTransformedPassDetails.size) {
+            axisTransformedPassDetails[theoreticalIndex]
+        } else {
+            axisTransformedPassDetails.last()
+        }
+        
+        val theoreticalFinalPoint = if (theoreticalIndex < finalTransformedPassDetails.size) {
+            finalTransformedPassDetails[theoreticalIndex]
+        } else {
+            finalTransformedPassDetails.last()
         }
 
-        // ✅ 원본 데이터 추출
-        val originalAzimuth = interpolatedPosition["originalAzimuth"] as? Float ?: 0.0f
-        val originalElevation = interpolatedPosition["originalElevation"] as? Float ?: 0.0f
-        val originalRange = interpolatedPosition["originalRange"] as? Float ?: 0.0f
-        val originalAltitude = interpolatedPosition["originalAltitude"] as? Float ?: 0.0f
+        // 4. ✅ 정확한 이론치 값 추출 (보간 없이 직접 매칭)
+        val originalAzimuth = (theoreticalPoint["Azimuth"] as? Double)?.toFloat() ?: 0.0f
+        val originalElevation = (theoreticalPoint["Elevation"] as? Double)?.toFloat() ?: 0.0f
+        val originalRange = (theoreticalPoint["Range"] as? Double)?.toFloat() ?: 0.0f
+        val originalAltitude = (theoreticalPoint["Altitude"] as? Double)?.toFloat() ?: 0.0f
 
-        // ✅ 축변환 데이터 추출
-        val axisTransformedAzimuth = interpolatedPosition["axisTransformedAzimuth"] as? Float ?: originalAzimuth
-        val axisTransformedElevation = interpolatedPosition["axisTransformedElevation"] as? Float ?: originalElevation
-        val axisTransformedRange = interpolatedPosition["axisTransformedRange"] as? Float ?: originalRange
-        val axisTransformedAltitude = interpolatedPosition["axisTransformedAltitude"] as? Float ?: originalAltitude
+        val axisTransformedAzimuth = (theoreticalAxisPoint["Azimuth"] as? Double)?.toFloat() ?: originalAzimuth
+        val axisTransformedElevation = (theoreticalAxisPoint["Elevation"] as? Double)?.toFloat() ?: originalElevation
+        val axisTransformedRange = (theoreticalAxisPoint["Range"] as? Double)?.toFloat() ?: originalRange
+        val axisTransformedAltitude = (theoreticalAxisPoint["Altitude"] as? Double)?.toFloat() ?: originalAltitude
 
-        // ✅ 최종 변환 데이터 추출 (±270도 제한 적용 후)
-        val finalTransformedAzimuth = interpolatedPosition["finalTransformedAzimuth"] as? Float ?: axisTransformedAzimuth
-        val finalTransformedElevation = interpolatedPosition["finalTransformedElevation"] as? Float ?: axisTransformedElevation
-        val finalTransformedRange = interpolatedPosition["finalTransformedRange"] as? Float ?: axisTransformedRange
-        val finalTransformedAltitude = interpolatedPosition["finalTransformedAltitude"] as? Float ?: axisTransformedAltitude
+        val finalTransformedAzimuth = (theoreticalFinalPoint["Azimuth"] as? Double)?.toFloat() ?: axisTransformedAzimuth
+        val finalTransformedElevation = (theoreticalFinalPoint["Elevation"] as? Double)?.toFloat() ?: axisTransformedElevation
+        val finalTransformedRange = (theoreticalFinalPoint["Range"] as? Double)?.toFloat() ?: axisTransformedRange
+        val finalTransformedAltitude = (theoreticalFinalPoint["Altitude"] as? Double)?.toFloat() ?: axisTransformedAltitude
 
         // 변환 정보 추출
-        val tiltAngle = interpolatedPosition["tiltAngle"] as? Double ?: -6.98
-        val transformationType = interpolatedPosition["transformationType"] as? String ?: "none"
+        val tiltAngle = theoreticalAxisPoint["TiltAngle"] as? Double ?: -6.98
+        val transformationType = theoreticalAxisPoint["TransformationType"] as? String ?: "none"
 
         // ✅ 변경: PushData 대신 DataStoreService에서 데이터 가져오기
         val currentData = dataStoreService.getLatestData()
@@ -1393,7 +1409,8 @@ class EphemerisService(
 
         // 실시간 추적 데이터 생성 (원본, 축변환, 최종 변환 데이터 모두 포함)
         return mapOf(
-            "index" to trackingDataIndex,
+            "index" to trackingDataIndex,  // 실시간 데이터 인덱스
+            "theoreticalIndex" to theoreticalIndex,  // ✅ 이론치 데이터 인덱스 추가
             "timestamp" to currentTime,
             
             // ✅ 원본 데이터 (변환 전)
@@ -1460,14 +1477,9 @@ class EphemerisService(
             // ✅ 변환 적용 여부
             "hasTransformation" to (transformationType != "none"),
             
-            // ✅ 보간 정보
-            "interpolationMethod" to "linear",
-            "interpolationAccuracy" to when (val accuracy = interpolatedPosition["interpolationAccuracy"]) {
-                is Double -> accuracy
-                is Float -> accuracy.toDouble()
-                is Number -> accuracy.toDouble()
-                else -> 0.0
-            }
+            // ✅ 보간 정보 (직접 매칭이므로 정확도 1.0)
+            "interpolationMethod" to "direct_matching",
+            "interpolationAccuracy" to 1.0
         )
     }
 
@@ -2014,86 +2026,6 @@ class EphemerisService(
             }
         }
     }
-/*
-    *//**
-     * 위성 추적 데이터 요청 처리 (ACU F/W로부터 요청 수신 시)
-     * 2.12.3 위성 추적 추가 데이터 요청에 대한 응답
-     *//*
-    fun handleEphemerisTrackingDataRequest(timeAcc: UInt, requestDataLength: UShort) {
-        if (trackingStatus.ephemerisStatus != true || currentTrackingPass == null) {
-            logger.error("위성 추적이 활성화되어 있지 않습니다.")
-            return
-        }
-        logger.info("timeAcc: ${timeAcc}ms")
-        logger.info("requestDataLength: ${requestDataLength}")
-        val passId = currentTrackingPass!!["No"] as UInt
-
-        // timeAcc를 실제 데이터 인덱스로 변환 (timeAcc는 ms 단위, 100ms 간격으로 변환)
-        val startIndex = (timeAcc.toInt() / 100).toInt()
-        logger.info("timeAcc: ${timeAcc}ms, startIndex: ${startIndex}")
-
-        // 요청된 데이터 길이에 따라 데이터 포인트 수 계산
-        sendAdditionalTrackingData(passId, startIndex, requestDataLength.toInt())
-    }
-
-    *//**
-     * 위성 추적 추가 데이터 전송
-     * 2.12.3 위성 추적 추가 데이터 요청에 대한 응답으로 사용
-     *//*
-    fun sendAdditionalTrackingData(passId: UInt, startIndex: Int, requestDataLength: Int = 25) {
-        try {
-            if (currentTrackingPass == null || trackingStatus.ephemerisStatus != true) {
-                logger.error("위성 추적이 시작되지 않았습니다. 먼저 startSatelliteTracking을 호출하세요.")
-                return
-            }
-            logger.info("startIndex :${startIndex}.")
-
-            val passDetails = getEphemerisTrackDtlByMstId(passId)
-            if (passDetails.isEmpty()) {
-                logger.error("선택된 패스 ID($passId)에 해당하는 세부 데이터를 찾을 수 없습니다.")
-                return
-            }
-
-            // 최적화된 인덱스 계산 (참고 코드와 동일한 로직)
-            val indexMs = startIndex / 100
-            logger.info("indexMs :${indexMs}.")
-
-            // 안전한 인덱스 범위 확인
-            val safeStartIndex = indexMs.coerceIn(0, passDetails.size - 1)
-            val actualCount = minOf(requestDataLength, passDetails.size - safeStartIndex)
-
-            if (actualCount <= 0) {
-                logger.info("더 이상 전송할 추적 데이터가 없습니다.")
-                return
-            }
-
-            // 직접 인덱스 접근으로 메모리 효율성 개선 (누적 시간 유지)
-            val additionalTrackingData = mutableListOf<Triple<Int, Float, Float>>()
-            for (i in 0 until actualCount) {
-                val point = passDetails[safeStartIndex + i]
-                additionalTrackingData.add(
-                    Triple(
-                        startIndex + i * 100, // 누적 시간 유지 (참고 코드와 동일)
-                        (point["Elevation"] as Double).toFloat(),
-                        (point["Azimuth"] as Double).toFloat()
-                    )
-                )
-            }
-
-            val additionalDataFrame = ICDService.SatelliteTrackThree.SetDataFrame(
-                cmdOne = 'T',
-                cmdTwo = 'R',
-                dataLength = additionalTrackingData.size.toUShort(),
-                satelliteTrackData = additionalTrackingData
-            )
-
-            udpFwICDService.sendSatelliteTrackAdditionalData(additionalDataFrame)
-            logger.info("위성 추적 추가 데이터 전송 완료 (${additionalTrackingData.size}개 데이터 포인트, 시작 인덱스: $startIndex)")
-
-        } catch (e: Exception) {
-            logger.error("위성 추적 추가 데이터 전송 중 오류 발생: ${e.message}", e)
-        }
-    }*/
 
     /**
      * 위성 추적 데이터 요청 처리 (ACU F/W로부터 요청 수신 시)
@@ -3077,5 +3009,42 @@ class EphemerisService(
                 "mstId" to mstId
             )
         }
+    }
+
+    // 새로운 보간 함수 추가
+    private fun calculateInterpolatedPositionWithSeparatedData(
+        original: List<Map<String, Any?>>, 
+        axisTransformed: List<Map<String, Any?>>, 
+        finalTransformed: List<Map<String, Any?>>, 
+        currentTime: ZonedDateTime, 
+        startTime: ZonedDateTime
+    ): Map<String, Any?> {
+        val timeDifferenceMs = Duration.between(startTime, currentTime).toMillis()
+        val calculatedIndex = timeDifferenceMs / 100.0
+
+        fun interpolate(list: List<Map<String, Any?>>, key: String): Float {
+            if (list.isEmpty()) return 0.0f
+            val lowerIndex = calculatedIndex.toInt().coerceIn(0, list.size - 1)
+            val upperIndex = (lowerIndex + 1).coerceAtMost(list.size - 1)
+            val fraction = (calculatedIndex - lowerIndex).coerceIn(0.0, 1.0)
+            val lower = (list[lowerIndex][key] as? Double) ?: 0.0
+            val upper = (list[upperIndex][key] as? Double) ?: 0.0
+            return (lower + (upper - lower) * fraction).toFloat()
+        }
+
+        return mapOf(
+            "originalAzimuth" to interpolate(original, "Azimuth"),
+            "originalElevation" to interpolate(original, "Elevation"),
+            "originalRange" to interpolate(original, "Range"),
+            "originalAltitude" to interpolate(original, "Altitude"),
+            "axisTransformedAzimuth" to interpolate(axisTransformed, "Azimuth"),
+            "axisTransformedElevation" to interpolate(axisTransformed, "Elevation"),
+            "axisTransformedRange" to interpolate(axisTransformed, "Range"),
+            "axisTransformedAltitude" to interpolate(axisTransformed, "Altitude"),
+            "finalTransformedAzimuth" to interpolate(finalTransformed, "Azimuth"),
+            "finalTransformedElevation" to interpolate(finalTransformed, "Elevation"),
+            "finalTransformedRange" to interpolate(finalTransformed, "Range"),
+            "finalTransformedAltitude" to interpolate(finalTransformed, "Altitude")
+        )
     }
 }
