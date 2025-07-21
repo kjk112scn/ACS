@@ -18,7 +18,7 @@ class SunTrackController {
         @PostMapping("/start-sun-track") // 경로 변수 제거
         fun startSunTrack(@RequestParam interval: Long, cmdAzimuthSpeed: Float , cmdElevationSpeed: Float, cmdTiltSpeed: Float): Mono<String> { // 요청 파라미터 추가
             return Mono.fromCallable {
-                sunTrackService.startSunTrackCommandPeriodically(interval,cmdAzimuthSpeed, cmdElevationSpeed, cmdTiltSpeed) // 서비스 함수에 변수 전달
+                sunTrackService.startSunTrack() // ✅ 새로운 메서드명 사용
                 "UDP 명령어 전송 요청 완료 (Command: Sun Track)"
             }.thenReturn("Sun Track UDP 명령어 전송 요청 완료 (Command:  $cmdAzimuthSpeed, $cmdElevationSpeed, $cmdTiltSpeed)")
         }
@@ -26,7 +26,7 @@ class SunTrackController {
         @PostMapping("/stop-sun-track") // 경로 변수 제거
         fun stopSunTrack(): Mono<String> { // 요청 파라미터 추가
             return Mono.fromCallable {
-                sunTrackService.stopSunTrackCommandPeriodically() // 서비스 함수에 변수 전달
+                sunTrackService.stopSunTrack() // ✅ 새로운 메서드명 사용
                 "UDP 명령어 전송 요청 완료 (Command: Sun Track)"
             }.thenReturn("Sun Track UDP 명령어 전송 요청 완료 (Command:)")
         }

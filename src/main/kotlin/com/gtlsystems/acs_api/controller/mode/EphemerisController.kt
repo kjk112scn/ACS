@@ -44,6 +44,35 @@ class EphemerisController(
         }
     }
 
+    @PostMapping("/3axis/tracking/geostationary/calculate-angles")
+    fun calculateGeostationaryAngles(@RequestBody request: GeostationaryTrackingRequest): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            try {
+                val geoPosition = ephemerisService.getCurrentGeostationaryPositionWith3AxisTransform(
+                    request.tleLine1, 
+                    request.tleLine2
+                )
+                
+                mapOf(
+                    "message" to "정지궤도 각도 계산 완료",
+                    "satelliteId" to request.tleLine1.substring(2, 7).trim(),
+                    "azimuth" to (geoPosition["transformedAzimuth"] as Double),
+                    "elevation" to (geoPosition["transformedElevation"] as Double),
+                    "originalAzimuth" to (geoPosition["originalAzimuth"] as Double),
+                    "originalElevation" to (geoPosition["originalElevation"] as Double),
+                    "tiltAngle" to (geoPosition["tiltAngle"] as Double),
+                    "rotatorAngle" to (geoPosition["rotatorAngle"] as Double),
+                    "trackingType" to "geostationary"
+                )
+            } catch (e: Exception) {
+                mapOf(
+                    "message" to "정지궤도 각도 계산 실패: ${e.message}",
+                    "error" to (e.message ?: "알 수 없는 오류")
+                )
+            }
+        }
+    }
+
     /**
      * 실시간 추적 데이터 조회 (JSON)
      */

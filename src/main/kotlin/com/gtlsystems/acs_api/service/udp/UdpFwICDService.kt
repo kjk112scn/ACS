@@ -157,8 +157,8 @@ class UdpFwICDService(
                     
                     // ✅ 안정성 우선 모니터링
                     val processingTime = (System.nanoTime() - startTime) / 1_000_000
-                    if (processingTime > 10) {  // 10ms 임계값으로 안정성 보장
-                        logger.warn("⚠️ UDP Send 지연 감지: {}ms (임계값: 10ms)", processingTime)
+                    if (processingTime > 25) {  // 10ms 임계값으로 안정성 보장
+                        logger.warn("⚠️ UDP Send 지연 감지: {}ms (임계값: 25ms)", processingTime)
                     }
                 } catch (e: Exception) {
                     logger.error("❌ UDP Send 오류: {}", e.message, e)

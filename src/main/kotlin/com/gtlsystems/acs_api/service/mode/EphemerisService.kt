@@ -80,6 +80,27 @@ class EphemerisService(
     private var modeExecutor: ScheduledExecutorService? = null
     private var modeTask: ScheduledFuture<*>? = null
 
+    // ✅ 정지궤도 추적 상태 관리
+    enum class TrackingState {
+        IDLE,
+        MOVING_TILT_TO_ZERO,
+        WAITING_FOR_TILT_STABILIZATION,
+        MOVING_TO_TARGET,
+        TRACKING_ACTIVE
+    }
+
+    private var currentTrackingState = TrackingState.IDLE
+    private var stabilizationStartTime: Long = 0
+    private var targetAzimuth: Float = 0f
+    private var targetElevation: Float = 0f
+
+    // ✅ 정지궤도 추적 타임아웃 설정
+    companion object {
+        const val TILT_MOVE_TIMEOUT = 120000L        // Tilt 이동: 2분
+        const val TILT_STABILIZATION_TIMEOUT = 3000L // Tilt 안정화: 3초
+        const val POSITION_MOVE_TIMEOUT = 120000L    // Az/El 이동: 2분
+    }
+
     private val realtimeTrackingDataList = mutableListOf<Map<String, Any?>>()
     private var trackingDataIndex = 0
     private val limitAngleCalculator = LimitAngleCalculator()
@@ -491,21 +512,24 @@ class EphemerisService(
                 }°"
             )
 
-            // 변환된 좌표로 이동 명령 전송
-            moveStartAnglePosition(
-                transformedAzimuth.toFloat(),
-                5f,  // 방위각 속도
-                transformedElevation.toFloat(),
-                5f,  // 고도각 속도
-                tiltAngle.toFloat(),  // 틸트 각도 (변환된 값 사용)
-                5f   // 틸트 속도
-            )
+            // ✅ 공통 상태머신 사용을 위한 목표 각도 설정
+            targetAzimuth = transformedAzimuth.toFloat()
+            targetElevation = transformedElevation.toFloat()
+
+            // ✅ 정지궤도 추적 상태 설정
+            trackingStatus.geostationaryStatus = true
+
+            // ✅ 공통 상태머신 진입
+            currentTrackingState = TrackingState.MOVING_TILT_TO_ZERO
+
+            // ✅ 모드 타이머 시작 (공통 상태머신 체크용)
+            startModeTimer()
 
             // 3축 변환 결과 로깅
             logger.info("✅ 3축 변환 완료")
             logger.info("🔄 변환 정보: 기울기=${tiltAngle}°, 회전체=${rotatorAngle}°")
 
-            logger.info("✅ 정지궤도 추적 시작 완료 (3축 변환 적용)")
+            logger.info("✅ 정지궤도 추적 시작 완료 (공통 상태머신 적용)")
 
         } catch (e: Exception) {
             logger.error("❌ 정지궤도 추적 시작 실패: ${e.message}", e)
@@ -1058,28 +1082,48 @@ class EphemerisService(
     }
 
 
-    fun moveStartAnglePosition(
-        cmdAzimuthAngle: Float,
-        cmdAzimuthSpeed: Float,
-        cmdElevationAngle: Float,
-        cmdElevationSpeed: Float,
-        cmdTiltAngle: Float,
-        cmdTiltSpeed: Float
-    ) {
+
+
+    // Tilt만 0으로 이동
+    private fun moveTiltToZero(tiltSpeed: Float) {
         val multiAxis = BitSet()
-        multiAxis.set(0)
-        multiAxis.set(1)
+        multiAxis.set(2)  // Tilt 축만 활성화
+        
         udpFwICDService.multiManualCommand(
-            multiAxis, cmdAzimuthAngle,  // null이면 0.0f 사용
-            cmdAzimuthSpeed, cmdElevationAngle, cmdElevationSpeed, cmdTiltAngle ?: 0.0f, cmdTiltSpeed ?: 0.0f
+            multiAxis, 0f, 0f, 0f, 0f, 0f, tiltSpeed
         )
+        
+        logger.info("🔄 Tilt를 0도로 이동 시작 (속도: ${tiltSpeed}도/초)")
     }
+
+    // 목표 Az/El로 이동
+    private fun moveToTargetAzEl() {
+        val multiAxis = BitSet()
+        multiAxis.set(0)  // Azimuth
+        multiAxis.set(1)  // Elevation
+        udpFwICDService.multiManualCommand(
+            multiAxis, targetAzimuth, 5f, targetElevation, 5f, 0f, 0f
+        )
+        logger.info("🔄 목표 Az/El로 이동: Az=${targetAzimuth}°, El=${targetElevation}°")
+    }
+
+    // Tilt가 0에 도달했는지 확인
+    private fun isTiltAtZero(): Boolean {
+        val currentTilt = dataStoreService.getLatestData().tiltAngle ?: 0.0
+        return kotlin.math.abs(currentTilt.toFloat()) <= 1.0f  // ±1도 이내
+    }
+
+    // Tilt가 안정화되었는지 확인
+    private fun isTiltStabilized(): Boolean {
+        val currentTilt = dataStoreService.getLatestData().tiltAngle ?: 0.0
+        return kotlin.math.abs(currentTilt.toFloat()) <= 0.5f  // ±0.5도 이내
+    }
+
+
 
     fun startEphemerisTracking(passId: UInt) {
         logger.info("🚀 위성 추적 시작: 패스 ID = {}", passId)
-        // 기존 타이머 중지
         stopModeTimer()
-        // ✅ 실행 플래그 초기화 (가장 중요!)
         executedActions.clear()
         logger.info("🔄 실행 플래그 초기화 완료")
         currentTrackingPassId = passId
@@ -1088,7 +1132,10 @@ class EphemerisService(
             logger.error("패스 ID {}에 해당하는 데이터를 찾을 수 없습니다", passId)
             return
         }
-        // ✅ 통합 모드 타이머 시작 (100ms 주기)
+        trackingStatus.ephemerisStatus = true
+        logger.info("✅ ephemeris 추적 상태 활성화 완료")
+        // 상태머신 진입
+        moveToStartPosition(passId)
         startModeTimer()
         logger.info("✅ 위성 추적 및 통합 모드 타이머 시작 완료")
     }
@@ -1097,12 +1144,29 @@ class EphemerisService(
      * 위성 추적 중지 (안전한 배치 종료 포함)
      */
     fun stopEphemerisTracking() {
-        if (trackingStatus.ephemerisStatus != true) {
+        if (trackingStatus.ephemerisStatus != true && trackingStatus.geostationaryStatus != true) {
             logger.info("위성 추적이 이미 중지되어 있습니다.")
             return
         }
         logger.info("위성 추적 중지")
         stopCommand()
+        
+        // ✅ 공통 상태머신 초기화
+        currentTrackingState = TrackingState.IDLE
+        stabilizationStartTime = 0
+        targetAzimuth = 0f
+        targetElevation = 0f
+        
+        // ✅ 정지궤도 추적 상태 초기화
+        if (trackingStatus.geostationaryStatus == true) {
+            trackingStatus.geostationaryStatus = false
+        }
+        
+        // ✅ ephemeris 상태도 초기화
+        if (trackingStatus.ephemerisStatus == true) {
+            trackingStatus.ephemerisStatus = false
+        }
+        
         // ✅ 안전한 배치 종료 처리
         safeBatchShutdown()
         // ✅ 통합 모드 타이머 중지
@@ -1214,54 +1278,72 @@ class EphemerisService(
      */
     private fun trackingSatelliteStateCheck() {
         try {
-            val passId = currentTrackingPassId
-            if (passId == null) {
-                logger.warn("현재 추적 중인 패스 ID가 설정되지 않았습니다.")
+            if (trackingStatus.ephemerisStatus != true) {
                 return
             }
-
-            val (startTime, endTime) = getCurrentTrackingPassTimes()
-            val calTime = GlobalData.Time.calUtcTimeOffsetTime
-            val timeDifference = Duration.between(startTime, calTime).seconds
-
-            // ✅ 디버깅 로그 (필요시 주석 처리)
-            logger.debug("⏰ 상태체크 - 시간차: {}초, 실행완료: {}", timeDifference, executedActions)
-
-            when {
-                // ✅ 시작 전: 한 번만 실행
-                timeDifference <= 0 && !executedActions.contains("BEFORE_START") -> {
-                    executedActions.add("BEFORE_START")
-                    logger.info("📍 시작 전 처리 실행 - 시작 위치로 이동")
-                    handleBeforeStart(passId)
-                }
-
-                // ✅ 진행 중: 한 번만 실행 + 실시간 데이터 저장
-                timeDifference > 0 && calTime.isBefore(endTime) -> {
-                    // 한 번만 실행되는 부분 (기존 로직 유지)
-                    if (!executedActions.contains("IN_PROGRESS")) {
-                        executedActions.add("IN_PROGRESS")
-                        logger.info("📡 추적 진행 중 처리 실행 - 데이터 전송 시작")
-                        handleInProgress(passId)
+            when (currentTrackingState) {
+                TrackingState.MOVING_TILT_TO_ZERO -> {
+                    moveTiltToZero(5f)
+                    if (isTiltAtZero()) {
+                        currentTrackingState = TrackingState.WAITING_FOR_TILT_STABILIZATION
+                        stabilizationStartTime = System.currentTimeMillis()
+                        logger.info("✅ Tilt가 0도에 도달, 안정화 대기 시작")
                     }
-
-                    // ✅ 실시간 추적 데이터 저장 (매번 실행)
-                    saveRealtimeTrackingData(passId, calTime, startTime)
                 }
-
-                // ✅ 완료: 한 번만 실행
-                calTime.isAfter(endTime) && !executedActions.contains("COMPLETED") -> {
-                    executedActions.add("COMPLETED")
-                    //stopEphemerisTracking()
-                    logger.info("✅ 추적 완료 처리 실행")
-                    handleCompleted()
+                TrackingState.WAITING_FOR_TILT_STABILIZATION -> {
+                    if (System.currentTimeMillis() - stabilizationStartTime >= TILT_STABILIZATION_TIMEOUT && isTiltStabilized()) {
+                        moveToTargetAzEl()
+                        currentTrackingState = TrackingState.MOVING_TO_TARGET
+                        logger.info("✅ Tilt 안정화 완료, 목표 Az/El로 이동 시작")
+                    }
                 }
-
-                else -> {
-                    // 조건에 맞지 않거나 이미 실행된 경우
-                    logger.debug("⏸️ 대기 중 또는 이미 처리됨")
+                TrackingState.MOVING_TO_TARGET -> {
+                    // 목표 위치 도달 체크는 생략(즉시 활성화)
+                    currentTrackingState = TrackingState.TRACKING_ACTIVE
+                    logger.info("✅ 목표 위치 이동 완료, 추적 활성화")
                 }
+                TrackingState.TRACKING_ACTIVE -> {
+                    // ✅ 정지궤도와 저궤도 구분 처리
+                    if (trackingStatus.geostationaryStatus == true) {
+                        // 정지궤도: 현재시간 1포인트 추적 (추가 동작 없음)
+                        logger.debug("🔄 정지궤도 추적 활성 상태 유지")
+                    } else {
+                        // 저궤도: 시간 기반 스케줄 추적
+                        val passId = currentTrackingPassId
+                        if (passId == null) {
+                            logger.warn("현재 추적 중인 패스 ID가 설정되지 않았습니다.")
+                            return
+                        }
+                        val (startTime, endTime) = getCurrentTrackingPassTimes()
+                        val calTime = GlobalData.Time.calUtcTimeOffsetTime
+                        val timeDifference = Duration.between(startTime, calTime).seconds
+                        logger.debug("⏰ 상태체크 - 시간차: {}초, 실행완료: {}", timeDifference, executedActions)
+                        when {
+                            timeDifference <= 0 && !executedActions.contains("BEFORE_START") -> {
+                                executedActions.add("BEFORE_START")
+                                logger.info("📍 시작 전 처리 실행 - 시작 위치로 이동(상태머신)")
+                            }
+                            timeDifference > 0 && calTime.isBefore(endTime) -> {
+                                if (!executedActions.contains("IN_PROGRESS")) {
+                                    executedActions.add("IN_PROGRESS")
+                                    logger.info("📡 추적 진행 중 처리 실행 - 데이터 전송 시작")
+                                    handleInProgress(passId)
+                                }
+                                saveRealtimeTrackingData(passId, calTime, startTime)
+                            }
+                            calTime.isAfter(endTime) && !executedActions.contains("COMPLETED") -> {
+                                executedActions.add("COMPLETED")
+                                logger.info("✅ 추적 완료 처리 실행")
+                                handleCompleted()
+                            }
+                            else -> {
+                                logger.debug("⏸️ 대기 중 또는 이미 처리됨")
+                            }
+                        }
+                    }
+                }
+                else -> {}
             }
-
         } catch (e: Exception) {
             logger.error("추적 상태 체크 오류: ${e.message}", e)
         }
@@ -1273,6 +1355,7 @@ class EphemerisService(
     private fun handleBeforeStart(passId: UInt) {
         logger.info("📍 시작 전 상태 - 시작 위치로 이동")
         moveToStartPosition(passId)
+
     }
 
     /**
@@ -1289,6 +1372,17 @@ class EphemerisService(
      */
     private fun handleCompleted() {
         logger.info("✅ 완료 상태 - 추적 종료")
+    }
+
+    /**
+     * 공통 추적 상태 초기화
+     */
+    private fun resetTrackingState() {
+        currentTrackingState = TrackingState.IDLE
+        stabilizationStartTime = 0
+        targetAzimuth = 0f
+        targetElevation = 0f
+        logger.info("🔄 공통 추적 상태 초기화 완료")
     }
 
     /**
@@ -1777,17 +1871,16 @@ class EphemerisService(
     }
 
     /**
-     * 시작 위치로 이동
+     * 시작 위치로 이동 (공통)
      */
     private fun moveToStartPosition(passId: UInt) {
         val passDetails = getEphemerisTrackDtlByMstId(passId)
-
         if (passDetails.isNotEmpty()) {
             val startPoint = passDetails.first()
-            val startAzimuth = (startPoint["Azimuth"] as Double).toFloat()
-            val startElevation = (startPoint["Elevation"] as Double).toFloat()
-            moveStartAnglePosition(startAzimuth, 5f, startElevation, 5f, 0f, 0f)
-            logger.info("📍 시작 위치 이동 완료: Az=${startAzimuth}°, El=${startElevation}°")
+            targetAzimuth = (startPoint["Azimuth"] as Double).toFloat()
+            targetElevation = (startPoint["Elevation"] as Double).toFloat()
+            // 상태머신 진입
+            currentTrackingState = TrackingState.MOVING_TILT_TO_ZERO
         }
     }
 

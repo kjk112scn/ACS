@@ -1144,12 +1144,13 @@ class ICDService {
                 val dataFrame = ByteArray(6)
                 val byteCrc16Target = ByteArray(dataFrame.size - 4)
 
-                // BitSet을 바이트 배열로 변환
-                val byteAxis = feedOnOff.toByteArray()[0]
+                 // BitSet을 바이트 배열로 변환 (안전한 방식)
+                val byteArray = feedOnOff.toByteArray()
+                val byteFeedOnOff = if (byteArray.isNotEmpty()) byteArray[0] else 0x00
 
                 dataFrame[0] = ICD_STX
                 dataFrame[1] = cmdOne.code.toByte()
-                dataFrame[2] = byteAxis
+                dataFrame[2] = byteFeedOnOff
 
                 // CRC 대상 복사
                 dataFrame.copyInto(byteCrc16Target, 0, 1, 1 + byteCrc16Target.size)

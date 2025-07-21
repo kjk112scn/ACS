@@ -207,12 +207,179 @@ class SolarOrekitCalculator(
     }
 
     /**
+     * ✅ 오늘 일출 정보 조회 (Azimuth, Elevation 포함)
+     */
+    fun getTodaySunrise(): SunPosition? {
+        checkInitialized()
+        
+        // 오늘 자정부터 시작
+        val todayMidnight = LocalDateTime.now(ZoneOffset.UTC)
+            .toLocalDate()
+            .atStartOfDay()
+        
+        return findNextSunrise(todayMidnight)
+    }
+
+    /**
+     * ✅ 오늘 일몰 정보 조회 (Azimuth, Elevation 포함)
+     */
+    fun getTodaySunset(): SunPosition? {
+        checkInitialized()
+        
+        // 오늘 자정부터 시작
+        val todayMidnight = LocalDateTime.now(ZoneOffset.UTC)
+            .toLocalDate()
+            .atStartOfDay()
+        
+        return findNextSunset(todayMidnight)
+    }
+
+    /**
+     * ✅ 오늘 일출/일몰 정보 모두 조회
+     */
+    fun getTodaySunriseAndSunset(): Map<String, Any> {
+        checkInitialized()
+        
+        val sunrise = getTodaySunrise()
+        val sunset = getTodaySunset()
+        
+        return mapOf(
+            "sunrise" to (sunrise?.let {
+                mapOf(
+                    "time" to it.dateTime.toString(),
+                    "azimuth_degrees" to String.format("%.6f", it.azimuthDegrees),
+                    "elevation_degrees" to String.format("%.6f", it.elevationDegrees),
+                    "range_km" to String.format("%.3f", it.rangeKm),
+                    "is_visible" to it.isSunVisible()
+                )
+            } ?: "일출 없음"),
+            "sunset" to (sunset?.let {
+                mapOf(
+                    "time" to it.dateTime.toString(),
+                    "azimuth_degrees" to String.format("%.6f", it.azimuthDegrees),
+                    "elevation_degrees" to String.format("%.6f", it.elevationDegrees),
+                    "range_km" to String.format("%.3f", it.rangeKm),
+                    "is_visible" to it.isSunVisible()
+                )
+            } ?: "일몰 없음"),
+            "current_time" to LocalDateTime.now(ZoneOffset.UTC).toString(),
+            "location" to mapOf(
+                "latitude" to "지상국 위도",
+                "longitude" to "지상국 경도"
+            )
+        )
+    }
+
+    /**
+     * ✅ 특정 날짜의 일출/일몰 정보 조회
+     */
+    fun getSunriseAndSunsetForDate(targetDate: LocalDateTime): Map<String, Any> {
+        checkInitialized()
+        
+        val dateMidnight = targetDate.toLocalDate().atStartOfDay()
+        
+        val sunrise = findNextSunrise(dateMidnight)
+        val sunset = findNextSunset(dateMidnight)
+        
+        return mapOf(
+            "date" to targetDate.toLocalDate().toString(),
+            "sunrise" to (sunrise?.let {
+                mapOf(
+                    "time" to it.dateTime.toString(),
+                    "azimuth_degrees" to String.format("%.6f", it.azimuthDegrees),
+                    "elevation_degrees" to String.format("%.6f", it.elevationDegrees),
+                    "range_km" to String.format("%.3f", it.rangeKm)
+                )
+            } ?: "일출 없음"),
+            "sunset" to (sunset?.let {
+                mapOf(
+                    "time" to it.dateTime.toString(),
+                    "azimuth_degrees" to String.format("%.6f", it.azimuthDegrees),
+                    "elevation_degrees" to String.format("%.6f", it.elevationDegrees),
+                    "range_km" to String.format("%.3f", it.rangeKm)
+                )
+            } ?: "일몰 없음")
+        )
+    }
+
+    /**
+     * ✅ 일출/일몰 가운데 Azimuth 각도 계산
+     */
+    fun getMidAzimuthBetweenSunriseAndSunset(): Map<String, Any> {
+        checkInitialized()
+        
+        try {
+            // 오늘 일출/일몰 정보 가져오기
+            val sunrise = getTodaySunrise()
+            val sunset = getTodaySunset()
+            
+            if (sunrise == null || sunset == null) {
+                return mapOf(
+                    "success" to false,
+                    "message" to "오늘 일출 또는 일몰이 없습니다"
+                )
+            }
+            
+            val sunriseAzimuth = sunrise.azimuthDegrees
+            val sunsetAzimuth = sunset.azimuthDegrees
+            
+            // ✅ 360도 경계 처리 (일출이 일몰보다 큰 각도인 경우)
+            val midAzimuth = if (sunriseAzimuth > sunsetAzimuth) {
+                // 일출이 일몰보다 큰 각도인 경우 (예: 일출 270도, 일몰 90도)
+                val adjustedSunsetAzimuth = sunsetAzimuth + 360.0
+                (sunriseAzimuth + adjustedSunsetAzimuth) / 2.0
+            } else {
+                // 일반적인 경우 (예: 일출 90도, 일몰 270도)
+                (sunriseAzimuth + sunsetAzimuth) / 2.0
+            }
+            
+            // ✅ 360도 범위로 정규화
+            val normalizedMidAzimuth = (midAzimuth + 360.0) % 360.0
+            
+            logger.info("일출/일몰 가운데 Azimuth 계산: 일출={}°, 일몰={}°, 가운데={}°", 
+                String.format("%.3f", sunriseAzimuth),
+                String.format("%.3f", sunsetAzimuth),
+                String.format("%.3f", normalizedMidAzimuth))
+            
+            return mapOf(
+                "success" to true,
+                "sunrise" to mapOf(
+                    "azimuth_degrees" to String.format("%.6f", sunriseAzimuth),
+                    "elevation_degrees" to String.format("%.6f", sunrise.elevationDegrees),
+                    "time" to sunrise.dateTime.toString()
+                ),
+                "sunset" to mapOf(
+                    "azimuth_degrees" to String.format("%.6f", sunsetAzimuth),
+                    "elevation_degrees" to String.format("%.6f", sunset.elevationDegrees),
+                    "time" to sunset.dateTime.toString()
+                ),
+                "mid_azimuth" to mapOf(
+                    "degrees" to String.format("%.6f", normalizedMidAzimuth),
+                    "radians" to String.format("%.6f", FastMath.toRadians(normalizedMidAzimuth))
+                ),
+                "calculation_info" to mapOf(
+                    "raw_mid_azimuth" to String.format("%.6f", midAzimuth),
+                    "normalized_mid_azimuth" to String.format("%.6f", normalizedMidAzimuth),
+                    "crosses_360_boundary" to (sunriseAzimuth > sunsetAzimuth)
+                )
+            )
+            
+        } catch (e: Exception) {
+            logger.error("일출/일몰 가운데 Azimuth 계산 실패: {}", e.message, e)
+            return mapOf(
+                "success" to false,
+                "message" to "일출/일몰 가운데 Azimuth 계산 중 오류 발생: ${e.message}"
+            )
+        }
+    }
+
+    /**
      * 현재 시간을 AbsoluteDate로 변환
      */
     private fun getCurrentAbsoluteDate(): AbsoluteDate {
         val currentTimeMillis = System.currentTimeMillis()
         val currentDate = Date(currentTimeMillis)
-        return AbsoluteDate(currentDate, ut1TimeScale)
+        return AbsoluteDate(currentDate, utcTimeScale)
     }
 
     /**
@@ -221,7 +388,7 @@ class SolarOrekitCalculator(
     private fun localDateTimeToAbsoluteDate(dateTime: LocalDateTime): AbsoluteDate {
         val epochSecond = dateTime.toEpochSecond(ZoneOffset.UTC)
         val date = Date(epochSecond * 1000)
-        return AbsoluteDate(date, ut1TimeScale)
+        return AbsoluteDate(date, utcTimeScale)
     }
 
     /**

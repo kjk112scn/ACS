@@ -13,7 +13,8 @@ object PushData {
         var ephemerisStatus: Boolean? = null,
         var passScheduleStatus: Boolean? = null,
         var sunTrackStatus: Boolean? = null,
-        var manualControlStatus: Boolean? = null
+        var manualControlStatus: Boolean? = null,
+        var geostationaryStatus: Boolean? = null
     )
     data class ReadData(
         val modeStatusBits: String? = null,
