@@ -332,6 +332,38 @@ class EphemerisTrackService {
     }
   }
 
+  async calculateGeostationaryAngles(request: GeostationaryTrackingRequest): Promise<{
+    message: string
+    satelliteId: string
+    azimuth: number
+    elevation: number
+    originalAzimuth: number
+    originalElevation: number
+    tiltAngle: number
+    rotatorAngle: number
+    trackingType: string
+  }> {
+    try {
+      const response = await api.post(
+        '/ephemeris/3axis/tracking/geostationary/calculate-angles',
+        request,
+      )
+      return response.data
+    } catch (error) {
+      return this.handleApiError(error, '정지궤도 각도 계산에 실패했습니다') as Promise<{
+        message: string
+        satelliteId: string
+        azimuth: number
+        elevation: number
+        originalAzimuth: number
+        originalElevation: number
+        tiltAngle: number
+        rotatorAngle: number
+        trackingType: string
+      }>
+    }
+  }
+
   /**
    * 3축 변환 계산 API
    */

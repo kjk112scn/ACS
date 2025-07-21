@@ -105,8 +105,30 @@
               <div class="text-subtitle1 text-weight-bold text-primary">Tracking Information</div>
               <div class="ephemeris-form">
                 <div class="form-row">
-                  <!-- 추가 정보 표시 영역 -->
-                  <div v-if="selectedScheduleInfo.satelliteName" class="schedule-info q-mt-md">
+                  <!-- ✅ 정지궤도 정보 표시 -->
+                  <div v-if="selectedScheduleInfo.isGeostationary" class="schedule-info q-mt-md">
+                    <div class="text-subtitle2 text-weight-bold text-primary q-mb-sm">
+                      정지궤도 위성 정보
+                    </div>
+
+                    <div class="info-row">
+                      <span class="info-label">위성 이름/ID:</span>
+                      <span class="info-value">{{ selectedScheduleInfo.satelliteName }}</span>
+                    </div>
+
+                    <div class="info-row">
+                      <span class="info-label">방위각:</span>
+                      <span class="info-value">{{ selectedScheduleInfo.startAzimuth.toFixed(2) }}°</span>
+                    </div>
+
+                    <div class="info-row">
+                      <span class="info-label">고도:</span>
+                      <span class="info-value">{{ selectedScheduleInfo.startElevation.toFixed(2) }}°</span>
+                    </div>
+                  </div>
+
+                  <!-- ✅ 기존 스케줄 정보 표시 (정지궤도가 아닌 경우) -->
+                  <div v-else-if="selectedScheduleInfo.satelliteName" class="schedule-info q-mt-md">
                     <div class="text-subtitle2 text-weight-bold text-primary q-mb-sm">
                       선택된 스케줄 정보
                     </div>
@@ -125,14 +147,14 @@
                       <span class="info-label">시작 시간:</span>
                       <span class="info-value">{{
                         formatToLocalTime(selectedScheduleInfo.startTime)
-                        }}</span>
+                      }}</span>
                     </div>
 
                     <div class="info-row">
                       <span class="info-label">종료 시간:</span>
                       <span class="info-value">{{
                         formatToLocalTime(selectedScheduleInfo.endTime)
-                        }}</span>
+                      }}</span>
                     </div>
 
                     <div class="info-row">
@@ -142,19 +164,19 @@
 
                     <div class="info-row">
                       <span class="info-label">시작 방위각/고도:</span>
-                      <span class="info-value">{{ selectedScheduleInfo.startAzimuth }}° /
-                        {{ selectedScheduleInfo.startElevation }}°</span>
+                      <span class="info-value">{{ selectedScheduleInfo.startAzimuth.toFixed(2) }}° /
+                        {{ selectedScheduleInfo.startElevation.toFixed(2) }}°</span>
                     </div>
 
                     <div class="info-row">
                       <span class="info-label">종료 방위각/고도:</span>
-                      <span class="info-value">{{ selectedScheduleInfo.endAzimuth }}° /
-                        {{ selectedScheduleInfo.endElevation }}°</span>
+                      <span class="info-value">{{ selectedScheduleInfo.endAzimuth.toFixed(2) }}° /
+                        {{ selectedScheduleInfo.endElevation.toFixed(2) }}°</span>
                     </div>
 
                     <div class="info-row">
                       <span class="info-label">최대 고도:</span>
-                      <span class="info-value">{{ selectedScheduleInfo.maxElevation }}°</span>
+                      <span class="info-value">{{ selectedScheduleInfo.maxElevation.toFixed(2) }}°</span>
                     </div>
 
                     <div class="info-row">
@@ -414,6 +436,40 @@ const $q = useQuasar()
 
 // ✅ 스토어에서 선택된 스케줄 정보 가져오기 - 탭 이동 시에도 유지
 const selectedScheduleInfo = computed(() => {
+  // ✅ 정지궤도 각도가 설정되어 있으면 정지궤도 정보 표시
+  if (ephemerisStore.geostationaryAngles.isSet) {
+    // TLE 라인에서 위성 ID 추출
+    const tleLine1 = ephemerisStore.geostationaryAngles.tleLine1 || ''
+    const satelliteId = tleLine1.length >= 7 ? tleLine1.substring(2, 7).trim() : 'N/A'
+
+    // 위성 이름과 ID 구분
+    const satelliteName = ephemerisStore.geostationaryAngles.satelliteName || ''
+
+    // 표시용 이름 생성: 3줄 TLE면 "이름/ID", 2줄 TLE면 "ID"만
+    const displayName = satelliteName && satelliteName !== satelliteId
+      ? `${satelliteName}/${satelliteId}`
+      : satelliteId
+
+    return {
+      passId: 0,
+      satelliteName: displayName,
+      satelliteId: satelliteId,
+      originalSatelliteName: satelliteName, // 원본 이름 보존
+      startTime: '',
+      endTime: '',
+      duration: '',
+      maxElevation: ephemerisStore.geostationaryAngles.elevation,
+      startTimeMs: 0,
+      timeRemaining: 0,
+      startAzimuth: ephemerisStore.geostationaryAngles.azimuth,
+      endAzimuth: ephemerisStore.geostationaryAngles.azimuth,
+      startElevation: ephemerisStore.geostationaryAngles.elevation,
+      endElevation: ephemerisStore.geostationaryAngles.elevation,
+      isGeostationary: true, // ✅ 정지궤도 구분 플래그
+    }
+  }
+
+  // 기존 스케줄 정보 로직
   const selected = ephemerisStore.selectedSchedule
   if (selected) {
     return {
@@ -430,6 +486,7 @@ const selectedScheduleInfo = computed(() => {
       endAzimuth: typeof selected.EndAzimuth === 'number' ? selected.EndAzimuth : 0,
       startElevation: typeof selected.StartElevation === 'number' ? selected.StartElevation : 0,
       endElevation: typeof selected.EndElevation === 'number' ? selected.EndElevation : 0,
+      isGeostationary: false,
     }
   }
 
@@ -447,6 +504,7 @@ const selectedScheduleInfo = computed(() => {
     endAzimuth: 0,
     startElevation: 0,
     endElevation: 0,
+    isGeostationary: false,
   }
 })
 // ✅ 개선된 RealtimeTrackingDataItem 타입을 사용하는 CSV 다운로드 함수
@@ -1156,6 +1214,9 @@ const selectSchedule = async () => {
     const selectedItem = selectedSchedule.value[0]
     if (!selectedItem) return
 
+    // ✅ 정지궤도 상태 초기화 (스케줄 선택 시)
+    ephemerisStore.resetGeostationaryAngles()
+
     // 스토어에 선택된 스케줄 저장 (탭 이동 시에도 유지됨)
     await ephemerisStore.selectSchedule(selectedItem)
 
@@ -1365,7 +1426,7 @@ const addTLEData = async () => {
     const isGEO = isGeostationaryOrbit(tempTLEData.value.tleText)
 
     if (isGEO) {
-      console.log('정지궤도 TLE 감지됨 - 정지궤도 추적 시작')
+      console.log('정지궤도 TLE 감지됨 - 정지궤도 각도 계산')
 
       // TLE 파싱
       const lines = tempTLEData.value.tleText.trim().split('\n').filter(line => line.trim() !== '')
@@ -1379,11 +1440,37 @@ const addTLEData = async () => {
         throw new Error('유효하지 않은 TLE 데이터입니다')
       }
 
-      // 정지궤도 추적 시작
-      await ephemerisStore.startGeostationaryTracking(tleLine1, tleLine2)
+      // ✅ 위성 이름과 ID 추출
+      let satelliteName = ''
+      const satelliteId = tleLine1.substring(2, 7).trim() // TLE Line 1에서 위성 ID 추출
+
+      if (lines.length >= 3 && lines[0]) {
+        // 3줄 형식: 첫 번째 줄이 위성 이름
+        satelliteName = lines[0].trim()
+      } else {
+        // 2줄 형식: 위성 이름은 ID와 동일하게 설정 (구분을 위해)
+        satelliteName = satelliteId
+      }
+
+      // 정지궤도 각도 계산 (추적 시작하지 않음)
+      await ephemerisStore.calculateGeostationaryAngles(tleLine1, tleLine2, satelliteName)
+
+      // ✅ TLE 표시 데이터 업데이트
+      ephemerisStore.updateTLEDisplayData({
+        displayText: tempTLEData.value.tleText,
+        tleLine1: tleLine1,
+        tleLine2: tleLine2,
+        satelliteName: satelliteName,
+      })
+
+      // ✅ 정지궤도 TLE 입력 시 스케줄 데이터 완전 초기화
+      ephemerisStore.clearScheduleData()
     }
     else {
       await ephemerisStore.processTLEData(tempTLEData.value.tleText)
+
+      // ✅ 저궤도 TLE 입력 시 항상 스케줄 데이터 로드 (강제 새로고침)
+      await loadScheduleData()
     }
 
     $q.notify({
@@ -1404,8 +1491,8 @@ const addTLEData = async () => {
 const openScheduleModal = async () => {
   showScheduleModal.value = true
 
-  // 데이터가 없으면 로드
-  if (ephemerisStore.masterData.length === 0) {
+  // ✅ 정지궤도 상태가 아닐 때만 스케줄 데이터 로드
+  if (!ephemerisStore.geostationaryAngles.isSet) {
     await loadScheduleData()
   }
 }
@@ -1413,13 +1500,35 @@ const openScheduleModal = async () => {
 // 명령 실행 함수들
 const handleEphemerisCommand = async () => {
   try {
-    if (!selectedScheduleInfo.value.passId) {
+    // ✅ 정지궤도 각도가 설정되어 있으면 정지궤도 추적 시작
+    if (ephemerisStore.geostationaryAngles.isSet) {
+      // 정지궤도 추적 활성화
+      ephemerisStore.activateGeostationaryTracking()
+
+      // 백엔드에 추적 시작 명령 전송
+      if (ephemerisStore.geostationaryAngles.tleLine1 && ephemerisStore.geostationaryAngles.tleLine2) {
+        await ephemerisStore.startGeostationaryTracking(
+          ephemerisStore.geostationaryAngles.tleLine1,
+          ephemerisStore.geostationaryAngles.tleLine2
+        )
+      }
+
       $q.notify({
-        type: 'warning',
-        message: '먼저 스케줄을 선택하세요',
+        type: 'positive',
+        message: `정지궤도 위성(${ephemerisStore.geostationaryAngles.satelliteName}) 추적이 활성화되었습니다`,
       })
       return
     }
+
+    // 기존 스케줄 추적 로직
+    if (!selectedScheduleInfo.value.passId) {
+      $q.notify({
+        type: 'warning',
+        message: '먼저 스케줄을 선택하거나 TLE를 입력하세요',
+      })
+      return
+    }
+
     // ✅ 추적 시작 전 경로 초기화
     ephemerisStore.clearTrackingPath()
     await ephemerisStore.startTracking()
@@ -1429,10 +1538,10 @@ const handleEphemerisCommand = async () => {
       message: 'Ephemeris 추적이 시작되었습니다',
     })
   } catch (error) {
-    console.error('Failed to start ephemeris tracking:', error)
+    console.error('Failed to start tracking:', error)
     $q.notify({
       type: 'negative',
-      message: 'Ephemeris 추적 시작에 실패했습니다',
+      message: '추적 시작에 실패했습니다',
     })
   }
 }
@@ -1760,6 +1869,39 @@ onUnmounted(() => {
 .schedule-table {
   background-color: var(--q-dark);
   color: white;
+}
+
+/* ✅ 스케줄 정보 표시 스타일 */
+.schedule-info {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-weight: 500;
+  color: #90caf9;
+  min-width: 120px;
+}
+
+.info-value {
+  font-weight: 400;
+  color: #ffffff;
+  text-align: right;
+  flex: 1;
 }
 </style>
 

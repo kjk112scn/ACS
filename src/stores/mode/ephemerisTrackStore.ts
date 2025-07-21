@@ -86,6 +86,16 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
     timeResult: '0.00', // ✅ timeResult 추가
   })
 
+  // ✅ 정지궤도 각도 정보 저장
+  const geostationaryAngles = ref({
+    azimuth: 0,
+    elevation: 0,
+    satelliteName: '',
+    tleLine1: '', // ✅ TLE 라인 저장 추가
+    tleLine2: '', // ✅ TLE 라인 저장 추가
+    isSet: false,
+  })
+
   // ✅ Worker 관련 상태
   let trackingWorker: Worker | null = null
   let workerInitialized = false
@@ -670,7 +680,39 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
   }
 
   /**
-   * 정지궤도 위성 추적 시작
+   * 정지궤도 각도 계산 (TLE 입력 시)
+   */
+  const calculateGeostationaryAngles = async (
+    tleLine1: string,
+    tleLine2: string,
+    satelliteName?: string,
+  ) => {
+    try {
+      const request = { tleLine1, tleLine2 }
+      const response = await ephemerisTrackService.calculateGeostationaryAngles(request)
+
+      // ✅ 정지궤도 각도 정보 설정 (백엔드에서 계산된 값 사용)
+      geostationaryAngles.value = {
+        azimuth: response.azimuth,
+        elevation: response.elevation,
+        satelliteName: satelliteName || response.satelliteId,
+        tleLine1: tleLine1,
+        tleLine2: tleLine2,
+        isSet: true,
+      }
+
+      // 성공 시 알림
+      console.log('정지궤도 각도 계산 완료:', response)
+
+      return response
+    } catch (err) {
+      error.value = '정지궤도 각도 계산에 실패했습니다'
+      throw err
+    }
+  }
+
+  /**
+   * 정지궤도 위성 추적 시작 (GO 버튼 클릭 시)
    */
   const startGeostationaryTracking = async (tleLine1: string, tleLine2: string) => {
     try {
@@ -684,6 +726,41 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
     } catch (err) {
       error.value = '정지궤도 위성 추적 시작에 실패했습니다'
       throw err
+    }
+  }
+
+  /**
+   * 정지궤도 추적 활성화 (GO 버튼 클릭 시)
+   */
+  const activateGeostationaryTracking = () => {
+    try {
+      if (!geostationaryAngles.value.isSet) {
+        throw new Error('정지궤도 각도 정보가 설정되지 않았습니다')
+      }
+
+      // 추적 상태를 활성화
+      trackingStatus.value = 'active'
+      currentTrackingPassId.value = 0 // 정지궤도는 passId가 없음
+
+      console.log('정지궤도 추적 활성화됨')
+      return { success: true }
+    } catch (err) {
+      error.value = '정지궤도 추적 활성화에 실패했습니다'
+      throw err
+    }
+  }
+
+  /**
+   * 정지궤도 각도만 초기화하는 메서드
+   */
+  const resetGeostationaryAngles = () => {
+    geostationaryAngles.value = {
+      azimuth: 0,
+      elevation: 0,
+      satelliteName: '',
+      tleLine1: '',
+      tleLine2: '',
+      isSet: false,
     }
   }
 
@@ -716,6 +793,16 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
       timeResult: '0.00',
     }
 
+    // ✅ 정지궤도 각도 정보 초기화
+    geostationaryAngles.value = {
+      azimuth: 0,
+      elevation: 0,
+      satelliteName: '',
+      tleLine1: '',
+      tleLine2: '',
+      isSet: false,
+    }
+
     // ✅ Worker도 정리
 
     cleanupWorker()
@@ -737,6 +824,16 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
     error.value = null
   }
 
+  /**
+   * 스케줄 데이터만 초기화
+   */
+  const clearScheduleData = () => {
+    masterData.value = []
+    detailData.value = []
+    selectedSchedule.value = null
+    currentTrackingPassId.value = null
+  }
+
   return {
     // 상태 (readonly로 외부 수정 방지)
     masterData: readonly(masterData),
@@ -753,6 +850,7 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
     trackingPath: readonly(trackingPath),
     offsetValues: readonly(offsetValues),
     workerStats: readonly(workerStats),
+    geostationaryAngles: readonly(geostationaryAngles),
 
     // 계산된 속성
     hasValidData,
@@ -770,6 +868,7 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
     reset,
     clearSelection,
     clearError,
+    clearScheduleData,
 
     // ✅ Worker-related 액션들
     updateTrackingPath,
@@ -778,7 +877,10 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
     cleanupWorker,
     updateOffsetValues,
     updateTLEDisplayData,
+    calculateGeostationaryAngles,
     startGeostationaryTracking,
+    activateGeostationaryTracking,
+    resetGeostationaryAngles,
   }
 })
 
