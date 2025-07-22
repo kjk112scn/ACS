@@ -14,6 +14,7 @@ object PushData {
         var ephemerisTrackingState: String? = null,     // 신규 (상세 추적 상태)
         var passScheduleStatus: Boolean? = null,
         var sunTrackStatus: Boolean? = null,
+        var sunTrackTrackingState: String? = null,      // 신규 (상세 태양 추적 상태)
         var manualControlStatus: Boolean? = null,
         var geostationaryStatus: Boolean? = null
     )
@@ -28,6 +29,14 @@ object PushData {
         TRACKING,               // 실제 추적 중
         COMPLETED,              // 추적 완료
         ERROR                   // 오류
+    }
+
+    // 태양 추적 상태 enum 추가
+    enum class SunTrackTrackingState {
+        IDLE,                    // 대기 (태양 추적 정지 상태)
+        TILT_MOVING_TO_ZERO,    // Tilt 시작 위치로 이동
+        TILT_STABILIZING,       // Tilt 안정화 대기
+        TRACKING               // 실제 추적 중
     }
     data class ReadData(
         val modeStatusBits: String? = null,

@@ -28,10 +28,16 @@ class PushDataService(
             val currentData = dataStoreService.getLatestData()
             val isUdpConnected = dataStoreService.isUdpConnected()
 
+            // ✅ Sun Track 상태 로깅 추가
+            val trackingStatus = PushData.TRACKING_STATUS
+            if (trackingStatus.sunTrackTrackingState != null) {
+                logger.debug("☀️ WebSocket 전송 - Sun Track 추적 상태: {}", trackingStatus.sunTrackTrackingState)
+            }
+
             // 필수 데이터만 포함하여 처리 시간 최소화
             val dataWithInfo = mapOf(
                 "data" to currentData,
-                "trackingStatus" to PushData.TRACKING_STATUS,
+                "trackingStatus" to trackingStatus,
                 "serverTime" to GlobalData.Time.serverTime,
                 "resultTimeOffsetCalTime" to GlobalData.Time.resultTimeOffsetCalTime,
                 "cmdAzimuthAngle" to PushData.CMD.cmdAzimuthAngle,
