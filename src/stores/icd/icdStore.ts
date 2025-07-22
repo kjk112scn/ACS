@@ -209,6 +209,7 @@ export const useICDStore = defineStore('icd', () => {
   const ephemerisTrackingState = ref<string | null>(null) // ✅ 추가
   const passScheduleStatus = ref<boolean | null>(null)
   const sunTrackStatus = ref<boolean | null>(null)
+  const sunTrackTrackingState = ref<string | null>(null) // ✅ 추가
   const communicationStatus = ref('')
   const currentTrackingMstId = ref<number | null>(null)
   const nextTrackingMstId = ref<number | null>(null)
@@ -1304,6 +1305,20 @@ export const useICDStore = defineStore('icd', () => {
           sunTrackStatus.value = newStatus
         }
       }
+
+      // ✅ 새로 추가: Sun Track 추적 상태 업데이트
+      if (trackingStatusData.sunTrackTrackingState !== undefined) {
+        const newState = trackingStatusData.sunTrackTrackingState as string | null
+        if (sunTrackTrackingState.value !== newState) {
+          console.log('☀️ Sun Track 추적 상태 변경 감지:', {
+            이전상태: sunTrackTrackingState.value,
+            새상태: newState,
+            전체데이터: trackingStatusData,
+          })
+          sunTrackTrackingState.value = newState
+          console.log('☀️ Sun Track 추적 상태 업데이트 완료:', newState)
+        }
+      }
     } catch (e) {
       console.error('❌ 추적 상태 업데이트 오류:', e)
     }
@@ -1848,6 +1863,34 @@ export const useICDStore = defineStore('icd', () => {
         return { displayLabel: '알 수 없음', displayColor: 'grey' }
     }
   })
+
+  // ✅ Sun Track 추적 상태 정보 computed 속성 추가
+  const sunTrackTrackingStateInfo = computed(() => {
+    const state = sunTrackTrackingState.value
+
+    // ✅ 디버깅 로그 추가
+    console.log('☀️ sunTrackTrackingStateInfo computed 실행:', {
+      현재상태: state,
+      타입: typeof state,
+      null여부: state === null,
+      undefined여부: state === undefined,
+    })
+
+    switch (state) {
+      case 'IDLE':
+        return { displayLabel: '대기', displayColor: 'grey' }
+      case 'TILT_MOVING_TO_ZERO':
+        return { displayLabel: 'Tilt 이동', displayColor: 'deep-orange' }
+      case 'TILT_STABILIZING':
+        return { displayLabel: 'Tilt 안정화', displayColor: 'amber-7' }
+      case 'TRACKING':
+        return { displayLabel: '추적 중', displayColor: 'green' }
+      default:
+        console.log('☀️ 알 수 없는 상태 감지:', state)
+        return { displayLabel: '알 수 없음', displayColor: 'grey' }
+    }
+  })
+
   // Standby 명령 전송
   const standbyCommand = async (azimuth: boolean, elevation: boolean, tilt: boolean) => {
     try {
@@ -2063,20 +2106,26 @@ export const useICDStore = defineStore('icd', () => {
 
   // 공개할 상태와 메서드 반환
   return {
-    // 상태
+    // 기본 상태
     serverTime,
     resultTimeOffsetCalTime,
-    modeStatusBits,
-    azimuthAngle,
-    azimuthSpeed,
-    elevationAngle,
-    elevationSpeed,
-    tiltAngle,
-    tiltSpeed,
     cmdAzimuthAngle,
     cmdElevationAngle,
     cmdTiltAngle,
     cmdTime,
+    error,
+    isConnected,
+    messageDelay,
+    lastUpdateTime,
+
+    // 안테나 데이터
+    modeStatusBits,
+    azimuthAngle,
+    elevationAngle,
+    tiltAngle,
+    azimuthSpeed,
+    elevationSpeed,
+    tiltSpeed,
     servoDriverAzimuthAngle,
     servoDriverElevationAngle,
     servoDriverTiltAngle,
@@ -2087,6 +2136,8 @@ export const useICDStore = defineStore('icd', () => {
     windDirection,
     rtdOne,
     rtdTwo,
+
+    // 보드 상태 비트
     mainBoardProtocolStatusBits,
     mainBoardStatusBits,
     mainBoardMCOnOffBits,
@@ -2099,6 +2150,8 @@ export const useICDStore = defineStore('icd', () => {
     tiltBoardStatusBits,
     feedSBoardStatusBits,
     feedXBoardStatusBits,
+
+    // LNA 및 RSSI 데이터
     currentSBandLNALHCP,
     currentSBandLNARHCP,
     currentXBandLNALHCP,
@@ -2107,12 +2160,16 @@ export const useICDStore = defineStore('icd', () => {
     rssiSBandLNARHCP,
     rssiXBandLNALHCP,
     rssiXBandLNARHCP,
+
+    // 가속도 데이터
     azimuthAcceleration,
     elevationAcceleration,
     tiltAcceleration,
     azimuthMaxAcceleration,
     elevationMaxAcceleration,
     tiltMaxAcceleration,
+
+    // 추적 데이터
     trackingAzimuthTime,
     trackingCMDAzimuthAngle,
     trackingActualAzimuthAngle,
@@ -2123,23 +2180,20 @@ export const useICDStore = defineStore('icd', () => {
     trackingCMDTiltAngle,
     trackingActualTiltAngle,
 
-    error,
-    isConnected,
-
+    // 업데이트 관련
     isUpdating,
     updateCount,
-    messageDelay,
     messageDelayStats,
     updateInterval,
     updateIntervalStats,
 
-    //계산된 속성
+    // 계산된 속성
     hasActiveConnection,
     lastUpdateTimeFormatted,
     connectionStatus,
     trackingScheduleInfo,
 
-    //비트처리
+    // 비트 처리 정보
     mainBoardStatusInfo,
     protocolStatusInfo,
     mainBoardMCOnOffInfo,
@@ -2151,19 +2205,26 @@ export const useICDStore = defineStore('icd', () => {
     tiltBoardStatusInfo,
     feedSBoardStatusInfo,
     feedXBoardStatusInfo,
-    //모드 상태 정보
+
+    // 모드 상태 정보
+    ephemerisStatus,
     ephemerisStatusInfo,
     ephemerisTrackingState,
     ephemerisTrackingStateInfo,
+    passScheduleStatus,
     passScheduleStatusInfo,
+    sunTrackStatus,
     sunTrackStatusInfo,
-    //펌웨어 UDP 상태
+    sunTrackTrackingState,
+    sunTrackTrackingStateInfo,
+
+    // 펌웨어 UDP 상태
     communicationStatus,
     adaptiveInterval,
     driftCorrection,
     timerStats,
 
-    // 🔧 readonly로 감싸서 외부 수정 방지
+    // 추적 스케줄 정보
     currentTrackingMstId: readonly(currentTrackingMstId),
     nextTrackingMstId: readonly(nextTrackingMstId),
     udpConnected: readonly(udpConnected),
@@ -2187,7 +2248,6 @@ export const useICDStore = defineStore('icd', () => {
     startSunTrack,
     sendPositionOffsetCommand,
     sendTimeOffsetCommand,
-
     resetMessageDelayStats,
     resetUpdateIntervalStats,
   }

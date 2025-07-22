@@ -1,6 +1,15 @@
 <template>
   <div class="sun-track-mode">
-    <div class="section-title text-h5 text-primary q-mb-sm">Sun Track Control</div>
+    <div class="section-title-container q-mb-sm">
+      <div class="section-title text-h5 text-primary">Sun Track Control</div>
+      <q-chip
+        :color="icdStore.sunTrackTrackingStateInfo.displayColor"
+        text-color="white"
+        :label="icdStore.sunTrackTrackingStateInfo.displayLabel"
+        size="sm"
+        class="tracking-status-chip q-ml-md"
+      />
+    </div>
 
     <!-- 입력-출력 박스 -->
     <q-card class="input-output-section q-mb-md">
@@ -643,6 +652,17 @@ input[type='number'] {
 /* 제어 버튼 섹션 스타일 */
 .control-buttons-section .q-btn {
   min-width: 120px;
+}
+
+/* 제목과 상태 표시 컨테이너 */
+.section-title-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.tracking-status-chip {
+  font-weight: 500;
 }
 
 /* 모바일 화면에서는 레이아웃 조정 */

@@ -1,8 +1,10 @@
 import { api } from 'boot/axios'
 export interface TrackingStatus {
   ephemerisStatus?: boolean | null
+  ephemerisTrackingState?: string | null
   passScheduleStatus?: boolean | null
   sunTrackStatus?: boolean | null
+  sunTrackTrackingState?: string | null
 }
 
 export interface MessageData {
