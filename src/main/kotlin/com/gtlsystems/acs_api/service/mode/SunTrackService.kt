@@ -19,6 +19,7 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.time.ZonedDateTime
+import kotlin.math.abs
 
 @Service
 class SunTrackService(
@@ -46,6 +47,11 @@ class SunTrackService(
     private var isInitialTiltMovementCompleted = false
     private var midTime: LocalDateTime? = null  // ✅ 일출/일몰 가운데 시간 저장
     private var rotatorAngle: Double? = null    // ✅ Rotator 각도 저장
+
+    // ✅ 일출/일몰 방향 정보 추가
+    private var sunriseAzimuth: Double? = null
+    private var sunsetAzimuth: Double? = null
+    private var isSouthPath: Boolean? = null // true면 동→남→서, false면 동→북→서
 
     // ✅ 추적 상태 참조 추가
     private val trackingStatus = PushData.TRACKING_STATUS
@@ -232,16 +238,23 @@ class SunTrackService(
 
                     // 360도 범위로 정규화
                     val normalizedMidAzimuth = (midAzimuth + 360.0) % 360.0
+                    
+                    // ✅ 일출/일몰 방향 정보 설정
+                    this.sunriseAzimuth = sunriseAzimuth
+                    this.sunsetAzimuth = sunsetAzimuth
+                    this.isSouthPath = sunriseAzimuth < sunsetAzimuth // true면 동→남→서, false면 동→북→서
+                    
                     targetTiltAngle = normalizedMidAzimuth
                     CMD.cmdTiltAngle = normalizedMidAzimuth.toFloat()
 
                     // Rotator 각도도 동일하게 설정
                     rotatorAngle = normalizedMidAzimuth
                   
-                    logger.info("일출/일몰 가운데 Azimuth 각도 계산 완료: 일출={}°, 일몰={}°, 가운데={}°", 
+                    logger.info("일출/일몰 가운데 Azimuth 각도 계산 완료: 일출={}°, 일몰={}°, 가운데={}°, 경로={}", 
                         String.format("%.3f", sunriseAzimuth),
                         String.format("%.3f", sunsetAzimuth),
-                        String.format("%.3f", normalizedMidAzimuth))
+                        String.format("%.3f", normalizedMidAzimuth),
+                        if (isSouthPath!!) "동→남→서" else "동→북→서")
 
                     // ✅ Tilt 이동 명령 전송
                     sendTiltMovementCommand(rotatorAngle!!)
@@ -394,9 +407,12 @@ class SunTrackService(
                 )
                 val transformDuration = System.currentTimeMillis() - transformStart
                 
-                // 4단계: 명령 전송 시간 측정
+                // ✅ 4단계: 일출/일몰 방향에 따른 Azimuth 계산
+                val pathAdjustedAzimuth = calculateAzimuthBySunPath(transformedAz)
+                
+                // 5단계: 명령 전송 시간 측정
                 val commandStart = System.currentTimeMillis()
-                sendAzimuthAndElevationAxisCommand(transformedAz.toFloat(), 5.0f, transformedEl.toFloat(), 5.0f, targetTiltAngle!!.toFloat())
+                sendAzimuthAndElevationAxisCommand(pathAdjustedAzimuth.toFloat(), 5.0f, transformedEl.toFloat(), 5.0f, targetTiltAngle!!.toFloat())
                 val commandDuration = System.currentTimeMillis() - commandStart
                 
                 // ✅ 데이터 스토어 업데이트
@@ -434,14 +450,19 @@ class SunTrackService(
                     String.format("%.3f", transformedAz),
                     String.format("%.3f", transformedEl),
                     String.format("%.3f", -6.98),
-                    String.format("%.3f", rotatorAngle))                
+                    String.format("%.3f", rotatorAngle))
+                logger.info("[CalTime] 경로 조정: Az={}° → {}° (경로={})", 
+                    String.format("%.3f", transformedAz),
+                    String.format("%.3f", pathAdjustedAzimuth),
+                    if (isSouthPath != null) (if (isSouthPath!!) "동→남→서" else "동→북→서") else "미설정")                
                 
-                logger.debug("[CalTime] 실시간 태양 추적: CalTime={}, 원본 Az={}°, El={}° → 3축변환 Az={}°, El={}°, Tilt={}°, Train={}°, 처리시간={}ms, 주기지연={}ms", 
+                logger.debug("[CalTime] 실시간 태양 추적: CalTime={}, 원본 Az={}°, El={}° → 3축변환 Az={}°, El={}° → 경로조정 Az={}°, Tilt={}°, Train={}°, 처리시간={}ms, 주기지연={}ms", 
                     calTime.toString(),
                     String.format("%.6f", sunPosition.azimuthDegrees),
                     String.format("%.6f", sunPosition.elevationDegrees),
                     String.format("%.6f", transformedAz),
                     String.format("%.6f", transformedEl),
+                    String.format("%.6f", pathAdjustedAzimuth),
                     String.format("%.3f", -6.98), // 실제 Tilt 기울기
                     String.format("%.3f", rotatorAngle), // Train 축 회전 각도
                     totalProcessingTime,
@@ -643,6 +664,27 @@ class SunTrackService(
     }
 
     /**
+     * ✅ 일출/일몰 방향 기반 Azimuth 정보 조회
+     */
+    fun getAzimuthLimitInfo(): Map<String, Any?> {
+        val currentAzimuth = dataStoreService.getLatestData().azimuthAngle
+        val currentTiltAngle = dataStoreService.getLatestData().tiltAngle
+        
+        return mapOf(
+            "currentAzimuth" to currentAzimuth,
+            "currentTiltAngle" to currentTiltAngle,
+            "rotatorAngle" to rotatorAngle,
+            "sunriseAzimuth" to sunriseAzimuth,
+            "sunsetAzimuth" to sunsetAzimuth,
+            "isSouthPath" to isSouthPath,
+            "sunPathType" to if (isSouthPath != null) (if (isSouthPath!!) "동→남→서" else "동→북→서") else "미설정",
+            "azimuthCalculationType" to "일출/일몰 방향 기반 (동→남→서: 270도 넘으면 음수, 동→북→서: 양수)",
+            "sunTrackState" to sunTrackState.name,
+            "targetTiltAngle" to targetTiltAngle
+        )
+    }
+
+    /**
      * ✅ Tilt 각도 도착 확인
      */
     private fun isTiltAngleReached(): Boolean {
@@ -748,6 +790,70 @@ class SunTrackService(
                 "message" to (e.message ?: "알 수 없는 오류")
             )
         }
+    }
+
+    /**
+     * ✅ Azimuth 최단 경로 계산 (동→서 이동 시 음수 각도 적용)
+     * 현재 각도에서 목표 각도까지의 최단 경로를 계산하여 동에서 서로 이동할 때 음수 각도 사용
+     */
+    private fun calculateShortestAzimuthPath(currentAzimuth: Double, targetAzimuth: Double): Double {
+        // 각도 차이 계산
+        var angleDifference = targetAzimuth - currentAzimuth
+        
+        // ±180도 범위로 정규화 (최단 경로)
+        while (angleDifference > 180.0) angleDifference -= 360.0
+        while (angleDifference < -180.0) angleDifference += 360.0
+        
+        // 최종 목표 각도 계산
+        val finalTarget = currentAzimuth + angleDifference
+        
+        logger.debug("Azimuth 최단 경로 계산: 현재={}°, 목표={}°, 차이={}°, 최종={}°", 
+            String.format("%.3f", currentAzimuth),
+            String.format("%.3f", targetAzimuth),
+            String.format("%.3f", angleDifference),
+            String.format("%.3f", finalTarget))
+        
+        return finalTarget
+    }
+
+    /**
+     * ✅ 일출/일몰 방향에 따른 Azimuth 계산
+     * 동→남→서 경로: 270도 넘으면 음수로 변환
+     * 동→북→서 경로: 양수로 유지
+     */
+    private fun calculateAzimuthBySunPath(azimuth: Double): Double {
+        if (isSouthPath == null) {
+            logger.warn("일출/일몰 방향 정보가 없습니다. 기본값(양수) 사용")
+            return azimuth
+        }
+        
+        return if (isSouthPath!!) {
+            // 1번 상황: 동→남→서 경로 → 270도 넘으면 음수로 변환
+            if (azimuth > 270.0) {
+                val negativeAzimuth = azimuth - 360.0
+                logger.debug("동→남→서 경로: {}° → {}° (음수 변환)", 
+                    String.format("%.3f", azimuth),
+                    String.format("%.3f", negativeAzimuth))
+                negativeAzimuth
+            } else {
+                logger.debug("동→남→서 경로: {}° (양수 유지)", String.format("%.3f", azimuth))
+                azimuth
+            }
+        } else {
+            // 2번 상황: 동→북→서 경로 → 양수로 유지
+            logger.debug("동→북→서 경로: {}° (양수 유지)", String.format("%.3f", azimuth))
+            azimuth
+        }
+    }
+
+    /**
+     * ✅ Azimuth 각도를 0~360도 범위로 정규화
+     */
+    private fun normalizeAzimuthTo360Range(azimuth: Double): Double {
+        var normalized = azimuth
+        while (normalized >= 360.0) normalized -= 360.0
+        while (normalized < 0.0) normalized += 360.0
+        return normalized
     }
 }
 
