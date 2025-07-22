@@ -206,6 +206,7 @@ export const useICDStore = defineStore('icd', () => {
   const trackingActualTiltAngle = ref('')
   // 96-98번째 줄 근처 - Boolean 타입으로 변경
   const ephemerisStatus = ref<boolean | null>(null)
+  const ephemerisTrackingState = ref<string | null>(null) // ✅ 추가
   const passScheduleStatus = ref<boolean | null>(null)
   const sunTrackStatus = ref<boolean | null>(null)
   const communicationStatus = ref('')
@@ -1277,6 +1278,15 @@ export const useICDStore = defineStore('icd', () => {
         }
       }
 
+      // ✅ 새로 추가: Ephemeris 추적 상태 업데이트
+      if (trackingStatusData.ephemerisTrackingState !== undefined) {
+        const newState = trackingStatusData.ephemerisTrackingState as string | null
+        if (ephemerisTrackingState.value !== newState) {
+          ephemerisTrackingState.value = newState
+          console.log(' Ephemeris 추적 상태 업데이트:', newState)
+        }
+      }
+
       // Pass Schedule 상태 업데이트 (Boolean)
       if (trackingStatusData.passScheduleStatus !== undefined) {
         const newStatus = trackingStatusData.passScheduleStatus as boolean | null
@@ -1813,6 +1823,31 @@ export const useICDStore = defineStore('icd', () => {
           ? 'INACTIVE'
           : 'UNKNOWN',
   }))
+
+  // ✅ 새로운 computed 속성 추가
+  const ephemerisTrackingStateInfo = computed(() => {
+    const state = ephemerisTrackingState.value
+    switch (state) {
+      case 'IDLE':
+        return { displayLabel: '대기(위성 추적 정지)', displayColor: 'grey' }
+      case 'TILT_MOVING_TO_ZERO':
+        return { displayLabel: 'Tilt 시작 위치로 이동', displayColor: 'deep-orange' }
+      case 'TILT_STABILIZING':
+        return { displayLabel: 'Tilt 안정화 대기', displayColor: 'amber-7' }
+      case 'MOVING_TO_START':
+        return { displayLabel: '시작 위치 이동', displayColor: 'blue' }
+      case 'WAITING_FOR_TRACKING':
+        return { displayLabel: '위성 추적 대기', displayColor: 'cyan' }
+      case 'TRACKING':
+        return { displayLabel: '추적 중', displayColor: 'green' }
+      case 'COMPLETED':
+        return { displayLabel: '완료', displayColor: 'purple' }
+      case 'ERROR':
+        return { displayLabel: '오류', displayColor: 'red' }
+      default:
+        return { displayLabel: '알 수 없음', displayColor: 'grey' }
+    }
+  })
   // Standby 명령 전송
   const standbyCommand = async (azimuth: boolean, elevation: boolean, tilt: boolean) => {
     try {
@@ -2118,6 +2153,8 @@ export const useICDStore = defineStore('icd', () => {
     feedXBoardStatusInfo,
     //모드 상태 정보
     ephemerisStatusInfo,
+    ephemerisTrackingState,
+    ephemerisTrackingStateInfo,
     passScheduleStatusInfo,
     sunTrackStatusInfo,
     //펌웨어 UDP 상태

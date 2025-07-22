@@ -102,7 +102,15 @@
         <div class="col-12 col-md-4">
           <q-card class="control-section">
             <q-card-section>
-              <div class="text-subtitle1 text-weight-bold text-primary">Tracking Information</div>
+              <div class="text-subtitle1 text-weight-bold text-primary">위성 추적 상태</div>
+
+              <!-- ✅ 추적 상태 표시 -->
+              <div class="info-row">
+                <span class="info-label">추적 상태:</span>
+                <q-chip :color="icdStore.ephemerisTrackingStateInfo.displayColor" text-color="white"
+                  :label="icdStore.ephemerisTrackingStateInfo.displayLabel" size="sm" class="tracking-status-chip" />
+              </div>
+
               <div class="ephemeris-form">
                 <div class="form-row">
                   <!-- ✅ 정지궤도 정보 표시 -->
@@ -296,7 +304,7 @@ ISS (ZARYA)
   </q-dialog>
 </template>
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { date } from 'quasar'
 
 import type { QTableProps } from 'quasar'
@@ -505,6 +513,24 @@ const selectedScheduleInfo = computed(() => {
     startElevation: 0,
     endElevation: 0,
     isGeostationary: false,
+  }
+})
+
+// ✅ 추적 상태 변경 감지 및 경로 초기화
+watch(() => icdStore.ephemerisTrackingState, (newState, oldState) => {
+  console.log('🔄 추적 상태 변경:', oldState, '→', newState)
+
+  // 추적 시작 또는 완료 시 경로 초기화
+  if (newState === 'TRACKING' || newState === 'COMPLETED' || newState === 'IDLE') {
+    // ✅ 현재 위치를 기준으로 경로 초기화 (0도에서 시작하는 문제 해결)
+    const currentAzimuth = parseFloat(icdStore.azimuthAngle) || 0
+    const currentElevation = parseFloat(icdStore.elevationAngle) || 0
+
+    ephemerisStore.clearTrackingPath(currentAzimuth, currentElevation)
+    console.log('🧹 추적 경로 초기화 완료 - 현재 위치 기준:', {
+      azimuth: currentAzimuth,
+      elevation: currentElevation
+    })
   }
 })
 // ✅ 개선된 RealtimeTrackingDataItem 타입을 사용하는 CSV 다운로드 함수
@@ -842,22 +868,29 @@ const updateChart = () => {
 
   perfMonitor.measureFrame(() => {
     try {
-      const azimuth = parseFloat(icdStore.azimuthAngle) || 0
-      const elevation = parseFloat(icdStore.elevationAngle) || 0
+      // ✅ 추적 상태에 따라 다른 데이터 소스 사용
+      const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
+
+      const azimuth = isTrackingActive
+        ? parseFloat(icdStore.trackingActualAzimuthAngle) || 0
+        : parseFloat(icdStore.azimuthAngle) || 0
+      const elevation = isTrackingActive
+        ? parseFloat(icdStore.trackingActualElevationAngle) || 0
+        : parseFloat(icdStore.elevationAngle) || 0
 
       const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
       const normalizedEl = Math.max(0, Math.min(90, elevation))
 
-      // ✅ 안전한 속성 업데이트
+      // ✅ 안전한 속성 업데이트 (원본 값 표시로 일관성 유지)
       if (currentPosition.value) {
-        currentPosition.value.azimuth = azimuth
+        currentPosition.value.azimuth = azimuth  // 원본 값 (-180.14°)
         currentPosition.value.elevation = elevation
         currentPosition.value.date = date.formatDate(new Date(), 'YYYY/MM/DD')
         currentPosition.value.time = date.formatDate(new Date(), 'HH:mm:ss')
       }
 
-      // ✅ 안전한 상태 체크
-      if (icdStore.ephemerisStatusInfo?.isActive === true) {
+      // ✅ 안전한 상태 체크 (실제 추적 상태 확인)
+      if (icdStore.ephemerisTrackingState === "TRACKING") {
         void ephemerisStore.updateTrackingPath(azimuth, elevation)
       }
 
@@ -993,7 +1026,10 @@ const initChart = () => {
         label: {
           show: true,
           formatter: function (params: EChartsScatterParam) {
-            return `Az: ${params.value[1].toFixed(2)}°\nEl: ${params.value[0].toFixed(2)}°`
+            // ✅ 원본 값 표시 (정규화된 값이 아닌)
+            const originalAz = currentPosition.value?.azimuth || params.value[1]
+            const originalEl = currentPosition.value?.elevation || params.value[0]
+            return `Az: ${originalAz.toFixed(2)}°\nEl: ${originalEl.toFixed(2)}°`
           },
           position: 'top',
           distance: 5,
@@ -1090,20 +1126,27 @@ const initChart = () => {
     let azimuth = 0
     let elevation = 0
 
-    azimuth = parseFloat(icdStore.azimuthAngle) || 0
-    elevation = parseFloat(icdStore.elevationAngle) || 0
+    // ✅ 추적 상태에 따라 다른 데이터 소스 사용
+    const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
+
+    azimuth = isTrackingActive
+      ? parseFloat(icdStore.trackingActualAzimuthAngle) || 0
+      : parseFloat(icdStore.azimuthAngle) || 0
+    elevation = isTrackingActive
+      ? parseFloat(icdStore.trackingActualElevationAngle) || 0
+      : parseFloat(icdStore.elevationAngle) || 0
 
     const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
     const normalizedEl = Math.max(0, Math.min(90, elevation))
 
-    // 현재 위치 정보 업데이트
-    currentPosition.value.azimuth = azimuth
+    // 현재 위치 정보 업데이트 (원본 값 표시)
+    currentPosition.value.azimuth = azimuth  // 원본 값 (정규화 전)
     currentPosition.value.elevation = elevation
     currentPosition.value.date = date.formatDate(new Date(), 'YYYY/MM/DD')
     currentPosition.value.time = date.formatDate(new Date(), 'HH:mm:ss')
 
     // ✅ 추적 중일 때 Worker를 통한 비동기 경로 처리
-    if (icdStore.ephemerisStatusInfo.isActive === true) {
+    if (icdStore.ephemerisTrackingState === "TRACKING") {
       // ✅ 비동기 호출이지만 결과를 기다리지 않음 (성능 최적화)
       void ephemerisStore.updateTrackingPath(azimuth, elevation)
     }
@@ -1529,8 +1572,11 @@ const handleEphemerisCommand = async () => {
       return
     }
 
-    // ✅ 추적 시작 전 경로 초기화
-    ephemerisStore.clearTrackingPath()
+    // ✅ 추적 시작 전 경로 초기화 (현재 위치 기준)
+    const currentAzimuth = parseFloat(icdStore.azimuthAngle) || 0
+    const currentElevation = parseFloat(icdStore.elevationAngle) || 0
+
+    ephemerisStore.clearTrackingPath(currentAzimuth, currentElevation)
     await ephemerisStore.startTracking()
 
     $q.notify({
@@ -1548,8 +1594,18 @@ const handleEphemerisCommand = async () => {
 
 const handleStopCommand = async () => {
   try {
+    // ✅ 기존 ephemeris 추적 중지 API 사용 (하드웨어 + 소프트웨어 상태 모두 처리)
+    await ephemerisTrackService.stopEphemerisTracking()
+
+    // ✅ 하드웨어 정지 명령도 함께 전송
     await icdStore.stopCommand(true, true, true)
+
+    // ✅ 프론트엔드 상태 업데이트
     await ephemerisStore.stopTracking()
+
+    // ✅ Stop 버튼 클릭 시 실시간 경로 초기화
+    ephemerisStore.clearTrackingPath()
+    console.log('🛑 Stop 버튼 클릭 - 추적 중지 및 상태 변경')
 
     $q.notify({
       type: 'positive',
@@ -1651,8 +1707,8 @@ const startMainThreadMonitoring = () => {
     const timeDiff = currentTime - lastCheck
 
     // ✅ 예상보다 오래 걸렸다면 메인 스레드가 블로킹되었음
-    if (timeDiff > 20) {
-      // 10ms 체크 간격에서 20ms 이상이면 블로킹
+    if (timeDiff > 50) {
+      // 10ms 체크 간격에서 50ms 이상이면 블로킹
       console.warn(`🚫 메인 스레드 블로킹 감지: ${timeDiff.toFixed(2)}ms`)
     }
 

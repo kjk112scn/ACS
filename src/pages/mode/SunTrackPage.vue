@@ -12,27 +12,12 @@
             <div class="input-box">
               <div class="label-text text-weight-medium text-primary">Azimuth</div>
               <div class="input-with-buttons">
-                <q-input
-                  v-model="inputs[0]"
-                  dense
-                  outlined
-                  class="input-field"
-                  type="number"
-                  step="0.01"
-                />
+                <q-input v-model="inputs[0]" dense outlined class="input-field" type="number" step="0.01" />
                 <div class="button-group">
                   <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
                   <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
                 </div>
-                <q-btn
-                  icon="refresh"
-                  size="sm"
-                  color="primary"
-                  dense
-                  flat
-                  class="reset-button"
-                  @click="reset(0)"
-                />
+                <q-btn icon="refresh" size="sm" color="primary" dense flat class="reset-button" @click="reset(0)" />
               </div>
             </div>
             <div class="output-box">
@@ -48,27 +33,12 @@
             <div class="input-box">
               <div class="label-text text-weight-medium text-primary">Elevation</div>
               <div class="input-with-buttons">
-                <q-input
-                  v-model="inputs[1]"
-                  dense
-                  outlined
-                  class="input-field"
-                  type="number"
-                  step="0.01"
-                />
+                <q-input v-model="inputs[1]" dense outlined class="input-field" type="number" step="0.01" />
                 <div class="button-group">
                   <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(1)" />
                   <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
                 </div>
-                <q-btn
-                  icon="refresh"
-                  size="sm"
-                  color="primary"
-                  dense
-                  flat
-                  class="reset-button"
-                  @click="reset(1)"
-                />
+                <q-btn icon="refresh" size="sm" color="primary" dense flat class="reset-button" @click="reset(1)" />
               </div>
             </div>
             <div class="output-box">
@@ -84,27 +54,12 @@
             <div class="input-box">
               <div class="label-text text-weight-medium text-primary">Tilt</div>
               <div class="input-with-buttons">
-                <q-input
-                  v-model="inputs[2]"
-                  dense
-                  outlined
-                  class="input-field"
-                  type="number"
-                  step="0.01"
-                />
+                <q-input v-model="inputs[2]" dense outlined class="input-field" type="number" step="0.01" />
                 <div class="button-group">
                   <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(2)" />
                   <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
                 </div>
-                <q-btn
-                  icon="refresh"
-                  size="sm"
-                  color="primary"
-                  dense
-                  flat
-                  class="reset-button"
-                  @click="reset(2)"
-                />
+                <q-btn icon="refresh" size="sm" color="primary" dense flat class="reset-button" @click="reset(2)" />
               </div>
             </div>
             <div class="output-box">
@@ -119,27 +74,12 @@
             <div class="input-box time-input">
               <div class="label-text text-weight-medium text-primary">Time</div>
               <div class="input-with-buttons">
-                <q-input
-                  v-model="inputs[3]"
-                  dense
-                  outlined
-                  class="input-field"
-                  type="number"
-                  step="0.01"
-                />
+                <q-input v-model="inputs[3]" dense outlined class="input-field" type="number" step="0.01" />
                 <div class="button-group">
                   <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(3)" />
                   <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
                 </div>
-                <q-btn
-                  icon="refresh"
-                  size="sm"
-                  color="primary"
-                  dense
-                  flat
-                  class="reset-button"
-                  @click="reset(3)"
-                />
+                <q-btn icon="refresh" size="sm" color="primary" dense flat class="reset-button" @click="reset(3)" />
               </div>
             </div>
 
@@ -176,40 +116,19 @@
           <!-- Azimuth Speed -->
           <div class="col-4">
             <div class="label-text text-weight-medium text-primary">Azimuth Speed</div>
-            <q-input
-              v-model="speedInputs.azimuth"
-              dense
-              outlined
-              type="number"
-              step="0.1"
-              class="speed-input"
-            />
+            <q-input v-model="speedInputs.azimuth" dense outlined type="number" step="0.1" class="speed-input" />
           </div>
 
           <!-- Elevation Speed -->
           <div class="col-4">
             <div class="label-text text-weight-medium text-primary">Elevation Speed</div>
-            <q-input
-              v-model="speedInputs.elevation"
-              dense
-              outlined
-              type="number"
-              step="0.1"
-              class="speed-input"
-            />
+            <q-input v-model="speedInputs.elevation" dense outlined type="number" step="0.1" class="speed-input" />
           </div>
 
           <!-- Tilt Speed -->
           <div class="col-4">
             <div class="label-text text-weight-medium text-primary">Tilt Speed</div>
-            <q-input
-              v-model="speedInputs.tilt"
-              dense
-              outlined
-              type="number"
-              step="0.1"
-              class="speed-input"
-            />
+            <q-input v-model="speedInputs.tilt" dense outlined type="number" step="0.1" class="speed-input" />
           </div>
         </div>
 
@@ -226,34 +145,16 @@
         <q-card-section>
           <div class="row q-col-gutter-md justify-center">
             <div class="col-auto">
-              <q-btn
-                label="Go"
-                color="positive"
-                icon="play_arrow"
-                size="lg"
-                @click="handleGoCommand"
-                :loading="isGoLoading"
-              />
+              <q-btn label="Go" color="positive" icon="play_arrow" size="lg" @click="handleGoCommand"
+                :loading="isGoLoading" />
             </div>
             <div class="col-auto">
-              <q-btn
-                label="Stop"
-                color="negative"
-                icon="stop"
-                size="lg"
-                @click="handleStopCommand"
-                :loading="isStopLoading"
-              />
+              <q-btn label="Stop" color="negative" icon="stop" size="lg" @click="handleStopCommand"
+                :loading="isStopLoading" />
             </div>
             <div class="col-auto">
-              <q-btn
-                label="Stow"
-                color="primary"
-                icon="home"
-                size="lg"
-                @click="handleStowCommand"
-                :loading="isStowLoading"
-              />
+              <q-btn label="Stow" color="primary" icon="home" size="lg" @click="handleStowCommand"
+                :loading="isStowLoading" />
             </div>
           </div>
         </q-card-section>
@@ -578,16 +479,16 @@ const formattedCalTime = computed(() => {
     // Parse the timestamp
     const date = new Date(calTime)
 
-    // Format as yyyy-mm-dd<br>hh:mm:ss.SSS using UTC methods
-    const year = date.getUTCFullYear()
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0')
-    const day = String(date.getUTCDate()).padStart(2, '0')
-    const hours = String(date.getUTCHours()).padStart(2, '0')
-    const minutes = String(date.getUTCMinutes()).padStart(2, '0')
-    const seconds = String(date.getUTCSeconds()).padStart(2, '0')
-    const milliseconds = String(date.getUTCMilliseconds()).padStart(3, '0')
+    // Format as yyyy-mm-dd hh:mm:ss.SSS using local time methods
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    const seconds = String(date.getSeconds()).padStart(2, '0')
+    const milliseconds = String(date.getMilliseconds()).padStart(3, '0')
 
-    // 날짜와 시간을 HTML 줄바꿈 태그로 구분
+    // 날짜와 시간을 한 줄로 구분
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`
   } catch (error) {
     console.error('Error formatting timestamp:', error)
@@ -621,6 +522,7 @@ input[type='number']::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
 input[type='number'] {
   -moz-appearance: textfield;
 }
@@ -642,25 +544,30 @@ input[type='number'] {
   display: flex;
   flex-wrap: wrap;
 
-  gap: 0.25rem; /* 간격을 최소화 */
-  justify-content: flex-start; /* 왼쪽부터 배치 */
+  gap: 0.25rem;
+  /* 간격을 최소화 */
+  justify-content: flex-start;
+  /* 왼쪽부터 배치 */
 }
 
 .input-output-pair {
   display: flex;
   position: relative;
 
-  padding: 0 0.1rem; /* 패딩 최소화 */
+  padding: 0 0.1rem;
+  /* 패딩 최소화 */
 }
 
 /* 표준 너비 (Azimuth, Elevation, Tilt) */
 .standard-width {
-  width: calc(20% - 0.25rem); /* 간격을 고려하여 약간 줄임 */
+  width: calc(20% - 0.25rem);
+  /* 간격을 고려하여 약간 줄임 */
 }
 
 /* 넓은 너비 (Time) */
 .wide-width {
-  width: calc(40% - 0.25rem); /* 나머지 공간을 차지하도록 조정 */
+  width: calc(40% - 0.25rem);
+  /* 나머지 공간을 차지하도록 조정 */
 }
 
 .input-box {
@@ -670,6 +577,7 @@ input[type='number'] {
   gap: 0.25rem;
   margin: 0;
 }
+
 .output-box {
   flex: 1.2;
   display: flex;
@@ -681,7 +589,8 @@ input[type='number'] {
 .label-text {
   font-size: 0.9rem;
 
-  margin-bottom: 0.1rem; /* 마진 줄이기 */
+  margin-bottom: 0.1rem;
+  /* 마진 줄이기 */
 }
 
 .input-with-buttons {
@@ -689,7 +598,8 @@ input[type='number'] {
   align-items: center;
 
   height: 40px;
-  position: relative; /* 상대 위치 설정 */
+  position: relative;
+  /* 상대 위치 설정 */
 }
 
 .input-field {
@@ -704,7 +614,8 @@ input[type='number'] {
 
 .reset-button {
   margin-left: 2px;
-  margin-right: 5px; /* 더 큰 여백 */
+  margin-right: 5px;
+  /* 더 큰 여백 */
 }
 
 /* 출력 필드 높이 맞추기 */
@@ -714,12 +625,14 @@ input[type='number'] {
 
 /* 간격 유지를 위한 스페이서 - 제거하거나 최소화 */
 .spacer-between {
-  width: 15px; /* 요소 사이의 간격 */
+  width: 15px;
+  /* 요소 사이의 간격 */
 }
 
 /* 마지막 요소 뒤의 spacer */
 .spacer-end {
-  width: 2px; /* 최소 너비로 설정 */
+  width: 2px;
+  /* 최소 너비로 설정 */
 }
 
 /* 상태 메시지 스타일 */
@@ -740,7 +653,8 @@ input[type='number'] {
 
   .input-output-pair {
     width: 100% !important;
-    margin-bottom: 0.5rem; /* 마진 줄이기 */
+    margin-bottom: 0.5rem;
+    /* 마진 줄이기 */
   }
 
   .spacer {
@@ -750,14 +664,17 @@ input[type='number'] {
 
 /* Time 관련 요소의 너비 조정 */
 .time-input {
-  flex: 0.6; /* Time 입력 부분을 절반 크기로 줄임 */
+  flex: 0.6;
+  /* Time 입력 부분을 절반 크기로 줄임 */
 }
 
 .time-result {
-  flex: 0.45; /* 입력과 Result 출력 부분을 절반 크기로 줄임 */
+  flex: 0.45;
+  /* 입력과 Result 출력 부분을 절반 크기로 줄임 */
 }
 
 .time-caltime {
-  flex: 0.95; /* Cal Time 부분을 2배로 키움 (입력과 Result 합친 것보다 크게) */
+  flex: 0.95;
+  /* Cal Time 부분을 2배로 키움 (입력과 Result 합친 것보다 크게) */
 }
 </style>

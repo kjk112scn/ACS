@@ -102,6 +102,11 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
   let pendingUpdates = 0
   const maxPendingUpdates = 5
 
+  // ✅ 추적 시작 지연을 위한 상태
+  const trackingStartTime = ref<number | null>(null)
+  const isInitialDelayActive = ref(false)
+  const INITIAL_DELAY_MS = 10000 // 5초 지연
+
   // ✅ Worker 통계 상태에 currentPathPoints 추가
   const workerStats = ref({
     totalUpdates: 0,
@@ -354,6 +359,19 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
       return
     }
 
+    // ✅ 추적 시작 후 5초 지연 체크
+    if (isInitialDelayActive.value && trackingStartTime.value) {
+      const elapsedTime = Date.now() - trackingStartTime.value
+      if (elapsedTime < INITIAL_DELAY_MS) {
+        // console.log(`⏸️ 추적 시작 지연 중... (${elapsedTime}ms / ${INITIAL_DELAY_MS}ms)`)
+        return // 경로 업데이트 무시
+      } else {
+        // ✅ 지연 시간 완료
+        isInitialDelayActive.value = false
+        console.log('✅ 추적 시작 지연 완료 - 경로 그리기 시작')
+      }
+    }
+
     // ✅ Worker 초기화 (비동기)
     if (!workerInitialized) {
       try {
@@ -491,13 +509,26 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
   }
 
   /**
-   * ✅ 추적 경로 초기화
+   * ✅ 추적 경로 초기화 (현재 위치로 시작)
    */
-  const clearTrackingPath = (): void => {
-    trackingPath.value.rawPath = []
-    trackingPath.value.sampledPath = []
-    trackingPath.value.lastUpdateTime = 0
+  const clearTrackingPath = (currentAzimuth?: number, currentElevation?: number): void => {
+    // ✅ 현재 위치를 첫 번째 포인트로 설정 (0에서 시작하는 문제 해결)
+    const azimuth = currentAzimuth ?? 0
+    const elevation = currentElevation ?? 0
+
+    const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
+    const normalizedEl = Math.max(0, Math.min(90, elevation))
+
+    const initialPoint: [number, number] = [normalizedEl, normalizedAz]
+
+    trackingPath.value.rawPath = [initialPoint]
+    trackingPath.value.sampledPath = [initialPoint]
+    trackingPath.value.lastUpdateTime = Date.now()
     pendingUpdates = 0
+
+    // ✅ 지연 관련 상태 초기화
+    trackingStartTime.value = null
+    isInitialDelayActive.value = false
 
     // ✅ 통계 초기화
     workerStats.value = {
@@ -505,10 +536,15 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
       totalProcessingTime: 0,
       averageProcessingTime: 0,
       pointsAdded: 0,
-      currentPathPoints: 0, // ✅ 모든 초기화에 추가
+      currentPathPoints: 0,
       lastUpdateTime: 0,
       errors: 0,
     }
+
+    console.log('🧹 추적 경로 초기화 완료 - 현재 위치 기준:', {
+      azimuth: normalizedAz,
+      elevation: normalizedEl,
+    })
   }
 
   // ===== 기존 액션 메서드들 =====
@@ -570,6 +606,8 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
     try {
       await ephemerisTrackService.startEphemerisTracking(currentTrackingPassId.value)
       trackingStatus.value = 'active'
+      trackingStartTime.value = Date.now() // 추적 시작 시간 기록
+      isInitialDelayActive.value = true // 지연 시작 활성화
     } catch (err) {
       trackingStatus.value = 'error'
       error.value = 'Failed to start tracking'
@@ -768,23 +806,34 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
    * 상태 초기화 (전체 리셋)
    */
   const reset = () => {
+    // ✅ 기본 상태 초기화
     masterData.value = []
     detailData.value = []
     selectedSchedule.value = null
     currentTrackingPassId.value = null
     trackingStatus.value = 'idle'
     tleData.value = null
-    error.value = null
-    lastFetchTime.value = 0
 
-    // ✅ 새로 추가된 상태들도 초기화
+    // ✅ TLE 표시 데이터 초기화
     tleDisplayData.value = {
       displayText: 'No TLE data available',
       tleLine1: undefined,
       tleLine2: undefined,
       satelliteName: undefined,
     }
-    clearTrackingPath()
+
+    // ✅ 추적 경로 초기화
+    trackingPath.value = {
+      rawPath: [],
+      sampledPath: [],
+      lastUpdateTime: 0,
+    }
+
+    // ✅ 지연 관련 상태 초기화
+    trackingStartTime.value = null
+    isInitialDelayActive.value = false
+
+    // ✅ 오프셋 값 초기화
     offsetValues.value = {
       azimuth: '0.00',
       elevation: '0.00',
@@ -793,7 +842,7 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
       timeResult: '0.00',
     }
 
-    // ✅ 정지궤도 각도 정보 초기화
+    // ✅ 정지궤도 각도 초기화
     geostationaryAngles.value = {
       azimuth: 0,
       elevation: 0,
@@ -803,9 +852,21 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
       isSet: false,
     }
 
-    // ✅ Worker도 정리
+    // ✅ Worker 통계 초기화
+    workerStats.value = {
+      totalUpdates: 0,
+      totalProcessingTime: 0,
+      averageProcessingTime: 0,
+      pointsAdded: 0,
+      currentPathPoints: 0,
+      lastUpdateTime: 0,
+      errors: 0,
+    }
 
+    // ✅ Worker 정리
     cleanupWorker()
+
+    console.log('🔄 Ephemeris Track Store 초기화 완료')
   }
 
   /**
