@@ -326,15 +326,11 @@ class SunTrackService(
             // ✅ 저장된 값 사용 (재계산 없음)
             if (midTime != null && rotatorAngle != null) {
                 val sunPosition = solarOrekitCalculator.getSunPositionAt(midTime!!)
-                
-                // ✅ Tilt가 이동한 각도만큼 보정된 Azimuth 계산
-                val correctedAzimuth = if (targetTiltAngle != null) {
-                    val adjustedAz = sunPosition.azimuthDegrees - targetTiltAngle!!
-                    adjustedAz
-                } else {
-                    sunPosition.azimuthDegrees
-                }
-                
+                val correctedAzimuth = sunPosition.azimuthDegrees - targetTiltAngle!!
+                logger.info("sunPosition.azimuthDegrees: {}", sunPosition.azimuthDegrees)
+                logger.info("targetTiltAngle: {}", targetTiltAngle)
+                logger.info("correctedAzimuth: {}", correctedAzimuth)
+
                 val (transformedAz, transformedEl) = CoordinateTransformer.transformCoordinatesWithRotator(
                     azimuth = correctedAzimuth,
                     elevation = sunPosition.elevationDegrees,

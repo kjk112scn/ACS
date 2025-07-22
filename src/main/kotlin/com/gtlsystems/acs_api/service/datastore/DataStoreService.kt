@@ -229,10 +229,14 @@ class DataStoreService {
      * ✅ 상호 배타적 추적 상태 업데이트 (하나만 true, 나머지는 false)
      */
     fun setEphemerisTracking(active: Boolean) {
+        val currentStatus = trackingStatus.get()
         val newStatus = PushData.TrackingStatus(
             ephemerisStatus = active,
+            ephemerisTrackingState = if (active) "TRACKING" else currentStatus.ephemerisTrackingState, // ✅ 기존 상태 유지
             passScheduleStatus = false,
-            sunTrackStatus = false
+            sunTrackStatus = false,
+            manualControlStatus = currentStatus.manualControlStatus,
+            geostationaryStatus = currentStatus.geostationaryStatus
         )
         updateTrackingStatus(newStatus)
     }
@@ -369,5 +373,45 @@ class DataStoreService {
             data.rssiSBandLNALHCP, data.rssiSBandLNARHCP,
             data.rssiXBandLNALHCP, data.rssiXBandLNARHCP
         ).size
+    }
+
+    /**
+     * ✅ Ephemeris 추적 상태 확인 (실제 추적 중인지)
+     */
+    fun isEphemerisTrackingActive(): Boolean {
+        return trackingStatus.get().ephemerisTrackingState == "TRACKING"
+    }
+
+    /**
+     * ✅ Ephemeris 추적 상태 가져오기
+     */
+    fun getEphemerisTrackingState(): String? {
+        return trackingStatus.get().ephemerisTrackingState
+    }
+
+    /**
+     * ✅ Pass Schedule 추적 상태 확인
+     */
+    fun isPassScheduleTrackingActive(): Boolean {
+        return trackingStatus.get().passScheduleStatus == true
+    }
+
+    /**
+     * ✅ Sun Track 추적 상태 확인
+     */
+    fun isSunTrackingActive(): Boolean {
+        return trackingStatus.get().sunTrackStatus == true
+    }
+
+    /**
+     * ✅ 현재 활성화된 추적 모드 확인
+     */
+    fun getActiveTrackingMode(): String? {
+        return when {
+            trackingStatus.get().ephemerisStatus == true -> "ephemeris"
+            trackingStatus.get().passScheduleStatus == true -> "passSchedule"
+            trackingStatus.get().sunTrackStatus == true -> "sunTrack"
+            else -> null
+        }
     }
 }

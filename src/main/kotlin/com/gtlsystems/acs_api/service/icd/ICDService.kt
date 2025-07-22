@@ -1083,6 +1083,7 @@ class ICDService {
                     cmdElevationAngle = elevationAngle + GlobalData.Offset.elevationPositionOffset
                     cmdTiltAngle = tiltAngle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
                 }
+            
                 return dataFrame
             }
         }

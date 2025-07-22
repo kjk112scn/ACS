@@ -10,12 +10,25 @@ object PushData {
         var cmdTime: ZonedDateTime? = null
     )
     data class TrackingStatus (
-        var ephemerisStatus: Boolean? = null,
+        var ephemerisStatus: Boolean? = null,           // 기존 (버튼 상태)
+        var ephemerisTrackingState: String? = null,     // 신규 (상세 추적 상태)
         var passScheduleStatus: Boolean? = null,
         var sunTrackStatus: Boolean? = null,
         var manualControlStatus: Boolean? = null,
         var geostationaryStatus: Boolean? = null
     )
+
+    // 추적 상태 enum 추가
+    enum class EphemerisTrackingState {
+        IDLE,                    // 대기 (추적 정지 상태)
+        TILT_MOVING_TO_ZERO,    // Tilt 시작 위치로 이동
+        TILT_STABILIZING,       // Tilt 안정화 대기
+        MOVING_TO_START,        // 시작 위치 이동 중
+        WAITING_FOR_TRACKING,   // 위성 추적 대기
+        TRACKING,               // 실제 추적 중
+        COMPLETED,              // 추적 완료
+        ERROR                   // 오류
+    }
     data class ReadData(
         val modeStatusBits: String? = null,
         val azimuthAngle: Float? = null,
@@ -72,6 +85,6 @@ object PushData {
     )
     // ✅ 인스턴스 객체
     val CMD = CMDValue()
-    val TRACKING_STATUS = TrackingStatus()
+    val TRACKING_STATUS = TrackingStatus(ephemerisTrackingState = "IDLE") // ✅ 초기 상태 설정
     val READ_DATA = ReadData() // ✅ 추가 필요!
 }

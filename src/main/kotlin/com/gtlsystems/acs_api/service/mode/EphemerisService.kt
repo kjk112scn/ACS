@@ -1132,8 +1132,7 @@ class EphemerisService(
             logger.error("패스 ID {}에 해당하는 데이터를 찾을 수 없습니다", passId)
             return
         }
-        trackingStatus.ephemerisStatus = true
-        logger.info("✅ ephemeris 추적 상태 활성화 완료")
+        logger.info("✅ ephemeris 추적 준비 완료 (실제 추적 시작 전)")
         // 상태머신 진입
         moveToStartPosition(passId)
         startModeTimer()
@@ -1144,6 +1143,7 @@ class EphemerisService(
      * 위성 추적 중지 (안전한 배치 종료 포함)
      */
     fun stopEphemerisTracking() {
+        // ✅ 내부 상태머신 진행용으로 ephemerisStatus 사용
         if (trackingStatus.ephemerisStatus != true && trackingStatus.geostationaryStatus != true) {
             logger.info("위성 추적이 이미 중지되어 있습니다.")
             return
@@ -1162,10 +1162,12 @@ class EphemerisService(
             trackingStatus.geostationaryStatus = false
         }
         
-        // ✅ ephemeris 상태도 초기화
+        // ✅ ephemeris 상태도 초기화 (내부 상태 + 프론트엔드 전달)
         if (trackingStatus.ephemerisStatus == true) {
             trackingStatus.ephemerisStatus = false
+            trackingStatus.ephemerisTrackingState = "IDLE"  // ✅ 추가
         }
+        dataStoreService.setEphemerisTracking(false) // ✅ 프론트엔드에 추적 종료 알림
         
         // ✅ 안전한 배치 종료 처리
         safeBatchShutdown()
@@ -1204,6 +1206,11 @@ class EphemerisService(
     private fun startModeTimer() {
         // 기존 타이머가 있다면 정리
         stopModeTimer()
+
+        // ✅ 위성 추적 시작 상태 설정
+        trackingStatus.ephemerisStatus = true
+        trackingStatus.ephemerisTrackingState = "TILT_MOVING_TO_ZERO"
+        logger.info("🚀 위성 추적 시작 - Tilt 시작 위치로 이동")
 
         // ✅ 통합 모드 실행기 사용
         modeExecutor = threadManager.getModeExecutor()
@@ -1283,14 +1290,22 @@ class EphemerisService(
             }
             when (currentTrackingState) {
                 TrackingState.MOVING_TILT_TO_ZERO -> {
+                    // ✅ Tilt 시작 위치로 이동 상태 표시
+                    trackingStatus.ephemerisTrackingState = "TILT_MOVING_TO_ZERO"
+                    
                     moveTiltToZero(5f)
                     if (isTiltAtZero()) {
                         currentTrackingState = TrackingState.WAITING_FOR_TILT_STABILIZATION
                         stabilizationStartTime = System.currentTimeMillis()
+                        // ✅ Tilt 0도 이동 완료, 안정화 대기 상태로 업데이트
+                        trackingStatus.ephemerisTrackingState = "TILT_STABILIZING"
                         logger.info("✅ Tilt가 0도에 도달, 안정화 대기 시작")
                     }
                 }
                 TrackingState.WAITING_FOR_TILT_STABILIZATION -> {
+                    // ✅ Tilt 안정화 대기 상태 표시
+                    trackingStatus.ephemerisTrackingState = "TILT_STABILIZING"
+                    
                     if (System.currentTimeMillis() - stabilizationStartTime >= TILT_STABILIZATION_TIMEOUT && isTiltStabilized()) {
                         moveToTargetAzEl()
                         currentTrackingState = TrackingState.MOVING_TO_TARGET
@@ -1300,7 +1315,12 @@ class EphemerisService(
                 TrackingState.MOVING_TO_TARGET -> {
                     // 목표 위치 도달 체크는 생략(즉시 활성화)
                     currentTrackingState = TrackingState.TRACKING_ACTIVE
-                    logger.info("✅ 목표 위치 이동 완료, 추적 활성화")
+                    // ✅ 목표 위치 이동 완료, 시작 위치 이동 상태로 업데이트
+                    trackingStatus.ephemerisTrackingState = "MOVING_TO_START"
+                    logger.info("✅ 목표 위치 이동 완료, 시작 위치 이동 상태")
+                    
+                    // ✅ 추적 대기 상태 추가 (다음 상태 체크에서 처리)
+                    logger.info("⏳ 위성 추적 대기 상태로 전환 준비")
                 }
                 TrackingState.TRACKING_ACTIVE -> {
                     // ✅ 정지궤도와 저궤도 구분 처리
@@ -1318,6 +1338,14 @@ class EphemerisService(
                         val calTime = GlobalData.Time.calUtcTimeOffsetTime
                         val timeDifference = Duration.between(startTime, calTime).seconds
                         logger.debug("⏰ 상태체크 - 시간차: {}초, 실행완료: {}", timeDifference, executedActions)
+                        
+                        // ✅ 추적 대기 상태 표시 (실제 추적 시작 전)
+                        if (!executedActions.contains("WAITING_FOR_TRACKING")) {
+                            trackingStatus.ephemerisTrackingState = "WAITING_FOR_TRACKING"
+                            logger.info("⏳ 위성 추적 대기 상태")
+                            executedActions.add("WAITING_FOR_TRACKING") // ✅ 중복 방지
+                        }
+                        
                         when {
                             timeDifference <= 0 && !executedActions.contains("BEFORE_START") -> {
                                 executedActions.add("BEFORE_START")
@@ -1363,6 +1391,7 @@ class EphemerisService(
      */
     private fun handleInProgress(passId: UInt) {
         logger.info("📡 진행 중 상태 - 추적 데이터 전송 시작")
+        trackingStatus.ephemerisTrackingState = "TRACKING"  // ✅ 추가
         dataStoreService.setEphemerisTracking(true)
         sendHeaderTrackingData(passId)
     }
@@ -1372,6 +1401,9 @@ class EphemerisService(
      */
     private fun handleCompleted() {
         logger.info("✅ 완료 상태 - 추적 종료")
+        trackingStatus.ephemerisStatus = false // Internal state update
+        trackingStatus.ephemerisTrackingState = "COMPLETED"  // ✅ 추가
+        dataStoreService.setEphemerisTracking(false) // Frontend state update
     }
 
     /**
@@ -1881,6 +1913,7 @@ class EphemerisService(
             targetElevation = (startPoint["Elevation"] as Double).toFloat()
             // 상태머신 진입
             currentTrackingState = TrackingState.MOVING_TILT_TO_ZERO
+            // ✅ Tilt 시작 위치로 이동 상태는 이미 startModeTimer()에서 설정됨
         }
     }
 
@@ -2238,6 +2271,8 @@ class EphemerisService(
         multiAxis.set(2)
         udpFwICDService.stopCommand(multiAxis)
     }
+
+
 
     /**
      * 패스의 첫 번째 방위각 가져오기
