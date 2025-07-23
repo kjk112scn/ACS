@@ -147,7 +147,7 @@ class SolarOrekitCalculator(
     }
 
     /**
-     * 다음 일출 시간 찾기
+     * 다음 일출 시간 찾기 (고도각이 음수에서 양수로 변하는 시점)
      */
     fun findNextSunrise(fromDateTime: LocalDateTime? = null): SunPosition? {
         checkInitialized()
@@ -160,13 +160,23 @@ class SolarOrekitCalculator(
 
         var currentDate = startDate
         val stepMinutes = 10.0
+        val today = LocalDateTime.now(ZoneOffset.UTC).toLocalDate()
+        
+        var previousPosition: SunPosition? = null
 
-        // 24시간 동안 검색
-        repeat(144) {
+        // 48시간 동안 검색 (288 * 10분 = 48시간)
+        repeat(288) {
             val position = calculateSunPosition(currentDate)
-            if (position.isSunVisible()) {
+            
+            // 고도각이 음수에서 양수로 변하는 시점 찾기 (오늘 날짜)
+            if (previousPosition != null && 
+                !previousPosition!!.isSunVisible() && 
+                position.isSunVisible() &&
+                position.dateTime.toLocalDate() == today) {
                 return position
             }
+            
+            previousPosition = position
             currentDate = currentDate.shiftedBy(stepMinutes * 60)
         }
 
@@ -174,7 +184,7 @@ class SolarOrekitCalculator(
     }
 
     /**
-     * 다음 일몰 시간 찾기
+     * 다음 일몰 시간 찾기 (고도각이 양수에서 음수로 변하는 시점)
      */
     fun findNextSunset(fromDateTime: LocalDateTime? = null): SunPosition? {
         checkInitialized()
@@ -185,21 +195,25 @@ class SolarOrekitCalculator(
             getCurrentAbsoluteDate()
         }
 
-        // 현재 태양이 보이는지 확인
-        val currentPosition = calculateSunPosition(startDate)
-        if (!currentPosition.isSunVisible()) {
-            return null // 태양이 이미 보이지 않으면 일몰을 찾을 수 없음
-        }
-
         var currentDate = startDate
         val stepMinutes = 10.0
+        val today = LocalDateTime.now(ZoneOffset.UTC).toLocalDate()
+        
+        var previousPosition: SunPosition? = null
 
-        // 24시간 동안 검색
-        repeat(144) {
+        // 48시간 동안 검색 (288 * 10분 = 48시간)
+        repeat(288) {
             val position = calculateSunPosition(currentDate)
-            if (!position.isSunVisible()) {
+            
+            // 고도각이 양수에서 음수로 변하는 시점 찾기 (오늘 날짜)
+            if (previousPosition != null && 
+                previousPosition!!.isSunVisible() && 
+                !position.isSunVisible() &&
+                position.dateTime.toLocalDate() == today) {
                 return position
             }
+            
+            previousPosition = position
             currentDate = currentDate.shiftedBy(stepMinutes * 60)
         }
 
@@ -207,41 +221,50 @@ class SolarOrekitCalculator(
     }
 
     /**
-     * ✅ 오늘 일출 정보 조회 (Azimuth, Elevation 포함)
+     * ✅ 오늘 일출 정보 조회 (48시간 검색)
      */
     fun getTodaySunrise(): SunPosition? {
         checkInitialized()
         
-        // 오늘 자정부터 시작
-        val todayMidnight = LocalDateTime.now(ZoneOffset.UTC)
+        // 하루 전날 자정부터 시작 (어제 00:00 → 오늘 24:00)
+        val yesterdayMidnight = LocalDateTime.now(ZoneOffset.UTC)
             .toLocalDate()
+            .minusDays(1)  // 하루 전날로 설정
             .atStartOfDay()
         
-        return findNextSunrise(todayMidnight)
+        return findNextSunrise(yesterdayMidnight)
     }
 
     /**
-     * ✅ 오늘 일몰 정보 조회 (Azimuth, Elevation 포함)
+     * ✅ 오늘 일몰 정보 조회 (48시간 검색)
      */
     fun getTodaySunset(): SunPosition? {
         checkInitialized()
         
-        // 오늘 자정부터 시작
-        val todayMidnight = LocalDateTime.now(ZoneOffset.UTC)
+        // 하루 전날 자정부터 시작 (어제 00:00 → 오늘 24:00)
+        val yesterdayMidnight = LocalDateTime.now(ZoneOffset.UTC)
             .toLocalDate()
+            .minusDays(1)  // 하루 전날로 설정
             .atStartOfDay()
         
-        return findNextSunset(todayMidnight)
+        return findNextSunset(yesterdayMidnight)
     }
 
     /**
-     * ✅ 오늘 일출/일몰 정보 모두 조회
+     * ✅ 오늘 일출/일몰 정보 모두 조회 (48시간 검색)
      */
     fun getTodaySunriseAndSunset(): Map<String, Any> {
         checkInitialized()
         
-        val sunrise = getTodaySunrise()
-        val sunset = getTodaySunset()
+        // 하루 전날 자정부터 시작 (어제 00:00 → 오늘 24:00)
+        val yesterdayMidnight = LocalDateTime.now(ZoneOffset.UTC)
+            .toLocalDate()
+            .minusDays(1)  // 하루 전날로 설정
+            .atStartOfDay()
+        
+        // 48시간 동안 검색 (어제 00:00 → 오늘 24:00)
+        val sunrise = findNextSunrise(yesterdayMidnight)
+        val sunset = findNextSunset(yesterdayMidnight)
         
         return mapOf(
             "sunrise" to (sunrise?.let {
@@ -250,7 +273,8 @@ class SolarOrekitCalculator(
                     "azimuth_degrees" to String.format("%.6f", it.azimuthDegrees),
                     "elevation_degrees" to String.format("%.6f", it.elevationDegrees),
                     "range_km" to String.format("%.3f", it.rangeKm),
-                    "is_visible" to it.isSunVisible()
+                    "is_visible" to it.isSunVisible(),
+                    "is_today" to (it.dateTime.toLocalDate() == LocalDateTime.now(ZoneOffset.UTC).toLocalDate())
                 )
             } ?: "일출 없음"),
             "sunset" to (sunset?.let {
@@ -259,10 +283,16 @@ class SolarOrekitCalculator(
                     "azimuth_degrees" to String.format("%.6f", it.azimuthDegrees),
                     "elevation_degrees" to String.format("%.6f", it.elevationDegrees),
                     "range_km" to String.format("%.3f", it.rangeKm),
-                    "is_visible" to it.isSunVisible()
+                    "is_visible" to it.isSunVisible(),
+                    "is_today" to (it.dateTime.toLocalDate() == LocalDateTime.now(ZoneOffset.UTC).toLocalDate())
                 )
             } ?: "일몰 없음"),
             "current_time" to LocalDateTime.now(ZoneOffset.UTC).toString(),
+            "search_range" to mapOf(
+                "start" to yesterdayMidnight.toString(),
+                "end" to yesterdayMidnight.plusDays(2).toString(),
+                "duration_hours" to 48
+            ),
             "location" to mapOf(
                 "latitude" to "지상국 위도",
                 "longitude" to "지상국 경도"
@@ -418,12 +448,12 @@ class SolarOrekitCalculator(
     }
 
     /**
-     * AbsoluteDate를 LocalDateTime으로 변환 (UT1 기준)
-     * @param absoluteDate UT1 기준 AbsoluteDate
+     * AbsoluteDate를 LocalDateTime으로 변환 (UTC 기준)
+     * @param absoluteDate UTC 기준 AbsoluteDate
      */
     private fun absoluteDateToLocalDateTime(absoluteDate: AbsoluteDate): LocalDateTime {
         // ✅ 명시적으로 UT1 시간 척도 사용
-        val date = absoluteDate.toDate(ut1TimeScale)
+        val date = absoluteDate.toDate(utcTimeScale)
         val instant = date.toInstant()
         return LocalDateTime.ofInstant(instant, ZoneOffset.UTC)
     }
@@ -435,6 +465,42 @@ class SolarOrekitCalculator(
         if (!isInitialized) {
             throw IllegalStateException("SolarOrekitCalculator is not initialized. Call initializeGroundStation() first.")
         }
+    }
+
+    /**
+     * 디버깅용: 특정 시간 범위의 태양 위치 확인
+     */
+    fun debugSunPositions(startDateTime: LocalDateTime, endDateTime: LocalDateTime, stepMinutes: Double = 60.0): Map<String, Any> {
+        checkInitialized()
+        
+        val positions = mutableListOf<Map<String, Any>>()
+        val startDate = localDateTimeToAbsoluteDate(startDateTime)
+        val endDate = localDateTimeToAbsoluteDate(endDateTime)
+        
+        var currentDate = startDate
+        val stepSeconds = stepMinutes * 60.0
+        
+        while (currentDate.compareTo(endDate) <= 0) {
+            val position = calculateSunPosition(currentDate)
+            positions.add(mapOf(
+                "time" to position.dateTime.toString(),
+                "azimuth_degrees" to String.format("%.6f", position.azimuthDegrees),
+                "elevation_degrees" to String.format("%.6f", position.elevationDegrees),
+                "is_visible" to position.isSunVisible(),
+                "date" to position.dateTime.toLocalDate().toString()
+            ))
+            currentDate = currentDate.shiftedBy(stepSeconds)
+        }
+        
+        return mapOf(
+            "search_range" to mapOf(
+                "start" to startDateTime.toString(),
+                "end" to endDateTime.toString(),
+                "step_minutes" to stepMinutes
+            ),
+            "positions" to positions,
+            "total_positions" to positions.size
+        )
     }
     /**
      * 시간 척도 정보 확인 (디버깅용)
