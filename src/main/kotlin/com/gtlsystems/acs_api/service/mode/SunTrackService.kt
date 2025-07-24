@@ -201,130 +201,430 @@ class SunTrackService(
     }
 
         /**
-     * ✅ 초기 Tilt 이동 처리
+     * ✅ 위도 기반 태양 추적 케이스 분류
      */
-    private fun processInitialTiltMovement() {
+    enum class SunTrackingCase(val description: String) {
+        EAST_SOUTH_WEST("동→남→서 (북반구 일반)"),
+        EAST_NORTH_WEST("동→북→서 (남반구 일반)"), 
+        MIDNIGHT_SUN("백야 (극지방 여름)"),
+        POLAR_NIGHT("극야 (극지방 겨울)")
+    }
+
+    /**
+     * ✅ 360도 경계 조건
+     */
+    enum class BoundaryCondition {
+        NORMAL,         // 일반적인 경우
+        CROSSES_NORTH   // 북쪽(0도) 경계를 넘음
+    }
+
+    /**
+     * ✅ Train 각도 계산 결과
+     */
+    data class TrainAngleResult(
+        val angle: Double,
+        val calculationMethod: String
+    )
+
+    /**
+     * ✅ GPS 위도 기반 자동 케이스 분류
+     */
+    private fun classifyTrackingCaseByLatitude(latitude: Double): SunTrackingCase {
+        return when {
+            latitude >= 66.5 -> {
+                // 북극권: 백야/극야 판단 필요
+                determineArcticCondition()
+            }
+            latitude > 23.5 -> {
+                // 북반구 일반 (한국 포함)
+                SunTrackingCase.EAST_SOUTH_WEST
+            }
+            latitude >= -23.5 -> {
+                // 열대: 계절별 판단 (일단 북반구로 처리)
+                SunTrackingCase.EAST_SOUTH_WEST
+            }
+            latitude > -66.5 -> {
+                // 남반구 일반
+                SunTrackingCase.EAST_NORTH_WEST
+            }
+            else -> {
+                // 남극권: 백야/극야 판단 필요
+                determineArcticCondition()
+            }
+        }
+    }
+
+    /**
+     * ✅ 극지방 상태 판단
+     */
+    private fun determineArcticCondition(): SunTrackingCase {
+        return try {
+            val sunInfo = solarOrekitCalculator.getTodaySunriseAndSunset()
+            val currentSun = solarOrekitCalculator.getCurrentSunPosition()
+            
+            when {
+                sunInfo["sunrise"] == "일출 없음" && currentSun.elevationDegrees > 0 -> {
+                    SunTrackingCase.MIDNIGHT_SUN
+                }
+                currentSun.elevationDegrees <= 0 -> {
+                    SunTrackingCase.POLAR_NIGHT
+                }
+                else -> {
+                    // 극지방이지만 정상적인 일출/일몰 있음
+                    SunTrackingCase.EAST_SOUTH_WEST
+                }
+            }
+        } catch (e: Exception) {
+            logger.warn("극지방 상태 판단 실패, 기본값 사용: {}", e.message)
+            SunTrackingCase.EAST_SOUTH_WEST
+        }
+    }
+
+    /**
+     * ✅ 360도 경계 조건 감지 (북반구 + 남반구 모두 지원)
+     */
+    private fun detectsBoundaryCondition(sunriseAz: Double, sunsetAz: Double): BoundaryCondition {
+        // 북반구 스타일: 일출이 서쪽, 일몰이 동쪽 (예: 350° → 10°)
+        val crossesNorthStyle = (sunriseAz > 270.0 && sunsetAz < 90.0)
+        
+        // 남반구 스타일: 일출이 동쪽, 일몰이 서쪽이지만 북쪽을 지남 (예: 32° → 293°)
+        val crossesSouthStyle = (sunriseAz < 90.0 && sunsetAz > 270.0)
+        
+        return if (crossesNorthStyle || crossesSouthStyle) {
+            if (crossesNorthStyle) {
+                logger.info("360도 경계 감지 (북반구형): 일출={}°, 일몰={}° → 북쪽 경로", 
+                    String.format("%.1f", sunriseAz),
+                    String.format("%.1f", sunsetAz))
+            } else {
+                logger.info("360도 경계 감지 (남반구형): 일출={}°, 일몰={}° → 북쪽 경로", 
+                    String.format("%.1f", sunriseAz),
+                    String.format("%.1f", sunsetAz))
+            }
+            BoundaryCondition.CROSSES_NORTH
+        } else {
+            BoundaryCondition.NORMAL
+        }
+    }
+
+    /**
+     * ✅ 경계 조건 고려한 Train 각도 계산
+     */
+    private fun calculateTrainAngleWithBoundaryCorrection(
+        sunriseAz: Double, 
+        sunsetAz: Double
+    ): TrainAngleResult {
+        
+        val boundary = detectsBoundaryCondition(sunriseAz, sunsetAz)
+        
+        return when (boundary) {
+            BoundaryCondition.CROSSES_NORTH -> {
+                // 북쪽 경계 보정: 남반구와 북반구 다르게 처리
+                val isNorthernHemisphere = sunriseAz > 270.0 && sunsetAz < 90.0
+                val isSouthernHemisphere = sunriseAz < 90.0 && sunsetAz > 270.0
+                
+                val trainAngle = if (isNorthernHemisphere) {
+                    // 북반구: 350° → 0° → 10° (일몰에 +360)
+                    val adjustedSunset = sunsetAz + 360.0
+                    val rawMidpoint = (sunriseAz + adjustedSunset) / 2.0
+                    rawMidpoint % 360.0
+                } else if (isSouthernHemisphere) {
+                    // 남반구: 32° → 0° → 293° (일몰에 -360, 더 가까운 쪽 선택)
+                    val option1 = (sunriseAz + sunsetAz) / 2.0  // 163도 (남쪽)
+                    val adjustedSunset = sunsetAz - 360.0  // -66.515
+                    val option2Raw = (sunriseAz + adjustedSunset) / 2.0  // -16.763
+                    val option2 = if (option2Raw < 0) option2Raw + 360 else option2Raw  // 343.237
+                    
+                    // 북쪽에 더 가까운 쪽 선택 (0도 기준)
+                    val distanceToNorth1 = Math.min(option1, 360 - option1)  // min(163, 197) = 163
+                    val distanceToNorth2 = Math.min(option2, 360 - option2)  // min(343, 17) = 17
+                    
+                    if (distanceToNorth2 < distanceToNorth1) option2 else option1
+                } else {
+                    (sunriseAz + sunsetAz) / 2.0  // 기본값
+                }
+                
+                // ✅ Train 축 ±270도 제한 적용
+                val finalTrainAngle = normalizeTrainAngleToMechanicalLimits(trainAngle)
+                
+                logger.info("북쪽 경계 처리: 일출={}°, 일몰={}° → Train={}° → 제한적용={}°",
+                    String.format("%.1f", sunriseAz),
+                    String.format("%.1f", sunsetAz),
+                    String.format("%.1f", trainAngle),
+                    String.format("%.1f", finalTrainAngle))
+                
+                TrainAngleResult(finalTrainAngle, "북쪽 경계 보정 (±270도 제한 적용)")
+            }
+            
+            BoundaryCondition.NORMAL -> {
+                // 일반적인 경우
+                val rawTrainAngle = (sunriseAz + sunsetAz) / 2.0
+                val finalTrainAngle = normalizeTrainAngleToMechanicalLimits(rawTrainAngle)
+                
+                logger.info("일반 계산: 일출={}°, 일몰={}° → Train={}° → 제한적용={}°",
+                    String.format("%.1f", sunriseAz),
+                    String.format("%.1f", sunsetAz),
+                    String.format("%.1f", rawTrainAngle),
+                    String.format("%.1f", finalTrainAngle))
+                
+                TrainAngleResult(finalTrainAngle, "일반 계산 (±270도 제한 적용)")
+            }
+        }
+    }
+
+    /**
+     * ✅ Train 각도를 기계적 제한 범위(±270도)로 정규화
+     */
+    private fun normalizeTrainAngleToMechanicalLimits(angle: Double): Double {
+        return when {
+            angle > 270.0 -> {
+                // 270도 초과시 역방향으로 변환 (343° → -17°)
+                val normalized = angle - 360.0
+                logger.debug("Train 각도 정규화: {}° → {}° (역방향)", 
+                    String.format("%.1f", angle),
+                    String.format("%.1f", normalized))
+                normalized
+            }
+            angle < -270.0 -> {
+                // -270도 미만시 정방향으로 변환 (-300° → 60°)
+                val normalized = angle + 360.0
+                logger.debug("Train 각도 정규화: {}° → {}° (정방향)", 
+                    String.format("%.1f", angle),
+                    String.format("%.1f", normalized))
+                normalized
+            }
+            else -> {
+                // ±270도 범위 내: 그대로 유지
+                angle
+            }
+        }
+    }
+
+    /**
+     * ✅ 백야 상황 전용 Train 각도 계산 (향후 구현)
+     */
+    private fun calculateTrainAngleForMidnightSun(): TrainAngleResult {
+        logger.info("⚠️ 백야 상황 감지 - 특수 처리 모드")
+        
+        // TODO: 백야 상황에서 Train 각도 계산 로직
+        // 가능한 방법들:
+        // 1. 동적 Train 회전 (12시간마다 180도)
+        // 2. 현재 태양 위치 기준 Train 설정
+        // 3. 시간대 기반 Train 설정
+        
+        return TrainAngleResult(
+            angle = 0.0,  // 임시값: 북쪽
+            calculationMethod = "백야 전용 로직 (구현 예정)"
+        )
+    }
+
+    /**
+     * ✅ 극야 상황 처리
+     */
+    private fun handlePolarNight(): TrainAngleResult {
+        logger.info("⚠️ 극야 상황 감지 - 태양 추적 불가능")
+        
+        return TrainAngleResult(
+            angle = Double.NaN,
+            calculationMethod = "극야 - 추적 중단"
+        )
+    }
+
+    /**
+     * ✅ 일반 지역용 일출/일몰 가운데 계산
+     */
+    private fun calculateTrainAngleByMiddleOfSunriseAndSunset(): TrainAngleResult {
+        val todaySunInfo = solarOrekitCalculator.getTodaySunriseAndSunset()
+        val sunriseInfo = todaySunInfo["sunrise"]
+        val sunsetInfo = todaySunInfo["sunset"]
+        
+        if (sunriseInfo is Map<*, *> && sunsetInfo is Map<*, *>) {
+            val sunriseAzimuth = (sunriseInfo["azimuth_degrees"] as String).toDouble()
+            val sunsetAzimuth = (sunsetInfo["azimuth_degrees"] as String).toDouble()
+            
+            // 360도 경계 처리 적용
+            val result = calculateTrainAngleWithBoundaryCorrection(sunriseAzimuth, sunsetAzimuth)
+            
+            logger.info("일출/일몰 가운데 계산: 일출={}°, 일몰={}°, Train={}° ({})",
+                String.format("%.3f", sunriseAzimuth),
+                String.format("%.3f", sunsetAzimuth), 
+                String.format("%.3f", result.angle),
+                result.calculationMethod)
+            
+            return result
+        } else {
+            throw RuntimeException("일출/일몰 정보를 가져올 수 없습니다: $todaySunInfo")
+        }
+    }
+
+    /**
+     * ✅ 모든 케이스를 고려한 최적 Train 각도 계산
+     */
+    private fun calculateOptimalTrainAngleUniversal(): TrainAngleResult {
         try {
-            if (targetTiltAngle == null) {
-                // ✅ 디버깅: 어제 자정부터 오늘 자정까지의 태양 위치 확인 (1시간 간격)
-                val yesterdayMidnight = LocalDateTime.now(ZoneOffset.UTC)
-                    .toLocalDate()
-                    .minusDays(1)
-                    .atStartOfDay()
-                val todayMidnight = LocalDateTime.now(ZoneOffset.UTC)
-                    .toLocalDate()
-                    .atStartOfDay()
-                
-                val debugInfo = solarOrekitCalculator.debugSunPositions(yesterdayMidnight, todayMidnight, 60.0)
-                logger.info("=== 태양 위치 디버깅 정보 (1시간 간격) ===")
-                logger.info("검색 범위: {} ~ {}", debugInfo["search_range"])
-                logger.info("총 위치 수: {}", debugInfo["total_positions"])
-                
-                val positions = debugInfo["positions"] as List<Map<String, Any>>
-                positions.forEach { pos ->
-                    logger.info("시간: {}, 고도각: {}°, 보임: {}, 날짜: {}", 
-                        pos["time"], pos["elevation_degrees"], pos["is_visible"], pos["date"])
+            val latitude = GlobalData.Location.latitude
+            val trackingCase = classifyTrackingCaseByLatitude(latitude)
+            
+            logger.info("GPS 위치 분석: 위도={}°, 케이스={}", 
+                String.format("%.3f", latitude), 
+                trackingCase.description)
+            
+            return when (trackingCase) {
+                SunTrackingCase.EAST_SOUTH_WEST, SunTrackingCase.EAST_NORTH_WEST -> {
+                    // 일반 지역: 일출/일몰 가운데 계산
+                    calculateTrainAngleByMiddleOfSunriseAndSunset()
                 }
-                logger.info("=== 1시간 간격 디버깅 정보 끝 ===")
                 
-                // ✅ 추가 디버깅: 10분 간격으로 일출/일몰 전후 시간 확인
-                val currentTime = LocalDateTime.now(ZoneOffset.UTC)
-                val startTime = currentTime.minusHours(2) // 현재 시간 2시간 전부터
-                val endTime = currentTime.plusHours(2)    // 현재 시간 2시간 후까지
-                
-                val detailedDebugInfo = solarOrekitCalculator.debugSunPositions(startTime, endTime, 10.0)
-                logger.info("=== 상세 태양 위치 디버깅 정보 (10분 간격) ===")
-                logger.info("검색 범위: {} ~ {}", detailedDebugInfo["search_range"])
-                logger.info("총 위치 수: {}", detailedDebugInfo["total_positions"])
-                
-                val detailedPositions = detailedDebugInfo["positions"] as List<Map<String, Any>>
-                detailedPositions.forEach { pos ->
-                    logger.info("상세시간: {}, 고도각: {}°, 보임: {}, 날짜: {}", 
-                        pos["time"], pos["elevation_degrees"], pos["is_visible"], pos["date"])
+                SunTrackingCase.MIDNIGHT_SUN -> {
+                    // 백야: 특수 함수 (구현 예정)
+                    calculateTrainAngleForMidnightSun()
                 }
-                logger.info("=== 10분 간격 디버깅 정보 끝 ===")
                 
-                // ✅ 일출/일몰 가운데 Azimuth 각도 계산
+                SunTrackingCase.POLAR_NIGHT -> {
+                    // 극야: 추적 중단
+                    handlePolarNight()
+                }
+            }
+        } catch (e: Exception) {
+            logger.error("Train 각도 계산 실패: {}", e.message, e)
+            // 기본값: 남쪽
+            return TrainAngleResult(180.0, "에러 발생 - 기본값 사용")
+        }
+    }
+
+    /**
+     * ✅ 범용 상대 Azimuth 계산
+     */
+    private fun calculateUniversalAzimuth(sunAzimuth: Double, trainAngle: Double): Double {
+        var relativeAzimuth = sunAzimuth - trainAngle
+        
+        // ±180도 범위로 정규화 (최단 경로)
+        while (relativeAzimuth > 180.0) relativeAzimuth -= 360.0
+        while (relativeAzimuth < -180.0) relativeAzimuth += 360.0
+        
+        return relativeAzimuth
+    }
+
+    /**
+     * ✅ 일출/일몰 방향 정보 설정
+     */
+    private fun setSunriseSunsetAzimuths() {
                 val todaySunInfo = solarOrekitCalculator.getTodaySunriseAndSunset()
-                
+        val sunriseInfo = todaySunInfo["sunrise"]
+        val sunsetInfo = todaySunInfo["sunset"]
+
+        if (sunriseInfo is Map<*, *> && sunsetInfo is Map<*, *>) {
+            this.sunriseAzimuth = (sunriseInfo["azimuth_degrees"] as String).toDouble()
+            this.sunsetAzimuth = (sunsetInfo["azimuth_degrees"] as String).toDouble()
+            this.isSouthPath = (sunriseAzimuth!! < sunsetAzimuth!!) // true면 동→남→서, false면 동→북→서
+        } else {
+            logger.error("일출/일몰 정보를 가져올 수 없습니다: {}", todaySunInfo)
+            this.sunriseAzimuth = null
+            this.sunsetAzimuth = null
+            this.isSouthPath = null
+        }
+    }
+
+    /**
+     * ✅ 일출/일몰 가운데 시간 계산
+     */
+    private fun calculateMidTime() {
+        val todaySunInfo = solarOrekitCalculator.getTodaySunriseAndSunset()
                 val sunriseInfo = todaySunInfo["sunrise"]
                 val sunsetInfo = todaySunInfo["sunset"]
                 
                 if (sunriseInfo is Map<*, *> && sunsetInfo is Map<*, *>) {
-                    // ✅ 일출/일몰 가운데 시간 계산 (한 번만)
                     val sunriseTime = LocalDateTime.parse(sunriseInfo["time"] as String)
                     val sunsetTime = LocalDateTime.parse(sunsetInfo["time"] as String)
-                    
-                    // UTC를 한국 시간으로 변환 (UTC+9)
-                    val koreaZone = java.time.ZoneId.of("Asia/Seoul")
-                    val sunriseKoreaTime = sunriseTime.atZone(java.time.ZoneOffset.UTC).withZoneSameInstant(koreaZone).toLocalDateTime()
-                    val sunsetKoreaTime = sunsetTime.atZone(java.time.ZoneOffset.UTC).withZoneSameInstant(koreaZone).toLocalDateTime()
-                    
-                    // 일출/일몰 시간 정보 로그 출력 (한국 시간)
 
-                    logger.info("일출/일몰 시간 정보: 일출={} ({}°), 일몰={} ({}°)", 
-                        sunriseKoreaTime.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")),
-                        String.format("%.3f", (sunriseInfo["azimuth_degrees"] as String).toDouble()),
-                        sunsetKoreaTime.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")),
-                        String.format("%.3f", (sunsetInfo["azimuth_degrees"] as String).toDouble()))
-                    
-                    // 디버깅용: 원본 데이터 출력
-                    logger.info("원본 일출/일몰 데이터: 일출={}, 일몰={}", 
-                        sunriseInfo["time"], sunsetInfo["time"])
-                    logger.info("파싱된 UTC 시간: 일출={}, 일몰={}", 
-                        sunriseTime, sunsetTime)
-                    logger.info("변환된 한국 시간: 일출={}, 일몰={}", 
-                        sunriseKoreaTime, sunsetKoreaTime)
-
-                    // ✅ 일출/일몰 가운데 시간 계산
                     midTime = if (sunriseTime.isBefore(sunsetTime)) {
                         sunriseTime.plusSeconds(sunriseTime.until(sunsetTime, java.time.temporal.ChronoUnit.SECONDS) / 2)
                     } else {
                         sunsetTime.plusSeconds(sunsetTime.until(sunriseTime, java.time.temporal.ChronoUnit.SECONDS) / 2)
-                    }
-                    
-                    // ✅ 일출/일몰 Azimuth 각도의 가운데 계산
-                    val sunriseAzimuth = (sunriseInfo["azimuth_degrees"] as String).toDouble()
-                    val sunsetAzimuth = (sunsetInfo["azimuth_degrees"] as String).toDouble()
+            }
+        } else {
+            logger.error("일출/일몰 정보를 가져올 수 없습니다: {}", todaySunInfo)
+            midTime = null
+        }
+    }
 
-                    // 360도 경계 처리
-                    val midAzimuth = if (sunriseAzimuth > sunsetAzimuth) {
-                        val adjustedSunsetAzimuth = sunsetAzimuth + 360.0
-                        (sunriseAzimuth + adjustedSunsetAzimuth) / 2.0
+    /**
+     * ✅ 일출/일몰 방향에 따른 Azimuth 계산
+     * 동→남→서 경로: 270도 넘으면 음수로 변환
+     * 동→북→서 경로: 양수로 유지
+     */
+    private fun calculateAzimuthBySunPath(azimuth: Double): Double {
+        if (isSouthPath == null) {
+            logger.warn("일출/일몰 방향 정보가 없습니다. 기본값(양수) 사용")
+            return azimuth
+        }
+        
+        return if (isSouthPath!!) {
+            // 1번 상황: 동→남→서 경로 → 270도 넘으면 음수로 변환
+            if (azimuth > 270.0) {
+                val negativeAzimuth = azimuth - 360.0
+                logger.debug("동→남→서 경로: {}° → {}° (음수 변환)", 
+                    String.format("%.3f", azimuth),
+                    String.format("%.3f", negativeAzimuth))
+                negativeAzimuth
                     } else {
-                        (sunriseAzimuth + sunsetAzimuth) / 2.0
-                    }
+                logger.debug("동→남→서 경로: {}° (양수 유지)", String.format("%.3f", azimuth))
+                azimuth
+            }
+        } else {
+            // 2번 상황: 동→북→서 경로 → 양수로 유지
+            logger.debug("동→북→서 경로: {}° (양수 유지)", String.format("%.3f", azimuth))
+            azimuth
+        }
+    }
 
-                    // 360도 범위로 정규화
-                    val normalizedMidAzimuth = (midAzimuth + 360.0) % 360.0
-                    
-                    // ✅ 일출/일몰 방향 정보 설정
-                    this.sunriseAzimuth = sunriseAzimuth
-                    this.sunsetAzimuth = sunsetAzimuth
-                    this.isSouthPath = sunriseAzimuth < sunsetAzimuth // true면 동→남→서, false면 동→북→서
-                    
-                    targetTiltAngle = normalizedMidAzimuth
-                    CMD.cmdTiltAngle = normalizedMidAzimuth.toFloat()
+    /**
+     * ✅ Azimuth 각도를 0~360도 범위로 정규화
+     */
+    private fun normalizeAzimuthTo360Range(azimuth: Double): Double {
+        var normalized = azimuth
+        while (normalized >= 360.0) normalized -= 360.0
+        while (normalized < 0.0) normalized += 360.0
+        return normalized
+    }
 
-                    // Rotator 각도도 동일하게 설정
-                    rotatorAngle = normalizedMidAzimuth
-                  
-                    logger.info("일출/일몰 가운데 Azimuth 각도 계산 완료: 가운데={}°, 경로={}", 
-                        String.format("%.3f", normalizedMidAzimuth),
-                        if (isSouthPath!!) "동→남→서" else "동→북→서")
-
-                    // ✅ Tilt 이동 명령 전송
+            /**
+     * ✅ 개선된 초기 Tilt 이동 처리
+     */
+    private fun processInitialTiltMovement() {
+        try {
+            if (targetTiltAngle == null) {
+                // ✅ 통합된 범용 Train 각도 계산 사용
+                val trainResult = calculateOptimalTrainAngleUniversal()
+                
+                if (trainResult.angle.isNaN()) {
+                    // 극야 등으로 Train 계산 불가능
+                    logger.warn("Train 각도 계산 불가능: {}", trainResult.calculationMethod)
+                    sunTrackState = SunTrackState.IDLE
+                    return
+                }
+                
+                targetTiltAngle = trainResult.angle
+                rotatorAngle = trainResult.angle
+                CMD.cmdTiltAngle = trainResult.angle.toFloat()
+                
+                // ✅ 일출/일몰 방향 정보 설정 (호환성 유지)
+                setSunriseSunsetAzimuths()
+                
+                // ✅ 일출/일몰 가운데 시간 계산 (호환성 유지)
+                calculateMidTime()
+                
+                logger.info("개선된 Train 각도 설정 완료: {}° ({})", 
+                    String.format("%.3f", trainResult.angle),
+                    trainResult.calculationMethod)
+                
+                // ✅ Train 이동 명령 전송
                     sendTiltMovementCommand(rotatorAngle!!)
                     
-                    // ✅ 이동 명령 전송 후에도 INITIAL_TILT 상태 유지 (목표 각도 도달 전까지)
-                    // sunTrackState는 INITIAL_TILT로 유지
-                    tiltStabilizationStartTime = null // 안정화 타이머 초기화
-                    
-                    logger.info("Tilt 이동 명령 전송 완료, 목표 각도 도달 대기 중")
-                } else {
-                    logger.error("일출/일몰 정보를 가져올 수 없습니다: {}", todaySunInfo)
-                    sunTrackState = SunTrackState.IDLE
-                }
+                // ✅ 안정화 단계로 전환
+                sunTrackState = SunTrackState.STABILIZING
+                tiltStabilizationStartTime = System.currentTimeMillis()
+                
+                logger.info("Train 이동 명령 전송 완료, 안정화 단계 진입")
             } else {
                 // ✅ targetTiltAngle이 이미 설정되어 있으면 매번 목표 각도 도달 확인
                 val currentTiltAngle = dataStoreService.getLatestData().tiltAngle
@@ -460,16 +760,27 @@ class SunTrackService(
                     azimuth = sunPosition.azimuthDegrees,  // 원본 태양 위치
                     elevation = sunPosition.elevationDegrees,
                     tiltAngle = -6.98,                     // 실제 Tilt 기울기
-                    rotatorAngle = 0.0                     // Train 축 회전 각도 (0도 기준으로 순수 변환)
+                    rotatorAngle = rotatorAngle!!          // Train 축 회전 각도 (일출/일몰 가운데)
                 )
                 val transformDuration = System.currentTimeMillis() - transformStart
                 
-                // ✅ 4단계: 일출/일몰 방향에 따른 Azimuth 계산
-                val pathAdjustedAzimuth = calculateAzimuthBySunPath(transformedAz)
+                            // ✅ 4단계: 범용 상대 Azimuth 계산
+            val relativeAzimuth = calculateUniversalAzimuth(
+                sunPosition.azimuthDegrees, 
+                rotatorAngle!!
+            )
+            
+            // ✅ ±270도 제한 체크
+            if (Math.abs(relativeAzimuth) > 270.0) {
+                logger.warn("태양이 Train 제한범위 초과: 상대Az={}°, 제한=±270°", 
+                    String.format("%.3f", relativeAzimuth))
+                dataStoreService.setSunTracking(false)
+                return
+            }
                 
                 // 5단계: 명령 전송 시간 측정
                 val commandStart = System.currentTimeMillis()
-                sendAzimuthAndElevationAxisCommand(pathAdjustedAzimuth.toFloat(), 5.0f, transformedEl.toFloat(), 5.0f, targetTiltAngle!!.toFloat())
+                sendAzimuthAndElevationAxisCommand(relativeAzimuth.toFloat(), 5.0f, transformedEl.toFloat(), 5.0f, rotatorAngle!!.toFloat())
                 val commandDuration = System.currentTimeMillis() - commandStart
                 
                 // ✅ 데이터 스토어 업데이트
@@ -503,28 +814,30 @@ class SunTrackService(
                     String.format("%.3f", sunPosition.azimuthDegrees),
                     String.format("%.3f", sunPosition.elevationDegrees),
                     calTime)
-                logger.info("[CalTime] 3축 변환 후: Az={}°, El={}° (Tilt={}°, Train=0°)", 
+                logger.info("[CalTime] 3축 변환 후: Az={}°, El={}° (Tilt={}°, Train={}°)", 
                     String.format("%.3f", transformedAz),
                     String.format("%.3f", transformedEl),
-                    String.format("%.3f", -6.98))
-                logger.info("[CalTime] 경로 조정: Az={}° → {}° (경로={})", 
-                    String.format("%.3f", transformedAz),
-                    String.format("%.3f", pathAdjustedAzimuth),
-                    if (isSouthPath != null) (if (isSouthPath!!) "동→남→서" else "동→북→서") else "미설정")                
+                    String.format("%.3f", -6.98),
+                    String.format("%.3f", rotatorAngle))
+                logger.info("[CalTime] 범용 Azimuth 계산: 태양={}°, Train={}°, 상대Az={}°", 
+                    String.format("%.3f", sunPosition.azimuthDegrees),
+                    String.format("%.3f", rotatorAngle),
+                    String.format("%.3f", relativeAzimuth))                
                 
-                logger.debug("[CalTime] 실시간 태양 추적: CalTime={}, 원본 Az={}°, El={}° → 3축변환 Az={}°, El={}° → 경로조정 Az={}°, Tilt={}°, Train=0°, 처리시간={}ms, 주기지연={}ms", 
+                logger.debug("[CalTime] 범용 태양 추적: CalTime={}, 원본 Az={}°, El={}° → 3축변환 Az={}°, El={}° → 상대Az={}°, Tilt={}°, Train={}°, 처리시간={}ms, 주기지연={}ms", 
                     calTime.toString(),
                     String.format("%.6f", sunPosition.azimuthDegrees),
                     String.format("%.6f", sunPosition.elevationDegrees),
                     String.format("%.6f", transformedAz),
                     String.format("%.6f", transformedEl),
-                    String.format("%.6f", pathAdjustedAzimuth),
+                    String.format("%.6f", relativeAzimuth),
                     String.format("%.3f", -6.98), // 실제 Tilt 기울기
+                    String.format("%.3f", rotatorAngle), // Train 축 회전 각도
                     totalProcessingTime,
                     timeSinceLastCycle)
                 
             } else {
-                logger.error("일출/일몰 방향 정보를 가져올 수 없습니다: {}", isSouthPath)
+                logger.error("Train 회전 각도 정보를 가져올 수 없습니다: {}", rotatorAngle)
                 dataStoreService.setSunTracking(false)
             }
             
@@ -728,12 +1041,12 @@ class SunTrackService(
         return mapOf(
             "currentAzimuth" to currentAzimuth,
             "currentTiltAngle" to currentTiltAngle,
-            "rotatorAngle" to 0.0, // 0도 기준으로 순수 변환
+            "rotatorAngle" to rotatorAngle,
             "sunriseAzimuth" to sunriseAzimuth,
             "sunsetAzimuth" to sunsetAzimuth,
             "isSouthPath" to isSouthPath,
             "sunPathType" to if (isSouthPath != null) (if (isSouthPath!!) "동→남→서" else "동→북→서") else "미설정",
-            "azimuthCalculationType" to "일출/일몰 방향 기반 (동→남→서: 중간값 기준 조정, 동→북→서: 양수)",
+            "azimuthCalculationType" to "일출/일몰 방향 기반 (동→남→서: 270도 넘으면 음수, 동→북→서: 양수)",
             "sunTrackState" to sunTrackState.name,
             "targetTiltAngle" to targetTiltAngle
         )
@@ -871,42 +1184,5 @@ class SunTrackService(
         return finalTarget
     }
 
-    /**
-     * ✅ 일출/일몰 방향에 따른 Azimuth 계산
-     * 동→남→서 경로: 일출/일몰 중간값 기준으로 조정 (0도를 지나면서 한 방향으로 연속 이동)
-     * 동→북→서 경로: 양수로 유지
-     */
-    private fun calculateAzimuthBySunPath(azimuth: Double): Double {
-        if (isSouthPath == null || sunriseAzimuth == null || sunsetAzimuth == null) {
-            logger.warn("일출/일몰 방향 정보가 없습니다. 기본값(양수) 사용")
-            return azimuth
-        }
-        
-        return if (isSouthPath!!) {
-            // 1번 상황: 동→남→서 경로 → 일출/일몰 중간값 기준으로 조정
-            val midAzimuth = (sunriseAzimuth!! + sunsetAzimuth!!) / 2.0
-            val adjustedAzimuth = azimuth - midAzimuth
-            logger.debug("동→남→서 경로: {}° → {}° (중간값 {}° 기준 조정)", 
-                String.format("%.3f", azimuth),
-                String.format("%.3f", adjustedAzimuth),
-                String.format("%.3f", midAzimuth))
-            adjustedAzimuth
-        } else {
-            // 2번 상황: 동→북→서 경로 → 양수로 유지 + 360도 정규화
-            val normalizedAzimuth = azimuth % 360.0
-            logger.debug("동→북→서 경로: {}° (양수 유지)", String.format("%.3f", normalizedAzimuth))
-            normalizedAzimuth
-        }
-    }
-
-    /**
-     * ✅ Azimuth 각도를 0~360도 범위로 정규화
-     */
-    private fun normalizeAzimuthTo360Range(azimuth: Double): Double {
-        var normalized = azimuth
-        while (normalized >= 360.0) normalized -= 360.0
-        while (normalized < 0.0) normalized += 360.0
-        return normalized
-    }
 }
 

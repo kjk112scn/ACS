@@ -69,6 +69,9 @@ object GlobalData {
     object Location {
         var latitude: Double = 35.317540//35.3175
         var longitude: Double = 128.608510//128.6083
+        //시드니 남반구 테스트 태양추적시시
+        //var latitude: Double = -33.8688 //35.3175
+        //var longitude: Double = 151.2093//128.6083
         var altitude: Double = 0.0
     }
 
