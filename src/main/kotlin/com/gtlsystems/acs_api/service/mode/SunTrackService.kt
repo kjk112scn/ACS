@@ -430,7 +430,7 @@ class SunTrackService(
     }
 
     /**
-     * ✅ 일반 지역용 일출/일몰 가운데 계산
+     * ✅ 단순화된 Train 각도 계산 (정오 태양 방위각 기반)
      */
     private fun calculateTrainAngleByMiddleOfSunriseAndSunset(): TrainAngleResult {
         val todaySunInfo = solarOrekitCalculator.getTodaySunriseAndSunset()
@@ -440,47 +440,100 @@ class SunTrackService(
         if (sunriseInfo is Map<*, *> && sunsetInfo is Map<*, *>) {
             val sunriseAzimuth = (sunriseInfo["azimuth_degrees"] as String).toDouble()
             val sunsetAzimuth = (sunsetInfo["azimuth_degrees"] as String).toDouble()
+            val sunriseTime = sunriseInfo["time"] as String
+            val sunsetTime = sunsetInfo["time"] as String
             
-            // 360도 경계 처리 적용
-            val result = calculateTrainAngleWithBoundaryCorrection(sunriseAzimuth, sunsetAzimuth)
+            // ✅ UTC → KST 변환 함수
+            fun utcToKst(utcTimeStr: String): String {
+                val utcDateTime = LocalDateTime.parse(utcTimeStr)
+                val kstDateTime = utcDateTime.atZone(ZoneOffset.UTC)
+                    .withZoneSameInstant(java.time.ZoneId.of("Asia/Seoul"))
+                return kstDateTime.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+            }
             
-            logger.info("일출/일몰 가운데 계산: 일출={}°, 일몰={}°, Train={}° ({})",
-                String.format("%.3f", sunriseAzimuth),
+            // ✅ 중간 시간 계산
+            val sunriseDateTime = LocalDateTime.parse(sunriseTime)
+            val sunsetDateTime = LocalDateTime.parse(sunsetTime)
+            val midDateTime = if (sunriseDateTime.isBefore(sunsetDateTime)) {
+                sunriseDateTime.plusSeconds(sunriseDateTime.until(sunsetDateTime, java.time.temporal.ChronoUnit.SECONDS) / 2)
+            } else {
+                sunsetDateTime.plusSeconds(sunsetDateTime.until(sunriseDateTime, java.time.temporal.ChronoUnit.SECONDS) / 2)
+            }
+            
+            // ✅ 실제 정오 시간 계산 (현지 12:00 기준)
+            val todayDate = LocalDateTime.now(ZoneOffset.UTC).toLocalDate()
+            val longitude = GlobalData.Location.longitude
+            val utcOffsetHours = longitude / 15.0  // 경도 15도 = 1시간
+            val utcNoon = todayDate.atTime(12, 0).minusHours(utcOffsetHours.toLong()).minusMinutes(((utcOffsetHours % 1) * 60).toLong())
+            
+            // ✅ 정오 시 태양 방위각 확인 (핵심 로직!)  
+            val noonSunPosition = solarOrekitCalculator.getSunPositionAt(utcNoon)
+            val noonAzimuth = noonSunPosition.azimuthDegrees
+            
+            // ✅ 단순화된 Train 각도 결정
+            val (trainAngle, pathType) = if (noonAzimuth >= 135.0 && noonAzimuth <= 225.0) {
+                // 정오에 남쪽 → 동남서 경로 → Train: 일출/일몰 중간
+                val rawAngle = (sunriseAzimuth + sunsetAzimuth) / 2.0
+                val finalAngle = normalizeTrainAngleToMechanicalLimits(rawAngle)
+                finalAngle to "동남서 경로"
+            } else {
+                // 정오에 북쪽 → 동북서 경로 → Train: 0° 근처
+                val adjustedSunset = if (sunsetAzimuth > 180.0) sunsetAzimuth - 360.0 else sunsetAzimuth
+                val rawAngle = (sunriseAzimuth + adjustedSunset) / 2.0
+                val finalAngle = normalizeTrainAngleToMechanicalLimits(rawAngle)
+                finalAngle to "동북서 경로"
+            }
+            
+            logger.info("🌅 단순화된 Train 각도 계산 완료:")
+            logger.info("  📍 일출: {}° (UTC: {} | KST: {})", 
+                String.format("%.3f", sunriseAzimuth), 
+                sunriseTime, 
+                utcToKst(sunriseTime))
+            logger.info("  📍 일몰: {}° (UTC: {} | KST: {})", 
                 String.format("%.3f", sunsetAzimuth), 
-                String.format("%.3f", result.angle),
-                result.calculationMethod)
+                sunsetTime, 
+                utcToKst(sunsetTime))
+            logger.info("  📍 정오: {}° (UTC: {} | KST: {})", 
+                String.format("%.3f", noonAzimuth), 
+                utcNoon.toString(), 
+                utcToKst(utcNoon.toString()))
+            logger.info("  🎯 경로: {} → Train 각도: {}°", pathType, String.format("%.3f", trainAngle))
             
-            return result
+            return TrainAngleResult(trainAngle, "단순화 로직 ($pathType)")
         } else {
             throw RuntimeException("일출/일몰 정보를 가져올 수 없습니다: $todaySunInfo")
         }
     }
 
     /**
-     * ✅ 모든 케이스를 고려한 최적 Train 각도 계산
+     * ✅ 단순화된 전세계 Train 각도 계산 (일출 존재 여부 기반)
      */
     private fun calculateOptimalTrainAngleUniversal(): TrainAngleResult {
         try {
-            val latitude = GlobalData.Location.latitude
-            val trackingCase = classifyTrackingCaseByLatitude(latitude)
+            // ✅ 일출/일몰 정보 확인
+                val todaySunInfo = solarOrekitCalculator.getTodaySunriseAndSunset()
+            val sunriseInfo = todaySunInfo["sunrise"]
+            val currentSun = solarOrekitCalculator.getCurrentSunPosition()
             
-            logger.info("GPS 위치 분석: 위도={}°, 케이스={}", 
-                String.format("%.3f", latitude), 
-                trackingCase.description)
+            logger.info("🌍 전세계 Train 각도 계산: 현재 태양 고도={}°", 
+                String.format("%.3f", currentSun.elevationDegrees))
             
-            return when (trackingCase) {
-                SunTrackingCase.EAST_SOUTH_WEST, SunTrackingCase.EAST_NORTH_WEST -> {
-                    // 일반 지역: 일출/일몰 가운데 계산
+            return when {
+                sunriseInfo != "일출 없음" -> {
+                    // ✅ 정상 케이스: 일출/일몰 존재 → 정오 방위각으로 판단
+                    logger.info("📅 정상 지역: 일출/일몰 존재 → 정오 방위각 기반 계산")
                     calculateTrainAngleByMiddleOfSunriseAndSunset()
                 }
                 
-                SunTrackingCase.MIDNIGHT_SUN -> {
-                    // 백야: 특수 함수 (구현 예정)
+                currentSun.elevationDegrees > 0 -> {
+                    // ✅ 백야: 일출 없음 + 태양 보임
+                    logger.info("☀️ 백야 지역: 24시간 태양 → 특수 처리")
                     calculateTrainAngleForMidnightSun()
                 }
                 
-                SunTrackingCase.POLAR_NIGHT -> {
-                    // 극야: 추적 중단
+                else -> {
+                    // ✅ 극야: 일출 없음 + 태양 안 보임
+                    logger.info("🌑 극야 지역: 24시간 어둠 → 추적 중단")
                     handlePolarNight()
                 }
             }
@@ -509,10 +562,10 @@ class SunTrackService(
      */
     private fun setSunriseSunsetAzimuths() {
                 val todaySunInfo = solarOrekitCalculator.getTodaySunriseAndSunset()
-        val sunriseInfo = todaySunInfo["sunrise"]
-        val sunsetInfo = todaySunInfo["sunset"]
-
-        if (sunriseInfo is Map<*, *> && sunsetInfo is Map<*, *>) {
+                val sunriseInfo = todaySunInfo["sunrise"]
+                val sunsetInfo = todaySunInfo["sunset"]
+                
+                if (sunriseInfo is Map<*, *> && sunsetInfo is Map<*, *>) {
             this.sunriseAzimuth = (sunriseInfo["azimuth_degrees"] as String).toDouble()
             this.sunsetAzimuth = (sunsetInfo["azimuth_degrees"] as String).toDouble()
             this.isSouthPath = (sunriseAzimuth!! < sunsetAzimuth!!) // true면 동→남→서, false면 동→북→서

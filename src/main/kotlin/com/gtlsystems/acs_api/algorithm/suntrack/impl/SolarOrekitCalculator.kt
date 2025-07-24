@@ -147,7 +147,7 @@ class SolarOrekitCalculator(
     }
 
     /**
-     * 다음 일출 시간 찾기
+     * 다음 일출 시간 찾기 (진짜 일출: 태양이 지평선 아래→위로 올라오는 시점)
      */
     fun findNextSunrise(fromDateTime: LocalDateTime? = null): SunPosition? {
         checkInitialized()
@@ -160,13 +160,25 @@ class SolarOrekitCalculator(
 
         var currentDate = startDate
         val stepMinutes = 10.0
+        var previousPosition: SunPosition? = null
 
-        // 24시간 동안 검색
-        repeat(144) {
-            val position = calculateSunPosition(currentDate)
-            if (position.isSunVisible()) {
-                return position
+        // 48시간 동안 검색 (24시간 → 48시간으로 증가)
+        repeat(288) {  // 48시간 = 288 * 10분
+            val currentPosition = calculateSunPosition(currentDate)
+            
+            // ✅ 진짜 일출 조건: 이전에는 안 보이다가 → 현재는 보임
+            val prevPos = previousPosition
+            if (prevPos != null && 
+                !prevPos.isSunVisible() && 
+                currentPosition.isSunVisible()) {
+                logger.debug("진짜 일출 발견: 이전={}°, 현재={}° (시간: {})", 
+                    String.format("%.3f", prevPos.elevationDegrees),
+                    String.format("%.3f", currentPosition.elevationDegrees),
+                    currentPosition.dateTime)
+                return currentPosition
             }
+            
+            previousPosition = currentPosition
             currentDate = currentDate.shiftedBy(stepMinutes * 60)
         }
 
@@ -174,7 +186,7 @@ class SolarOrekitCalculator(
     }
 
     /**
-     * 다음 일몰 시간 찾기
+     * 다음 일몰 시간 찾기 (진짜 일몰: 태양이 지평선 위에서 아래로 내려가는 시점)
      */
     fun findNextSunset(fromDateTime: LocalDateTime? = null): SunPosition? {
         checkInitialized()
@@ -185,21 +197,27 @@ class SolarOrekitCalculator(
             getCurrentAbsoluteDate()
         }
 
-        // 현재 태양이 보이는지 확인
-        val currentPosition = calculateSunPosition(startDate)
-        if (!currentPosition.isSunVisible()) {
-            return null // 태양이 이미 보이지 않으면 일몰을 찾을 수 없음
-        }
-
         var currentDate = startDate
         val stepMinutes = 10.0
+        var previousPosition: SunPosition? = null
 
-        // 24시간 동안 검색
-        repeat(144) {
-            val position = calculateSunPosition(currentDate)
-            if (!position.isSunVisible()) {
-                return position
+        // 48시간 동안 검색 (24시간 → 48시간으로 증가)
+        repeat(288) {  // 48시간 = 288 * 10분
+            val currentPosition = calculateSunPosition(currentDate)
+            
+            // ✅ 진짜 일몰 조건: 이전에는 보이다가 → 현재는 안 보임
+            val prevPos = previousPosition
+            if (prevPos != null && 
+                prevPos.isSunVisible() && 
+                !currentPosition.isSunVisible()) {
+                logger.debug("진짜 일몰 발견: 이전={}°, 현재={}° (시간: {})", 
+                    String.format("%.3f", prevPos.elevationDegrees),
+                    String.format("%.3f", currentPosition.elevationDegrees),
+                    currentPosition.dateTime)
+                return currentPosition
             }
+            
+            previousPosition = currentPosition
             currentDate = currentDate.shiftedBy(stepMinutes * 60)
         }
 
@@ -208,30 +226,34 @@ class SolarOrekitCalculator(
 
     /**
      * ✅ 오늘 일출 정보 조회 (Azimuth, Elevation 포함)
+     * 시간대 문제 완전 해결: 전날 자정부터 검색 시작
      */
     fun getTodaySunrise(): SunPosition? {
         checkInitialized()
         
-        // 오늘 자정부터 시작
-        val todayMidnight = LocalDateTime.now(ZoneOffset.UTC)
+        // ✅ 전날 자정부터 시작 (효율적인 범위)
+        val yesterdayMidnight = LocalDateTime.now(ZoneOffset.UTC)
             .toLocalDate()
+            .minusDays(1)  // 하루 전 자정
             .atStartOfDay()
         
-        return findNextSunrise(todayMidnight)
+        return findNextSunrise(yesterdayMidnight)
     }
 
     /**
      * ✅ 오늘 일몰 정보 조회 (Azimuth, Elevation 포함)
+     * 시간대 문제 완전 해결: 전날 자정부터 검색 시작
      */
     fun getTodaySunset(): SunPosition? {
         checkInitialized()
         
-        // 오늘 자정부터 시작
-        val todayMidnight = LocalDateTime.now(ZoneOffset.UTC)
+        // ✅ 전날 자정부터 시작 (효율적인 범위)
+        val yesterdayMidnight = LocalDateTime.now(ZoneOffset.UTC)
             .toLocalDate()
+            .minusDays(1)  // 하루 전 자정
             .atStartOfDay()
         
-        return findNextSunset(todayMidnight)
+        return findNextSunset(yesterdayMidnight)
     }
 
     /**
@@ -272,11 +294,15 @@ class SolarOrekitCalculator(
 
     /**
      * ✅ 특정 날짜의 일출/일몰 정보 조회
+     * 시간대 문제 완전 해결: 전날 자정부터 검색 시작
      */
     fun getSunriseAndSunsetForDate(targetDate: LocalDateTime): Map<String, Any> {
         checkInitialized()
         
-        val dateMidnight = targetDate.toLocalDate().atStartOfDay()
+        // ✅ 전날 자정부터 시작 (효율적인 범위)
+        val dateMidnight = targetDate.toLocalDate()
+            .minusDays(1)  // 하루 전 자정
+            .atStartOfDay()
         
         val sunrise = findNextSunrise(dateMidnight)
         val sunset = findNextSunset(dateMidnight)
