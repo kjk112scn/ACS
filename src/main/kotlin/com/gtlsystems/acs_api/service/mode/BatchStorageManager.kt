@@ -137,8 +137,10 @@ class BatchStorageManager(
             // ✅ 배치 데이터 저장
             saveBatchToStorage(validData, batchMetadata)
             
-            logger.info("📦 배치 저장 완료: {}개 데이터, 평균 Az 오차: {:.2f}°, El 오차: {:.2f}°, 처리시간: {}ms",
-                validData.size, avgAzimuthError, avgElevationError, 
+            logger.info("📦 배치 저장 완료: {}개 데이터, 평균 Az 오차: {}°, El 오차: {}°, 처리시간: {}ms",
+                validData.size, 
+                String.format("%.2f", avgAzimuthError),
+                String.format("%.2f", avgElevationError),
                 System.currentTimeMillis() - startTime)
                 
         } catch (e: Exception) {
