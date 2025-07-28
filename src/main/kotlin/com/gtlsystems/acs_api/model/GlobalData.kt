@@ -67,6 +67,7 @@ object GlobalData {
 * 위치 정보
 */
     object Location {
+         //한국 GTL 본사
         var latitude: Double = 35.317540//35.3175
         var longitude: Double = 128.608510//128.6083
         //시드니 남반구 테스트 태양추적시시
