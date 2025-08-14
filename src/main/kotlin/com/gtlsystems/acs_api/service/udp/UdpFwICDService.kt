@@ -8,6 +8,7 @@ import com.gtlsystems.acs_api.service.datastore.DataStoreService
 import com.gtlsystems.acs_api.service.icd.ICDService
 import com.gtlsystems.acs_api.util.JKUtil
 import com.gtlsystems.acs_api.config.ThreadManager
+import com.gtlsystems.acs_api.service.system.ConfigurationService
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
@@ -35,15 +36,18 @@ class UdpFwICDService(
     private val dataStoreService: DataStoreService,
     private val environment: Environment,
     private val eventBus: ACSEventBus,
-    private val threadManager: ThreadManager // ✅ 통합 쓰레드 관리자 주입
+    private val threadManager: ThreadManager, // ✅ 통합 쓰레드 관리자 주입
+    private val configurationService: ConfigurationService
 ) {
 
     private val logger = LoggerFactory.getLogger(UdpFwICDService::class.java)
-    private val icdService = ICDService.Classify(dataStoreService, eventBus)
+    private val icdService: ICDService.Classify get() = ICDService.Classify(dataStoreService, eventBus, configurationService)
 
-    // UDP 채널 및 버퍼
+    // UDP 채널 및 버퍼 (ConfigurationService에서 크기 로드)
     private lateinit var channel: DatagramChannel
-    private val receiveBuffer = ByteBuffer.allocate(512)
+    private val receiveBuffer: ByteBuffer get() = ByteBuffer.allocate(
+        configurationService.getValue("udp.maxBufferSize") as? Int ?: 1024
+    )
     private var readData: PushData.ReadData = PushData.ReadData()
 
     // Stow Command 실행 중인지 추적하기 위한 변수
@@ -130,7 +134,8 @@ class UdpFwICDService(
                 }
             }
 
-            // ✅ UDP Receive (안정성 보장, 10ms 간격)
+            // ✅ UDP Receive (안정성 보장, 설정에서 간격 로드)
+            val receiveInterval = configurationService.getValue("udp.receiveInterval") as? Long ?: 10L
             realtimeExecutor?.scheduleAtFixedRate({
                 try {
                     val startTime = System.nanoTime()
@@ -139,15 +144,17 @@ class UdpFwICDService(
 
                     // ✅ 안정성 우선 모니터링
                     val processingTime = (System.nanoTime() - startTime) / 1_000_000
-                    if (processingTime > 15) {  // 15ms 임계값으로 안정성 보장
-                        logger.warn("⚠️ UDP Receive 지연 감지: {}ms (임계값: 15ms)", processingTime)
+                    val performanceThreshold = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 15L
+                    if (processingTime > performanceThreshold) {  // 설정에서 임계값 로드
+                        logger.warn("⚠️ UDP Receive 지연 감지: {}ms (임계값: {}ms)", processingTime, performanceThreshold)
                     }
                 } catch (e: Exception) {
                     logger.debug("UDP Receive 오류: {}", e.message)
                 }
-            }, 0, 10, TimeUnit.MILLISECONDS)  // 10ms로 안정성 보장
+            }, 0, receiveInterval, TimeUnit.MILLISECONDS)  // 설정에서 간격 로드
 
-            // ✅ UDP Send (안정성 보장, 30ms 간격) - 디버깅 로그 추가
+            // ✅ UDP Send (안정성 보장, 설정에서 간격 로드) - 디버깅 로그 추가
+            val sendInterval = configurationService.getValue("udp.sendInterval") as? Long ?: 30L
             realtimeExecutor?.scheduleAtFixedRate({
                 try {
                     val startTime = System.nanoTime()
@@ -157,13 +164,14 @@ class UdpFwICDService(
                     
                     // ✅ 안정성 우선 모니터링
                     val processingTime = (System.nanoTime() - startTime) / 1_000_000
-                    if (processingTime > 25) {  // 10ms 임계값으로 안정성 보장
-                        logger.warn("⚠️ UDP Send 지연 감지: {}ms (임계값: 25ms)", processingTime)
+                    val sendPerformanceThreshold = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 25L
+                    if (processingTime > sendPerformanceThreshold) {  // 설정에서 임계값 로드
+                        logger.warn("⚠️ UDP Send 지연 감지: {}ms (임계값: {}ms)", processingTime, sendPerformanceThreshold)
                     }
                 } catch (e: Exception) {
                     logger.error("❌ UDP Send 오류: {}", e.message, e)
                 }
-            }, 0, 30, TimeUnit.MILLISECONDS)  // 30ms로 안정성 보장
+            }, 0, sendInterval, TimeUnit.MILLISECONDS)  // 설정에서 간격 로드
 
             logger.info("✅ 실시간 UDP 통신 시작 완료 (Send 카운트: {}, Receive 카운트: {})", 
                 sendCount.get(), receiveCount.get())

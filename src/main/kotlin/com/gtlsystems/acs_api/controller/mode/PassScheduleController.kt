@@ -1,6 +1,9 @@
 package com.gtlsystems.acs_api.controller.mode
 
 import com.gtlsystems.acs_api.service.mode.PassScheduleService
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -12,6 +15,7 @@ import java.time.ZonedDateTime
  */
 @RestController
 @RequestMapping("/api/pass-schedule")
+@Tag(name = "Mode - Pass Schedule", description = "패스 스케줄링 TLE 관리 API - 위성 궤도 데이터 관리, 추적 스케줄 생성, 모니터링")
 class PassScheduleController(
     private val passScheduleService: PassScheduleService
 ) {
@@ -37,7 +41,65 @@ class PassScheduleController(
      * TLE 데이터 추가
      */
     @PostMapping("/tle")
-    fun addTle(@RequestBody request: AddTleRequest): ResponseEntity<Map<String, Any>> {
+    @Operation(
+        summary = "TLE 데이터 추가",
+        description = """
+            위성 궤도 데이터(TLE)를 추가합니다.
+            
+            ## 기능 설명
+            - **TLE 데이터**: Two-Line Element를 사용한 위성 궤도 정보 추가
+            - **자동 ID 추출**: satelliteId가 제공되지 않으면 TLE Line1에서 자동 추출
+            - **데이터 검증**: TLE 형식 및 필수 필드 검증
+            - **캐시 저장**: 메모리 기반 캐시에 TLE 데이터 저장
+            
+            ## 입력 파라미터
+            - **satelliteId**: 위성 ID (선택적, null 허용)
+            - **satelliteName**: 위성 이름 (선택적)
+            - **tleLine1**: TLE 첫 번째 라인 (69자, 필수)
+            - **tleLine2**: TLE 두 번째 라인 (69자, 필수)
+            
+            ## TLE 형식
+            - **Line1**: 위성 식별자, 궤도 요소 등 (69자)
+            - **Line2**: 궤도 운동 요소, 이심률, 궤도 경사각 등 (69자)
+            
+            ## 자동 ID 추출
+            - TLE Line1의 3-7번째 문자에서 위성 번호 추출
+            - 예: "1 25544U 98067A" → "25544"
+            
+            ## 사용 예시
+            ```json
+            {
+              "satelliteId": "25544",
+              "satelliteName": "ISS",
+              "tleLine1": "1 25544U 98067A   21001.50000000 .00000000  00000+0  00000+0 0    04",
+              "tleLine2": "2 25544  51.6400 114.5000 0001001 100.5000 259.5000 15.05431418000000"
+            }
+            ```
+            
+            ## 응답 예시
+            ```json
+            {
+              "success": true,
+              "message": "TLE 데이터가 성공적으로 추가되었습니다.",
+              "data": {
+                "satelliteId": "25544",
+                "tleLine1": "1 25544U 98067A...",
+                "tleLine2": "2 25544  51.6400...",
+                "added": true,
+                "satelliteIdSource": "provided"
+              }
+            }
+            ```
+        """,
+        tags = ["Mode - Pass Schedule"]
+    )
+    fun addTle(
+        @Parameter(
+            description = "TLE 데이터 추가 요청",
+            required = true
+        )
+        @RequestBody request: AddTleRequest
+    ): ResponseEntity<Map<String, Any>> {
         return try {
             // satelliteId 결정: 요청에서 제공되면 사용, 없으면 TLE Line1에서 추출
             val finalSatelliteId = if (request.satelliteId.isNullOrBlank()) {
@@ -415,6 +477,55 @@ class PassScheduleController(
      * 모든 TLE 데이터에 대해 위성 추적 정보를 생성합니다 (비동기)
      */
     @PostMapping("/tracking/generate-all")
+    @Operation(
+        summary = "모든 위성 추적 데이터 생성",
+        description = """
+            모든 TLE 데이터에 대해 위성 추적 정보를 생성합니다.
+            
+            ## 기능 설명
+            - **비동기 처리**: Mono를 사용한 비동기 추적 데이터 생성
+            - **전체 위성**: 등록된 모든 위성의 패스 스케줄 계산
+            - **궤도 계산**: Orekit을 사용한 정밀한 궤도 계산
+            - **패스 정보**: 통과 시간, 고도각, 방위각 등 상세 정보
+            
+            ## 처리 과정
+            1. **TLE 데이터 로드**: 캐시된 모든 TLE 데이터 조회
+            2. **궤도 계산**: 각 위성별 궤도 요소 계산
+            3. **패스 스케줄**: 통과 시간 및 위치 정보 생성
+            4. **데이터 저장**: 마스터/세부 데이터로 구조화하여 저장
+            
+            ## 생성되는 데이터
+            - **마스터 데이터**: 패스별 요약 정보 (시작/종료 시간, 최대 고도각 등)
+            - **세부 데이터**: 추적 포인트별 상세 정보 (시간, 위치, 각도 등)
+            
+            ## 사용 예시
+            ```
+            POST /api/pass-schedule/tracking/generate-all
+            ```
+            
+            ## 응답 예시
+            ```json
+            {
+              "success": true,
+              "message": "모든 위성 추적 데이터 생성 완료",
+              "data": {
+                "processedSatellites": 3,
+                "totalPasses": 15,
+                "totalTrackingPoints": 1500,
+                "satellites": [
+                  {
+                    "satelliteId": "25544",
+                    "passCount": 5,
+                    "trackingPointCount": 500,
+                    "satelliteName": "ISS"
+                  }
+                ]
+              }
+            }
+            ```
+        """,
+        tags = ["Mode - Pass Schedule"]
+    )
     fun generateAllTrackingData(): Mono<ResponseEntity<Map<String, Any>>> {
         logger.info("모든 위성 추적 데이터 생성 요청 수신")
         return passScheduleService.generateAllPassScheduleTrackingDataAsync()

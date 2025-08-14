@@ -23,6 +23,7 @@ import org.orekit.utils.Constants
 import org.orekit.utils.IERSConventions
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import com.gtlsystems.acs_api.service.system.ConfigurationService
 import java.io.File
 import java.io.FileOutputStream
 import java.net.JarURLConnection
@@ -41,7 +42,8 @@ class OrekitCalculator(
     private val utcTimeScale: TimeScale,
     private val earthFrame: Frame,
     private val earthModel: OneAxisEllipsoid,
-    private val orekitStatus: OrekitConfig.OrekitInitializationStatus
+    private val orekitStatus: OrekitConfig.OrekitInitializationStatus,
+    private val configurationService: ConfigurationService
 ){
     private val logger = LoggerFactory.getLogger(javaClass)
     private var isOrekitInitialized = true
@@ -68,7 +70,7 @@ class OrekitCalculator(
         latitude: Double,
         longitude: Double,
         altitude: Double = 0.0,
-        trackingIntervalMs: Int = 100
+        trackingIntervalMs: Int = (configurationService.getValue("tracking.interval") as? Long ?: 100L).toInt()
     ): SatelliteTrackingSchedule {
 
         logger.info("최적화된 위성 추적 스케줄 생성 시작: ${startDate}, 기간: ${durationDays}일")
@@ -140,7 +142,8 @@ class OrekitCalculator(
                 // 위성 고도 계산
                 val satellitePosition = state.getPVCoordinates(earthFrame).position
                 val satelliteRadius = satellitePosition.norm
-                val satelliteAltitude = (satelliteRadius - Constants.WGS84_EARTH_EQUATORIAL_RADIUS) / 1000.0
+                val altitudeConversionFactor = configurationService.getValue("udp.maxBufferSize") as? Int ?: 1000
+                val satelliteAltitude = (satelliteRadius - Constants.WGS84_EARTH_EQUATORIAL_RADIUS) / altitudeConversionFactor.toDouble()
 
                 val wasVisible = isVisible
                 isVisible = elevation >= minElevation
@@ -168,12 +171,13 @@ class OrekitCalculator(
                     }
 
                     // 추적 데이터 추가
+                    val rangeConversionFactor = configurationService.getValue("udp.maxBufferSize") as? Int ?: 1000
                     currentPassData.add(
                         SatelliteTrackData(
                             azimuth = azimuth,
                             elevation = elevation,
                             timestamp = currentTime,
-                            range = distance / 1000.0,
+                            range = distance / rangeConversionFactor.toDouble(),
                             altitude = satelliteAltitude
                         )
                     )

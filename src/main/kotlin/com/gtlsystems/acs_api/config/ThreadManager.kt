@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.stereotype.Service
+import com.gtlsystems.acs_api.service.system.ConfigurationService
 import java.lang.management.ManagementFactory
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -17,7 +18,9 @@ import java.util.concurrent.TimeUnit
  * 하이브리드 하드웨어 최적화 + 쓰레드 통합 관리
  */
 @Configuration
-class ThreadManager {
+class ThreadManager(
+    private val configurationService: ConfigurationService
+) {
     
     private val logger = LoggerFactory.getLogger(ThreadManager::class.java)
     
@@ -78,10 +81,18 @@ class ThreadManager {
      * ✅ 성능 등급 자동 분류
      */
     fun classifyPerformanceTier(specs: SystemSpecs): PerformanceTier {
+        // 설정에서 성능 등급 기준 로드
+        val ultraCores = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 12L
+        val highCores = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 8L
+        val mediumCores = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 4L
+        val ultraMemory = configurationService.getValue("udp.maxBufferSize") as? Long ?: 16_000_000_000L
+        val highMemory = configurationService.getValue("udp.maxBufferSize") as? Long ?: 8_000_000_000L
+        val mediumMemory = configurationService.getValue("udp.maxBufferSize") as? Long ?: 4_000_000_000L
+        
         return when {
-            specs.cpuCores >= 12 && specs.totalMemory >= 16_000_000_000L -> PerformanceTier.ULTRA
-            specs.cpuCores >= 8 && specs.totalMemory >= 8_000_000_000L -> PerformanceTier.HIGH
-            specs.cpuCores >= 4 && specs.totalMemory >= 4_000_000_000L -> PerformanceTier.MEDIUM
+            specs.cpuCores >= ultraCores && specs.totalMemory >= ultraMemory -> PerformanceTier.ULTRA
+            specs.cpuCores >= highCores && specs.totalMemory >= highMemory -> PerformanceTier.HIGH
+            specs.cpuCores >= mediumCores && specs.totalMemory >= mediumMemory -> PerformanceTier.MEDIUM
             else -> PerformanceTier.LOW
         }
     }
@@ -109,12 +120,17 @@ class ThreadManager {
         System.setProperty("spring.jvm.memory.initial", "2g")
         System.setProperty("spring.jvm.memory.maximum", "9g")
         
-        // ✅ 실시간 성능 최우선 JVM 최적화
+        // ✅ 실시간 성능 최우선 JVM 최적화 (설정에서 값 로드)
+        val gcPause = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 10L
+        val heapRegionSize = configurationService.getValue("udp.maxBufferSize") as? Int ?: 32
+        val concurrentThreads = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 6L
+        val parallelThreads = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 10L
+        
         System.setProperty("spring.jvm.gc", "G1GC")
-        System.setProperty("spring.jvm.gc.pause", "10")  // 10ms로 실시간 성능 보장
-        System.setProperty("spring.jvm.gc.heap.region.size", "32m")  // 더 큰 영역으로 GC 빈도 감소
-        System.setProperty("spring.jvm.gc.concurrent.threads", "6")  // 더 많은 동시 스레드
-        System.setProperty("spring.jvm.gc.parallel.threads", "10")   // 더 많은 병렬 스레드
+        System.setProperty("spring.jvm.gc.pause", gcPause.toString())  // 설정에서 GC 일시정지 시간 로드
+        System.setProperty("spring.jvm.gc.heap.region.size", "${heapRegionSize}m")  // 설정에서 힙 영역 크기 로드
+        System.setProperty("spring.jvm.gc.concurrent.threads", concurrentThreads.toString())  // 설정에서 동시 스레드 수 로드
+        System.setProperty("spring.jvm.gc.parallel.threads", parallelThreads.toString())   // 설정에서 병렬 스레드 수 로드
         System.setProperty("spring.jvm.gc.incremental.mode", "true") // 증분 모드로 일시정지 분산
         
         // ✅ 안정성 우선 메모리 최적화

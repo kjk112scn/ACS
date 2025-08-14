@@ -1,7 +1,9 @@
-package com.gtlsystems.acs_api.service.mode
+package com.gtlsystems.acs_api.service.system
 
 import com.gtlsystems.acs_api.config.ThreadManager
 import com.gtlsystems.acs_api.service.datastore.DataStoreService
+import com.gtlsystems.acs_api.service.system.ConfigurationService
+import com.gtlsystems.acs_api.service.system.LoggingService
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import jakarta.annotation.PostConstruct
@@ -16,14 +18,16 @@ import java.util.concurrent.TimeUnit
 @Service
 class BatchStorageManager(
     private val threadManager: ThreadManager,
-    private val dataStoreService: DataStoreService
+    private val dataStoreService: DataStoreService,
+    private val configurationService: ConfigurationService,
+    private val loggingService: LoggingService
 ) {
     private val logger = LoggerFactory.getLogger(BatchStorageManager::class.java)
     
-    // ✅ 배치 설정
-    private val batchSize = 50  // 50개씩 배치 처리
-    private val batchTimeoutMs = 2000L  // 2초 타임아웃
-    private val maxBatchSize = 100  // 최대 배치 크기
+    // ✅ 배치 설정 (ConfigurationService에서 로드)
+    private val batchSize: Int get() = configurationService.getValue("storage.batchSize") as? Int ?: 1000
+    private val batchTimeoutMs: Long get() = configurationService.getValue("storage.saveInterval") as? Long ?: 100L
+    private val maxBatchSize: Int get() = configurationService.getValue("storage.batchSize") as? Int ?: 1000
     
     // ✅ 배치 데이터 관리
     private val batchBuffer = mutableListOf<Map<String, Any?>>()
@@ -39,14 +43,17 @@ class BatchStorageManager(
     
     @PostConstruct
     fun init() {
+        loggingService.logSystemStart("BatchStorageManager", "1.0.0")
+        
         // ✅ 지연 초기화로 의존성 주입 문제 해결
         batchExecutor = threadManager.getBatchExecutor()
         batchScheduler = threadManager.getRealtimeExecutor()
         
-        // ✅ 주기적 배치 저장 스케줄링
+        // ✅ 주기적 배치 저장 스케줄링 (ConfigurationService에서 간격 로드)
+        val saveInterval = configurationService.getValue("storage.saveInterval") as? Long ?: 100L
         batchScheduler?.scheduleAtFixedRate({
             processBatch()
-        }, 100, 100, TimeUnit.MILLISECONDS)
+        }, saveInterval, saveInterval, TimeUnit.MILLISECONDS)
         
         logger.info("✅ 배치 저장 관리자 초기화 완료 - 배치 크기: {}, 타임아웃: {}ms", batchSize, batchTimeoutMs)
     }
@@ -55,13 +62,15 @@ class BatchStorageManager(
      * ✅ 배치 데이터 추가
      */
     fun addToBatch(data: Map<String, Any?>) {
-        synchronized(batchBuffer) {
-            batchBuffer.add(data)
-            
-            // ✅ 배치 크기 또는 시간 조건 확인
-            if (batchBuffer.size >= batchSize || 
-                (System.currentTimeMillis() - lastBatchTime) >= batchTimeoutMs) {
-                processBatch()
+        return loggingService.logPerformance("addToBatch") {
+            synchronized(batchBuffer) {
+                batchBuffer.add(data)
+                
+                // ✅ 배치 크기 또는 시간 조건 확인
+                if (batchBuffer.size >= batchSize || 
+                    (System.currentTimeMillis() - lastBatchTime) >= batchTimeoutMs) {
+                    processBatch()
+                }
             }
         }
     }

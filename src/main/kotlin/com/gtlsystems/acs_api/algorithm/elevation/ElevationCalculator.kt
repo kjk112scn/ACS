@@ -2,11 +2,14 @@ package com.gtlsystems.acs_api.algorithm
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import com.gtlsystems.acs_api.service.system.ConfigurationService
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
 
-class ElevationCalculator {
+class ElevationCalculator(
+    private val configurationService: ConfigurationService
+) {
 
     /**
      * 두 API 모두 호출해서 결과 비교
@@ -89,8 +92,10 @@ class ElevationCalculator {
 
             val connection = URL(url).openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
-            connection.connectTimeout = 10000
-            connection.readTimeout = 10000
+            val connectTimeout = configurationService.getValue("udp.timeout") as? Long ?: 10000L
+            val readTimeout = configurationService.getValue("udp.timeout") as? Long ?: 10000L
+            connection.connectTimeout = connectTimeout.toInt()
+            connection.readTimeout = readTimeout.toInt()
 
             if (connection.responseCode == HttpURLConnection.HTTP_OK) {
                 val response = connection.inputStream.bufferedReader().readText()

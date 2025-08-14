@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- 로그 출력 패턴 정의 -->
+    <property name="CONSOLE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
+    <property name="FILE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
+    
+    <!-- 로그 파일 경로 설정 -->
+    <property name="LOG_PATH" value="logs"/>
+    <property name="LOG_ARCHIVE_PATH" value="logs/archive"/>
+    
+    <!-- 콘솔 출력 설정 -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+    
+    <!-- 전체 애플리케이션 로그 (INFO 레벨) -->
+    <appender name="FILE-ALL" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/acs-application.log</file>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_ARCHIVE_PATH}/acs-application.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+    </appender>
+    
+    <!-- 에러 로그 (ERROR 레벨만) -->
+    <appender name="FILE-ERROR" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/acs-error.log</file>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>ERROR</level>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_ARCHIVE_PATH}/acs-error.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>90</maxHistory>
+        </rollingPolicy>
+    </appender>
+    
+    <!-- 성능 로그 (성능 관련 로그만) -->
+    <appender name="FILE-PERFORMANCE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/acs-performance.log</file>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_ARCHIVE_PATH}/acs-performance.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+    </appender>
+    
+    <!-- 비즈니스 로그 (사용자 액션 등) -->
+    <appender name="FILE-BUSINESS" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/acs-business.log</file>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_ARCHIVE_PATH}/acs-business.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>90</maxHistory>
+        </rollingPolicy>
+    </appender>
+    
+    <!-- 패키지별 로그 레벨 설정 -->
+    
+    <!-- ACS API 메인 패키지 -->
+    <logger name="com.gtlsystems.acs_api" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE-ALL"/>
+        <appender-ref ref="FILE-ERROR"/>
+    </logger>
+    
+    <!-- 컨트롤러 패키지 -->
+    <logger name="com.gtlsystems.acs_api.controller" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE-ALL"/>
+        <appender-ref ref="FILE-ERROR"/>
+        <appender-ref ref="FILE-BUSINESS"/>
+    </logger>
+    
+    <!-- 서비스 패키지 -->
+    <logger name="com.gtlsystems.acs_api.service" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE-ALL"/>
+        <appender-ref ref="FILE-ERROR"/>
+        <appender-ref ref="FILE-PERFORMANCE"/>
+    </logger>
+    
+    <!-- 알고리즘 패키지 -->
+    <logger name="com.gtlsystems.acs_api.algorithm" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE-ALL"/>
+        <appender-ref ref="FILE-ERROR"/>
+        <appender-ref ref="FILE-PERFORMANCE"/>
+    </logger>
+    
+    <!-- 설정 관련 패키지 -->
+    <logger name="com.gtlsystems.acs_api.config" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE-ALL"/>
+        <appender-ref ref="FILE-ERROR"/>
+    </logger>
+    
+    <!-- 이벤트 관련 패키지 -->
+    <logger name="com.gtlsystems.acs_api.event" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE-ALL"/>
+        <appender-ref ref="FILE-ERROR"/>
+        <appender-ref ref="FILE-BUSINESS"/>
+    </logger>
+    
+    <!-- Spring Framework 관련 로그 -->
+    <logger name="org.springframework" level="WARN" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE-ALL"/>
+        <appender-ref ref="FILE-ERROR"/>
+    </logger>
+    
+    <!-- Hibernate 관련 로그 -->
+    <logger name="org.hibernate" level="WARN" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE-ALL"/>
+        <appender-ref ref="FILE-ERROR"/>
+    </logger>
+    
+    <!-- SQL 관련 로그 -->
+    <logger name="org.hibernate.SQL" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE-ALL"/>
+        <appender-ref ref="FILE-PERFORMANCE"/>
+    </logger>
+    
+    <!-- SQL 파라미터 로그 -->
+    <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="DEBUG" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE-ALL"/>
+    </logger>
+    
+    <!-- WebSocket 관련 로그 -->
+    <logger name="org.springframework.web.socket" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE-ALL"/>
+        <appender-ref ref="FILE-ERROR"/>
+        <appender-ref ref="FILE-BUSINESS"/>
+    </logger>
+    
+    <!-- UDP 관련 로그 -->
+    <logger name="com.gtlsystems.acs_api.service.udp" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE-ALL"/>
+        <appender-ref ref="FILE-ERROR"/>
+        <appender-ref ref="FILE-BUSINESS"/>
+    </logger>
+    
+    <!-- ICD 관련 로그 -->
+    <logger name="com.gtlsystems.acs_api.service.icd" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE-ALL"/>
+        <appender-ref ref="FILE-ERROR"/>
+        <appender-ref ref="FILE-BUSINESS"/>
+    </logger>
+    
+    <!-- 위성 추적 관련 로그 -->
+    <logger name="com.gtlsystems.acs_api.service.mode" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE-ALL"/>
+        <appender-ref ref="FILE-ERROR"/>
+        <appender-ref ref="FILE-PERFORMANCE"/>
+        <appender-ref ref="FILE-BUSINESS"/>
+    </logger>
+    
+    <!-- 태양 추적 관련 로그 -->
+    <logger name="com.gtlsystems.acs_api.algorithm.suntrack" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE-ALL"/>
+        <appender-ref ref="FILE-ERROR"/>
+        <appender-ref ref="FILE-PERFORMANCE"/>
+    </logger>
+    
+    <!-- 위성 추적 알고리즘 로그 -->
+    <logger name="com.gtlsystems.acs_api.algorithm.satellitetracker" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE-ALL"/>
+        <appender-ref ref="FILE-ERROR"/>
+        <appender-ref ref="FILE-PERFORMANCE"/>
+    </logger>
+    
+    <!-- 루트 로거 설정 -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE-ALL"/>
+        <appender-ref ref="FILE-ERROR"/>
+    </root>
+    
+    <!-- 개발 환경에서만 DEBUG 레벨 활성화 -->
+    <springProfile name="dev">
+        <logger name="com.gtlsystems.acs_api" level="DEBUG" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="FILE-ALL"/>
+            <appender-ref ref="FILE-ERROR"/>
+        </logger>
+    </springProfile>
+    
+    <!-- 프로덕션 환경에서는 WARN 레벨로 제한 -->
+    <springProfile name="prod">
+        <logger name="com.gtlsystems.acs_api" level="WARN" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="FILE-ALL"/>
+            <appender-ref ref="FILE-ERROR"/>
+        </logger>
+    </springProfile>
+</configuration> 

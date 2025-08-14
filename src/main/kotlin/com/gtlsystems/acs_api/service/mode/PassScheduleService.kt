@@ -10,6 +10,7 @@ import com.gtlsystems.acs_api.model.SatelliteTrackingData
 import com.gtlsystems.acs_api.service.datastore.DataStoreService
 import com.gtlsystems.acs_api.service.icd.ICDService
 import com.gtlsystems.acs_api.service.udp.UdpFwICDService
+import com.gtlsystems.acs_api.service.system.ConfigurationService
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
@@ -49,7 +50,8 @@ class PassScheduleService(
     private val orekitCalculator: OrekitCalculator,
     private val acsEventBus: ACSEventBus,
     private val udpFwICDService: UdpFwICDService,
-    private val dataStoreService: DataStoreService
+    private val dataStoreService: DataStoreService,
+    private val configurationService: ConfigurationService
 ) {
     private val logger = LoggerFactory.getLogger(PassScheduleService::class.java)
 
@@ -93,7 +95,7 @@ class PassScheduleService(
      * 상태 변경 최소 간격 (밀리초)
      * 너무 빈번한 상태 변경을 방지하기 위한 설정
      */
-    private val MIN_STATE_CHANGE_INTERVAL = 500 // 0.5초
+    private val MIN_STATE_CHANGE_INTERVAL: Long get() = configurationService.getValue("tracking.interval") as? Long ?: 500L
 
     // ===== 기존 저장소들 (변경 없음) =====
     private val passScheduleTleCache = ConcurrentHashMap<String, Triple<String, String, String>>()
@@ -104,7 +106,7 @@ class PassScheduleService(
 
     // ===== 기존 상태 관리 변수들 (Boolean 제거) =====
     private var lastPreparedSchedule: Map<String, Any?>? = null
-    private val PREPARATION_TIME_MINUTES = 2L
+    private val PREPARATION_TIME_MINUTES: Long get() = configurationService.getValue("tracking.stabilizationTimeout") as? Long ?: 2L
     private val subscriptions: MutableList<Disposable> = mutableListOf()
 
     // ✅ 새로 추가: 성능 최적화용 캐시 및 스레드 (기존 동작에 영향 없음)
@@ -129,7 +131,7 @@ class PassScheduleService(
             val azimuth: Float
         )
 
-        fun isExpired(maxAgeMs: Long = 3600000): Boolean = // 1시간 후 만료
+        fun isExpired(maxAgeMs: Long = 3600000L): Boolean = // 1시간 후 만료 (기본값)
             System.currentTimeMillis() - createdAt > maxAgeMs
     }
 
@@ -147,7 +149,7 @@ class PassScheduleService(
     // ✅ 기존 설정들 (변경 없음)
     private val trackingData = SatelliteTrackingData.Tracking
     private val locationData = GlobalData.Location
-    private val limitAngleCalculator = LimitAngleCalculator()
+    private val limitAngleCalculator: LimitAngleCalculator get() = LimitAngleCalculator(configurationService)
     private var globalMstId = 0
 
     @PostConstruct

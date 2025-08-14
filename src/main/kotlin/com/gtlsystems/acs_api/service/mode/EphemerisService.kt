@@ -35,7 +35,8 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.TimeUnit
-import com.gtlsystems.acs_api.service.mode.BatchStorageManager
+import com.gtlsystems.acs_api.service.system.BatchStorageManager
+import com.gtlsystems.acs_api.service.system.ConfigurationService
 import kotlin.math.abs
 
 /**
@@ -49,7 +50,8 @@ class EphemerisService(
     private val udpFwICDService: UdpFwICDService,
     private val dataStoreService: DataStoreService, // DataStoreService 주입
     private val threadManager: ThreadManager, // ✅ 통합 쓰레드 관리자 주입
-    private val batchStorageManager: BatchStorageManager // ✅ 배치 저장 관리자 주입
+    private val batchStorageManager: BatchStorageManager, // ✅ 배치 저장 관리자 주입
+    private val configurationService: ConfigurationService
 ) {
 
     // 밀리초를 포함하는 사용자 정의 포맷터 생성
@@ -103,7 +105,7 @@ class EphemerisService(
 
     private val realtimeTrackingDataList = mutableListOf<Map<String, Any?>>()
     private var trackingDataIndex = 0
-    private val limitAngleCalculator = LimitAngleCalculator()
+    private val limitAngleCalculator: LimitAngleCalculator get() = LimitAngleCalculator(configurationService)
 
     @PostConstruct
     fun init() {

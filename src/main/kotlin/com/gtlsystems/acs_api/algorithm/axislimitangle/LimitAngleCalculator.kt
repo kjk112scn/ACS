@@ -2,12 +2,15 @@ package com.gtlsystems.acs_api.algorithm.axislimitangle
 
 import org.slf4j.LoggerFactory
 import kotlin.math.abs
+import com.gtlsystems.acs_api.service.system.ConfigurationService
 
 /**
  * 축 제한 각도 계산 클래스
  * 0~360도 방위각을 포지셔너 ±270도 범위로 변환 (회전 방향성 보장)
  */
-class LimitAngleCalculator {
+class LimitAngleCalculator(
+    private val configurationService: ConfigurationService
+) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -154,8 +157,9 @@ class LimitAngleCalculator {
             // 이전 변환값에 동일한 회전량 적용
             val nextConverted = previousConverted + rotationAmount
 
-            // ±270° 범위로 정규화 (방향성 유지)
-            val normalizedAngle = normalizeWithDirectionPreservation(nextConverted, previousConverted, rotationDirection)
+            // 설정에서 범위 로드하여 정규화 (방향성 유지)
+            val maxAngleRange = configurationService.getValue("location.trackingSpeed") as? Int ?: 270
+            val normalizedAngle = normalizeWithDirectionPreservation(nextConverted, previousConverted, rotationDirection, maxAngleRange)
 
             result.add(normalizedAngle)
 
@@ -304,18 +308,20 @@ class LimitAngleCalculator {
     }
 
     /**
-     * ✅ 방향성을 유지하는 정규화
+     * ✅ 방향성을 유지하는 정규화 (설정에서 범위 로드)
      */
     private fun normalizeWithDirectionPreservation(
         angle: Double,
         previousAngle: Double,
-        direction: RotationDirection
+        direction: RotationDirection,
+        maxAngleRange: Int = 270
     ): Double {
         var normalized = angle
 
-        // 기본 ±270° 범위 정규화
-        while (normalized > 270.0) normalized -= 360.0
-        while (normalized < -270.0) normalized += 360.0
+        // 설정에서 로드한 범위로 정규화
+        val maxRange = maxAngleRange.toDouble()
+        while (normalized > maxRange) normalized -= 360.0
+        while (normalized < -maxRange) normalized += 360.0
 
         // 방향성 검증 및 보정
         val actualDelta = normalized - previousAngle
@@ -329,7 +335,7 @@ class LimitAngleCalculator {
             val alternative2 = normalized - 360.0
 
             val candidates = listOf(normalized, alternative1, alternative2)
-                .filter { it >= -270.0 && it <= 270.0 }
+                .filter { it >= -maxRange && it <= maxRange }
 
             if (candidates.isNotEmpty()) {
                 val bestCandidate = candidates.minByOrNull { abs(it - previousAngle) }
@@ -341,9 +347,9 @@ class LimitAngleCalculator {
         }
 
         // 최종 범위 검증
-        if (normalized < -270.0 || normalized > 270.0) {
+        if (normalized < -maxRange || normalized > maxRange) {
             logger.error("최종 검증 실패: ${String.format("%.2f", normalized)}° - 클램핑 적용")
-            normalized = normalized.coerceIn(-270.0, 270.0)
+            normalized = normalized.coerceIn(-maxRange, maxRange)
         }
 
         return normalized
@@ -383,8 +389,10 @@ class LimitAngleCalculator {
     private fun calculateConversionQuality(convertedAzimuths: List<Double>, originalAzimuths: List<Double>): Double {
         if (convertedAzimuths.size != originalAzimuths.size || convertedAzimuths.size < 2) return 0.0
 
-        // 1. 범위 준수 검사 (30점)
-        val outOfRangeCount = convertedAzimuths.count { it < -270.0 || it > 270.0 }
+        // 1. 범위 준수 검사 (30점) - 설정에서 범위 로드
+        val maxAngleRange = configurationService.getValue("location.trackingSpeed") as? Int ?: 270
+        val maxRange = maxAngleRange.toDouble()
+        val outOfRangeCount = convertedAzimuths.count { it < -maxRange || it > maxRange }
         val rangeScore = maxOf(0.0, 30.0 - (outOfRangeCount * 5.0))
 
         // 2. 연속성 검사 (40점)

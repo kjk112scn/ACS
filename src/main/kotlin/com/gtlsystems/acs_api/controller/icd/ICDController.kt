@@ -2,6 +2,9 @@ package com.gtlsystems.acs_api.controller.icd
 
 import com.gtlsystems.acs_api.model.GlobalData
 import com.gtlsystems.acs_api.service.udp.UdpFwICDService
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PostMapping
@@ -12,14 +15,67 @@ import java.util.BitSet
 
 @RestController
 @RequestMapping("/api/icd")
+@Tag(name = "ICD - Communication", description = "외부 시스템과의 ICD 통신 API - 서보 제어, 비상 정지, 통신 상태 모니터링")
 class ICDController(private val udpFwICDService: UdpFwICDService) {
 
     private val logger = LoggerFactory.getLogger(ICDController::class.java)
 
     @PostMapping("/servo-preset-command")
+    @Operation(
+        summary = "서보 프리셋 명령",
+        description = """
+            안테나 서보 시스템의 프리셋 명령을 전송합니다.
+            
+            ## 기능 설명
+            - **프리셋 설정**: 지정된 축의 서보를 프리셋 위치로 이동
+            - **축별 제어**: 방위각, 고도각, 기울기 축을 개별적으로 제어 가능
+            - **UDP 통신**: 외부 시스템과의 UDP 프로토콜을 통한 명령 전송
+            
+            ## 입력 파라미터
+            - **azimuth**: 방위각 축 프리셋 여부 (기본값: false)
+            - **elevation**: 고도각 축 프리셋 여부 (기본값: false)
+            - **tilt**: 기울기 축 프리셋 여부 (기본값: false)
+            
+            ## 명령 처리
+            - **비트맵 생성**: 각 축의 상태를 비트맵으로 변환
+            - **UDP 전송**: UdpFwICDService를 통한 명령 전송
+            - **응답 생성**: 명령 처리 결과 및 상태 정보 반환
+            
+            ## 사용 예시
+            ```
+            POST /api/icd/servo-preset-command?azimuth=true&elevation=true
+            ```
+            
+            ## 응답 예시
+            ```json
+            {
+              "status": "success",
+              "message": "ServoPreset 명령이 성공적으로 전송되었습니다",
+              "command": "ServoPreset",
+              "axes": "AZIMUTH,ELEVATION"
+            }
+            ```
+        """,
+        tags = ["ICD - Communication"]
+    )
     fun servoPresetCommand(
+        @Parameter(
+            description = "방위각 축 프리셋 여부",
+            example = "true",
+            required = false
+        )
         @RequestParam azimuth: Boolean = false,
+        @Parameter(
+            description = "고도각 축 프리셋 여부",
+            example = "true",
+            required = false
+        )
         @RequestParam elevation: Boolean = false,
+        @Parameter(
+            description = "기울기 축 프리셋 여부",
+            example = "false",
+            required = false
+        )
         @RequestParam tilt: Boolean = false
     ): ResponseEntity<Map<String, String>> {
         return try {
@@ -53,9 +109,61 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
         }
     }
     @PostMapping("/standby-command")
+    @Operation(
+        summary = "대기 모드 명령",
+        description = """
+            안테나 서보 시스템을 대기 모드로 전환하는 명령을 전송합니다.
+            
+            ## 기능 설명
+            - **대기 모드**: 지정된 축의 서보를 안전한 대기 상태로 전환
+            - **축별 제어**: 방위각, 고도각, 기울기 축을 개별적으로 제어 가능
+            - **안전 기능**: 시스템을 안전한 대기 상태로 유지
+            
+            ## 입력 파라미터
+            - **azStandby**: 방위각 축 대기 모드 여부 (기본값: false)
+            - **elStandby**: 고도각 축 대기 모드 여부 (기본값: false)
+            - **tiStandby**: 기울기 축 대기 모드 여부 (기본값: false)
+            
+            ## 명령 처리
+            - **비트맵 생성**: 각 축의 대기 상태를 비트맵으로 변환
+            - **UDP 전송**: UdpFwICDService를 통한 명령 전송
+            - **응답 생성**: 명령 처리 결과 및 상태 정보 반환
+            
+            ## 사용 예시
+            ```
+            POST /api/icd/standby-command?azStandby=true&elStandby=true
+            ```
+            
+            ## 응답 예시
+            ```json
+            {
+              "status": "success",
+              "message": "Standby 명령이 성공적으로 전송되었습니다",
+              "command": "Standby",
+              "axes": "AZIMUTH,ELEVATION"
+            }
+            ```
+        """,
+        tags = ["ICD - Communication"]
+    )
     fun standbyCommand(
+        @Parameter(
+            description = "방위각 축 대기 모드 여부",
+            example = "true",
+            required = false
+        )
         @RequestParam azStandby: Boolean = false,
+        @Parameter(
+            description = "고도각 축 대기 모드 여부",
+            example = "true",
+            required = false
+        )
         @RequestParam elStandby: Boolean = false,
+        @Parameter(
+            description = "기울기 축 대기 모드 여부",
+            example = "false",
+            required = false
+        )
         @RequestParam tiStandby: Boolean = false
     ): ResponseEntity<Map<String, String>> {
         return try {
@@ -90,7 +198,55 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
     }
 
     @PostMapping("/on-emergency-stop-command")
-    fun onEmergencyStopCommand(@RequestParam commandType: Char): ResponseEntity<Map<String, String>> {
+    @Operation(
+        summary = "비상 정지 명령",
+        description = """
+            안테나 시스템에 비상 정지 명령을 전송합니다.
+            
+            ## 기능 설명
+            - **비상 정지**: 시스템을 즉시 안전한 상태로 정지
+            - **명령 타입**: 비상 정지(E) 또는 안전 정지(S) 구분
+            - **즉시 실행**: 명령 수신 즉시 모든 동작 중단
+            
+            ## 입력 파라미터
+            - **commandType**: 비상 정지 명령 타입
+              - **'E'**: Emergency Stop (비상 정지)
+              - **'S'**: Safe Stop (안전 정지)
+            
+            ## 명령 처리
+            - **타입 검증**: 'E' 또는 'S' 값 검증
+            - **UDP 전송**: UdpFwICDService를 통한 명령 전송
+            - **응답 생성**: 명령 처리 결과 및 상태 정보 반환
+            
+            ## 안전 고려사항
+            - **비상 정지(E)**: 모든 동작을 즉시 중단, 안전 장치 작동
+            - **안전 정지(S)**: 안전한 순서로 동작을 중단, 데이터 보존
+            
+            ## 사용 예시
+            ```
+            POST /api/icd/on-emergency-stop-command?commandType=E
+            ```
+            
+            ## 응답 예시
+            ```json
+            {
+              "status": "success",
+              "message": "Emergency Stop 명령이 성공적으로 전송되었습니다",
+              "command": "Emergency Stop",
+              "commandType": "E"
+            }
+            ```
+        """,
+        tags = ["ICD - Communication"]
+    )
+    fun onEmergencyStopCommand(
+        @Parameter(
+            description = "비상 정지 명령 타입 (E: Emergency, S: Safe)",
+            example = "E",
+            required = true
+        )
+        @RequestParam commandType: Char
+    ): ResponseEntity<Map<String, String>> {
         return try {
             // commandType이 'E' 또는 'S'인지 검증
             if (commandType != 'E' && commandType != 'S') {
@@ -369,6 +525,49 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
     // === 추가 유틸리티 엔드포인트들 ===
 
     @PostMapping("/communication-status")
+    @Operation(
+        summary = "통신 상태 확인",
+        description = """
+            외부 시스템과의 UDP 통신 상태를 확인합니다.
+            
+            ## 기능 설명
+            - **통신 상태**: UDP 연결의 건강성 및 성능 상태 확인
+            - **성능 통계**: 패킷 전송/수신 통계, 지연 시간 등
+            - **연결 상태**: 외부 시스템과의 연결 상태 모니터링
+            
+            ## 제공 정보
+            - **healthy**: 통신 연결 상태 (true/false)
+            - **statistics**: UDP 성능 통계 정보
+            - **timestamp**: 상태 확인 시간 (Unix timestamp)
+            
+            ## 성능 통계 항목
+            - **패킷 전송**: 성공/실패 패킷 수
+            - **지연 시간**: 평균/최대/최소 지연 시간
+            - **연결 상태**: 연결 유지 시간, 재연결 횟수
+            - **오류 정보**: 통신 오류 발생 횟수 및 유형
+            
+            ## 사용 예시
+            ```
+            POST /api/icd/communication-status
+            ```
+            
+            ## 응답 예시
+            ```json
+            {
+              "status": "success",
+              "healthy": true,
+              "statistics": {
+                "packetsSent": 1000,
+                "packetsReceived": 998,
+                "averageLatency": 5.2,
+                "connectionUptime": 3600
+              },
+              "timestamp": 1691928000000
+            }
+            ```
+        """,
+        tags = ["ICD - Communication"]
+    )
     fun getCommunicationStatus(): ResponseEntity<Map<String, Any>> {
         return try {
             val stats = udpFwICDService.getUdpPerformanceStats()

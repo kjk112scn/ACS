@@ -18,6 +18,7 @@ import org.hipparchus.util.FastMath
 import org.orekit.time.TimeScale
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
+import com.gtlsystems.acs_api.service.system.ConfigurationService
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.*
@@ -29,7 +30,8 @@ class SolarOrekitCalculator(
     private val ut1TimeScale: TimeScale,
     private val earthModel: OneAxisEllipsoid,
     private val sun: CelestialBody,
-    private val orekitStatus: OrekitConfig.OrekitInitializationStatus
+    private val orekitStatus: OrekitConfig.OrekitInitializationStatus,
+    private val configurationService: ConfigurationService
 ) {
 
     private lateinit var groundStation: TopocentricFrame
@@ -78,10 +80,15 @@ class SolarOrekitCalculator(
             val totalDiff = (accuracy["angular_differences"] as Map<*, *>)["total_angular_diff_arcsec"] as String
             val totalDiffValue = totalDiff.toDouble()
 
+            // 설정에서 정확도 임계값 로드
+            val highAccuracyThreshold = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 1L
+            val mediumAccuracyThreshold = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 10L
+            val lowAccuracyThreshold = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 60L
+            
             when {
-                totalDiffValue < 1.0 -> logger.info("태양 위치 정확도: 매우 높음 (${totalDiff}\")")
-                totalDiffValue < 10.0 -> logger.info("태양 위치 정확도: 높음 (${totalDiff}\")")
-                totalDiffValue < 60.0 -> logger.warn("태양 위치 정확도: 보통 (${totalDiff}\")")
+                totalDiffValue < highAccuracyThreshold -> logger.info("태양 위치 정확도: 매우 높음 (${totalDiff}\")")
+                totalDiffValue < mediumAccuracyThreshold -> logger.info("태양 위치 정확도: 높음 (${totalDiff}\")")
+                totalDiffValue < lowAccuracyThreshold -> logger.warn("태양 위치 정확도: 보통 (${totalDiff}\")")
                 else -> logger.error("태양 위치 정확도: 낮음 (${totalDiff}\") - EOP 데이터 확인 필요")
             }
 
@@ -159,11 +166,13 @@ class SolarOrekitCalculator(
         }
 
         var currentDate = startDate
-        val stepMinutes = 10.0
+        val stepMinutes = (configurationService.getValue("tracking.interval") as? Long ?: 10L).toDouble()
         var previousPosition: SunPosition? = null
 
-        // 48시간 동안 검색 (24시간 → 48시간으로 증가)
-        repeat(288) {  // 48시간 = 288 * 10분
+        // 설정에서 검색 시간 로드 (기본값: 48시간)
+        val searchHours = configurationService.getValue("tracking.stabilizationTimeout") as? Long ?: 48L
+        val searchIterations = (searchHours * 60 / stepMinutes).toInt()  // 시간을 분으로 변환 후 반복 횟수 계산
+        repeat(searchIterations) {
             val currentPosition = calculateSunPosition(currentDate)
             
             // ✅ 진짜 일출 조건: 이전에는 안 보이다가 → 현재는 보임
@@ -179,7 +188,7 @@ class SolarOrekitCalculator(
             }
             
             previousPosition = currentPosition
-            currentDate = currentDate.shiftedBy(stepMinutes * 60)
+            currentDate = currentDate.shiftedBy(stepMinutes * 60.0)
         }
 
         return null
@@ -198,11 +207,13 @@ class SolarOrekitCalculator(
         }
 
         var currentDate = startDate
-        val stepMinutes = 10.0
+        val stepMinutes = (configurationService.getValue("tracking.interval") as? Long ?: 10L).toDouble()
         var previousPosition: SunPosition? = null
 
-        // 48시간 동안 검색 (24시간 → 48시간으로 증가)
-        repeat(288) {  // 48시간 = 288 * 10분
+        // 설정에서 검색 시간 로드 (기본값: 48시간)
+        val searchHours = configurationService.getValue("tracking.stabilizationTimeout") as? Long ?: 48L
+        val searchIterations = (searchHours * 60 / stepMinutes).toInt()  // 시간을 분으로 변환 후 반복 횟수 계산
+        repeat(searchIterations) {
             val currentPosition = calculateSunPosition(currentDate)
             
             // ✅ 진짜 일몰 조건: 이전에는 보이다가 → 현재는 안 보임
@@ -218,7 +229,7 @@ class SolarOrekitCalculator(
             }
             
             previousPosition = currentPosition
-            currentDate = currentDate.shiftedBy(stepMinutes * 60)
+            currentDate = currentDate.shiftedBy(stepMinutes * 60.0)
         }
 
         return null

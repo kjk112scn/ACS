@@ -2,6 +2,7 @@ package com.gtlsystems.acs_api.controller.websocket
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.gtlsystems.acs_api.service.websocket.PushDataService
+import com.gtlsystems.acs_api.service.system.ConfigurationService
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
@@ -21,7 +22,8 @@ import java.util.concurrent.atomic.AtomicLong
 @Component
 class PushDataController(
     private val pushDataService: PushDataService,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val configurationService: ConfigurationService
 ) : WebSocketHandler {
 
     private val logger = LoggerFactory.getLogger(PushDataController::class.java)
@@ -36,12 +38,10 @@ class PushDataController(
     private val errorCount = AtomicLong(0)
     private val transmissionCount = AtomicLong(0)
 
-    // === 실시간 전송 설정 ===
-    companion object {
-        const val REALTIME_TRANSMISSION_INTERVAL_MS = 30L  // 30ms 주기
-        const val MAX_PROCESSING_TIME_MS = 25L  // 25ms 이상이면 경고
-        const val SESSION_TIMEOUT_MS = 30000L  // 30초 타임아웃
-    }
+    // === 실시간 전송 설정 (ConfigurationService에서 로드) ===
+    private val REALTIME_TRANSMISSION_INTERVAL_MS: Long get() = configurationService.getValue("tracking.transmissionInterval") as? Long ?: 100L
+    private val MAX_PROCESSING_TIME_MS: Long get() = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 100L
+    private val SESSION_TIMEOUT_MS: Long get() = configurationService.getValue("udp.timeout") as? Long ?: 25L
 
     // === 세션 정보 클래스 (실시간 전송 전용) ===
     private data class SessionInfo(

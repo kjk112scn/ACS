@@ -5,6 +5,7 @@ import com.gtlsystems.acs_api.event.ACSEventBus
 import com.gtlsystems.acs_api.model.GlobalData
 import com.gtlsystems.acs_api.model.PushData
 import com.gtlsystems.acs_api.service.datastore.DataStoreService
+import com.gtlsystems.acs_api.service.system.ConfigurationService
 import com.gtlsystems.acs_api.util.Crc16
 import com.gtlsystems.acs_api.util.JKUtil
 import org.slf4j.LoggerFactory
@@ -20,15 +21,20 @@ class ICDService {
         const val ICD_ETX: Byte = 0x03
     }
 
-    class Classify(private val dataStoreService: DataStoreService, private val acsEventBus: ACSEventBus) {
+    class Classify(
+        private val dataStoreService: DataStoreService, 
+        private val acsEventBus: ACSEventBus,
+        private val configurationService: ConfigurationService
+    ) {
         private var lastPacketTime = System.nanoTime()
         private val logger = LoggerFactory.getLogger(Classify::class.java)
 
-        // 패킷 타이밍 모니터링 메서드
+        // 패킷 타이밍 모니터링 메서드 (ConfigurationService에서 임계값 로드)
         private fun monitorPacketTiming(data: ByteArray) {
             val now = System.nanoTime()
             val interval = (now - lastPacketTime) / 1_000_000.0 // ms로 변환
-            if (interval > 60.0) { // 예상보다 지연된 경우
+            val packetDelayThreshold = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 60L
+            if (interval > packetDelayThreshold) { // 설정에서 임계값 로드
                 // logger.warn("패킷 지연 감지: ${interval}ms")
             }
             lastPacketTime = now

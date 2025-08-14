@@ -7,6 +7,7 @@ import com.gtlsystems.acs_api.model.GlobalData
 import com.gtlsystems.acs_api.model.PushData
 import com.gtlsystems.acs_api.model.PushData.CMD
 import com.gtlsystems.acs_api.service.udp.UdpFwICDService
+import com.gtlsystems.acs_api.service.system.ConfigurationService
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
@@ -23,7 +24,8 @@ class SunTrackService(
     private val udpFwICDService: UdpFwICDService,
     private val dataStoreService: com.gtlsystems.acs_api.service.datastore.DataStoreService,
     private val threadManager: ThreadManager,
-    private val solarOrekitCalculator: SolarOrekitCalculator
+    private val solarOrekitCalculator: SolarOrekitCalculator,
+    private val configurationService: ConfigurationService
 ) {
     private val logger = LoggerFactory.getLogger(SunTrackService::class.java)
 
@@ -31,9 +33,9 @@ class SunTrackService(
     private var modeExecutor: ScheduledExecutorService? = null
     private var modeTask: ScheduledFuture<*>? = null
 
-    // ✅ 성능 모니터링
+    // ✅ 성능 모니터링 (ConfigurationService에서 로드)
     private var lastProcessingTime = 0L
-    private var processingTimeWarningThreshold = 50L // 50ms 이상이면 경고
+    private val processingTimeWarningThreshold: Long get() = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 100L
     private var lastTrackingTime: Long? = null // 마지막 추적 시간
 
     // ✅ SunTrack 상태 관리 (핵심 변수만)
@@ -118,11 +120,12 @@ class SunTrackService(
                     }
                 },
                 0, // 즉시 시작
-                100, // 100ms 간격
+                configurationService.getValue("tracking.interval") as? Long ?: 100L, // 설정에서 간격 로드
                 TimeUnit.MILLISECONDS
             )
             
-            logger.info("Sun Track 모드 타이머 시작 (100ms 간격)")
+            val trackingInterval = configurationService.getValue("tracking.interval") as? Long ?: 100L
+            logger.info("Sun Track 모드 타이머 시작 ({}ms 간격)", trackingInterval)
             
         } catch (e: Exception) {
             logger.error("Sun Track 모드 타이머 시작 실패: {}", e.message, e)
@@ -459,8 +462,9 @@ class SunTrackService(
                             stabilizationDuration)
                     }
                     
-                    // ✅ 5초 안정화 완료
-                    if (stabilizationDuration >= 5000 && angleDifference <= stabilizationTolerance) {
+                    // ✅ 안정화 완료 (설정에서 타임아웃 로드)
+                    val stabilizationTimeout = configurationService.getValue("tracking.stabilizationTimeout") as? Long ?: 5000L
+                    if (stabilizationDuration >= stabilizationTimeout && angleDifference <= stabilizationTolerance) {
                         logger.info("Rotator 안정화 완료: 현재={}°, 목표={}°, 차이={}°, 대기시간={}ms", 
                             String.format("%.3f", currentRotatorAngle),
                             String.format("%.3f", targetRotatorAngle),

@@ -3,6 +3,9 @@ package com.gtlsystems.acs_api.controller.mode
 import com.gtlsystems.acs_api.algorithm.satellitetracker.impl.OrekitCalculator
 import com.gtlsystems.acs_api.algorithm.satellitetracker.model.SatelliteTrackData
 import com.gtlsystems.acs_api.service.mode.EphemerisService
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -17,6 +20,7 @@ import java.nio.charset.StandardCharsets
 
 @RestController
 @RequestMapping("/api/ephemeris")
+@Tag(name = "Mode - Ephemeris", description = "위성 궤도 추적 API - TLE 기반 위성 위치 계산, 추적 경로 생성, 가시성 분석")
 class EphemerisController(
     private val orekitCalculator: OrekitCalculator,
     private val ephemerisService: EphemerisService
@@ -25,7 +29,16 @@ class EphemerisController(
     private val logger = LoggerFactory.getLogger(EphemerisController::class.java)
 
     @PostMapping("/3axis/tracking/geostationary/start")
-    fun startGeostationaryTracking(@RequestBody request: GeostationaryTrackingRequest): Mono<Map<String, Any>> {
+    @Operation(
+        tags = ["Mode - Ephemeris"]
+    )
+    fun startGeostationaryTracking(
+        @Parameter(
+            description = "정지궤도 위성 추적 요청 데이터",
+            required = true
+        )
+        @RequestBody request: GeostationaryTrackingRequest
+    ): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             try {
                 ephemerisService.startGeostationaryTracking(request.tleLine1, request.tleLine2)
@@ -45,7 +58,42 @@ class EphemerisController(
     }
 
     @PostMapping("/3axis/tracking/geostationary/calculate-angles")
-    fun calculateGeostationaryAngles(@RequestBody request: GeostationaryTrackingRequest): Mono<Map<String, Any>> {
+    @Operation(
+        summary = "정지궤도 위성 각도 계산",
+        description = """
+            정지궤도 위성의 현재 위치에 대한 3축 각도를 계산합니다.
+            
+            ## 계산되는 각도
+            - **방위각 (Azimuth)**: 북쪽을 기준으로 한 수평 각도 (0°~360°)
+            - **고도각 (Elevation)**: 지평선을 기준으로 한 수직 각도 (0°~90°)
+            - **기울기각 (Tilt)**: 안테나 기울기 보정 각도
+            - **회전각 (Rotator)**: 안테나 회전 보정 각도
+            
+            ## 3축 변환
+            - **원본 각도**: Orekit 계산 결과
+            - **변환된 각도**: 안테나 시스템에 맞게 보정된 각도
+            - **기울기 보정**: 지구 자전축 기울기 보정
+            - **회전 보정**: 안테나 회전축 보정
+            
+            ## 응답 예시
+            ```json
+            {
+              "azimuth": 180.5,
+              "elevation": 45.2,
+              "tiltAngle": -6.98,
+              "rotatorAngle": 0.0
+            }
+            ```
+        """,
+        tags = ["Mode - Ephemeris"]
+    )
+    fun calculateGeostationaryAngles(
+        @Parameter(
+            description = "정지궤도 위성 각도 계산 요청 데이터",
+            required = true
+        )
+        @RequestBody request: GeostationaryTrackingRequest
+    ): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             try {
                 val geoPosition = ephemerisService.getCurrentGeostationaryPositionWith3AxisTransform(
@@ -77,6 +125,29 @@ class EphemerisController(
      * 실시간 추적 데이터 조회 (JSON)
      */
     @GetMapping("/tracking/realtime-data")
+    @Operation(
+        summary = "실시간 추적 데이터 조회",
+        description = """
+            현재 추적 중인 모든 위성의 실시간 데이터를 조회합니다.
+            
+            ## 제공 데이터
+            - **위성 정보**: 위성 ID, 이름, TLE 데이터
+            - **위치 정보**: 현재 위도, 경도, 고도
+            - **각도 정보**: 방위각, 고도각, 기울기각
+            - **추적 상태**: 추적 시작 시간, 마지막 업데이트 시간
+            
+            ## 통계 정보
+            - **totalCount**: 현재 추적 중인 위성 수
+            - **data**: 각 위성별 상세 추적 데이터
+            - **statistics**: 추적 성능 통계
+            
+            ## 사용 예시
+            ```
+            GET /api/ephemeris/tracking/realtime-data
+            ```
+        """,
+        tags = ["Mode - Ephemeris"]
+    )
     fun getRealtimeTrackingData(): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             val realtimeData = ephemerisService.getRealtimeTrackingData()
@@ -93,6 +164,28 @@ class EphemerisController(
      * 실시간 추적 데이터 초기화
      */
     @PostMapping("/realtime-data/clear")
+    @Operation(
+        summary = "실시간 추적 데이터 초기화",
+        description = """
+            모든 실시간 추적 데이터를 초기화합니다.
+            
+            ## 초기화 대상
+            - **위성 추적 데이터**: 현재 추적 중인 모든 위성 정보
+            - **통계 데이터**: 추적 성능 통계 정보
+            - **임시 데이터**: 메모리에 저장된 임시 추적 데이터
+            
+            ## 주의사항
+            - **데이터 손실**: 모든 추적 데이터가 영구적으로 삭제됩니다
+            - **추적 중단**: 초기화 후 새로운 추적을 시작해야 합니다
+            - **백업 권장**: 중요한 추적 데이터는 초기화 전 백업을 권장합니다
+            
+            ## 사용 예시
+            ```
+            POST /api/ephemeris/realtime-data/clear
+            ```
+        """,
+        tags = ["Mode - Ephemeris"]
+    )
     fun clearRealtimeTrackingData(): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             ephemerisService.clearRealtimeTrackingData()
@@ -141,7 +234,47 @@ class EphemerisController(
      * 현재 시간의 위성 위치를 계산합니다.
      */
     @PostMapping("/position/current")
-    fun getCurrentPosition(@RequestBody request: SatellitePositionRequest): Mono<SatelliteTrackData> {
+    @Operation(
+        summary = "현재 위성 위치 계산",
+        description = """
+            TLE 데이터를 기반으로 현재 시간의 위성 위치를 계산합니다.
+            
+            ## 계산 항목
+            - **위성 위치**: 위도, 경도, 고도
+            - **추적 각도**: 방위각, 고도각
+            - **궤도 정보**: 궤도 반지름, 궤도 속도
+            
+            ## 입력 파라미터
+            - **TLE 데이터**: Two-Line Element (위성 궤도 요소)
+            - **관측자 위치**: 위도, 경도, 고도
+            - **현재 시간**: 시스템 시간 기준
+            
+            ## 응답 데이터
+            - **위성 정보**: 위성 ID, 이름, TLE 데이터
+            - **위치 정보**: 위도, 경도, 고도, 속도
+            - **각도 정보**: 방위각, 고도각, 거리
+            - **시간 정보**: 계산 시간, TLE 에포크
+            
+            ## 사용 예시
+            ```json
+            {
+              "tleLine1": "1 25544U 98067A   21001.50000000 .00000000  00000+0  00000+0 0    04",
+              "tleLine2": "2 25544  51.6400 114.5000 0001001 100.5000 259.5000 15.05431418000000",
+              "latitude": 37.5665,
+              "longitude": 126.9780,
+              "altitude": 0.0
+            }
+            ```
+        """,
+        tags = ["Mode - Ephemeris"]
+    )
+    fun getCurrentPosition(
+        @Parameter(
+            description = "위성 위치 계산 요청 데이터",
+            required = true
+        )
+        @RequestBody request: SatellitePositionRequest
+    ): Mono<SatelliteTrackData> {
         return Mono.fromCallable {
             orekitCalculator.getCurrentPosition(
                 request.tleLine1,
@@ -157,7 +290,48 @@ class EphemerisController(
      * 지정된 시간의 위성 위치를 계산합니다.
      */
     @PostMapping("/position/at-time")
-    fun getPositionAtTime(@RequestBody request: SatellitePositionTimeRequest): Mono<SatelliteTrackData> {
+    @Operation(
+        summary = "지정 시간 위성 위치 계산",
+        description = """
+            TLE 데이터를 기반으로 특정 시간의 위성 위치를 계산합니다.
+            
+            ## 계산 항목
+            - **위성 위치**: 지정 시간의 위도, 경도, 고도
+            - **추적 각도**: 방위각, 고도각
+            - **궤도 정보**: 궤도 반지름, 궤도 속도
+            
+            ## 입력 파라미터
+            - **TLE 데이터**: Two-Line Element (위성 궤도 요소)
+            - **관측자 위치**: 위도, 경도, 고도
+            - **계산 시간**: ISO 8601 형식 (예: 2025-08-13T12:00:00Z)
+            
+            ## 응답 데이터
+            - **위성 정보**: 위성 ID, 이름, TLE 데이터
+            - **위치 정보**: 지정 시간의 위도, 경도, 고도, 속도
+            - **각도 정보**: 방위각, 고도각, 거리
+            - **시간 정보**: 계산 시간, TLE 에포크
+            
+            ## 사용 예시
+            ```json
+            {
+              "tleLine1": "1 25544U 98067A   21001.50000000 .00000000  00000+0  00000+0 0    04",
+              "tleLine2": "2 25544  51.6400 114.5000 0001001 100.5000 259.5000 15.05431418000000",
+              "dateTime": "2025-08-13T12:00:00Z",
+              "latitude": 37.5665,
+              "longitude": 126.9780,
+              "altitude": 0.0
+            }
+            ```
+        """,
+        tags = ["Mode - Ephemeris"]
+    )
+    fun getPositionAtTime(
+        @Parameter(
+            description = "지정 시간 위성 위치 계산 요청 데이터",
+            required = true
+        )
+        @RequestBody request: SatellitePositionTimeRequest
+    ): Mono<SatelliteTrackData> {
         return Mono.fromCallable {
             orekitCalculator.calculatePosition(
                 request.tleLine1,
@@ -173,7 +347,54 @@ class EphemerisController(
      * 위성 추적 스케줄을 생성합니다.
      */
     @PostMapping("/tracking/schedule")
-    fun generateTrackingSchedule(@RequestBody request: SatelliteTrackingScheduleRequest): Mono<OrekitCalculator.SatelliteTrackingSchedule> {
+    @Operation(
+        summary = "위성 추적 스케줄 생성",
+        description = """
+            TLE 데이터를 기반으로 위성 추적 스케줄을 생성합니다.
+            
+            ## 스케줄 항목
+            - **통과 시간**: 위성이 관측 가능한 시간대
+            - **최적 각도**: 최대 고도각 시점
+            - **추적 간격**: 설정된 간격으로 추적 데이터 생성
+            - **가시성**: 최소 고도각 기준 통과 여부
+            
+            ## 입력 파라미터
+            - **TLE 데이터**: Two-Line Element (위성 궤도 요소)
+            - **시작 날짜**: 스케줄 생성 시작 날짜
+            - **기간**: 스케줄 생성 기간 (일)
+            - **최소 고도각**: 통과로 인정할 최소 고도각
+            - **관측자 위치**: 위도, 경도, 고도
+            - **추적 간격**: 추적 데이터 생성 간격 (밀리초)
+            
+            ## 응답 데이터
+            - **스케줄 정보**: 통과 시작/종료 시간, 최대 고도각
+            - **추적 데이터**: 설정된 간격의 추적 포인트
+            - **통계 정보**: 총 통과 횟수, 총 추적 시간
+            
+            ## 사용 예시
+            ```json
+            {
+              "tleLine1": "1 25544U 98067A   21001.50000000 .00000000  00000+0  00000+0 0    04",
+              "tleLine2": "2 25544  51.6400 114.5000 0001001 100.5000 259.5000 15.05431418000000",
+              "startDate": "2025-08-13T00:00:00Z",
+              "durationDays": 7,
+              "minElevation": 10.0,
+              "latitude": 37.5665,
+              "longitude": 126.9780,
+              "altitude": 0.0,
+              "trackingIntervalMs": 100
+            }
+            ```
+        """,
+        tags = ["Mode - Ephemeris"]
+    )
+    fun generateTrackingSchedule(
+        @Parameter(
+            description = "위성 추적 스케줄 생성 요청 데이터",
+            required = true
+        )
+        @RequestBody request: SatelliteTrackingScheduleRequest
+    ): Mono<OrekitCalculator.SatelliteTrackingSchedule> {
         return Mono.fromCallable {
             orekitCalculator.generateSatelliteTrackingSchedule(
                 request.tleLine1,
@@ -192,7 +413,45 @@ class EphemerisController(
      * TLE 데이터로 위성 궤도 추적 데이터를 생성합니다.
      */
     @PostMapping("/tracking/generate")
-    fun generateEphemerisTrack(@RequestBody request: EphemerisTrackRequest): Mono<Map<String, Any>> {
+    @Operation(
+        summary = "위성 궤도 추적 데이터 생성",
+        description = """
+            TLE 데이터를 기반으로 위성 궤도 추적 데이터를 생성합니다.
+            
+            ## 생성 데이터
+            - **마스터 데이터 (MST)**: 위성 기본 정보 및 궤도 요소
+            - **세부 데이터 (DTL)**: 시간별 상세 추적 정보
+            - **변환 데이터**: 3축 변환이 적용된 최종 각도
+            
+            ## 처리 과정
+            1. **TLE 파싱**: Two-Line Element 데이터 검증 및 파싱
+            2. **궤도 계산**: Orekit을 사용한 정밀 궤도 계산
+            3. **데이터 생성**: 마스터 및 세부 데이터 생성
+            4. **비동기 처리**: 대용량 데이터 처리를 위한 비동기 실행
+            
+            ## 응답 데이터
+            - **message**: 처리 결과 메시지
+            - **mstCount**: 생성된 마스터 데이터 개수
+            - **dtlCount**: 생성된 세부 데이터 개수
+            
+            ## 사용 예시
+            ```json
+            {
+              "tleLine1": "1 25544U 98067A   21001.50000000 .00000000  00000+0  00000+0 0    04",
+              "tleLine2": "2 25544  51.6400 114.5000 0001001 100.5000 259.5000 15.05431418000000",
+              "satelliteName": "ISS"
+            }
+            ```
+        """,
+        tags = ["Mode - Ephemeris"]
+    )
+    fun generateEphemerisTrack(
+        @Parameter(
+            description = "위성 궤도 추적 데이터 생성 요청",
+            required = true
+        )
+        @RequestBody request: EphemerisTrackRequest
+    ): Mono<Map<String, Any>> {
         return ephemerisService.generateEphemerisDesignationTrackAsync(
             request.tleLine1,
             request.tleLine2,
@@ -218,6 +477,43 @@ class EphemerisController(
      * 모든 위성 추적 마스터 데이터를 조회합니다.
      */
     @GetMapping("/master")
+    @Operation(
+        summary = "모든 위성 추적 마스터 데이터 조회",
+        description = """
+            시스템에 저장된 모든 위성 추적 마스터 데이터를 조회합니다.
+            
+            ## 제공 데이터
+            - **위성 정보**: 위성 ID, 이름, TLE 데이터
+            - **궤도 요소**: 궤도 반지름, 이심률, 궤도 경사각
+            - **생성 정보**: 데이터 생성 시간, 처리 상태
+            - **변환 정보**: 3축 변환이 적용된 최종 데이터
+            
+            ## 데이터 구조
+            - **마스터 데이터 (MST)**: 위성별 기본 정보
+            - **세부 데이터 (DTL)**: 시간별 상세 추적 정보
+            - **변환 데이터**: 원본, 3축 변환, 최종 변환 단계
+            
+            ## 사용 예시
+            ```
+            GET /api/ephemeris/master
+            ```
+            
+            ## 응답 예시
+            ```json
+            [
+              {
+                "mstId": 1,
+                "satelliteName": "ISS",
+                "tleLine1": "1 25544U 98067A...",
+                "tleLine2": "2 25544 51.6400...",
+                "createdAt": "2025-08-13T10:00:00Z",
+                "status": "COMPLETED"
+              }
+            ]
+            ```
+        """,
+        tags = ["Mode - Ephemeris"]
+    )
     fun getAllEphemerisTrackMst(): Mono<List<Map<String, Any?>>> {
         return Mono.fromCallable {
             ephemerisService.getFinalTransformedEphemerisTrackMst()
@@ -228,7 +524,55 @@ class EphemerisController(
      * 특정 마스터 ID에 해당하는 세부 추적 데이터를 조회합니다.
      */
     @GetMapping("/detail/{mstId}")
-    fun getEphemerisTrackDtlByMstId(@PathVariable mstId: UInt): Mono<List<Map<String, Any?>>> {
+    @Operation(
+        summary = "특정 위성 세부 추적 데이터 조회",
+        description = """
+            지정된 마스터 ID에 해당하는 위성의 세부 추적 데이터를 조회합니다.
+            
+            ## 제공 데이터
+            - **시간별 위치**: 각 시간대의 위성 위치 (위도, 경도, 고도)
+            - **추적 각도**: 방위각, 고도각, 거리
+            - **궤도 정보**: 궤도 반지름, 궤도 속도
+            - **변환 데이터**: 3축 변환이 적용된 각도
+            
+            ## 데이터 구조
+            - **시간 정보**: 추적 시작/종료 시간, 간격
+            - **위치 정보**: 위성의 3차원 위치 좌표
+            - **각도 정보**: 관측자 기준 추적 각도
+            - **메타데이터**: 데이터 생성 시간, 품질 정보
+            
+            ## 사용 예시
+            ```
+            GET /api/ephemeris/detail/1
+            ```
+            
+            ## 응답 예시
+            ```json
+            [
+              {
+                "dtlId": 1,
+                "mstId": 1,
+                "timestamp": "2025-08-13T10:00:00Z",
+                "latitude": 37.5665,
+                "longitude": 126.9780,
+                "altitude": 408.0,
+                "azimuth": 180.5,
+                "elevation": 45.2,
+                "distance": 1234.5
+              }
+            ]
+            ```
+        """,
+        tags = ["Mode - Ephemeris"]
+    )
+    fun getEphemerisTrackDtlByMstId(
+        @Parameter(
+            description = "마스터 데이터 ID",
+            example = "1",
+            required = true
+        )
+        @PathVariable mstId: UInt
+    ): Mono<List<Map<String, Any?>>> {
         return Mono.fromCallable {
             ephemerisService.getEphemerisTrackDtlByMstId(mstId)
         }
@@ -239,7 +583,48 @@ class EphemerisController(
      * 헤더 정보 전송 및 초기 추적 데이터 전송을 수행합니다.
      */
     @PostMapping("/tracking/start/{passId}")
-    fun startEphemerisTracking(@PathVariable passId: UInt): Mono<Map<String, Any>> {
+    @Operation(
+        summary = "위성 추적 시작",
+        description = """
+            지정된 통과 ID의 위성 추적을 시작합니다.
+            
+            ## 추적 시작 과정
+            1. **헤더 정보 전송**: 위성 기본 정보 및 궤도 요소 전송
+            2. **초기 추적 데이터**: 시작 시점의 위치 및 각도 정보
+            3. **추적 상태 설정**: 시스템을 추적 모드로 전환
+            
+            ## 입력 파라미터
+            - **passId**: 통과 일정 ID (UInt)
+            
+            ## 응답 데이터
+            - **message**: 추적 시작 결과 메시지
+            - **passId**: 시작된 통과 ID
+            - **status**: 추적 상태 (tracking)
+            
+            ## 사용 예시
+            ```
+            POST /api/ephemeris/tracking/start/1
+            ```
+            
+            ## 응답 예시
+            ```json
+            {
+              "message": "위성 추적이 시작되었습니다.",
+              "passId": 1,
+              "status": "tracking"
+            }
+            ```
+        """,
+        tags = ["Mode - Ephemeris"]
+    )
+    fun startEphemerisTracking(
+        @Parameter(
+            description = "통과 일정 ID",
+            example = "1",
+            required = true
+        )
+        @PathVariable passId: UInt
+    ): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             // 위성 추적 시작 (헤더 정보 전송)
             ephemerisService.startEphemerisTracking(passId)
@@ -258,6 +643,35 @@ class EphemerisController(
      * 위성 추적을 중지합니다.
      */
     @PostMapping("/tracking/stop")
+    @Operation(
+        summary = "위성 추적 중지",
+        description = """
+            현재 진행 중인 위성 추적을 중지합니다.
+            
+            ## 추적 중지 과정
+            1. **추적 데이터 전송 중단**: 실시간 데이터 전송 중단
+            2. **시스템 상태 변경**: 추적 모드에서 대기 모드로 전환
+            3. **리소스 정리**: 추적 관련 메모리 및 연결 정리
+            
+            ## 응답 데이터
+            - **message**: 추적 중지 결과 메시지
+            - **status**: 시스템 상태 (stopped)
+            
+            ## 사용 예시
+            ```
+            POST /api/ephemeris/tracking/stop
+            ```
+            
+            ## 응답 예시
+            ```json
+            {
+              "message": "위성 추적이 중지되었습니다.",
+              "status": "stopped"
+            }
+            ```
+        """,
+        tags = ["Mode - Ephemeris"]
+    )
     fun stopEphemerisTracking(): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             ephemerisService.stopEphemerisTracking()
@@ -274,6 +688,46 @@ class EphemerisController(
      * 위성 추적 상태를 확인합니다.
      */
     @GetMapping("/tracking/status")
+    @Operation(
+        summary = "위성 추적 상태 확인",
+        description = """
+            현재 위성 추적 시스템의 상태를 확인합니다.
+            
+            ## 상태 정보
+            - **tracking**: 추적 중인 상태
+            - **idle**: 대기 중인 상태
+            
+            ## 추적 중일 때 제공 정보
+            - **passId**: 현재 추적 중인 통과 일정 ID
+            - **satelliteName**: 추적 중인 위성 이름
+            - **startTime**: 추적 시작 시간
+            - **endTime**: 추적 종료 예정 시간
+            
+            ## 사용 예시
+            ```
+            GET /api/ephemeris/tracking/status
+            ```
+            
+            ## 응답 예시 (추적 중)
+            ```json
+            {
+              "status": "tracking",
+              "passId": 1,
+              "satelliteName": "ISS",
+              "startTime": "2025-08-13T10:00:00Z",
+              "endTime": "2025-08-13T10:15:00Z"
+            }
+            ```
+            
+            ## 응답 예시 (대기 중)
+            ```json
+            {
+              "status": "idle"
+            }
+            ```
+        """,
+        tags = ["Mode - Ephemeris"]
+    )
     fun getTrackingStatus(): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             val isTracking = ephemerisService.isTracking()
@@ -299,7 +753,58 @@ class EphemerisController(
      * 3축 변환 계산 API
      */
     @PostMapping("/calculate-axis-transform")
-    fun calculateAxisTransform(@RequestBody request: Map<String, Double>): ResponseEntity<Map<String, Any>> {
+    @Operation(
+        summary = "3축 변환 계산",
+        description = """
+            위성 추적 각도를 3축 변환하여 안테나 제어에 적합한 각도로 변환합니다.
+            
+            ## 변환 과정
+            1. **방위각 변환**: 지구 자전축 기울기 보정
+            2. **고도각 변환**: 안테나 기울기 보정
+            3. **회전각 계산**: 안테나 회전축 보정
+            4. **최종 각도**: 모든 보정이 적용된 최종 각도
+            
+            ## 입력 파라미터
+            - **azimuth**: 원본 방위각 (0°~360°)
+            - **elevation**: 원본 고도각 (0°~90°)
+            - **tilt**: 안테나 기울기 각도 (기본값: -6.98°)
+            - **rotator**: 안테나 회전각 (기본값: 0°)
+            
+            ## 응답 데이터
+            - **transformedAzimuth**: 변환된 방위각
+            - **transformedElevation**: 변환된 고도각
+            - **tiltAngle**: 적용된 기울기 각도
+            - **rotatorAngle**: 적용된 회전각
+            
+            ## 사용 예시
+            ```json
+            {
+              "azimuth": 180.0,
+              "elevation": 45.0,
+              "tilt": -6.98,
+              "rotator": 0.0
+            }
+            ```
+            
+            ## 응답 예시
+            ```json
+            {
+              "transformedAzimuth": 186.98,
+              "transformedElevation": 51.98,
+              "tiltAngle": -6.98,
+              "rotatorAngle": 0.0
+            }
+            ```
+        """,
+        tags = ["Mode - Ephemeris"]
+    )
+    fun calculateAxisTransform(
+        @Parameter(
+            description = "3축 변환 계산 요청 데이터 (azimuth, elevation, tilt, rotator)",
+            required = true
+        )
+        @RequestBody request: Map<String, Double>
+    ): ResponseEntity<Map<String, Any>> {
         try {
             val azimuth = request["azimuth"] ?: 0.0
             val elevation = request["elevation"] ?: 0.0
@@ -326,6 +831,45 @@ class EphemerisController(
      * 변환 전 원본 위성 추적 데이터를 조회합니다.
      */
     @GetMapping("/master/original")
+    @Operation(
+        summary = "원본 위성 추적 데이터 조회",
+        description = """
+            변환 전 원본 위성 추적 데이터를 조회합니다.
+            
+            ## 데이터 특징
+            - **원본 데이터**: Orekit 계산 결과 그대로
+            - **변환 미적용**: 3축 변환이 적용되지 않은 상태
+            - **정밀도**: 최고 정밀도의 궤도 계산 결과
+            
+            ## 제공 데이터
+            - **위성 정보**: 위성 ID, 이름, TLE 데이터
+            - **궤도 요소**: 궤도 반지름, 이심률, 궤도 경사각
+            - **위치 정보**: 위도, 경도, 고도, 속도
+            - **각도 정보**: 방위각, 고도각, 거리
+            
+            ## 사용 예시
+            ```
+            GET /api/ephemeris/master/original
+            ```
+            
+            ## 응답 예시
+            ```json
+            {
+              "dataType": "original",
+              "description": "변환 전 원본 위성 추적 데이터",
+              "data": [
+                {
+                  "mstId": 1,
+                  "satelliteName": "ISS",
+                  "azimuth": 180.0,
+                  "elevation": 45.0
+                }
+              ]
+            }
+            ```
+        """,
+        tags = ["Mode - Ephemeris"]
+    )
     fun getOriginalEphemerisTrackMst(): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             val originalMst = ephemerisService.getOriginalEphemerisTrackMst()
@@ -343,6 +887,48 @@ class EphemerisController(
      * 기울기 변환이 적용된 위성 추적 데이터를 조회합니다.
      */
     @GetMapping("/master/axis-transformed")
+    @Operation(
+        summary = "3축 변환 위성 추적 데이터 조회",
+        description = """
+            기울기 변환이 적용된 위성 추적 데이터를 조회합니다.
+            
+            ## 변환 특징
+            - **기울기 보정**: 지구 자전축 기울기 (-6.98°) 보정
+            - **회전각 보정**: 안테나 회전축 보정 (기본값: 0°)
+            - **1단계 변환**: 원본 데이터에서 기울기 보정만 적용
+            
+            ## 제공 데이터
+            - **위성 정보**: 위성 ID, 이름, TLE 데이터
+            - **변환된 각도**: 기울기 보정이 적용된 방위각, 고도각
+            - **변환 정보**: 적용된 기울기 각도, 회전각
+            - **데이터 개수**: 변환된 데이터의 총 개수
+            
+            ## 변환 공식
+            - **방위각**: 원본 방위각 + 기울기 보정각
+            - **고도각**: 원본 고도각 + 기울기 보정각
+            - **거리**: 원본 거리 (변경 없음)
+            
+            ## 사용 예시
+            ```
+            GET /api/ephemeris/master/axis-transformed
+            ```
+            
+            ## 응답 예시
+            ```json
+            {
+              "dataType": "axis_transformed",
+              "description": "기울기 변환이 적용된 위성 추적 데이터",
+              "count": 10,
+              "transformationInfo": {
+                "tiltAngle": -6.98,
+                "rotatorAngle": 0.0,
+                "transformationType": "axis_transform"
+              }
+            }
+            ```
+        """,
+        tags = ["Mode - Ephemeris"]
+    )
     fun getAxisTransformedEphemerisTrackMst(): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             val axisTransformedMst = ephemerisService.getAxisTransformedEphemerisTrackMst()
@@ -365,6 +951,55 @@ class EphemerisController(
      * 방위각 변환까지 적용된 최종 위성 추적 데이터를 조회합니다.
      */
     @GetMapping("/master/final-transformed")
+    @Operation(
+        summary = "최종 변환 위성 추적 데이터 조회",
+        description = """
+            방위각 변환까지 적용된 최종 위성 추적 데이터를 조회합니다.
+            
+            ## 변환 특징
+            - **기울기 보정**: 지구 자전축 기울기 (-6.98°) 보정
+            - **회전각 보정**: 안테나 회전축 보정 (기본값: 0°)
+            - **방위각 보정**: ±270도 제한이 적용된 최종 방위각
+            - **2단계 변환**: 기울기 보정 + 방위각 제한 적용
+            
+            ## 제공 데이터
+            - **위성 정보**: 위성 ID, 이름, TLE 데이터
+            - **최종 각도**: 모든 보정이 적용된 방위각, 고도각
+            - **변환 정보**: 적용된 기울기 각도, 회전각, 각도 제한
+            - **데이터 개수**: 최종 변환된 데이터의 총 개수
+            
+            ## 변환 공식
+            - **방위각**: (기울기 보정 방위각) ±270도 제한 적용
+            - **고도각**: 기울기 보정 고도각 (변경 없음)
+            - **거리**: 원본 거리 (변경 없음)
+            
+            ## 각도 제한
+            - **방위각**: -270° ~ +270° 범위로 제한
+            - **고도각**: 0° ~ 90° 범위 유지
+            - **안전성**: 안테나 시스템의 물리적 제한 고려
+            
+            ## 사용 예시
+            ```
+            GET /api/ephemeris/master/final-transformed
+            ```
+            
+            ## 응답 예시
+            ```json
+            {
+              "dataType": "final_transformed",
+              "description": "방위각 변환까지 적용된 최종 위성 추적 데이터",
+              "count": 10,
+              "transformationInfo": {
+                "tiltAngle": -6.98,
+                "rotatorAngle": 0.0,
+                "transformationType": "final_transform",
+                "angleLimit": "±270도"
+              }
+            }
+            ```
+        """,
+        tags = ["Mode - Ephemeris"]
+    )
     fun getFinalTransformedEphemerisTrackMst(): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             val finalTransformedMst = ephemerisService.getFinalTransformedEphemerisTrackMst()
@@ -520,7 +1155,60 @@ class EphemerisController(
      * 모든 MST 데이터를 CSV 파일로 내보내기 API
      */
     @PostMapping("/export/csv/all")
-    fun exportAllMstDataToCsv(@RequestParam(defaultValue = "csv_exports") outputDirectory: String): Mono<Map<String, Any>> {
+    @Operation(
+        summary = "모든 위성 추적 데이터 CSV 내보내기",
+        description = """
+            시스템에 저장된 모든 위성 추적 데이터를 CSV 파일로 내보냅니다.
+            
+            ## 내보내기 대상
+            - **마스터 데이터 (MST)**: 모든 위성의 기본 정보
+            - **세부 데이터 (DTL)**: 각 위성의 상세 추적 정보
+            - **변환 데이터**: 원본, 3축 변환, 최종 변환 단계별 데이터
+            
+            ## 파일 구조
+            - **파일명**: `ephemeris_track_all_YYYYMMDD_HHMMSS.csv`
+            - **인코딩**: UTF-8 with BOM (Excel 호환성)
+            - **구분자**: 쉼표 (,)
+            
+            ## 출력 디렉토리
+            - **기본값**: `csv_exports`
+            - **사용자 지정**: `outputDirectory` 파라미터로 변경 가능
+            - **자동 생성**: 디렉토리가 없으면 자동으로 생성
+            
+            ## 응답 데이터
+            - **totalMstCount**: 전체 마스터 데이터 개수
+            - **successCount**: 성공적으로 내보낸 데이터 개수
+            - **errorCount**: 오류 발생 데이터 개수
+            - **createdFiles**: 생성된 CSV 파일 목록
+            
+            ## 사용 예시
+            ```
+            POST /api/ephemeris/export/csv/all?outputDirectory=my_exports
+            ```
+            
+            ## 응답 예시
+            ```json
+            {
+              "success": true,
+              "message": "모든 MST 데이터가 CSV 파일로 성공적으로 내보내졌습니다.",
+              "totalMstCount": 10,
+              "successCount": 10,
+              "errorCount": 0,
+              "createdFiles": ["ephemeris_track_all_20250813_143000.csv"],
+              "outputDirectory": "my_exports"
+            }
+            ```
+        """,
+        tags = ["Mode - Ephemeris"]
+    )
+    fun exportAllMstDataToCsv(
+        @Parameter(
+            description = "CSV 파일 출력 디렉토리 (기본값: csv_exports)",
+            example = "csv_exports",
+            required = false
+        )
+        @RequestParam(defaultValue = "csv_exports") outputDirectory: String
+    ): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             try {
                 val result = ephemerisService.exportAllMstDataToCsv(outputDirectory)
@@ -556,8 +1244,68 @@ class EphemerisController(
      * 특정 MST ID의 데이터를 CSV 파일로 내보내기 API
      */
     @PostMapping("/export/csv/{mstId}")
+    @Operation(
+        summary = "특정 위성 추적 데이터 CSV 내보내기",
+        description = """
+            지정된 마스터 ID의 위성 추적 데이터를 CSV 파일로 내보냅니다.
+            
+            ## 내보내기 대상
+            - **마스터 데이터 (MST)**: 위성 기본 정보 및 궤도 요소
+            - **세부 데이터 (DTL)**: 시간별 상세 추적 정보
+            - **변환 데이터**: 원본, 3축 변환, 최종 변환 단계별 데이터
+            
+            ## 파일 구조
+            - **파일명**: `ephemeris_track_MST{mstId}_YYYYMMDD_HHMMSS.csv`
+            - **인코딩**: UTF-8 with BOM (Excel 호환성)
+            - **구분자**: 쉼표 (,)
+            - **데이터 단계**: 원본, 3축 변환, 최종 변환 순서로 정렬
+            
+            ## 출력 디렉토리
+            - **기본값**: `csv_exports`
+            - **사용자 지정**: `outputDirectory` 파라미터로 변경 가능
+            - **자동 생성**: 디렉토리가 없으면 자동으로 생성
+            
+            ## 응답 데이터
+            - **filename**: 생성된 CSV 파일명
+            - **filePath**: 파일의 전체 경로
+            - **satelliteName**: 위성 이름
+            - **originalDataCount**: 원본 데이터 개수
+            - **axisTransformedDataCount**: 3축 변환 데이터 개수
+            - **finalTransformedDataCount**: 최종 변환 데이터 개수
+            
+            ## 사용 예시
+            ```
+            POST /api/ephemeris/export/csv/1?outputDirectory=my_exports
+            ```
+            
+            ## 응답 예시
+            ```json
+            {
+              "success": true,
+              "message": "MST ID 1 데이터가 CSV 파일로 성공적으로 내보내졌습니다.",
+              "filename": "ephemeris_track_MST1_20250813_143000.csv",
+              "filePath": "my_exports/ephemeris_track_MST1_20250813_143000.csv",
+              "satelliteName": "ISS",
+              "originalDataCount": 1000,
+              "axisTransformedDataCount": 1000,
+              "finalTransformedDataCount": 1000
+            }
+            ```
+        """,
+        tags = ["Mode - Ephemeris"]
+    )
     fun exportMstDataToCsv(
+        @Parameter(
+            description = "마스터 데이터 ID",
+            example = "1",
+            required = true
+        )
         @PathVariable mstId: Int,
+        @Parameter(
+            description = "CSV 파일 출력 디렉토리 (기본값: csv_exports)",
+            example = "csv_exports",
+            required = false
+        )
         @RequestParam(defaultValue = "csv_exports") outputDirectory: String
     ): Mono<Map<String, Any>> {
         return Mono.fromCallable {
