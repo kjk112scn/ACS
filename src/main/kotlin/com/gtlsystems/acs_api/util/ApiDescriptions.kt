@@ -7,7 +7,20 @@ object ApiDescriptions {
     
     // Ephemeris 관련 API 설명
     val EPHEMERIS_DESCRIPTIONS = mapOf(
-        "tracking.stop" to mapOf(
+        // API 경로 기반 키 (주소 패턴: /api/ephemeris/tracking/stop)
+        "ephemeris.tracking.stop" to mapOf(
+            "ko" to mapOf(
+                "summary" to "위성 추적 중지",
+                "description" to "현재 진행 중인 위성 추적을 중지합니다."
+            ),
+            "en" to mapOf(
+                "summary" to "Stop Satellite Tracking",
+                "description" to "Stop ongoing satellite tracking."
+            )
+        ),
+        
+        // 위성 추적 중지 관련 키 (다양한 메서드명 대응)
+        "stopEphemerisTracking" to mapOf(
             "ko" to mapOf(
                 "summary" to "위성 추적 중지",
                 "description" to """
@@ -61,6 +74,187 @@ object ApiDescriptions {
                 """.trimIndent()
             )
         ),
+        // 동일한 API에 대한 다른 메서드명 매핑
+        "stop" to mapOf(
+            "ko" to mapOf(
+                "summary" to "위성 추적 중지",
+                "description" to "현재 진행 중인 위성 추적을 중지합니다."
+            ),
+            "en" to mapOf(
+                "summary" to "Stop Satellite Tracking",
+                "description" to "Stop ongoing satellite tracking."
+            )
+        ),
+        "tracking.stop" to mapOf(
+            "ko" to mapOf(
+                "summary" to "위성 추적 중지",
+                "description" to "현재 진행 중인 위성 추적을 중지합니다."
+            ),
+            "en" to mapOf(
+                "summary" to "Stop Satellite Tracking",
+                "description" to "Stop ongoing satellite tracking."
+            )
+        ),
+        // 위성 추적 시작 관련 키
+        "startEphemerisTracking" to mapOf(
+            "ko" to mapOf(
+                "summary" to "위성 추적 시작",
+                "description" to "지정된 통과 ID로 위성 추적을 시작합니다."
+            ),
+            "en" to mapOf(
+                "summary" to "Start Satellite Tracking",
+                "description" to "Start satellite tracking with the specified pass ID."
+            )
+        ),
+        // API 경로 기반 키 (주소 패턴: /api/ephemeris/tracking/start/{passId})
+        "ephemeris.tracking.start.{passId}" to mapOf(
+            "ko" to mapOf(
+                "summary" to "위성 추적 시작",
+                "description" to """
+                    지정된 통과 ID의 위성 추적을 시작합니다.
+                    
+                    ## 추적 시작 과정
+                    1. **헤더 정보 전송**: 위성 기본 정보 및 궤도 요소 전송
+                    2. **초기 추적 데이터**: 시작 시점의 위치 및 각도 정보
+                    3. **추적 상태 설정**: 시스템을 추적 모드로 전환
+                    
+                    ## 입력 파라미터
+                    - **passId**: 통과 일정 ID (UInt)
+                    
+                    ## 응답 데이터
+                    - **message**: 추적 시작 결과 메시지
+                    - **passId**: 시작된 통과 ID
+                    - **status**: 추적 상태 (tracking)
+                    
+                    ## 사용 예시
+                    ```
+                    POST /api/ephemeris/tracking/start/1
+                    ```
+                    
+                    ## 응답 예시
+                    ```json
+                    {
+                      "message": "위성 추적이 시작되었습니다.",
+                      "passId": 1,
+                      "status": "tracking"
+                    }
+                    ```
+                """.trimIndent()
+            ),
+            "en" to mapOf(
+                "summary" to "Start Satellite Tracking",
+                "description" to """
+                    Start satellite tracking with the specified pass ID.
+                    
+                    ## Tracking Start Process
+                    1. **Header Information Transmission**: Transmit satellite basic information and orbital elements
+                    2. **Initial Tracking Data**: Position and angle information at the start point
+                    3. **Tracking Status Setting**: Switch the system to tracking mode
+                    
+                    ## Input Parameters
+                    - **passId**: Pass schedule ID (UInt)
+                    
+                    ## Response Data
+                    - **message**: Tracking start result message
+                    - **passId**: Started pass ID
+                    - **status**: Tracking status (tracking)
+                    
+                    ## Usage Example
+                    ```
+                    POST /api/ephemeris/tracking/start/1
+                    ```
+                    
+                    ## Response Example
+                    ```json
+                    {
+                      "message": "Satellite tracking has been started.",
+                      "passId": 1,
+                      "status": "tracking"
+                    }
+                    ```
+                """.trimIndent()
+            )
+        ),
+        // API 경로 기반 키 (주소 패턴: /api/ephemeris/tracking/start)
+        "ephemeris.tracking.start" to mapOf(
+            "ko" to mapOf(
+                "summary" to "위성 추적 시작",
+                "description" to """
+                    지정된 통과 ID의 위성 추적을 시작합니다.
+                    
+                    ## 추적 시작 과정
+                    1. **헤더 정보 전송**: 위성 기본 정보 및 궤도 요소 전송
+                    2. **초기 추적 데이터**: 시작 시점의 위치 및 각도 정보
+                    3. **추적 상태 설정**: 시스템을 추적 모드로 전환
+                    
+                    ## 입력 파라미터
+                    - **passId**: 통과 일정 ID (UInt)
+                    
+                    ## 응답 데이터
+                    - **message**: 추적 시작 결과 메시지
+                    - **passId**: 시작된 통과 ID
+                    - **status**: 추적 상태 (tracking)
+                    
+                    ## 사용 예시
+                    ```
+                    POST /api/ephemeris/tracking/start/1
+                    ```
+                    
+                    ## 응답 예시
+                    ```json
+                    {
+                      "message": "위성 추적이 시작되었습니다.",
+                      "passId": 1,
+                      "status": "tracking"
+                    }
+                    ```
+                """.trimIndent()
+            ),
+            "en" to mapOf(
+                "summary" to "Start Satellite Tracking",
+                "description" to """
+                    Start satellite tracking with the specified pass ID.
+                    
+                    ## Tracking Start Process
+                    1. **Header Information Transmission**: Transmit satellite basic information and orbital elements
+                    2. **Initial Tracking Data**: Position and angle information at the start point
+                    3. **Tracking Status Setting**: Switch the system to tracking mode
+                    
+                    ## Input Parameters
+                    - **passId**: Pass schedule ID (UInt)
+                    
+                    ## Response Data
+                    - **message**: Tracking start result message
+                    - **passId**: Started pass ID
+                    - **status**: Tracking status (tracking)
+                    
+                    ## Usage Example
+                    ```
+                    POST /api/ephemeris/tracking/start/1
+                    ```
+                    
+                    ## Response Example
+                    ```json
+                    {
+                      "message": "Satellite tracking has been started.",
+                      "passId": 1,
+                      "status": "tracking"
+                    }
+                    ```
+                """.trimIndent()
+            )
+        ),
+        // 동일한 API에 대한 다른 메서드명 매핑
+        "start" to mapOf(
+            "ko" to mapOf(
+                "summary" to "위성 추적 시작",
+                "description" to "지정된 통과 ID로 위성 추적을 시작합니다."
+            ),
+            "en" to mapOf(
+                "summary" to "Start Satellite Tracking",
+                "description" to "Start satellite tracking with the specified pass ID."
+            )
+        ),
         "tracking.start" to mapOf(
             "ko" to mapOf(
                 "summary" to "위성 추적 시작",
@@ -71,7 +265,8 @@ object ApiDescriptions {
                 "description" to "Start satellite tracking with the specified pass ID."
             )
         ),
-        "tracking.schedule" to mapOf(
+        // 위성 추적 스케줄 생성 관련 키
+        "generateTrackingSchedule" to mapOf(
             "ko" to mapOf(
                 "summary" to "위성 추적 스케줄 생성",
                 "description" to "위성 통과 일정을 기반으로 추적 스케줄을 생성합니다."
@@ -81,7 +276,7 @@ object ApiDescriptions {
                 "description" to "Generate tracking schedule based on satellite pass schedule."
             )
         ),
-        "tracking.generate" to mapOf(
+        "generateEphemerisTrack" to mapOf(
             "ko" to mapOf(
                 "summary" to "위성 궤도 추적 데이터 생성",
                 "description" to "TLE 데이터를 기반으로 위성 궤도 추적 데이터를 생성합니다."
@@ -125,6 +320,29 @@ object ApiDescriptions {
     
     // Configuration 관련 API 설명
     val CONFIGURATION_DESCRIPTIONS = mapOf(
+        // API 경로 기반 키
+        "configuration.all" to mapOf(
+            "ko" to "모든 설정 조회",
+            "en" to "Get All Configurations"
+        ),
+        "configuration" to mapOf(
+            "ko" to "설정 관리",
+            "en" to "Configuration Management"
+        ),
+        "configuration.get" to mapOf(
+            "ko" to "특정 설정 조회",
+            "en" to "Get Specific Configuration"
+        ),
+        "configuration.update" to mapOf(
+            "ko" to "설정 업데이트",
+            "en" to "Update Configuration"
+        ),
+        "configuration.delete" to mapOf(
+            "ko" to "설정 삭제",
+            "en" to "Delete Configuration"
+        ),
+        
+        // 메서드명 기반 키
         "getAllConfigurations" to mapOf(
             "ko" to "모든 설정 조회",
             "en" to "Get All Configurations"
@@ -145,6 +363,21 @@ object ApiDescriptions {
     
     // SunTrack 관련 API 설명
     val SUNTRACK_DESCRIPTIONS = mapOf(
+        // API 경로 기반 키
+        "sun-track.start" to mapOf(
+            "ko" to "태양 추적 시작",
+            "en" to "Start Sun Tracking"
+        ),
+        "sun-track.stop" to mapOf(
+            "ko" to "태양 추적 중지",
+            "en" to "Stop Sun Tracking"
+        ),
+        "sun-track.data" to mapOf(
+            "ko" to "태양 추적 데이터 조회",
+            "en" to "Get Sun Tracking Data"
+        ),
+        
+        // 메서드명 기반 키
         "startTracking" to mapOf(
             "ko" to "태양 추적 시작",
             "en" to "Start Sun Tracking"
@@ -161,6 +394,21 @@ object ApiDescriptions {
     
     // PassSchedule 관련 API 설명
     val PASS_SCHEDULE_DESCRIPTIONS = mapOf(
+        // API 경로 기반 키
+        "pass-schedule.tle.add" to mapOf(
+            "ko" to "TLE 데이터 추가",
+            "en" to "Add TLE Data"
+        ),
+        "pass-schedule.tracking.generate" to mapOf(
+            "ko" to "추적 데이터 생성",
+            "en" to "Generate Tracking Data"
+        ),
+        "pass-schedule.schedules" to mapOf(
+            "ko" to "통과 일정 조회",
+            "en" to "Get Pass Schedules"
+        ),
+        
+        // 메서드명 기반 키
         "addTle" to mapOf(
             "ko" to "TLE 데이터 추가",
             "en" to "Add TLE Data"
@@ -211,22 +459,42 @@ object ApiDescriptions {
      * API 키에 해당하는 언어별 설명을 반환
      */
     fun getDescription(apiKey: String, language: String, type: String = "summary"): String {
-        val descriptions = when {
-            apiKey.startsWith("ephemeris.") -> EPHEMERIS_DESCRIPTIONS
-            apiKey.startsWith("configuration.") -> CONFIGURATION_DESCRIPTIONS
-            apiKey.startsWith("suntrack.") -> SUNTRACK_DESCRIPTIONS
-            apiKey.startsWith("passschedule.") -> PASS_SCHEDULE_DESCRIPTIONS
-            apiKey.startsWith("icd.") -> ICD_DESCRIPTIONS
-            apiKey.startsWith("performance.") -> PERFORMANCE_DESCRIPTIONS
-            else -> emptyMap()
+        // 먼저 EPHEMERIS_DESCRIPTIONS에서 찾기 (nested structure)
+        EPHEMERIS_DESCRIPTIONS[apiKey]?.let { descriptions ->
+            val langDesc = descriptions[language]
+            return if (langDesc is Map<*, *>) {
+                (langDesc[type] as? String) ?: apiKey
+            } else {
+                apiKey
+            }
         }
         
-        val apiDescriptions = descriptions[apiKey.removePrefix("${apiKey.split(".").first()}.")]
-        return when (val langDesc = apiDescriptions?.get(language)) {
-            is Map<*, *> -> (langDesc[type] as? String) ?: apiKey
-            is String -> langDesc
-            else -> apiKey
+        // CONFIGURATION_DESCRIPTIONS에서 찾기 (simple structure)
+        CONFIGURATION_DESCRIPTIONS[apiKey]?.let { desc ->
+            return desc[language] ?: apiKey
         }
+        
+        // SUNTRACK_DESCRIPTIONS에서 찾기 (simple structure)
+        SUNTRACK_DESCRIPTIONS[apiKey]?.let { desc ->
+            return desc[language] ?: apiKey
+        }
+        
+        // PASS_SCHEDULE_DESCRIPTIONS에서 찾기 (simple structure)
+        PASS_SCHEDULE_DESCRIPTIONS[apiKey]?.let { desc ->
+            return desc[language] ?: apiKey
+        }
+        
+        // ICD_DESCRIPTIONS에서 찾기 (simple structure)
+        ICD_DESCRIPTIONS[apiKey]?.let { desc ->
+            return desc[language] ?: apiKey
+        }
+        
+        // PERFORMANCE_DESCRIPTIONS에서 찾기 (simple structure)
+        PERFORMANCE_DESCRIPTIONS[apiKey]?.let { desc ->
+            return desc[language] ?: apiKey
+        }
+        
+        return apiKey
     }
     
     /**
