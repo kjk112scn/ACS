@@ -34,86 +34,88 @@ class ConfigurationService(
     }
     
     /**
-     * 설정을 캐시에 로드
+     * 설정 캐시를 메모리에 로드
      */
     private fun loadConfigurationToCache() {
-        return loggingService.logPerformance("loadConfigurationToCache") {
-            try {
-                // UDP 설정
-                configCache["udp.receiveInterval"] = systemConfiguration.udp.receiveInterval
-                configCache["udp.sendInterval"] = systemConfiguration.udp.sendInterval
-                configCache["udp.timeout"] = systemConfiguration.udp.timeout
-                configCache["udp.reconnectInterval"] = systemConfiguration.udp.reconnectInterval
-                configCache["udp.maxBufferSize"] = systemConfiguration.udp.maxBufferSize
-                configCache["udp.commandDelay"] = systemConfiguration.udp.commandDelay
-                
-                // 추적 설정
-                configCache["tracking.interval"] = systemConfiguration.tracking.interval
-                configCache["tracking.transmissionInterval"] = systemConfiguration.tracking.transmissionInterval
-                configCache["tracking.fineInterval"] = systemConfiguration.tracking.fineInterval
-                configCache["tracking.coarseInterval"] = systemConfiguration.tracking.coarseInterval
-                configCache["tracking.performanceThreshold"] = systemConfiguration.tracking.performanceThreshold
-                configCache["tracking.stabilizationTimeout"] = systemConfiguration.tracking.stabilizationTimeout
-                
-                // 데이터 저장 설정
-                configCache["storage.batchSize"] = systemConfiguration.storage.batchSize
-                configCache["storage.saveInterval"] = systemConfiguration.storage.saveInterval
-                configCache["storage.progressLogInterval"] = systemConfiguration.storage.progressLogInterval
-                
-                // 위치 설정
-                configCache["location.latitude"] = systemConfiguration.location.latitude
-                configCache["location.longitude"] = systemConfiguration.location.longitude
-                configCache["location.trackingSpeed"] = systemConfiguration.location.trackingSpeed
-                
-                logger.info("📋 설정 캐시 로드 완료: ${configCache.size}개 항목")
-                
-            } catch (e: Exception) {
-                loggingService.error("설정 캐시 로드 실패", e)
-                logger.error("❌ 설정 캐시 로드 실패", e)
-                throw RuntimeException("설정 초기화 실패", e)
-            }
+        // 성능 로깅 비활성화
+        // return loggingService.logPerformance("loadConfigurationToCache") {
+        try {
+            // UDP 설정
+            configCache["udp.receiveInterval"] = systemConfiguration.udp.receiveInterval
+            configCache["udp.sendInterval"] = systemConfiguration.udp.sendInterval
+            configCache["udp.timeout"] = systemConfiguration.udp.timeout
+            configCache["udp.reconnectInterval"] = systemConfiguration.udp.reconnectInterval
+            configCache["udp.maxBufferSize"] = systemConfiguration.udp.maxBufferSize
+            configCache["udp.commandDelay"] = systemConfiguration.udp.commandDelay
+            
+            // 추적 설정
+            configCache["tracking.interval"] = systemConfiguration.tracking.interval
+            configCache["tracking.transmissionInterval"] = systemConfiguration.tracking.transmissionInterval
+            configCache["tracking.fineInterval"] = systemConfiguration.tracking.fineInterval
+            configCache["tracking.coarseInterval"] = systemConfiguration.tracking.coarseInterval
+            configCache["tracking.performanceThreshold"] = systemConfiguration.tracking.performanceThreshold
+            configCache["tracking.stabilizationTimeout"] = systemConfiguration.tracking.stabilizationTimeout
+            
+            // 데이터 저장 설정
+            configCache["storage.batchSize"] = systemConfiguration.storage.batchSize
+            configCache["storage.saveInterval"] = systemConfiguration.storage.saveInterval
+            configCache["storage.progressLogInterval"] = systemConfiguration.storage.progressLogInterval
+            
+            // 위치 설정
+            configCache["location.latitude"] = systemConfiguration.location.latitude
+            configCache["location.longitude"] = systemConfiguration.location.longitude
+            configCache["location.trackingSpeed"] = systemConfiguration.location.trackingSpeed
+            
+            logger.info("📋 설정 캐시 로드 완료: ${configCache.size}개 항목")
+        } catch (e: Exception) {
+            loggingService.error("설정 캐시 로드 실패", e)
+            logger.error("❌ 설정 캐시 로드 실패", e)
+            throw RuntimeException("설정 초기화 실패", e)
         }
+        // }
     }
-    
+
     /**
      * 설정 값 조회
      */
     fun getValue(key: String): Any? {
-        return loggingService.logPerformance("getValue") {
-            val value = configCache[key]
-            loggingService.debug("설정 값 조회: $key = $value")
-            value
-        }
+        // 성능 로깅 비활성화
+        // return loggingService.logPerformance("getValue") {
+        val value = configCache[key]
+        loggingService.debug("설정 값 조회: $key = $value")
+        return value
+        // }
     }
-    
+
     /**
      * 설정 값 업데이트
      */
     fun updateValue(key: String, newValue: Any): Boolean {
-        return loggingService.logPerformance("updateValue") {
-            try {
-                val oldValue = configCache[key]
-                if (oldValue != newValue) {
-                    configCache[key] = newValue
-                    logger.info("🔄 설정 변경: $key = $oldValue → $newValue")
-                    
-                    // 설정 변경 로깅
-                    loggingService.logConfigurationChange(key, oldValue, newValue)
-                    
-                    // 설정 변경 이벤트 발행
-                    val event = ConfigurationChangedEvent(key, oldValue, newValue)
-                    eventPublisher.publishEvent(event)
-                    
-                    true
-                } else {
-                    false
-                }
-            } catch (e: Exception) {
-                loggingService.error("설정 업데이트 실패: $key = $newValue", e)
-                logger.error("❌ 설정 업데이트 실패: $key = $newValue", e)
-                false
+        // 성능 로깅 비활성화
+        // return loggingService.logPerformance("updateValue") {
+        try {
+            val oldValue = configCache[key]
+            if (oldValue != newValue) {
+                configCache[key] = newValue
+                logger.info("🔄 설정 변경: $key = $oldValue → $newValue")
+                
+                // 설정 변경 로깅
+                loggingService.logConfigurationChange(key, oldValue, newValue)
+                
+                // 설정 변경 이벤트 발행
+                val event = ConfigurationChangedEvent(key, oldValue, newValue)
+                eventPublisher.publishEvent(event)
+                
+                return true
+            } else {
+                return false
             }
+        } catch (e: Exception) {
+            loggingService.error("설정 업데이트 실패: $key = $newValue", e)
+            logger.error("❌ 설정 업데이트 실패: $key = $newValue", e)
+            return false
         }
+        // }
     }
     
     /**

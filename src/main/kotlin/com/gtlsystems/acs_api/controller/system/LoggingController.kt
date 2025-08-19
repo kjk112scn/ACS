@@ -1,6 +1,7 @@
 package com.gtlsystems.acs_api.controller.system
 
 import com.gtlsystems.acs_api.service.system.LoggingService
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
@@ -27,6 +28,7 @@ import java.time.format.DateTimeFormatter
  */
 @RestController
 @RequestMapping("/api/logging")
+@Tag(name = "logging-controller", description = "로깅 관리 - 시스템 로깅 및 로그 레벨 제어")
 class LoggingController(
     private val loggingService: LoggingService
 ) {

@@ -62,17 +62,18 @@ class BatchStorageManager(
      * ✅ 배치 데이터 추가
      */
     fun addToBatch(data: Map<String, Any?>) {
-        return loggingService.logPerformance("addToBatch") {
-            synchronized(batchBuffer) {
-                batchBuffer.add(data)
-                
-                // ✅ 배치 크기 또는 시간 조건 확인
-                if (batchBuffer.size >= batchSize || 
-                    (System.currentTimeMillis() - lastBatchTime) >= batchTimeoutMs) {
-                    processBatch()
-                }
+        // 성능 로깅 비활성화
+        // return loggingService.logPerformance("addToBatch") {
+        synchronized(batchBuffer) {
+            batchBuffer.add(data)
+            
+            // ✅ 배치 크기 또는 시간 조건 확인
+            if (batchBuffer.size >= batchSize || 
+                (System.currentTimeMillis() - lastBatchTime) >= batchTimeoutMs) {
+                processBatch()
             }
         }
+        // }
     }
     
     /**

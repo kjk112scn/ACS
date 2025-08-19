@@ -44,7 +44,7 @@ repositories {
 
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-webflux")
-	// SpringDoc OpenAPI + Swagger UI (WebFlux용)
+	// SpringDoc OpenAPI + Swagger UI (WebFlux용) - Spring Boot 3.4.4와 호환되는 최신 버전
 	implementation("org.springdoc:springdoc-openapi-starter-webflux-ui:2.8.6")
 	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 	implementation("io.projectreactor.kotlin:reactor-kotlin-extensions")
