@@ -42,55 +42,7 @@ class PassScheduleController(
      */
     @PostMapping("/tle")
     @Operation(
-        summary = "TLE 데이터 추가",
-        description = """
-            위성 궤도 데이터(TLE)를 추가합니다.
-            
-            ## 기능 설명
-            - **TLE 데이터**: Two-Line Element를 사용한 위성 궤도 정보 추가
-            - **자동 ID 추출**: satelliteId가 제공되지 않으면 TLE Line1에서 자동 추출
-            - **데이터 검증**: TLE 형식 및 필수 필드 검증
-            - **캐시 저장**: 메모리 기반 캐시에 TLE 데이터 저장
-            
-            ## 입력 파라미터
-            - **satelliteId**: 위성 ID (선택적, null 허용)
-            - **satelliteName**: 위성 이름 (선택적)
-            - **tleLine1**: TLE 첫 번째 라인 (69자, 필수)
-            - **tleLine2**: TLE 두 번째 라인 (69자, 필수)
-            
-            ## TLE 형식
-            - **Line1**: 위성 식별자, 궤도 요소 등 (69자)
-            - **Line2**: 궤도 운동 요소, 이심률, 궤도 경사각 등 (69자)
-            
-            ## 자동 ID 추출
-            - TLE Line1의 3-7번째 문자에서 위성 번호 추출
-            - 예: "1 25544U 98067A" → "25544"
-            
-            ## 사용 예시
-            ```json
-            {
-              "satelliteId": "25544",
-              "satelliteName": "ISS",
-              "tleLine1": "1 25544U 98067A   21001.50000000 .00000000  00000+0  00000+0 0    04",
-              "tleLine2": "2 25544  51.6400 114.5000 0001001 100.5000 259.5000 15.05431418000000"
-            }
-            ```
-            
-            ## 응답 예시
-            ```json
-            {
-              "success": true,
-              "message": "TLE 데이터가 성공적으로 추가되었습니다.",
-              "data": {
-                "satelliteId": "25544",
-                "tleLine1": "1 25544U 98067A...",
-                "tleLine2": "2 25544  51.6400...",
-                "added": true,
-                "satelliteIdSource": "provided"
-              }
-            }
-            ```
-        """,
+        operationId = "addtle",
         tags = ["Mode - Pass Schedule"]
     )
     fun addTle(
@@ -189,6 +141,10 @@ class PassScheduleController(
      * 특정 위성의 TLE 데이터 조회
      */
     @GetMapping("/tle/{satelliteId}")
+    @Operation(
+        operationId = "gettle",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getTle(@PathVariable satelliteId: String): ResponseEntity<Map<String, Any>> {
         return try {
             val tleData = passScheduleService.getPassScheduleTleWithName(satelliteId)
@@ -235,6 +191,10 @@ class PassScheduleController(
      * 전체 TLE 데이터 조회
      */
     @GetMapping("/tle")
+    @Operation(
+        operationId = "gettlelist",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getAllTles(): ResponseEntity<Map<String, Any>> {
         return try {
             val satelliteIds = passScheduleService.getAllPassScheduleTleIds()
@@ -284,6 +244,10 @@ class PassScheduleController(
      * 특정 위성의 TLE 데이터 삭제
      */
     @DeleteMapping("/tle/{satelliteId}")
+    @Operation(
+        operationId = "deletetle",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun deleteTle(@PathVariable satelliteId: String): ResponseEntity<Map<String, Any>> {
         return try {
             // 삭제 전 존재 여부 확인
@@ -329,6 +293,10 @@ class PassScheduleController(
      * 전체 TLE 데이터 삭제
      */
     @DeleteMapping("/tle")
+    @Operation(
+        operationId = "deletealltles",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun deleteAllTles(): ResponseEntity<Map<String, Any>> {
         return try {
             val beforeCount = passScheduleService.getCacheSize()
@@ -363,6 +331,10 @@ class PassScheduleController(
      * TLE 캐시 상태 조회
      */
     @GetMapping("/status")
+    @Operation(
+        operationId = "gettlestatus",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getCacheStatus(): ResponseEntity<Map<String, Any>> {
         return try {
             val cacheSize = passScheduleService.getCacheSize()
@@ -402,6 +374,10 @@ class PassScheduleController(
      * TLE 데이터 업데이트 (기존 데이터 덮어쓰기)
      */
     @PutMapping("/tle/{satelliteId}")
+    @Operation(
+        operationId = "updatetle",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun updateTle(
         @PathVariable satelliteId: String,
         @RequestBody request: UpdateTleRequest
@@ -478,52 +454,7 @@ class PassScheduleController(
      */
     @PostMapping("/tracking/generate-all")
     @Operation(
-        summary = "모든 위성 추적 데이터 생성",
-        description = """
-            모든 TLE 데이터에 대해 위성 추적 정보를 생성합니다.
-            
-            ## 기능 설명
-            - **비동기 처리**: Mono를 사용한 비동기 추적 데이터 생성
-            - **전체 위성**: 등록된 모든 위성의 패스 스케줄 계산
-            - **궤도 계산**: Orekit을 사용한 정밀한 궤도 계산
-            - **패스 정보**: 통과 시간, 고도각, 방위각 등 상세 정보
-            
-            ## 처리 과정
-            1. **TLE 데이터 로드**: 캐시된 모든 TLE 데이터 조회
-            2. **궤도 계산**: 각 위성별 궤도 요소 계산
-            3. **패스 스케줄**: 통과 시간 및 위치 정보 생성
-            4. **데이터 저장**: 마스터/세부 데이터로 구조화하여 저장
-            
-            ## 생성되는 데이터
-            - **마스터 데이터**: 패스별 요약 정보 (시작/종료 시간, 최대 고도각 등)
-            - **세부 데이터**: 추적 포인트별 상세 정보 (시간, 위치, 각도 등)
-            
-            ## 사용 예시
-            ```
-            POST /api/pass-schedule/tracking/generate-all
-            ```
-            
-            ## 응답 예시
-            ```json
-            {
-              "success": true,
-              "message": "모든 위성 추적 데이터 생성 완료",
-              "data": {
-                "processedSatellites": 3,
-                "totalPasses": 15,
-                "totalTrackingPoints": 1500,
-                "satellites": [
-                  {
-                    "satelliteId": "25544",
-                    "passCount": 5,
-                    "trackingPointCount": 500,
-                    "satelliteName": "ISS"
-                  }
-                ]
-              }
-            }
-            ```
-        """,
+        operationId = "generateallpassscheduletracking",
         tags = ["Mode - Pass Schedule"]
     )
     fun generateAllTrackingData(): Mono<ResponseEntity<Map<String, Any>>> {
@@ -632,6 +563,10 @@ class PassScheduleController(
      * 특정 위성의 패스 스케줄 마스터 데이터를 조회합니다.
      */
     @GetMapping("/tracking/master/{satelliteId}")
+    @Operation(
+        operationId = "getpassschedulemasterdata",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getTrackingMasterData(@PathVariable satelliteId: String): ResponseEntity<Map<String, Any>> {
         return try {
             val mstData = passScheduleService.getPassScheduleTrackMstBySatelliteId(satelliteId)
@@ -677,6 +612,10 @@ class PassScheduleController(
      * 특정 위성의 패스 스케줄 세부 데이터를 조회합니다.
      */
     @GetMapping("/tracking/detail/{satelliteId}")
+    @Operation(
+        operationId = "getpassscheduledetaildata",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getTrackingDetailData(@PathVariable satelliteId: String): ResponseEntity<Map<String, Any>> {
         return try {
             val dtlData = passScheduleService.getPassScheduleTrackDtlBySatelliteId(satelliteId)
@@ -722,6 +661,10 @@ class PassScheduleController(
      * 특정 위성의 특정 패스에 대한 세부 데이터를 조회합니다.
      */
     @GetMapping("/tracking/detail/{satelliteId}/pass/{passId}")
+    @Operation(
+        operationId = "getpassscheduledetailbypass",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getTrackingDetailDataByPass(
         @PathVariable satelliteId: String,
         @PathVariable passId: UInt
@@ -771,6 +714,10 @@ class PassScheduleController(
      * 모든 위성의 패스 스케줄 마스터 데이터를 조회합니다.
      */
     @GetMapping("/tracking/master")
+    @Operation(
+        operationId = "getallpassschedulemasterdata",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getAllTrackingMasterData(): ResponseEntity<Map<String, Any>> {
         return try {
             val allMstData = passScheduleService.getAllPassScheduleTrackMst()
@@ -822,6 +769,10 @@ class PassScheduleController(
      * 추적 데이터 통계 정보를 조회합니다.
      */
     @GetMapping("/tracking/statistics")
+    @Operation(
+        operationId = "getpassschedulestatistics",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getTrackingStatistics(): ResponseEntity<Map<String, Any>> {
         return try {
             val statistics = passScheduleService.getTrackingDataStatistics()
@@ -850,6 +801,10 @@ class PassScheduleController(
      * 특정 위성의 간단한 패스 정보만 조회합니다 (요약 정보)
      */
     @GetMapping("/tracking/summary/{satelliteId}")
+    @Operation(
+        operationId = "getpassschedulesummary",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getTrackingSummary(@PathVariable satelliteId: String): ResponseEntity<Map<String, Any>> {
         return try {
             val mstData = passScheduleService.getPassScheduleTrackMstBySatelliteId(satelliteId)
@@ -914,6 +869,10 @@ class PassScheduleController(
      * 모든 위성의 간단한 패스 정보만 조회합니다 (전체 요약 정보)
      */
     @GetMapping("/tracking/summary")
+    @Operation(
+        operationId = "getallpassschedulesummary",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getAllTrackingSummary(): ResponseEntity<Map<String, Any>> {
         return try {
             val allMstData = passScheduleService.getAllPassScheduleTrackMst()
@@ -991,6 +950,10 @@ class PassScheduleController(
      * 특정 위성의 추적 데이터를 삭제합니다.
      */
     @DeleteMapping("/tracking/{satelliteId}")
+    @Operation(
+        operationId = "deletepassscheduledata",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun deleteTrackingData(@PathVariable satelliteId: String): ResponseEntity<Map<String, Any>> {
         return try {
             // 삭제 전 존재 여부 확인
@@ -1043,6 +1006,10 @@ class PassScheduleController(
      * 모든 위성의 추적 데이터를 삭제합니다.
      */
     @DeleteMapping("/tracking")
+    @Operation(
+        operationId = "deleteallpassscheduledata",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun deleteAllTrackingData(): ResponseEntity<Map<String, Any>> {
         return try {
             val statistics = passScheduleService.getTrackingDataStatistics()
@@ -1084,6 +1051,10 @@ class PassScheduleController(
      * TLE 데이터 추가와 동시에 추적 데이터를 생성합니다 (원스톱 API)
      */
     @PostMapping("/tle-and-tracking")
+    @Operation(
+        operationId = "addtleandgeneratetracking",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun addTleAndGenerateTracking(@RequestBody request: AddTleRequest): Mono<ResponseEntity<Map<String, Any>>> {
         logger.info("TLE 추가 및 추적 데이터 생성 요청 수신")
 
@@ -1186,6 +1157,10 @@ class PassScheduleController(
      * ✅ 위성 추적 스케줄 대상 목록을 설정합니다.
      */
     @PostMapping("/tracking-targets")
+    @Operation(
+        operationId = "setpassscheduletargets",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun setTrackingTargets(@RequestBody request: SetTrackingTargetsRequest): ResponseEntity<Map<String, Any>> {
         return try {
             // 입력 검증
@@ -1281,6 +1256,10 @@ class PassScheduleController(
      * ✅ 위성 추적 스케줄 대상 목록을 조회합니다.
      */
     @GetMapping("/tracking-targets")
+    @Operation(
+        operationId = "getpassscheduletargets",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getTrackingTargets(): ResponseEntity<Map<String, Any>> {
         return try {
             val trackingTargets = passScheduleService.getTrackingTargetList()
@@ -1324,6 +1303,10 @@ class PassScheduleController(
      * ✅ 특정 위성의 추적 대상 목록을 조회합니다.
      */
     @GetMapping("/tracking-targets/satellite/{satelliteId}")
+    @Operation(
+        operationId = "getpassscheduletargetsbysatellite",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getTrackingTargetsBySatellite(@PathVariable satelliteId: String): ResponseEntity<Map<String, Any>> {
         return try {
             val trackingTargets = passScheduleService.getTrackingTargetsBySatelliteId(satelliteId)
@@ -1368,6 +1351,10 @@ class PassScheduleController(
      * ✅ 특정 MST ID의 추적 대상을 조회합니다.
      */
     @GetMapping("/tracking-targets/mst/{mstId}")
+    @Operation(
+        operationId = "getpassscheduletargetbymstid",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getTrackingTargetByMstId(@PathVariable mstId: UInt): ResponseEntity<Map<String, Any>> {
         return try {
             val trackingTarget = passScheduleService.getTrackingTargetByMstId(mstId)
@@ -1416,6 +1403,10 @@ class PassScheduleController(
      * ✅ 추적 대상 목록을 초기화합니다.
      */
     @DeleteMapping("/tracking-targets")
+    @Operation(
+        operationId = "clearpassscheduletargets",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun clearTrackingTargets(): ResponseEntity<Map<String, Any>> {
         return try {
             val beforeCount = passScheduleService.getTrackingTargetList().size
@@ -1451,6 +1442,10 @@ class PassScheduleController(
      * ✅ 특정 위성의 선별된 마스터 데이터를 조회합니다.
      */
     @GetMapping("/selected-tracking/master/{satelliteId}")
+    @Operation(
+        operationId = "getselectedpassschedulemasterdata",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getSelectedTrackingMasterData(@PathVariable satelliteId: String): ResponseEntity<Map<String, Any>> {
         return try {
             val selectedMstData = passScheduleService.getSelectedTrackMstBySatelliteId(satelliteId)
@@ -1496,6 +1491,10 @@ class PassScheduleController(
      * ✅ 모든 위성의 선별된 마스터 데이터를 조회합니다.
      */
     @GetMapping("/selected-tracking/master")
+    @Operation(
+        operationId = "getallselectedpassschedulemasterdata",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getAllSelectedTrackingMasterData(): ResponseEntity<Map<String, Any>> {
         return try {
             val allSelectedMstData = passScheduleService.getAllSelectedTrackMst()
@@ -1547,6 +1546,10 @@ class PassScheduleController(
      * ✅ 특정 MST ID의 선별된 세부 데이터를 조회합니다.
      */
     @GetMapping("/selected-tracking/detail/mst/{mstId}")
+    @Operation(
+        operationId = "getselectedpassscheduledetailbymstid",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getSelectedTrackingDetailByMstId(@PathVariable mstId: UInt): ResponseEntity<Map<String, Any>> {
         return try {
             val selectedDtlData = passScheduleService.getSelectedTrackDtlByMstId(mstId)
@@ -1592,6 +1595,10 @@ class PassScheduleController(
      * ✅ 현재 시간 기준으로 진행 중인 선별된 추적 패스를 조회합니다.
      */
     @GetMapping("/selected-tracking/current")
+    @Operation(
+        operationId = "getcurrentselectedpassschedule",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getCurrentSelectedTrackingPass(): ResponseEntity<Map<String, Any>> {
         return try {
             val currentPass = passScheduleService.getCurrentSelectedTrackingPass()
@@ -1640,6 +1647,10 @@ class PassScheduleController(
      * ✅ 다음 선별된 추적 패스를 조회합니다.
      */
     @GetMapping("/selected-tracking/next")
+    @Operation(
+        operationId = "getnextselectedpassschedule",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getNextSelectedTrackingPass(): ResponseEntity<Map<String, Any>> {
         return try {
             val nextPass = passScheduleService.getNextSelectedTrackingPass()
@@ -1689,6 +1700,10 @@ class PassScheduleController(
      * ✅ 추적 모니터링 시작 (100ms 주기)
      */
     @PostMapping("/tracking/start")
+    @Operation(
+        operationId = "startpassscheduletracking",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun startScheduleTracking(): ResponseEntity<Map<String, Any>> {
         return try {
             passScheduleService.startScheduleTracking()
@@ -1724,6 +1739,10 @@ class PassScheduleController(
      * ✅ 추적 모니터링 중지
      */
     @PostMapping("/tracking/stop")
+    @Operation(
+        operationId = "stoppassscheduletracking",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun stopScheduleTracking(): ResponseEntity<Map<String, Any>> {
         return try {
             passScheduleService.stopScheduleTracking()
@@ -1758,6 +1777,10 @@ class PassScheduleController(
      * ✅ 추적 모니터링 상태 조회
      */
     @GetMapping("/tracking-monitor/status")
+    @Operation(
+        operationId = "getpassschedulemonitorstatus",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getTrackingMonitorStatus(): ResponseEntity<Map<String, Any>> {
         return try {
             val status = passScheduleService.getTrackingMonitorStatus()
@@ -1788,6 +1811,10 @@ class PassScheduleController(
      * ✅ 현재 표시 중인 스케줄 조회
      */
     @GetMapping("/tracking-monitor/current-schedule")
+    @Operation(
+        operationId = "getcurrentdisplayedschedule",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun getCurrentDisplayedSchedule(): ResponseEntity<Map<String, Any>> {
         return try {
             val currentSchedule = passScheduleService.getCurrentDisplayedSchedule()
@@ -1842,6 +1869,10 @@ class PassScheduleController(
      * ✅ 추적 모니터링 재시작 (중지 후 시작)
      */
     @PostMapping("/tracking-monitor/restart")
+    @Operation(
+        operationId = "restartpassschedulemonitor",
+        tags = ["Mode - Pass Schedule"]
+    )
     fun restartTrackingMonitor(): ResponseEntity<Map<String, Any>> {
         return try {
             // 먼저 중지
@@ -1878,8 +1909,6 @@ class PassScheduleController(
             )
         }
     }
-
-
 }
 
 /**
