@@ -20,7 +20,7 @@ import java.nio.charset.StandardCharsets
 
 @RestController
 @RequestMapping("/api/ephemeris")
-@Tag(name = "Mode - Ephemeris", description = "���� �˵� ���� API - TLE ���� ���� ��ġ ����, ���� ���� ����, ���ü� �м�")
+@Tag(name = "Mode - Ephemeris", description = "위성 궤도 제어 API - TLE 기반 위성 위치 계산, 궤도 추적 제어, 가시성 분석")
 class EphemerisController(
     private val orekitCalculator: OrekitCalculator,
     private val ephemerisService: EphemerisService
@@ -34,7 +34,7 @@ class EphemerisController(
     )
     fun startGeostationaryTracking(
         @Parameter(
-            description = "�����˵� ���� ���� ��û ������",
+            description = "정지궤도 위성 추적 시작 요청 데이터",
             required = true
         )
         @RequestBody request: GeostationaryTrackingRequest
@@ -44,14 +44,14 @@ class EphemerisController(
                 ephemerisService.startGeostationaryTracking(request.tleLine1, request.tleLine2)
                 
                 mapOf(
-                    "message" to "�����˵� ���� ������ ���۵Ǿ����ϴ�.",
+                    "message" to "정지궤도 위성 추적이 시작되었습니다.",
                     "satelliteId" to request.tleLine1.substring(2, 7).trim(),
                     "trackingType" to "geostationary"
                 )
             } catch (e: Exception) {
                 mapOf(
-                    "message" to "�����˵� ���� ���� ���� ����: ${e.message}",
-                    "error" to (e.message ?: "�� �� ���� ����")
+                    "message" to "정지궤도 위성 추적 시작 실패: ${e.message}",
+                    "error" to (e.message ?: "알 수 없는 오류")
                 )
             }
         }
@@ -64,7 +64,7 @@ class EphemerisController(
     )
     fun calculateGeostationaryAngles(
         @Parameter(
-            description = "�����˵� ���� ���� ���� ��û ������",
+            description = "정지궤도 위성 추적 각도 계산 요청 데이터",
             required = true
         )
         @RequestBody request: GeostationaryTrackingRequest
@@ -77,7 +77,7 @@ class EphemerisController(
                 )
                 
                 mapOf(
-                    "message" to "�����˵� ���� ���� �Ϸ�",
+                    "message" to "정지궤도 위성 각도가 계산되었습니다.",
                     "satelliteId" to request.tleLine1.substring(2, 7).trim(),
                     "azimuth" to (geoPosition["transformedAzimuth"] as Double),
                     "elevation" to (geoPosition["transformedElevation"] as Double),
@@ -89,15 +89,15 @@ class EphemerisController(
                 )
             } catch (e: Exception) {
                 mapOf(
-                    "message" to "�����˵� ���� ���� ����: ${e.message}",
-                    "error" to (e.message ?: "�� �� ���� ����")
+                    "message" to "정지궤도 위성 각도 계산 실패: ${e.message}",
+                    "error" to (e.message ?: "알 수 없는 오류")
                 )
             }
         }
     }
 
     /**
-     * �ǽð� ���� ������ ��ȸ (JSON)
+     * 실시간 추적 데이터를 조회 (JSON)
      */
     @GetMapping("/tracking/realtime-data")
     @Operation(
@@ -117,7 +117,7 @@ class EphemerisController(
         }
     }
     /**
-     * �ǽð� ���� ������ �ʱ�ȭ
+     * 실시간 추적 데이터를 초기화
      */
     @PostMapping("/realtime-data/clear")
     @Operation(
@@ -128,7 +128,7 @@ class EphemerisController(
         return Mono.fromCallable {
             ephemerisService.clearRealtimeTrackingData()
             mapOf(
-                "message" to "�ǽð� ���� �����Ͱ� �ʱ�ȭ�Ǿ����ϴ�",
+                "message" to "실시간 추적 데이터가 초기화되었습니다",
                 "status" to "cleared"
             )
         }
@@ -140,14 +140,14 @@ class EphemerisController(
             ephemerisService.setCurrentTrackingPassId(passId)
             ResponseEntity.ok(mapOf(
                 "status" to "success",
-                "message" to "setCurrentTrackingPassId ������ ���������� ���۵Ǿ����ϴ�",
+                "message" to "setCurrentTrackingPassId 명령이 성공적으로 처리되었습니다.",
                 "command" to "setCurrentTrackingPassId",
                 "passId" to passId.toString()
             ))
         } catch (e: Exception) {
             ResponseEntity.internalServerError().body(mapOf(
                 "status" to "error",
-                "message" to "setCurrentTrackingPassId ���� ���� ����: ${e.message}"
+                "message" to "setCurrentTrackingPassId 명령 처리 실패: ${e.message}"
             ))
         }
     }
@@ -157,19 +157,19 @@ class EphemerisController(
             ephemerisService.ephemerisTimeOffsetCommand(inputTimeOffset)
             ResponseEntity.ok(mapOf(
                 "status" to "success",
-                "message" to "TimeOffset ������ ���������� ���۵Ǿ����ϴ�",
+                "message" to "TimeOffset 명령이 성공적으로 처리되었습니다.",
                 "command" to "TimeOffset",
                 "timeOffset" to inputTimeOffset.toString()
             ))
         } catch (e: Exception) {
             ResponseEntity.internalServerError().body(mapOf(
                 "status" to "error",
-                "message" to "TimeOffset ���� ���� ����: ${e.message}"
+                "message" to "TimeOffset 명령 처리 실패: ${e.message}"
             ))
         }
     }
     /**
-     * ���� �ð��� ���� ��ġ�� �����մϴ�.
+     * 위성 위치를 계산합니다.
      */
     @PostMapping("/position/current")
     @Operation(
@@ -178,7 +178,7 @@ class EphemerisController(
     )
     fun getCurrentPosition(
         @Parameter(
-            description = "���� ��ġ ���� ��û ������",
+            description = "위성 위치 계산 요청 데이터",
             required = true
         )
         @RequestBody request: SatellitePositionRequest
@@ -195,7 +195,7 @@ class EphemerisController(
     }
 
     /**
-     * ������ �ð��� ���� ��ġ�� �����մϴ�.
+     * 특정 시간의 위성 위치를 계산합니다.
      */
     @PostMapping("/position/at-time")
     @Operation(
@@ -204,7 +204,7 @@ class EphemerisController(
     )
     fun getPositionAtTime(
         @Parameter(
-            description = "���� �ð� ���� ��ġ ���� ��û ������",
+            description = "특정 시간 위성 위치 계산 요청 데이터",
             required = true
         )
         @RequestBody request: SatellitePositionTimeRequest
@@ -221,7 +221,7 @@ class EphemerisController(
         }
     }
     /**
-     * ���� ���� �������� �����մϴ�.
+     * 추적 스케줄을 생성합니다.
      */
     @PostMapping("/tracking/schedule")
     @Operation(
@@ -230,7 +230,7 @@ class EphemerisController(
     )
     fun generateTrackingSchedule(
         @Parameter(
-            description = "���� ���� ������ ���� ��û ������",
+            description = "추적 스케줄 생성 요청 데이터",
             required = true
         )
         @RequestBody request: SatelliteTrackingScheduleRequest
@@ -250,7 +250,7 @@ class EphemerisController(
         }
     }
     /**
-     * TLE �����ͷ� ���� �˵� ���� �����͸� �����մϴ�.
+     * TLE 데이터를 기반으로 추적 데이터를 생성합니다.
      */
     @PostMapping("/tracking/generate")
     @Operation(
@@ -259,7 +259,7 @@ class EphemerisController(
     )
     fun generateEphemerisTrack(
         @Parameter(
-            description = "���� �˵� ���� ������ ���� ��û",
+            description = "추적 데이터 생성 요청 데이터",
             required = true
         )
         @RequestBody request: EphemerisTrackRequest
@@ -270,23 +270,23 @@ class EphemerisController(
             request.satelliteName
         )
             .map { (mstData, dtlData) ->
-                mapOf<String, Any>(  // ? ������ Ÿ�� ����
-                    "message" to "���� �˵� ���� ������ ���� �Ϸ�",
+                mapOf<String, Any>(  // ? 데이터 타입 정의
+                    "message" to "추적 데이터가 성공적으로 생성되었습니다.",
                     "mstCount" to mstData.size,
                     "dtlCount" to dtlData.size
                 )
             }
             .onErrorReturn(
-                mapOf<String, Any>(  // ? ������ Ÿ�� ����
-                    "message" to "���� �˵� ���� ������ ���� ����",
-                    "error" to "���� �� ������ �߻��߽��ϴ�"
+                mapOf<String, Any>(  // ? 데이터 타입 정의
+                    "message" to "추적 데이터 생성 실패",
+                    "error" to "추적 데이터 생성에 실패했습니다."
                 )
             )
     }
 
 
     /**
-     * ���� ���� ���� ������ �����͸� ��ȸ�մϴ�.
+     * 추적 데이터 목록을 조회합니다.
      */
     @GetMapping("/master")
     @Operation(
@@ -300,7 +300,7 @@ class EphemerisController(
     }
 
     /**
-     * Ư�� ������ ID�� �ش��ϴ� ���� ���� �����͸� ��ȸ�մϴ�.
+     * 추적 데이터 상세 정보를 조회합니다.
      */
     @GetMapping("/detail/{mstId}")
     @Operation(
@@ -309,7 +309,7 @@ class EphemerisController(
     )
     fun getEphemerisTrackDtlByMstId(
         @Parameter(
-            description = "������ ������ ID",
+            description = "추적 데이터 목록 ID",
             example = "1",
             required = true
         )
@@ -321,8 +321,7 @@ class EphemerisController(
     }
 
     /**
-     * ���� ������ �����մϴ�.
-     * ���� ���� ���� �� �ʱ� ���� ������ ������ �����մϴ�.
+     * 추적을 시작합니다.
      */
     @PostMapping("/tracking/start/{passId}")
     @Operation(
@@ -331,20 +330,20 @@ class EphemerisController(
     )
     fun startEphemerisTracking(
         @Parameter(
-            description = "���� ���� ID",
+            description = "추적 ID",
             example = "1",
             required = true
         )
         @PathVariable passId: UInt
     ): Mono<Map<String, Any>> {
         return Mono.fromCallable {
-            // ���� ���� ���� (���� ���� ����)
+            // 추적 시작 (추적 데이터 시작)
             ephemerisService.startEphemerisTracking(passId)
-            // �ʱ� ���� ������ ����
+            // 초기 추적 데이터 전송
             //ephemerisService.sendInitialTrackingData(passId)
 
             mapOf(
-                "message" to "���� ������ ���۵Ǿ����ϴ�.",
+                "message" to "추적이 시작되었습니다.",
                 "passId" to passId,
                 "status" to "tracking"
             )
@@ -352,7 +351,7 @@ class EphemerisController(
     }
 
     /**
-     * ���� ������ �����մϴ�.
+     * 추적을 중지합니다.
      */
     @PostMapping("/tracking/stop")
     @Operation(
@@ -363,7 +362,7 @@ class EphemerisController(
         return Mono.fromCallable {
             ephemerisService.stopEphemerisTracking()
             mapOf(
-                "message" to "���� ������ �����Ǿ����ϴ�.",
+                "message" to "추적이 중지되었습니다.",
                 "status" to "stopped"
             )
         }
@@ -372,7 +371,7 @@ class EphemerisController(
 
 
     /**
-     * ���� ���� ���¸� Ȯ���մϴ�.
+     * 추적 상태를 확인합니다.
      */
     @GetMapping("/tracking/status")
     @Operation(
@@ -401,7 +400,7 @@ class EphemerisController(
     }
 
     /**
-     * 3�� ��ȯ ���� API
+     * 축 변환을 계산합니다.
      */
     @PostMapping("/calculate-axis-transform")
     @Operation(
@@ -410,7 +409,7 @@ class EphemerisController(
     )
     fun calculateAxisTransform(
         @Parameter(
-            description = "3�� ��ȯ ���� ��û ������ (azimuth, elevation, tilt, rotator)",
+            description = "축 변환 계산 요청 데이터 (azimuth, elevation, tilt, rotator)",
             required = true
         )
         @RequestBody request: Map<String, Double>
@@ -425,20 +424,19 @@ class EphemerisController(
             
             return ResponseEntity.ok(result)
         } catch (error: Exception) {
-            logger.error("3�� ��ȯ ���� API ����: ${error.message}")
+            logger.error("축 변환 계산 API 오류: ${error.message}")
             return ResponseEntity.badRequest().body(mapOf(
                 "success" to false,
-                "error" to (error.message ?: "�� �� ���� ����"),
-                "message" to "3�� ��ȯ ���� API ȣ�⿡ �����߽��ϴ�"
+                "error" to (error.message ?: "알 수 없는 오류"),
+                "message" to "축 변환 계산 API 실패"
             ))
         }
     }
 
-    // ? ���ο� ������ Ÿ�Ժ� ��ȸ API�� �߰�
+    // ? 참고용 데이터 조회 API 추가
 
     /**
-     * ���� ������ ������ ��ȸ API
-     * ��ȯ �� ���� ���� ���� �����͸� ��ȸ�մϴ�.
+     * 원본 추적 데이터를 조회합니다.
      */
     @GetMapping("/master/original")
     @Operation(
@@ -450,7 +448,7 @@ class EphemerisController(
             val originalMst = ephemerisService.getOriginalEphemerisTrackMst()
             mapOf(
                 "dataType" to "original",
-                "description" to "��ȯ �� ���� ���� ���� ������",
+                "description" to "원본 추적 데이터 목록",
                 "count" to originalMst.size,
                 "data" to originalMst
             )
@@ -458,8 +456,7 @@ class EphemerisController(
     }
 
     /**
-     * �ຯȯ ������ ������ ��ȸ API
-     * ������ ��ȯ�� ������ ���� ���� �����͸� ��ȸ�մϴ�.
+     * 축 변환된 추적 데이터를 조회합니다.
      */
     @GetMapping("/master/axis-transformed")
     @Operation(
@@ -471,7 +468,7 @@ class EphemerisController(
             val axisTransformedMst = ephemerisService.getAxisTransformedEphemerisTrackMst()
             mapOf(
                 "dataType" to "axis_transformed",
-                "description" to "������ ��ȯ�� ������ ���� ���� ������",
+                "description" to "축 변환된 추적 데이터 목록",
                 "count" to axisTransformedMst.size,
                 "data" to axisTransformedMst,
                 "transformationInfo" to mapOf(
@@ -484,8 +481,7 @@ class EphemerisController(
     }
 
     /**
-     * ���� ��ȯ ������ ������ ��ȸ API
-     * ������ ��ȯ���� ������ ���� ���� ���� �����͸� ��ȸ�մϴ�.
+     * 최종 변환된 추적 데이터를 조회합니다.
      */
     @GetMapping("/master/final-transformed")
     @Operation(
@@ -497,21 +493,21 @@ class EphemerisController(
             val finalTransformedMst = ephemerisService.getFinalTransformedEphemerisTrackMst()
             mapOf(
                 "dataType" to "final_transformed",
-                "description" to "������ ��ȯ���� ������ ���� ���� ���� ������",
+                "description" to "최종 변환된 추적 데이터 목록",
                 "count" to finalTransformedMst.size,
                 "data" to finalTransformedMst,
                 "transformationInfo" to mapOf(
                     "tiltAngle" to -6.98,
                     "rotatorAngle" to 0.0,
                     "transformationType" to "final_transform",
-                    "angleLimit" to "��270��"
+                    "angleLimit" to "270도"
                 )
             )
         }
     }
 
     /**
-     * Ư�� ������ ID�� ���� ���� ������ ��ȸ API
+     * 추적 데이터 상세 정보를 조회합니다.
      */
     @GetMapping("/detail/{mstId}/original")
     @Operation(
@@ -524,7 +520,7 @@ class EphemerisController(
             mapOf(
                 "mstId" to mstId,
                 "dataType" to "original",
-                "description" to "��ȯ �� ���� ���� ���� ���� ������",
+                "description" to "원본 추적 데이터 상세",
                 "count" to originalDtl.size,
                 "data" to originalDtl
             )
@@ -532,7 +528,7 @@ class EphemerisController(
     }
 
     /**
-     * Ư�� ������ ID�� �ຯȯ ���� ������ ��ȸ API
+     * 축 변환된 추적 데이터 상세 정보를 조회합니다.
      */
     @GetMapping("/detail/{mstId}/axis-transformed")
     @Operation(
@@ -545,7 +541,7 @@ class EphemerisController(
             mapOf(
                 "mstId" to mstId,
                 "dataType" to "axis_transformed",
-                "description" to "������ ��ȯ�� ������ ���� ���� ���� ������",
+                "description" to "축 변환된 추적 데이터 상세",
                 "count" to axisTransformedDtl.size,
                 "data" to axisTransformedDtl,
                 "transformationInfo" to mapOf(
@@ -558,7 +554,7 @@ class EphemerisController(
     }
 
     /**
-     * Ư�� ������ ID�� ���� ��ȯ ���� ������ ��ȸ API
+     * 최종 변환된 추적 데이터 상세 정보를 조회합니다.
      */
     @GetMapping("/detail/{mstId}/final-transformed")
     @Operation(
@@ -571,21 +567,21 @@ class EphemerisController(
             mapOf(
                 "mstId" to mstId,
                 "dataType" to "final_transformed",
-                "description" to "������ ��ȯ���� ������ ���� ���� ���� ���� ������",
+                "description" to "최종 변환된 추적 데이터 상세",
                 "count" to finalTransformedDtl.size,
                 "data" to finalTransformedDtl,
                 "transformationInfo" to mapOf(
                     "tiltAngle" to -6.98,
                     "rotatorAngle" to 0.0,
                     "transformationType" to "final_transform",
-                    "angleLimit" to "��270��"
+                    "angleLimit" to "270도"
                 )
             )
         }
     }
 
     /**
-     * ������ Ÿ�Ժ� ������ ������ ��ȸ API (����)
+     * 데이터 타입별 추적 목록을 조회합니다.
      */
     @GetMapping("/master/by-type/{dataType}")
     @Operation(
@@ -605,7 +601,7 @@ class EphemerisController(
     }
 
     /**
-     * ������ Ÿ�Ժ� ���� ������ ��ȸ API (����)
+     * 데이터 타입별 추적 상세 정보를 조회합니다.
      */
     @GetMapping("/detail/by-type/{dataType}")
     @Operation(
@@ -625,7 +621,7 @@ class EphemerisController(
     }
 
     /**
-     * ���� ��ȯ �ܰ躰 ������ ���� ��ȸ API
+     * 모든 변환 요약을 조회합니다.
      */
     @GetMapping("/summary/all-transformations")
     @Operation(
@@ -642,33 +638,33 @@ class EphemerisController(
                 "summary" to mapOf(
                     "original" to mapOf(
                         "mstCount" to originalMst.size,
-                        "description" to "��ȯ �� ���� ������"
+                        "description" to "원본 추적 목록"
                     ),
                     "axisTransformed" to mapOf(
                         "mstCount" to axisTransformedMst.size,
-                        "description" to "������ ��ȯ�� ������ ������",
+                        "description" to "축 변환된 추적 목록",
                         "tiltAngle" to -6.98,
                         "rotatorAngle" to 0.0
                     ),
                     "finalTransformed" to mapOf(
                         "mstCount" to finalTransformedMst.size,
-                        "description" to "������ ��ȯ���� ������ ���� ������",
-                        "angleLimit" to "��270��"
+                        "description" to "최종 변환된 추적 목록",
+                        "angleLimit" to "270도"
                     )
                 ),
                 "totalMstCount" to (originalMst.size + axisTransformedMst.size + finalTransformedMst.size),
                 "transformationSteps" to listOf(
-                    "1. ���� ������ ����",
-                    "2. �ຯȯ ���� (������ -6.98��)",
-                    "3. ������ ��ȯ (��270�� ����)",
-                    "4. ���� ������ ����"
+                    "1. 추적 데이터 생성",
+                    "2. 축 변환 (회전각 -6.98도)",
+                    "3. 최종 변환 (270도 제한)",
+                    "4. 추적 데이터 저장"
                 )
             )
         }
     }
 
     /**
-     * ���� MST �����͸� CSV ���Ϸ� �������� API
+     * 모든 추적 데이터를 CSV 형식으로 내보냅니다.
      */
     @PostMapping("/export/csv/all")
     @Operation(
@@ -677,7 +673,7 @@ class EphemerisController(
     )
     fun exportAllMstDataToCsv(
         @Parameter(
-            description = "CSV ���� ���� �����丮 (�⺻��: csv_exports)",
+            description = "CSV 내보내기 디렉토리 경로 (기본값: csv_exports)",
             example = "csv_exports",
             required = false
         )
@@ -690,7 +686,7 @@ class EphemerisController(
                 if (result["success"] == true) {
                     mapOf(
                         "success" to true,
-                        "message" to "���� MST �����Ͱ� CSV ���Ϸ� ���������� �����������ϴ�.",
+                        "message" to "모든 추적 데이터가 CSV 형식으로 내보내졌습니다.",
                         "totalMstCount" to (result["totalMstCount"] ?: 0),
                         "successCount" to (result["successCount"] ?: 0),
                         "errorCount" to (result["errorCount"] ?: 0),
@@ -700,22 +696,22 @@ class EphemerisController(
                 } else {
                     mapOf(
                         "success" to false,
-                        "message" to "CSV �������� ����: ${result["error"] ?: "�� �� ���� ����"}",
-                        "error" to (result["error"] ?: "�� �� ���� ����")
+                        "message" to "CSV 내보내기 실패: ${result["error"] ?: "알 수 없는 오류"}",
+                        "error" to (result["error"] ?: "알 수 없는 오류")
                     )
                 }
             } catch (e: Exception) {
                 mapOf(
                     "success" to false,
-                    "message" to "CSV �������� �� ���� �߻�: ${e.message ?: "�� �� ���� ����"}",
-                    "error" to (e.message ?: "�� �� ���� ����")
+                    "message" to "CSV 내보내기 중 오류 발생: ${e.message ?: "알 수 없는 오류"}",
+                    "error" to (e.message ?: "알 수 없는 오류")
                 )
             }
         }
     }
 
     /**
-     * Ư�� MST ID�� �����͸� CSV ���Ϸ� �������� API
+     * 특정 추적 데이터를 CSV 형식으로 내보냅니다.
      */
     @PostMapping("/export/csv/{mstId}")
     @Operation(
@@ -724,13 +720,13 @@ class EphemerisController(
     )
     fun exportMstDataToCsv(
         @Parameter(
-            description = "������ ������ ID",
+            description = "추적 데이터 목록 ID",
             example = "1",
             required = true
         )
         @PathVariable mstId: Int,
         @Parameter(
-            description = "CSV ���� ���� �����丮 (�⺻��: csv_exports)",
+            description = "CSV 내보내기 디렉토리 경로 (기본값: csv_exports)",
             example = "csv_exports",
             required = false
         )
@@ -743,7 +739,7 @@ class EphemerisController(
                 if (result["success"] == true) {
                     mapOf(
                         "success" to true,
-                        "message" to "MST ID $mstId �����Ͱ� CSV ���Ϸ� ���������� �����������ϴ�.",
+                        "message" to "MST ID $mstId 데이터가 CSV 형식으로 내보내졌습니다.",
                         "filename" to (result["filename"] ?: ""),
                         "filePath" to (result["filePath"] ?: ""),
                         "satelliteName" to (result["satelliteName"] ?: ""),
@@ -754,106 +750,106 @@ class EphemerisController(
                 } else {
                     mapOf(
                         "success" to false,
-                        "message" to "CSV �������� ����: ${result["error"] ?: "�� �� ���� ����"}",
-                        "error" to (result["error"] ?: "�� �� ���� ����")
+                        "message" to "CSV 내보내기 실패: ${result["error"] ?: "알 수 없는 오류"}",
+                        "error" to (result["error"] ?: "알 수 없는 오류")
                     )
                 }
             } catch (e: Exception) {
                 mapOf(
                     "success" to false,
-                    "message" to "CSV �������� �� ���� �߻�: ${e.message ?: "�� �� ���� ����"}",
-                    "error" to (e.message ?: "�� �� ���� ����")
+                    "message" to "CSV 내보내기 중 오류 발생: ${e.message ?: "알 수 없는 오류"}",
+                    "error" to (e.message ?: "알 수 없는 오류")
                 )
             }
         }
     }
 }
 /**
- * CSV ������ ���� ���� �޼��� (������ ���� - createRealtimeTrackingData�� ����)
+ * CSV 데이터 생성 함수 (실시간 추적 데이터 생성 시 사용)
  */
 private fun generateRealtimeTrackingCsv(data: List<Map<String, Any?>>): ByteArray {
     val outputStream = ByteArrayOutputStream()
     val writer = OutputStreamWriter(outputStream, StandardCharsets.UTF_8)
 
     try {
-        // UTF-8 BOM �߰� (Excel���� �ѱ� ���� ����)
+        // UTF-8 BOM 추가 (Excel에서 한글 깨짐 방지)
         outputStream.write(0xEF)
         outputStream.write(0xBB)
         outputStream.write(0xBF)
 
-        // CSV ���� �ۼ� (createRealtimeTrackingData�� ���� �ʵ� ����)
+        // CSV 헤더 작성 (createRealtimeTrackingData에서 사용된 필드 순서)
         val headers = listOf(
             "Index", "TheoreticalIndex", "Timestamp", "PassId", "ElapsedTime(s)",
             
-            // ���� ������ (��ȯ ��)
-            "OriginalAzimuth(��)", "OriginalElevation(��)", "OriginalRange(km)", "OriginalAltitude(km)",
+            // 원본 데이터 (변환 전)
+            "OriginalAzimuth(도)", "OriginalElevation(도)", "OriginalRange(km)", "OriginalAltitude(km)",
             
-            // �ຯȯ ������ (������ ��ȯ ����)
-            "AxisTransformedAzimuth(��)", "AxisTransformedElevation(��)", "AxisTransformedRange(km)", "AxisTransformedAltitude(km)",
+            // 축 변환된 데이터 (축 변환 후)
+            "AxisTransformedAzimuth(도)", "AxisTransformedElevation(도)", "AxisTransformedRange(km)", "AxisTransformedAltitude(km)",
             
-            // ���� ��ȯ ������ (��270�� ���� ����)
-            "FinalTransformedAzimuth(��)", "FinalTransformedElevation(��)", "FinalTransformedRange(km)", "FinalTransformedAltitude(km)",
+            // 최종 변환된 데이터 (최종 변환 후)
+            "FinalTransformedAzimuth(도)", "FinalTransformedElevation(도)", "FinalTransformedRange(km)", "FinalTransformedAltitude(km)",
             
-            // ���� �� ���� ������
-            "CmdAzimuth(��)", "CmdElevation(��)", "ActualAzimuth(��)", "ActualElevation(��)",
+            // 명령 데이터
+            "CmdAzimuth(도)", "CmdElevation(도)", "ActualAzimuth(도)", "ActualElevation(도)",
             
-            // ���� ���� ������
-            "TrackingAzimuthTime", "TrackingCMDAzimuth(��)", "TrackingActualAzimuth(��)",
-            "TrackingElevationTime", "TrackingCMDElevation(��)", "TrackingActualElevation(��)",
-            "TrackingTiltTime", "TrackingCMDTilt(��)", "TrackingActualTilt(��)",
+            // 추적 데이터
+            "TrackingAzimuthTime", "TrackingCMDAzimuth(도)", "TrackingActualAzimuth(도)",
+            "TrackingElevationTime", "TrackingCMDElevation(도)", "TrackingActualElevation(도)",
+            "TrackingTiltTime", "TrackingCMDTilt(도)", "TrackingActualTilt(도)",
             
-            // ���� �м�
-            "AzimuthError(��)", "ElevationError(��)",
-            "OriginalToAxisTransformationError(��)", "AxisToFinalTransformationError(��)", "TotalTransformationError(��)",
+            // 오차 데이터
+            "AzimuthError(도)", "ElevationError(도)",
+            "OriginalToAxisTransformationError(도)", "AxisToFinalTransformationError(도)", "TotalTransformationError(도)",
             
-            // ��Ȯ�� �м� (���� �߰��� �ʵ���)
-            "�ð���Ȯ��(s)", "Az_CMD��Ȯ��(��)", "Az_Act��Ȯ��(��)", "Az_������Ȯ��(��)",
-            "El_CMD��Ȯ��(��)", "El_Act��Ȯ��(��)", "El_������Ȯ��(��)",
+            // 정확도 데이터
+            "TimeAccuracy(s)", "AzCmdAccuracy(도)", "AzActAccuracy(도)", "AzFinalAccuracy(도)",
+            "ElCmdAccuracy(도)", "ElActAccuracy(도)", "ElFinalAccuracy(도)",
             
-            // ��ȯ ����
-            "TiltAngle(��)", "TransformationType", "HasTransformation", "InterpolationMethod", "InterpolationAccuracy",
+            // 변환 정보
+            "TiltAngle(도)", "TransformationType", "HasTransformation", "InterpolationMethod", "InterpolationAccuracy",
             "HasValidData", "DataSource"
         )
 
         writer.write(headers.joinToString(","))
         writer.write("\n")
 
-        // ������ �� �ۼ�
+        // 데이터 행 작성
         val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
 
         data.forEach { record ->
             val row = listOf(
                 record["index"]?.toString() ?: "",
-                record["theoreticalIndex"]?.toString() ?: "",  // ? �̷�ġ ������ �ε��� �߰�
+                record["theoreticalIndex"]?.toString() ?: "",  // ? 데이터 타입 정의
                 (record["timestamp"] as? ZonedDateTime)?.format(dateFormatter) ?: "",
                 record["passId"]?.toString() ?: "",
                 String.format("%.3f", record["elapsedTimeSeconds"] as? Float ?: 0.0f),
                 
-                // ���� ������
+                // 원본 데이터
                 String.format("%.6f", record["originalAzimuth"] as? Float ?: 0.0f),
                 String.format("%.6f", record["originalElevation"] as? Float ?: 0.0f),
                 String.format("%.6f", record["originalRange"] as? Float ?: 0.0f),
                 String.format("%.6f", record["originalAltitude"] as? Float ?: 0.0f),
                 
-                // �ຯȯ ������
+                // 축 변환된 데이터
                 String.format("%.6f", record["axisTransformedAzimuth"] as? Float ?: 0.0f),
                 String.format("%.6f", record["axisTransformedElevation"] as? Float ?: 0.0f),
                 String.format("%.6f", record["axisTransformedRange"] as? Float ?: 0.0f),
                 String.format("%.6f", record["axisTransformedAltitude"] as? Float ?: 0.0f),
                 
-                // ���� ��ȯ ������
+                // 최종 변환된 데이터
                 String.format("%.6f", record["finalTransformedAzimuth"] as? Float ?: 0.0f),
                 String.format("%.6f", record["finalTransformedElevation"] as? Float ?: 0.0f),
                 String.format("%.6f", record["finalTransformedRange"] as? Float ?: 0.0f),
                 String.format("%.6f", record["finalTransformedAltitude"] as? Float ?: 0.0f),
                 
-                // ���� �� ���� ������
+                // 명령 데이터
                 String.format("%.6f", record["cmdAz"] as? Float ?: 0.0f),
                 String.format("%.6f", record["cmdEl"] as? Float ?: 0.0f),
                 String.format("%.6f", record["actualAz"] as? Float ?: 0.0f),
                 String.format("%.6f", record["actualEl"] as? Float ?: 0.0f),
                 
-                // ���� ���� ������
+                // 추적 데이터
                 record["trackingAzimuthTime"]?.toString() ?: "",
                 String.format("%.6f", record["trackingCMDAzimuthAngle"] as? Float ?: 0.0f),
                 String.format("%.6f", record["trackingActualAzimuthAngle"] as? Float ?: 0.0f),
@@ -864,14 +860,14 @@ private fun generateRealtimeTrackingCsv(data: List<Map<String, Any?>>): ByteArra
                 String.format("%.6f", record["trackingCMDTiltAngle"] as? Float ?: 0.0f),
                 String.format("%.6f", record["trackingActualTiltAngle"] as? Float ?: 0.0f),
                 
-                // ���� �м�
+                // 오차 데이터
                 String.format("%.6f", record["azimuthError"] as? Float ?: 0.0f),
                 String.format("%.6f", record["elevationError"] as? Float ?: 0.0f),
                 String.format("%.6f", record["originalToAxisTransformationError"] as? Float ?: 0.0f),
                 String.format("%.6f", record["axisToFinalTransformationError"] as? Float ?: 0.0f),
                 String.format("%.6f", record["totalTransformationError"] as? Float ?: 0.0f),
                 
-                // ��Ȯ�� �м� (���� �߰��� �ʵ���)
+                // 정확도 데이터
                 String.format("%.6f", record["timeAccuracy"] as? Float ?: 0.0f),
                 String.format("%.6f", record["azCmdAccuracy"] as? Float ?: 0.0f),
                 String.format("%.6f", record["azActAccuracy"] as? Float ?: 0.0f),
@@ -880,7 +876,7 @@ private fun generateRealtimeTrackingCsv(data: List<Map<String, Any?>>): ByteArra
                 String.format("%.6f", record["elActAccuracy"] as? Float ?: 0.0f),
                 String.format("%.6f", record["elFinalAccuracy"] as? Float ?: 0.0f),
                 
-                // ��ȯ ����
+                // 변환 정보
                 String.format("%.6f", record["tiltAngle"] as? Double ?: 0.0),
                 "\"${record["transformationType"] ?: ""}\"",
                 (record["hasTransformation"] as? Boolean ?: false).toString(),
@@ -903,7 +899,7 @@ private fun generateRealtimeTrackingCsv(data: List<Map<String, Any?>>): ByteArra
     }
 }
 /**
- * ���� ��ġ ��û ����
+ * 위성 위치 요청 데이터
  */
 data class SatellitePositionRequest(
     val tleLine1: String,
@@ -914,7 +910,7 @@ data class SatellitePositionRequest(
 )
 
 /**
- * Ư�� �ð��� ���� ��ġ ��û ����
+ * 위성 위치 요청 데이터
  */
 data class SatellitePositionTimeRequest(
     val tleLine1: String,
@@ -926,7 +922,7 @@ data class SatellitePositionTimeRequest(
 )
 
 /**
- * ���� ���� ���� ��û ����
+ * 추적 경로 요청 데이터
  */
 data class SatelliteTrackingPathRequest(
     val tleLine1: String,
@@ -940,7 +936,7 @@ data class SatelliteTrackingPathRequest(
 )
 
 /**
- * ���� ���ü� ��û ����
+ * 가시성 요청 데이터
  */
 data class SatelliteVisibilityRequest(
     val tleLine1: String,
@@ -955,7 +951,7 @@ data class SatelliteVisibilityRequest(
 )
 
 /**
- * ���� ���ü� �Ⱓ ���� ����
+ * 가시성 기간 데이터
  */
 data class VisibilityPeriod(
     val startTime: ZonedDateTime,
@@ -963,7 +959,7 @@ data class VisibilityPeriod(
 )
 
 /**
- * ���� ���� ������ ��û ����
+ * 추적 스케줄 요청 데이터
  */
 data class SatelliteTrackingScheduleRequest(
     val tleLine1: String,
@@ -974,11 +970,11 @@ data class SatelliteTrackingScheduleRequest(
     val latitude: Double,
     val longitude: Double,
     val altitude: Double = 0.0,
-    val trackingIntervalMs: Int = 100 // �⺻�� 100ms
+    val trackingIntervalMs: Int = 100 // 기본값 100ms
 )
 
 /**
- * ���� �˵� ���� ��û ����
+ * 추적 데이터 요청 데이터
  */
 data class EphemerisTrackRequest(
     val tleLine1: String,
@@ -987,17 +983,17 @@ data class EphemerisTrackRequest(
 )
 
 /**
- * ������ ��ȯ�� ������ ���� �˵� ���� ��û ����
+ * 추적 데이터 요청 데이터
  */
 data class EphemerisTrackWithTiltRequest(
     val tleLine1: String,
     val tleLine2: String,
     val satelliteName: String? = null,
-    val tiltAngle: Double = -6.98  // �⺻ ������ ����
+    val tiltAngle: Double = -6.98  // 기본값 회전각
 )
 
 /**
- * �����˵� ���� ���� ��û ����
+ * 정지궤도 추적 요청 데이터
  */
 data class GeostationaryTrackingRequest(
     val tleLine1: String,
