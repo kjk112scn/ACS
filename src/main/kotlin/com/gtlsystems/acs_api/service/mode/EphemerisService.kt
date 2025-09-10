@@ -3,7 +3,6 @@ package com.gtlsystems.acs_api.service.mode
 import com.gtlsystems.acs_api.algorithm.axislimitangle.LimitAngleCalculator
 import com.gtlsystems.acs_api.algorithm.satellitetracker.impl.OrekitCalculator
 import com.gtlsystems.acs_api.model.GlobalData
-import com.gtlsystems.acs_api.model.SatelliteTrackingData
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -36,7 +35,7 @@ import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.TimeUnit
 import com.gtlsystems.acs_api.service.system.BatchStorageManager
-import com.gtlsystems.acs_api.service.system.ConfigurationService
+import com.gtlsystems.acs_api.service.system.settings.SettingsService
 import kotlin.math.abs
 
 /**
@@ -51,7 +50,7 @@ class EphemerisService(
     private val dataStoreService: DataStoreService, // DataStoreService 주입
     private val threadManager: ThreadManager, // ✅ 통합 쓰레드 관리자 주입
     private val batchStorageManager: BatchStorageManager, // ✅ 배치 저장 관리자 주입
-    private val configurationService: ConfigurationService
+    private val settingsService: SettingsService // ✅ 설정 서비스 주입
 ) {
 
     // 밀리초를 포함하는 사용자 정의 포맷터 생성
@@ -59,8 +58,7 @@ class EphemerisService(
 
     // 위성 TLE 데이터 캐시
     private val satelliteTleCache = ConcurrentHashMap<String, Pair<String, String>>()
-    private val trackingData = SatelliteTrackingData.Tracking
-    private val locationData = GlobalData.Location
+    private val locationData = settingsService.locationData
 
     // 위성 추적 마스터 및 세부 데이터 저장소 (실제로는 데이터베이스를 사용할 것입니다)
     private val ephemerisTrackMstStorage = mutableListOf<Map<String, Any?>>()
@@ -102,10 +100,8 @@ class EphemerisService(
         const val TILT_STABILIZATION_TIMEOUT = 3000L // Tilt 안정화: 3초
         const val POSITION_MOVE_TIMEOUT = 120000L    // Az/El 이동: 2분
     }
-
-    private val realtimeTrackingDataList = mutableListOf<Map<String, Any?>>()
     private var trackingDataIndex = 0
-    private val limitAngleCalculator: LimitAngleCalculator get() = LimitAngleCalculator(configurationService)
+    private val limitAngleCalculator = LimitAngleCalculator()
 
     @PostConstruct
     fun init() {
@@ -275,7 +271,7 @@ class EphemerisService(
             tleLine2 = tleLine2,
             startDate = today,
             durationDays = 2,
-            minElevation = trackingData.minElevationAngle,
+            minElevation = settingsService.minElevationAngle,
             latitude = locationData.latitude,
             longitude = locationData.longitude,
             altitude = locationData.altitude,
@@ -294,7 +290,7 @@ class EphemerisService(
             tleLine2 = tleLine2,
             startDate = today,
             durationDays = 2,
-            minElevation = trackingData.minElevationAngle,
+            minElevation = settingsService.minElevationAngle,
             latitude = locationData.latitude,
             longitude = locationData.longitude,
             altitude = locationData.altitude,
@@ -751,7 +747,7 @@ class EphemerisService(
             tleLine2 = tleLine2,
             startDate = today.withZoneSameInstant(ZoneOffset.UTC),
             durationDays = 2,
-            minElevation = trackingData.minElevationAngle,
+            minElevation = settingsService.minElevationAngle,
             latitude = locationData.latitude,
             longitude = locationData.longitude,
             altitude = locationData.altitude,
@@ -1087,19 +1083,21 @@ class EphemerisService(
 
 
     // Tilt만 0으로 이동
-    private fun moveTiltToZero(tiltSpeed: Float) {
+    private fun moveTiltToZero(tiltAngle: Float) {
         val multiAxis = BitSet()
         multiAxis.set(2)  // Tilt 축만 활성화
-        
-        udpFwICDService.multiManualCommand(
-            multiAxis, 0f, 0f, 0f, 0f, 0f, tiltSpeed
+        PushData.CMD.cmdTiltAngle = GlobalData.Offset.tiltPositionOffset
+        udpFwICDService.singleManualCommand(
+            multiAxis, tiltAngle, 5f
         )
         
-        logger.info("🔄 Tilt를 0도로 이동 시작 (속도: ${tiltSpeed}도/초)")
+        logger.info("🔄 Tilt를 ${tiltAngle} 도로 이동 시작)")
     }
 
     // 목표 Az/El로 이동
     private fun moveToTargetAzEl() {
+        GlobalData.EphemerisTrakingAngle.azimuthAngle = targetAzimuth
+        GlobalData.EphemerisTrakingAngle.elevationAngle= targetElevation
         val multiAxis = BitSet()
         multiAxis.set(0)  // Azimuth
         multiAxis.set(1)  // Elevation
@@ -1111,18 +1109,17 @@ class EphemerisService(
 
     // Tilt가 0에 도달했는지 확인
     private fun isTiltAtZero(): Boolean {
+        val cmdTilt = PushData.CMD.cmdTiltAngle ?: 0f  // null이면 0f 사용
         val currentTilt = dataStoreService.getLatestData().tiltAngle ?: 0.0
-        return kotlin.math.abs(currentTilt.toFloat()) <= 1.0f  // ±1도 이내
+        return kotlin.math.abs(cmdTilt - currentTilt.toFloat()) <= 0.1f
     }
 
     // Tilt가 안정화되었는지 확인
     private fun isTiltStabilized(): Boolean {
+        val cmdTilt = PushData.CMD.cmdTiltAngle ?: 0f  // null이면 0f 사용
         val currentTilt = dataStoreService.getLatestData().tiltAngle ?: 0.0
-        return kotlin.math.abs(currentTilt.toFloat()) <= 0.5f  // ±0.5도 이내
+        return kotlin.math.abs(cmdTilt - currentTilt.toFloat()) <= 0.1f
     }
-
-
-
     fun startEphemerisTracking(passId: UInt) {
         logger.info("🚀 위성 추적 시작: 패스 ID = {}", passId)
         stopModeTimer()
@@ -1186,7 +1183,7 @@ class EphemerisService(
     private fun safeBatchShutdown() {
         try {
             logger.info("🔄 안전한 배치 종료 처리 시작")
-            val batchShutdownSuccess = batchStorageManager.safeShutdown()
+                val batchShutdownSuccess = batchStorageManager.safeShutdown()
             if (batchShutdownSuccess) {
                 logger.info("✅ 배치 데이터 안전 종료 완료")
             } else {
@@ -1281,12 +1278,14 @@ class EphemerisService(
         )
     }
 
-
     /**
      * 100ms 주기 상태 체크 (핵심 로직)
      */
-    private fun trackingSatelliteStateCheck() {
+private fun trackingSatelliteStateCheck() {
         try {
+            // ✅ Offset 값 변경 감지 및 CMD 값 업데이트 로직 추가
+            //checkAndApplyPositionOffsets()
+
             if (trackingStatus.ephemerisStatus != true) {
                 return
             }
@@ -1294,8 +1293,9 @@ class EphemerisService(
                 TrackingState.MOVING_TILT_TO_ZERO -> {
                     // ✅ Tilt 시작 위치로 이동 상태 표시
                     trackingStatus.ephemerisTrackingState = "TILT_MOVING_TO_ZERO"
-                    
-                    moveTiltToZero(5f)
+                    var tiltAngle = 0f
+                    GlobalData.EphemerisTrakingAngle.tiltAngle = tiltAngle
+                    moveTiltToZero(tiltAngle)
                     if (isTiltAtZero()) {
                         currentTrackingState = TrackingState.WAITING_FOR_TILT_STABILIZATION
                         stabilizationStartTime = System.currentTimeMillis()
@@ -1360,6 +1360,8 @@ class EphemerisService(
                                     handleInProgress(passId)
                                 }
                                 saveRealtimeTrackingData(passId, calTime, startTime)
+                                //moveTiltToZero(GlobalData.Offset.tiltPositionOffset+ GlobalData.Offset.trueNorthOffset)
+
                             }
                             calTime.isAfter(endTime) && !executedActions.contains("COMPLETED") -> {
                                 executedActions.add("COMPLETED")
@@ -1403,9 +1405,9 @@ class EphemerisService(
      */
     private fun handleCompleted() {
         logger.info("✅ 완료 상태 - 추적 종료")
-        trackingStatus.ephemerisStatus = false // Internal state update
+        //trackingStatus.ephemerisStatus = false // Internal state update
         trackingStatus.ephemerisTrackingState = "COMPLETED"  // ✅ 추가
-        dataStoreService.setEphemerisTracking(false) // Frontend state update
+        //dataStoreService.setEphemerisTracking(false) // Frontend state update
     }
 
     /**
@@ -1986,7 +1988,7 @@ class EphemerisService(
             logger.info("위성 추적 전체 길이 ${calculateDataByteSize(passId).toUShort()}")
             logger.info("위성 추적 헤더 정보 전송 완료")
 
-            //dataStoreService.setEphemerisTracking(true)
+            dataStoreService.setEphemerisTracking(true)
 
 
         } catch (e: Exception) {

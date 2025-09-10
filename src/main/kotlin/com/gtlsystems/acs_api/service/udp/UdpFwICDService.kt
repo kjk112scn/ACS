@@ -8,7 +8,6 @@ import com.gtlsystems.acs_api.service.datastore.DataStoreService
 import com.gtlsystems.acs_api.service.icd.ICDService
 import com.gtlsystems.acs_api.util.JKUtil
 import com.gtlsystems.acs_api.config.ThreadManager
-import com.gtlsystems.acs_api.service.system.ConfigurationService
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
@@ -22,11 +21,9 @@ import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
 import java.time.Duration
-import java.time.ZonedDateTime
 import java.util.BitSet
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
-import java.util.concurrent.ThreadFactory
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
@@ -36,18 +33,16 @@ class UdpFwICDService(
     private val dataStoreService: DataStoreService,
     private val environment: Environment,
     private val eventBus: ACSEventBus,
-    private val threadManager: ThreadManager, // ✅ 통합 쓰레드 관리자 주입
-    private val configurationService: ConfigurationService
+    private val threadManager: ThreadManager // ✅ 통합 쓰레드 관리자 주입
 ) {
 
     private val logger = LoggerFactory.getLogger(UdpFwICDService::class.java)
-    private val icdService: ICDService.Classify get() = ICDService.Classify(dataStoreService, eventBus, configurationService)
+    private val icdService = ICDService.Classify(dataStoreService, eventBus)
+    private val trackingStatus = PushData.TRACKING_STATUS
 
-    // UDP 채널 및 버퍼 (ConfigurationService에서 크기 로드)
+    // UDP 채널 및 버퍼
     private lateinit var channel: DatagramChannel
-    private val receiveBuffer: ByteBuffer get() = ByteBuffer.allocate(
-        configurationService.getValue("udp.maxBufferSize") as? Int ?: 1024
-    )
+    private val receiveBuffer = ByteBuffer.allocate(512)
     private var readData: PushData.ReadData = PushData.ReadData()
 
     // Stow Command 실행 중인지 추적하기 위한 변수
@@ -68,7 +63,11 @@ class UdpFwICDService(
 
     var firmwareAddress = InetSocketAddress("127.0.0.1", 8080)
 
-    // ✅ 통합 쓰레드 관리자 사용
+    // Kotlin 방식 (동일한 효과)
+    /**
+     * 설정 변경 로그 메시지
+     * 실제 메시지: "설정이 변경되었습니다: {0} ({1} → {2})"
+     */
     private var realtimeExecutor: ScheduledExecutorService? = null
 
     // 통신 상태 관리
@@ -134,8 +133,7 @@ class UdpFwICDService(
                 }
             }
 
-            // ✅ UDP Receive (안정성 보장, 설정에서 간격 로드)
-            val receiveInterval = configurationService.getValue("udp.receiveInterval") as? Long ?: 10L
+            // ✅ UDP Receive (안정성 보장, 10ms 간격)
             realtimeExecutor?.scheduleAtFixedRate({
                 try {
                     val startTime = System.nanoTime()
@@ -144,37 +142,36 @@ class UdpFwICDService(
 
                     // ✅ 안정성 우선 모니터링
                     val processingTime = (System.nanoTime() - startTime) / 1_000_000
-                    val performanceThreshold = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 15L
-                    if (processingTime > performanceThreshold) {  // 설정에서 임계값 로드
-                        logger.warn("⚠️ UDP Receive 지연 감지: {}ms (임계값: {}ms)", processingTime, performanceThreshold)
+                    if (processingTime > 15) {  // 15ms 임계값으로 안정성 보장
+                        logger.warn("⚠️ UDP Receive 지연 감지: {}ms (임계값: 15ms)", processingTime)
                     }
                 } catch (e: Exception) {
                     logger.debug("UDP Receive 오류: {}", e.message)
                 }
-            }, 0, receiveInterval, TimeUnit.MILLISECONDS)  // 설정에서 간격 로드
+            }, 0, 10, TimeUnit.MILLISECONDS)  // 10ms로 안정성 보장
 
-            // ✅ UDP Send (안정성 보장, 설정에서 간격 로드) - 디버깅 로그 추가
-            val sendInterval = configurationService.getValue("udp.sendInterval") as? Long ?: 30L
+            // ✅ UDP Send (안정성 보장, 30ms 간격) - 디버깅 로그 추가
             realtimeExecutor?.scheduleAtFixedRate({
                 try {
                     val startTime = System.nanoTime()
                     logger.debug("🔄 UDP Send 명령 실행 중... (카운트: {})", sendCount.get())
                     sendReadStatusCommand()
                     sendCount.incrementAndGet()
-                    
+
                     // ✅ 안정성 우선 모니터링
                     val processingTime = (System.nanoTime() - startTime) / 1_000_000
-                    val sendPerformanceThreshold = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 25L
-                    if (processingTime > sendPerformanceThreshold) {  // 설정에서 임계값 로드
-                        logger.warn("⚠️ UDP Send 지연 감지: {}ms (임계값: {}ms)", processingTime, sendPerformanceThreshold)
+                    if (processingTime > 25) {  // 10ms 임계값으로 안정성 보장
+                        logger.warn("⚠️ UDP Send 지연 감지: {}ms (임계값: 25ms)", processingTime)
                     }
                 } catch (e: Exception) {
                     logger.error("❌ UDP Send 오류: {}", e.message, e)
                 }
-            }, 0, sendInterval, TimeUnit.MILLISECONDS)  // 설정에서 간격 로드
+            }, 0, 30, TimeUnit.MILLISECONDS)  // 30ms로 안정성 보장
 
-            logger.info("✅ 실시간 UDP 통신 시작 완료 (Send 카운트: {}, Receive 카운트: {})", 
-                sendCount.get(), receiveCount.get())
+            logger.info(
+                "✅ 실시간 UDP 통신 시작 완료 (Send 카운트: {}, Receive 카운트: {})",
+                sendCount.get(), receiveCount.get()
+            )
         }
     }
 
@@ -216,13 +213,13 @@ class UdpFwICDService(
             logger.debug("📤 Read Status 명령 전송 시작...")
             val setDataFrameInstance = ICDService.ReadStatus.SetDataFrame()
             val dataToSend = setDataFrameInstance.setDataFrame()
-            
+
             logger.debug("📤 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
             logger.debug("📤 펌웨어 주소: {}", firmwareAddress)
-            
+
             val bytesSent = channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
             logger.debug("📤 전송 완료: {} bytes", bytesSent)
-            
+
         } catch (e: Exception) {
             logger.error("❌ Read Status 명령 전송 실패: {}", e.message, e)
         }
@@ -377,6 +374,27 @@ class UdpFwICDService(
             )
 
             val dataToSend = setDataFrameInstance.setDataFrame()
+            PushData.CMD.apply {
+                cmdAzimuthAngle = azAngle + GlobalData.Offset.azimuthPositionOffset
+                cmdElevationAngle = elAngle + GlobalData.Offset.elevationPositionOffset
+                cmdTiltAngle = tiAngle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
+            }
+            /* 
+            if(PushData.TRACKING_STATUS.sunTrackTrackingState == "TRACKING") {
+                PushData.CMD.apply {
+                    cmdAzimuthAngle = azAngle + GlobalData.Offset.azimuthPositionOffset
+                    cmdElevationAngle = elAngle + GlobalData.Offset.elevationPositionOffset
+                    cmdTiltAngle = tiAngle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
+                }   
+            }
+            else{
+                PushData.CMD.apply {
+                    cmdAzimuthAngle = azAngle + GlobalData.Offset.azimuthPositionOffset
+                    cmdElevationAngle = elAngle + GlobalData.Offset.elevationPositionOffset
+                    cmdTiltAngle = tiAngle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
+                }   
+            } 
+            */
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
             logger.info("Manual 제어 명령 전송 완료: Az={}°, El={}°, Ti={}°", azAngle, elAngle, tiAngle)
@@ -387,6 +405,64 @@ class UdpFwICDService(
                 { /* 성공 */ },
                 { error ->
                     logger.error("수동 제어 명령 처리 오류: {}", error.message, error)
+                }
+            )
+    }
+
+    /**
+     * 단일 축 수동 제어 명령 - Mono 비동기 처리
+     */
+    fun singleManualCommand(
+        singleAxis: BitSet,
+        angle: Float,
+        speed: Float
+    ) {
+        Mono.fromCallable {
+            val setDataFrameInstance = ICDService.SingleManualControl.SetDataFrame(
+                stx = 0x02,
+                cmdOne = 'M',
+                axis = singleAxis,
+                axisAngle = angle,
+                axisSpeed = speed,
+                crc16 = 0u,
+                etx = 0x03
+            )
+
+            val dataToSend = setDataFrameInstance.setDataFrame()
+
+            PushData.CMD.apply {
+                when {
+                    singleAxis.get(0) -> {  // Azimuth (0x01)
+                        //cmdAzimuthAngle = angle
+                    }
+
+                    singleAxis.get(1) -> {  // Elevation (0x02)
+                        //cmdElevationAngle = angle
+                    }
+
+                    singleAxis.get(2) -> {  // Tilt (0x04)
+                        //cmdTiltAngle = angle
+                    }
+                }
+            }
+
+            channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
+
+            val axisStr = when {
+                singleAxis.get(0) -> "Azimuth"
+                singleAxis.get(1) -> "Elevation"
+                singleAxis.get(2) -> "Tilt"
+                else -> "Unknown"
+            }
+
+            logger.info("단일 축 수동 제어 명령 전송 완료: {} - 각도: {}°, 속도: {}", axisStr, angle, speed)
+            logger.debug("단일 축 제어 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
+        }
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe(
+                { /* 성공 */ },
+                { error ->
+                    logger.error("단일 축 수동 제어 명령 처리 오류: {}", error.message, error)
                 }
             )
     }
@@ -429,6 +505,13 @@ class UdpFwICDService(
             )
     }
 
+    // BitSet helper for axis selection (0: Azimuth, 1: Elevation, 2: Tilt)
+    private fun bitsetOf(index: Int): BitSet {
+        val bs = BitSet(3)
+        bs.set(index)
+        return bs
+    }
+
     /**
      * 위치 오프셋 명령 - Mono 비동기 처리
      */
@@ -445,16 +528,74 @@ class UdpFwICDService(
                 etx = 0x03
             )
 
+            // OP 프레임 전송 및 GlobalData 갱신
             val dataToSend = setDataFrameInstance.setDataFrame()
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
-            // 글로벌 데이터 업데이트
+            // 변경 여부 판단 (현재 GlobalData 값과 비교)
+            val azChanged = azOffset != GlobalData.Offset.azimuthPositionOffset
+            val elChanged = elOffset != GlobalData.Offset.elevationPositionOffset
+            val tiChanged = tiOffset != GlobalData.Offset.tiltPositionOffset
+
+            // 오프셋 갱신
             GlobalData.Offset.azimuthPositionOffset = azOffset
             GlobalData.Offset.elevationPositionOffset = elOffset
             GlobalData.Offset.tiltPositionOffset = tiOffset
+            // 의미 있는 조건 변수로 분리 추적 여부 확인.
+            val isAnyModeOn =
+                trackingStatus.ephemerisStatus == true ||
+                        trackingStatus.passScheduleStatus == true ||
+                        trackingStatus.geostationaryStatus == true ||
+                        trackingStatus.sunTrackStatus == true
+
+            val isTracking =
+                trackingStatus.ephemerisTrackingState == "TRACKING" ||
+                        trackingStatus.sunTrackTrackingState == "TRACKING"
+
+            //TRACKING 상태라면 OFFSET 수행 시 수동 제어 실시
+            //추적 중이라면 펌웨어에서 OFFSET만 적용되도록 수정 수정제어안함.
+            val isNotTracking =
+                trackingStatus.ephemerisTrackingState != "TRACKING" &&
+                        trackingStatus.sunTrackTrackingState != "TRACKING"
+
+
+            if (isAnyModeOn && isTracking) {
+                var angle = 0f
+                if (trackingStatus.ephemerisStatus == true && tiChanged) {
+                    angle = GlobalData.EphemerisTrakingAngle.tiltAngle
+                    singleManualCommand(bitsetOf(2), angle, 5f)
+                    PushData.CMD.cmdTiltAngle =
+                        angle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
+
+                } else if (trackingStatus.sunTrackStatus == true && tiChanged) {
+                    angle = GlobalData.SunTrackingData.tiltAngle
+                    singleManualCommand(bitsetOf(2), angle, 5f)
+                    PushData.CMD.cmdTiltAngle =
+                        angle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
+                }
+            }
+
+            // 조건 충족 시 변경된 축만 이동 + 표시값 Offset 반영
+            if (isAnyModeOn && isNotTracking) {
+                if (azChanged) {
+                    val angle = GlobalData.EphemerisTrakingAngle.azimuthAngle
+                    singleManualCommand(bitsetOf(0), angle, 5f)
+                    PushData.CMD.cmdAzimuthAngle = angle + GlobalData.Offset.azimuthPositionOffset
+                }
+                if (elChanged) {
+                    val angle = GlobalData.EphemerisTrakingAngle.elevationAngle
+                    singleManualCommand(bitsetOf(1), angle, 5f)
+                    PushData.CMD.cmdElevationAngle = angle + GlobalData.Offset.elevationPositionOffset
+                }
+                if (tiChanged) {
+                    val angle = GlobalData.EphemerisTrakingAngle.tiltAngle
+                    singleManualCommand(bitsetOf(2), angle, 5f)
+                    PushData.CMD.cmdTiltAngle =
+                        angle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
+                }
+            }
 
             logger.info("PositionOffset 명령 전송 완료: Az={}°, El={}°, Ti={}°", azOffset, elOffset, tiOffset)
-            logger.debug("PositionOffset 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
         }
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe(
@@ -687,6 +828,7 @@ class UdpFwICDService(
         }
 
         Mono.fromCallable {
+            PushData.CMD.cmdTiltAngle = stowTiltAngle
             stowTiltCommand(tiltAxis, stowTiltAngle, stowTiltSpeed)
             logger.info("Stow 1단계: 틸트 축 제어 명령 전송 완료")
         }
@@ -707,6 +849,8 @@ class UdpFwICDService(
                 }
 
                 Mono.fromCallable {
+                    PushData.CMD.cmdAzimuthAngle = stowAzimuthAngle
+                    PushData.CMD.cmdElevationAngle = stowElevationAngle
                     stowAzElCommand(
                         azElAxis,
                         stowAzimuthAngle, stowAzimuthSpeed,

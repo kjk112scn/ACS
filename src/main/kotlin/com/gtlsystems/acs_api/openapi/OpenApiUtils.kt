@@ -35,6 +35,10 @@ object OpenApiUtils {
             "ICDController" -> {
                 ICDApiDescriptions.applyDescriptions(operation, operationId, language)
             }
+            // Settings 관련 API 추가
+            "SettingsController" -> {
+                SettingsApiDescriptions.applyDescriptions(operation, operationId, language)
+            }
             // 추가 컨트롤러가 있다면 여기에 추가
         }
     }

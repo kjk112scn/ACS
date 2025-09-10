@@ -6,8 +6,8 @@ import com.gtlsystems.acs_api.config.ThreadManager
 import com.gtlsystems.acs_api.model.GlobalData
 import com.gtlsystems.acs_api.model.PushData
 import com.gtlsystems.acs_api.model.PushData.CMD
+import com.gtlsystems.acs_api.service.system.settings.SettingsService
 import com.gtlsystems.acs_api.service.udp.UdpFwICDService
-import com.gtlsystems.acs_api.service.system.ConfigurationService
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
@@ -25,7 +25,7 @@ class SunTrackService(
     private val dataStoreService: com.gtlsystems.acs_api.service.datastore.DataStoreService,
     private val threadManager: ThreadManager,
     private val solarOrekitCalculator: SolarOrekitCalculator,
-    private val configurationService: ConfigurationService
+    private val settingsService: SettingsService
 ) {
     private val logger = LoggerFactory.getLogger(SunTrackService::class.java)
 
@@ -33,9 +33,9 @@ class SunTrackService(
     private var modeExecutor: ScheduledExecutorService? = null
     private var modeTask: ScheduledFuture<*>? = null
 
-    // ✅ 성능 모니터링 (ConfigurationService에서 로드)
+    // ✅ 성능 모니터링
     private var lastProcessingTime = 0L
-    private val processingTimeWarningThreshold: Long get() = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 100L
+    private var processingTimeWarningThreshold = 50L // 50ms 이상이면 경고
     private var lastTrackingTime: Long? = null // 마지막 추적 시간
 
     // ✅ SunTrack 상태 관리 (핵심 변수만)
@@ -43,7 +43,6 @@ class SunTrackService(
     private var targetRotatorAngle: Double? = null
     private var tiltStabilizationStartTime: Long? = null
     private var isInitialTiltMovementCompleted = false
-    private var rotatorAngle: Double? = null    // ✅ Rotator 각도 저장
 
     // ✅ 추적 상태 참조
     private val trackingStatus = PushData.TRACKING_STATUS
@@ -62,6 +61,11 @@ class SunTrackService(
         val calculationMethod: String
     )
 
+    // ✅ 속도 설정 변수 추가
+    private var azimuthSpeed: Float = 1.0f
+    private var elevationSpeed: Float = 1.0f
+    private var tiltSpeed: Float = 5.0f
+
     @PostConstruct
     fun init() {
         logger.info("SunTrackService 초기화 시작")
@@ -70,9 +74,9 @@ class SunTrackService(
         // ✅ 지상국 초기화
         try {
             solarOrekitCalculator.initializeGroundStation(
-                GlobalData.Location.latitude,
-                GlobalData.Location.longitude,
-                GlobalData.Location.altitude
+                settingsService.locationData.latitude,
+                settingsService.locationData.longitude,
+                settingsService.locationData.altitude
             )
             logger.info("지상국 초기화 완료")
         } catch (e: Exception) {
@@ -120,12 +124,11 @@ class SunTrackService(
                     }
                 },
                 0, // 즉시 시작
-                configurationService.getValue("tracking.interval") as? Long ?: 100L, // 설정에서 간격 로드
+                100, // 100ms 간격
                 TimeUnit.MILLISECONDS
             )
             
-            val trackingInterval = configurationService.getValue("tracking.interval") as? Long ?: 100L
-            logger.info("Sun Track 모드 타이머 시작 ({}ms 간격)", trackingInterval)
+            logger.info("Sun Track 모드 타이머 시작 (100ms 간격)")
             
         } catch (e: Exception) {
             logger.error("Sun Track 모드 타이머 시작 실패: {}", e.message, e)
@@ -268,7 +271,7 @@ class SunTrackService(
             
             // ✅ 실제 정오 시간 계산 (현지 12:00 기준)
             val todayDate = LocalDateTime.now(ZoneOffset.UTC).toLocalDate()
-            val longitude = GlobalData.Location.longitude
+            val longitude = settingsService.locationData.longitude
             val utcOffsetHours = longitude / 15.0  // 경도 15도 = 1시간
             val utcNoon = todayDate.atTime(12, 0).minusHours(utcOffsetHours.toLong()).minusMinutes(((utcOffsetHours % 1) * 60).toLong())
             
@@ -384,15 +387,14 @@ class SunTrackService(
                 }
                 
                 targetRotatorAngle = trainResult.angle
-                rotatorAngle = trainResult.angle
-                CMD.cmdTiltAngle = trainResult.angle.toFloat()
-                
+                CMD.cmdTiltAngle = getRotatorOffsetCalculator()!!.toFloat()
                 logger.info("개선된 Train 각도 설정 완료: {}° ({})", 
                     String.format("%.3f", trainResult.angle),
                     trainResult.calculationMethod)
                 
                 // ✅ Train 이동 명령 전송
-                sendTiltMovementCommand(rotatorAngle!!)
+                GlobalData.SunTrackingData.tiltAngle = targetRotatorAngle?.toFloat()!!
+                sendTiltMovementCommand(targetRotatorAngle?.toFloat()!!, tiltSpeed)
                     
                 // ✅ 안정화 단계로 전환
                 sunTrackState = SunTrackState.STABILIZING
@@ -405,7 +407,7 @@ class SunTrackService(
                 val moveTolerance = 1.0 // ±1.0도 허용
                 
                 if (currentRotatorAngle != null && targetRotatorAngle != null) {
-                    val angleDifference = Math.abs(currentRotatorAngle - targetRotatorAngle!!)
+                    val angleDifference = Math.abs(currentRotatorAngle - getRotatorOffsetCalculator()!!.toFloat())
                     
                     logger.debug("Rotator 목표 각도 확인 중: 현재={}°, 목표={}°, 차이={}°", 
                         String.format("%.3f", currentRotatorAngle),
@@ -441,7 +443,7 @@ class SunTrackService(
             val stabilizationTolerance = 0.5 // ±0.5도 허용
 
             if (currentRotatorAngle != null && targetRotatorAngle != null) {
-                val angleDifference = Math.abs(currentRotatorAngle - targetRotatorAngle!!)
+                val angleDifference = Math.abs(currentRotatorAngle - getRotatorOffsetCalculator()!!.toFloat())
                 
                 if (sunTrackState == SunTrackState.STABILIZING) {
                     if (tiltStabilizationStartTime == null) {
@@ -453,8 +455,8 @@ class SunTrackService(
                     val currentTime = System.currentTimeMillis()
                     val stabilizationDuration = currentTime - tiltStabilizationStartTime!!
                     
-                    // ✅ 1초마다 로그 출력
-                    if (stabilizationDuration % 1000 < 100) {
+                    // ✅ 5초마다 로그 출력
+                    if (stabilizationDuration % 5000 < 100) {
                         logger.debug("Rotator 안정화 대기: 현재={}°, 목표={}°, 차이={}°, 경과시간={}ms", 
                             String.format("%.3f", currentRotatorAngle),
                             String.format("%.3f", targetRotatorAngle),
@@ -462,9 +464,8 @@ class SunTrackService(
                             stabilizationDuration)
                     }
                     
-                    // ✅ 안정화 완료 (설정에서 타임아웃 로드)
-                    val stabilizationTimeout = configurationService.getValue("tracking.stabilizationTimeout") as? Long ?: 5000L
-                    if (stabilizationDuration >= stabilizationTimeout && angleDifference <= stabilizationTolerance) {
+                    // ✅ 1초 안정화 완료
+                    if (stabilizationDuration >= 1000 && angleDifference <= stabilizationTolerance) {
                         logger.info("Rotator 안정화 완료: 현재={}°, 목표={}°, 차이={}°, 대기시간={}ms", 
                             String.format("%.3f", currentRotatorAngle),
                             String.format("%.3f", targetRotatorAngle),
@@ -474,8 +475,6 @@ class SunTrackService(
                         // ✅ 실시간 추적 상태로 전환
                         sunTrackState = SunTrackState.TRACKING
                         isInitialTiltMovementCompleted = true
-                        CMD.cmdTiltAngle = targetRotatorAngle!!.toFloat()
-                        
                         logger.info("Sun Track 실시간 추적 상태로 전환 완료")
                     } else if (stabilizationDuration > 300000) {
                         // ✅ 5분 후에도 안정화되지 못한 경우
@@ -488,8 +487,6 @@ class SunTrackService(
                         // ✅ 실패 시에도 추적 시작
                         sunTrackState = SunTrackState.TRACKING
                         isInitialTiltMovementCompleted = true
-                        CMD.cmdTiltAngle = targetRotatorAngle!!.toFloat()
-                        
                         logger.info("Rotator 안정화 실패했지만 추적 시작")
                     }
                 }
@@ -514,7 +511,7 @@ class SunTrackService(
         val totalStartTime = System.currentTimeMillis()
         
         try {
-            if (rotatorAngle != null) {
+            if (targetRotatorAngle?.toFloat() != null) {
                 // 1단계: Cal Time 계산
                 val calTimeStart = System.currentTimeMillis()
                 val calTime = GlobalData.Time.resultTimeOffsetCalTime
@@ -532,7 +529,7 @@ class SunTrackService(
                     azimuth = sunPosition.azimuthDegrees,
                     elevation = sunPosition.elevationDegrees,
                     tiltAngle = -6.98,
-                    rotatorAngle = rotatorAngle!!
+                    rotatorAngle = targetRotatorAngle!!
                 )
                 val transformDuration = System.currentTimeMillis() - transformStart
                 
@@ -543,10 +540,11 @@ class SunTrackService(
                 val commandStart = System.currentTimeMillis()
                 sendAzimuthAndElevationAxisCommand(
                     pathAdjustedAzimuth.toFloat(), 
-                    5.0f, 
+                    azimuthSpeed,
                     transformedEl.toFloat(), 
-                    5.0f, 
-                    rotatorAngle!!.toFloat()
+                    elevationSpeed,
+                    targetRotatorAngle!!.toFloat(),
+                    tiltSpeed
                 )
                 val commandDuration = System.currentTimeMillis() - commandStart
                 
@@ -583,13 +581,13 @@ class SunTrackService(
                     String.format("%.3f", transformedAz),
                     String.format("%.3f", transformedEl),
                     String.format("%.3f", -6.98),
-                    String.format("%.3f", rotatorAngle))
+                    String.format("%.3f", targetRotatorAngle?.toFloat()!!))
                 logger.info("[CalTime] 연속 추적: {}° → {}°", 
                     String.format("%.3f", transformedAz),
                     String.format("%.3f", pathAdjustedAzimuth))
                 
             } else {
-                logger.error("Train 회전 각도 정보를 가져올 수 없습니다: {}", rotatorAngle)
+                logger.error("Train 회전 각도 정보를 가져올 수 없습니다: targetRotatorAngle?.toFloat()가 null입니다")
                 dataStoreService.setSunTracking(false)
             }
             
@@ -600,42 +598,55 @@ class SunTrackService(
         }
     }
 
+  fun getRotatorOffsetCalculator(): Double? {
+        val offsetAppliedAngle = targetRotatorAngle?.let { targetAngle ->
+            targetAngle.toFloat() + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
+        }
+        
+        return if (offsetAppliedAngle != null) {
+            //CMD.cmdTiltAngle = offsetAppliedAngle
+            offsetAppliedAngle.toDouble()
+        } else {
+            null
+        }
+    }
+
     /**
      * ✅ Azimuth와 Elevation 축 명령 전송
      */
-    fun sendAzimuthAndElevationAxisCommand(cmdAzimuthAngle: Float, cmdAzimuthSpeed: Float, cmdElevationAngle: Float, cmdElevationSpeed: Float, cmdRotatorAngle: Float) {
-        CMD.cmdTiltAngle = targetRotatorAngle!!.toFloat()
+    fun sendAzimuthAndElevationAxisCommand(cmdAzimuthAngle: Float, cmdAzimuthSpeed: Float, cmdElevationAngle: Float, cmdElevationSpeed: Float, cmdTiltAngle: Float, cmdTiltSpeed: Float) {
+        //CMD.cmdTiltAngle = targetRotatorAngle!!.toFloat()
+        //CMD.cmdAzimuthAngle = cmdAzimuthAngle
+        //CMD.cmdElevationAngle = cmdElevationAngle
         val multiAxis = BitSet()
         multiAxis.set(0) // azimuth
         multiAxis.set(1) // elevation
-        
+        //multiAxis.set(2) // train
+        GlobalData.SunTrackingData.azimuthSpeed = cmdAzimuthSpeed
+        GlobalData.SunTrackingData.elevationSpeed = cmdElevationSpeed
         udpFwICDService.multiManualCommand(
             multiAxis,
             cmdAzimuthAngle,
             cmdAzimuthSpeed,
             cmdElevationAngle,
             cmdElevationSpeed,
-            cmdRotatorAngle,
-            0.0f
+            cmdTiltAngle,
+            cmdTiltSpeed
         )
     }
 
     /**
      * ✅ Rotator 이동 명령 전송
      */
-    private fun sendTiltMovementCommand(targetAngle: Double) {
+    private fun sendTiltMovementCommand(targetAngle: Float, tiltSpeed: Float) {
         try {
             val multiAxis = BitSet()
             multiAxis.set(2) // rotator만 이동
-            
-            udpFwICDService.multiManualCommand(
+            GlobalData.SunTrackingData.tiltSpeed = tiltSpeed
+            udpFwICDService.singleManualCommand(
                 multiAxis,
-                0.0f, // azimuth 각도 (이동 안함)
-                0.0f, // azimuth 속도
-                0.0f, // elevation 각도 (이동 안함)
-                0.0f, // elevation 속도
-                targetAngle.toFloat(), // 목표 Rotator 각도
-                5.0f // Rotator 속도
+                targetAngle, // 목표 Rotator 각도
+                tiltSpeed // Rotator 속도
             )
 
             logger.info("Rotator 이동 명령 전송: {}도", String.format("%.6f", targetAngle))
@@ -645,13 +656,25 @@ class SunTrackService(
             throw e
         }
     }
-
+    // ✅ 속도 설정 메서드 추가
+    fun setSpeeds(azimuthSpeed: Float, elevationSpeed: Float, tiltSpeed: Float) {
+        this.azimuthSpeed = azimuthSpeed
+        this.elevationSpeed = elevationSpeed
+        this.tiltSpeed = tiltSpeed
+        logger.info("Sun Track 속도 설정: Az={}°/s, El={}°/s, Tilt={}°/s", 
+            azimuthSpeed, elevationSpeed, tiltSpeed)
+    }
     /**
      * ✅ Sun Track 시작
      */
-    fun startSunTrack() {
-        try {
-            logger.info("Sun Track 시작 (개선된 버전)")
+   // ✅ startSunTrack 메서드 수정
+   fun startSunTrack(azimuthSpeed: Float, elevationSpeed: Float, tiltSpeed: Float) {
+    try {
+        logger.info("Sun Track 시작 (개선된 버전)")
+        
+        // ✅ 속도 설정
+        setSpeeds(azimuthSpeed, elevationSpeed, tiltSpeed)
+        
             
             // ✅ 상태 초기화
             sunTrackState = SunTrackState.INITIAL_TILT

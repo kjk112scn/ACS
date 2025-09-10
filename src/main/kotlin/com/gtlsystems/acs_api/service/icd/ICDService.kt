@@ -5,7 +5,6 @@ import com.gtlsystems.acs_api.event.ACSEventBus
 import com.gtlsystems.acs_api.model.GlobalData
 import com.gtlsystems.acs_api.model.PushData
 import com.gtlsystems.acs_api.service.datastore.DataStoreService
-import com.gtlsystems.acs_api.service.system.ConfigurationService
 import com.gtlsystems.acs_api.util.Crc16
 import com.gtlsystems.acs_api.util.JKUtil
 import org.slf4j.LoggerFactory
@@ -21,20 +20,15 @@ class ICDService {
         const val ICD_ETX: Byte = 0x03
     }
 
-    class Classify(
-        private val dataStoreService: DataStoreService, 
-        private val acsEventBus: ACSEventBus,
-        private val configurationService: ConfigurationService
-    ) {
+    class Classify(private val dataStoreService: DataStoreService, private val acsEventBus: ACSEventBus) {
         private var lastPacketTime = System.nanoTime()
         private val logger = LoggerFactory.getLogger(Classify::class.java)
 
-        // 패킷 타이밍 모니터링 메서드 (ConfigurationService에서 임계값 로드)
+        // 패킷 타이밍 모니터링 메서드
         private fun monitorPacketTiming(data: ByteArray) {
             val now = System.nanoTime()
             val interval = (now - lastPacketTime) / 1_000_000.0 // ms로 변환
-            val packetDelayThreshold = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 60L
-            if (interval > packetDelayThreshold) { // 설정에서 임계값 로드
+            if (interval > 60.0) { // 예상보다 지연된 경우
                 // logger.warn("패킷 지연 감지: ${interval}ms")
             }
             lastPacketTime = now
@@ -113,13 +107,13 @@ class ICDService {
 
                                 //traking 정보
                                 trackingAzimuthTime = it.trackingAzimuthTime,
-                                trackingCMDAzimuthAngle = it.trackingCMDAzimuthAngle,
+                                trackingCMDAzimuthAngle = it.trackingCMDAzimuthAngle + GlobalData.Offset.azimuthPositionOffset,
                                 trackingActualAzimuthAngle = it.trackingActualAzimuthAngle,
                                 trackingElevationTime = it.trackingElevationTime,
-                                trackingCMDElevationAngle = it.trackingCMDElevationAngle,
+                                trackingCMDElevationAngle = it.trackingCMDElevationAngle + GlobalData.Offset.elevationPositionOffset,
                                 trackingActualElevationAngle = it.trackingActualElevationAngle,
                                 trackingTiltTime = it.trackingTiltTime,
-                                trackingCMDTiltAngle = it.trackingCMDTiltAngle,
+                                trackingCMDTiltAngle = it.trackingCMDTiltAngle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset,
                                 trackingActualTiltAngle = it.trackingActualTiltAngle,
 
                             )
@@ -160,9 +154,12 @@ class ICDService {
                 }
                 //2.7 Manual Controls Command(1-Axis)
                 else if (receiveData[1] == 'M'.code.toByte()) {
-
+                    val parsedData = SingleManualControl.GetDataFrame.fromByteArray(receiveData)
+                    parsedData?.let {
+                        // println("파싱된 ICD 데이터: $it")
+                    }
                 }
-                //2.8 Manual Controls Command(1-Axis)
+                //2.8 Manual Controls Command(Multi-Axis)
                 else if (receiveData[1] == 'A'.code.toByte()) {
                     val parsedData = MultiManualControl.GetDataFrame.fromByteArray(receiveData)
                     parsedData?.let {
@@ -254,6 +251,10 @@ class ICDService {
             }
         }
     }
+
+
+
+
     /**
      * 2.10 Standby Command
      * 대기 상태 정보를 송신하기 위한 프로토콜이다.
@@ -1084,11 +1085,6 @@ class ICDService {
                 dataFrame[27] = crc16Check[0]
                 dataFrame[28] = crc16Check[1]
                 dataFrame[29] = ICD_ETX
-                PushData.CMD.apply {
-                    cmdAzimuthAngle = azimuthAngle + GlobalData.Offset.azimuthPositionOffset
-                    cmdElevationAngle = elevationAngle + GlobalData.Offset.elevationPositionOffset
-                    cmdTiltAngle = tiltAngle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
-                }
             
                 return dataFrame
             }
@@ -1501,7 +1497,7 @@ class ICDService {
     }
 
     /// <summary>
-    /// 송신 데이터 프레임 값 전송을 위한 배열 세팅 함수
+    /// 2.1 DefaultInfo 송신 데이터 프레임 값 전송을 위한 배열 세팅 함수
     /// <br>총 30개 배열 데이터</br>
     /// </summary>
     /// <returns></returns>
@@ -2066,6 +2062,109 @@ class ICDService {
                             cmdTwo = data[2],
                             axis = data[3],
                             ack = data[4],
+                            checkSum = rxChecksum,
+                            etx = data.last()
+                        )
+                    } else {
+                        println("CRC 체크 실패 또는 ETX 불일치")
+                        return null
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 2.7 Manual Controls Command(1-Axis)
+     * 하나의 축을 제어하기 위한 프로토콜이다.
+     * 주요 정보: 1-Axis Positioner 각도/각속도 정보
+     * 주요 사용처: Step, Slew, Pedestal Position
+     */
+    class SingleManualControl {
+        data class SetDataFrame(
+            var stx: Byte = ICD_STX,
+            var cmdOne: Char,
+            var axis: BitSet,
+            var axisAngle: Float,
+            var axisSpeed: Float,
+            var crc16: UShort = 0u,
+            var etx: Byte = ICD_ETX
+        ) {
+            fun setDataFrame(): ByteArray {
+                val dataFrame = ByteArray(14)
+                val byteCrc16Target = ByteArray(dataFrame.size - 4)
+
+                // Float 값들을 바이트 배열로 변환 (엔디안 변환 포함)
+                val byteAxisAngle = JKUtil.JKConvert.Companion.floatToByteArray(axisAngle, false)
+                val byteAxisSpeed = JKUtil.JKConvert.Companion.floatToByteArray(axisSpeed, false)
+
+                // BitSet을 바이트 배열로 변환
+                val byteAxis = if (axis.isEmpty) {
+                    0x00.toByte()
+                } else {
+                    axis.toByteArray().getOrElse(0) { 0x00.toByte() }
+                }
+
+                dataFrame[0] = ICD_STX
+                dataFrame[1] = cmdOne.code.toByte()
+                dataFrame[2] = byteAxis
+
+                // 1축 각도 값
+                dataFrame[3] = byteAxisAngle[0]
+                dataFrame[4] = byteAxisAngle[1]
+                dataFrame[5] = byteAxisAngle[2]
+                dataFrame[6] = byteAxisAngle[3]
+
+                // 1축 속도 값
+                dataFrame[7] = byteAxisSpeed[0]
+                dataFrame[8] = byteAxisSpeed[1]
+                dataFrame[9] = byteAxisSpeed[2]
+                dataFrame[10] = byteAxisSpeed[3]
+
+                // CRC 대상 복사
+                dataFrame.copyInto(byteCrc16Target, 0, 1, 1 + byteCrc16Target.size)
+
+                // CRC16 계산 및 엔디안 변환
+                val crc16s = Crc16.computeCrc(byteCrc16Target)
+                val crc16Buffer = JKUtil.JKConvert.Companion.shortToByteArray(crc16s, false)
+
+                // CRC16 값 설정
+                dataFrame[11] = crc16Buffer[0]
+                dataFrame[12] = crc16Buffer[1]
+                dataFrame[13] = ICD_ETX
+  
+                return dataFrame
+            }
+        }
+
+        data class GetDataFrame(
+            var stx: Byte = ICD_STX,
+            var cmdOne: Byte = 0x00,
+            var ack: Byte = 0x00,
+            var checkSum: UShort = 0u,
+            var etx: Byte = ICD_ETX
+        ) {
+            companion object {
+                const val FRAME_LENGTH = 6
+
+                fun fromByteArray(data: ByteArray): GetDataFrame? {
+                    if (data.size < FRAME_LENGTH) {
+                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        return null
+                    }
+
+                    // CRC 체크섬 추출 (리틀 엔디안)
+                    val rxChecksum = ByteBuffer.wrap(byteArrayOf(data[FRAME_LENGTH - 3], data[FRAME_LENGTH - 2]))
+                        .short.toUShort()
+                    val crc16Target = data.copyOfRange(1, FRAME_LENGTH - 3)
+                    val crc16Check = Crc16.computeCrc(crc16Target).toUShort()
+
+                    // CRC 검증 및 ETX 확인
+                    if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
+                        return GetDataFrame(
+                            stx = data[0],
+                            cmdOne = data[1],
+                            ack = data[2],
                             checkSum = rxChecksum,
                             etx = data.last()
                         )

@@ -47,7 +47,7 @@ class SunTrackController(private val sunTrackService: SunTrackService) {
         @RequestParam cmdTiltSpeed: Float
     ): Mono<String> {
         return Mono.fromCallable {
-            sunTrackService.startSunTrack()
+            sunTrackService.startSunTrack(cmdAzimuthSpeed, cmdElevationSpeed, cmdTiltSpeed)
             "UDP 명령어 전송 요청 완료 (Command: Sun Track)"
         }.thenReturn("Sun Track UDP 명령어 전송 요청 완료 (Command: $cmdAzimuthSpeed, $cmdElevationSpeed, $cmdTiltSpeed)")
     }

@@ -6,11 +6,11 @@ import com.gtlsystems.acs_api.event.ACSEvent
 import com.gtlsystems.acs_api.event.ACSEventBus
 import com.gtlsystems.acs_api.event.subscribeToType
 import com.gtlsystems.acs_api.model.GlobalData
-import com.gtlsystems.acs_api.model.SatelliteTrackingData
 import com.gtlsystems.acs_api.service.datastore.DataStoreService
 import com.gtlsystems.acs_api.service.icd.ICDService
 import com.gtlsystems.acs_api.service.udp.UdpFwICDService
 import com.gtlsystems.acs_api.service.system.ConfigurationService
+import com.gtlsystems.acs_api.service.system.settings.SettingsService
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
@@ -51,7 +51,7 @@ class PassScheduleService(
     private val acsEventBus: ACSEventBus,
     private val udpFwICDService: UdpFwICDService,
     private val dataStoreService: DataStoreService,
-    private val configurationService: ConfigurationService
+    private val settingsService: SettingsService
 ) {
     private val logger = LoggerFactory.getLogger(PassScheduleService::class.java)
 
@@ -90,12 +90,12 @@ class PassScheduleService(
      * 상태 변경 간격을 제어하여 과도한 상태 전환을 방지합니다.
      */
     private var lastStateChangeTime = 0L
-    
+
     /**
      * 상태 변경 최소 간격 (밀리초)
      * 너무 빈번한 상태 변경을 방지하기 위한 설정
      */
-    private val MIN_STATE_CHANGE_INTERVAL: Long get() = configurationService.getValue("tracking.interval") as? Long ?: 500L
+    private val MIN_STATE_CHANGE_INTERVAL = 500 // 0.5초
 
     // ===== 기존 저장소들 (변경 없음) =====
     private val passScheduleTleCache = ConcurrentHashMap<String, Triple<String, String, String>>()
@@ -106,7 +106,7 @@ class PassScheduleService(
 
     // ===== 기존 상태 관리 변수들 (Boolean 제거) =====
     private var lastPreparedSchedule: Map<String, Any?>? = null
-    private val PREPARATION_TIME_MINUTES: Long get() = configurationService.getValue("tracking.stabilizationTimeout") as? Long ?: 2L
+    private val PREPARATION_TIME_MINUTES = 2L
     private val subscriptions: MutableList<Disposable> = mutableListOf()
 
     // ✅ 새로 추가: 성능 최적화용 캐시 및 스레드 (기존 동작에 영향 없음)
@@ -147,9 +147,8 @@ class PassScheduleService(
     )
 
     // ✅ 기존 설정들 (변경 없음)
-    private val trackingData = SatelliteTrackingData.Tracking
-    private val locationData = GlobalData.Location
-    private val limitAngleCalculator: LimitAngleCalculator get() = LimitAngleCalculator(configurationService)
+    private val locationData = settingsService.locationData
+    private val limitAngleCalculator = LimitAngleCalculator()
     private var globalMstId = 0
 
     @PostConstruct
@@ -1351,7 +1350,7 @@ class PassScheduleService(
                 tleLine2 = tleLine2,
                 startDate = today.withZoneSameInstant(ZoneOffset.UTC),
                 durationDays = 2,
-                minElevation = trackingData.minElevationAngle,
+                minElevation = settingsService.minElevationAngle,
                 latitude = locationData.latitude,
                 longitude = locationData.longitude,
                 altitude = locationData.altitude,
