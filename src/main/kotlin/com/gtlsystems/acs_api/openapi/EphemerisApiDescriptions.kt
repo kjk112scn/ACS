@@ -214,7 +214,6 @@ object EphemerisApiDescriptions {
                             <ul>
                                 <li>감속 제어: 부드러운 정지 구현</li>
                                 <li>위치 고정: 현재 위치 유지</li>
-                                <li>알람 해제: 모든 경고 상태 해제</li>
                                 <li>상태 초기화: 추적 파라미터 초기화</li>
                             </ul>
                         """.trimIndent()
@@ -235,7 +234,6 @@ object EphemerisApiDescriptions {
                             <ul>
                                 <li>Deceleration Control: Implement smooth stop</li>
                                 <li>Position Lock: Maintain current position</li>
-                                <li>Alarm Clear: Clear all warning states</li>
                                 <li>State Reset: Reset tracking parameters</li>
                             </ul>
                         """.trimIndent()
