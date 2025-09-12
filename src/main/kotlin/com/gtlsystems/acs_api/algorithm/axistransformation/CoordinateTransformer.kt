@@ -21,13 +21,13 @@ class CoordinateTransformer {
             azimuth: Double,
             elevation: Double,
             tiltAngle: Double,
-            rotatorAngle: Double
+            trainAngle: Double
         ): Pair<Double, Double> {
             // 1. 방위각과 고도각을 라디안으로 변환
             val azRad = Math.toRadians(azimuth)
             val elRad = Math.toRadians(elevation)
             val tiltRad = Math.toRadians(tiltAngle)
-            val rotatorRad = Math.toRadians(rotatorAngle)
+            val rotatorRad = Math.toRadians(trainAngle)
 
             // 2. 방위각과 고도각을 3D 직교 좌표로 변환
             // 표준 좌표계: x(동), y(북), z(상)

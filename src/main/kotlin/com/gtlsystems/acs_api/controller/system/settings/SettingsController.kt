@@ -25,11 +25,7 @@ class SettingsController(
         tags = ["System - Settings"]
     )
     fun getLocation(): Map<String, Any> {
-        return mapOf(
-            "latitude" to settingsService.latitude,
-            "longitude" to settingsService.longitude,
-            "altitude" to settingsService.altitude
-        )
+        return settingsService.getLocationSettings()
     }
 
     /**
@@ -46,7 +42,7 @@ class SettingsController(
             required = true
         )
         @RequestBody request: LocationRequest
-    ): ResponseEntity<Map<String, String>> {
+    ): ResponseEntity<Map<String, Any>> {
         return try {
             settingsService.setLocation(
                 lat = request.latitude,
@@ -56,9 +52,11 @@ class SettingsController(
             ResponseEntity.ok(mapOf(
                 "status" to "success",
                 "message" to "위치 설정이 성공적으로 변경되었습니다.",
-                "latitude" to request.latitude.toString(),
-                "longitude" to request.longitude.toString(),
-                "altitude" to request.altitude.toString()
+                "data" to mapOf(
+                    "latitude" to settingsService.latitude,
+                    "longitude" to settingsService.longitude,
+                    "altitude" to settingsService.altitude
+                )
             ))
         } catch (e: Exception) {
             ResponseEntity.badRequest().body(mapOf(
@@ -77,11 +75,7 @@ class SettingsController(
         tags = ["System - Settings"]
     )
     fun getTracking(): Map<String, Any> {
-        return mapOf(
-            "msInterval" to settingsService.msInterval,
-            "durationDays" to settingsService.durationDays,
-            "minElevationAngle" to settingsService.minElevationAngle
-        )
+        return settingsService.getTrackingSettings()
     }
 
     /**
@@ -98,7 +92,7 @@ class SettingsController(
             required = true
         )
         @RequestBody request: TrackingRequest
-    ): ResponseEntity<Map<String, String>> {
+    ): ResponseEntity<Map<String, Any>> {
         return try {
             settingsService.setTracking(
                 interval = request.msInterval,
@@ -108,14 +102,491 @@ class SettingsController(
             ResponseEntity.ok(mapOf(
                 "status" to "success",
                 "message" to "추적 설정이 성공적으로 변경되었습니다.",
-                "msInterval" to request.msInterval.toString(),
-                "durationDays" to request.durationDays.toString(),
-                "minElevationAngle" to request.minElevationAngle.toString()
+                "data" to mapOf(
+                    "msInterval" to settingsService.msInterval,
+                    "durationDays" to settingsService.durationDays,
+                    "minElevationAngle" to settingsService.minElevationAngle
+                )
             ))
         } catch (e: Exception) {
             ResponseEntity.badRequest().body(mapOf(
                 "status" to "error",
                 "message" to "추적 설정 변경 실패: ${e.message}"
+            ))
+        }
+    }
+
+    /**
+     * Stow Angle 설정 조회
+     */
+    @GetMapping("/stow/angle")
+    @Operation(
+        operationId = "getStowAngle",
+        tags = ["System - Settings"]
+    )
+    fun getStowAngle(): Map<String, Any> {
+        return settingsService.getStowAngleSettings()
+    }
+
+    /**
+     * Stow Angle 설정 변경
+     */
+    @PostMapping("/stow/angle")
+    @Operation(
+        operationId = "setStowAngle",
+        tags = ["System - Settings"]
+    )
+    fun setStowAngle(
+        @RequestBody request: StowAngleRequest
+    ): ResponseEntity<Map<String, Any>> {
+        return try {
+            settingsService.setStowAngles(
+                azimuth = request.azimuth,
+                elevation = request.elevation,
+                train = request.train
+            )
+            ResponseEntity.ok(mapOf(
+                "status" to "success",
+                "message" to "Stow Angle 설정이 성공적으로 변경되었습니다.",
+                "data" to mapOf(
+                    "azimuth" to settingsService.stowAngleAzimuth,
+                    "elevation" to settingsService.stowAngleElevation,
+                    "train" to settingsService.stowAngleTrain
+                )
+            ))
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body(mapOf(
+                "status" to "error",
+                "message" to "Stow Angle 설정 변경 실패: ${e.message}"
+            ))
+        }
+    }
+
+    /**
+     * Stow Speed 설정 조회
+     */
+    @GetMapping("/stow/speed")
+    @Operation(
+        operationId = "getStowSpeed",
+        tags = ["System - Settings"]
+    )
+    fun getStowSpeed(): Map<String, Any> {
+        return settingsService.getStowSpeedSettings()
+    }
+
+    /**
+     * Stow Speed 설정 변경
+     */
+    @PostMapping("/stow/speed")
+    @Operation(
+        operationId = "setStowSpeed",
+        tags = ["System - Settings"]
+    )
+    fun setStowSpeed(
+        @RequestBody request: StowSpeedRequest
+    ): ResponseEntity<Map<String, Any>> {
+        return try {
+            settingsService.setStowSpeeds(
+                azimuth = request.azimuth,
+                elevation = request.elevation,
+                train = request.train
+            )
+            ResponseEntity.ok(mapOf(
+                "status" to "success",
+                "message" to "Stow Speed 설정이 성공적으로 변경되었습니다.",
+                "data" to mapOf(
+                    "azimuth" to settingsService.stowSpeedAzimuth,
+                    "elevation" to settingsService.stowSpeedElevation,
+                    "train" to settingsService.stowSpeedTrain
+                )
+            ))
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body(mapOf(
+                "status" to "error",
+                "message" to "Stow Speed 설정 변경 실패: ${e.message}"
+            ))
+        }
+    }
+
+    /**
+     * Stow 전체 설정 조회
+     */
+    @GetMapping("/stow/all")
+    @Operation(
+        operationId = "getStowAll",
+        tags = ["System - Settings"]
+    )
+    fun getStowAll(): Map<String, Any> {
+        return mapOf(
+            "angle" to settingsService.getStowAngleSettings(),
+            "speed" to settingsService.getStowSpeedSettings()
+        )
+    }
+
+    /**
+     * Stow 전체 설정 변경
+     */
+    @PostMapping("/stow/all")
+    @Operation(
+        operationId = "setStowAll",
+        tags = ["System - Settings"]
+    )
+    fun setStowAll(
+        @RequestBody request: StowAllRequest
+    ): ResponseEntity<Map<String, Any>> {
+        return try {
+            settingsService.setStowAll(
+                angleAzimuth = request.angleAzimuth,
+                angleElevation = request.angleElevation,
+                angleTrain = request.angleTrain,
+                speedAzimuth = request.speedAzimuth,
+                speedElevation = request.speedElevation,
+                speedTrain = request.speedTrain
+            )
+            ResponseEntity.ok(mapOf(
+                "status" to "success",
+                "message" to "Stow 전체 설정이 성공적으로 변경되었습니다.",
+                "data" to mapOf(
+                    "angle" to mapOf(
+                        "azimuth" to settingsService.stowAngleAzimuth,
+                        "elevation" to settingsService.stowAngleElevation,
+                        "train" to settingsService.stowAngleTrain
+                    ),
+                    "speed" to mapOf(
+                        "azimuth" to settingsService.stowSpeedAzimuth,
+                        "elevation" to settingsService.stowSpeedElevation,
+                        "train" to settingsService.stowSpeedTrain
+                    )
+                )
+            ))
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body(mapOf(
+                "status" to "error",
+                "message" to "Stow 전체 설정 변경 실패: ${e.message}"
+            ))
+        }
+    }
+
+    /**
+     * AntennaSpec 설정 조회
+     */
+    @GetMapping("/antennaspec")
+    @Operation(
+        operationId = "getAntennaSpec",
+        tags = ["System - Settings"]
+    )
+    fun getAntennaSpec(): Map<String, Any> {
+        return settingsService.getAntennaSpecSettings()
+    }
+
+    /**
+     * AntennaSpec 설정 변경
+     */
+    @PostMapping("/antennaspec")
+    @Operation(
+        operationId = "setAntennaSpec",
+        tags = ["System - Settings"]
+    )
+    fun setAntennaSpec(
+        @RequestBody request: AntennaSpecRequest
+    ): ResponseEntity<Map<String, Any>> {
+        return try {
+            settingsService.setAntennaSpec(
+                trueNorthOffsetAngle = request.trueNorthOffsetAngle,
+                tiltAngle = request.tiltAngle
+            )
+            ResponseEntity.ok(mapOf(
+                "status" to "success",
+                "message" to "AntennaSpec 설정이 성공적으로 변경되었습니다.",
+                "data" to mapOf(
+                    "trueNorthOffsetAngle" to settingsService.trueNorthOffsetAngle,
+                    "tiltAngle" to settingsService.tiltAngle
+                )
+            ))
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body(mapOf(
+                "status" to "error",
+                "message" to "AntennaSpec 설정 변경 실패: ${e.message}"
+            ))
+        }
+    }
+
+    /**
+     * Angle Limits 설정 조회
+     */
+    @GetMapping("/anglelimits")
+    @Operation(
+        operationId = "getAngleLimits",
+        tags = ["System - Settings"]
+    )
+    fun getAngleLimits(): Map<String, Any> {
+        return settingsService.getAngleLimitsSettings()
+    }
+
+    /**
+     * Angle Limits 설정 변경
+     */
+    @PostMapping("/anglelimits")
+    @Operation(
+        operationId = "setAngleLimits",
+        tags = ["System - Settings"]
+    )
+    fun setAngleLimits(
+        @RequestBody request: AngleLimitsRequest
+    ): ResponseEntity<Map<String, Any>> {
+        return try {
+            settingsService.setAngleLimits(
+                azimuthMin = request.azimuthMin,
+                azimuthMax = request.azimuthMax,
+                elevationMin = request.elevationMin,
+                elevationMax = request.elevationMax,
+                trainMin = request.trainMin,
+                trainMax = request.trainMax
+            )
+            ResponseEntity.ok(mapOf(
+                "status" to "success",
+                "message" to "Angle Limits 설정이 성공적으로 변경되었습니다.",
+                "data" to mapOf(
+                    "azimuthMin" to settingsService.angleAzimuthMin,
+                    "azimuthMax" to settingsService.angleAzimuthMax,
+                    "elevationMin" to settingsService.angleElevationMin,
+                    "elevationMax" to settingsService.angleElevationMax,
+                    "trainMin" to settingsService.angleTrainMin,
+                    "trainMax" to settingsService.angleTrainMax
+                )
+            ))
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body(mapOf(
+                "status" to "error",
+                "message" to "Angle Limits 설정 변경 실패: ${e.message}"
+            ))
+        }
+    }
+
+    /**
+     * Speed Limits 설정 조회
+     */
+    @GetMapping("/speedlimits")
+    @Operation(
+        operationId = "getSpeedLimits",
+        tags = ["System - Settings"]
+    )
+    fun getSpeedLimits(): Map<String, Any> {
+        return settingsService.getSpeedLimitsSettings()
+    }
+
+    /**
+     * Speed Limits 설정 변경
+     */
+    @PostMapping("/speedlimits")
+    @Operation(
+        operationId = "setSpeedLimits",
+        tags = ["System - Settings"]
+    )
+    fun setSpeedLimits(
+        @RequestBody request: SpeedLimitsRequest
+    ): ResponseEntity<Map<String, Any>> {
+        return try {
+            settingsService.setSpeedLimits(
+                azimuthMin = request.azimuthMin,
+                azimuthMax = request.azimuthMax,
+                elevationMin = request.elevationMin,
+                elevationMax = request.elevationMax,
+                trainMin = request.trainMin,
+                trainMax = request.trainMax
+            )
+            ResponseEntity.ok(mapOf(
+                "status" to "success",
+                "message" to "Speed Limits 설정이 성공적으로 변경되었습니다.",
+                "data" to mapOf(
+                    "azimuthMin" to settingsService.speedAzimuthMin,
+                    "azimuthMax" to settingsService.speedAzimuthMax,
+                    "elevationMin" to settingsService.speedElevationMin,
+                    "elevationMax" to settingsService.speedElevationMax,
+                    "trainMin" to settingsService.speedTrainMin,
+                    "trainMax" to settingsService.speedTrainMax
+                )
+            ))
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body(mapOf(
+                "status" to "error",
+                "message" to "Speed Limits 설정 변경 실패: ${e.message}"
+            ))
+        }
+    }
+
+    /**
+     * Angle Offset Limits 설정 조회
+     */
+    @GetMapping("/angleoffsetlimits")
+    @Operation(
+        operationId = "getAngleOffsetLimits",
+        tags = ["System - Settings"]
+    )
+    fun getAngleOffsetLimits(): Map<String, Any> {
+        return settingsService.getAngleOffsetLimitsSettings()
+    }
+
+    /**
+     * Angle Offset Limits 설정 변경
+     */
+    @PostMapping("/angleoffsetlimits")
+    @Operation(
+        operationId = "setAngleOffsetLimits",
+        tags = ["System - Settings"]
+    )
+    fun setAngleOffsetLimits(
+        @RequestBody request: AngleOffsetLimitsRequest
+    ): ResponseEntity<Map<String, Any>> {
+        return try {
+            settingsService.setAngleOffsetLimits(
+                azimuth = request.azimuth,
+                elevation = request.elevation,
+                train = request.train
+            )
+            ResponseEntity.ok(mapOf(
+                "status" to "success",
+                "message" to "Angle Offset Limits 설정이 성공적으로 변경되었습니다.",
+                "data" to mapOf(
+                    "azimuth" to settingsService.angleOffsetAzimuth,
+                    "elevation" to settingsService.angleOffsetElevation,
+                    "train" to settingsService.angleOffsetTrain
+                )
+            ))
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body(mapOf(
+                "status" to "error",
+                "message" to "Angle Offset Limits 설정 변경 실패: ${e.message}"
+            ))
+        }
+    }
+
+    /**
+     * Time Offset Limits 설정 조회
+     */
+    @GetMapping("/timeoffsetlimits")
+    @Operation(
+        operationId = "getTimeOffsetLimits",
+        tags = ["System - Settings"]
+    )
+    fun getTimeOffsetLimits(): Map<String, Any> {
+        return settingsService.getTimeOffsetLimitsSettings()
+    }
+
+    /**
+     * Time Offset Limits 설정 변경
+     */
+    @PostMapping("/timeoffsetlimits")
+    @Operation(
+        operationId = "setTimeOffsetLimits",
+        tags = ["System - Settings"]
+    )
+    fun setTimeOffsetLimits(
+        @RequestBody request: TimeOffsetLimitsRequest
+    ): ResponseEntity<Map<String, Any>> {
+        return try {
+            settingsService.setTimeOffsetLimits(
+                min = request.min,
+                max = request.max
+            )
+            ResponseEntity.ok(mapOf(
+                "status" to "success",
+                "message" to "Time Offset Limits 설정이 성공적으로 변경되었습니다.",
+                "data" to mapOf(
+                    "min" to settingsService.timeOffsetMin,
+                    "max" to settingsService.timeOffsetMax
+                )
+            ))
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body(mapOf(
+                "status" to "error",
+                "message" to "Time Offset Limits 설정 변경 실패: ${e.message}"
+            ))
+        }
+    }
+
+    /**
+     * Algorithm 설정 조회
+     */
+    @GetMapping("/algorithm")
+    @Operation(
+        operationId = "getAlgorithm",
+        tags = ["System - Settings"]
+    )
+    fun getAlgorithm(): Map<String, Any> {
+        return settingsService.getAlgorithmSettings()
+    }
+
+    /**
+     * Algorithm 설정 변경
+     */
+    @PostMapping("/algorithm")
+    @Operation(
+        operationId = "setAlgorithm",
+        tags = ["System - Settings"]
+    )
+    fun setAlgorithm(
+        @RequestBody request: AlgorithmRequest
+    ): ResponseEntity<Map<String, Any>> {
+        return try {
+            settingsService.setAlgorithm(
+                geoMinMotion = request.geoMinMotion
+            )
+            ResponseEntity.ok(mapOf(
+                "status" to "success",
+                "message" to "Algorithm 설정이 성공적으로 변경되었습니다.",
+                "data" to mapOf(
+                    "geoMinMotion" to settingsService.geoMinMotion
+                )
+            ))
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body(mapOf(
+                "status" to "error",
+                "message" to "Algorithm 설정 변경 실패: ${e.message}"
+            ))
+        }
+    }
+
+    /**
+     * StepSizeLimit 설정 조회
+     */
+    @GetMapping("/stepsizelimit")
+    @Operation(
+        operationId = "getStepSizeLimit",
+        tags = ["System - Settings"]
+    )
+    fun getStepSizeLimit(): Map<String, Any> {
+        return settingsService.getStepSizeLimitSettings()
+    }
+
+    /**
+     * StepSizeLimit 설정 변경
+     */
+    @PostMapping("/stepsizelimit")
+    @Operation(
+        operationId = "setStepSizeLimit",
+        tags = ["System - Settings"]
+    )
+    fun setStepSizeLimit(
+        @RequestBody request: StepSizeLimitRequest
+    ): ResponseEntity<Map<String, Any>> {
+        return try {
+            settingsService.setStepSizeLimit(
+                min = request.min,
+                max = request.max
+            )
+            ResponseEntity.ok(mapOf(
+                "status" to "success",
+                "message" to "StepSizeLimit 설정이 성공적으로 변경되었습니다.",
+                "data" to mapOf(
+                    "min" to settingsService.stepSizeMin,
+                    "max" to settingsService.stepSizeMax
+                )
+            ))
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body(mapOf(
+                "status" to "error",
+                "message" to "StepSizeLimit 설정 변경 실패: ${e.message}"
             ))
         }
     }
@@ -149,4 +620,98 @@ data class TrackingRequest(
     val msInterval: Int,
     val durationDays: Long,
     val minElevationAngle: Float
+)
+
+/**
+ * Stow Angle 설정 요청 데이터
+ */
+data class StowAngleRequest(
+    val azimuth: Double,
+    val elevation: Double,
+    val train: Double
+)
+
+/**
+ * Stow Speed 설정 요청 데이터
+ */
+data class StowSpeedRequest(
+    val azimuth: Double,
+    val elevation: Double,
+    val train: Double
+)
+
+/**
+ * Stow 전체 설정 요청 데이터
+ */
+data class StowAllRequest(
+    val angleAzimuth: Double,
+    val angleElevation: Double,
+    val angleTrain: Double,
+    val speedAzimuth: Double,
+    val speedElevation: Double,
+    val speedTrain: Double
+)
+
+/**
+ * AntennaSpec 설정 요청 데이터
+ */
+data class AntennaSpecRequest(
+    val trueNorthOffsetAngle: Double,
+    val tiltAngle: Double
+)
+
+/**
+ * Angle Limits 설정 요청 데이터
+ */
+data class AngleLimitsRequest(
+    val azimuthMin: Double,
+    val azimuthMax: Double,
+    val elevationMin: Double,
+    val elevationMax: Double,
+    val trainMin: Double,
+    val trainMax: Double
+)
+
+/**
+ * Speed Limits 설정 요청 데이터
+ */
+data class SpeedLimitsRequest(
+    val azimuthMin: Double,
+    val azimuthMax: Double,
+    val elevationMin: Double,
+    val elevationMax: Double,
+    val trainMin: Double,
+    val trainMax: Double
+)
+
+/**
+ * Angle Offset Limits 설정 요청 데이터
+ */
+data class AngleOffsetLimitsRequest(
+    val azimuth: Double,
+    val elevation: Double,
+    val train: Double
+)
+
+/**
+ * Time Offset Limits 설정 요청 데이터
+ */
+data class TimeOffsetLimitsRequest(
+    val min: Double,
+    val max: Double
+)
+
+/**
+ * Algorithm 설정 요청 데이터
+ */
+data class AlgorithmRequest(
+    val geoMinMotion: Double
+)
+
+/**
+ * StepSizeLimit 설정 요청 데이터
+ */
+data class StepSizeLimitRequest(
+    val min: Double,
+    val max: Double
 )

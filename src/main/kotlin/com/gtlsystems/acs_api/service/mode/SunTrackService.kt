@@ -529,7 +529,7 @@ class SunTrackService(
                     azimuth = sunPosition.azimuthDegrees,
                     elevation = sunPosition.elevationDegrees,
                     tiltAngle = -6.98,
-                    rotatorAngle = targetRotatorAngle!!
+                    trainAngle = targetRotatorAngle!!
                 )
                 val transformDuration = System.currentTimeMillis() - transformStart
                 
