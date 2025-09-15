@@ -16,8 +16,7 @@ object ICDApiDescriptions {
                             <h4>기능:</h4>
                             <ul>
                                 <li>각 축(방위각, 고도각, 기울기)의 프리셋 위치 설정</li>
-                                <li>UDP 통신을 통한 외부 시스템 제어</li>
-                                <li>비트맵 기반 축 상태 제어</li>
+                                <li>UDP 통신을 통한 외부 시스템 프리셋 제어</li>
                             </ul>
 
                             <h4>제어 파라미터:</h4>
@@ -53,42 +52,42 @@ object ICDApiDescriptions {
             "standbycommand" -> {
                 when (language) {
                     Language.KOREAN -> {
-                        operation.summary = "대기 모드 명령"
+                        operation.summary = "대기(제동) 명령"
                         operation.description = """
-                            <h4>안테나 서보 시스템을 안전한 대기 상태로 전환합니다.</h4>
+                            <h4>안테나 서보 시스템을 안전한 제동 상태로 전환합니다.</h4>
 
                             <h4>기능:</h4>
                             <ul>
-                                <li>각 축의 안전한 대기 위치 설정</li>
+                                <li>각 축의 안전한 대기(제동) 위치 설정</li>
                                 <li>시스템 보호 및 에너지 절약</li>
-                                <li>축별 개별 대기 모드 전환</li>
+                                <li>축별 개별 대기(제동) 모드 전환</li>
                             </ul>
 
                             <h4>제어 파라미터:</h4>
                             <ul>
-                                <li>azStandby: 방위각 축 대기 모드</li>
-                                <li>elStandby: 고도각 축 대기 모드</li>
-                                <li>tiStandby: 기울기 축 대기 모드</li>
+                                <li>azStandby: 방위각 축 대기(제동) 모드</li>
+                                <li>elStandby: 고도각 축 대기(제동) 모드</li>
+                                <li>tiStandby: 기울기 축 대기(제동) 모드</li>
                             </ul>
                         """.trimIndent()
                     }
                     Language.ENGLISH -> {
-                        operation.summary = "Standby Mode Command"
+                        operation.summary = "Standby (Brake) Command"
                         operation.description = """
-                            <h4>Transitions antenna servo system to a safe standby state.</h4>
+                            <h4>Transitions antenna servo system to a safe standby (brake) state.</h4>
 
                             <h4>Features:</h4>
                             <ul>
-                                <li>Set safe standby position for each axis</li>
+                                <li>Set safe standby (brake) position for each axis</li>
                                 <li>System protection and energy saving</li>
-                                <li>Individual axis standby mode transition</li>
+                                <li>Individual axis standby (brake) mode transition</li>
                             </ul>
 
                             <h4>Control Parameters:</h4>
                             <ul>
-                                <li>azStandby: Azimuth axis standby mode</li>
-                                <li>elStandby: Elevation axis standby mode</li>
-                                <li>tiStandby: Tilt axis standby mode</li>
+                                <li>azStandby: Azimuth axis standby (brake) mode</li>
+                                <li>elStandby: Elevation axis standby (brake) mode</li>
+                                <li>tiStandby: Tilt axis standby (brake) mode</li>
                             </ul>
                         """.trimIndent()
                     }
@@ -104,7 +103,7 @@ object ICDApiDescriptions {
                             <h4>명령 유형:</h4>
                             <ul>
                                 <li>'E': 긴급 정지 (Emergency Stop)</li>
-                                <li>'S': 안전 정지 (Safe Stop)</li>
+                                <li>'S': 긴급 정지 해제 (Safe)</li>
                             </ul>
 
                             <h4>긴급 정지 특징:</h4>
@@ -123,7 +122,7 @@ object ICDApiDescriptions {
                             <h4>Command Types:</h4>
                             <ul>
                                 <li>'E': Emergency Stop</li>
-                                <li>'S': Safe Stop</li>
+                                <li>'S': Safe</li>
                             </ul>
 
                             <h4>Emergency Stop Characteristics:</h4>
@@ -271,15 +270,15 @@ object ICDApiDescriptions {
             "positionoffsetcommand" -> {
                 when (language) {
                     Language.KOREAN -> {
-                        operation.summary = "위치 오프셋 명령"
+                        operation.summary = "각도 오프셋 명령"
                         operation.description = """
-                            <h4>안테나 각 축의 위치 오프셋을 조정합니다.</h4>
+                            <h4>안테나 각 축의 각도 오프셋을 조정합니다.</h4>
 
                             <h4>기능:</h4>
                             <ul>
                                 <li>방위각, 고도각, 기울기 축 미세 조정</li>
                                 <li>기계적 오차 보정</li>
-                                <li>정밀 위치 제어</li>
+                                <li>정밀 각도 제어</li>
                             </ul>
 
                             <h4>제어 파라미터:</h4>
@@ -447,13 +446,13 @@ object ICDApiDescriptions {
             "stowcommand" -> {
                 when (language) {
                     Language.KOREAN -> {
-                        operation.summary = "보관 모드 명령"
+                        operation.summary = "Stow 모드 명령"
                         operation.description = """
-                            <h4>안테나 시스템을 안전한 보관 위치로 이동합니다.</h4>
+                            <h4>안테나 시스템을 안전한 Stow 위치로 이동합니다.</h4>
 
                             <h4>기능:</h4>
                             <ul>
-                                <li>모든 축을 안전 보관 위치로 이동</li>
+                                <li>모든 축을 안전한 Stow 위치로 이동</li>
                                 <li>시스템 보호 및 안전 상태 유지</li>
                                 <li>장기 미사용 시 최적 상태 유지</li>
                             </ul>

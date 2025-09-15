@@ -12,60 +12,12 @@ object EphemerisApiDescriptions {
                         operation.summary = "정지궤도 위성 각도 계산"
                         operation.description = """
                             <h4>정지궤도 위성의 경도를 기반으로 안테나 추적 각도를 계산합니다.</h4>
-
-                            <h4>계산되는 각도:</h4>
-                            <ul>
-                                <li>방위각: 북쪽 기준 수평각 (0° ~ 360°)</li>
-                                <li>고도각: 지평선 기준 수직각 (0° ~ 90°)</li>
-                                <li>기울기각: 편파면 일치를 위한 보정각</li>
-                                <li>회전각: 안테나 회전축 보정각</li>
-                            </ul>
-
-                            <h4>좌표계 변환:</h4>
-                            <ul>
-                                <li>입력: 정지궤도 위성 경도</li>
-                                <li>중간: ITRF/WGS84 좌표계</li>
-                                <li>출력: 안테나 좌표계 (Az/El)</li>
-                                <li>보정: 지구 자전/편평도 고려</li>
-                            </ul>
-
-                            <h4>정밀도:</h4>
-                            <ul>
-                                <li>각도 계산: 0.1° 이내</li>
-                                <li>위치 오차: ±0.1°</li>
-                                <li>갱신 주기: 1초</li>
-                                <li>시간 동기: NTP 기반</li>
-                            </ul>
                         """.trimIndent()
                     }
                     Language.ENGLISH -> {
                         operation.summary = "Calculate Geostationary Satellite Angles"
                         operation.description = """
                             <h4>Calculates antenna tracking angles based on geostationary satellite longitude.</h4>
-
-                            <h4>Calculated Angles:</h4>
-                            <ul>
-                                <li>Azimuth: Horizontal angle from North (0° ~ 360°)</li>
-                                <li>Elevation: Vertical angle from horizon (0° ~ 90°)</li>
-                                <li>Tilt: Polarization plane alignment angle</li>
-                                <li>Rotation: Antenna rotation axis correction</li>
-                            </ul>
-
-                            <h4>Coordinate Transformation:</h4>
-                            <ul>
-                                <li>Input: Geostationary satellite longitude</li>
-                                <li>Intermediate: ITRF/WGS84 coordinates</li>
-                                <li>Output: Antenna coordinates (Az/El)</li>
-                                <li>Correction: Earth rotation/oblate consideration</li>
-                            </ul>
-
-                            <h4>Precision:</h4>
-                            <ul>
-                                <li>Angle calculation: Within 0.1°</li>
-                                <li>Position error: ±0.1°</li>
-                                <li>Update rate: 1 second</li>
-                                <li>Time sync: NTP based</li>
-                            </ul>
                         """.trimIndent()
                     }
                 }
@@ -136,6 +88,7 @@ object EphemerisApiDescriptions {
             "startephemeristrack" -> {
                 when (language) {
                     Language.KOREAN -> {
+                        operation.summary = "PassId 기반 위성 추적 시작."
                         operation.description = """
                             <h4>위성 추적을 시작하고 실시간 각도 계산을 수행합니다.</h4>
 
@@ -159,7 +112,6 @@ object EphemerisApiDescriptions {
                             <ul>
                                 <li>각도 제한: 기계적 한계 고려</li>
                                 <li>속도 제한: 최대 이동 속도 제한</li>
-                                <li>충돌 방지: 장애물 회피 로직</li>
                                 <li>비상 정지: 이상 상황 감지 시 정지</li>
                             </ul>
                         """.trimIndent()
@@ -199,8 +151,9 @@ object EphemerisApiDescriptions {
             "stopephemeristrack" -> {
                 when (language) {
                     Language.KOREAN -> {
+                        operation.summary = "위성 추적 중지."
                         operation.description = """
-                            <h4>위성 추적을 중지하고 안테나를 안전 상태로 전환합니다.</h4>
+                            <h4>위성 추적을 중지합니다.</h4>
 
                             <h4>수행 작업:</h4>
                             <ul>
@@ -304,7 +257,380 @@ object EphemerisApiDescriptions {
                 }
             }
 
-            // ... 나머지 API 설명들도 동일한 패턴으로 추가 ...
+            "getephemerisdata" -> {
+                when (language) {
+                    Language.KOREAN -> {
+                        operation.summary = "실시간 위성 추적 데이터 조회"
+                        operation.description = """
+                            <h4>현재 추적 중인 위성의 실시간 데이터를 조회합니다.</h4>
+
+                            <h4>조회 데이터:</h4>
+                            <ul>
+                                <li>실시간 각도: 방위각/고도각/기울기각</li>
+                                <li>위성 정보: 위성 ID/이름/궤도 데이터</li>
+                                <li>추적 상태: 현재 추적 상태 및 진행률</li>
+                                <li>통계 정보: 추적 성능 및 오차 분석</li>
+                                <li>추적한 데이터가 계속 축적됨 이를 조회하여 csv로 다운하고있음.</li>
+                            </ul>
+
+                            <h4>데이터 형식:</h4>
+                            <ul>
+                                <li>JSON 형식: 구조화된 데이터 제공</li>
+                                <li>실시간 업데이트: 1초 간격 갱신</li>
+                                <li>타임스탬프: UTC 기준 시간 정보</li>
+                                <li>오차 분석: 각도별 정확도 정보</li>
+                            </ul>
+                        """.trimIndent()
+                    }
+                    Language.ENGLISH -> {
+                        operation.summary = "Get Real-time Satellite Tracking Data"
+                        operation.description = """
+                            <h4>Retrieves real-time data for currently tracked satellite.</h4>
+
+                            <h4>Retrieved Data:</h4>
+                            <ul>
+                                <li>Real-time Angles: Azimuth/Elevation/Tilt</li>
+                                <li>Satellite Info: Satellite ID/Name/Orbital data</li>
+                                <li>Tracking Status: Current tracking status and progress</li>
+                                <li>Statistics: Tracking performance and error analysis</li>
+                                <li>Accumulated tracking data is continuously stored and can be downloaded as CSV.</li>
+                            </ul>
+
+                            <h4>Data Format:</h4>
+                            <ul>
+                                <li>JSON Format: Structured data provision</li>
+                                <li>Real-time Update: 1-second interval refresh</li>
+                                <li>Timestamp: UTC-based time information</li>
+                                <li>Error Analysis: Accuracy information per angle</li>
+                            </ul>
+                        """.trimIndent()
+                    }
+                }
+            }
+
+            "generateephemeristrack" -> {
+                when (language) {
+                    Language.KOREAN -> {
+                        operation.summary = "위성 추적 데이터 생성"
+                        operation.description = """
+                            <h4>TLE 데이터를 기반으로 위성 추적 데이터를 생성합니다.</h4>
+
+                            <h4>생성 과정:</h4>
+                            <ul>
+                                <li>TLE 파싱: 위성 궤도 요소 추출</li>
+                                <li>각도 계산: 방위각/고도각/기울기각</li>
+                            </ul>
+
+                            <h4>출력 데이터:</h4>
+                            <ul>
+                                <li>마스터 데이터: 추적 목록 정보</li>
+                                <li>상세 데이터: 시간별 각도 정보</li>
+                                <li>통계 정보: 생성된 데이터 개수</li>
+                                <li>오류 처리: 생성 실패 시 오류 메시지</li>
+                                <li>실제 위성 추적 데이터를 생성함.</li>
+                            </ul>
+                        """.trimIndent()
+                    }
+                    Language.ENGLISH -> {
+                        operation.summary = "Generate Satellite Tracking Data"
+                        operation.description = """
+                            <h4>Generates satellite tracking data based on TLE data.</h4>
+
+                            <h4>Generation Process:</h4>
+                            <ul>
+                                <li>TLE Parsing: Extract satellite orbital elements</li>
+                                <li>Angle Calculation: Azimuth/Elevation/Tilt calculation</li>
+                            </ul>
+
+                            <h4>Output Data:</h4>
+                            <ul>
+                                <li>Master Data: Tracking list information</li>
+                                <li>Detail Data: Time-based angle information</li>
+                                <li>Statistics: Generated data count</li>
+                                <li>Error Handling: Error message on failure</li>
+                                <li>Generates actual satellite tracking data for real-time tracking.</li>
+                            </ul>
+                        """.trimIndent()
+                    }
+                }
+            }
+
+            "getephemerislist" -> {
+                when (language) {
+                    Language.KOREAN -> {
+                        operation.summary = "위성 추적 데이터 목록 조회"
+                        operation.description = """
+                            <h4>생성된 위성 추적 데이터 목록을 조회합니다.</h4>
+
+                            <h4>조회 정보:</h4>
+                            <ul>
+                                <li>위성 정보: 위성 ID/이름/궤도 타입</li>
+                                <li>시간 정보: 시작/종료 시간/지속 시간</li>
+                                <li>각도 정보: 최대 고도/시작/종료 각도</li>
+                                <li>상태 정보: 생성 상태/데이터 품질</li>
+                                <li>위성 추적 데이터를 생성하면 실제 위성 추적 목록을 일괄 조회함.</li>
+                            </ul>
+
+                            <h4>정렬 및 필터링:</h4>
+                            <ul>
+                                <li>시간순 정렬: 최신 데이터 우선</li>
+                                <li>위성별 그룹화: 동일 위성 데이터 묶음</li>
+                                <li>상태별 필터링: 활성/비활성 데이터 구분</li>
+                            </ul>
+                        """.trimIndent()
+                    }
+                    Language.ENGLISH -> {
+                        operation.summary = "Get Satellite Tracking Data List"
+                        operation.description = """
+                            <h4>Retrieves list of generated satellite tracking data.</h4>
+
+                            <h4>Retrieved Information:</h4>
+                            <ul>
+                                <li>Satellite Info: Satellite ID/Name/Orbit type</li>
+                                <li>Time Info: Start/End time/Duration</li>
+                                <li>Angle Info: Maximum elevation/Start/End angles</li>
+                                <li>Status Info: Generation status/Data quality</li>
+                                <li>Retrieves all satellite tracking data lists when tracking data is generated.</li>
+                            </ul>
+
+                            <h4>Sorting & Filtering:</h4>
+                            <ul>
+                                <li>Time Sort: Latest data first</li>
+                                <li>Satellite Grouping: Same satellite data grouped</li>
+                                <li>Status Filtering: Active/Inactive data separation</li>
+                            </ul>
+                        """.trimIndent()
+                    }
+                }
+            }
+
+            "getephemerisdetail" -> {
+                when (language) {
+                    Language.KOREAN -> {
+                        operation.summary = "위성 추적 데이터 상세 조회"
+                        operation.description = """
+                            <h4>선택된 위성 추적 데이터의 상세 정보를 조회합니다.</h4>
+
+                            <h4>상세 데이터:</h4>
+                            <ul>
+                                <li>시간별 각도: 방위각/고도각/기울기각</li>
+                                <li>위성 위치: 거리/고도/속도 정보</li>
+                                <li>추적 경로: 연속적인 궤적 데이터</li>
+                                <li>오차 분석: 이론값 대비 실제값 오차</li>
+                                <li>선택된 위성의 상세 추적 값을 조회함.</li>
+                            </ul>
+
+                            <h4>데이터 활용:</h4>
+                            <ul>
+                                <li>차트 표시: 궤적 시각화</li>
+                                <li>추적 제어: 실시간 각도 제어</li>
+                                <li>성능 분석: 추적 정확도 평가</li>
+                                <li>CSV 내보내기: 데이터 분석용</li>
+                            </ul>
+                        """.trimIndent()
+                    }
+                    Language.ENGLISH -> {
+                        operation.summary = "Get Satellite Tracking Data Detail"
+                        operation.description = """
+                            <h4>Retrieves detailed information for selected satellite tracking data.</h4>
+
+                            <h4>Detail Data:</h4>
+                            <ul>
+                                <li>Time-based Angles: Azimuth/Elevation/Tilt</li>
+                                <li>Satellite Position: Range/Altitude/Velocity information</li>
+                                <li>Tracking Path: Continuous trajectory data</li>
+                                <li>Error Analysis: Theoretical vs actual value error</li>
+                                <li>Retrieves detailed tracking values for the selected satellite.</li>
+                            </ul>
+
+                            <h4>Data Usage:</h4>
+                            <ul>
+                                <li>Chart Display: Trajectory visualization</li>
+                                <li>Tracking Control: Real-time angle control</li>
+                                <li>Performance Analysis: Tracking accuracy evaluation</li>
+                                <li>CSV Export: For data analysis</li>
+                            </ul>
+                        """.trimIndent()
+                    }
+                }
+            }
+
+            "calculateaxistransform" -> {
+                when (language) {
+                    Language.KOREAN -> {
+                        operation.summary = "3축 변환 계산"
+                        operation.description = """
+                            <h4>입력된 각도들을 3축 변환하여 안테나 좌표계로 변환합니다.</h4>
+
+                            <h4>입력 파라미터:</h4>
+                            <ul>
+                                <li>Azimuth: 방위각 (0° ~ 360°)</li>
+                                <li>Elevation: 고도각 (0° ~ 90°)</li>
+                                <li>Tilt: 기울기각 (-90° ~ 90°)</li>
+                                <li>Rotator: 회전각 (0° ~ 360°)</li>
+                                <li>현재는 계산기로 활용하기 위함으로 개발함.</li>
+                            </ul>
+
+                            <h4>변환 과정:</h4>
+                            <ul>
+                                <li>좌표계 변환: 입력 좌표 → 안테나 좌표</li>
+                                <li>기울기 보정: 편파면 일치를 위한 보정</li>
+                                <li>회전 보정: 안테나 회전축 보정</li>
+                                <li>각도 제한: 기계적 한계 고려</li>
+                            </ul>
+
+                            <h4>출력 결과:</h4>
+                            <ul>
+                                <li>변환된 방위각: 최종 방위각 값</li>
+                                <li>변환된 고도각: 최종 고도각 값</li>
+                                <li>변환 성공 여부: 변환 결과 상태</li>
+                                <li>오류 메시지: 변환 실패 시 원인</li>
+                            </ul>
+                        """.trimIndent()
+                    }
+                    Language.ENGLISH -> {
+                        operation.summary = "Calculate 3-Axis Transform"
+                        operation.description = """
+                            <h4>Transforms input angles using 3-axis transformation to antenna coordinates.</h4>
+
+                            <h4>Input Parameters:</h4>
+                            <ul>
+                                <li>Azimuth: Azimuth angle (0° ~ 360°)</li>
+                                <li>Elevation: Elevation angle (0° ~ 90°)</li>
+                                <li>Tilt: Tilt angle (-90° ~ 90°)</li>
+                                <li>Rotator: Rotation angle (0° ~ 360°)</li>
+                                <li>Currently developed for use as a calculator tool.</li>
+                            </ul>
+
+                            <h4>Transformation Process:</h4>
+                            <ul>
+                                <li>Coordinate Transform: Input coordinates → Antenna coordinates</li>
+                                <li>Tilt Correction: Polarization plane alignment correction</li>
+                                <li>Rotation Correction: Antenna rotation axis correction</li>
+                                <li>Angle Limits: Mechanical limits consideration</li>
+                            </ul>
+
+                            <h4>Output Results:</h4>
+                            <ul>
+                                <li>Transformed Azimuth: Final azimuth value</li>
+                                <li>Transformed Elevation: Final elevation value</li>
+                                <li>Transformation Success: Result status</li>
+                                <li>Error Message: Failure cause if any</li>
+                            </ul>
+                        """.trimIndent()
+                    }
+                }
+            }
+
+            "setcurrenttrackingpassid" -> {
+                when (language) {
+                    Language.KOREAN -> {
+                        operation.summary = "현재 추적 ID 설정"
+                        operation.description = """
+                            <h4>현재 추적 중인 위성의 Pass ID를 설정합니다.</h4>
+
+                            <h4>기능:</h4>
+                            <ul>
+                                <li>추적 ID 설정: 현재 추적할 위성 ID 지정</li>
+                                <li>상태 업데이트: 추적 상태 정보 갱신</li>
+                                <li>데이터 연동: 해당 ID의 추적 데이터 활성화</li>
+                            </ul>
+
+                            <h4>파라미터:</h4>
+                            <ul>
+                                <li>passId: 추적할 위성의 Pass ID (UInt)</li>
+                            </ul>
+
+                            <h4>응답:</h4>
+                            <ul>
+                                <li>성공: 설정 완료 메시지</li>
+                                <li>실패: 오류 메시지 및 원인</li>
+                            </ul>
+                        """.trimIndent()
+                    }
+                    Language.ENGLISH -> {
+                        operation.summary = "Set Current Tracking Pass ID"
+                        operation.description = """
+                            <h4>Sets the Pass ID for currently tracked satellite.</h4>
+
+                            <h4>Features:</h4>
+                            <ul>
+                                <li>Pass ID Setting: Specify satellite ID to track</li>
+                                <li>Status Update: Update tracking status information</li>
+                                <li>Data Integration: Activate tracking data for the ID</li>
+                            </ul>
+
+                            <h4>Parameters:</h4>
+                            <ul>
+                                <li>passId: Pass ID of satellite to track (UInt)</li>
+                            </ul>
+
+                            <h4>Response:</h4>
+                            <ul>
+                                <li>Success: Setting completion message</li>
+                                <li>Failure: Error message and cause</li>
+                            </ul>
+                        """.trimIndent()
+                    }
+                }
+            }
+
+            "startgeostationarytracking" -> {
+                when (language) {
+                    Language.KOREAN -> {
+                        operation.summary = "정지궤도 위성 추적 시작"
+                        operation.description = """
+                            <h4>정지궤도 위성의 추적을 시작합니다.</h4>
+
+                            <h4>기능:</h4>
+                            <ul>
+                                <li>정지궤도 추적: 지구와 동기화된 위성 추적</li>
+                                <li>실시간 각도 계산: 방위각/고도각/기울기각</li>
+                                <li>자동 제어: 안테나 방향 자동 조정</li>
+                                <li>상태 모니터링: 추적 상태 실시간 확인</li>
+                            </ul>
+
+                            <h4>입력 데이터:</h4>
+                            <ul>
+                                <li>TLE Line 1: 위성 궤도 요소 1</li>
+                                <li>TLE Line 2: 위성 궤도 요소 2</li>
+                            </ul>
+
+                            <h4>응답:</h4>
+                            <ul>
+                                <li>성공: 추적 시작 메시지 및 위성 ID</li>
+                                <li>실패: 오류 메시지 및 원인</li>
+                            </ul>
+                        """.trimIndent()
+                    }
+                    Language.ENGLISH -> {
+                        operation.summary = "Start Geostationary Satellite Tracking"
+                        operation.description = """
+                            <h4>Starts tracking of geostationary satellite.</h4>
+
+                            <h4>Features:</h4>
+                            <ul>
+                                <li>Geostationary Tracking: Earth-synchronized satellite tracking</li>
+                                <li>Real-time Angle Calculation: Azimuth/Elevation/Tilt angles</li>
+                                <li>Automatic Control: Automatic antenna direction adjustment</li>
+                                <li>Status Monitoring: Real-time tracking status check</li>
+                            </ul>
+
+                            <h4>Input Data:</h4>
+                            <ul>
+                                <li>TLE Line 1: Satellite orbital elements 1</li>
+                                <li>TLE Line 2: Satellite orbital elements 2</li>
+                            </ul>
+
+                            <h4>Response:</h4>
+                            <ul>
+                                <li>Success: Tracking start message and satellite ID</li>
+                                <li>Failure: Error message and cause</li>
+                            </ul>
+                        """.trimIndent()
+                    }
+                }
+            }
         }
     }
 } 

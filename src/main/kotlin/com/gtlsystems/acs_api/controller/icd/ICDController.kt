@@ -389,6 +389,7 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
                 "status" to "success",
                 "message" to "DefaultInfo 명령이 성공적으로 전송되었습니다",
                 "command" to "DefaultInfo",
+                "utcTime" to GlobalData.Time.utcNow.toString(),
                 "timeOffset" to GlobalData.Offset.TimeOffset.toString(),
                 "offsets" to "Az:${GlobalData.Offset.azimuthPositionOffset}°, El:${GlobalData.Offset.elevationPositionOffset}°, Ti:${GlobalData.Offset.tiltPositionOffset}°"
             ))
@@ -474,31 +475,6 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
             ResponseEntity.internalServerError().body(mapOf(
                 "status" to "error",
                 "message" to "통신 상태 조회 실패: ${e.message}"
-            ))
-        }
-    }
-
-    @PostMapping("/test-command")
-    @Operation(
-        operationId = "testCommand",
-        tags = ["ICD - Communication"]
-    )
-    fun sendTestCommand(): ResponseEntity<Map<String, String>> {
-        return try {
-            udpFwICDService.sendTestCommand()
-
-            logger.info("테스트 명령 요청 완료")
-
-            ResponseEntity.ok(mapOf(
-                "status" to "success",
-                "message" to "테스트 명령이 성공적으로 전송되었습니다",
-                "command" to "Test"
-            ))
-        } catch (e: Exception) {
-            logger.error("테스트 명령 요청 실패: {}", e.message, e)
-            ResponseEntity.internalServerError().body(mapOf(
-                "status" to "error",
-                "message" to "테스트 명령 전송 실패: ${e.message}"
             ))
         }
     }

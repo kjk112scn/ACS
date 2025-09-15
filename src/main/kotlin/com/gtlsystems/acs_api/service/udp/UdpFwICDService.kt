@@ -1118,45 +1118,6 @@ class UdpFwICDService(
         logger.info("UDP 통신 서비스 종료 완료")
     }
 
-    // === 디버깅 및 테스트 메서드들 ===
-
-    /**
-     * 테스트용 더미 명령 전송
-     */
-    fun sendTestCommand() {
-        logger.info("테스트 명령 전송 중...")
-
-        val testBitSet = BitSet()
-        testBitSet.set(0) // 방위각 축만 설정
-
-        Mono.fromCallable {
-            val setDataFrameInstance = ICDService.MultiManualControl.SetDataFrame(
-                stx = 0x02,
-                cmdOne = 'A',
-                axis = testBitSet,
-                azimuthAngle = 0.0f,
-                azimuthSpeed = 1.0f,
-                elevationAngle = 0.0f,
-                elevationSpeed = 0.0f,
-                tiltAngle = 0.0f,
-                tiltSpeed = 0.0f,
-                crc16 = 0u,
-                etx = 0x03
-            )
-
-            val dataToSend = setDataFrameInstance.setDataFrame()
-            channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
-
-            logger.info("테스트 명령 전송 완료")
-            logger.debug("테스트 명령 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
-        }
-            .subscribeOn(Schedulers.boundedElastic())
-            .subscribe(
-                { logger.info("테스트 명령 성공") },
-                { error -> logger.error("테스트 명령 실패: {}", error.message, error) }
-            )
-    }
-
     /**
      * 강제 재연결 (비상용)
      */

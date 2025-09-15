@@ -20,23 +20,29 @@ class PassScheduleController(
     private val passScheduleService: PassScheduleService
 ) {
     private val logger = LoggerFactory.getLogger(PassScheduleController::class.java)
+
     @PostMapping("/time-offset-command")
     fun timeOffsetCommand(@RequestParam inputTimeOffset: Float): ResponseEntity<Map<String, String>> {
         return try {
             passScheduleService.passScheduleTimeOffsetCommand(inputTimeOffset)
-            ResponseEntity.ok(mapOf(
-                "status" to "success",
-                "message" to "TimeOffset 명령이 성공적으로 전송되었습니다",
-                "command" to "TimeOffset",
-                "timeOffset" to inputTimeOffset.toString()
-            ))
+            ResponseEntity.ok(
+                mapOf(
+                    "status" to "success",
+                    "message" to "TimeOffset 명령이 성공적으로 전송되었습니다",
+                    "command" to "TimeOffset",
+                    "timeOffset" to inputTimeOffset.toString()
+                )
+            )
         } catch (e: Exception) {
-            ResponseEntity.internalServerError().body(mapOf(
-                "status" to "error",
-                "message" to "TimeOffset 명령 전송 실패: ${e.message}"
-            ))
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "TimeOffset 명령 전송 실패: ${e.message}"
+                )
+            )
         }
     }
+
     /**
      * TLE 데이터 추가
      */
@@ -797,6 +803,7 @@ class PassScheduleController(
             )
         }
     }
+
     /**
      * 특정 위성의 간단한 패스 정보만 조회합니다 (요약 정보)
      */
@@ -1399,6 +1406,7 @@ class PassScheduleController(
             )
         }
     }
+
     /**
      * ✅ 추적 대상 목록을 초기화합니다.
      */
@@ -1921,6 +1929,7 @@ data class AddTleRequest(
     val tleLine1: String,             // 필수 필드
     val tleLine2: String              // 필수 필드
 )
+
 /**
  * TLE 업데이트 요청 데이터 클래스
  */

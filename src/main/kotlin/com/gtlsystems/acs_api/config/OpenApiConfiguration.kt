@@ -139,9 +139,7 @@ class OpenApiConfiguration {
         ApiTagInfo("Mode - Ephemeris", "위성 궤도 추적", "Satellite Ephemeris Tracking"),
         ApiTagInfo("Mode - Pass Schedule", "패스 스케줄링", "Pass Schedule Management"),
         ApiTagInfo("Mode - Sun Track", "태양 추적", "Sun Tracking"),
-        ApiTagInfo("System - Configuration", "시스템 설정 관리", "System Configuration Management"),
         ApiTagInfo("System - Performance", "시스템 성능 모니터링", "System Performance Monitoring"),
-        ApiTagInfo("language-api-docs-controller", "다국어 API 문서", "Multilingual API Documentation"),
         ApiTagInfo("logging-controller", "로깅 관리", "Logging Management")
     )
 
