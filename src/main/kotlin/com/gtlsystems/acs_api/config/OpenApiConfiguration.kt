@@ -153,7 +153,7 @@ class OpenApiConfiguration {
         # 🚀 ACS API 시스템
 
         ## 📡 주요 기능
-        - **시스템 설정**: ConfigurationService를 통한 동적 설정 관리
+        - **시스템 설정**: SettingsService를 통한 동적 설정 관리
         - **위성 추적**: Ephemeris 기반 위성 궤도 계산 및 추적
         - **패스 관리**: 위성 통과 스케줄 생성 및 관리  
         - **태양 추적**: 태양 위치 계산 및 추적
@@ -175,7 +175,7 @@ class OpenApiConfiguration {
         # 🚀 ACS API System
 
         ## 📡 Key Features
-        - **System Configuration**: Dynamic configuration management via ConfigurationService
+        - **System Configuration**: Dynamic configuration management via SettingsService
         - **Satellite Tracking**: Ephemeris-based satellite orbit calculation and tracking
         - **Pass Management**: Satellite pass schedule generation and management
         - **Sun Tracking**: Solar position calculation and tracking

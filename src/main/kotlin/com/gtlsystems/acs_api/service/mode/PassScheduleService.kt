@@ -9,7 +9,6 @@ import com.gtlsystems.acs_api.model.GlobalData
 import com.gtlsystems.acs_api.service.datastore.DataStoreService
 import com.gtlsystems.acs_api.service.icd.ICDService
 import com.gtlsystems.acs_api.service.udp.UdpFwICDService
-import com.gtlsystems.acs_api.service.system.ConfigurationService
 import com.gtlsystems.acs_api.service.system.settings.SettingsService
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy

@@ -2,13 +2,13 @@ package com.gtlsystems.acs_api.algorithm
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import com.gtlsystems.acs_api.service.system.ConfigurationService
+import com.gtlsystems.acs_api.service.system.settings.SettingsService
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
 
 class ElevationCalculator(
-    private val configurationService: ConfigurationService
+    private val settingsService: SettingsService
 ) {
 
     /**
@@ -92,8 +92,8 @@ class ElevationCalculator(
 
             val connection = URL(url).openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
-            val connectTimeout = configurationService.getValue("udp.timeout") as? Long ?: 10000L
-            val readTimeout = configurationService.getValue("udp.timeout") as? Long ?: 10000L
+            val connectTimeout = settingsService.systemUdpTimeout * 400  // 25ms * 400 = 10초
+            val readTimeout = settingsService.systemUdpTimeout * 400     // 25ms * 400 = 10초
             connection.connectTimeout = connectTimeout.toInt()
             connection.readTimeout = readTimeout.toInt()
 
@@ -103,7 +103,7 @@ class ElevationCalculator(
             } else {
                 println("Google API HTTP Error: ${connection.responseCode}")
                 null
-            }
+            }   
         } catch (e: Exception) {
             println("Google Elevation API 호출 실패: ${e.message}")
             null

@@ -14,9 +14,20 @@ import java.time.Duration
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import com.gtlsystems.acs_api.service.system.settings.SettingsService
 
 class OrekitCalcuatorTest {
+/*
 
+    private val settingsService: SettingsService
+
+    init {
+        // SettingsService 초기화
+        // 실제 애플리케이션에서는 의존성 주입 또는 전역 객체로 관리
+        // 여기서는 임시로 생성
+        settingsService = SettingsService()
+    }
+*/
 
     /**
      * 한 번에 가시성 기간 찾기 + 상세 추적 데이터 생성
@@ -31,7 +42,7 @@ class OrekitCalcuatorTest {
         latitude: Double,
         longitude: Double,
         altitude: Double = 0.0,
-        trackingIntervalMs: Int = (configurationService.getValue("tracking.interval") as? Long ?: 100L).toInt()
+        trackingIntervalMs: Int = settingsService.systemTrackingInterval.toInt()
     ): SatelliteTrackingSchedule {
 
         logger.info("최적화된 위성 추적 스케줄 생성 시작: ${startDate}, 기간: ${durationDays}일")
@@ -103,7 +114,7 @@ class OrekitCalcuatorTest {
                 // 위성 고도 계산
                 val satellitePosition = state.getPVCoordinates(earthFrame).position
                 val satelliteRadius = satellitePosition.norm
-                val altitudeConversionFactor = configurationService.getValue("udp.maxBufferSize") as? Int ?: 1000
+                val altitudeConversionFactor = settingsService.systemUdpMaxBufferSize
                 val satelliteAltitude = (satelliteRadius - Constants.WGS84_EARTH_EQUATORIAL_RADIUS) / altitudeConversionFactor.toDouble()
 
                 val wasVisible = isVisible
@@ -132,7 +143,7 @@ class OrekitCalcuatorTest {
                     }
 
                     // 추적 데이터 추가
-                    val rangeConversionFactor = configurationService.getValue("udp.maxBufferSize") as? Int ?: 1000
+                    val rangeConversionFactor = settingsService.systemUdpMaxBufferSize
                     currentPassData.add(
                         SatelliteTrackData(
                             azimuth = azimuth,

@@ -2,7 +2,7 @@ package com.gtlsystems.acs_api.controller.websocket
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.gtlsystems.acs_api.service.websocket.PushDataService
-import com.gtlsystems.acs_api.service.system.ConfigurationService
+import com.gtlsystems.acs_api.service.system.settings.SettingsService
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicLong
 class PushDataController(
     private val pushDataService: PushDataService,
     private val objectMapper: ObjectMapper,
-    private val configurationService: ConfigurationService
+    private val settingsService: SettingsService
 ) : WebSocketHandler {
 
     private val logger = LoggerFactory.getLogger(PushDataController::class.java)
@@ -39,9 +39,9 @@ class PushDataController(
     private val transmissionCount = AtomicLong(0)
 
     // === 실시간 전송 설정 (ConfigurationService에서 로드) ===
-    private val REALTIME_TRANSMISSION_INTERVAL_MS: Long get() = configurationService.getValue("tracking.transmissionInterval") as? Long ?: 100L
-    private val MAX_PROCESSING_TIME_MS: Long get() = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 100L
-    private val SESSION_TIMEOUT_MS: Long get() = configurationService.getValue("udp.timeout") as? Long ?: 25L
+    private val REALTIME_TRANSMISSION_INTERVAL_MS: Long get() = settingsService.systemTrackingTransmissionInterval
+    private val MAX_PROCESSING_TIME_MS: Long get() = settingsService.systemTrackingPerformanceThreshold
+    private val SESSION_TIMEOUT_MS: Long get() = settingsService.systemUdpTimeout
 
     // === 세션 정보 클래스 (실시간 전송 전용) ===
     private data class SessionInfo(

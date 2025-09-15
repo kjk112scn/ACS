@@ -5,7 +5,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.stereotype.Service
-import com.gtlsystems.acs_api.service.system.ConfigurationService
+import com.gtlsystems.acs_api.service.system.settings.SettingsService
 import java.lang.management.ManagementFactory
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit
  */
 @Configuration
 class ThreadManager(
-    private val configurationService: ConfigurationService
+    private val settingsService: SettingsService
 ) {
     
     private val logger = LoggerFactory.getLogger(ThreadManager::class.java)
@@ -82,12 +82,12 @@ class ThreadManager(
      */
     fun classifyPerformanceTier(specs: SystemSpecs): PerformanceTier {
         // 설정에서 성능 등급 기준 로드
-        val ultraCores = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 12L
-        val highCores = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 8L
-        val mediumCores = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 4L
-        val ultraMemory = configurationService.getValue("udp.maxBufferSize") as? Long ?: 16_000_000_000L
-        val highMemory = configurationService.getValue("udp.maxBufferSize") as? Long ?: 8_000_000_000L
-        val mediumMemory = configurationService.getValue("udp.maxBufferSize") as? Long ?: 4_000_000_000L
+        val ultraCores = settingsService.systemTrackingPerformanceThreshold
+        val highCores = settingsService.systemTrackingPerformanceThreshold
+        val mediumCores = settingsService.systemTrackingPerformanceThreshold
+        val ultraMemory = settingsService.systemUdpMaxBufferSize.toLong()
+        val highMemory = settingsService.systemUdpMaxBufferSize.toLong()
+        val mediumMemory = settingsService.systemUdpMaxBufferSize.toLong()
         
         return when {
             specs.cpuCores >= ultraCores && specs.totalMemory >= ultraMemory -> PerformanceTier.ULTRA
@@ -121,10 +121,10 @@ class ThreadManager(
         System.setProperty("spring.jvm.memory.maximum", "9g")
         
         // ✅ 실시간 성능 최우선 JVM 최적화 (설정에서 값 로드)
-        val gcPause = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 10L
-        val heapRegionSize = configurationService.getValue("udp.maxBufferSize") as? Int ?: 32
-        val concurrentThreads = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 6L
-        val parallelThreads = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 10L
+        val gcPause = settingsService.systemTrackingPerformanceThreshold
+        val heapRegionSize = settingsService.systemUdpMaxBufferSize
+        val concurrentThreads = settingsService.systemTrackingPerformanceThreshold
+        val parallelThreads = settingsService.systemTrackingPerformanceThreshold
         
         System.setProperty("spring.jvm.gc", "G1GC")
         System.setProperty("spring.jvm.gc.pause", gcPause.toString())  // 설정에서 GC 일시정지 시간 로드

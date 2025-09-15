@@ -2,7 +2,7 @@ package com.gtlsystems.acs_api.service.system
 
 import com.gtlsystems.acs_api.config.ThreadManager
 import com.gtlsystems.acs_api.service.datastore.DataStoreService
-import com.gtlsystems.acs_api.service.system.ConfigurationService
+import com.gtlsystems.acs_api.service.system.settings.SettingsService
 import com.gtlsystems.acs_api.service.system.LoggingService
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -19,15 +19,15 @@ import java.util.concurrent.TimeUnit
 class BatchStorageManager(
     private val threadManager: ThreadManager,
     private val dataStoreService: DataStoreService,
-    private val configurationService: ConfigurationService,
+    private val settingsService: SettingsService,
     private val loggingService: LoggingService
 ) {
     private val logger = LoggerFactory.getLogger(BatchStorageManager::class.java)
     
-    // ✅ 배치 설정 (ConfigurationService에서 로드)
-    private val batchSize: Int get() = configurationService.getValue("storage.batchSize") as? Int ?: 1000
-    private val batchTimeoutMs: Long get() = configurationService.getValue("storage.saveInterval") as? Long ?: 100L
-    private val maxBatchSize: Int get() = configurationService.getValue("storage.batchSize") as? Int ?: 1000
+    // ✅ 배치 설정 (SettingsService에서 로드)
+    private val batchSize: Int get() = settingsService.systemStorageBatchSize
+    private val batchTimeoutMs: Long get() = settingsService.systemStorageSaveInterval
+    private val maxBatchSize: Int get() = settingsService.systemStorageBatchSize
     
     // ✅ 배치 데이터 관리
     private val batchBuffer = mutableListOf<Map<String, Any?>>()
@@ -49,8 +49,8 @@ class BatchStorageManager(
         batchExecutor = threadManager.getBatchExecutor()
         batchScheduler = threadManager.getRealtimeExecutor()
         
-        // ✅ 주기적 배치 저장 스케줄링 (ConfigurationService에서 간격 로드)
-        val saveInterval = configurationService.getValue("storage.saveInterval") as? Long ?: 100L
+        // ✅ 주기적 배치 저장 스케줄링 (SettingsService에서 간격 로드)
+        val saveInterval = settingsService.systemStorageSaveInterval
         batchScheduler?.scheduleAtFixedRate({
             processBatch()
         }, saveInterval, saveInterval, TimeUnit.MILLISECONDS)

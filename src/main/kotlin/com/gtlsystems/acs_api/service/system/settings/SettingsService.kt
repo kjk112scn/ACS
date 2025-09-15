@@ -98,7 +98,41 @@ class SettingsService(
         
         // StepSizeLimit 설정
         "stepsizelimit.min" to SettingDefinition("stepsizelimit.min", 50, SettingType.DOUBLE, "스텝 사이즈 최소값"),
-        "stepsizelimit.max" to SettingDefinition("stepsizelimit.max", 50, SettingType.DOUBLE, "스텝 사이즈 최대값")
+        "stepsizelimit.max" to SettingDefinition("stepsizelimit.max", 50, SettingType.DOUBLE, "스텝 사이즈 최대값"),
+
+        // 기존 설정들 뒤에 추가할 시스템 설정들
+        // === ConfigurationService에서 가져올 시스템 설정 ===
+        // UDP 통신 설정
+        "system.udp.receiveInterval" to SettingDefinition("system.udp.receiveInterval", 10L, SettingType.LONG, "UDP 수신 간격"),
+        "system.udp.sendInterval" to SettingDefinition("system.udp.sendInterval", 10L, SettingType.LONG, "UDP 전송 간격"),
+        "system.udp.timeout" to SettingDefinition("system.udp.timeout", 25L, SettingType.LONG, "UDP 타임아웃"),
+        "system.udp.reconnectInterval" to SettingDefinition("system.udp.reconnectInterval", 1000L, SettingType.LONG, "UDP 재연결 간격"),
+        "system.udp.maxBufferSize" to SettingDefinition("system.udp.maxBufferSize", 1024, SettingType.INTEGER, "UDP 최대 버퍼 크기"),
+        "system.udp.commandDelay" to SettingDefinition("system.udp.commandDelay", 100L, SettingType.LONG, "UDP 명령 지연"),
+
+        // 추적 설정
+        "system.tracking.interval" to SettingDefinition("system.tracking.interval", 100L, SettingType.LONG, "추적 간격"),
+        "system.tracking.transmissionInterval" to SettingDefinition("system.tracking.transmissionInterval", 100L, SettingType.LONG, "전송 간격"),
+        "system.tracking.fineInterval" to SettingDefinition("system.tracking.fineInterval", 100L, SettingType.LONG, "정밀 계산 간격"),
+        "system.tracking.coarseInterval" to SettingDefinition("system.tracking.coarseInterval", 1000L, SettingType.LONG, "일반 계산 간격"),
+        "system.tracking.performanceThreshold" to SettingDefinition("system.tracking.performanceThreshold", 100L, SettingType.LONG, "성능 임계값"),
+        "system.tracking.stabilizationTimeout" to SettingDefinition("system.tracking.stabilizationTimeout", 5000L, SettingType.LONG, "안정화 타임아웃"),
+
+        // 데이터 저장 설정
+        "system.storage.batchSize" to SettingDefinition("system.storage.batchSize", 1000, SettingType.INTEGER, "배치 크기"),
+        "system.storage.saveInterval" to SettingDefinition("system.storage.saveInterval", 100L, SettingType.LONG, "저장 간격"),
+        "system.storage.progressLogInterval" to SettingDefinition("system.storage.progressLogInterval", 1000, SettingType.INTEGER, "진행률 로깅 간격"),
+
+        // 위치 설정
+        "system.location.latitude" to SettingDefinition("system.location.latitude", 37.4563, SettingType.DOUBLE, "시스템 위도"),
+        "system.location.longitude" to SettingDefinition("system.location.longitude", 128.608510, SettingType.DOUBLE, "시스템 경도"),
+        "system.location.trackingSpeed" to SettingDefinition("system.location.trackingSpeed", 10, SettingType.INTEGER, "시스템 추적 속도"),
+
+        // === 태양 추적 정확도 임계값 설정 ===
+        "system.suntrack.highAccuracyThreshold" to SettingDefinition("system.suntrack.highAccuracyThreshold", 0.000278, SettingType.DOUBLE, "태양 추적 높은 정확도 임계값"),
+        "system.suntrack.mediumAccuracyThreshold" to SettingDefinition("system.suntrack.mediumAccuracyThreshold", 0.002778, SettingType.DOUBLE, "태양 추적 중간 정확도 임계값"),
+        "system.suntrack.lowAccuracyThreshold" to SettingDefinition("system.suntrack.lowAccuracyThreshold", 0.016667, SettingType.DOUBLE, "태양 추적 낮은 정확도 임계값"),
+        "system.suntrack.searchHours" to SettingDefinition("system.suntrack.searchHours", 48.0, SettingType.DOUBLE, "태양 추적 검색 시간")
     )
 
     // 기본값과 타입 매핑 자동 생성
@@ -225,61 +259,410 @@ class SettingsService(
         }
     }
 
-    // 위치 관련 설정
+    // === 위치 관련 설정 ===
+    /**
+     * 위도 (도)
+     * 시스템의 위도 좌표를 설정합니다.
+     * 기본값: 35.317540
+     */
     var latitude: Double by createSettingProperty("location.latitude", "위도")
+
+    /**
+     * 경도 (도)
+     * 시스템의 경도 좌표를 설정합니다.
+     * 기본값: 128.608510
+     */
     var longitude: Double by createSettingProperty("location.longitude", "경도")
+
+    /**
+     * 고도 (미터)
+     * 시스템의 고도 좌표를 설정합니다.
+     * 기본값: 0.0
+     */
     var altitude: Double by createSettingProperty("location.altitude", "고도")
 
-    // 추적 관련 설정
+    // === 추적 관련 설정 ===
+    /**
+     * 추적 간격 (밀리초)
+     * 위성/태양 추적 계산 주기를 설정합니다.
+     * 기본값: 100ms
+     */
     var msInterval: Int by createSettingProperty("tracking.msInterval", "추적 간격")
+
+    /**
+     * 추적 기간 (일)
+     * 추적을 수행할 기간을 설정합니다.
+     * 기본값: 1일
+     */
     var durationDays: Long by createSettingProperty("tracking.durationDays", "추적 기간")
+
+    /**
+     * 최소 고도각 (도)
+     * 추적 시 고려할 최소 고도각을 설정합니다.
+     * 기본값: -7.0도
+     */
     var minElevationAngle: Float by createSettingProperty("tracking.minElevationAngle", "최소 고도각")
 
-    // Stow Angle 설정
+    // === Stow Angle 설정 ===
+    /**
+     * Stow 방위각 (도)
+     * Stow 위치의 방위각을 설정합니다.
+     * 기본값: 0.0도
+     */
     var stowAngleAzimuth: Double by createSettingProperty("stow.angle.azimuth", "Stow 방위각")
+
+    /**
+     * Stow 고도각 (도)
+     * Stow 위치의 고도각을 설정합니다.
+     * 기본값: 90.0도
+     */
     var stowAngleElevation: Double by createSettingProperty("stow.angle.elevation", "Stow 고도각")
+
+    /**
+     * Stow Train각 (도)
+     * Stow 위치의 Train각을 설정합니다.
+     * 기본값: 0.0도
+     */
     var stowAngleTrain: Double by createSettingProperty("stow.angle.train", "Stow Train각")
 
-    // Stow Speed 설정
+    // === Stow Speed 설정 ===
+    /**
+     * Stow 방위각 속도 (도/초)
+     * Stow 이동 시 방위각 속도를 설정합니다.
+     * 기본값: 5.0도/초
+     */
     var stowSpeedAzimuth: Double by createSettingProperty("stow.speed.azimuth", "Stow 방위각 속도")
+
+    /**
+     * Stow 고도각 속도 (도/초)
+     * Stow 이동 시 고도각 속도를 설정합니다.
+     * 기본값: 5.0도/초
+     */
     var stowSpeedElevation: Double by createSettingProperty("stow.speed.elevation", "Stow 고도각 속도")
+
+    /**
+     * Stow Train각 속도 (도/초)
+     * Stow 이동 시 Train각 속도를 설정합니다.
+     * 기본값: 5.0도/초
+     */
     var stowSpeedTrain: Double by createSettingProperty("stow.speed.train", "Stow Train각 속도")
 
-    // AntennaSpec 설정
+    // === AntennaSpec 설정 ===
+    /**
+     * True North Offset Angle (도)
+     * True North 기준 오프셋 각도를 설정합니다.
+     * 기본값: 0.0도
+     */
     var trueNorthOffsetAngle: Double by createSettingProperty("antennaspec.trueNorthOffsetAngle", "True North Offset Angle")
+
+    /**
+     * Tilt Angle (도)
+     * 안테나 틸트 각도를 설정합니다.
+     * 기본값: -7.0도
+     */
     var tiltAngle: Double by createSettingProperty("antennaspec.tiltAngle", "Tilt Angle")
 
-    // Angle Limits 설정 (그룹명 포함으로 변경)
+    // === Angle Limits 설정 ===
+    /**
+     * Azimuth 최소각 (도)
+     * 방위각의 최소 제한값을 설정합니다.
+     * 기본값: -270.0도
+     */
     var angleAzimuthMin: Double by createSettingProperty("anglelimits.azimuthMin", "Azimuth 최소각")
+
+    /**
+     * Azimuth 최대각 (도)
+     * 방위각의 최대 제한값을 설정합니다.
+     * 기본값: 270.0도
+     */
     var angleAzimuthMax: Double by createSettingProperty("anglelimits.azimuthMax", "Azimuth 최대각")
+
+    /**
+     * Elevation 최소각 (도)
+     * 고도각의 최소 제한값을 설정합니다.
+     * 기본값: 0.0도
+     */
     var angleElevationMin: Double by createSettingProperty("anglelimits.elevationMin", "Elevation 최소각")
+
+    /**
+     * Elevation 최대각 (도)
+     * 고도각의 최대 제한값을 설정합니다.
+     * 기본값: 180.0도
+     */
     var angleElevationMax: Double by createSettingProperty("anglelimits.elevationMax", "Elevation 최대각")
+
+    /**
+     * Train 최소각 (도)
+     * Train각의 최소 제한값을 설정합니다.
+     * 기본값: -270.0도
+     */
     var angleTrainMin: Double by createSettingProperty("anglelimits.trainMin", "Train 최소각")
+
+    /**
+     * Train 최대각 (도)
+     * Train각의 최대 제한값을 설정합니다.
+     * 기본값: 270.0도
+     */
     var angleTrainMax: Double by createSettingProperty("anglelimits.trainMax", "Train 최대각")
 
-    // Speed Limits 설정
+    // === Speed Limits 설정 ===
+    /**
+     * Azimuth 최소속도 (도/초)
+     * 방위각의 최소 속도를 설정합니다.
+     * 기본값: 0.1도/초
+     */
     var speedAzimuthMin: Double by createSettingProperty("speedlimits.azimuthMin", "Azimuth 최소속도")
+
+    /**
+     * Azimuth 최대속도 (도/초)
+     * 방위각의 최대 속도를 설정합니다.
+     * 기본값: 15.0도/초
+     */
     var speedAzimuthMax: Double by createSettingProperty("speedlimits.azimuthMax", "Azimuth 최대속도")
+
+    /**
+     * Elevation 최소속도 (도/초)
+     * 고도각의 최소 속도를 설정합니다.
+     * 기본값: 0.1도/초
+     */
     var speedElevationMin: Double by createSettingProperty("speedlimits.elevationMin", "Elevation 최소속도")
+
+    /**
+     * Elevation 최대속도 (도/초)
+     * 고도각의 최대 속도를 설정합니다.
+     * 기본값: 10.0도/초
+     */
     var speedElevationMax: Double by createSettingProperty("speedlimits.elevationMax", "Elevation 최대속도")
+
+    /**
+     * Train 최소속도 (도/초)
+     * Train각의 최소 속도를 설정합니다.
+     * 기본값: 0.1도/초
+     */
     var speedTrainMin: Double by createSettingProperty("speedlimits.trainMin", "Train 최소속도")
+
+    /**
+     * Train 최대속도 (도/초)
+     * Train각의 최대 속도를 설정합니다.
+     * 기본값: 5.0도/초
+     */
     var speedTrainMax: Double by createSettingProperty("speedlimits.trainMax", "Train 최대속도")
 
-    // Angle Offset Limits 설정
+    // === Angle Offset Limits 설정 ===
+    /**
+     * Azimuth 오프셋 제한 (도)
+     * 방위각 오프셋의 최대 제한값을 설정합니다.
+     * 기본값: 50.0도
+     */
     var angleOffsetAzimuth: Double by createSettingProperty("angleoffsetlimits.azimuth", "Azimuth 오프셋 제한")
+
+    /**
+     * Elevation 오프셋 제한 (도)
+     * 고도각 오프셋의 최대 제한값을 설정합니다.
+     * 기본값: 50.0도
+     */
     var angleOffsetElevation: Double by createSettingProperty("angleoffsetlimits.elevation", "Elevation 오프셋 제한")
+
+    /**
+     * Train 오프셋 제한 (도)
+     * Train각 오프셋의 최대 제한값을 설정합니다.
+     * 기본값: 50.0도
+     */
     var angleOffsetTrain: Double by createSettingProperty("angleoffsetlimits.train", "Train 오프셋 제한")
 
-    // Time Offset Limits 설정
+    // === Time Offset Limits 설정 ===
+    /**
+     * 시간 오프셋 최소값 (초)
+     * 시간 오프셋의 최소 제한값을 설정합니다.
+     * 기본값: 0.1초
+     */
     var timeOffsetMin: Double by createSettingProperty("timeoffsetlimits.min", "시간 오프셋 최소값")
+
+    /**
+     * 시간 오프셋 최대값 (초)
+     * 시간 오프셋의 최대 제한값을 설정합니다.
+     * 기본값: 99999초
+     */
     var timeOffsetMax: Double by createSettingProperty("timeoffsetlimits.max", "시간 오프셋 최대값")
 
-    // Algorithm 설정
+    // === Algorithm 설정 ===
+    /**
+     * Geo Min Motion (도/초)
+     * 지구 동기 궤도 최소 모션을 설정합니다.
+     * 기본값: 1.1도/초
+     */
     var geoMinMotion: Double by createSettingProperty("algorithm.geoMinMotion", "Geo Min Motion")
 
-    // StepSizeLimit 설정
+    // === StepSizeLimit 설정 ===
+    /**
+     * 스텝 사이즈 최소값 (도)
+     * 스텝 사이즈의 최소 제한값을 설정합니다.
+     * 기본값: 50도
+     */
     var stepSizeMin: Double by createSettingProperty("stepsizelimit.min", "스텝 사이즈 최소값")
+
+    /**
+     * 스텝 사이즈 최대값 (도)
+     * 스텝 사이즈의 최대 제한값을 설정합니다.
+     * 기본값: 50도
+     */
     var stepSizeMax: Double by createSettingProperty("stepsizelimit.max", "스텝 사이즈 최대값")
+
+    // === 시스템 설정 프로퍼티들 ===
+    /**
+     * 시스템 UDP 수신 간격 (밀리초)
+     * UDP 패킷 수신 간격을 설정합니다.
+     * 기본값: 10ms
+     */
+    var systemUdpReceiveInterval: Long by createSettingProperty("system.udp.receiveInterval", "UDP 수신 간격")
+
+    /**
+     * 시스템 UDP 전송 간격 (밀리초)
+     * UDP 패킷 전송 간격을 설정합니다.
+     * 기본값: 10ms
+     */
+    var systemUdpSendInterval: Long by createSettingProperty("system.udp.sendInterval", "UDP 전송 간격")
+
+    /**
+     * 시스템 UDP 타임아웃 (밀리초)
+     * UDP 통신의 타임아웃 시간을 설정합니다.
+     * 기본값: 25ms
+     */
+    var systemUdpTimeout: Long by createSettingProperty("system.udp.timeout", "UDP 타임아웃")
+
+    /**
+     * 시스템 UDP 재연결 간격 (밀리초)
+     * UDP 연결 실패 시 재연결 시도 간격을 설정합니다.
+     * 기본값: 1000ms
+     */
+    var systemUdpReconnectInterval: Long by createSettingProperty("system.udp.reconnectInterval", "UDP 재연결 간격")
+
+    /**
+     * 시스템 UDP 최대 버퍼 크기 (바이트)
+     * UDP 통신에서 사용할 최대 버퍼 크기를 설정합니다.
+     * 기본값: 1024
+     */
+    var systemUdpMaxBufferSize: Int by createSettingProperty("system.udp.maxBufferSize", "UDP 최대 버퍼 크기")
+
+    /**
+     * 시스템 UDP 명령 지연 (밀리초)
+     * UDP 명령 전송 후 대기 시간을 설정합니다.
+     * 기본값: 100ms
+     */
+    var systemUdpCommandDelay: Long by createSettingProperty("system.udp.commandDelay", "UDP 명령 지연")
+
+    /**
+     * 시스템 추적 간격 (밀리초)
+     * 위성/태양 추적 계산 주기를 설정합니다.
+     * 기본값: 100ms
+     */
+    var systemTrackingInterval: Long by createSettingProperty("system.tracking.interval", "추적 간격")
+
+    /**
+     * 시스템 추적 전송 간격 (밀리초)
+     * WebSocket을 통한 실시간 데이터 전송 주기를 설정합니다.
+     * 기본값: 100ms
+     */
+    var systemTrackingTransmissionInterval: Long by createSettingProperty("system.tracking.transmissionInterval", "전송 간격")
+
+    /**
+     * 시스템 추적 정밀 계산 간격 (밀리초)
+     * 정밀한 추적 계산을 수행하는 주기를 설정합니다.
+     * 기본값: 100ms
+     */
+    var systemTrackingFineInterval: Long by createSettingProperty("system.tracking.fineInterval", "정밀 계산 간격")
+
+    /**
+     * 시스템 추적 일반 계산 간격 (밀리초)
+     * 일반적인 추적 계산을 수행하는 주기를 설정합니다.
+     * 기본값: 1000ms
+     */
+    var systemTrackingCoarseInterval: Long by createSettingProperty("system.tracking.coarseInterval", "일반 계산 간격")
+
+    /**
+     * 시스템 추적 성능 임계값 (밀리초)
+     * 데이터 처리 시 허용되는 최대 시간을 설정합니다.
+     * 기본값: 100ms
+     */
+    var systemTrackingPerformanceThreshold: Long by createSettingProperty("system.tracking.performanceThreshold", "성능 임계값")
+
+    /**
+     * 시스템 추적 안정화 타임아웃 (밀리초)
+     * 추적 안정화를 위한 대기 시간을 설정합니다.
+     * 기본값: 5000ms
+     */
+    var systemTrackingStabilizationTimeout: Long by createSettingProperty("system.tracking.stabilizationTimeout", "안정화 타임아웃")
+
+    /**
+     * 시스템 저장 배치 크기 (개수)
+     * 데이터 저장 시 한 번에 처리할 배치 크기를 설정합니다.
+     * 기본값: 1000
+     */
+    var systemStorageBatchSize: Int by createSettingProperty("system.storage.batchSize", "배치 크기")
+
+    /**
+     * 시스템 저장 간격 (밀리초)
+     * 데이터 저장을 수행하는 주기를 설정합니다.
+     * 기본값: 100ms
+     */
+    var systemStorageSaveInterval: Long by createSettingProperty("system.storage.saveInterval", "저장 간격")
+
+    /**
+     * 시스템 저장 진행률 로깅 간격 (개수)
+     * 저장 진행률을 로깅하는 간격을 설정합니다.
+     * 기본값: 1000
+     */
+    var systemStorageProgressLogInterval: Int by createSettingProperty("system.storage.progressLogInterval", "진행률 로깅 간격")
+
+    /**
+     * 시스템 위치 위도 (도)
+     * 시스템의 기본 위도 좌표를 설정합니다.
+     * 기본값: 37.4563
+     */
+    var systemLocationLatitude: Double by createSettingProperty("system.location.latitude", "시스템 위도")
+
+    /**
+     * 시스템 위치 경도 (도)
+     * 시스템의 기본 경도 좌표를 설정합니다.
+     * 기본값: 128.608510
+     */
+    var systemLocationLongitude: Double by createSettingProperty("system.location.longitude", "시스템 경도")
+
+    /**
+     * 시스템 위치 추적 속도 (도/초)
+     * 시스템의 기본 추적 속도를 설정합니다.
+     * 기본값: 10
+     */
+    var systemLocationTrackingSpeed: Int by createSettingProperty("system.location.trackingSpeed", "시스템 추적 속도")
+
+    // === 태양 추적 정확도 임계값 프로퍼티들 ===
+    /**
+     * 태양 추적 높은 정확도 임계값 (도)
+     * 태양 위치 계산 시 높은 정확도를 요구하는 임계값을 설정합니다.
+     * 기본값: 0.000278도 (1 arcsec)
+     */
+    var systemSuntrackHighAccuracyThreshold: Double by createSettingProperty("system.suntrack.highAccuracyThreshold", "태양 추적 높은 정확도 임계값")
+
+    /**
+     * 태양 추적 중간 정확도 임계값 (도)
+     * 태양 위치 계산 시 중간 정확도를 요구하는 임계값을 설정합니다.
+     * 기본값: 0.002778도 (10 arcsec)
+     */
+    var systemSuntrackMediumAccuracyThreshold: Double by createSettingProperty("system.suntrack.mediumAccuracyThreshold", "태양 추적 중간 정확도 임계값")
+
+    /**
+     * 태양 추적 낮은 정확도 임계값 (도)
+     * 태양 위치 계산 시 낮은 정확도를 요구하는 임계값을 설정합니다.
+     * 기본값: 0.016667도 (60 arcsec)
+     */
+    var systemSuntrackLowAccuracyThreshold: Double by createSettingProperty("system.suntrack.lowAccuracyThreshold", "태양 추적 낮은 정확도 임계값")
+
+    /**
+     * 태양 추적 검색 시간 (시간)
+     * 태양 위치 검색을 수행할 시간을 설정합니다.
+     * 기본값: 48시간
+     */
+    var systemSuntrackSearchHours: Double by createSettingProperty("system.suntrack.searchHours", "태양 추적 검색 시간")
 
     // LocationData 객체 제공
     val locationData: LocationData
@@ -523,6 +906,42 @@ class SettingsService(
     fun getAlgorithmSettings(): Map<String, Any> = settings.filterKeys { it.startsWith("algorithm.") }
     fun getStepSizeLimitSettings(): Map<String, Any> = settings.filterKeys { it.startsWith("stepsizelimit.") }
 
+    // === 시스템 설정 그룹별 조회 메서드들 ===
+    /**
+     * 시스템 UDP 설정 조회
+     * UDP 통신 관련 모든 설정을 반환합니다.
+     * @return UDP 설정 맵
+     */
+    fun getSystemUdpSettings(): Map<String, Any> = settings.filterKeys { it.startsWith("system.udp.") }
+
+    /**
+     * 시스템 추적 설정 조회
+     * 추적 관련 모든 설정을 반환합니다.
+     * @return 추적 설정 맵
+     */
+    fun getSystemTrackingSettings(): Map<String, Any> = settings.filterKeys { it.startsWith("system.tracking.") }
+
+    /**
+     * 시스템 저장 설정 조회
+     * 데이터 저장 관련 모든 설정을 반환합니다.
+     * @return 저장 설정 맵
+     */
+    fun getSystemStorageSettings(): Map<String, Any> = settings.filterKeys { it.startsWith("system.storage.") }
+
+    /**
+     * 시스템 위치 설정 조회
+     * 시스템 위치 관련 모든 설정을 반환합니다.
+     * @return 위치 설정 맵
+     */
+    fun getSystemLocationSettings(): Map<String, Any> = settings.filterKeys { it.startsWith("system.location.") }
+
+    /**
+     * 시스템 태양 추적 설정 조회
+     * 태양 추적 관련 모든 설정을 반환합니다.
+     * @return 태양 추적 설정 맵
+     */
+    fun getSystemSuntrackSettings(): Map<String, Any> = settings.filterKeys { it.startsWith("system.suntrack.") }
+
     // 이벤트 리스너
     @EventListener
     fun handleSettingsChanged(event: SettingsChangedEvent) {
@@ -535,6 +954,12 @@ class SettingsService(
             event.key.startsWith("timeoffsetlimits.") -> "초"
             event.key.startsWith("algorithm.") -> "도/초"
             event.key.startsWith("stepsizelimit.") -> "도"
+            // === 시스템 설정 단위 추가 ===
+            event.key.startsWith("system.udp.") -> "ms"
+            event.key.startsWith("system.tracking.") -> "ms"
+            event.key.startsWith("system.storage.") -> "ms"
+            event.key.startsWith("system.location.") -> "도"
+            event.key.startsWith("system.suntrack.") -> "도"
             else -> ""
         }
         
@@ -571,6 +996,22 @@ class SettingsService(
             }
             event.key.startsWith("stepsizelimit.") -> {
                 // StepSizeLimit 설정 변경 시 처리 로직
+            }
+            // === 시스템 설정 그룹들 추가 ===
+            event.key.startsWith("system.udp.") -> {
+                // 시스템 UDP 설정 변경 시 처리 로직
+            }
+            event.key.startsWith("system.tracking.") -> {
+                // 시스템 추적 설정 변경 시 처리 로직
+            }
+            event.key.startsWith("system.storage.") -> {
+                // 시스템 저장 설정 변경 시 처리 로직
+            }
+            event.key.startsWith("system.location.") -> {
+                // 시스템 위치 설정 변경 시 처리 로직
+            }
+            event.key.startsWith("system.suntrack.") -> {
+                // 시스템 태양 추적 설정 변경 시 처리 로직
             }
         }
     }

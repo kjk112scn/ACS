@@ -23,7 +23,6 @@ import org.orekit.utils.Constants
 import org.orekit.utils.IERSConventions
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import com.gtlsystems.acs_api.service.system.ConfigurationService
 import java.io.File
 import java.io.FileOutputStream
 import java.net.JarURLConnection

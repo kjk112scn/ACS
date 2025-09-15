@@ -18,7 +18,7 @@ import org.hipparchus.util.FastMath
 import org.orekit.time.TimeScale
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
-import com.gtlsystems.acs_api.service.system.ConfigurationService
+import com.gtlsystems.acs_api.service.system.settings.SettingsService
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.*
@@ -31,7 +31,7 @@ class SolarOrekitCalculator(
     private val earthModel: OneAxisEllipsoid,
     private val sun: CelestialBody,
     private val orekitStatus: OrekitConfig.OrekitInitializationStatus,
-    private val configurationService: ConfigurationService
+    private val settingsService: SettingsService
 ) {
 
     private lateinit var groundStation: TopocentricFrame
@@ -81,9 +81,9 @@ class SolarOrekitCalculator(
             val totalDiffValue = totalDiff.toDouble()
 
             // 설정에서 정확도 임계값 로드
-            val highAccuracyThreshold = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 1L
-            val mediumAccuracyThreshold = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 10L
-            val lowAccuracyThreshold = configurationService.getValue("tracking.performanceThreshold") as? Long ?: 60L
+            val highAccuracyThreshold = settingsService.systemSuntrackHighAccuracyThreshold
+            val mediumAccuracyThreshold = settingsService.systemSuntrackMediumAccuracyThreshold
+            val lowAccuracyThreshold = settingsService.systemSuntrackLowAccuracyThreshold
             
             when {
                 totalDiffValue < highAccuracyThreshold -> logger.info("태양 위치 정확도: 매우 높음 (${totalDiff}\")")
@@ -166,12 +166,10 @@ class SolarOrekitCalculator(
         }
 
         var currentDate = startDate
-        val stepMinutes = (configurationService.getValue("tracking.interval") as? Long ?: 10L).toDouble()
+        val (stepMinutes, searchHours) = getSearchConfiguration()
         var previousPosition: SunPosition? = null
 
-        // 설정에서 검색 시간 로드 (기본값: 48시간)
-        val searchHours = configurationService.getValue("tracking.stabilizationTimeout") as? Long ?: 48L
-        val searchIterations = (searchHours * 60 / stepMinutes).toInt()  // 시간을 분으로 변환 후 반복 횟수 계산
+        val searchIterations = (searchHours * 60 / stepMinutes).toInt()
         repeat(searchIterations) {
             val currentPosition = calculateSunPosition(currentDate)
             
@@ -207,12 +205,10 @@ class SolarOrekitCalculator(
         }
 
         var currentDate = startDate
-        val stepMinutes = (configurationService.getValue("tracking.interval") as? Long ?: 10L).toDouble()
+        val (stepMinutes, searchHours) = getSearchConfiguration()
         var previousPosition: SunPosition? = null
 
-        // 설정에서 검색 시간 로드 (기본값: 48시간)
-        val searchHours = configurationService.getValue("tracking.stabilizationTimeout") as? Long ?: 48L
-        val searchIterations = (searchHours * 60 / stepMinutes).toInt()  // 시간을 분으로 변환 후 반복 횟수 계산
+        val searchIterations = (searchHours * 60 / stepMinutes).toInt()
         repeat(searchIterations) {
             val currentPosition = calculateSunPosition(currentDate)
             
@@ -881,5 +877,14 @@ class SolarOrekitCalculator(
                     "elevation=${String.format("%.2f", elevationDegrees)}°, " +
                     "range=${String.format("%.0f", rangeKm)}km, visible=${isSunVisible()})"
         }
+    }
+
+    /**
+     * 설정에서 검색 시간과 간격을 로드
+     */
+    private fun getSearchConfiguration(): Pair<Double, Double> {
+        val stepMinutes = settingsService.systemTrackingInterval.toDouble()
+        val searchHours = settingsService.systemSuntrackSearchHours
+        return Pair(stepMinutes, searchHours)
     }
 }
