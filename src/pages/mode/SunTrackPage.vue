@@ -2,13 +2,8 @@
   <div class="sun-track-mode">
     <div class="section-title-container q-mb-sm">
       <div class="section-title text-h5 text-primary">Sun Track Control</div>
-      <q-chip
-        :color="icdStore.sunTrackTrackingStateInfo.displayColor"
-        text-color="white"
-        :label="icdStore.sunTrackTrackingStateInfo.displayLabel"
-        size="sm"
-        class="tracking-status-chip q-ml-md"
-      />
+      <q-chip :color="icdStore.sunTrackTrackingStateInfo.displayColor" text-color="white"
+        :label="icdStore.sunTrackTrackingStateInfo.displayLabel" size="sm" class="tracking-status-chip q-ml-md" />
     </div>
 
     <!-- 입력-출력 박스 -->
@@ -203,9 +198,9 @@ watch(
 )
 // Speed 입력 필드
 const speedInputs = ref({
-  azimuth: '0.0',
-  elevation: '0.0',
-  tilt: '0.0',
+  azimuth: '1.00',
+  elevation: '1.00',
+  tilt: '1.00',
 })
 
 // Go 명령 처리 함수 (Sun Track 시작)

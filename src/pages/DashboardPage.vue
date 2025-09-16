@@ -31,17 +31,17 @@
               <div class="axis-data-row">
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">CMD</q-item-label>
-                  <q-item-label class="adaptive-text">{{ azimuthCmdValue }}</q-item-label>
+                  <q-item-label class="adaptive-text">{{ displayValue(azimuthCmdValue) }}</q-item-label>
                 </div>
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">Actual</q-item-label>
-                  <q-item-label class="adaptive-text">{{ azimuthActualValue }}</q-item-label>
+                  <q-item-label class="adaptive-text">{{ displayValue(azimuthActualValue) }}</q-item-label>
                 </div>
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">Speed</q-item-label>
                   <q-item-label class="adaptive-text">{{
                     displayValue(icdStore.azimuthSpeed)
-                    }}</q-item-label>
+                  }}</q-item-label>
                 </div>
               </div>
             </q-card-section>
@@ -58,17 +58,17 @@
               <div class="axis-data-row">
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">CMD</q-item-label>
-                  <q-item-label class="adaptive-text">{{ elevationCmdValue }}</q-item-label>
+                  <q-item-label class="adaptive-text">{{ displayValue(elevationCmdValue) }}</q-item-label>
                 </div>
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">Actual</q-item-label>
-                  <q-item-label class="adaptive-text">{{ elevationActualValue }}</q-item-label>
+                  <q-item-label class="adaptive-text">{{ displayValue(elevationActualValue) }}</q-item-label>
                 </div>
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">Speed</q-item-label>
                   <q-item-label class="adaptive-text">{{
                     displayValue(icdStore.elevationSpeed)
-                    }}</q-item-label>
+                  }}</q-item-label>
                 </div>
               </div>
             </q-card-section>
@@ -85,17 +85,17 @@
               <div class="axis-data-row">
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">CMD</q-item-label>
-                  <q-item-label class="adaptive-text">{{ tiltCmdValue }}</q-item-label>
+                  <q-item-label class="adaptive-text">{{ displayValue(tiltCmdValue) }}</q-item-label>
                 </div>
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">Actual</q-item-label>
-                  <q-item-label class="adaptive-text">{{ tiltActualValue }}</q-item-label>
+                  <q-item-label class="adaptive-text">{{ displayValue(tiltActualValue) }}</q-item-label>
                 </div>
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">Speed</q-item-label>
                   <q-item-label class="adaptive-text">{{
                     displayValue(icdStore.tiltSpeed)
-                    }}</q-item-label>
+                  }}</q-item-label>
                 </div>
               </div>
             </q-card-section>
@@ -704,59 +704,109 @@ interface EChartsScatterParam {
 }
 
 // ✅ 조건부 데이터 computed 속성들 (실제 추적 상태 확인)
-const azimuthCmdValue = computed(() => {
-  return (icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive)
-    ? displayValue(icdStore.trackingCMDAzimuthAngle)
-    : displayValue(icdStore.cmdAzimuthAngle)
+// 테스트 예정
+// 백앤드에서 오프셋 변경 시 조건 확인 가능 여기서 조건 확인되면 수동 이동 하는 방식으로 검토중.
+/*
+const azimuthCmdValue = computed((): number => {
+
+  const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
+  const value = isTrackingActive ? icdStore.trackingCMDAzimuthAngle : icdStore.cmdAzimuthAngle
+  const numValue = Number(value)
+  return isNaN(numValue) ? 0 : numValue
+
 })
 
-const azimuthActualValue = computed(() => {
-  return (icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive)
-    ? displayValue(icdStore.trackingActualAzimuthAngle)
-    : displayValue(icdStore.azimuthAngle)
+const azimuthActualValue = computed((): number => {
+  const numValue = Number(icdStore.azimuthAngle)
+  return isNaN(numValue) ? 0 : numValue
 })
 
-const elevationCmdValue = computed(() => {
-  return (icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive)
-    ? displayValue(icdStore.trackingCMDElevationAngle)
-    : displayValue(icdStore.cmdElevationAngle)
+
+const elevationCmdValue = computed((): number => {
+  const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
+  const value = isTrackingActive ? icdStore.trackingCMDElevationAngle : icdStore.cmdElevationAngle
+  const numValue = Number(value)
+  return isNaN(numValue) ? 0 : numValue
 })
 
-const elevationActualValue = computed(() => {
-  return (icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive)
-    ? displayValue(icdStore.trackingActualElevationAngle)
-    : displayValue(icdStore.elevationAngle)
+const elevationActualValue = computed((): number => {
+  const numValue = Number(icdStore.elevationAngle)
+  return isNaN(numValue) ? 0 : numValue
 })
 
-const tiltCmdValue = computed(() => {
-  return (icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive)
-    ? displayValue(icdStore.trackingCMDTiltAngle)
-    : displayValue(icdStore.cmdTiltAngle)
+const tiltCmdValue = computed((): number => {
+  const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
+  const value = isTrackingActive ? icdStore.trackingCMDTiltAngle : icdStore.cmdTiltAngle
+  const numValue = Number(value)
+  return isNaN(numValue) ? 0 : numValue
 })
 
-const tiltActualValue = computed(() => {
-  return (icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive)
-    ? displayValue(icdStore.trackingActualTiltAngle)
-    : displayValue(icdStore.tiltAngle)
+const tiltActualValue = computed((): number => {
+  const numValue = Number(icdStore.tiltAngle)
+  return isNaN(numValue) ? 0 : numValue
+})
+ */
+
+const azimuthCmdValue = computed((): number => {
+
+  const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
+  const value = isTrackingActive ? icdStore.trackingCMDAzimuthAngle : icdStore.cmdAzimuthAngle
+  const numValue = Number(value)
+  return isNaN(numValue) ? 0 : numValue
+
 })
 
-// ✅ 차트에서 사용할 실제 값들을 computed로 변경 (실제 추적 상태 확인)
-const getCurrentAzimuthActualValue = computed((): number => {
+const azimuthActualValue = computed((): number => {
   const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
   const value = isTrackingActive ? icdStore.trackingActualAzimuthAngle : icdStore.azimuthAngle
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
-const getCurrentElevationActualValue = computed((): number => {
+
+const elevationCmdValue = computed((): number => {
+  const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
+  const value = isTrackingActive ? icdStore.trackingCMDElevationAngle : icdStore.cmdElevationAngle
+  const numValue = Number(value)
+  return isNaN(numValue) ? 0 : numValue
+})
+
+const elevationActualValue = computed((): number => {
   const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
   const value = isTrackingActive ? icdStore.trackingActualElevationAngle : icdStore.elevationAngle
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
-const getCurrentTiltActualValue = computed((): number => {
+const tiltCmdValue = computed((): number => {
   const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
+  const value = isTrackingActive ? icdStore.trackingCMDTiltAngle : icdStore.cmdTiltAngle
+  const numValue = Number(value)
+  return isNaN(numValue) ? 0 : numValue
+})
+
+const tiltActualValue = computed((): number => {
+  const numValue = Number(icdStore.tiltAngle)
+  return isNaN(numValue) ? 0 : numValue
+})
+
+// ✅ 차트에서 사용할 실제 값들을 computed로 변경 (실제 추적 상태 확인)
+const getCurrentAzimuthActualValue = computed((): number => {
+  const isTrackingActive = icdStore.ephemerisStatusInfo.isActive || icdStore.passScheduleStatusInfo.isActive
+  const value = isTrackingActive ? icdStore.trackingActualAzimuthAngle : icdStore.azimuthAngle
+  const numValue = Number(value)
+  return isNaN(numValue) ? 0 : numValue
+})
+
+const getCurrentElevationActualValue = computed((): number => {
+  const isTrackingActive = icdStore.ephemerisStatusInfo.isActive || icdStore.passScheduleStatusInfo.isActive
+  const value = isTrackingActive ? icdStore.trackingActualElevationAngle : icdStore.elevationAngle
+  const numValue = Number(value)
+  return isNaN(numValue) ? 0 : numValue
+})
+
+const getCurrentTiltActualValue = computed((): number => {
+  const isTrackingActive = icdStore.ephemerisStatusInfo.isActive || icdStore.passScheduleStatusInfo.isActive
   const value = isTrackingActive ? icdStore.trackingActualTiltAngle : icdStore.tiltAngle
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
