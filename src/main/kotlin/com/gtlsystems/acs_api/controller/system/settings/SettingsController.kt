@@ -8,10 +8,15 @@ import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 import org.springframework.http.ResponseEntity
+import org.springframework.transaction.annotation.Transactional
+import jakarta.validation.constraints.DecimalMax
+import jakarta.validation.constraints.DecimalMin
+import jakarta.validation.constraints.NotNull
 
 @RestController
 @RequestMapping("/api/settings")
 @Tag(name = "System - Settings", description = "시스템 설정 관리 API - 위치, 추적, 기타 설정값 관리")
+@Transactional  // ← 이 어노테이션 추가 필요
 class SettingsController(
     private val settingsService: SettingsService
 ) {
@@ -608,8 +613,18 @@ class SettingsController(
  * 위치 설정 요청 데이터
  */
 data class LocationRequest(
+    @field:NotNull(message = "위도는 필수입니다")
+    @field:DecimalMin(value = "-90.0", message = "위도는 -90도 이상이어야 합니다")
+    @field:DecimalMax(value = "90.0", message = "위도는 90도 이하여야 합니다")
     val latitude: Double,
+    
+    @field:NotNull(message = "경도는 필수입니다")
+    @field:DecimalMin(value = "-180.0", message = "경도는 -180도 이상이어야 합니다")
+    @field:DecimalMax(value = "180.0", message = "경도는 180도 이하여야 합니다")
     val longitude: Double,
+    
+    @field:NotNull(message = "고도는 필수입니다")
+    @field:DecimalMin(value = "0.0", message = "고도는 0미터 이상이어야 합니다")
     val altitude: Double
 )
 

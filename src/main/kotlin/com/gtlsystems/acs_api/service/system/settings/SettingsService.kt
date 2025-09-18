@@ -13,6 +13,10 @@ import jakarta.annotation.PostConstruct
 import java.util.concurrent.ConcurrentHashMap  
 import kotlin.reflect.KProperty
 import kotlin.properties.ReadWriteProperty
+import org.springframework.transaction.annotation.Transactional
+import jakarta.validation.constraints.DecimalMax
+import jakarta.validation.constraints.DecimalMin
+import jakarta.validation.constraints.NotNull
 
 // LocationData 클래스를 SettingsService 밖으로 이동
 data class LocationData(
@@ -34,6 +38,7 @@ data class SettingDefinition(
  * 프론트엔드에서 관리 가능한 설정값들을 관리
  */
 @Service
+@Transactional
 class SettingsService(
     private val settingsRepository: SettingsRepository,
     private val settingsHistoryRepository: SettingsHistoryRepository,
