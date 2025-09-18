@@ -132,7 +132,7 @@
           <!-- Tilt Speed -->
           <div class="col-4">
             <div class="label-text text-weight-medium text-primary">Tilt Speed</div>
-            <q-input v-model="speedInputs.tilt" dense outlined type="number" step="0.1" class="speed-input" />
+            <q-input v-model="speedInputs.train" dense outlined type="number" step="0.1" class="speed-input" />
           </div>
         </div>
 
@@ -198,9 +198,9 @@ watch(
 )
 // Speed 입력 필드
 const speedInputs = ref({
-  azimuth: '1.00',
-  elevation: '1.00',
-  tilt: '1.00',
+  azimuth: '5.0',
+  elevation: '5.0',
+  train: '5.0',
 })
 
 // Go 명령 처리 함수 (Sun Track 시작)
@@ -211,20 +211,20 @@ const handleGoCommand = async () => {
     // Speed 값 가져오기 (문자열을 숫자로 변환)
     const azimuthSpeed = parseFloat(speedInputs.value.azimuth) || 0.0
     const elevationSpeed = parseFloat(speedInputs.value.elevation) || 0.0
-    const tiltSpeed = parseFloat(speedInputs.value.tilt) || 0.0
+    const trainSpeed = parseFloat(speedInputs.value.train) || 0.0
 
     // 기본 interval 값 (밀리초 단위, 필요에 따라 조정)
     const interval = 1000 // 1초
 
     // Sun Track 시작 API 호출
-    await icdStore.startSunTrack(interval, azimuthSpeed, elevationSpeed, tiltSpeed)
+    await icdStore.startSunTrack(interval, azimuthSpeed, elevationSpeed, trainSpeed)
 
     // Notify 대신 console.log 사용 (임시)
-    console.log('Sun Track이 시작되었습니다. 설정된 속도:', azimuthSpeed, elevationSpeed, tiltSpeed)
+    console.log('Sun Track이 시작되었습니다. 설정된 속도:', azimuthSpeed, elevationSpeed, trainSpeed)
 
     // Notify가 작동하지 않는 경우 alert 사용 (임시)
     /* alert(
-      `Sun Track이 시작되었습니다. 설정된 속도: Az=${azimuthSpeed}, El=${elevationSpeed}, Tilt=${tiltSpeed}`,
+      `Sun Track이 시작되었습니다. 설정된 속도: Az=${azimuthSpeed}, El=${elevationSpeed}, Train=${trainSpeed}`,
     ) */
   } catch (error) {
     console.error('Sun Track 시작 중 오류:', error)
@@ -287,21 +287,21 @@ const increment = async (index: number) => {
     inputs.value[index] = '0.01'
   }
 
-  // Azimuth, Elevation, Tilt 값이 변경된 경우에만 API 호출
+  // Azimuth, Elevation, Train 값이 변경된 경우에만 API 호출
   if (index <= 2) {
     try {
       // 입력값을 숫자로 변환 (타입 에러 수정)
       const azOffset = parseFloat(offsetCals.value[0] || '0')
       const elOffset = parseFloat(offsetCals.value[1] || '0')
-      const tiOffset = parseFloat(offsetCals.value[2] || '0')
+      const trainOffset = parseFloat(offsetCals.value[2] || '0')
 
       // ICD 스토어의 함수 호출하고 응답 받기
-      const response = await icdStore.sendPositionOffsetCommand(azOffset, elOffset, tiOffset)
+      const response = await icdStore.sendPositionOffsetCommand(azOffset, elOffset, trainOffset)
 
       // 응답에서 출력값 업데이트 (백엔드 응답 구조에 맞게 수정 필요)
       if (response && typeof response === 'object') {
         // 백엔드 응답에 해당 값이 있다면 그 값을 사용
-        // 예시: response.azimuthResult, response.elevationResult, response.tiltResult
+        // 예시: response.azimuthResult, response.elevationResult, response.trainResult
         // 실제 백엔드 응답 구조에 맞게 수정 필요
         outputs.value[0] = String(
           response.azimuthOffset?.toFixed(2) || offsetCals.value[0] || '0.00',
@@ -309,7 +309,7 @@ const increment = async (index: number) => {
         outputs.value[1] = String(
           response.elevationOffset?.toFixed(2) || offsetCals.value[1] || '0.00',
         )
-        outputs.value[2] = String(response.tiltOffset?.toFixed(2) || offsetCals.value[2] || '0.00')
+        outputs.value[2] = String(response.trainOffset?.toFixed(2) || offsetCals.value[2] || '0.00')
       } else {
         // 응답이 없거나 예상 형식이 아닌 경우 입력값을 그대로 출력값으로 사용
         outputs.value[0] = offsetCals.value[0] || '0.00'
@@ -367,21 +367,21 @@ const decrement = async (index: number) => {
     inputs.value[index] = '0.01'
   }
 
-  // Azimuth, Elevation, Tilt 값이 변경된 경우에만 API 호출
+  // Azimuth, Elevation, Train 값이 변경된 경우에만 API 호출
   if (index <= 2) {
     try {
       // 입력값을 숫자로 변환 (타입 에러 수정)
       const azOffset = parseFloat(offsetCals.value[0] || '0')
       const elOffset = parseFloat(offsetCals.value[1] || '0')
-      const tiOffset = parseFloat(offsetCals.value[2] || '0')
+      const trainOffset = parseFloat(offsetCals.value[2] || '0')
 
       // ICD 스토어의 함수 호출하고 응답 받기
-      const response = await icdStore.sendPositionOffsetCommand(azOffset, elOffset, tiOffset)
+      const response = await icdStore.sendPositionOffsetCommand(azOffset, elOffset, trainOffset)
 
       // 응답에서 출력값 업데이트 (백엔드 응답 구조에 맞게 수정 필요)
       if (response && typeof response === 'object') {
         // 백엔드 응답에 해당 값이 있다면 그 값을 사용
-        // 예시: response.azimuthResult, response.elevationResult, response.tiltResult
+        // 예시: response.azimuthResult, response.elevationResult, response.trainResult
         // 실제 백엔드 응답 구조에 맞게 수정 필요
         outputs.value[0] = String(
           response.azimuthOffset?.toFixed(2) || offsetCals.value[0] || '0.00',
@@ -389,7 +389,7 @@ const decrement = async (index: number) => {
         outputs.value[1] = String(
           response.elevationOffset?.toFixed(2) || offsetCals.value[1] || '0.00',
         )
-        outputs.value[2] = String(response.tiltOffset?.toFixed(2) || offsetCals.value[2] || '0.00')
+        outputs.value[2] = String(response.trainOffset?.toFixed(2) || offsetCals.value[2] || '0.00')
       } else {
         // 응답이 없거나 예상 형식이 아닌 경우 입력값을 그대로 출력값으로 사용
         outputs.value[0] = offsetCals.value[0] || '0.00'
@@ -459,7 +459,7 @@ const reset = async (index: number) => {
     } else if (index === 2) {
       // 틸트각 오프셋 초기화 - 다른 축은 현재 값 유지
       const response = await icdStore.sendPositionOffsetCommand(azOffset, elOffset, 0)
-      outputs.value[2] = response.tiltOffset?.toFixed(2) || '0.00'
+      outputs.value[2] = response.trainOffset?.toFixed(2) || '0.00'
       offsetCals.value[2] = outputs.value[2]
     } else if (index === 3) {
       const response = await icdStore.sendTimeOffsetCommand(0)
@@ -562,7 +562,7 @@ input[type='number'] {
   /* 패딩 최소화 */
 }
 
-/* 표준 너비 (Azimuth, Elevation, Tilt) */
+/* 표준 너비 (Azimuth, Elevation, Train) */
 .standard-width {
   width: calc(20% - 0.25rem);
   /* 간격을 고려하여 약간 줄임 */

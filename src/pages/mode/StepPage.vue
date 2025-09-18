@@ -11,27 +11,12 @@
 
               <!-- 체크박스 그룹 -->
               <div class="checkbox-group q-gutter-x-xl q-mb-lg">
-                <q-checkbox
-                  v-model="stepStore.selectedAxes.azimuth"
-                  label="Azimuth"
-                  color="primary"
-                  class="axis-checkbox"
-                  size="lg"
-                />
-                <q-checkbox
-                  v-model="stepStore.selectedAxes.elevation"
-                  label="Elevation"
-                  color="primary"
-                  class="axis-checkbox"
-                  size="lg"
-                />
-                <q-checkbox
-                  v-model="stepStore.selectedAxes.tilt"
-                  label="Tilt"
-                  color="primary"
-                  class="axis-checkbox"
-                  size="lg"
-                />
+                <q-checkbox v-model="stepStore.selectedAxes.azimuth" label="Azimuth" color="primary"
+                  class="axis-checkbox" size="lg" />
+                <q-checkbox v-model="stepStore.selectedAxes.elevation" label="Elevation" color="primary"
+                  class="axis-checkbox" size="lg" />
+                <q-checkbox v-model="stepStore.selectedAxes.train" label="Tilt" color="primary" class="axis-checkbox"
+                  size="lg" />
               </div>
 
               <!-- 각도 및 속도 입력 -->
@@ -42,42 +27,19 @@
                     <div class="col-6">
                       <div class="input-group">
                         <div class="text-subtitle2 q-mb-sm">Azimuth Angle</div>
-                        <q-input
-                          v-model="stepStore.angles.azimuth"
-                          type="number"
-                          outlined
-                          dense
-                          class="full-width"
-                          suffix="°"
-                          :disable="!stepStore.selectedAxes.azimuth"
-                          step="0.01"
-                          placeholder="0.00"
-                          @update:model-value="formatAngle('azimuth')"
-                          @focus="clearValue('angles', 'azimuth')"
-                          @blur="handleBlur('angles', 'azimuth')"
-                          hide-bottom-space
-                        />
+                        <q-input v-model="stepStore.angles.azimuth" type="number" outlined dense class="full-width"
+                          suffix="°" :disable="!stepStore.selectedAxes.azimuth" step="0.01" placeholder="0.00"
+                          @update:model-value="formatAngle('azimuth')" @focus="clearValue('angles', 'azimuth')"
+                          @blur="handleBlur('angles', 'azimuth')" hide-bottom-space />
                       </div>
                     </div>
                     <div class="col-6">
                       <div class="input-group">
                         <div class="text-subtitle2 q-mb-sm">Azimuth Speed</div>
-                        <q-input
-                          v-model="stepStore.speeds.azimuth"
-                          type="number"
-                          outlined
-                          dense
-                          class="full-width"
-                          suffix="°/s"
-                          :disable="!stepStore.selectedAxes.azimuth"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
-                          @update:model-value="formatSpeed('azimuth')"
-                          @focus="clearValue('speeds', 'azimuth')"
-                          @blur="handleBlur('speeds', 'azimuth')"
-                          hide-bottom-space
-                        />
+                        <q-input v-model="stepStore.speeds.azimuth" type="number" outlined dense class="full-width"
+                          suffix="°/s" :disable="!stepStore.selectedAxes.azimuth" min="0" step="0.01" placeholder="0.00"
+                          @update:model-value="formatSpeed('azimuth')" @focus="clearValue('speeds', 'azimuth')"
+                          @blur="handleBlur('speeds', 'azimuth')" hide-bottom-space />
                       </div>
                     </div>
                   </div>
@@ -89,42 +51,20 @@
                     <div class="col-6">
                       <div class="input-group">
                         <div class="text-subtitle2 q-mb-sm">Elevation Angle</div>
-                        <q-input
-                          v-model="stepStore.angles.elevation"
-                          type="number"
-                          outlined
-                          dense
-                          class="full-width"
-                          suffix="°"
-                          :disable="!stepStore.selectedAxes.elevation"
-                          step="0.01"
-                          placeholder="0.00"
-                          @update:model-value="formatAngle('elevation')"
-                          @focus="clearValue('angles', 'elevation')"
-                          @blur="handleBlur('angles', 'elevation')"
-                          hide-bottom-space
-                        />
+                        <q-input v-model="stepStore.angles.elevation" type="number" outlined dense class="full-width"
+                          suffix="°" :disable="!stepStore.selectedAxes.elevation" step="0.01" placeholder="0.00"
+                          @update:model-value="formatAngle('elevation')" @focus="clearValue('angles', 'elevation')"
+                          @blur="handleBlur('angles', 'elevation')" hide-bottom-space />
                       </div>
                     </div>
                     <div class="col-6">
                       <div class="input-group">
                         <div class="text-subtitle2 q-mb-sm">Elevation Speed</div>
-                        <q-input
-                          v-model="stepStore.speeds.elevation"
-                          type="number"
-                          outlined
-                          dense
-                          class="full-width"
-                          suffix="°/s"
-                          :disable="!stepStore.selectedAxes.elevation"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
-                          @update:model-value="formatSpeed('elevation')"
-                          @focus="clearValue('speeds', 'elevation')"
-                          @blur="handleBlur('speeds', 'elevation')"
-                          hide-bottom-space
-                        />
+                        <q-input v-model="stepStore.speeds.elevation" type="number" outlined dense class="full-width"
+                          suffix="°/s" :disable="!stepStore.selectedAxes.elevation" min="0" step="0.01"
+                          placeholder="0.00" @update:model-value="formatSpeed('elevation')"
+                          @focus="clearValue('speeds', 'elevation')" @blur="handleBlur('speeds', 'elevation')"
+                          hide-bottom-space />
                       </div>
                     </div>
                   </div>
@@ -136,42 +76,19 @@
                     <div class="col-6">
                       <div class="input-group">
                         <div class="text-subtitle2 q-mb-sm">Tilt Angle</div>
-                        <q-input
-                          v-model="stepStore.angles.tilt"
-                          type="number"
-                          outlined
-                          dense
-                          class="full-width"
-                          suffix="°"
-                          :disable="!stepStore.selectedAxes.tilt"
-                          step="0.01"
-                          placeholder="0.00"
-                          @update:model-value="formatAngle('tilt')"
-                          @focus="clearValue('angles', 'tilt')"
-                          @blur="handleBlur('angles', 'tilt')"
-                          hide-bottom-space
-                        />
+                        <q-input v-model="stepStore.angles.train" type="number" outlined dense class="full-width"
+                          suffix="°" :disable="!stepStore.selectedAxes.train" step="0.01" placeholder="0.00"
+                          @update:model-value="formatAngle('train')" @focus="clearValue('angles', 'train')"
+                          @blur="handleBlur('angles', 'train')" hide-bottom-space />
                       </div>
                     </div>
                     <div class="col-6">
                       <div class="input-group">
                         <div class="text-subtitle2 q-mb-sm">Tilt Speed</div>
-                        <q-input
-                          v-model="stepStore.speeds.tilt"
-                          type="number"
-                          outlined
-                          dense
-                          class="full-width"
-                          suffix="°/s"
-                          :disable="!stepStore.selectedAxes.tilt"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
-                          @update:model-value="formatSpeed('tilt')"
-                          @focus="clearValue('speeds', 'tilt')"
-                          @blur="handleBlur('speeds', 'tilt')"
-                          hide-bottom-space
-                        />
+                        <q-input v-model="stepStore.speeds.train" type="number" outlined dense class="full-width"
+                          suffix="°/s" :disable="!stepStore.selectedAxes.train" min="0" step="0.01" placeholder="0.00"
+                          @update:model-value="formatSpeed('train')" @focus="clearValue('speeds', 'train')"
+                          @blur="handleBlur('speeds', 'train')" hide-bottom-space />
                       </div>
                     </div>
                   </div>
@@ -180,14 +97,8 @@
 
               <!-- 버튼 그룹 -->
               <div class="button-group q-mt-lg q-gutter-x-lg">
-                <q-btn
-                  color="positive"
-                  label="Go"
-                  size="lg"
-                  :disable="!stepStore.isAnyAxisSelected()"
-                  @click="handleGo"
-                  icon="play_arrow"
-                />
+                <q-btn color="positive" label="Go" size="lg" :disable="!stepStore.isAnyAxisSelected()" @click="handleGo"
+                  icon="play_arrow" />
                 <q-btn color="negative" label="Stop" size="lg" @click="handleStop" icon="stop" />
                 <q-btn color="primary" label="Stow" size="lg" @click="handleStow" icon="home" />
               </div>
@@ -262,23 +173,23 @@ const handleGo = async () => {
     }
 
     // tiAngle 계산 로직
-    let calculatedTiAngle = parseFloat(stepStore.angles.tilt)
+    let calculatedTrainAngle = parseFloat(stepStore.angles.train)
 
-    if (stepStore.selectedAxes.tilt) {
-      // tiltBoardServoStatusInfo의 servoMotor 값 확인
-      if (icdStore.tiltBoardServoStatusInfo.servoMotor) {
-        // servoMotor가 true이면 cmdTiltAngle 값에 stepStore.angles.tilt 값을 더함
-        const cmdTiltValue = parseFloat(icdStore.cmdTiltAngle) || 0
-        calculatedTiAngle = cmdTiltValue + parseFloat(stepStore.angles.tilt)
+    if (stepStore.selectedAxes.train) {
+      // trainBoardServoStatusInfo의 servoMotor 값 확인
+      if (icdStore.trainBoardServoStatusInfo.servoMotor) {
+        // servoMotor가 true이면 cmdTrainngle 값에 stepStore.angles.train 값을 더함
+        const cmdTrainValue = parseFloat(icdStore.cmdTrainAngle) || 0
+        calculatedTrainAngle = cmdTrainValue + parseFloat(stepStore.angles.train)
         console.log(
-          `Tilt 계산 (ServoMotor=true): ${cmdTiltValue} + ${parseFloat(stepStore.angles.tilt)} = ${calculatedTiAngle}`,
+          `Train 계산 (ServoMotor=true): ${cmdTrainValue} + ${parseFloat(stepStore.angles.train)} = ${calculatedTrainAngle}`,
         )
       } else {
-        // servoMotor가 false이면 tiltAngle 값에 stepStore.angles.tilt 값을 더함
-        const tiltValue = parseFloat(icdStore.tiltAngle) || 0
-        calculatedTiAngle = tiltValue + parseFloat(stepStore.angles.tilt)
+        // servoMotor가 false이면 trainAngle 값에 stepStore.angles.train 값을 더함
+        const trainValue = parseFloat(icdStore.trainAngle) || 0
+        calculatedTrainAngle = trainValue + parseFloat(stepStore.angles.train)
         console.log(
-          `Tilt 계산 (ServoMotor=false): ${tiltValue} + ${parseFloat(stepStore.angles.tilt)} = ${calculatedTiAngle}`,
+          `Train 계산 (ServoMotor=false): ${trainValue} + ${parseFloat(stepStore.angles.train)} = ${calculatedTrainAngle}`,
         )
       }
     }
@@ -286,13 +197,13 @@ const handleGo = async () => {
     await icdStore.sendMultiControlCommand({
       azimuth: stepStore.selectedAxes.azimuth,
       elevation: stepStore.selectedAxes.elevation,
-      tilt: stepStore.selectedAxes.tilt,
+      train: stepStore.selectedAxes.train,
       azAngle: calculatedAzAngle,
       elAngle: calculatedElAngle,
-      tiAngle: calculatedTiAngle,
+      trainAngle: calculatedTrainAngle,
       azSpeed: parseFloat(stepStore.speeds.azimuth),
       elSpeed: parseFloat(stepStore.speeds.elevation),
-      tiSpeed: parseFloat(stepStore.speeds.tilt),
+      trainSpeed: parseFloat(stepStore.speeds.train),
     })
     console.log('Step 명령 전송 성공')
   } catch (error) {
@@ -306,7 +217,7 @@ const handleStop = async () => {
     await icdStore.stopCommand(
       stepStore.selectedAxes.azimuth,
       stepStore.selectedAxes.elevation,
-      stepStore.selectedAxes.tilt,
+      stepStore.selectedAxes.train,
     )
     console.log('Stop 명령 전송 성공')
   } catch (error) {
@@ -325,7 +236,7 @@ const handleStow = async () => {
 }
 
 // 속도 값 포맷팅 (소수점 2자리까지, 양수만)
-const formatSpeed = (axis: 'azimuth' | 'elevation' | 'tilt') => {
+const formatSpeed = (axis: 'azimuth' | 'elevation' | 'train') => {
   let value = parseFloat(stepStore.speeds[axis])
   if (isNaN(value) || value < 0) {
     value = 0
@@ -334,7 +245,7 @@ const formatSpeed = (axis: 'azimuth' | 'elevation' | 'tilt') => {
 }
 
 // 각도 값 포맷팅 (소수점 2자리까지, 음수 허용)
-const formatAngle = (axis: 'azimuth' | 'elevation' | 'tilt') => {
+const formatAngle = (axis: 'azimuth' | 'elevation' | 'train') => {
   let value = parseFloat(stepStore.angles[axis])
   if (isNaN(value)) {
     value = 0
@@ -343,7 +254,7 @@ const formatAngle = (axis: 'azimuth' | 'elevation' | 'tilt') => {
 }
 
 // 입력 필드 값 초기화
-const clearValue = (type: 'speeds' | 'angles', axis: 'azimuth' | 'elevation' | 'tilt') => {
+const clearValue = (type: 'speeds' | 'angles', axis: 'azimuth' | 'elevation' | 'train') => {
   if (type === 'speeds') {
     stepStore.updateSpeed(axis, '')
   } else {
@@ -352,7 +263,7 @@ const clearValue = (type: 'speeds' | 'angles', axis: 'azimuth' | 'elevation' | '
 }
 
 // 입력 필드 포커스 잃을 때 처리
-const handleBlur = (type: 'speeds' | 'angles', axis: 'azimuth' | 'elevation' | 'tilt') => {
+const handleBlur = (type: 'speeds' | 'angles', axis: 'azimuth' | 'elevation' | 'train') => {
   const value = type === 'speeds' ? stepStore.speeds[axis] : stepStore.angles[axis]
   if (value === '' || value === undefined || value === null) {
     if (type === 'speeds') {

@@ -81,7 +81,7 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
   const offsetValues = ref({
     azimuth: '0.00',
     elevation: '0.00',
-    tilt: '0.00',
+    train: '0.00',
     time: '0.00',
     timeResult: '0.00', // ✅ timeResult 추가
   })
@@ -673,7 +673,7 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
    * 오프셋 값 업데이트
    */
   const updateOffsetValues = (
-    type: 'azimuth' | 'elevation' | 'tilt' | 'time' | 'timeResult',
+    type: 'azimuth' | 'elevation' | 'train' | 'time' | 'timeResult',
     value: string,
   ) => {
     offsetValues.value[type] = value
@@ -837,7 +837,7 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
     offsetValues.value = {
       azimuth: '0.00',
       elevation: '0.00',
-      tilt: '0.00',
+      train: '0.00',
       time: '0.00',
       timeResult: '0.00',
     }

@@ -4,13 +4,13 @@ import { ref } from 'vue'
 export interface SlewAxes {
   azimuth: boolean
   elevation: boolean
-  tilt: boolean
+  train: boolean
 }
 
 export interface SlewSpeeds {
   azimuth: string
   elevation: string
-  tilt: string
+  train: string
 }
 
 export const useSlewStore = defineStore('slew', () => {
@@ -18,14 +18,14 @@ export const useSlewStore = defineStore('slew', () => {
   const selectedAxes = ref<SlewAxes>({
     azimuth: false,
     elevation: false,
-    tilt: false,
+    train: false,
   })
 
   // 속도 값
   const speeds = ref<SlewSpeeds>({
     azimuth: '0.00',
     elevation: '0.00',
-    tilt: '0.00',
+    train: '0.00',
   })
 
   // 축 선택 상태 업데이트
@@ -43,7 +43,7 @@ export const useSlewStore = defineStore('slew', () => {
     selectedAxes.value = {
       azimuth: false,
       elevation: false,
-      tilt: false,
+      train: false,
     }
   }
 
@@ -52,7 +52,7 @@ export const useSlewStore = defineStore('slew', () => {
     speeds.value = {
       azimuth: '0.00',
       elevation: '0.00',
-      tilt: '0.00',
+      train: '0.00',
     }
   }
 
@@ -64,7 +64,7 @@ export const useSlewStore = defineStore('slew', () => {
 
   // 최소 하나의 축이 선택되었는지 확인
   const isAnyAxisSelected = () => {
-    return selectedAxes.value.azimuth || selectedAxes.value.elevation || selectedAxes.value.tilt
+    return selectedAxes.value.azimuth || selectedAxes.value.elevation || selectedAxes.value.train
   }
 
   return {

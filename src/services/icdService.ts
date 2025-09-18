@@ -13,14 +13,14 @@ export interface MessageData {
   data?: string | Record<string, unknown> | MessageData
   azimuthAngle?: number | string
   elevationAngle?: number | string
-  tiltAngle?: number | string
+  trainAngle?: number | string
   azimuthSpeed?: number | string
   elevationSpeed?: number | string
-  tiltSpeed?: number | string
+  trainSpeed?: number | string
   modeStatusBits?: string
   cmdAzimuthAngle?: number | string
   cmdElevationAngle?: number | string
-  cmdTiltAngle?: number | string
+  cmdTrainAngle?: number | string
   cmdTime?: string
   serverTime?: string
   resultTimeOffsetCalTime?: string
@@ -42,14 +42,14 @@ export interface CommandStatus {
 export interface MultiControlCommand {
   azimuth?: boolean
   elevation?: boolean
-  tilt?: boolean
+  train?: boolean
   stow?: boolean
   azAngle?: number
   azSpeed?: number
   elAngle?: number
   elSpeed?: number
-  tiAngle?: number
-  tiSpeed?: number
+  trainAngle?: number
+  trainSpeed?: number
 }
 
 export class CommandError extends Error {
@@ -363,13 +363,13 @@ export const icdService = {
    * @param interval 간격
    * @param azimuthSpeed 방위각 속도
    * @param elevationSpeed 고도각 속도
-   * @param tiltSpeed 틸트각 속도
+   * @param trainSpeed 틸트각 속도
    */
   async startSunTrack(
     interval: number,
     azimuthSpeed: number,
     elevationSpeed: number,
-    tiltSpeed: number,
+    trainSpeed: number,
   ) {
     try {
       const response = await api.post('/sun-track/start-sun-track', null, {
@@ -377,7 +377,7 @@ export const icdService = {
           interval,
           cmdAzimuthSpeed: azimuthSpeed,
           cmdElevationSpeed: elevationSpeed,
-          cmdTiltSpeed: tiltSpeed,
+          cmdTrainSpeed: trainSpeed,
         },
       })
       console.log('Start Sun Track command sent:', response.data)
@@ -480,14 +480,14 @@ export const icdService = {
         params: {
           azimuth: command.azimuth || false,
           elevation: command.elevation || false,
-          tilt: command.tilt || false,
+          train: command.train || false,
           stow: command.stow || false,
           azAngle: command.azAngle || 0,
           azSpeed: command.azSpeed || 0,
           elAngle: command.elAngle || 0,
           elSpeed: command.elSpeed || 0,
-          tiAngle: command.tiAngle || 0,
-          tiSpeed: command.tiSpeed || 0,
+          trainAngle: command.trainAngle || 0,
+          trainSpeed: command.trainSpeed || 0,
         },
       })
       console.log('Multi control command sent:', response.data)
@@ -629,19 +629,19 @@ export const icdService = {
    * 서보 프리셋 명령 전송
    * @param azimuth 방위각 프리셋 여부
    * @param elevation 고도각 프리셋 여부
-   * @param tilt 틸트각 프리셋 여부
+   * @param train 틸트각 프리셋 여부
    */
   async sendServoPresetCommand(
     azimuth: boolean = false,
     elevation: boolean = false,
-    tilt: boolean = false,
+    train: boolean = false,
   ) {
     try {
       const response = await api.post('/icd/servo-preset-command', null, {
         params: {
           azimuth,
           elevation,
-          tilt,
+          train: train,
         },
       })
       console.log('Servo preset command sent:', response.data)
@@ -667,7 +667,7 @@ export const icdService = {
   async setPosition(command: {
     azimuthAngle: number
     elevationAngle: number
-    tiltAngle: number
+    trainAngle: number
     timestamp: string
   }) {
     try {

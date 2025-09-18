@@ -6,11 +6,11 @@ export const useStandbyModeStore = defineStore('standbyMode', () => {
   const selectedAxes = ref({
     azimuth: false,
     elevation: false,
-    tilt: false,
+    train: false,
   })
 
   // 축 상태 업데이트
-  const updateAxis = (axis: 'azimuth' | 'elevation' | 'tilt', value: boolean) => {
+  const updateAxis = (axis: 'azimuth' | 'elevation' | 'train', value: boolean) => {
     selectedAxes.value[axis] = value
   }
 
@@ -18,14 +18,14 @@ export const useStandbyModeStore = defineStore('standbyMode', () => {
   const setAllAxes = (value: boolean) => {
     selectedAxes.value.azimuth = value
     selectedAxes.value.elevation = value
-    selectedAxes.value.tilt = value
+    selectedAxes.value.train = value
   }
 
   // 선택된 축 초기화
   const resetAxes = () => {
     selectedAxes.value.azimuth = false
     selectedAxes.value.elevation = false
-    selectedAxes.value.tilt = false
+    selectedAxes.value.train = false
   }
 
   return {

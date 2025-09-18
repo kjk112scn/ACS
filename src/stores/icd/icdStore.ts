@@ -34,7 +34,7 @@ export const useICDStore = defineStore('icd', () => {
   const resultTimeOffsetCalTime = ref('')
   const cmdAzimuthAngle = ref('')
   const cmdElevationAngle = ref('')
-  const cmdTiltAngle = ref('')
+  const cmdTrainAngle = ref('')
   const cmdTime = ref('')
   const error = ref('')
   const isConnected = ref(false)
@@ -44,16 +44,16 @@ export const useICDStore = defineStore('icd', () => {
   const modeStatusBits = ref('')
   const azimuthAngle = ref('')
   const elevationAngle = ref('')
-  const tiltAngle = ref('')
+  const trainAngle = ref('')
   const azimuthSpeed = ref('')
   const elevationSpeed = ref('')
-  const tiltSpeed = ref('')
+  const trainSpeed = ref('')
   const servoDriverAzimuthAngle = ref('')
   const servoDriverElevationAngle = ref('')
-  const servoDriverTiltAngle = ref('')
+  const servoDriverTrainAngle = ref('')
   const torqueAzimuth = ref('')
   const torqueElevation = ref('')
-  const torqueTilt = ref('')
+  const torqueTrain = ref('')
   const windSpeed = ref('')
   const windDirection = ref('')
   const rtdOne = ref('')
@@ -62,7 +62,7 @@ export const useICDStore = defineStore('icd', () => {
   // mainBoardProtocolStatusBits 관련 개별 상태들
   const protocolElevationStatus = ref<boolean>(false)
   const protocolAzimuthStatus = ref<boolean>(false)
-  const protocolTiltStatus = ref<boolean>(false)
+  const protocolTrainStatus = ref<boolean>(false)
   const protocolFeedStatus = ref<boolean>(false)
   const mainBoardProtocolStatusBitsReserve1 = ref<boolean>(false)
   const mainBoardProtocolStatusBitsReserve2 = ref<boolean>(false)
@@ -82,7 +82,7 @@ export const useICDStore = defineStore('icd', () => {
 
   const mainBoardMCOnOffBits = ref('')
   // mainBoardMCOnOffBits 관련 개별 상태들 (기존 mainBoardStatusBits 관련 상태들 뒤에 추가)
-  const mcTilt = ref<boolean>(false)
+  const mcTrain = ref<boolean>(false)
   const mcElevation = ref<boolean>(false)
   const mcAzimuth = ref<boolean>(false)
   const mainBoardMCOnOffBitsReserve1 = ref<boolean>(false)
@@ -137,30 +137,30 @@ export const useICDStore = defineStore('icd', () => {
   const elevationBoardStatusReserve2 = ref<boolean>(false)
   const elevationBoardStatusEncoder = ref<boolean>(false)
 
-  const tiltBoardServoStatusBits = ref('')
-  // tiltBoardServoStatusBits 관련 개별 상태들 (기존 elevationBoardStatusBits 관련 상태들 뒤에 추가)
-  const tiltBoardServoStatusServoAlarmCode1 = ref<boolean>(false)
-  const tiltBoardServoStatusServoAlarmCode2 = ref<boolean>(false)
-  const tiltBoardServoStatusServoAlarmCode3 = ref<boolean>(false)
-  const tiltBoardServoStatusServoAlarmCode4 = ref<boolean>(false)
-  const tiltBoardServoStatusServoAlarmCode5 = ref<boolean>(false)
-  const tiltBoardServoStatusServoAlarm = ref<boolean>(false)
-  const tiltBoardServoStatusServoBrake = ref<boolean>(false)
-  const tiltBoardServoStatusServoMotor = ref<boolean>(false)
+  const trainBoardServoStatusBits = ref('')
+  // trainBoardServoStatusBits 관련 개별 상태들 (기존 elevationBoardStatusBits 관련 상태들 뒤에 추가)
+  const trainBoardServoStatusServoAlarmCode1 = ref<boolean>(false)
+  const trainBoardServoStatusServoAlarmCode2 = ref<boolean>(false)
+  const trainBoardServoStatusServoAlarmCode3 = ref<boolean>(false)
+  const trainBoardServoStatusServoAlarmCode4 = ref<boolean>(false)
+  const trainBoardServoStatusServoAlarmCode5 = ref<boolean>(false)
+  const trainBoardServoStatusServoAlarm = ref<boolean>(false)
+  const trainBoardServoStatusServoBrake = ref<boolean>(false)
+  const trainBoardServoStatusServoMotor = ref<boolean>(false)
 
-  const tiltBoardStatusBits = ref('')
-  // tiltBoardStatusBits 관련 개별 상태들 (기존 tiltBoardServoStatusBits 관련 상태들 뒤에 추가)
-  const tiltBoardStatusLimitSwitchPositive275 = ref<boolean>(false) // +275도 리미트 스위치
-  const tiltBoardStatusLimitSwitchNegative275 = ref<boolean>(false) // -275도 리미트 스위치
-  const tiltBoardStatusReserve1 = ref<boolean>(false)
-  const tiltBoardStatusReserve2 = ref<boolean>(false)
-  const tiltBoardStatusStowPin = ref<boolean>(false)
-  const tiltBoardStatusReserve3 = ref<boolean>(false)
-  const tiltBoardStatusReserve4 = ref<boolean>(false)
-  const tiltBoardStatusEncoder = ref<boolean>(false)
+  const trainBoardStatusBits = ref('')
+  // trainBoardStatusBits 관련 개별 상태들 (기존 trainBoardServoStatusBits 관련 상태들 뒤에 추가)
+  const trainBoardStatusLimitSwitchPositive275 = ref<boolean>(false) // +275도 리미트 스위치
+  const trainBoardStatusLimitSwitchNegative275 = ref<boolean>(false) // -275도 리미트 스위치
+  const trainBoardStatusReserve1 = ref<boolean>(false)
+  const trainBoardStatusReserve2 = ref<boolean>(false)
+  const trainBoardStatusStowPin = ref<boolean>(false)
+  const trainBoardStatusReserve3 = ref<boolean>(false)
+  const trainBoardStatusReserve4 = ref<boolean>(false)
+  const trainBoardStatusEncoder = ref<boolean>(false)
 
   const feedSBoardStatusBits = ref('')
-  // feedSBoardStatusBits 관련 개별 상태들 (기존 tiltBoardStatusBits 관련 상태들 뒤에 추가)
+  // feedSBoardStatusBits 관련 개별 상태들 (기존 trainBoardStatusBits 관련 상태들 뒤에 추가)
   const feedSBoardStatusLNALHCPPower = ref<boolean>(false) // S-Band LNA LHCP ON/OFF (1=ON, 0=OFF)
   const feedSBoardStatusLNALHCPError = ref<boolean>(false) // S-Band LNA LHCP Error/Normal (1=Error, 0=Normal)
   const feedSBoardStatusLNARHCPPower = ref<boolean>(false) // S-Band LNA RHCP ON/OFF (1=ON, 0=OFF)
@@ -191,19 +191,19 @@ export const useICDStore = defineStore('icd', () => {
   const rssiXBandLNARHCP = ref('')
   const azimuthAcceleration = ref('')
   const elevationAcceleration = ref('')
-  const tiltAcceleration = ref('')
+  const trainAcceleration = ref('')
   const azimuthMaxAcceleration = ref('')
   const elevationMaxAcceleration = ref('')
-  const tiltMaxAcceleration = ref('')
+  const trainMaxAcceleration = ref('')
   const trackingAzimuthTime = ref('')
   const trackingCMDAzimuthAngle = ref('')
   const trackingActualAzimuthAngle = ref('')
   const trackingElevationTime = ref('')
   const trackingCMDElevationAngle = ref('')
   const trackingActualElevationAngle = ref('')
-  const trackingTiltTime = ref('')
-  const trackingCMDTiltAngle = ref('')
-  const trackingActualTiltAngle = ref('')
+  const trackingTrainTime = ref('')
+  const trackingCMDTrainAngle = ref('')
+  const trackingActualTrainAngle = ref('')
   // 96-98번째 줄 근처 - Boolean 타입으로 변경
   const ephemerisStatus = ref<boolean | null>(null)
   const ephemerisTrackingState = ref<string | null>(null) // ✅ 추가
@@ -223,7 +223,7 @@ export const useICDStore = defineStore('icd', () => {
 
     protocolElevationStatus.value = bits[0] === '1' // 1번째 비트
     protocolAzimuthStatus.value = bits[1] === '1' // 2번째 비트
-    protocolTiltStatus.value = bits[2] === '1' // 3번째 비트
+    protocolTrainStatus.value = bits[2] === '1' // 3번째 비트
     protocolFeedStatus.value = bits[3] === '1' // 4번째 비트
     mainBoardProtocolStatusBitsReserve1.value = bits[4] === '1' // 5번째 비트
     mainBoardProtocolStatusBitsReserve2.value = bits[5] === '1' // 6번째 비트
@@ -249,7 +249,7 @@ export const useICDStore = defineStore('icd', () => {
     // "00001000" -> ['0','0','0','0','1','0','0','0']
     const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
 
-    mcTilt.value = bits[0] === '1' // 1번째 비트
+    mcTrain.value = bits[0] === '1' // 1번째 비트
     mcElevation.value = bits[1] === '1' // 2번째 비트
     mcAzimuth.value = bits[2] === '1' // 3번째 비트
     mainBoardMCOnOffBitsReserve1.value = bits[3] === '1' // 4번째 비트
@@ -316,34 +316,34 @@ export const useICDStore = defineStore('icd', () => {
     elevationBoardStatusEncoder.value = bits[7] === '1' // 8번째 비트
   }
   // 비트 문자열을 개별 boolean으로 파싱하는 헬퍼 함수 (기존 parseElevationBoardStatusBits 함수 뒤에 추가)
-  const parseTiltBoardServoStatusBits = (bitString: string) => {
+  const parseTrainBoardServoStatusBits = (bitString: string) => {
     // "00001000" -> ['0','0','0','0','1','0','0','0']
     const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
 
-    tiltBoardServoStatusServoAlarmCode1.value = bits[0] === '1' // 1번째 비트
-    tiltBoardServoStatusServoAlarmCode2.value = bits[1] === '1' // 2번째 비트
-    tiltBoardServoStatusServoAlarmCode3.value = bits[2] === '1' // 3번째 비트
-    tiltBoardServoStatusServoAlarmCode4.value = bits[3] === '1' // 4번째 비트
-    tiltBoardServoStatusServoAlarmCode5.value = bits[4] === '1' // 5번째 비트
-    tiltBoardServoStatusServoAlarm.value = bits[5] === '1' // 6번째 비트
-    tiltBoardServoStatusServoBrake.value = bits[6] === '1' // 7번째 비트
-    tiltBoardServoStatusServoMotor.value = bits[7] === '1' // 8번째 비트
+    trainBoardServoStatusServoAlarmCode1.value = bits[0] === '1' // 1번째 비트
+    trainBoardServoStatusServoAlarmCode2.value = bits[1] === '1' // 2번째 비트
+    trainBoardServoStatusServoAlarmCode3.value = bits[2] === '1' // 3번째 비트
+    trainBoardServoStatusServoAlarmCode4.value = bits[3] === '1' // 4번째 비트
+    trainBoardServoStatusServoAlarmCode5.value = bits[4] === '1' // 5번째 비트
+    trainBoardServoStatusServoAlarm.value = bits[5] === '1' // 6번째 비트
+    trainBoardServoStatusServoBrake.value = bits[6] === '1' // 7번째 비트
+    trainBoardServoStatusServoMotor.value = bits[7] === '1' // 8번째 비트
   }
-  // 비트 문자열을 개별 boolean으로 파싱하는 헬퍼 함수 (기존 parseTiltBoardServoStatusBits 함수 뒤에 추가)
-  const parseTiltBoardStatusBits = (bitString: string) => {
+  // 비트 문자열을 개별 boolean으로 파싱하는 헬퍼 함수 (기존 parseTrainBoardServoStatusBits 함수 뒤에 추가)
+  const parseTrainBoardStatusBits = (bitString: string) => {
     // "00001000" -> ['0','0','0','0','1','0','0','0']
     const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
 
-    tiltBoardStatusLimitSwitchPositive275.value = bits[0] === '1' // 1번째 비트
-    tiltBoardStatusLimitSwitchNegative275.value = bits[1] === '1' // 2번째 비트
-    tiltBoardStatusReserve1.value = bits[2] === '1' // 3번째 비트
-    tiltBoardStatusReserve2.value = bits[3] === '1' // 4번째 비트
-    tiltBoardStatusStowPin.value = bits[4] === '1' // 5번째 비트
-    tiltBoardStatusReserve3.value = bits[5] === '1' // 6번째 비트
-    tiltBoardStatusReserve4.value = bits[6] === '1' // 7번째 비트
-    tiltBoardStatusEncoder.value = bits[7] === '1' // 8번째 비트
+    trainBoardStatusLimitSwitchPositive275.value = bits[0] === '1' // 1번째 비트
+    trainBoardStatusLimitSwitchNegative275.value = bits[1] === '1' // 2번째 비트
+    trainBoardStatusReserve1.value = bits[2] === '1' // 3번째 비트
+    trainBoardStatusReserve2.value = bits[3] === '1' // 4번째 비트
+    trainBoardStatusStowPin.value = bits[4] === '1' // 5번째 비트
+    trainBoardStatusReserve3.value = bits[5] === '1' // 6번째 비트
+    trainBoardStatusReserve4.value = bits[6] === '1' // 7번째 비트
+    trainBoardStatusEncoder.value = bits[7] === '1' // 8번째 비트
   }
-  // 비트 문자열을 개별 boolean으로 파싱하는 헬퍼 함수 (기존 parseTiltBoardStatusBits 함수 뒤에 추가)
+  // 비트 문자열을 개별 boolean으로 파싱하는 헬퍼 함수 (기존 parseTrainBoardStatusBits 함수 뒤에 추가)
   const parseFeedSBoardStatusBits = (bitString: string) => {
     // "00001000" -> ['0','0','0','0','1','0','0','0']
     const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
@@ -377,7 +377,7 @@ export const useICDStore = defineStore('icd', () => {
     raw: mainBoardProtocolStatusBits.value,
     elevation: protocolElevationStatus.value,
     azimuth: protocolAzimuthStatus.value,
-    tilt: protocolTiltStatus.value,
+    train: protocolTrainStatus.value,
     feed: protocolFeedStatus.value,
     reserve1: mainBoardProtocolStatusBitsReserve1.value,
     reserve2: mainBoardProtocolStatusBitsReserve2.value,
@@ -387,7 +387,7 @@ export const useICDStore = defineStore('icd', () => {
     activeProtocols: [
       protocolElevationStatus.value && 'elevation',
       protocolAzimuthStatus.value && 'azimuth',
-      protocolTiltStatus.value && 'tilt',
+      protocolTrainStatus.value && 'train',
       protocolFeedStatus.value && 'feed',
     ].filter(Boolean),
     // 전체 상태 요약
@@ -395,13 +395,13 @@ export const useICDStore = defineStore('icd', () => {
       totalActive: [
         protocolElevationStatus.value,
         protocolAzimuthStatus.value,
-        protocolTiltStatus.value,
+        protocolTrainStatus.value,
         protocolFeedStatus.value,
       ].filter(Boolean).length,
       hasAnyActive:
         protocolElevationStatus.value ||
         protocolAzimuthStatus.value ||
-        protocolTiltStatus.value ||
+        protocolTrainStatus.value ||
         protocolFeedStatus.value,
     },
   }))
@@ -444,7 +444,7 @@ export const useICDStore = defineStore('icd', () => {
   // 전체 MC On/Off 상태 정보를 제공하는 computed (기존 mainBoardStatusInfo computed 뒤에 추가)
   const mainBoardMCOnOffInfo = computed(() => ({
     raw: mainBoardMCOnOffBits.value,
-    mcTilt: mcTilt.value,
+    mcTrain: mcTrain.value,
     mcElevation: mcElevation.value,
     mcAzimuth: mcAzimuth.value,
     reserve1: mainBoardMCOnOffBitsReserve1.value,
@@ -454,18 +454,18 @@ export const useICDStore = defineStore('icd', () => {
     reserve5: mainBoardMCOnOffBitsReserve5.value,
     // 활성화된 MC 목록
     activeMCs: [
-      mcTilt.value && 'tilt',
+      mcTrain.value && 'train',
       mcElevation.value && 'elevation',
       mcAzimuth.value && 'azimuth',
     ].filter(Boolean),
     // 전체 상태 요약
     summary: {
-      totalActive: [mcTilt.value, mcElevation.value, mcAzimuth.value].filter(Boolean).length,
-      hasAnyActive: mcTilt.value || mcElevation.value || mcAzimuth.value,
-      allAxesActive: mcTilt.value && mcElevation.value && mcAzimuth.value,
+      totalActive: [mcTrain.value, mcElevation.value, mcAzimuth.value].filter(Boolean).length,
+      hasAnyActive: mcTrain.value || mcElevation.value || mcAzimuth.value,
+      allAxesActive: mcTrain.value && mcElevation.value && mcAzimuth.value,
       // 축별 상태
       axesStatus: {
-        tilt: mcTilt.value ? 'ON' : 'OFF',
+        train: mcTrain.value ? 'ON' : 'OFF',
         elevation: mcElevation.value ? 'ON' : 'OFF',
         azimuth: mcAzimuth.value ? 'ON' : 'OFF',
       },
@@ -726,118 +726,119 @@ export const useICDStore = defineStore('icd', () => {
     },
   }))
 
-  // 전체 Tilt Board Servo 상태 정보를 제공하는 computed (기존 elevationBoardStatusInfo computed 뒤에 추가)
-  const tiltBoardServoStatusInfo = computed(() => ({
-    raw: tiltBoardServoStatusBits.value,
-    servoAlarmCode1: tiltBoardServoStatusServoAlarmCode1.value,
-    servoAlarmCode2: tiltBoardServoStatusServoAlarmCode2.value,
-    servoAlarmCode3: tiltBoardServoStatusServoAlarmCode3.value,
-    servoAlarmCode4: tiltBoardServoStatusServoAlarmCode4.value,
-    servoAlarmCode5: tiltBoardServoStatusServoAlarmCode5.value,
-    servoAlarm: tiltBoardServoStatusServoAlarm.value,
-    servoBrake: tiltBoardServoStatusServoBrake.value,
-    servoMotor: tiltBoardServoStatusServoMotor.value,
+  // 전체 Train Board Servo 상태 정보를 제공하는 computed (기존 elevationBoardStatusInfo computed 뒤에 추가)
+  const trainBoardServoStatusInfo = computed(() => ({
+    raw: trainBoardServoStatusBits.value,
+    servoAlarmCode1: trainBoardServoStatusServoAlarmCode1.value,
+    servoAlarmCode2: trainBoardServoStatusServoAlarmCode2.value,
+    servoAlarmCode3: trainBoardServoStatusServoAlarmCode3.value,
+    servoAlarmCode4: trainBoardServoStatusServoAlarmCode4.value,
+    servoAlarmCode5: trainBoardServoStatusServoAlarmCode5.value,
+    servoAlarm: trainBoardServoStatusServoAlarm.value,
+    servoBrake: trainBoardServoStatusServoBrake.value,
+    servoMotor: trainBoardServoStatusServoMotor.value,
     // 활성화된 알람 코드 목록
     activeAlarmCodes: [
-      tiltBoardServoStatusServoAlarmCode1.value && 'AlarmCode1',
-      tiltBoardServoStatusServoAlarmCode2.value && 'AlarmCode2',
-      tiltBoardServoStatusServoAlarmCode3.value && 'AlarmCode3',
-      tiltBoardServoStatusServoAlarmCode4.value && 'AlarmCode4',
-      tiltBoardServoStatusServoAlarmCode5.value && 'AlarmCode5',
+      trainBoardServoStatusServoAlarmCode1.value && 'AlarmCode1',
+      trainBoardServoStatusServoAlarmCode2.value && 'AlarmCode2',
+      trainBoardServoStatusServoAlarmCode3.value && 'AlarmCode3',
+      trainBoardServoStatusServoAlarmCode4.value && 'AlarmCode4',
+      trainBoardServoStatusServoAlarmCode5.value && 'AlarmCode5',
     ].filter(Boolean),
     // 활성화된 서보 상태 목록
     activeServoStatuses: [
-      tiltBoardServoStatusServoAlarm.value && 'Alarm',
-      tiltBoardServoStatusServoBrake.value && 'Brake',
-      tiltBoardServoStatusServoMotor.value && 'Motor',
+      trainBoardServoStatusServoAlarm.value && 'Alarm',
+      trainBoardServoStatusServoBrake.value && 'Brake',
+      trainBoardServoStatusServoMotor.value && 'Motor',
     ].filter(Boolean),
     // 전체 상태 요약
     summary: {
       totalAlarmCodes: [
-        tiltBoardServoStatusServoAlarmCode1.value,
-        tiltBoardServoStatusServoAlarmCode2.value,
-        tiltBoardServoStatusServoAlarmCode3.value,
-        tiltBoardServoStatusServoAlarmCode4.value,
-        tiltBoardServoStatusServoAlarmCode5.value,
+        trainBoardServoStatusServoAlarmCode1.value,
+        trainBoardServoStatusServoAlarmCode2.value,
+        trainBoardServoStatusServoAlarmCode3.value,
+        trainBoardServoStatusServoAlarmCode4.value,
+        trainBoardServoStatusServoAlarmCode5.value,
       ].filter(Boolean).length,
       hasAnyAlarmCode:
-        tiltBoardServoStatusServoAlarmCode1.value ||
-        tiltBoardServoStatusServoAlarmCode2.value ||
-        tiltBoardServoStatusServoAlarmCode3.value ||
-        tiltBoardServoStatusServoAlarmCode4.value ||
-        tiltBoardServoStatusServoAlarmCode5.value,
-      hasServoAlarm: tiltBoardServoStatusServoAlarm.value,
-      isBrakeActive: tiltBoardServoStatusServoBrake.value,
-      isMotorActive: tiltBoardServoStatusServoMotor.value,
+        trainBoardServoStatusServoAlarmCode1.value ||
+        trainBoardServoStatusServoAlarmCode2.value ||
+        trainBoardServoStatusServoAlarmCode3.value ||
+        trainBoardServoStatusServoAlarmCode4.value ||
+        trainBoardServoStatusServoAlarmCode5.value,
+      hasServoAlarm: trainBoardServoStatusServoAlarm.value,
+      isBrakeActive: trainBoardServoStatusServoBrake.value,
+      isMotorActive: trainBoardServoStatusServoMotor.value,
       // 서보 상태
       servoStatus: {
-        alarm: tiltBoardServoStatusServoAlarm.value ? 'ALARM' : 'NORMAL',
-        brake: tiltBoardServoStatusServoBrake.value ? 'ON' : 'OFF',
-        motor: tiltBoardServoStatusServoMotor.value ? 'ON' : 'OFF',
+        alarm: trainBoardServoStatusServoAlarm.value ? 'ALARM' : 'NORMAL',
+        brake: trainBoardServoStatusServoBrake.value ? 'ON' : 'OFF',
+        motor: trainBoardServoStatusServoMotor.value ? 'ON' : 'OFF',
       },
       // 전체 상태 판단
-      overallStatus: tiltBoardServoStatusServoAlarm.value
+      overallStatus: trainBoardServoStatusServoAlarm.value
         ? 'ALARM'
-        : tiltBoardServoStatusServoMotor.value
+        : trainBoardServoStatusServoMotor.value
           ? 'ACTIVE'
           : 'STANDBY',
     },
   }))
-  // 전체 Tilt Board 상태 정보를 제공하는 computed (기존 tiltBoardServoStatusInfo computed 뒤에 추가)
-  const tiltBoardStatusInfo = computed(() => ({
-    raw: tiltBoardStatusBits.value,
-    limitSwitchPositive275: tiltBoardStatusLimitSwitchPositive275.value,
-    limitSwitchNegative275: tiltBoardStatusLimitSwitchNegative275.value,
-    reserve1: tiltBoardStatusReserve1.value,
-    reserve2: tiltBoardStatusReserve2.value,
-    stowPin: tiltBoardStatusStowPin.value,
-    reserve3: tiltBoardStatusReserve3.value,
-    reserve4: tiltBoardStatusReserve4.value,
-    encoder: tiltBoardStatusEncoder.value,
+  // 전체 Train Board 상태 정보를 제공하는 computed (기존 trainBoardServoStatusInfo computed 뒤에 추가)
+  const trainBoardStatusInfo = computed(() => ({
+    raw: trainBoardStatusBits.value,
+    limitSwitchPositive275: trainBoardStatusLimitSwitchPositive275.value,
+    limitSwitchNegative275: trainBoardStatusLimitSwitchNegative275.value,
+    reserve1: trainBoardStatusReserve1.value,
+    reserve2: trainBoardStatusReserve2.value,
+    stowPin: trainBoardStatusStowPin.value,
+    reserve3: trainBoardStatusReserve3.value,
+    reserve4: trainBoardStatusReserve4.value,
+    encoder: trainBoardStatusEncoder.value,
     // 활성화된 리미트 스위치 목록
     activeLimitSwitches: [
-      tiltBoardStatusLimitSwitchPositive275.value && '+275°',
-      tiltBoardStatusLimitSwitchNegative275.value && '-275°',
+      trainBoardStatusLimitSwitchPositive275.value && '+275°',
+      trainBoardStatusLimitSwitchNegative275.value && '-275°',
     ].filter(Boolean),
     // 활성화된 상태 목록
     activeStatuses: [
-      tiltBoardStatusLimitSwitchPositive275.value && 'LimitSwitch+275',
-      tiltBoardStatusLimitSwitchNegative275.value && 'LimitSwitch-275',
-      tiltBoardStatusStowPin.value && 'StowPin',
-      tiltBoardStatusEncoder.value && 'Encoder',
+      trainBoardStatusLimitSwitchPositive275.value && 'LimitSwitch+275',
+      trainBoardStatusLimitSwitchNegative275.value && 'LimitSwitch-275',
+      trainBoardStatusStowPin.value && 'StowPin',
+      trainBoardStatusEncoder.value && 'Encoder',
     ].filter(Boolean),
     // 전체 상태 요약
     summary: {
       hasLimitSwitchActive:
-        tiltBoardStatusLimitSwitchPositive275.value || tiltBoardStatusLimitSwitchNegative275.value,
-      isStowPinActive: tiltBoardStatusStowPin.value,
-      isEncoderActive: tiltBoardStatusEncoder.value,
+        trainBoardStatusLimitSwitchPositive275.value ||
+        trainBoardStatusLimitSwitchNegative275.value,
+      isStowPinActive: trainBoardStatusStowPin.value,
+      isEncoderActive: trainBoardStatusEncoder.value,
       totalActiveStatuses: [
-        tiltBoardStatusLimitSwitchPositive275.value,
-        tiltBoardStatusLimitSwitchNegative275.value,
-        tiltBoardStatusStowPin.value,
-        tiltBoardStatusEncoder.value,
+        trainBoardStatusLimitSwitchPositive275.value,
+        trainBoardStatusLimitSwitchNegative275.value,
+        trainBoardStatusStowPin.value,
+        trainBoardStatusEncoder.value,
       ].filter(Boolean).length,
       // 리미트 스위치 상태
       limitSwitchStatus: {
-        positive275: tiltBoardStatusLimitSwitchPositive275.value ? 'ACTIVE' : 'NORMAL',
-        negative275: tiltBoardStatusLimitSwitchNegative275.value ? 'ACTIVE' : 'NORMAL',
+        positive275: trainBoardStatusLimitSwitchPositive275.value ? 'ACTIVE' : 'NORMAL',
+        negative275: trainBoardStatusLimitSwitchNegative275.value ? 'ACTIVE' : 'NORMAL',
         anyActive:
-          tiltBoardStatusLimitSwitchPositive275.value ||
-          tiltBoardStatusLimitSwitchNegative275.value,
+          trainBoardStatusLimitSwitchPositive275.value ||
+          trainBoardStatusLimitSwitchNegative275.value,
       },
       // 전체 상태 판단
       overallStatus:
-        tiltBoardStatusLimitSwitchPositive275.value || tiltBoardStatusLimitSwitchNegative275.value
+        trainBoardStatusLimitSwitchPositive275.value || trainBoardStatusLimitSwitchNegative275.value
           ? 'LIMIT_REACHED'
-          : tiltBoardStatusStowPin.value
+          : trainBoardStatusStowPin.value
             ? 'STOWED'
-            : tiltBoardStatusEncoder.value
+            : trainBoardStatusEncoder.value
               ? 'ENCODER_ACTIVE'
               : 'NORMAL',
     },
   }))
-  // 전체 Feed S-Band Board 상태 정보를 제공하는 computed (기존 tiltBoardStatusInfo computed 뒤에 추가)
+  // 전체 Feed S-Band Board 상태 정보를 제공하는 computed (기존 trainBoardStatusInfo computed 뒤에 추가)
   const feedSBoardStatusInfo = computed(() => ({
     raw: feedSBoardStatusBits.value,
     sLnaLHCPPower: feedSBoardStatusLNALHCPPower.value,
@@ -1205,8 +1206,8 @@ export const useICDStore = defineStore('icd', () => {
         cmdElevationAngle.value = safeToString(message.cmdElevationAngle)
       }
 
-      if (message.cmdTiltAngle !== undefined) {
-        cmdTiltAngle.value = safeToString(message.cmdTiltAngle)
+      if (message.cmdTrainAngle !== undefined) {
+        cmdTrainAngle.value = safeToString(message.cmdTrainAngle)
       }
       // 🆕 추적 스케줄 정보 업데이트
       if (message.currentTrackingMstId !== undefined) {
@@ -1336,8 +1337,8 @@ export const useICDStore = defineStore('icd', () => {
       if (antennaData.elevationAngle !== undefined && antennaData.elevationAngle !== null) {
         elevationAngle.value = safeToString(antennaData.elevationAngle)
       }
-      if (antennaData.tiltAngle !== undefined && antennaData.tiltAngle !== null) {
-        tiltAngle.value = safeToString(antennaData.tiltAngle)
+      if (antennaData.trainAngle !== undefined && antennaData.trainAngle !== null) {
+        trainAngle.value = safeToString(antennaData.trainAngle)
       }
       if (antennaData.azimuthSpeed !== undefined && antennaData.azimuthSpeed !== null) {
         azimuthSpeed.value = safeToString(antennaData.azimuthSpeed)
@@ -1345,8 +1346,8 @@ export const useICDStore = defineStore('icd', () => {
       if (antennaData.elevationSpeed !== undefined && antennaData.elevationSpeed !== null) {
         elevationSpeed.value = safeToString(antennaData.elevationSpeed)
       }
-      if (antennaData.tiltSpeed !== undefined && antennaData.tiltSpeed !== null) {
-        tiltSpeed.value = safeToString(antennaData.tiltSpeed)
+      if (antennaData.trainSpeed !== undefined && antennaData.trainSpeed !== null) {
+        trainSpeed.value = safeToString(antennaData.trainSpeed)
       }
 
       // 서보 드라이버 데이터
@@ -1363,10 +1364,10 @@ export const useICDStore = defineStore('icd', () => {
         servoDriverElevationAngle.value = safeToString(antennaData.servoDriverElevationAngle)
       }
       if (
-        antennaData.servoDriverTiltAngle !== undefined &&
-        antennaData.servoDriverTiltAngle !== null
+        antennaData.servoDriverTrainAngle !== undefined &&
+        antennaData.servoDriverTrainAngle !== null
       ) {
-        servoDriverTiltAngle.value = safeToString(antennaData.servoDriverTiltAngle)
+        servoDriverTrainAngle.value = safeToString(antennaData.servoDriverTrainAngle)
       }
 
       // 토크 데이터
@@ -1376,8 +1377,8 @@ export const useICDStore = defineStore('icd', () => {
       if (antennaData.torqueElevation !== undefined && antennaData.torqueElevation !== null) {
         torqueElevation.value = safeToString(antennaData.torqueElevation)
       }
-      if (antennaData.torqueTilt !== undefined && antennaData.torqueTilt !== null) {
-        torqueTilt.value = safeToString(antennaData.torqueTilt)
+      if (antennaData.torqueTrain !== undefined && antennaData.torqueTrain !== null) {
+        torqueTrain.value = safeToString(antennaData.torqueTrain)
       }
 
       // 환경 데이터
@@ -1459,20 +1460,20 @@ export const useICDStore = defineStore('icd', () => {
         parseElevationBoardStatusBits(newBitString)
       }
       if (
-        antennaData.tiltBoardServoStatusBits !== undefined &&
-        antennaData.tiltBoardServoStatusBits !== null
+        antennaData.trainBoardServoStatusBits !== undefined &&
+        antennaData.trainBoardServoStatusBits !== null
       ) {
-        const newBitString = safeToString(antennaData.tiltBoardServoStatusBits)
-        tiltBoardServoStatusBits.value = newBitString
-        parseTiltBoardServoStatusBits(newBitString)
+        const newBitString = safeToString(antennaData.trainBoardServoStatusBits)
+        trainBoardServoStatusBits.value = newBitString
+        parseTrainBoardServoStatusBits(newBitString)
       }
       if (
-        antennaData.tiltBoardStatusBits !== undefined &&
-        antennaData.tiltBoardStatusBits !== null
+        antennaData.trainBoardStatusBits !== undefined &&
+        antennaData.trainBoardStatusBits !== null
       ) {
-        const newBitString = safeToString(antennaData.tiltBoardStatusBits)
-        tiltBoardStatusBits.value = newBitString
-        parseTiltBoardStatusBits(newBitString)
+        const newBitString = safeToString(antennaData.trainBoardStatusBits)
+        trainBoardStatusBits.value = newBitString
+        parseTrainBoardStatusBits(newBitString)
       }
 
       // Feed 보드 상태
@@ -1546,8 +1547,8 @@ export const useICDStore = defineStore('icd', () => {
       ) {
         elevationAcceleration.value = safeToString(antennaData.elevationAcceleration)
       }
-      if (antennaData.tiltAcceleration !== undefined && antennaData.tiltAcceleration !== null) {
-        tiltAcceleration.value = safeToString(antennaData.tiltAcceleration)
+      if (antennaData.trainAcceleration !== undefined && antennaData.trainAcceleration !== null) {
+        trainAcceleration.value = safeToString(antennaData.trainAcceleration)
       }
       if (
         antennaData.azimuthMaxAcceleration !== undefined &&
@@ -1562,10 +1563,10 @@ export const useICDStore = defineStore('icd', () => {
         elevationMaxAcceleration.value = safeToString(antennaData.elevationMaxAcceleration)
       }
       if (
-        antennaData.tiltMaxAcceleration !== undefined &&
-        antennaData.tiltMaxAcceleration !== null
+        antennaData.trainMaxAcceleration !== undefined &&
+        antennaData.trainMaxAcceleration !== null
       ) {
-        tiltMaxAcceleration.value = safeToString(antennaData.tiltMaxAcceleration)
+        trainMaxAcceleration.value = safeToString(antennaData.trainMaxAcceleration)
       }
 
       // 트래킹 데이터
@@ -1605,20 +1606,20 @@ export const useICDStore = defineStore('icd', () => {
       ) {
         trackingActualElevationAngle.value = safeToString(antennaData.trackingActualElevationAngle)
       }
-      if (antennaData.trackingTiltTime !== undefined && antennaData.trackingTiltTime !== null) {
-        trackingTiltTime.value = safeToString(antennaData.trackingTiltTime)
+      if (antennaData.trackingTrainTime !== undefined && antennaData.trackingTrainTime !== null) {
+        trackingTrainTime.value = safeToString(antennaData.trackingTrainTime)
       }
       if (
-        antennaData.trackingCMDTiltAngle !== undefined &&
-        antennaData.trackingCMDTiltAngle !== null
+        antennaData.trackingCMDTrainAngle !== undefined &&
+        antennaData.trackingCMDTrainAngle !== null
       ) {
-        trackingCMDTiltAngle.value = safeToString(antennaData.trackingCMDTiltAngle)
+        trackingCMDTrainAngle.value = safeToString(antennaData.trackingCMDTrainAngle)
       }
       if (
-        antennaData.trackingActualTiltAngle !== undefined &&
-        antennaData.trackingActualTiltAngle !== null
+        antennaData.trackingActualTrainAngle !== undefined &&
+        antennaData.trackingActualTrainAngle !== null
       ) {
-        trackingActualTiltAngle.value = safeToString(antennaData.trackingActualTiltAngle)
+        trackingActualTrainAngle.value = safeToString(antennaData.trackingActualTrainAngle)
       }
     } catch (e) {
       console.error('❌ 센서 데이터 업데이트 오류:', e)
@@ -1845,10 +1846,10 @@ export const useICDStore = defineStore('icd', () => {
     switch (state) {
       case 'IDLE':
         return { displayLabel: '대기(위성 추적 정지)', displayColor: 'grey' }
-      case 'TILT_MOVING_TO_ZERO':
-        return { displayLabel: 'Tilt 시작 위치로 이동', displayColor: 'deep-orange' }
-      case 'TILT_STABILIZING':
-        return { displayLabel: 'Tilt 안정화 대기', displayColor: 'amber-7' }
+      case 'TRAIN_MOVING_TO_ZERO':
+        return { displayLabel: 'Train 시작 위치로 이동', displayColor: 'deep-orange' }
+      case 'TRAIN_STABILIZING':
+        return { displayLabel: 'Train 안정화 대기', displayColor: 'amber-7' }
       case 'MOVING_TO_START':
         return { displayLabel: '시작 위치 이동', displayColor: 'blue' }
       case 'WAITING_FOR_TRACKING':
@@ -1879,10 +1880,10 @@ export const useICDStore = defineStore('icd', () => {
     switch (state) {
       case 'IDLE':
         return { displayLabel: '대기', displayColor: 'grey' }
-      case 'TILT_MOVING_TO_ZERO':
-        return { displayLabel: 'Tilt 이동', displayColor: 'deep-orange' }
-      case 'TILT_STABILIZING':
-        return { displayLabel: 'Tilt 안정화', displayColor: 'amber-7' }
+      case 'TRAIN_MOVING_TO_ZERO':
+        return { displayLabel: 'Train 이동', displayColor: 'deep-orange' }
+      case 'TRAIN_STABILIZING':
+        return { displayLabel: 'Train 안정화', displayColor: 'amber-7' }
       case 'TRACKING':
         return { displayLabel: '추적 중', displayColor: 'green' }
       default:
@@ -1892,9 +1893,9 @@ export const useICDStore = defineStore('icd', () => {
   })
 
   // Standby 명령 전송
-  const standbyCommand = async (azimuth: boolean, elevation: boolean, tilt: boolean) => {
+  const standbyCommand = async (azimuth: boolean, elevation: boolean, train: boolean) => {
     try {
-      const response = await icdService.standbyCommand(azimuth, elevation, tilt)
+      const response = await icdService.standbyCommand(azimuth, elevation, train)
       return {
         success: true,
         data: response,
@@ -1943,9 +1944,13 @@ export const useICDStore = defineStore('icd', () => {
     }
   }
   // 서보 프리셋 명령 전송
-  const sendServoPresetCommand = async (azimuth: number, elevation: number, tilt: number) => {
+  const sendServoPresetCommand = async (azimuth: number, elevation: number, train: number) => {
     try {
-      const response = await icdService.sendServoPresetCommand(azimuth > 0, elevation > 0, tilt > 0)
+      const response = await icdService.sendServoPresetCommand(
+        azimuth > 0,
+        elevation > 0,
+        train > 0,
+      )
       return { success: true, data: response, message: '서보 프리셋 명령이 전송되었습니다.' }
     } catch (error) {
       console.error('서보 프리셋 명령 전송 실패:', error)
@@ -1958,9 +1963,9 @@ export const useICDStore = defineStore('icd', () => {
   }
 
   // 정지 명령 전송
-  const stopCommand = async (azimuth: boolean, elevation: boolean, tilt: boolean) => {
+  const stopCommand = async (azimuth: boolean, elevation: boolean, train: boolean) => {
     try {
-      const response = await icdService.stopCommand(azimuth, elevation, tilt)
+      const response = await icdService.stopCommand(azimuth, elevation, train)
       return { success: true, data: response, message: '정지 명령이 전송되었습니다.' }
     } catch (error) {
       console.error('정지 명령 전송 실패:', error)
@@ -2013,10 +2018,10 @@ export const useICDStore = defineStore('icd', () => {
     interval: number,
     azSpeed: number,
     elSpeed: number,
-    tiltSpeed: number,
+    trainSpeed: number,
   ) => {
     try {
-      const response = await icdService.startSunTrack(interval, azSpeed, elSpeed, tiltSpeed)
+      const response = await icdService.startSunTrack(interval, azSpeed, elSpeed, trainSpeed)
       return { success: true, data: response, message: 'Sun Track이 시작되었습니다.' }
     } catch (error) {
       console.error('Sun Track 시작 실패:', error)
@@ -2048,7 +2053,7 @@ export const useICDStore = defineStore('icd', () => {
         message: '위치 오프셋 명령이 전송되었습니다.',
         azimuthOffset: azOffset, // 실제 응답 구조에 맞게 수정 필요
         elevationOffset: elOffset, // 실제 응답 구조에 맞게 수정 필요
-        tiltOffset: tiOffset, // 실제 응답 구조에 맞게 수정 필요
+        trainOffset: tiOffset, // 실제 응답 구조에 맞게 수정 필요
       }
     } catch (error) {
       console.error('위치 오프셋 명령 전송 실패:', error)
@@ -2058,7 +2063,7 @@ export const useICDStore = defineStore('icd', () => {
         message: '위치 오프셋 명령 전송에 실패했습니다.',
         azimuthOffset: 0,
         elevationOffset: 0,
-        tiltOffset: 0,
+        trainOffset: 0,
       }
     }
   }
@@ -2111,7 +2116,7 @@ export const useICDStore = defineStore('icd', () => {
     resultTimeOffsetCalTime,
     cmdAzimuthAngle,
     cmdElevationAngle,
-    cmdTiltAngle,
+    cmdTrainAngle: cmdTrainAngle,
     cmdTime,
     error,
     isConnected,
@@ -2122,16 +2127,16 @@ export const useICDStore = defineStore('icd', () => {
     modeStatusBits,
     azimuthAngle,
     elevationAngle,
-    tiltAngle,
+    trainAngle: trainAngle,
     azimuthSpeed,
     elevationSpeed,
-    tiltSpeed,
+    trainSpeed: trainSpeed,
     servoDriverAzimuthAngle,
     servoDriverElevationAngle,
-    servoDriverTiltAngle,
+    servoDriverTrainAngle: servoDriverTrainAngle,
     torqueAzimuth,
     torqueElevation,
-    torqueTilt,
+    torqueTrain: torqueTrain,
     windSpeed,
     windDirection,
     rtdOne,
@@ -2146,8 +2151,8 @@ export const useICDStore = defineStore('icd', () => {
     azimuthBoardStatusBits,
     elevationBoardServoStatusBits,
     elevationBoardStatusBits,
-    tiltBoardServoStatusBits,
-    tiltBoardStatusBits,
+    trainBoardServoStatusBits: trainBoardServoStatusBits,
+    trainBoardStatusBits: trainBoardStatusBits,
     feedSBoardStatusBits,
     feedXBoardStatusBits,
 
@@ -2164,10 +2169,10 @@ export const useICDStore = defineStore('icd', () => {
     // 가속도 데이터
     azimuthAcceleration,
     elevationAcceleration,
-    tiltAcceleration,
+    trainAcceleration: trainAcceleration,
     azimuthMaxAcceleration,
     elevationMaxAcceleration,
-    tiltMaxAcceleration,
+    trainMaxAcceleration: trainMaxAcceleration,
 
     // 추적 데이터
     trackingAzimuthTime,
@@ -2176,9 +2181,9 @@ export const useICDStore = defineStore('icd', () => {
     trackingElevationTime,
     trackingCMDElevationAngle,
     trackingActualElevationAngle,
-    trackingTiltTime,
-    trackingCMDTiltAngle,
-    trackingActualTiltAngle,
+    trackingTrainTime: trackingTrainTime,
+    trackingCMDTrainAngle: trackingCMDTrainAngle,
+    trackingActualTrainAngle: trackingActualTrainAngle,
 
     // 업데이트 관련
     isUpdating,
@@ -2201,8 +2206,8 @@ export const useICDStore = defineStore('icd', () => {
     azimuthBoardStatusInfo,
     elevationBoardServoStatusInfo,
     elevationBoardStatusInfo,
-    tiltBoardServoStatusInfo,
-    tiltBoardStatusInfo,
+    trainBoardServoStatusInfo: trainBoardServoStatusInfo,
+    trainBoardStatusInfo: trainBoardStatusInfo,
     feedSBoardStatusInfo,
     feedXBoardStatusInfo,
 

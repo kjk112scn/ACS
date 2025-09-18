@@ -6,170 +6,75 @@
     <div class="row q-col-gutter-md">
       <!-- Azimuth 패널 -->
       <div class="col-12 col-md-4">
-        <q-card
-          class="axis-panel"
-          :class="{ 'disabled-panel': !pedestalStore.selectedAxes.azimuth }"
-        >
+        <q-card class="axis-panel" :class="{ 'disabled-panel': !pedestalStore.selectedAxes.azimuth }">
           <q-card-section>
             <div class="axis-header q-mb-md">
-              <q-checkbox
-                v-model="pedestalStore.selectedAxes.azimuth"
-                color="primary"
-                class="axis-checkbox"
-              />
+              <q-checkbox v-model="pedestalStore.selectedAxes.azimuth" color="primary" class="axis-checkbox" />
               <div class="text-h6 text-primary axis-title">Azimuth</div>
             </div>
 
             <div class="text-subtitle2">Current Position</div>
-            <q-input
-              v-model="currentPositions.azimuth"
-              outlined
-              readonly
-              dense
-              suffix="°"
-              class="q-mb-sm"
-            />
+            <q-input v-model="currentPositions.azimuth" outlined readonly dense suffix="°" class="q-mb-sm" />
 
             <div class="text-subtitle2">Target Position</div>
-            <q-input
-              v-model="pedestalStore.targetPositions.azimuth"
-              outlined
-              dense
-              type="number"
-              suffix="°"
-              :disable="!pedestalStore.selectedAxes.azimuth"
-              min="-360"
-              max="360"
-              step="0.01"
-              @update:model-value="formatTargetPosition('azimuth')"
-              class="q-mb-sm"
-            />
+            <q-input v-model="pedestalStore.targetPositions.azimuth" outlined dense type="number" suffix="°"
+              :disable="!pedestalStore.selectedAxes.azimuth" min="-360" max="360" step="0.01"
+              @update:model-value="formatTargetPosition('azimuth')" class="q-mb-sm" />
 
             <div class="text-subtitle2">Target Speed</div>
-            <q-input
-              v-model="pedestalStore.targetSpeeds.azimuth"
-              outlined
-              dense
-              type="number"
-              suffix="°/s"
-              :disable="!pedestalStore.selectedAxes.azimuth"
-              min="7"
-              max="173"
-              step="0.01"
-              @update:model-value="formatTargetSpeed('azimuth')"
-            />
+            <q-input v-model="pedestalStore.targetSpeeds.azimuth" outlined dense type="number" suffix="°/s"
+              :disable="!pedestalStore.selectedAxes.azimuth" min="7" max="173" step="0.01"
+              @update:model-value="formatTargetSpeed('azimuth')" />
           </q-card-section>
         </q-card>
       </div>
 
       <!-- Elevation 패널 -->
       <div class="col-12 col-md-4">
-        <q-card
-          class="axis-panel"
-          :class="{ 'disabled-panel': !pedestalStore.selectedAxes.elevation }"
-        >
+        <q-card class="axis-panel" :class="{ 'disabled-panel': !pedestalStore.selectedAxes.elevation }">
           <q-card-section>
             <div class="axis-header q-mb-md">
-              <q-checkbox
-                v-model="pedestalStore.selectedAxes.elevation"
-                color="primary"
-                class="axis-checkbox"
-              />
+              <q-checkbox v-model="pedestalStore.selectedAxes.elevation" color="primary" class="axis-checkbox" />
               <div class="text-h6 text-primary axis-title">Elevation</div>
             </div>
 
             <div class="text-subtitle2">Current Position</div>
-            <q-input
-              v-model="currentPositions.elevation"
-              outlined
-              readonly
-              dense
-              suffix="°"
-              class="q-mb-sm"
-            />
+            <q-input v-model="currentPositions.elevation" outlined readonly dense suffix="°" class="q-mb-sm" />
 
             <div class="text-subtitle2">Target Position</div>
-            <q-input
-              v-model="pedestalStore.targetPositions.elevation"
-              outlined
-              dense
-              type="number"
-              suffix="°"
-              :disable="!pedestalStore.selectedAxes.elevation"
-              min="-360"
-              max="360"
-              step="0.01"
-              @update:model-value="formatTargetPosition('elevation')"
-              class="q-mb-sm"
-            />
+            <q-input v-model="pedestalStore.targetPositions.elevation" outlined dense type="number" suffix="°"
+              :disable="!pedestalStore.selectedAxes.elevation" min="-360" max="360" step="0.01"
+              @update:model-value="formatTargetPosition('elevation')" class="q-mb-sm" />
 
             <div class="text-subtitle2">Target Speed</div>
-            <q-input
-              v-model="pedestalStore.targetSpeeds.elevation"
-              outlined
-              dense
-              type="number"
-              suffix="°/s"
-              :disable="!pedestalStore.selectedAxes.elevation"
-              min="0"
-              step="0.01"
-              @update:model-value="formatTargetSpeed('elevation')"
-            />
+            <q-input v-model="pedestalStore.targetSpeeds.elevation" outlined dense type="number" suffix="°/s"
+              :disable="!pedestalStore.selectedAxes.elevation" min="0" step="0.01"
+              @update:model-value="formatTargetSpeed('elevation')" />
           </q-card-section>
         </q-card>
       </div>
 
       <!-- Tilt 패널 -->
       <div class="col-12 col-md-4">
-        <q-card class="axis-panel" :class="{ 'disabled-panel': !pedestalStore.selectedAxes.tilt }">
+        <q-card class="axis-panel" :class="{ 'disabled-panel': !pedestalStore.selectedAxes.train }">
           <q-card-section>
             <div class="axis-header q-mb-md">
-              <q-checkbox
-                v-model="pedestalStore.selectedAxes.tilt"
-                color="primary"
-                class="axis-checkbox"
-              />
+              <q-checkbox v-model="pedestalStore.selectedAxes.train" color="primary" class="axis-checkbox" />
               <div class="text-h6 text-primary axis-title">Tilt</div>
             </div>
 
             <div class="text-subtitle2">Current Position</div>
-            <q-input
-              v-model="currentPositions.tilt"
-              outlined
-              readonly
-              dense
-              suffix="°"
-              class="q-mb-sm"
-            />
+            <q-input v-model="currentPositions.train" outlined readonly dense suffix="°" class="q-mb-sm" />
 
             <div class="text-subtitle2">Target Position</div>
-            <q-input
-              v-model="pedestalStore.targetPositions.tilt"
-              outlined
-              dense
-              type="number"
-              suffix="°"
-              :disable="!pedestalStore.selectedAxes.tilt"
-              min="-360"
-              max="360"
-              step="0.01"
-              @update:model-value="formatTargetPosition('tilt')"
-              class="q-mb-sm"
-            />
+            <q-input v-model="pedestalStore.targetPositions.train" outlined dense type="number" suffix="°"
+              :disable="!pedestalStore.selectedAxes.train" min="-360" max="360" step="0.01"
+              @update:model-value="formatTargetPosition('train')" class="q-mb-sm" />
 
             <div class="text-subtitle2">Target Speed</div>
-            <q-input
-              v-model="pedestalStore.targetSpeeds.tilt"
-              outlined
-              dense
-              type="number"
-              suffix="°/s"
-              :disable="!pedestalStore.selectedAxes.tilt"
-              min="-360"
-              max="360"
-              step="0.01"
-              @update:model-value="formatTargetSpeed('tilt')"
-            />
+            <q-input v-model="pedestalStore.targetSpeeds.train" outlined dense type="number" suffix="°/s"
+              :disable="!pedestalStore.selectedAxes.train" min="-360" max="360" step="0.01"
+              @update:model-value="formatTargetSpeed('train')" />
           </q-card-section>
         </q-card>
       </div>
@@ -179,32 +84,12 @@
     <q-card class="q-mt-md">
       <q-card-section>
         <div class="row justify-center q-gutter-md">
-          <q-btn
-            label="Go"
-            color="positive"
-            icon="play_arrow"
-            size="lg"
-            :disable="!pedestalStore.isAnyAxisSelected()"
-            @click="handleGoCommand"
-            :loading="isGoLoading"
-          />
-          <q-btn
-            label="Stop"
-            color="negative"
-            icon="stop"
-            size="lg"
-            :disable="!pedestalStore.isAnyAxisSelected()"
-            @click="handleStopCommand"
-            :loading="isStopLoading"
-          />
-          <q-btn
-            label="Stow"
-            color="primary"
-            icon="home"
-            size="lg"
-            @click="handleStowCommand"
-            :loading="isStowLoading"
-          />
+          <q-btn label="Go" color="positive" icon="play_arrow" size="lg" :disable="!pedestalStore.isAnyAxisSelected()"
+            @click="handleGoCommand" :loading="isGoLoading" />
+          <q-btn label="Stop" color="negative" icon="stop" size="lg" :disable="!pedestalStore.isAnyAxisSelected()"
+            @click="handleStopCommand" :loading="isStopLoading" />
+          <q-btn label="Stow" color="primary" icon="home" size="lg" @click="handleStowCommand"
+            :loading="isStowLoading" />
         </div>
       </q-card-section>
     </q-card>
@@ -227,8 +112,8 @@ interface CommandParams {
   azimuthSpeed?: number
   elevationAngle?: number
   elevationSpeed?: number
-  tiltAngle?: number
-  tiltSpeed?: number
+  trainAngle?: number
+  trainSpeed?: number
   [key: string]: number | undefined
 }
 
@@ -243,13 +128,13 @@ const isStowLoading = ref(false)
 const currentPositions = ref({
   azimuth: '0.00',
   elevation: '0.00',
-  tilt: '0.00',
+  train: '0.00',
 })
 
 const statusMessage = ref('')
 const statusClass = ref('bg-positive text-white')
 
-const formatTargetPosition = (axis: 'azimuth' | 'elevation' | 'tilt') => {
+const formatTargetPosition = (axis: 'azimuth' | 'elevation' | 'train') => {
   let value = parseFloat(pedestalStore.targetPositions[axis])
 
   if (isNaN(value)) {
@@ -263,7 +148,7 @@ const formatTargetPosition = (axis: 'azimuth' | 'elevation' | 'tilt') => {
   pedestalStore.updateTargetPosition(axis, value.toFixed(2))
 }
 
-const formatTargetSpeed = (axis: 'azimuth' | 'elevation' | 'tilt') => {
+const formatTargetSpeed = (axis: 'azimuth' | 'elevation' | 'train') => {
   let value = parseFloat(pedestalStore.targetSpeeds[axis])
   if (isNaN(value) || value < 0) {
     value = 0
@@ -290,10 +175,10 @@ watch(
 )
 
 watch(
-  () => icdStore.tiltAngle,
+  () => icdStore.trainAngle,
   (newValue) => {
     if (newValue) {
-      currentPositions.value.tilt = parseFloat(newValue).toFixed(2)
+      currentPositions.value.train = parseFloat(newValue).toFixed(2)
     }
   },
 )
@@ -305,8 +190,8 @@ onMounted(() => {
   if (icdStore.elevationAngle) {
     currentPositions.value.elevation = parseFloat(icdStore.elevationAngle).toFixed(2)
   }
-  if (icdStore.tiltAngle) {
-    currentPositions.value.tilt = parseFloat(icdStore.tiltAngle).toFixed(2)
+  if (icdStore.trainAngle) {
+    currentPositions.value.train = parseFloat(icdStore.trainAngle).toFixed(2)
   }
 })
 
@@ -326,21 +211,21 @@ const handleGoCommand = async () => {
       command.elevationSpeed = parseFloat(pedestalStore.targetSpeeds.elevation)
     }
 
-    if (pedestalStore.selectedAxes.tilt) {
-      command.tiltAngle = parseFloat(pedestalStore.targetPositions.tilt)
-      command.tiltSpeed = parseFloat(pedestalStore.targetSpeeds.tilt)
+    if (pedestalStore.selectedAxes.train) {
+      command.trainAngle = parseFloat(pedestalStore.targetPositions.train)
+      command.trainSpeed = parseFloat(pedestalStore.targetSpeeds.train)
     }
 
     await icdStore.sendMultiControlCommand({
       azimuth: pedestalStore.selectedAxes.azimuth,
       elevation: pedestalStore.selectedAxes.elevation,
-      tilt: pedestalStore.selectedAxes.tilt,
+      train: pedestalStore.selectedAxes.train,
       azAngle: command.azimuthAngle ?? 0,
       azSpeed: command.azimuthSpeed ?? 0,
       elAngle: command.elevationAngle ?? 0,
       elSpeed: command.elevationSpeed ?? 0,
-      tiAngle: command.tiltAngle ?? 0,
-      tiSpeed: command.tiltSpeed ?? 0,
+      trainAngle: command.trainAngle ?? 0,
+      trainSpeed: command.trainSpeed ?? 0,
     })
 
     statusMessage.value = '위치 명령이 성공적으로 전송되었습니다.'
@@ -378,7 +263,7 @@ const handleStopCommand = async () => {
     await icdStore.stopCommand(
       pedestalStore.selectedAxes.azimuth,
       pedestalStore.selectedAxes.elevation,
-      pedestalStore.selectedAxes.tilt,
+      pedestalStore.selectedAxes.train,
     )
 
     statusMessage.value = '정지 명령이 성공적으로 전송되었습니다.'
@@ -488,6 +373,7 @@ input[type='number']::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
 input[type='number'] {
   -moz-appearance: textfield;
 }

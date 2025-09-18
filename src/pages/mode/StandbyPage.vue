@@ -8,27 +8,9 @@
 
           <!-- 체크박스 그룹 -->
           <div class="checkbox-group q-gutter-x-xl">
-            <q-checkbox
-              v-model="azimuthChecked"
-              label="Azimuth"
-              color="primary"
-              class="axis-checkbox"
-              size="lg"
-            />
-            <q-checkbox
-              v-model="elevationChecked"
-              label="Elevation"
-              color="primary"
-              class="axis-checkbox"
-              size="lg"
-            />
-            <q-checkbox
-              v-model="tiltChecked"
-              label="Tilt"
-              color="primary"
-              class="axis-checkbox"
-              size="lg"
-            />
+            <q-checkbox v-model="azimuthChecked" label="Azimuth" color="primary" class="axis-checkbox" size="lg" />
+            <q-checkbox v-model="elevationChecked" label="Elevation" color="primary" class="axis-checkbox" size="lg" />
+            <q-checkbox v-model="trainChecked" label="Tilt" color="primary" class="axis-checkbox" size="lg" />
           </div>
 
           <!-- 버튼 그룹 -->
@@ -69,16 +51,16 @@ const elevationChecked = computed({
   set: (value: boolean) => standbyStore.updateAxis('elevation', value),
 })
 
-const tiltChecked = computed({
-  get: () => standbyStore.selectedAxes.tilt,
-  set: (value: boolean) => standbyStore.updateAxis('tilt', value),
+const trainChecked = computed({
+  get: () => standbyStore.selectedAxes.train,
+  set: (value: boolean) => standbyStore.updateAxis('train', value),
 })
 
 // Standby 버튼 핸들러 - 선택된 축만 standby
 const handleStandby = async () => {
   try {
     const axes = standbyStore.selectedAxes
-    await icdStore.standbyCommand(axes.azimuth, axes.elevation, axes.tilt)
+    await icdStore.standbyCommand(axes.azimuth, axes.elevation, axes.train)
     console.log('Standby 명령 전송 성공')
   } catch (error) {
     console.error('Standby 명령 전송 실패:', error)

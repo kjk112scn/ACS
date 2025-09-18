@@ -67,9 +67,9 @@ export interface RealtimeTrackingDataItem {
   trackingElevationTime: number
   trackingCMDElevationAngle: number
   trackingActualElevationAngle: number
-  trackingTiltTime: number
-  trackingCMDTiltAngle: number
-  trackingActualTiltAngle: number
+  trackingTrainTime: number
+  trackingCMDTrainAngle: number
+  trackingActualTrainAngle: number
 
   // 오차 분석
   azimuthError: number
@@ -88,7 +88,7 @@ export interface RealtimeTrackingDataItem {
   elFinalAccuracy?: number
 
   // 변환 정보
-  tiltAngle?: number
+  trainAngle?: number
   transformationType?: string
   hasTransformation?: boolean
   interpolationMethod?: string
@@ -371,7 +371,7 @@ class EphemerisTrackService {
     azimuth: number
     elevation: number
     tilt: number
-    rotator: number
+    train: number
   }): Promise<{
     success: boolean
     input: { azimuth: number; elevation: number; tilt: number; rotator: number }

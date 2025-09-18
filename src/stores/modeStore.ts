@@ -12,7 +12,7 @@ export interface AxisData {
 export interface ModeDataMapping {
   azimuth: AxisData
   elevation: AxisData
-  tilt: AxisData
+  train: AxisData
 }
 
 // 모드별 데이터 매핑 정의 (기존과 동일)
@@ -21,50 +21,50 @@ const MODE_DATA_MAPPINGS: Record<ModeType, ModeDataMapping> = {
     azimuth: {
       cmd: 'trackingCMDAzimuthAngle',
       actual: 'trackingActualAzimuthAngle',
-      speed: 'azimuthSpeed'
+      speed: 'azimuthSpeed',
     },
     elevation: {
       cmd: 'trackingCMDElevationAngle',
       actual: 'trackingActualElevationAngle',
-      speed: 'elevationSpeed'
+      speed: 'elevationSpeed',
     },
-    tilt: {
+    train: {
       cmd: 'trackingCMDTiltAngle',
       actual: 'trackingActualTiltAngle',
-      speed: 'tiltSpeed'
-    }
+      speed: 'tiltSpeed',
+    },
   },
   // ... 다른 모드들은 기본 데이터 사용
   step: {
     azimuth: { cmd: 'cmdAzimuthAngle', actual: 'azimuthAngle', speed: 'azimuthSpeed' },
     elevation: { cmd: 'cmdElevationAngle', actual: 'elevationAngle', speed: 'elevationSpeed' },
-    tilt: { cmd: 'cmdTiltAngle', actual: 'tiltAngle', speed: 'tiltSpeed' }
+    train: { cmd: 'cmdTiltAngle', actual: 'tiltAngle', speed: 'tiltSpeed' },
   },
   slew: {
     azimuth: { cmd: 'cmdAzimuthAngle', actual: 'azimuthAngle', speed: 'azimuthSpeed' },
     elevation: { cmd: 'cmdElevationAngle', actual: 'elevationAngle', speed: 'elevationSpeed' },
-    tilt: { cmd: 'cmdTiltAngle', actual: 'tiltAngle', speed: 'tiltSpeed' }
+    train: { cmd: 'cmdTiltAngle', actual: 'tiltAngle', speed: 'tiltSpeed' },
   },
   pedestal: {
     azimuth: { cmd: 'cmdAzimuthAngle', actual: 'azimuthAngle', speed: 'azimuthSpeed' },
     elevation: { cmd: 'cmdElevationAngle', actual: 'elevationAngle', speed: 'elevationSpeed' },
-    tilt: { cmd: 'cmdTiltAngle', actual: 'tiltAngle', speed: 'tiltSpeed' }
+    train: { cmd: 'cmdTiltAngle', actual: 'tiltAngle', speed: 'tiltSpeed' },
   },
   suntrack: {
     azimuth: { cmd: 'cmdAzimuthAngle', actual: 'azimuthAngle', speed: 'azimuthSpeed' },
     elevation: { cmd: 'cmdElevationAngle', actual: 'elevationAngle', speed: 'elevationSpeed' },
-    tilt: { cmd: 'cmdTiltAngle', actual: 'tiltAngle', speed: 'tiltSpeed' }
+    train: { cmd: 'cmdTiltAngle', actual: 'tiltAngle', speed: 'tiltSpeed' },
   },
   standby: {
     azimuth: { cmd: 'cmdAzimuthAngle', actual: 'azimuthAngle', speed: 'azimuthSpeed' },
     elevation: { cmd: 'cmdElevationAngle', actual: 'elevationAngle', speed: 'elevationSpeed' },
-    tilt: { cmd: 'cmdTiltAngle', actual: 'tiltAngle', speed: 'tiltSpeed' }
+    train: { cmd: 'cmdTiltAngle', actual: 'tiltAngle', speed: 'tiltSpeed' },
   },
   feed: {
     azimuth: { cmd: 'cmdAzimuthAngle', actual: 'azimuthAngle', speed: 'azimuthSpeed' },
     elevation: { cmd: 'cmdElevationAngle', actual: 'elevationAngle', speed: 'elevationSpeed' },
-    tilt: { cmd: 'cmdTiltAngle', actual: 'tiltAngle', speed: 'tiltSpeed' }
-  }
+    train: { cmd: 'cmdTiltAngle', actual: 'tiltAngle', speed: 'tiltSpeed' },
+  },
 }
 
 export const useModeStore = defineStore('mode', () => {
@@ -82,13 +82,13 @@ export const useModeStore = defineStore('mode', () => {
 
   // 모드별 활성화 상태
   const modeActivationStatus = ref<Record<ModeType, boolean>>({
-    standby: true,  // standby는 기본적으로 활성화
+    standby: true, // standby는 기본적으로 활성화
     step: false,
     slew: false,
     pedestal: false,
     ephemeris: false,
     suntrack: false,
-    feed: false
+    feed: false,
   })
 
   // 현재 활성 모드의 데이터 매핑 가져오기
@@ -143,7 +143,10 @@ export const useModeStore = defineStore('mode', () => {
   }
 
   // 특정 축의 데이터 필드명 가져오기 (활성 모드 기준)
-  const getAxisFieldName = (axis: 'azimuth' | 'elevation' | 'tilt', type: 'cmd' | 'actual' | 'speed'): string => {
+  const getAxisFieldName = (
+    axis: 'azimuth' | 'elevation' | 'train',
+    type: 'cmd' | 'actual' | 'speed',
+  ): string => {
     return activeModeMapping.value[axis][type]
   }
 
@@ -169,7 +172,7 @@ export const useModeStore = defineStore('mode', () => {
 
     if (savedActiveMode && Object.keys(MODE_DATA_MAPPINGS).includes(savedActiveMode)) {
       // 모든 모드 비활성화 후 저장된 모드만 활성화
-      Object.keys(modeActivationStatus.value).forEach(mode => {
+      Object.keys(modeActivationStatus.value).forEach((mode) => {
         modeActivationStatus.value[mode as ModeType] = false
       })
 
@@ -186,7 +189,7 @@ export const useModeStore = defineStore('mode', () => {
     previous: previousActiveMode.value,
     activatedAt: modeActivatedAt.value,
     activationStatus: { ...modeActivationStatus.value },
-    mapping: activeModeMapping.value
+    mapping: activeModeMapping.value,
   }))
 
   return {
@@ -206,6 +209,6 @@ export const useModeStore = defineStore('mode', () => {
     getAxisFieldName,
     isModeActive,
     isCurrentActiveMode,
-    initializeMode
+    initializeMode,
   }
 })

@@ -4,19 +4,19 @@ import { ref } from 'vue'
 export interface PedestalAxes {
   azimuth: boolean
   elevation: boolean
-  tilt: boolean
+  train: boolean
 }
 
 export interface PedestalPositions {
   azimuth: string
   elevation: string
-  tilt: string
+  train: string
 }
 
 export interface PedestalSpeeds {
   azimuth: string
   elevation: string
-  tilt: string
+  train: string
 }
 
 export const usePedestalPositionStore = defineStore('pedestalPosition', () => {
@@ -24,21 +24,21 @@ export const usePedestalPositionStore = defineStore('pedestalPosition', () => {
   const selectedAxes = ref<PedestalAxes>({
     azimuth: false,
     elevation: false,
-    tilt: false,
+    train: false,
   })
 
   // 목표 위치
   const targetPositions = ref<PedestalPositions>({
     azimuth: '0.00',
     elevation: '0.00',
-    tilt: '0.00',
+    train: '0.00',
   })
 
   // 목표 속도
   const targetSpeeds = ref<PedestalSpeeds>({
     azimuth: '0.50',
     elevation: '0.50',
-    tilt: '0.50',
+    train: '0.50',
   })
 
   // 축 선택 상태 업데이트
@@ -61,7 +61,7 @@ export const usePedestalPositionStore = defineStore('pedestalPosition', () => {
     selectedAxes.value = {
       azimuth: false,
       elevation: false,
-      tilt: false,
+      train: false,
     }
   }
 
@@ -70,7 +70,7 @@ export const usePedestalPositionStore = defineStore('pedestalPosition', () => {
     targetPositions.value = {
       azimuth: '0.00',
       elevation: '0.00',
-      tilt: '0.00',
+      train: '0.00',
     }
   }
 
@@ -79,7 +79,7 @@ export const usePedestalPositionStore = defineStore('pedestalPosition', () => {
     targetSpeeds.value = {
       azimuth: '0.50',
       elevation: '0.50',
-      tilt: '0.50',
+      train: '0.50',
     }
   }
 
@@ -88,7 +88,7 @@ export const usePedestalPositionStore = defineStore('pedestalPosition', () => {
     selectedAxes.value = {
       azimuth: true,
       elevation: true,
-      tilt: true,
+      train: true,
     }
     resetAllPositions()
     resetAllSpeeds()
@@ -96,7 +96,7 @@ export const usePedestalPositionStore = defineStore('pedestalPosition', () => {
 
   // 최소 하나의 축이 선택되었는지 확인
   const isAnyAxisSelected = () => {
-    return selectedAxes.value.azimuth || selectedAxes.value.elevation || selectedAxes.value.tilt
+    return selectedAxes.value.azimuth || selectedAxes.value.elevation || selectedAxes.value.train
   }
 
   return {

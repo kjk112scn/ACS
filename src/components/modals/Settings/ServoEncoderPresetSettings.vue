@@ -8,12 +8,7 @@
           <q-card-section>
             <div class="text-h6">Azimuth</div>
             <div class="q-mt-md">
-              <q-btn
-                color="primary"
-                label="Preset"
-                class="full-width"
-                @click="showPresetConfirmation('azimuth')"
-              />
+              <q-btn color="primary" label="Preset" class="full-width" @click="showPresetConfirmation('azimuth')" />
             </div>
           </q-card-section>
         </q-card>
@@ -24,12 +19,7 @@
           <q-card-section>
             <div class="text-h6">Elevation</div>
             <div class="q-mt-md">
-              <q-btn
-                color="primary"
-                label="Preset"
-                class="full-width"
-                @click="showPresetConfirmation('elevation')"
-              />
+              <q-btn color="primary" label="Preset" class="full-width" @click="showPresetConfirmation('elevation')" />
             </div>
           </q-card-section>
         </q-card>
@@ -40,12 +30,7 @@
           <q-card-section>
             <div class="text-h6">Tilt</div>
             <div class="q-mt-md">
-              <q-btn
-                color="primary"
-                label="Preset"
-                class="full-width"
-                @click="showPresetConfirmation('tilt')"
-              />
+              <q-btn color="primary" label="Preset" class="full-width" @click="showPresetConfirmation('train')" />
             </div>
           </q-card-section>
         </q-card>
@@ -64,22 +49,9 @@
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn
-            flat
-            label="아니오"
-            color="negative"
-            v-close-popup
-            @click="cancelPresetConfirmation"
-            :disable="isLoading"
-          />
-          <q-btn
-            flat
-            label="예"
-            color="positive"
-            @click="confirmPreset"
-            :loading="isLoading"
-            :disable="isLoading"
-          />
+          <q-btn flat label="아니오" color="negative" v-close-popup @click="cancelPresetConfirmation"
+            :disable="isLoading" />
+          <q-btn flat label="예" color="positive" @click="confirmPreset" :loading="isLoading" :disable="isLoading" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -99,10 +71,10 @@ const isLoading = ref(false)
 
 // 확인 모달 관련 상태
 const confirmationDialog = ref(false)
-const presetToConfirm = ref<'azimuth' | 'elevation' | 'tilt' | null>(null)
+const presetToConfirm = ref<'azimuth' | 'elevation' | 'train' | null>(null)
 
 // 프리셋 확인 모달 표시
-const showPresetConfirmation = (preset: 'azimuth' | 'elevation' | 'tilt') => {
+const showPresetConfirmation = (preset: 'azimuth' | 'elevation' | 'train') => {
   presetToConfirm.value = preset
   confirmationDialog.value = true
 }
@@ -122,7 +94,7 @@ const confirmPreset = async () => {
     // 선택된 축에 따라 파라미터 설정
     const azimuth = presetToConfirm.value === 'azimuth'
     const elevation = presetToConfirm.value === 'elevation'
-    const tilt = presetToConfirm.value === 'tilt'
+    const tilt = presetToConfirm.value === 'train'
 
     // 서보 프리셋 명령 전송
     // boolean을 number로 변환

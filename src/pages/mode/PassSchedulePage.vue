@@ -277,7 +277,7 @@
                   <q-td :props="props" class="elevation-info-cell">
                     <div class="elevation-container">
                       <div class="max-elevation">{{ formatAngle(props.row.maxElevation) }}</div>
-                      <div class="tilt">{{ formatAngle(0) }}</div>
+                      <div class="train">{{ formatAngle(0) }}</div>
                     </div>
                   </q-td>
                 </template>
@@ -1664,7 +1664,7 @@ const updateOffset = async (index: number, value: string) => {
     const numValue = Number(parseFloat(value).toFixed(2)) || 0
     console.log('계산된 numValue:', numValue)
 
-    const offsetTypes = ['azimuth', 'elevation', 'tilt', 'time'] as const
+    const offsetTypes = ['azimuth', 'elevation', 'train', 'time'] as const
     const offsetType = offsetTypes[index]
 
     if (!offsetType) {
@@ -1685,12 +1685,12 @@ const updateOffset = async (index: number, value: string) => {
       return
     }
 
-    // Position Offset 처리 (azimuth, elevation, tilt)
+    // Position Offset 처리 (azimuth, elevation, train)
     passScheduleStore.updateOffsetValues(offsetType, numValue.toFixed(2))
 
     const azOffset = Number((parseFloat(passScheduleStore.offsetValues.azimuth) || 0).toFixed(2))
     const elOffset = Number((parseFloat(passScheduleStore.offsetValues.elevation) || 0).toFixed(2))
-    const tiOffset = Number((parseFloat(passScheduleStore.offsetValues.tilt) || 0).toFixed(2))
+    const tiOffset = Number((parseFloat(passScheduleStore.offsetValues.train) || 0).toFixed(2))
 
     await icdStore.sendPositionOffsetCommand(azOffset, elOffset, tiOffset)
   } catch (error) {
@@ -2673,7 +2673,7 @@ const formattedCalTime = computed(() => {
 .schedule-table tbody tr.highlight-current-schedule .start-az,
 .schedule-table tbody tr.highlight-current-schedule .end-az,
 .schedule-table tbody tr.highlight-current-schedule .max-elevation,
-.schedule-table tbody tr.highlight-current-schedule .tilt {
+.schedule-table tbody tr.highlight-current-schedule .train {
   background-color: #c8e6c9 !important;
   color: #2e7d32 !important;
   font-weight: 500 !important;
@@ -2711,7 +2711,7 @@ const formattedCalTime = computed(() => {
 .schedule-table tbody tr.highlight-next-schedule .start-az,
 .schedule-table tbody tr.highlight-next-schedule .end-az,
 .schedule-table tbody tr.highlight-next-schedule .max-elevation,
-.schedule-table tbody tr.highlight-next-schedule .tilt {
+.schedule-table tbody tr.highlight-next-schedule .train {
   background-color: #e3f2fd !important;
   color: #1565c0 !important;
   font-weight: 500 !important;
@@ -2787,7 +2787,7 @@ const formattedCalTime = computed(() => {
 }
 
 .max-elevation,
-.tilt {
+.train {
   font-size: 11px;
   font-weight: 600;
   line-height: 1.2;
@@ -2798,7 +2798,7 @@ const formattedCalTime = computed(() => {
   color: #9c27b0;
 }
 
-.tilt {
+.train {
   color: #607d8b;
 }
 

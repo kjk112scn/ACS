@@ -4,19 +4,19 @@ import { ref } from 'vue'
 export interface StepAxes {
   azimuth: boolean
   elevation: boolean
-  tilt: boolean
+  train: boolean
 }
 
 export interface StepAngles {
   azimuth: string
   elevation: string
-  tilt: string
+  train: string
 }
 
 export interface StepSpeeds {
   azimuth: string
   elevation: string
-  tilt: string
+  train: string
 }
 
 export const useStepStore = defineStore('step', () => {
@@ -24,21 +24,21 @@ export const useStepStore = defineStore('step', () => {
   const selectedAxes = ref<StepAxes>({
     azimuth: false,
     elevation: false,
-    tilt: false,
+    train: false,
   })
 
   // 각도 상태
   const angles = ref<StepAngles>({
     azimuth: '0.00',
     elevation: '0.00',
-    tilt: '0.00',
+    train: '0.00',
   })
 
   // 속도 상태
   const speeds = ref<StepSpeeds>({
     azimuth: '0.00',
     elevation: '0.00',
-    tilt: '0.00',
+    train: '0.00',
   })
 
   // 축 선택 상태 업데이트
@@ -61,7 +61,7 @@ export const useStepStore = defineStore('step', () => {
     selectedAxes.value = {
       azimuth: false,
       elevation: false,
-      tilt: false,
+      train: false,
     }
   }
 
@@ -70,7 +70,7 @@ export const useStepStore = defineStore('step', () => {
     angles.value = {
       azimuth: '0.00',
       elevation: '0.00',
-      tilt: '0.00',
+      train: '0.00',
     }
   }
 
@@ -79,7 +79,7 @@ export const useStepStore = defineStore('step', () => {
     speeds.value = {
       azimuth: '0.00',
       elevation: '0.00',
-      tilt: '0.00',
+      train: '0.00',
     }
   }
 
@@ -92,7 +92,7 @@ export const useStepStore = defineStore('step', () => {
 
   // 최소 하나의 축이 선택되었는지 확인
   const isAnyAxisSelected = () => {
-    return selectedAxes.value.azimuth || selectedAxes.value.elevation || selectedAxes.value.tilt
+    return selectedAxes.value.azimuth || selectedAxes.value.elevation || selectedAxes.value.train
   }
 
   return {

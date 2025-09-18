@@ -15,7 +15,7 @@
         <div class="input-item">
           <label class="input-label">Azimuth (°)</label>
           <q-input v-model.number="inputData.azimuth" type="number" outlined dense step="0.01" min="0" max="360"
-            :rules="[val => (val >= 0 && val <= 360) || '0-360도 범위여야 합니다']" class="q-mb-sm" />
+            :rules="[val => (val >= -270 && val <= 270) || '0-360도 범위여야 합니다']" class="q-mb-sm" />
         </div>
 
         <!-- Elevation 입력 -->
@@ -32,10 +32,10 @@
             :rules="[val => (val >= -90 && val <= 90) || '-90-90도 범위여야 합니다']" class="q-mb-sm" />
         </div>
 
-        <!-- Rotator 입력 -->
+        <!-- Train 입력 -->
         <div class="input-item">
-          <label class="input-label">Rotator (°)</label>
-          <q-input v-model.number="inputData.rotator" type="number" outlined dense step="0.01" min="-270" max="270"
+          <label class="input-label">Train (°)</label>
+          <q-input v-model.number="inputData.train" type="number" outlined dense step="0.01" min="-270" max="270"
             :rules="[val => (val >= -270 && val <= 270) || '-270~270도 범위여야 합니다']" class="q-mb-sm" />
         </div>
       </div>
@@ -90,7 +90,7 @@ const inputData = reactive({
   azimuth: 0,
   elevation: 0,
   tilt: 0,
-  rotator: 0
+  train: 0
 })
 
 // 출력 데이터
@@ -110,7 +110,7 @@ const calculateTransform = async () => {
     resultMessage.value = null
 
     // 입력값 검증
-    if (inputData.azimuth < 0 || inputData.azimuth > 360) {
+    if (inputData.azimuth < -270 || inputData.azimuth > 270) {
       throw new Error('Azimuth는 0-360도 범위여야 합니다')
     }
     if (inputData.elevation < 0 || inputData.elevation > 180) {
@@ -119,8 +119,8 @@ const calculateTransform = async () => {
     if (inputData.tilt < -90 || inputData.tilt > 90) {
       throw new Error('Tilt는 -90-90도 범위여야 합니다')
     }
-    if (inputData.rotator < -270 || inputData.rotator > 270) {
-      throw new Error('Rotator는 0-360도 범위여야 합니다')
+    if (inputData.train < -270 || inputData.train > 270) {
+      throw new Error('Train는 -270 ~ 270도 범위여야 합니다')
     }
 
     // API 호출
@@ -128,7 +128,7 @@ const calculateTransform = async () => {
       azimuth: inputData.azimuth,
       elevation: inputData.elevation,
       tilt: inputData.tilt,
-      rotator: inputData.rotator
+      train: inputData.train
     })
 
     if (response.success) {
@@ -167,7 +167,7 @@ const resetInputs = () => {
   inputData.azimuth = 0
   inputData.elevation = 0
   inputData.tilt = 0
-  inputData.rotator = 0
+  inputData.train = 0
 
   outputData.azimuth = ''
   outputData.elevation = ''

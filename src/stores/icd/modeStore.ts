@@ -12,7 +12,7 @@ export interface AxisData {
 export interface ModeDataMapping {
   azimuth: AxisData
   elevation: AxisData
-  tilt: AxisData
+  train: AxisData
 }
 
 // 모드별 데이터 매핑 정의
@@ -21,121 +21,121 @@ const MODE_DATA_MAPPINGS: Record<ModeType, ModeDataMapping> = {
     azimuth: {
       cmd: 'trackingCMDAzimuthAngle',
       actual: 'trackingActualAzimuthAngle',
-      speed: 'azimuthSpeed'
+      speed: 'azimuthSpeed',
     },
     elevation: {
       cmd: 'trackingCMDElevationAngle',
       actual: 'trackingActualElevationAngle',
-      speed: 'elevationSpeed'
+      speed: 'elevationSpeed',
     },
-    tilt: {
-      cmd: 'trackingCMDTiltAngle',
-      actual: 'trackingActualTiltAngle',
-      speed: 'tiltSpeed'
-    }
+    train: {
+      cmd: 'trackingCMDTrainAngle',
+      actual: 'trackingActualTrainAngle',
+      speed: 'trainSpeed',
+    },
   },
   step: {
     azimuth: {
       cmd: 'cmdAzimuthAngle',
       actual: 'azimuthAngle',
-      speed: 'azimuthSpeed'
+      speed: 'azimuthSpeed',
     },
     elevation: {
       cmd: 'cmdElevationAngle',
       actual: 'elevationAngle',
-      speed: 'elevationSpeed'
+      speed: 'elevationSpeed',
     },
-    tilt: {
-      cmd: 'cmdTiltAngle',
-      actual: 'tiltAngle',
-      speed: 'tiltSpeed'
-    }
+    train: {
+      cmd: 'cmdTrainAngle',
+      actual: 'trainAngle',
+      speed: 'trainSpeed',
+    },
   },
   slew: {
     azimuth: {
       cmd: 'cmdAzimuthAngle',
       actual: 'azimuthAngle',
-      speed: 'azimuthSpeed'
+      speed: 'azimuthSpeed',
     },
     elevation: {
       cmd: 'cmdElevationAngle',
       actual: 'elevationAngle',
-      speed: 'elevationSpeed'
+      speed: 'elevationSpeed',
     },
-    tilt: {
-      cmd: 'cmdTiltAngle',
-      actual: 'tiltAngle',
-      speed: 'tiltSpeed'
-    }
+    train: {
+      cmd: 'cmdTrainAngle',
+      actual: 'trainAngle',
+      speed: 'trainSpeed',
+    },
   },
   pedestal: {
     azimuth: {
       cmd: 'cmdAzimuthAngle',
       actual: 'azimuthAngle',
-      speed: 'azimuthSpeed'
+      speed: 'azimuthSpeed',
     },
     elevation: {
       cmd: 'cmdElevationAngle',
       actual: 'elevationAngle',
-      speed: 'elevationSpeed'
+      speed: 'elevationSpeed',
     },
-    tilt: {
-      cmd: 'cmdTiltAngle',
-      actual: 'tiltAngle',
-      speed: 'tiltSpeed'
-    }
+    train: {
+      cmd: 'cmdTrainAngle',
+      actual: 'trainAngle',
+      speed: 'trainSpeed',
+    },
   },
   suntrack: {
     azimuth: {
       cmd: 'cmdAzimuthAngle',
       actual: 'azimuthAngle',
-      speed: 'azimuthSpeed'
+      speed: 'azimuthSpeed',
     },
     elevation: {
       cmd: 'cmdElevationAngle',
       actual: 'elevationAngle',
-      speed: 'elevationSpeed'
+      speed: 'elevationSpeed',
     },
-    tilt: {
-      cmd: 'cmdTiltAngle',
-      actual: 'tiltAngle',
-      speed: 'tiltSpeed'
-    }
+    train: {
+      cmd: 'cmdTrainAngle',
+      actual: 'trainAngle',
+      speed: 'trainSpeed',
+    },
   },
   standby: {
     azimuth: {
       cmd: 'cmdAzimuthAngle',
       actual: 'azimuthAngle',
-      speed: 'azimuthSpeed'
+      speed: 'azimuthSpeed',
     },
     elevation: {
       cmd: 'cmdElevationAngle',
       actual: 'elevationAngle',
-      speed: 'elevationSpeed'
+      speed: 'elevationSpeed',
     },
-    tilt: {
-      cmd: 'cmdTiltAngle',
-      actual: 'tiltAngle',
-      speed: 'tiltSpeed'
-    }
+    train: {
+      cmd: 'cmdTrainAngle',
+      actual: 'trainAngle',
+      speed: 'trainSpeed',
+    },
   },
   feed: {
     azimuth: {
       cmd: 'cmdAzimuthAngle',
       actual: 'azimuthAngle',
-      speed: 'azimuthSpeed'
+      speed: 'azimuthSpeed',
     },
     elevation: {
       cmd: 'cmdElevationAngle',
       actual: 'elevationAngle',
-      speed: 'elevationSpeed'
+      speed: 'elevationSpeed',
     },
-    tilt: {
-      cmd: 'cmdTiltAngle',
-      actual: 'tiltAngle',
-      speed: 'tiltSpeed'
-    }
-  }
+    train: {
+      cmd: 'cmdTrainAngle',
+      actual: 'trainAngle',
+      speed: 'trainSpeed',
+    },
+  },
 }
 
 export const useModeStore = defineStore('mode', () => {
@@ -166,7 +166,10 @@ export const useModeStore = defineStore('mode', () => {
   }
 
   // 특정 축의 데이터 필드명 가져오기
-  const getAxisFieldName = (axis: 'azimuth' | 'elevation' | 'tilt', type: 'cmd' | 'actual' | 'speed'): string => {
+  const getAxisFieldName = (
+    axis: 'azimuth' | 'elevation' | 'train',
+    type: 'cmd' | 'actual' | 'speed',
+  ): string => {
     return currentModeMapping.value[axis][type]
   }
 
@@ -184,7 +187,7 @@ export const useModeStore = defineStore('mode', () => {
     current: currentMode.value,
     previous: previousMode.value,
     changedAt: modeChangedAt.value,
-    mapping: currentModeMapping.value
+    mapping: currentModeMapping.value,
   }))
 
   return {
@@ -198,6 +201,6 @@ export const useModeStore = defineStore('mode', () => {
     // 메서드
     setMode,
     getAxisFieldName,
-    initializeMode
+    initializeMode,
   }
 })

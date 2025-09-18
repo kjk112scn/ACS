@@ -80,21 +80,21 @@
               <div class="text-subtitle1 text-weight-bold text-primary">Tilt</div>
 
               <!-- Tilt 차트 영역 추가 -->
-              <div class="axis-chart" ref="tiltChartRef"></div>
+              <div class="axis-chart" ref="trainChartRef"></div>
 
               <div class="axis-data-row">
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">CMD</q-item-label>
-                  <q-item-label class="adaptive-text">{{ displayValue(tiltCmdValue) }}</q-item-label>
+                  <q-item-label class="adaptive-text">{{ displayValue(trainCmdValue) }}</q-item-label>
                 </div>
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">Actual</q-item-label>
-                  <q-item-label class="adaptive-text">{{ displayValue(tiltActualValue) }}</q-item-label>
+                  <q-item-label class="adaptive-text">{{ displayValue(trainActualValue) }}</q-item-label>
                 </div>
                 <div class="axis-data-item">
                   <q-item-label class="adaptive-caption">Speed</q-item-label>
                   <q-item-label class="adaptive-text">{{
-                    displayValue(icdStore.tiltSpeed)
+                    displayValue(icdStore.trainSpeed)
                   }}</q-item-label>
                 </div>
               </div>
@@ -287,11 +287,11 @@ const route = useRoute()
 // 차트 관련
 const azimuthChartRef = ref<HTMLElement | null>(null)
 const elevationChartRef = ref<HTMLElement | null>(null)
-const tiltChartRef = ref<HTMLElement | null>(null)
+const trainChartRef = ref<HTMLElement | null>(null)
 
 let azimuthChart: ECharts | undefined = undefined
 let elevationChart: ECharts | undefined = undefined
-let tiltChart: ECharts | undefined = undefined
+let trainChart: ECharts | undefined = undefined
 
 const chartsInitialized = ref(false)
 
@@ -323,15 +323,15 @@ const errorPositionerActive = computed(() => {
     icdStore.elevationBoardStatusInfo.encoder ||
     icdStore.elevationBoardServoStatusInfo.servoAlarm
 
-  // ✅ Tilt 축 상태 체크 (ServoBrake, ServoMotor 제외)
-  const tiltError =
-    icdStore.tiltBoardStatusInfo.limitSwitchNegative275 ||
-    icdStore.tiltBoardStatusInfo.limitSwitchPositive275 ||
-    icdStore.tiltBoardStatusInfo.encoder ||
-    icdStore.tiltBoardServoStatusInfo.servoAlarm
+  // ✅ Train 축 상태 체크 (ServoBrake, ServoMotor 제외)
+  const trainError =
+    icdStore.trainBoardStatusInfo.limitSwitchNegative275 ||
+    icdStore.trainBoardStatusInfo.limitSwitchPositive275 ||
+    icdStore.trainBoardStatusInfo.encoder ||
+    icdStore.trainBoardServoStatusInfo.servoAlarm
 
   // ✅ 하나라도 에러가 있으면 true 반환
-  return azimuthError || elevationError || tiltError
+  return azimuthError || elevationError || trainError
 })
 const errorFeedActive = computed(() => {
   // ✅ Feed X Board Error Status 체크
@@ -355,7 +355,7 @@ const errorProtocolActive = computed(() => {
   const protocolError =
     icdStore.protocolStatusInfo.elevation ||
     icdStore.protocolStatusInfo.azimuth ||
-    icdStore.protocolStatusInfo.tilt ||
+    icdStore.protocolStatusInfo.train ||
     icdStore.protocolStatusInfo.feed
 
   return protocolError
@@ -473,18 +473,18 @@ const updateCharts = () => {
       }
     }
 
-    // 3. Tilt 차트 업데이트
-    if (tiltChart && icdStore.tiltAngle !== undefined) {
-      const tilt = Number(icdStore.tiltAngle)
-      if (!isNaN(tilt)) {
-        const normalizedTilt = tilt < 0 ? tilt + 360 : tilt
-        tiltChart.setOption(
+    // 3. Train 차트 업데이트
+    if (trainChart && icdStore.trainAngle !== undefined) {
+      const train = Number(icdStore.trainAngle)
+      if (!isNaN(train)) {
+        const normalizedTrain = train < 0 ? train + 360 : train
+        trainChart.setOption(
           {
             series: [
               {
-                data: [[1, normalizedTilt]],
+                data: [[1, normalizedTrain]],
                 label: {
-                  formatter: () => `${tilt.toFixed(2)}°`,
+                  formatter: () => `${train.toFixed(2)}°`,
                 },
               },
             ],
@@ -501,7 +501,7 @@ const updateCharts = () => {
       console.log(`🔄 [${uiUpdateCount.value}] 차트 업데이트:`, {
         azimuth: icdStore.azimuthAngle,
         elevation: icdStore.elevationAngle,
-        tilt: icdStore.tiltAngle,
+        train: icdStore.trainAngle,
         serverTime: icdStore.serverTime,
         storeUpdateCount: icdStore.updateCount,
       })
@@ -586,7 +586,7 @@ onMounted(async () => {
     if (chartsInitialized.value) {
       azimuthChart?.resize()
       elevationChart?.resize()
-      tiltChart?.resize()
+      trainChart?.resize()
     }
   }
   window.addEventListener('resize', handleResize)
@@ -598,26 +598,26 @@ onMounted(async () => {
     console.log('📊 현재 표시 값들:')
     console.log('  - Azimuth Actual:', azimuthActualValue.value)
     console.log('  - Elevation Actual:', elevationActualValue.value)
-    console.log('  - Tilt Actual:', tiltActualValue.value)
+    console.log('  - Train Actual:', trainActualValue.value)
     console.log('  - Azimuth CMD:', azimuthCmdValue.value)
     console.log('  - Elevation CMD:', elevationCmdValue.value)
-    console.log('  - Tilt CMD:', tiltCmdValue.value)
+    console.log('  - Train CMD:', trainCmdValue.value)
     console.log('📊 원본 데이터:')
     console.log('  일반 모드:', {
       azimuth: icdStore.azimuthAngle,
       elevation: icdStore.elevationAngle,
-      tilt: icdStore.tiltAngle,
+      train: icdStore.trainAngle,
       cmdAzimuth: icdStore.cmdAzimuthAngle,
       cmdElevation: icdStore.cmdElevationAngle,
-      cmdTilt: icdStore.cmdTiltAngle,
+      cmdTrain: icdStore.cmdTrainAngle,
     })
     console.log('  추적 모드:', {
       azimuth: icdStore.trackingActualAzimuthAngle,
       elevation: icdStore.trackingActualElevationAngle,
-      tilt: icdStore.trackingActualTiltAngle,
+      train: icdStore.trackingActualTrainAngle,
       cmdAzimuth: icdStore.trackingCMDAzimuthAngle,
       cmdElevation: icdStore.trackingCMDElevationAngle,
-      cmdTilt: icdStore.trackingCMDTiltAngle,
+      cmdTrain: icdStore.trackingCMDTrainAngle,
     })
     console.log('========================')
   }, 5000)
@@ -734,15 +734,15 @@ const elevationActualValue = computed((): number => {
   return isNaN(numValue) ? 0 : numValue
 })
 
-const tiltCmdValue = computed((): number => {
+const trainCmdValue = computed((): number => {
   const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
-  const value = isTrackingActive ? icdStore.trackingCMDTiltAngle : icdStore.cmdTiltAngle
+  const value = isTrackingActive ? icdStore.trackingCMDTrainAngle : icdStore.cmdTrainAngle
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
-const tiltActualValue = computed((): number => {
-  const numValue = Number(icdStore.tiltAngle)
+const trainActualValue = computed((): number => {
+  const numValue = Number(icdStore.trainAngle)
   return isNaN(numValue) ? 0 : numValue
 })
  */
@@ -778,15 +778,15 @@ const elevationActualValue = computed((): number => {
   return isNaN(numValue) ? 0 : numValue
 })
 
-const tiltCmdValue = computed((): number => {
+const trainCmdValue = computed((): number => {
   const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
-  const value = isTrackingActive ? icdStore.trackingCMDTiltAngle : icdStore.cmdTiltAngle
+  const value = isTrackingActive ? icdStore.trackingCMDTrainAngle : icdStore.cmdTrainAngle
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
-const tiltActualValue = computed((): number => {
-  const numValue = Number(icdStore.tiltAngle)
+const trainActualValue = computed((): number => {
+  const numValue = Number(icdStore.trainAngle)
   return isNaN(numValue) ? 0 : numValue
 })
 
@@ -805,9 +805,9 @@ const getCurrentElevationActualValue = computed((): number => {
   return isNaN(numValue) ? 0 : numValue
 })
 
-const getCurrentTiltActualValue = computed((): number => {
+const getCurrentTrainActualValue = computed((): number => {
   const isTrackingActive = icdStore.ephemerisStatusInfo.isActive || icdStore.passScheduleStatusInfo.isActive
-  const value = isTrackingActive ? icdStore.trackingActualTiltAngle : icdStore.tiltAngle
+  const value = isTrackingActive ? icdStore.trackingActualTrainAngle : icdStore.trainAngle
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
@@ -946,7 +946,7 @@ const initCharts = () => {
 
     // 새 차트 인스턴스 생성
     elevationChart = echarts.init(elevationChartRef.value)
-    // 초기 tilt 값 가져오기
+    // 초기 train 값 가져오기
     const elevation = getCurrentElevationActualValue.value // ✅ computed 값 사용
     const normalizedInitialElevation = elevation < 0 ? elevation + 360 : elevation % 360
     // Elevation 차트만의 옵션 설정
@@ -1045,18 +1045,18 @@ const initCharts = () => {
     console.error('Elevation 차트 DOM 요소가 없음')
   }
 
-  // 3. Tilt 차트 초기화
-  if (tiltChartRef.value) {
-    if (tiltChart) {
-      tiltChart.dispose()
+  // 3. Train 차트 초기화
+  if (trainChartRef.value) {
+    if (trainChart) {
+      trainChart.dispose()
     }
-    tiltChart = echarts.init(tiltChartRef.value)
+    trainChart = echarts.init(trainChartRef.value)
 
-    // 초기 tilt 값 가져오기
-    const tilt = getCurrentTiltActualValue.value // ✅ computed 값 사용
-    const normalizedInitialTilt = tilt < 0 ? tilt + 360 : tilt % 360
+    // 초기 traub 값 가져오기
+    const train = getCurrentTrainActualValue.value // ✅ computed 값 사용
+    const normalizedInitialTrain = train < 0 ? train + 360 : train % 360
 
-    const tiltOption = {
+    const trainOption = {
       backgroundColor: 'transparent',
       grid: { containLabel: true },
       polar: {
@@ -1124,12 +1124,12 @@ const initCharts = () => {
           symbol: 'circle',
           symbolSize: 12,
           itemStyle: { color: '#4caf50' },
-          data: [[1, normalizedInitialTilt]], // 초기값을 현재 tilt 값으로 설정
+          data: [[1, normalizedInitialTrain]], // 초기값을 현재 train 값으로 설정
           zlevel: 2,
           label: {
             show: true,
             formatter: function () {
-              return `${tilt.toFixed(2)}°`
+              return `${train.toFixed(2)}°`
             },
             position: 'top',
             distance: 0,
@@ -1144,14 +1144,14 @@ const initCharts = () => {
       animation: false,
     }
 
-    tiltChart.setOption(tiltOption)
+    trainChart.setOption(trainOption)
   }
 
   // 모든 차트 초기화 후 명시적으로 리사이즈 호출
   setTimeout(() => {
     if (azimuthChart) azimuthChart.resize()
     if (elevationChart) elevationChart.resize()
-    if (tiltChart) tiltChart.resize()
+    if (trainChart) trainChart.resize()
   }, 0)
 }
 // Emergency 버튼 클릭 핸들러
@@ -1201,8 +1201,8 @@ watch(
       newVal ? icdStore.trackingActualElevationAngle : icdStore.elevationAngle,
     )
     console.log(
-      '📊 Tilt Actual 값:',
-      newVal ? icdStore.trackingActualTiltAngle : icdStore.tiltAngle,
+      '📊 Train Actual 값:',
+      newVal ? icdStore.trackingActualTrainAngle : icdStore.trainAngle,
     )
     console.log(
       '📊 Azimuth CMD 값:',
@@ -1212,7 +1212,7 @@ watch(
       '📊 Elevation CMD 값:',
       newVal ? icdStore.trackingCMDElevationAngle : icdStore.cmdElevationAngle,
     )
-    console.log('📊 Tilt CMD 값:', newVal ? icdStore.trackingCMDTiltAngle : icdStore.cmdTiltAngle)
+    console.log('📊 Train CMD 값:', newVal ? icdStore.trackingCMDTrainAngle : icdStore.cmdTrainAngle)
   },
 )
 /*
@@ -1246,16 +1246,16 @@ watch(
 )
 
 watch(
-  () => icdStore.tiltAngle,
+  () => icdStore.trainAngle,
   (newVal) => {
-    console.log('🎯 일반 Tilt 각도 변경:', newVal)
+    console.log('🎯 일반 Train 각도 변경:', newVal)
   },
 )
 
 watch(
-  () => icdStore.trackingActualTiltAngle,
+  () => icdStore.trackingActualTrainAngle,
   (newVal) => {
-    console.log('🛰️ 추적 Tilt 각도 변경:', newVal)
+    console.log('🛰️ 추적 Train 각도 변경:', newVal)
   },
 )
 
@@ -1283,10 +1283,10 @@ watch(
 )
 
 watch(
-  () => tiltActualValue.value,
+  () => trainActualValue.value,
   (newVal) => {
     console.log(
-      '📈 표시되는 Tilt Actual 값:',
+      '📈 표시되는 Train Actual 값:',
       newVal,
       `(Ephemeris: ${icdStore.ephemerisStatusInfo.isActive})`,
     )
@@ -1316,10 +1316,10 @@ watch(
 )
 
 watch(
-  () => tiltCmdValue.value,
+  () => trainCmdValue.value,
   (newVal) => {
     console.log(
-      '📈 표시되는 Tilt CMD 값:',
+      '📈 표시되는 Train CMD 값:',
       newVal,
       `(Ephemeris: ${icdStore.ephemerisStatusInfo.isActive})`,
     )

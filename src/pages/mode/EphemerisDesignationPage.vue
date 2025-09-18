@@ -155,14 +155,14 @@
                       <span class="info-label">시작 시간:</span>
                       <span class="info-value">{{
                         formatToLocalTime(selectedScheduleInfo.startTime)
-                      }}</span>
+                        }}</span>
                     </div>
 
                     <div class="info-row">
                       <span class="info-label">종료 시간:</span>
                       <span class="info-value">{{
                         formatToLocalTime(selectedScheduleInfo.endTime)
-                      }}</span>
+                        }}</span>
                     </div>
 
                     <div class="info-row">
@@ -361,7 +361,7 @@ const tleData = computed(() => ephemerisStore.tleDisplayData)
 const currentPosition = ref({
   azimuth: 0,
   elevation: 0,
-  tilt: 0,
+  train: 0,
   date: date.formatDate(new Date(), 'YYYY/MM/DD'),
   time: date.formatDate(new Date(), 'HH:mm'),
 })
@@ -434,7 +434,7 @@ const inputs = ref<string[]>(['0.00', '0.00', '0.00', '0.00'])
 const outputs = computed(() => [
   ephemerisStore.offsetValues.azimuth,
   ephemerisStore.offsetValues.elevation,
-  ephemerisStore.offsetValues.tilt,
+  ephemerisStore.offsetValues.train,
   ephemerisStore.offsetValues.timeResult, // ✅ 별도 관리되는 Result 값
 ])
 // Quasar 인스턴스 가져오기
@@ -560,7 +560,7 @@ const downloadCSVWithTransformations = (data: RealtimeTrackingDataItem[]) => {
     'CmdAzimuth(°)', 'CmdElevation(°)', 'ActualAzimuth(°)', 'ActualElevation(°)',
     'TrackingAzimuthTime(s)', 'TrackingCMDAzimuth(°)', 'TrackingActualAzimuth(°)',
     'TrackingElevationTime(s)', 'TrackingCMDElevation(°)', 'TrackingActualElevation(°)',
-    'TrackingTiltTime(s)', 'TrackingCMDTilt(°)', 'TrackingActualTilt(°)',
+    'TrackingTrainTime(s)', 'TrackingCMDTrain(°)', 'TrackingActualTrain(°)',
 
     // 오차 분석
     'AzimuthError(°)', 'ElevationError(°)',
@@ -571,7 +571,7 @@ const downloadCSVWithTransformations = (data: RealtimeTrackingDataItem[]) => {
     'El_CMD정확도(°)', 'El_Act정확도(°)', 'El_최종정확도(°)',
 
     // 변환 정보
-    'TiltAngle(°)', 'TransformationType', 'HasTransformation', 'InterpolationMethod', 'InterpolationAccuracy'
+    'TrainAngle(°)', 'TransformationType', 'HasTransformation', 'InterpolationMethod', 'InterpolationAccuracy'
   ]
 
   // CSV 데이터 생성 (안전한 처리 적용)
@@ -614,9 +614,9 @@ const downloadCSVWithTransformations = (data: RealtimeTrackingDataItem[]) => {
         safeToFixed(item.trackingElevationTime, 2),
         safeToFixed(item.trackingCMDElevationAngle, 6),
         safeToFixed(item.trackingActualElevationAngle, 6),
-        safeToFixed(item.trackingTiltTime, 2),
-        safeToFixed(item.trackingCMDTiltAngle, 6),
-        safeToFixed(item.trackingActualTiltAngle, 6),
+        safeToFixed(item.trackingTrainTime, 2),
+        safeToFixed(item.trackingCMDTrainAngle, 6),
+        safeToFixed(item.trackingActualTrainAngle, 6),
 
         // 오차 분석
         safeToFixed(item.azimuthError, 6),
@@ -635,7 +635,7 @@ const downloadCSVWithTransformations = (data: RealtimeTrackingDataItem[]) => {
         safeToFixed(item.elFinalAccuracy, 6),
 
         // 변환 정보
-        safeToFixed(item.tiltAngle, 6),
+        safeToFixed(item.trainAngle, 6),
         `"${item.transformationType || 'none'}"`,
         item.hasTransformation ? 'true' : 'false',
         `"${item.interpolationMethod || 'linear'}"`,
@@ -1346,7 +1346,7 @@ const updateOffset = async (index: number, value: string) => {
     const numValue = Number(parseFloat(value).toFixed(2)) || 0
     console.log('계산된 numValue:', numValue)
 
-    const offsetTypes = ['azimuth', 'elevation', 'tilt', 'time'] as const
+    const offsetTypes = ['azimuth', 'elevation', 'train', 'time'] as const
     const offsetType = offsetTypes[index]
 
     if (!offsetType) {
@@ -1367,14 +1367,14 @@ const updateOffset = async (index: number, value: string) => {
       return
     }
 
-    // Position Offset 처리 (azimuth, elevation, tilt)
+    // Position Offset 처리 (azimuth, elevation, train)
     ephemerisStore.updateOffsetValues(offsetType, numValue.toFixed(2))
 
     const azOffset = Number((parseFloat(ephemerisStore.offsetValues.azimuth) || 0).toFixed(2))
     const elOffset = Number((parseFloat(ephemerisStore.offsetValues.elevation) || 0).toFixed(2))
-    const tiOffset = Number((parseFloat(ephemerisStore.offsetValues.tilt) || 0).toFixed(2))
+    const trainOffset = Number((parseFloat(ephemerisStore.offsetValues.train) || 0).toFixed(2))
 
-    await icdStore.sendPositionOffsetCommand(azOffset, elOffset, tiOffset)
+    await icdStore.sendPositionOffsetCommand(azOffset, elOffset, trainOffset)
   } catch (error) {
     console.error('Error updating offset:', error)
   }
@@ -1740,7 +1740,7 @@ onMounted(async () => {
   inputs.value = [
     ephemerisStore.offsetValues.azimuth,
     ephemerisStore.offsetValues.elevation,
-    ephemerisStore.offsetValues.tilt,
+    ephemerisStore.offsetValues.train,
     ephemerisStore.offsetValues.time,
   ]
 
