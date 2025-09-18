@@ -283,6 +283,314 @@ class OrekitCalcuatorTest {
             throw e
         }
     }
+      /**
+     * 위성 추적 스케줄의 모든 데이터를 저장합니다.
+     * - 각 패스별 세부 데이터 파일 (CSV)
+     * - 전체 요약 정보 파일
+     *
+     * @param schedule 위성 추적 스케줄
+     * @param outputDir 출력 디렉토리 경로
+     * @param filePrefix 파일 이름 접두사 (기본값: "satellite_tracking")
+     * @return 생성된 모든 파일 경로 목록
+     */
+    fun saveAllTrackingData(
+        schedule: SatelliteTrackingSchedule,
+        outputDir: String,
+        filePrefix: String = "satellite_tracking"
+    ): List<String> {
+        val createdFiles = mutableListOf<String>()
+
+        try {
+            // 디렉토리 생성
+            val directory = File(outputDir)
+            if (!directory.exists()) {
+                directory.mkdirs()
+            }
+
+            // 1. 각 패스별 CSV 파일 생성
+            val baseFilePath = "$outputDir/${filePrefix}_pass"
+            val passFiles = saveAllPassesTrackingDataToFiles(schedule, baseFilePath)
+            createdFiles.addAll(passFiles)
+
+            // 2. 요약 정보 파일 생성
+            val summaryFilePath = "$outputDir/${filePrefix}_summary.txt"
+            val summaryFile = saveTrackingScheduleSummary(schedule, summaryFilePath)
+            createdFiles.add(summaryFile)
+
+            // 3. 위성 정보 파일 생성 (선택 사항)
+            val satelliteInfoFilePath = "$outputDir/${filePrefix}_info.txt"
+            File(satelliteInfoFilePath).bufferedWriter().use { writer ->
+                writer.write("위성 정보\n")
+                writer.write("========\n\n")
+                writer.write("TLE 데이터:\n")
+                writer.write("${schedule.satelliteTle1}\n")
+                writer.write("${schedule.satelliteTle2}\n\n")
+
+                // TLE에서 위성 ID 추출
+                val satelliteId = schedule.satelliteTle1.substring(2, 7).trim()
+                writer.write("위성 ID: $satelliteId\n")
+
+                // 국제 지정 번호 추출
+                val internationalDesignator = schedule.satelliteTle1.substring(9, 17).trim()
+                writer.write("국제 지정 번호: $internationalDesignator\n")
+
+                // 궤도 정보 (TLE에서 추출)
+                writer.write("\n궤도 정보:\n")
+
+                // TLE 두 번째 줄에서 궤도 정보 추출
+                val inclination = schedule.satelliteTle2.substring(8, 16).trim().toDouble()
+                val rightAscension = schedule.satelliteTle2.substring(17, 25).trim().toDouble()
+                val eccentricity = "0.${schedule.satelliteTle2.substring(26, 33).trim()}".toDouble()
+                val argOfPerigee = schedule.satelliteTle2.substring(34, 42).trim().toDouble()
+                val meanAnomaly = schedule.satelliteTle2.substring(43, 51).trim().toDouble()
+                val meanMotion = schedule.satelliteTle2.substring(52, 63).trim().toDouble()
+
+                writer.write("- 궤도 경사각: $inclination°\n")
+                writer.write("- 승교점 적경: $rightAscension°\n")
+                writer.write("- 이심률: $eccentricity\n")
+                writer.write("- 근지점 인수: $argOfPerigee°\n")
+                writer.write("- 평균 근점 이각: $meanAnomaly°\n")
+                writer.write("- 평균 운동: $meanMotion 회/일\n")
+
+                // 궤도 주기 계산
+                val periodMinutes = 1440.0 / meanMotion
+                val periodHours = periodMinutes / 60.0
+                writer.write(
+                    "- 궤도 주기: ${String.format("%.2f", periodMinutes)} 분 (${
+                        String.format(
+                            "%.2f",
+                            periodHours
+                        )
+                    } 시간)\n"
+                )
+
+                // 근지점 및 원지점 고도 계산 (대략적인 계산)
+                val earthRadius = 6378.137 // 지구 적도 반경 (km)
+                val semiMajorAxis = (earthRadius + 42164.0) * Math.pow(24.0 / periodHours, 2.0 / 3.0) // 정지궤도 고도 기준 계산
+
+                val perigeeRadius = semiMajorAxis * (1.0 - eccentricity)
+                val apogeeRadius = semiMajorAxis * (1.0 + eccentricity)
+
+                val perigeeAltitude = perigeeRadius - earthRadius
+                val apogeeAltitude = apogeeRadius - earthRadius
+
+                writer.write("- 근지점 고도: ${String.format("%.2f", perigeeAltitude)} km\n")
+                writer.write("- 원지점 고도: ${String.format("%.2f", apogeeAltitude)} km\n")
+            }
+            createdFiles.add(satelliteInfoFilePath)
+
+            logger.info("모든 위성 추적 데이터가 ${outputDir} 디렉토리에 저장되었습니다.")
+            logger.info("총 ${createdFiles.size}개의 파일이 생성되었습니다.")
+        } catch (e: Exception) {
+            logger.error("위성 추적 데이터 저장 중 오류 발생: ${e.message}", e)
+            throw e
+        }
+
+        return createdFiles
+    }
+
+    /**
+     * 모든 패스의 세부 추적 데이터를 각각 별도의 CSV 파일로 저장합니다.
+     *
+     * @param schedule 위성 추적 스케줄
+     * @param baseFilePath 기본 파일 경로 (예: "tracking_data/pass")
+     * @param fileExtension 파일 확장자 (기본값: ".csv")
+     * @return 생성된 파일 경로 목록
+     */
+    fun saveAllPassesTrackingDataToFiles(
+        schedule: SatelliteTrackingSchedule,
+        baseFilePath: String,
+        fileExtension: String = ".csv"
+    ): List<String> {
+        val createdFiles = mutableListOf<String>()
+
+        try {
+            // 디렉토리 생성
+            val directory = File(baseFilePath).parentFile
+            if (!directory.exists()) {
+                directory.mkdirs()
+            }
+
+            // 각 패스에 대해 파일 생성
+            schedule.trackingPasses.forEachIndexed { index, pass ->
+                val passNumber = index + 1
+                val filePath = "${baseFilePath}_${passNumber}${fileExtension}"
+                val file = File(filePath)
+
+                file.bufferedWriter().use { writer ->
+                    // 파일 헤더 - CSV 형식
+                    writer.write("시간,방위각(°),고도각(°),거리(km),고도(km)\n")
+
+                    // 데이터 행
+                    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
+                    pass.trackingData.forEach { data ->
+                        writer.write("${data.timestamp?.format(formatter)},${data.azimuth},${data.elevation},${data.range},${data.altitude}\n")
+                    }
+                }
+
+                createdFiles.add(filePath)
+                logger.info("패스 ${passNumber} 데이터가 ${filePath}에 저장되었습니다.")
+            }
+
+            logger.info("총 ${createdFiles.size}개의 패스 데이터 파일이 생성되었습니다.")
+        } catch (e: Exception) {
+            logger.error("패스 데이터 파일 생성 중 오류 발생: ${e.message}", e)
+            throw e
+        }
+
+        return createdFiles
+    }
+
+    /**
+     * 모든 패스의 요약 정보를 하나의 파일로 저장합니다.
+     *
+     * @param schedule 위성 추적 스케줄
+     * @param filePath 파일 경로
+     * @return 생성된 파일 경로
+     */
+    /**
+     * 모든 패스의 요약 정보를 하나의 파일로 저장합니다.
+     */
+    fun saveTrackingScheduleSummary(
+        schedule: SatelliteTrackingSchedule,
+        filePath: String
+    ): String {
+        try {
+            val file = File(filePath)
+
+            // 디렉토리 생성
+            file.parentFile?.mkdirs()
+
+            file.bufferedWriter().use { writer ->
+                val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
+
+                // 스케줄 요약 정보
+                writer.write("위성 추적 스케줄 요약\n")
+                writer.write("===================\n\n")
+                writer.write("위성 TLE:\n")
+                writer.write("${schedule.satelliteTle1}\n")
+                writer.write("${schedule.satelliteTle2}\n\n")
+                writer.write(
+                    "기간: ${schedule.startDate.format(DateTimeFormatter.ISO_LOCAL_DATE)} ~ ${
+                        schedule.endDate.format(
+                            DateTimeFormatter.ISO_LOCAL_DATE
+                        )
+                    }\n"
+                )
+                writer.write("지상국 위치: 위도 ${schedule.stationLatitude}°, 경도 ${schedule.stationLongitude}°, 고도 ${schedule.stationAltitude}m\n")
+                writer.write("최소 고도각: ${schedule.minElevation}°\n")
+                writer.write("추적 간격: ${schedule.trackingIntervalMs}ms\n")
+                writer.write("총 패스 수: ${schedule.totalPasses}\n")
+                writer.write("총 추적 시간: ${schedule.getTotalTrackingDurationString()}\n\n")
+
+                // 패스 목록 테이블 헤더 (각속도 및 각가속도 정보 추가)
+                writer.write("패스 목록:\n")
+                writer.write("─────┬────────────────────┬────────────────────┬──────────┬─────────────┬───────────┬───────────┬───────────┬───────────┐\n")
+                writer.write("│ 번호│      시작 시간     │      종료 시간     │ 지속시간 │ 최대고도각  │ 최대Az속도│ 최대El속도│ 최대Az가속│ 최대El가속│\n")
+                writer.write("├─────┼────────────────────┼────────────────────┼──────────┼─────────────┼───────────┼───────────┼───────────┼───────────┤\n")
+
+                // 각 패스 정보 (각속도 및 각가속도 정보 추가)
+                schedule.trackingPasses.forEachIndexed { index, pass ->
+                    val passNumber = index + 1
+                    val maxElevation = String.format("%.2f°", pass.maxElevation)
+                    val maxAzRateStr = String.format("%.2f°/s", pass.maxAzimuthRate)
+                    val maxElRateStr = String.format("%.2f°/s", pass.maxElevationRate)
+                    val maxAzAccelStr = String.format("%.2f°/s²", pass.maxAzimuthAccel)
+                    val maxElAccelStr = String.format("%.2f°/s²", pass.maxElevationAccel)
+
+                    writer.write(
+                        String.format(
+                            "│ %3d │ %s │ %s │ %s │ %-11s │ %-9s │ %-9s │ %-9s │ %-9s │\n",
+                            passNumber,
+                            pass.startTime.format(formatter),
+                            pass.endTime.format(formatter),
+                            pass.getDurationString(),
+                            maxElevation,
+                            maxAzRateStr,
+                            maxElRateStr,
+                            maxAzAccelStr,
+                            maxElAccelStr
+                        )
+                    )
+                }
+
+                writer.write("└─────┴────────────────────┴────────────────────┴──────────┴─────────────┴───────────┴───────────┴───────────┴───────────┘\n")
+
+                // 전체 패스 중 최대값 출력
+                if (schedule.trackingPasses.isNotEmpty()) {
+                    val overallMaxAzRate = schedule.trackingPasses.maxOf { it.maxAzimuthRate }
+                    val overallMaxElRate = schedule.trackingPasses.maxOf { it.maxElevationRate }
+                    val overallMaxAzAccel = schedule.trackingPasses.maxOf { it.maxAzimuthAccel }
+                    val overallMaxElAccel = schedule.trackingPasses.maxOf { it.maxElevationAccel }
+
+                    writer.write("\n전체 패스 중 최대값:\n")
+                    writer.write("- 최대 방위각 각속도: ${String.format("%.2f", overallMaxAzRate)}°/s\n")
+                    writer.write("- 최대 고도각 각속도: ${String.format("%.2f", overallMaxElRate)}°/s\n")
+                    writer.write("- 최대 방위각 각가속도: ${String.format("%.2f", overallMaxAzAccel)}°/s²\n")
+                    writer.write("- 최대 고도각 각가속도: ${String.format("%.2f", overallMaxElAccel)}°/s²\n")
+                }
+
+                // 각 패스별 세부 정보
+                writer.write("\n\n패스별 세부 정보:\n")
+                writer.write("=================\n\n")
+
+                schedule.trackingPasses.forEachIndexed { index, pass ->
+                    val passNumber = index + 1
+
+                    writer.write("패스 ${passNumber} 정보:\n")
+                    writer.write("- 시작 시간: ${pass.startTime.format(formatter)}\n")
+                    writer.write("- 종료 시간: ${pass.endTime.format(formatter)}\n")
+                    writer.write(
+                        "- 최대 고도각: ${
+                            String.format(
+                                "%.2f",
+                                pass.maxElevation
+                            )
+                        }° (${pass.maxElevationTime?.format(DateTimeFormatter.ISO_LOCAL_TIME) ?: "N/A"})\n"
+                    )
+                    writer.write("- 지속 시간: ${pass.getDurationString()}\n")
+                    writer.write("- 데이터 포인트 수: ${pass.dataPointCount}\n")
+
+                    // 각속도 및 각가속도 정보 추가
+                    writer.write("- 최대 방위각 각속도: ${String.format("%.2f", pass.maxAzimuthRate)}°/s\n")
+                    writer.write("- 최대 고도각 각속도: ${String.format("%.2f", pass.maxElevationRate)}°/s\n")
+                    writer.write("- 최대 방위각 각가속도: ${String.format("%.2f", pass.maxAzimuthAccel)}°/s²\n")
+                    writer.write("- 최대 고도각 각가속도: ${String.format("%.2f", pass.maxElevationAccel)}°/s²\n")
+
+                    // 첫 데이터 포인트와 마지막 데이터 포인트 정보
+                    if (pass.trackingData.isNotEmpty()) {
+                        val firstPoint = pass.trackingData.first()
+                        val lastPoint = pass.trackingData.last()
+
+                        writer.write(
+                            "- 첫 데이터 포인트: 방위각=${
+                                String.format(
+                                    "%.2f",
+                                    firstPoint.azimuth
+                                )
+                            }°, 고도각=${String.format("%.2f", firstPoint.elevation)}°\n"
+                        )
+                        writer.write(
+                            "- 마지막 데이터 포인트: 방위각=${
+                                String.format(
+                                    "%.2f",
+                                    lastPoint.azimuth
+                                )
+                            }°, 고도각=${String.format("%.2f", lastPoint.elevation)}°\n"
+                        )
+                    }
+
+                    writer.write("\n")
+                }
+            }
+
+            logger.info("위성 추적 스케줄 요약이 ${filePath}에 저장되었습니다.")
+            return filePath
+        } catch (e: Exception) {
+            logger.error("위성 추적 스케줄 요약 저장 중 오류 발생: ${e.message}", e)
+            throw e
+        }
+    }
 */
 
 }

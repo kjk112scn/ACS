@@ -43,18 +43,18 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
             example = "false",
             required = false
         )
-        @RequestParam tilt: Boolean = false
+        @RequestParam train: Boolean = false
     ): ResponseEntity<Map<String, String>> {
         return try {
             val bitAxis = BitSet()
             if (azimuth) bitAxis.set(0)
             if (elevation) bitAxis.set(1)
-            if (tilt) bitAxis.set(2)
+            if (train) bitAxis.set(2)
 
             val axesStr = listOfNotNull(
                 if (azimuth) "AZIMUTH" else null,
                 if (elevation) "ELEVATION" else null,
-                if (tilt) "TILT" else null
+                if (train) "TRAIN" else null
             ).joinToString(",")
 
             udpFwICDService.servoPresetCommand(bitAxis)
@@ -98,18 +98,18 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
             example = "false",
             required = false
         )
-        @RequestParam tiStandby: Boolean = false
+        @RequestParam trainStandby: Boolean = false
     ): ResponseEntity<Map<String, String>> {
         return try {
             val bitStandby = BitSet()
             if (azStandby) bitStandby.set(0)
             if (elStandby) bitStandby.set(1)
-            if (tiStandby) bitStandby.set(2)
+            if (trainStandby) bitStandby.set(2)
 
             val axesStr = listOfNotNull(
                 if (azStandby) "AZIMUTH" else null,
                 if (elStandby) "ELEVATION" else null,
-                if (tiStandby) "TILT" else null
+                if (trainStandby) "Train" else null
             ).joinToString(",")
 
             udpFwICDService.standbyCommand(bitStandby)
@@ -208,31 +208,31 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
     fun multiManualControlCommand(
         @RequestParam azimuth: Boolean = false,
         @RequestParam elevation: Boolean = false,
-        @RequestParam tilt: Boolean = false,
+        @RequestParam train: Boolean = false,
         @RequestParam stow: Boolean = false,
         @RequestParam azAngle: Float,
         @RequestParam azSpeed: Float,
         @RequestParam elAngle: Float,
         @RequestParam elSpeed: Float,
-        @RequestParam tiAngle: Float,
-        @RequestParam tiSpeed: Float
+        @RequestParam trainAngle: Float,
+        @RequestParam trainSpeed: Float
     ): ResponseEntity<Map<String, String>> {
         return try {
             val multiAxis = BitSet()
             if (azimuth) multiAxis.set(0)
             if (elevation) multiAxis.set(1)
-            if (tilt) multiAxis.set(2)
+            if (train) multiAxis.set(2)
             if (stow) multiAxis.set(7)
 
             val axesStr = listOfNotNull(
                 if (azimuth) "AZIMUTH" else null,
                 if (elevation) "ELEVATION" else null,
-                if (tilt) "TILT" else null,
+                if (train) "Train" else null,
                 if (stow) "STOW" else null
             ).joinToString(",")
 
             udpFwICDService.multiManualCommand(
-                multiAxis, azAngle, azSpeed, elAngle, elSpeed, tiAngle, tiSpeed
+                multiAxis, azAngle, azSpeed, elAngle, elSpeed, trainAngle, trainSpeed
             )
 
             logger.info("MultiManual 제어 명령 요청 완료: {}", axesStr)
@@ -242,7 +242,7 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
                 "message" to "MultiManual 제어 명령이 성공적으로 전송되었습니다",
                 "command" to "MultiManualControl",
                 "axes" to axesStr,
-                "angles" to "Az:${azAngle}°, El:${elAngle}°, Ti:${tiAngle}°"
+                "angles" to "Az:${azAngle}°, El:${elAngle}°, Train:${trainAngle}°"
             ))
         } catch (e: Exception) {
             logger.error("MultiManual 제어 명령 요청 실패: {}", e.message, e)
@@ -352,7 +352,7 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
             val bitStr = listOfNotNull(
                 if (azStop) "Azimuth Stop" else null,
                 if (elStop) "Elevation Stop" else null,
-                if (tiStop) "Tilt Stop" else null
+                if (tiStop) "TRAIN Stop" else null
             ).joinToString(",")
 
             udpFwICDService.stopCommand(bitStop)
@@ -391,7 +391,7 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
                 "command" to "DefaultInfo",
                 "utcTime" to GlobalData.Time.utcNow.toString(),
                 "timeOffset" to GlobalData.Offset.TimeOffset.toString(),
-                "offsets" to "Az:${GlobalData.Offset.azimuthPositionOffset}°, El:${GlobalData.Offset.elevationPositionOffset}°, Ti:${GlobalData.Offset.tiltPositionOffset}°"
+                "offsets" to "Az:${GlobalData.Offset.azimuthPositionOffset}°, El:${GlobalData.Offset.elevationPositionOffset}°, Ti:${GlobalData.Offset.trainPositionOffset}°"
             ))
         } catch (e: Exception) {
             logger.error("DefaultInfo 명령 요청 실패: {}", e.message, e)

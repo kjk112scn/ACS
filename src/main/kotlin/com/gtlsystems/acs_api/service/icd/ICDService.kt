@@ -49,22 +49,22 @@ class ICDService {
                                 // Angle data
                                 azimuthAngle = it.azimuthAngle,
                                 elevationAngle = it.elevationAngle,
-                                tiltAngle = it.tiltAngle,
+                                trainAngle = it.tiltAngle,
 
                                 // Speed data
                                 azimuthSpeed = it.azimuthSpeed,
                                 elevationSpeed = it.elevationSpeed,
-                                tiltSpeed = it.tiltSpeed,
+                                trainSpeed = it.tiltSpeed,
 
                                 // Servo driver angle data
                                 servoDriverAzimuthAngle = it.servoDriverAzimuthAngle,
                                 servoDriverElevationAngle = it.servoDriverElevationAngle,
-                                servoDriverTiltAngle = it.servoDriverTiltAngle,
+                                servoDriverTrainAngle = it.servoDriverTiltAngle,
 
                                 // Torque data
                                 torqueAzimuth = it.torqueAzimuth,
                                 torqueElevation = it.torqueElevation,
-                                torqueTilt = it.torqueTilt,
+                                torqueTrain = it.torqueTilt,
 
                                 // Environmental data
                                 windSpeed = it.windSpeed,
@@ -82,8 +82,8 @@ class ICDService {
                                 azimuthBoardStatusBits = it.azimuthBoardStatusBits,
                                 elevationBoardServoStatusBits = it.elevationBoardServoStatusBits,
                                 elevationBoardStatusBits = it.elevationBoardStatusBits,
-                                tiltBoardServoStatusBits = it.tiltBoardServoStatusBits,
-                                tiltBoardStatusBits = it.tiltBoardStatusBits,
+                                trainBoardServoStatusBits = it.tiltBoardServoStatusBits,
+                                trainBoardStatusBits = it.tiltBoardStatusBits,
                                 feedSBoardStatusBits = it.feedSBoardStatusBits,
                                 feedXBoardStatusBits = it.feedXBoardStatusBits,
 
@@ -100,10 +100,10 @@ class ICDService {
                                 //각가속도, 최대 각가속도
                                 azimuthAcceleration = it.azimuthAcceleration,
                                 elevationAcceleration = it.elevationAcceleration,
-                                tiltAcceleration = it.tiltAcceleration,
+                                trainAcceleration = it.tiltAcceleration,
                                 azimuthMaxAcceleration = it.azimuthMaxAcceleration,
                                 elevationMaxAcceleration = it.elevationMaxAcceleration,
-                                tiltMaxAcceleration = it.tiltMaxAcceleration,
+                                trainMaxAcceleration = it.tiltMaxAcceleration,
 
                                 //traking 정보
                                 trackingAzimuthTime = it.trackingAzimuthTime,
@@ -112,9 +112,9 @@ class ICDService {
                                 trackingElevationTime = it.trackingElevationTime,
                                 trackingCMDElevationAngle = it.trackingCMDElevationAngle + GlobalData.Offset.elevationPositionOffset,
                                 trackingActualElevationAngle = it.trackingActualElevationAngle,
-                                trackingTiltTime = it.trackingTiltTime,
-                                trackingCMDTiltAngle = it.trackingCMDTiltAngle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset,
-                                trackingActualTiltAngle = it.trackingActualTiltAngle,
+                                trackingTrainTime = it.trackingTiltTime,
+                                trackingCMDTrainAngle = it.trackingCMDTiltAngle + GlobalData.Offset.trainPositionOffset + GlobalData.Offset.trueNorthOffset,
+                                trackingActualTrainAngle = it.trackingActualTiltAngle,
 
                             )
 
@@ -1013,8 +1013,8 @@ class ICDService {
             var azimuthSpeed: Float,
             var elevationAngle: Float,
             var elevationSpeed: Float,
-            var tiltAngle: Float,
-            var tiltSpeed: Float,
+            var trainAngle: Float,
+            var trainSpeed: Float,
             var crc16: UShort = 0u,
             var etx: Byte = ICD_ETX
         ) {
@@ -1027,8 +1027,8 @@ class ICDService {
                 val byteAzimuthSpeed = JKUtil.JKConvert.Companion.floatToByteArray(azimuthSpeed, false)
                 val byteElevationAngle = JKUtil.JKConvert.Companion.floatToByteArray(elevationAngle, false)
                 val byteElevationSpeed = JKUtil.JKConvert.Companion.floatToByteArray(elevationSpeed, false)
-                val byteTiltAngle = JKUtil.JKConvert.Companion.floatToByteArray(tiltAngle, false)
-                val byteTiltSpeed = JKUtil.JKConvert.Companion.floatToByteArray(tiltSpeed, false)
+                val byteTiltAngle = JKUtil.JKConvert.Companion.floatToByteArray(trainAngle, false)
+                val byteTiltSpeed = JKUtil.JKConvert.Companion.floatToByteArray(trainSpeed, false)
 
                 // BitSet을 바이트 배열로 변환
                 val byteAxis = axis.toByteArray()[0]
@@ -1227,7 +1227,7 @@ class ICDService {
             var cmdTwo: Char,
             var azimuthOffset: Float,
             var elevationOffset: Float,
-            var tiltOffset: Float,
+            var trainOffset: Float,
             var crc16: UShort,
             var etx: Byte = ICD_ETX
         ) {
@@ -1237,7 +1237,7 @@ class ICDService {
                 // Float 값을 바이트 배열로 변환 (엔디안 변환 포함)
                 val byteAzimuthOffset = JKUtil.JKConvert.Companion.floatToByteArray(azimuthOffset, false)
                 val byteElevationOffset = JKUtil.JKConvert.Companion.floatToByteArray(elevationOffset, false)
-                val byteTiltOffset = JKUtil.JKConvert.Companion.floatToByteArray(tiltOffset, false)
+                val byteTiltOffset = JKUtil.JKConvert.Companion.floatToByteArray(trainOffset, false)
 
                 val byteCrc16Target = ByteArray(dataFrame.size - 4)
 
@@ -1514,7 +1514,7 @@ class ICDService {
             var timeOffset: Float,
             var azimuthOffset: Float,
             var elevationOffset: Float,
-            var tiltOffset: Float,
+            var trainOffset: Float,
             var crc16: UShort
         ) {
             fun setDataFrame(): ByteArray {
@@ -1524,7 +1524,7 @@ class ICDService {
                 val byteTimeOffset: ByteArray = JKUtil.JKConvert.floatToByteArray(timeOffset, false)
                 val byteAzimuthOffset: ByteArray = JKUtil.JKConvert.floatToByteArray(azimuthOffset, false);
                 val byteElevationOffset: ByteArray = JKUtil.JKConvert.floatToByteArray(elevationOffset, false);
-                val byteTiltOffset: ByteArray = JKUtil.JKConvert.floatToByteArray(tiltOffset, false);
+                val byteTiltOffset: ByteArray = JKUtil.JKConvert.floatToByteArray(trainOffset, false);
                 val byteCrc16Target = ByteArray(dataFrame.size - 4)
 
                 dataFrame[0] = ICD_STX

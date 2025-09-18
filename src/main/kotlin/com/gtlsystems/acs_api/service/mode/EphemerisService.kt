@@ -19,7 +19,6 @@ import com.gtlsystems.acs_api.service.udp.UdpFwICDService
 import com.gtlsystems.acs_api.config.ThreadManager
 import io.netty.handler.timeout.TimeoutException
 import jakarta.annotation.PreDestroy
-import org.springframework.util.ClassUtils.isVisible
 import reactor.core.Disposable
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
@@ -29,10 +28,8 @@ import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import java.util.BitSet
-import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
-import java.util.concurrent.ThreadFactory
 import java.util.concurrent.TimeUnit
 import com.gtlsystems.acs_api.service.system.BatchStorageManager
 import com.gtlsystems.acs_api.service.system.settings.SettingsService
@@ -83,8 +80,8 @@ class EphemerisService(
     // ✅ 정지궤도 추적 상태 관리
     enum class TrackingState {
         IDLE,
-        MOVING_TILT_TO_ZERO,
-        WAITING_FOR_TILT_STABILIZATION,
+        MOVING_TRAIN_TO_ZERO,
+        WAITING_FOR_TRAIN_STABILIZATION,
         MOVING_TO_TARGET,
         TRACKING_ACTIVE
     }
@@ -94,11 +91,9 @@ class EphemerisService(
     private var targetAzimuth: Float = 0f
     private var targetElevation: Float = 0f
 
-    // ✅ 정지궤도 추적 타임아웃 설정
+    // ✅ Train 축 안정화 대기 시간
     companion object {
-        const val TILT_MOVE_TIMEOUT = 100000L        // Tilt 이동: 10분
-        const val TILT_STABILIZATION_TIMEOUT = 3000L // Tilt 안정화: 3초
-        const val POSITION_MOVE_TIMEOUT = 100000L    // Az/El 이동: 10분
+        const val TRAIN_STABILIZATION_TIMEOUT = 3L // Tilt 안정화: 10분
     }
 
     private var trackingDataIndex = 0
@@ -178,8 +173,8 @@ class EphemerisService(
             val transformedElevation = geo3AxisPosition["transformedElevation"] as? Double ?: originalElevation
 
             // 변환 정보 추출
-            val tiltAngle = geo3AxisPosition["tiltAngle"] as? Double ?: -6.98
-            val rotatorAngle = geo3AxisPosition["rotatorAngle"] as? Double ?: 0.0
+            val tiltAngle = settingsService.tiltAngle
+            val trainAngle = geo3AxisPosition["trainAngle"] as? Double ?: 0.0
 
             logger.info(
                 "📍 정지궤도 원본 좌표: Az=${String.format("%.2f", originalAzimuth)}°, El=${
@@ -189,7 +184,7 @@ class EphemerisService(
                     )
                 }°"
             )
-            logger.info("🔄 3축 변환 적용: 기울기=${tiltAngle}°, 회전체=${rotatorAngle}°")
+            logger.info("🔄 3축 변환 적용: 기울기=${tiltAngle}°, 회전체=${trainAngle}°")
             logger.info(
                 "📍 정지궤도 변환 좌표: Az=${String.format("%.2f", transformedAzimuth)}°, El=${
                     String.format(
@@ -220,15 +215,14 @@ class EphemerisService(
             trackingStatus.geostationaryStatus = true
 
             // ✅ 공통 상태머신 진입
-            currentTrackingState = TrackingState.MOVING_TILT_TO_ZERO
+            currentTrackingState = TrackingState.MOVING_TRAIN_TO_ZERO
 
             // ✅ 모드 타이머 시작 (공통 상태머신 체크용)
             startModeTimer()
 
             // 3축 변환 결과 로깅
             logger.info("✅ 3축 변환 완료")
-            logger.info("🔄 변환 정보: 기울기=${tiltAngle}°, 회전체=${rotatorAngle}°")
-
+            logger.info("🔄 변환 정보: 기울기=${tiltAngle}°, 회전체=${trainAngle}°")
             logger.info("✅ 정지궤도 추적 시작 완료 (공통 상태머신 적용)")
 
         } catch (e: Exception) {
@@ -295,7 +289,7 @@ class EphemerisService(
         tleLine1: String,
         tleLine2: String,
         targetTime: ZonedDateTime? = null,
-        tiltAngle: Double = -6.98,
+        tiltAngle: Double = -7.0,
         trainAngle: Double = 0.0  // 회전체 각도 (기본값 0도)
     ): Map<String, Any> {
         try {
@@ -314,7 +308,7 @@ class EphemerisService(
                 }°"
             )
             // 2. 3축 변환 적용 (단일 좌표 변환)
-            val (transformedAzimuth, transformedElevation) = CoordinateTransformer.transformCoordinatesWithRotator(
+            val (transformedAzimuth, transformedElevation) = CoordinateTransformer.transformCoordinatesWithTrain(
                 azimuth = originalAzimuth,
                 elevation = originalElevation,
                 tiltAngle = tiltAngle,
@@ -536,11 +530,11 @@ class EphemerisService(
                 val originalAzimuth = originalPoint["Azimuth"] as Double
                 val originalElevation = originalPoint["Elevation"] as Double
 
-                // 축변환 적용 (기울기 -6.98도, 회전체 0도)
-                val (transformedAzimuth, transformedElevation) = CoordinateTransformer.transformCoordinatesWithRotator(
+                // 축변환 적용 (기울기 -7도, 회전체 0도)
+                val (transformedAzimuth, transformedElevation) = CoordinateTransformer.transformCoordinatesWithTrain(
                     azimuth = originalAzimuth,
                     elevation = originalElevation,
-                    tiltAngle = -6.98,
+                    tiltAngle = settingsService.tiltAngle,
                     trainAngle = 0.0
                 )
 
@@ -555,7 +549,7 @@ class EphemerisService(
                     "Altitude" to originalPoint["Altitude"],
                     "OriginalAzimuth" to originalAzimuth,
                     "OriginalElevation" to originalElevation,
-                    "TiltAngle" to -6.98,
+                    "TiltAngle" to settingsService.tiltAngle,
                     "trainAngle" to 0.0,
                     "TransformationType" to "axis_transform",
                     "DataType" to "axis_transformed"
@@ -613,7 +607,7 @@ class EphemerisService(
 
             // 축변환된 마스터 데이터 생성
             val axisTransformedMstData = originalMstData.toMutableMap().apply {
-                put("TiltAngle", -6.98)
+                put("TiltAngle", settingsService.tiltAngle)
                 put("RotatorAngle", 0.0)
                 put("TransformationType", "axis_transform")
                 put("OriginalDataCount", passDtl.size)
@@ -705,7 +699,7 @@ class EphemerisService(
         }
 
         logger.info("🔄 2단계 완료: 축변환 적용 - ${axisTransformedMst.size}개 패스, ${axisTransformedDtl.size}개 좌표")
-        logger.info("변환 정보: 기울기=-6.98°, 회전체=0도")
+        logger.info("변환 정보: 기울기=${settingsService.tiltAngle}°, 회전체=0도")
         return Pair(axisTransformedMst, axisTransformedDtl)
     }
 
@@ -791,15 +785,15 @@ class EphemerisService(
 
 
     // Tilt만 0으로 이동
-    private fun moveTiltToZero(tiltAngle: Float) {
+    private fun moveTrainToZero(TrainAngle: Float) {
         val multiAxis = BitSet()
         multiAxis.set(2)  // Tilt 축만 활성화
-        PushData.CMD.cmdTiltAngle = GlobalData.Offset.tiltPositionOffset
+        PushData.CMD.cmdTrainAngle = GlobalData.Offset.trainPositionOffset
         udpFwICDService.singleManualCommand(
-            multiAxis, tiltAngle, 5f
+            multiAxis, TrainAngle, 5f
         )
 
-        logger.info("🔄 Tilt를 ${tiltAngle} 도로 이동 시작)")
+        logger.info("🔄 TrainAngle를 ${TrainAngle} 도로 이동 시작)")
     }
 
     // 목표 Az/El로 이동
@@ -815,17 +809,17 @@ class EphemerisService(
         logger.info("🔄 목표 Az/El로 이동: Az=${targetAzimuth}°, El=${targetElevation}°")
     }
 
-    // Tilt가 0에 도달했는지 확인
-    private fun isTiltAtZero(): Boolean {
-        val cmdTilt = PushData.CMD.cmdTiltAngle ?: 0f  // null이면 0f 사용
-        val currentTilt = dataStoreService.getLatestData().tiltAngle ?: 0.0
+    // Train가 0에 도달했는지 확인
+    private fun isTrainAtZero(): Boolean {
+        val cmdTilt = PushData.CMD.cmdTrainAngle ?: 0f  // null이면 0f 사용
+        val currentTilt = dataStoreService.getLatestData().trainAngle ?: 0.0
         return kotlin.math.abs(cmdTilt - currentTilt.toFloat()) <= 0.1f
     }
 
-    // Tilt가 안정화되었는지 확인
-    private fun isTiltStabilized(): Boolean {
-        val cmdTilt = PushData.CMD.cmdTiltAngle ?: 0f  // null이면 0f 사용
-        val currentTilt = dataStoreService.getLatestData().tiltAngle ?: 0.0
+    // Train가 안정화되었는지 확인
+    private fun isTrainStabilized(): Boolean {
+        val cmdTilt = PushData.CMD.cmdTrainAngle ?: 0f  // null이면 0f 사용
+        val currentTilt = dataStoreService.getLatestData().trainAngle ?: 0.0
         return kotlin.math.abs(cmdTilt - currentTilt.toFloat()) <= 0.1f
     }
 
@@ -917,7 +911,7 @@ class EphemerisService(
 
         // ✅ 위성 추적 시작 상태 설정
         trackingStatus.ephemerisStatus = true
-        trackingStatus.ephemerisTrackingState = "TILT_MOVING_TO_ZERO"
+        trackingStatus.ephemerisTrackingState = "TRAIN_MOVING_TO_ZERO"
         logger.info("🚀 위성 추적 시작 - Tilt 시작 위치로 이동")
 
         // ✅ 통합 모드 실행기 사용
@@ -994,34 +988,33 @@ class EphemerisService(
         try {
             // ✅ Offset 값 변경 감지 및 CMD 값 업데이트 로직 추가
             //checkAndApplyPositionOffsets()
-
             if (trackingStatus.ephemerisStatus != true) {
                 return
             }
             when (currentTrackingState) {
-                TrackingState.MOVING_TILT_TO_ZERO -> {
+                TrackingState.MOVING_TRAIN_TO_ZERO -> {
                     // ✅ Tilt 시작 위치로 이동 상태 표시
-                    trackingStatus.ephemerisTrackingState = "TILT_MOVING_TO_ZERO"
-                    var tiltAngle = 0f
-                    GlobalData.EphemerisTrakingAngle.tiltAngle = tiltAngle
-                    moveTiltToZero(tiltAngle)
-                    if (isTiltAtZero()) {
-                        currentTrackingState = TrackingState.WAITING_FOR_TILT_STABILIZATION
+                    trackingStatus.ephemerisTrackingState = "TRAIN_MOVING_TO_ZERO"
+                    var trainAngle = 0f
+                    GlobalData.EphemerisTrakingAngle.trainAngle = trainAngle
+                    moveTrainToZero(trainAngle)
+                    if (isTrainAtZero()) {
+                        currentTrackingState = TrackingState.WAITING_FOR_TRAIN_STABILIZATION
                         stabilizationStartTime = System.currentTimeMillis()
                         // ✅ Tilt 0도 이동 완료, 안정화 대기 상태로 업데이트
-                        trackingStatus.ephemerisTrackingState = "TILT_STABILIZING"
-                        logger.info("✅ Tilt가 0도에 도달, 안정화 대기 시작")
+                        trackingStatus.ephemerisTrackingState = "TRAIN_STABILIZING"
+                        logger.info("✅ Train가 0도에 도달, 안정화 대기 시작")
                     }
                 }
 
-                TrackingState.WAITING_FOR_TILT_STABILIZATION -> {
+                TrackingState.WAITING_FOR_TRAIN_STABILIZATION -> {
                     // ✅ Tilt 안정화 대기 상태 표시
-                    trackingStatus.ephemerisTrackingState = "TILT_STABILIZING"
+                    trackingStatus.ephemerisTrackingState = "TRAIN_STABILIZING"
 
-                    if (System.currentTimeMillis() - stabilizationStartTime >= TILT_STABILIZATION_TIMEOUT && isTiltStabilized()) {
+                    if (System.currentTimeMillis() - stabilizationStartTime >= TRAIN_STABILIZATION_TIMEOUT && isTrainStabilized()) {
                         moveToTargetAzEl()
                         currentTrackingState = TrackingState.MOVING_TO_TARGET
-                        logger.info("✅ Tilt 안정화 완료, 목표 Az/El로 이동 시작")
+                        logger.info("✅ TRAIN 안정화 완료, 목표 Az/El로 이동 시작")
                     }
                 }
 
@@ -1106,7 +1099,7 @@ class EphemerisService(
 
     }
 
-    /**
+    /**                                                                        R
      * 추적 진행 중 처리
      */
     private fun handleInProgress(passId: UInt) {
@@ -1226,7 +1219,7 @@ class EphemerisService(
             (theoreticalFinalPoint["Altitude"] as? Double)?.toFloat() ?: axisTransformedAltitude
 
         // 변환 정보 추출
-        val tiltAngle = theoreticalAxisPoint["TiltAngle"] as? Double ?: -6.98
+        val tiltAngle = settingsService.tiltAngle
         val transformationType = theoreticalAxisPoint["TransformationType"] as? String ?: "none"
 
         // ✅ 변경: PushData 대신 DataStoreService에서 데이터 가져오기
@@ -1237,14 +1230,14 @@ class EphemerisService(
 
         val trackingCmdAzimuthTime = trackingOnlyData["trackingAzimuthTime"]
         val trackingCmdElevationTime = trackingOnlyData["trackingElevationTime"]
-        val trackingCmdTiltTime = trackingOnlyData["trackingTiltTime"]
+        val trackingCmdTrainTime = trackingOnlyData["trackingTiltTime"]
 
         val trackingCmdAzimuth = trackingOnlyData["trackingCMDAzimuthAngle"]
         val trackingActualAzimuth = trackingOnlyData["trackingActualAzimuthAngle"]
         val trackingCmdElevation = trackingOnlyData["trackingCMDElevationAngle"]
         val trackingActualElevation = trackingOnlyData["trackingActualElevationAngle"]
-        val trackingCmdTilt = trackingOnlyData["trackingCMDTiltAngle"]
-        val trackingActualTilt = trackingOnlyData["trackingActualTiltAngle"]
+        val trackingCmdTrain = trackingOnlyData["trackingCMDTrainAngle"]
+        val trackingActualTrain = trackingOnlyData["trackingActualTrainAngle"]
 
         // ✅ 데이터 유효성 검사
         val hasValidData =
@@ -1292,9 +1285,9 @@ class EphemerisService(
             "trackingElevationTime" to trackingCmdElevationTime,
             "trackingCMDElevationAngle" to trackingCmdElevation,
             "trackingActualElevationAngle" to trackingActualElevation,
-            "trackingTiltTime" to trackingCmdTiltTime,
-            "trackingCMDTiltAngle" to trackingCmdTilt,
-            "trackingActualTiltAngle" to trackingActualTilt,
+            "trackingTrainTime" to trackingCmdTrainTime,
+            "trackingCMDTrainAngle" to trackingCmdTrain,
+            "trackingActualTrainAngle" to trackingActualTrain,
             "passId" to passId,
 
             // ✅ 변환 오차 계산
@@ -1414,7 +1407,7 @@ class EphemerisService(
             val finalTransformedAltitude = axisTransformedAltitude
 
             // 변환 정보
-            val tiltAngle = lowerPoint["TiltAngle"] as? Double ?: -6.98
+            val tiltAngle = settingsService.tiltAngle
             val transformationType = lowerPoint["TransformationType"] as? String ?: "none"
 
             // 보간 정확도 계산
@@ -1475,7 +1468,7 @@ class EphemerisService(
         val finalTransformedRange = axisTransformedRange
         val finalTransformedAltitude = axisTransformedAltitude
 
-        val tiltAngle = targetPoint["TiltAngle"] as? Double ?: -6.98
+        val tiltAngle = settingsService.tiltAngle
         val transformationType = targetPoint["TransformationType"] as? String ?: "none"
 
         return mapOf(
@@ -1509,9 +1502,9 @@ class EphemerisService(
         logger.info("  - trackingElevationTime: {}", readData.trackingElevationTime)
         logger.info("  - trackingCMDElevationAngle: {}", readData.trackingCMDElevationAngle)
         logger.info("  - trackingActualElevationAngle: {}", readData.trackingActualElevationAngle)
-        logger.info("  - trackingTiltTime: {}", readData.trackingTiltTime)
-        logger.info("  - trackingCMDTiltAngle: {}", readData.trackingCMDTiltAngle)
-        logger.info("  - trackingActualTiltAngle: {}", readData.trackingActualTiltAngle)
+        logger.info("  - trackingTiltTime: {}", readData.trackingTrainTime)
+        logger.info("  - trackingCMDTiltAngle: {}", readData.trackingCMDTrainAngle)
+        logger.info("  - trackingActualTiltAngle: {}", readData.trackingActualTrainAngle)
     }
 
     // ✅ 새로운 디버깅 메서드 추가
@@ -1536,7 +1529,7 @@ class EphemerisService(
             logger.info("  일반 각도 데이터:")
             logger.info("    - azimuthAngle: {}", currentData.azimuthAngle)
             logger.info("    - elevationAngle: {}", currentData.elevationAngle)
-            logger.info("    - tiltAngle: {}", currentData.tiltAngle)
+            logger.info("    - tiltAngle: {}", currentData.trainAngle)
 
         } catch (e: Exception) {
             logger.error("DataStore 디버깅 중 오류: {}", e.message, e)
@@ -1636,7 +1629,7 @@ class EphemerisService(
             targetAzimuth = (startPoint["Azimuth"] as Double).toFloat()
             targetElevation = (startPoint["Elevation"] as Double).toFloat()
             // 상태머신 진입
-            currentTrackingState = TrackingState.MOVING_TILT_TO_ZERO
+            currentTrackingState = TrackingState.MOVING_TRAIN_TO_ZERO
             // ✅ Tilt 시작 위치로 이동 상태는 이미 startModeTimer()에서 설정됨
         }
     }
@@ -2422,7 +2415,7 @@ class EphemerisService(
             }
 
             // 3축 변환 계산
-            val (transformedAz, transformedEl) = CoordinateTransformer.transformCoordinatesWithRotator(
+            val (transformedAz, transformedEl) = CoordinateTransformer.transformCoordinatesWithTrain(
                 azimuth, elevation, tilt, rotator
             )
 

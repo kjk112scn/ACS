@@ -664,15 +664,15 @@ class PassScheduleService(
         cmdAzimuthSpeed: Float,
         cmdElevationAngle: Float,
         cmdElevationSpeed: Float,
-        cmdTiltAngle: Float,
-        cmdTiltSpeed: Float
+        cmdTrainAngle: Float,
+        cmdTrainSpeed: Float
     ) {
         val multiAxis = BitSet()
         multiAxis.set(0)
         multiAxis.set(1)
         udpFwICDService.multiManualCommand(
             multiAxis, cmdAzimuthAngle,
-            cmdAzimuthSpeed, cmdElevationAngle, cmdElevationSpeed, cmdTiltAngle ?: 0.0f, cmdTiltSpeed ?: 0.0f
+            cmdAzimuthSpeed, cmdElevationAngle, cmdElevationSpeed, cmdTrainAngle ?: 0.0f, cmdTrainSpeed ?: 0.0f
         )
     }
 

@@ -6,7 +6,7 @@ object PushData {
     data class CMDValue (
         var cmdAzimuthAngle: Float? = null,
         var cmdElevationAngle: Float? = null,
-        var cmdTiltAngle: Float? = null,
+        var cmdTrainAngle: Float? = null,
         var cmdTime: ZonedDateTime? = null
     )
     data class TrackingStatus (
@@ -22,8 +22,8 @@ object PushData {
     // 추적 상태 enum 추가
     enum class EphemerisTrackingState {
         IDLE,                    // 대기 (추적 정지 상태)
-        TILT_MOVING_TO_ZERO,    // Tilt 시작 위치로 이동
-        TILT_STABILIZING,       // Tilt 안정화 대기
+        TRAIN_MOVING_TO_ZERO,    // Tilt 시작 위치로 이동
+        TRAIN_STABILIZING,       // Tilt 안정화 대기
         MOVING_TO_START,        // 시작 위치 이동 중
         WAITING_FOR_TRACKING,   // 위성 추적 대기
         TRACKING,               // 실제 추적 중
@@ -34,24 +34,24 @@ object PushData {
     // 태양 추적 상태 enum 추가
     enum class SunTrackTrackingState {
         IDLE,                    // 대기 (태양 추적 정지 상태)
-        TILT_MOVING_TO_ZERO,    // Tilt 시작 위치로 이동
-        TILT_STABILIZING,       // Tilt 안정화 대기
+        TRAIN_MOVING_TO_ZERO,    // Tilt 시작 위치로 이동
+        TRAIN_STABILIZING,       // Tilt 안정화 대기
         TRACKING               // 실제 추적 중
     }
     data class ReadData(
         val modeStatusBits: String? = null,
         val azimuthAngle: Float? = null,
         val elevationAngle: Float? = null,
-        val tiltAngle: Float? = null,
+        val trainAngle: Float? = null,
         val azimuthSpeed: Float? = null,
         val elevationSpeed: Float? = null,
-        val tiltSpeed: Float? = null,
+        val trainSpeed: Float? = null,
         val servoDriverAzimuthAngle: Float? = null,
         val servoDriverElevationAngle: Float? = null,
-        val servoDriverTiltAngle: Float? = null,
+        val servoDriverTrainAngle: Float? = null,
         val torqueAzimuth: Float? = null,
         val torqueElevation: Float? = null,
-        val torqueTilt: Float? = null,
+        val torqueTrain: Float? = null,
         val windSpeed: Float? = null,
         val windDirection: UShort? = null,
         val rtdOne: Float? = null,
@@ -64,8 +64,8 @@ object PushData {
         val azimuthBoardStatusBits: String? = null,
         val elevationBoardServoStatusBits: String? = null,
         val elevationBoardStatusBits: String? = null,
-        val tiltBoardServoStatusBits: String? = null,
-        val tiltBoardStatusBits: String? = null,
+        val trainBoardServoStatusBits: String? = null,
+        val trainBoardStatusBits: String? = null,
         val feedSBoardStatusBits: String? = null,
         val feedXBoardStatusBits: String? = null,
         val currentSBandLNALHCP: Float? = null,
@@ -78,19 +78,19 @@ object PushData {
         val rssiXBandLNARHCP: Float? = null,
         val azimuthAcceleration: Float? = null,
         val elevationAcceleration: Float? = null,
-        val tiltAcceleration: Float? = null,
+        val trainAcceleration: Float? = null,
         val azimuthMaxAcceleration: Float? = null,
         val elevationMaxAcceleration: Float? = null,
-        val tiltMaxAcceleration: Float? = null,
+        val trainMaxAcceleration: Float? = null,
         val trackingAzimuthTime : Float? = null,
         val trackingCMDAzimuthAngle : Float? = null,
         val trackingActualAzimuthAngle : Float? = null,
         val trackingElevationTime : Float? = null,
         val trackingCMDElevationAngle : Float? = null,
         val trackingActualElevationAngle : Float? = null,
-        val trackingTiltTime : Float? = null,
-        val trackingCMDTiltAngle : Float? = null,
-        val trackingActualTiltAngle : Float? = null
+        val trackingTrainTime : Float? = null,
+        val trackingCMDTrainAngle : Float? = null,
+        val trackingActualTrainAngle : Float? = null
     )
     // ✅ 인스턴스 객체
     val CMD = CMDValue()

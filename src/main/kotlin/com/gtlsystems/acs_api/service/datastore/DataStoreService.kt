@@ -32,16 +32,16 @@ class DataStoreService {
             modeStatusBits = newData.modeStatusBits ?: currentData.modeStatusBits,
             azimuthAngle = newData.azimuthAngle ?: currentData.azimuthAngle,
             elevationAngle = newData.elevationAngle ?: currentData.elevationAngle,
-            tiltAngle = newData.tiltAngle ?: currentData.tiltAngle,
+            trainAngle = newData.trainAngle ?: currentData.trainAngle,
             azimuthSpeed = newData.azimuthSpeed ?: currentData.azimuthSpeed,
             elevationSpeed = newData.elevationSpeed ?: currentData.elevationSpeed,
-            tiltSpeed = newData.tiltSpeed ?: currentData.tiltSpeed,
+            trainSpeed = newData.trainSpeed ?: currentData.trainSpeed,
             servoDriverAzimuthAngle = newData.servoDriverAzimuthAngle ?: currentData.servoDriverAzimuthAngle,
             servoDriverElevationAngle = newData.servoDriverElevationAngle ?: currentData.servoDriverElevationAngle,
-            servoDriverTiltAngle = newData.servoDriverTiltAngle ?: currentData.servoDriverTiltAngle,
+            servoDriverTrainAngle = newData.servoDriverTrainAngle ?: currentData.servoDriverTrainAngle,
             torqueAzimuth = newData.torqueAzimuth ?: currentData.torqueAzimuth,
             torqueElevation = newData.torqueElevation ?: currentData.torqueElevation,
-            torqueTilt = newData.torqueTilt ?: currentData.torqueTilt,
+            torqueTrain = newData.torqueTrain ?: currentData.torqueTrain,
             windSpeed = newData.windSpeed ?: currentData.windSpeed,
             windDirection = newData.windDirection ?: currentData.windDirection,
             rtdOne = newData.rtdOne ?: currentData.rtdOne,
@@ -54,8 +54,8 @@ class DataStoreService {
             azimuthBoardStatusBits = newData.azimuthBoardStatusBits ?: currentData.azimuthBoardStatusBits,
             elevationBoardServoStatusBits = newData.elevationBoardServoStatusBits ?: currentData.elevationBoardServoStatusBits,
             elevationBoardStatusBits = newData.elevationBoardStatusBits ?: currentData.elevationBoardStatusBits,
-            tiltBoardServoStatusBits = newData.tiltBoardServoStatusBits ?: currentData.tiltBoardServoStatusBits,
-            tiltBoardStatusBits = newData.tiltBoardStatusBits ?: currentData.tiltBoardStatusBits,
+            trainBoardServoStatusBits = newData.trainBoardServoStatusBits ?: currentData.trainBoardServoStatusBits,
+            trainBoardStatusBits = newData.trainBoardStatusBits ?: currentData.trainBoardStatusBits,
             feedSBoardStatusBits = newData.feedSBoardStatusBits ?: currentData.feedSBoardStatusBits,
             feedXBoardStatusBits = newData.feedXBoardStatusBits ?: currentData.feedXBoardStatusBits,
             currentSBandLNALHCP = newData.currentSBandLNALHCP ?: currentData.currentSBandLNALHCP,
@@ -68,19 +68,19 @@ class DataStoreService {
             rssiXBandLNARHCP = newData.rssiXBandLNARHCP ?: currentData.rssiXBandLNARHCP,
             azimuthAcceleration = newData.azimuthAcceleration ?: currentData.azimuthAcceleration,
             elevationAcceleration = newData.elevationAcceleration ?: currentData.elevationAcceleration,
-            tiltAcceleration = newData.tiltAcceleration ?: currentData.tiltAcceleration,
+            trainAcceleration = newData.trainAcceleration ?: currentData.trainAcceleration,
             azimuthMaxAcceleration = newData.azimuthMaxAcceleration ?: currentData.azimuthMaxAcceleration,
             elevationMaxAcceleration = newData.elevationMaxAcceleration ?: currentData.elevationMaxAcceleration,
-            tiltMaxAcceleration = newData.tiltMaxAcceleration ?: currentData.tiltMaxAcceleration,
+            trainMaxAcceleration = newData.trainMaxAcceleration ?: currentData.trainMaxAcceleration,
             trackingAzimuthTime = newData.trackingAzimuthTime ?: currentData.trackingAzimuthTime,
             trackingCMDAzimuthAngle = newData.trackingCMDAzimuthAngle ?: currentData.trackingCMDAzimuthAngle,
             trackingActualAzimuthAngle = newData.trackingActualAzimuthAngle ?: currentData.trackingActualAzimuthAngle,
             trackingElevationTime = newData.trackingElevationTime ?: currentData.trackingElevationTime,
             trackingCMDElevationAngle = newData.trackingCMDElevationAngle ?: currentData.trackingCMDElevationAngle,
             trackingActualElevationAngle = newData.trackingActualElevationAngle ?: currentData.trackingActualElevationAngle,
-            trackingTiltTime = newData.trackingTiltTime ?: currentData.trackingTiltTime,
-            trackingCMDTiltAngle = newData.trackingCMDTiltAngle ?: currentData.trackingCMDTiltAngle,
-            trackingActualTiltAngle = newData.trackingActualTiltAngle ?: currentData.trackingActualTiltAngle,
+            trackingTrainTime = newData.trackingTrainTime ?: currentData.trackingTrainTime,
+            trackingCMDTrainAngle = newData.trackingCMDTrainAngle ?: currentData.trackingCMDTrainAngle,
+            trackingActualTrainAngle = newData.trackingActualTrainAngle ?: currentData.trackingActualTrainAngle,
         )
 
         // ⚡ 최적화: 실제로 변경된 경우에만 업데이트
@@ -102,16 +102,16 @@ class DataStoreService {
             "modeStatusBits" to data.modeStatusBits,
             "azimuthAngle" to data.azimuthAngle,
             "elevationAngle" to data.elevationAngle,
-            "tiltAngle" to data.tiltAngle,
+            "trainAngle" to data.trainAngle,
             "azimuthSpeed" to data.azimuthSpeed,
             "elevationSpeed" to data.elevationSpeed,
-            "tiltSpeed" to data.tiltSpeed,
+            "trainSpeed" to data.trainSpeed,
             "servoDriverAzimuthAngle" to data.servoDriverAzimuthAngle,
             "servoDriverElevationAngle" to data.servoDriverElevationAngle,
-            "servoDriverTiltAngle" to data.servoDriverTiltAngle,
+            "servoDriverTrainAngle" to data.servoDriverTrainAngle,
             "torqueAzimuth" to data.torqueAzimuth,
             "torqueElevation" to data.torqueElevation,
-            "torqueTilt" to data.torqueTilt,
+            "torqueTrain" to data.torqueTrain,
             "windSpeed" to data.windSpeed,
             "windDirection" to data.windDirection,
             "rtdOne" to data.rtdOne,
@@ -124,8 +124,8 @@ class DataStoreService {
             "azimuthBoardStatusBits" to data.azimuthBoardStatusBits,
             "elevationBoardServoStatusBits" to data.elevationBoardServoStatusBits,
             "elevationBoardStatusBits" to data.elevationBoardStatusBits,
-            "tiltBoardServoStatusBits" to data.tiltBoardServoStatusBits,
-            "tiltBoardStatusBits" to data.tiltBoardStatusBits,
+            "trainBoardServoStatusBits" to data.trainBoardServoStatusBits,
+            "trainBoardStatusBits" to data.trainBoardStatusBits,
             "feedSBoardStatusBits" to data.feedSBoardStatusBits,
             "feedXBoardStatusBits" to data.feedXBoardStatusBits,
             "currentSBandLNALHCP" to data.currentSBandLNALHCP,
@@ -138,19 +138,19 @@ class DataStoreService {
             "rssiXBandLNARHCP" to data.rssiXBandLNARHCP,
             "azimuthAcceleration" to data.azimuthAcceleration,
             "elevationAcceleration" to data.elevationAcceleration,
-            "tiltAcceleration" to data.tiltAcceleration,
+            "trainAcceleration" to data.trainAcceleration,
             "azimuthMaxAcceleration" to data.azimuthMaxAcceleration,
             "elevationMaxAcceleration" to data.elevationMaxAcceleration,
-            "tiltMaxAcceleration" to data.tiltMaxAcceleration,
+            "trainMaxAcceleration" to data.trainMaxAcceleration,
             "trackingAzimuthTime" to data.trackingAzimuthTime,
             "trackingCMDAzimuthAngle" to data.trackingCMDAzimuthAngle,
             "trackingActualAzimuthAngle" to data.trackingActualAzimuthAngle,
             "trackingElevationTime" to data.trackingElevationTime,
             "trackingCMDElevationAngle" to data.trackingCMDElevationAngle,
             "trackingActualElevationAngle" to data.trackingActualElevationAngle,
-            "trackingTiltTime" to data.trackingTiltTime,
-            "trackingCMDTiltAngle" to data.trackingCMDTiltAngle,
-            "trackingActualTiltAngle" to data.trackingActualTiltAngle
+            "trackingTrainTime" to data.trackingTrainTime,
+            "trackingCMDTrainAngle" to data.trackingCMDTrainAngle,
+            "trackingActualTrainAngle" to data.trackingActualTrainAngle
         )
     }
     /**
@@ -165,9 +165,9 @@ class DataStoreService {
             "trackingElevationTime" to data.trackingElevationTime,
             "trackingCMDElevationAngle" to data.trackingCMDElevationAngle,
             "trackingActualElevationAngle" to data.trackingActualElevationAngle,
-            "trackingTiltTime" to data.trackingTiltTime,
-            "trackingCMDTiltAngle" to data.trackingCMDTiltAngle,
-            "trackingActualTiltAngle" to data.trackingActualTiltAngle
+            "trackingTrainTime" to data.trackingTrainTime,
+            "trackingCMDTrainAngle" to data.trackingCMDTrainAngle,
+            "trackingActualTrainAngle" to data.trackingActualTrainAngle
         )
     }
     private val currentTrackingMstId = AtomicReference<UInt?>(null)
@@ -276,10 +276,10 @@ class DataStoreService {
     private fun isDataEqual(data1: PushData.ReadData, data2: PushData.ReadData): Boolean {
         return data1.azimuthAngle == data2.azimuthAngle &&
                data1.elevationAngle == data2.elevationAngle &&
-               data1.tiltAngle == data2.tiltAngle &&
+               data1.trainAngle == data2.trainAngle &&
                data1.azimuthSpeed == data2.azimuthSpeed &&
                data1.elevationSpeed == data2.elevationSpeed &&
-               data1.tiltSpeed == data2.tiltSpeed &&
+               data1.trainSpeed == data2.trainSpeed &&
                data1.modeStatusBits == data2.modeStatusBits &&
                data1.windSpeed == data2.windSpeed &&
                data1.windDirection == data2.windDirection
@@ -357,16 +357,16 @@ class DataStoreService {
      */
     private fun countNonNullFields(data: PushData.ReadData): Int {
         return listOfNotNull(
-            data.modeStatusBits, data.azimuthAngle, data.elevationAngle, data.tiltAngle,
-            data.azimuthSpeed, data.elevationSpeed, data.tiltSpeed,
-            data.servoDriverAzimuthAngle, data.servoDriverElevationAngle, data.servoDriverTiltAngle,
-            data.torqueAzimuth, data.torqueElevation, data.torqueTilt,
+            data.modeStatusBits, data.azimuthAngle, data.elevationAngle, data.trainAngle,
+            data.azimuthSpeed, data.elevationSpeed, data.trainSpeed,
+            data.servoDriverAzimuthAngle, data.servoDriverElevationAngle, data.servoDriverTrainAngle,
+            data.torqueAzimuth, data.torqueElevation, data.torqueTrain,
             data.windSpeed, data.windDirection, data.rtdOne, data.rtdTwo,
             data.mainBoardProtocolStatusBits, data.mainBoardStatusBits,
             data.mainBoardMCOnOffBits, data.mainBoardReserveBits,
             data.azimuthBoardServoStatusBits, data.azimuthBoardStatusBits,
             data.elevationBoardServoStatusBits, data.elevationBoardStatusBits,
-            data.tiltBoardServoStatusBits, data.tiltBoardStatusBits,
+            data.trainBoardServoStatusBits, data.trainBoardStatusBits,
             data.feedSBoardStatusBits, data.feedXBoardStatusBits,
             data.currentSBandLNALHCP, data.currentSBandLNARHCP,
             data.currentXBandLNALHCP, data.currentXBandLNARHCP,

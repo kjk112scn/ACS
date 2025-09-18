@@ -52,7 +52,7 @@ class SettingsService(
         // 추적 설정
         "tracking.msInterval" to SettingDefinition("tracking.msInterval", 100, SettingType.INTEGER, "추적 간격"),
         "tracking.durationDays" to SettingDefinition("tracking.durationDays", 1L, SettingType.LONG, "추적 기간(일)"),
-        "tracking.minElevationAngle" to SettingDefinition("tracking.minElevationAngle", -7f, SettingType.FLOAT, "최소 고도각"),
+        "tracking.minElevationAngle" to SettingDefinition("tracking.minElevationAngle", 0f, SettingType.FLOAT, "최소 고도각"),
         
         // Stow Angle 설정
         "stow.angle.azimuth" to SettingDefinition("stow.angle.azimuth", 0.0, SettingType.DOUBLE, "Stow 방위각"),
@@ -122,11 +122,6 @@ class SettingsService(
         "system.storage.batchSize" to SettingDefinition("system.storage.batchSize", 1000, SettingType.INTEGER, "배치 크기"),
         "system.storage.saveInterval" to SettingDefinition("system.storage.saveInterval", 100L, SettingType.LONG, "저장 간격"),
         "system.storage.progressLogInterval" to SettingDefinition("system.storage.progressLogInterval", 1000, SettingType.INTEGER, "진행률 로깅 간격"),
-
-        // 위치 설정
-        "system.location.latitude" to SettingDefinition("system.location.latitude", 37.4563, SettingType.DOUBLE, "시스템 위도"),
-        "system.location.longitude" to SettingDefinition("system.location.longitude", 128.608510, SettingType.DOUBLE, "시스템 경도"),
-        "system.location.trackingSpeed" to SettingDefinition("system.location.trackingSpeed", 10, SettingType.INTEGER, "시스템 추적 속도"),
 
         // === 태양 추적 정확도 임계값 설정 ===
         "system.suntrack.highAccuracyThreshold" to SettingDefinition("system.suntrack.highAccuracyThreshold", 0.000278, SettingType.DOUBLE, "태양 추적 높은 정확도 임계값"),
@@ -614,27 +609,6 @@ class SettingsService(
      */
     var systemStorageProgressLogInterval: Int by createSettingProperty("system.storage.progressLogInterval", "진행률 로깅 간격")
 
-    /**
-     * 시스템 위치 위도 (도)
-     * 시스템의 기본 위도 좌표를 설정합니다.
-     * 기본값: 37.4563
-     */
-    var systemLocationLatitude: Double by createSettingProperty("system.location.latitude", "시스템 위도")
-
-    /**
-     * 시스템 위치 경도 (도)
-     * 시스템의 기본 경도 좌표를 설정합니다.
-     * 기본값: 128.608510
-     */
-    var systemLocationLongitude: Double by createSettingProperty("system.location.longitude", "시스템 경도")
-
-    /**
-     * 시스템 위치 추적 속도 (도/초)
-     * 시스템의 기본 추적 속도를 설정합니다.
-     * 기본값: 10
-     */
-    var systemLocationTrackingSpeed: Int by createSettingProperty("system.location.trackingSpeed", "시스템 추적 속도")
-
     // === 태양 추적 정확도 임계값 프로퍼티들 ===
     /**
      * 태양 추적 높은 정확도 임계값 (도)
@@ -929,13 +903,6 @@ class SettingsService(
     fun getSystemStorageSettings(): Map<String, Any> = settings.filterKeys { it.startsWith("system.storage.") }
 
     /**
-     * 시스템 위치 설정 조회
-     * 시스템 위치 관련 모든 설정을 반환합니다.
-     * @return 위치 설정 맵
-     */
-    fun getSystemLocationSettings(): Map<String, Any> = settings.filterKeys { it.startsWith("system.location.") }
-
-    /**
      * 시스템 태양 추적 설정 조회
      * 태양 추적 관련 모든 설정을 반환합니다.
      * @return 태양 추적 설정 맵
@@ -958,7 +925,6 @@ class SettingsService(
             event.key.startsWith("system.udp.") -> "ms"
             event.key.startsWith("system.tracking.") -> "ms"
             event.key.startsWith("system.storage.") -> "ms"
-            event.key.startsWith("system.location.") -> "도"
             event.key.startsWith("system.suntrack.") -> "도"
             else -> ""
         }
@@ -1001,14 +967,8 @@ class SettingsService(
             event.key.startsWith("system.udp.") -> {
                 // 시스템 UDP 설정 변경 시 처리 로직
             }
-            event.key.startsWith("system.tracking.") -> {
-                // 시스템 추적 설정 변경 시 처리 로직
-            }
             event.key.startsWith("system.storage.") -> {
                 // 시스템 저장 설정 변경 시 처리 로직
-            }
-            event.key.startsWith("system.location.") -> {
-                // 시스템 위치 설정 변경 시 처리 로직
             }
             event.key.startsWith("system.suntrack.") -> {
                 // 시스템 태양 추적 설정 변경 시 처리 로직

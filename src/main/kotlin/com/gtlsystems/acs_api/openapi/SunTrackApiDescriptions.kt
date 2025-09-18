@@ -26,14 +26,14 @@ object SunTrackApiDescriptions {
                                 <li>interval: 추적 간격 (밀리초 단위)</li>
                                 <li>cmdAzimuthSpeed: 방위각 축 이동 속도 (도/초)</li>
                                 <li>cmdElevationSpeed: 고도각 축 이동 속도 (도/초)</li>
-                                <li>cmdTiltSpeed: 기울기 축 이동 속도 (도/초)</li>
+                                <li>cmdTrainSpeed: Train 축 이동 속도 (도/초)</li>
                             </ul>
 
                             <h4>태양 추적 원리:</h4>
                             <ul>
                                 <li>천문학적 계산: 태양의 적경/적위 계산</li>
                                 <li>좌표 변환: 천구 좌표를 안테나 좌표로 변환</li>
-                                <li>각도 계산: 방위각, 고도각, 기울기각 계산</li>
+                                <li>각도 계산: 방위각, 고도각, Trainr각 계산</li>
                                 <li>제어 명령: 계산된 각도로 안테나 제어</li>
                             </ul>
                         """.trimIndent()
@@ -56,14 +56,14 @@ object SunTrackApiDescriptions {
                                 <li>interval: Tracking interval (milliseconds)</li>
                                 <li>cmdAzimuthSpeed: Azimuth axis movement speed (deg/sec)</li>
                                 <li>cmdElevationSpeed: Elevation axis movement speed (deg/sec)</li>
-                                <li>cmdTiltSpeed: Tilt axis movement speed (deg/sec)</li>
+                                <li>cmdTrainSpeed: Train axis movement speed (deg/sec)</li>
                             </ul>
 
                             <h4>Sun Tracking Principles:</h4>
                             <ul>
                                 <li>Astronomical Calculation: Calculate sun's RA/Dec</li>
                                 <li>Coordinate Transform: Convert celestial to antenna coordinates</li>
-                                <li>Angle Calculation: Calculate azimuth, elevation, tilt angles</li>
+                                <li>Angle Calculation: Calculate azimuth, elevation, train angles</li>
                                 <li>Control Command: Control antenna with calculated angles</li>
                             </ul>
                         """.trimIndent()

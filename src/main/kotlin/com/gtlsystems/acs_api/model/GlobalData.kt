@@ -1,11 +1,9 @@
 package com.gtlsystems.acs_api.model
 
-import com.gtlsystems.acs_api.model.PushData.ReadData
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
-import java.util.concurrent.atomic.AtomicReference
 
 /**
  * 전역 데이터 클래스
@@ -51,21 +49,21 @@ object GlobalData {
         var TimeOffset: Float = 0.0f
         var azimuthPositionOffset: Float = 0.0f
         var elevationPositionOffset: Float = 0.0f
-        var tiltPositionOffset: Float = 0.0f
+        var trainPositionOffset: Float = 0.0f
         var trueNorthOffset: Float = 0.0f
     }
     object EphemerisTrakingAngle {
         var azimuthAngle: Float = 0.0f
         var elevationAngle: Float = 0.0f
-        var tiltAngle: Float = 0.0f
+        var trainAngle: Float = 0.0f
     }
     object SunTrackingData {
         var azimuthAngle: Float = 0.0f
         var azimuthSpeed: Float = 0.0f
         var elevationAngle: Float = 0.0f
         var elevationSpeed: Float = 0.0f
-        var tiltAngle: Float = 0.0f
-        var tiltSpeed: Float = 0.0f
+        var trainAngle: Float = 0.0f
+        var trainSpeed: Float = 0.0f
     }
     /*
 * 버전 정보

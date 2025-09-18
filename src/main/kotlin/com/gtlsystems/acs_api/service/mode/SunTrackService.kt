@@ -40,9 +40,9 @@ class SunTrackService(
 
     // ✅ SunTrack 상태 관리 (핵심 변수만)
     private var sunTrackState = SunTrackState.IDLE
-    private var targetRotatorAngle: Double? = null
-    private var tiltStabilizationStartTime: Long? = null
-    private var isInitialTiltMovementCompleted = false
+    private var targetTrainAngle: Double? = null
+    private var trainStabilizationStartTime: Long? = null
+    private var isInitialTrainMovementCompleted = false
 
     // ✅ 추적 상태 참조
     private val trackingStatus = PushData.TRACKING_STATUS
@@ -50,8 +50,8 @@ class SunTrackService(
     // ✅ SunTrack 상태 열거형
     enum class SunTrackState {
         IDLE,           // 대기 상태
-        INITIAL_TILT,   // 초기 Tilt 이동 중
-        STABILIZING,    // Tilt 안정화 대기 중
+        INITIAL_Train,   // 초기 Train 이동 중
+        STABILIZING,    // Train 안정화 대기 중
         TRACKING        // 실시간 태양 추적 중
     }
 
@@ -64,7 +64,7 @@ class SunTrackService(
     // ✅ 속도 설정 변수 추가
     private var azimuthSpeed: Float = 1.0f
     private var elevationSpeed: Float = 1.0f
-    private var tiltSpeed: Float = 5.0f
+    private var trainSpeed: Float = 5.0f
 
     @PostConstruct
     fun init() {
@@ -166,16 +166,16 @@ class SunTrackService(
                 logger.debug("☀️ Sun Track 상태: IDLE")
             }
             
-            SunTrackState.INITIAL_TILT -> {
-                trackingStatus.sunTrackTrackingState = "TILT_MOVING_TO_ZERO"
-                logger.debug("☀️ Sun Track 상태: TILT_MOVING_TO_ZERO")
-                processInitialTiltMovement()
+            SunTrackState.INITIAL_Train -> {
+                trackingStatus.sunTrackTrackingState = "TRAIN_MOVING_TO_ZERO"
+                logger.debug("☀️ Sun Track 상태: TRAIN_MOVING_TO_ZERO")
+                processInitialTrainMovement()
             }
             
             SunTrackState.STABILIZING -> {
-                trackingStatus.sunTrackTrackingState = "TILT_STABILIZING"
-                logger.debug("☀️ Sun Track 상태: TILT_STABILIZING")
-                processTiltStabilization()
+                trackingStatus.sunTrackTrackingState = "TRAIN_STABILIZING"
+                logger.debug("☀️ Sun Track 상태: TRAIN_STABILIZING")
+                processTrainStabilization()
             }
             
             SunTrackState.TRACKING -> {
@@ -373,9 +373,9 @@ class SunTrackService(
     /**
      * ✅ 초기 Train 이동 처리
      */
-    private fun processInitialTiltMovement() {
+    private fun processInitialTrainMovement() {
         try {
-            if (targetRotatorAngle == null) {
+            if (targetTrainAngle == null) {
                 // ✅ 통합된 범용 Train 각도 계산 사용
                 val trainResult = calculateOptimalTrainAngleUniversal()
                 
@@ -386,120 +386,120 @@ class SunTrackService(
                     return
                 }
                 
-                targetRotatorAngle = trainResult.angle
-                CMD.cmdTiltAngle = getRotatorOffsetCalculator()!!.toFloat()
+                targetTrainAngle = trainResult.angle
+                CMD.cmdTrainAngle = getTrainOffsetCalculator()!!.toFloat()
                 logger.info("개선된 Train 각도 설정 완료: {}° ({})", 
                     String.format("%.3f", trainResult.angle),
                     trainResult.calculationMethod)
                 
                 // ✅ Train 이동 명령 전송
-                GlobalData.SunTrackingData.tiltAngle = targetRotatorAngle?.toFloat()!!
-                sendTiltMovementCommand(targetRotatorAngle?.toFloat()!!, tiltSpeed)
+                GlobalData.SunTrackingData.trainAngle = targetTrainAngle?.toFloat()!!
+                sendTrainMovementCommand(targetTrainAngle?.toFloat()!!, trainSpeed)
                     
                 // ✅ 안정화 단계로 전환
                 sunTrackState = SunTrackState.STABILIZING
-                tiltStabilizationStartTime = System.currentTimeMillis()
+                trainStabilizationStartTime = System.currentTimeMillis()
                 
                 logger.info("Train 이동 명령 전송 완료, 안정화 단계 진입")
             } else {
-                // ✅ targetRotatorAngle이 이미 설정되어 있으면 매번 목표 각도 도달 확인
-                val currentRotatorAngle = dataStoreService.getLatestData().tiltAngle
+                // ✅ targetTrainAngle이 이미 설정되어 있으면 매번 목표 각도 도달 확인
+                val currentTrainAngle = dataStoreService.getLatestData().trainAngle
                 val moveTolerance = 1.0 // ±1.0도 허용
                 
-                if (currentRotatorAngle != null && targetRotatorAngle != null) {
-                    val angleDifference = Math.abs(currentRotatorAngle - getRotatorOffsetCalculator()!!.toFloat())
+                if (currentTrainAngle != null && targetTrainAngle != null) {
+                    val angleDifference = Math.abs(currentTrainAngle - getTrainOffsetCalculator()!!.toFloat())
                     
-                    logger.debug("Rotator 목표 각도 확인 중: 현재={}°, 목표={}°, 차이={}°", 
-                        String.format("%.3f", currentRotatorAngle),
-                        String.format("%.3f", targetRotatorAngle),
+                    logger.debug("Train 목표 각도 확인 중: 현재={}°, 목표={}°, 차이={}°",
+                        String.format("%.3f", currentTrainAngle),
+                        String.format("%.3f", targetTrainAngle),
                         String.format("%.3f", angleDifference))
                     
                     // ✅ 목표 각도 도달 시 STABILIZING 상태로 전환
                     if (angleDifference <= moveTolerance) {
-                        logger.info("Rotator 목표 각도 도달: 현재={}°, 목표={}°, 차이={}° (허용오차: ±{}°)", 
-                            String.format("%.3f", currentRotatorAngle),
-                            String.format("%.3f", targetRotatorAngle),
+                        logger.info("Train 목표 각도 도달: 현재={}°, 목표={}°, 차이={}° (허용오차: ±{}°)",
+                            String.format("%.3f", currentTrainAngle),
+                            String.format("%.3f", targetTrainAngle),
                             String.format("%.3f", angleDifference),
                             moveTolerance)
                         
                         sunTrackState = SunTrackState.STABILIZING
-                        tiltStabilizationStartTime = System.currentTimeMillis()
-                        logger.info("Rotator 안정화 단계 시작")
+                        trainStabilizationStartTime = System.currentTimeMillis()
+                        logger.info("Train 안정화 단계 시작")
                     }
                 }
             }
         } catch (e: Exception) {
-            logger.error("초기 Rotator 이동 처리 중 오류: {}", e.message, e)
+            logger.error("초기 Train 이동 처리 중 오류: {}", e.message, e)
             sunTrackState = SunTrackState.IDLE
         }
     }
 
     /**
-     * ✅ Rotator 안정화 대기 처리
+     * ✅ Train 안정화 대기 처리
      */
-    private fun processTiltStabilization() {
+    private fun processTrainStabilization() {
         try {
-            val currentRotatorAngle = dataStoreService.getLatestData().tiltAngle
+            val currentTrainAngle = dataStoreService.getLatestData().trainAngle
             val stabilizationTolerance = 0.5 // ±0.5도 허용
 
-            if (currentRotatorAngle != null && targetRotatorAngle != null) {
-                val angleDifference = Math.abs(currentRotatorAngle - getRotatorOffsetCalculator()!!.toFloat())
+            if (currentTrainAngle != null && targetTrainAngle != null) {
+                val angleDifference = Math.abs(currentTrainAngle - getTrainOffsetCalculator()!!.toFloat())
                 
                 if (sunTrackState == SunTrackState.STABILIZING) {
-                    if (tiltStabilizationStartTime == null) {
-                        tiltStabilizationStartTime = System.currentTimeMillis()
-                        logger.info("Rotator 안정화 타이머 시작")
+                    if (trainStabilizationStartTime == null) {
+                        trainStabilizationStartTime = System.currentTimeMillis()
+                        logger.info("Train 안정화 타이머 시작")
                         return
                     }
 
                     val currentTime = System.currentTimeMillis()
-                    val stabilizationDuration = currentTime - tiltStabilizationStartTime!!
+                    val stabilizationDuration = currentTime - trainStabilizationStartTime!!
                     
                     // ✅ 5초마다 로그 출력
                     if (stabilizationDuration % 5000 < 100) {
-                        logger.debug("Rotator 안정화 대기: 현재={}°, 목표={}°, 차이={}°, 경과시간={}ms", 
-                            String.format("%.3f", currentRotatorAngle),
-                            String.format("%.3f", targetRotatorAngle),
+                        logger.debug("Train 안정화 대기: 현재={}°, 목표={}°, 차이={}°, 경과시간={}ms",
+                            String.format("%.3f", currentTrainAngle),
+                            String.format("%.3f", targetTrainAngle),
                             String.format("%.3f", angleDifference),
                             stabilizationDuration)
                     }
                     
                     // ✅ 1초 안정화 완료
                     if (stabilizationDuration >= 1000 && angleDifference <= stabilizationTolerance) {
-                        logger.info("Rotator 안정화 완료: 현재={}°, 목표={}°, 차이={}°, 대기시간={}ms", 
-                            String.format("%.3f", currentRotatorAngle),
-                            String.format("%.3f", targetRotatorAngle),
+                        logger.info("Train 안정화 완료: 현재={}°, 목표={}°, 차이={}°, 대기시간={}ms",
+                            String.format("%.3f", currentTrainAngle),
+                            String.format("%.3f", targetTrainAngle),
                             String.format("%.3f", angleDifference),
                             stabilizationDuration)
                         
                         // ✅ 실시간 추적 상태로 전환
                         sunTrackState = SunTrackState.TRACKING
-                        isInitialTiltMovementCompleted = true
+                        isInitialTrainMovementCompleted = true
                         logger.info("Sun Track 실시간 추적 상태로 전환 완료")
                     } else if (stabilizationDuration > 300000) {
                         // ✅ 5분 후에도 안정화되지 못한 경우
-                        logger.warn("Rotator 안정화 실패: 현재={}°, 목표={}°, 차이={}°, 대기시간={}ms", 
-                            String.format("%.3f", currentRotatorAngle),
-                            String.format("%.3f", targetRotatorAngle),
+                        logger.warn("Train 안정화 실패: 현재={}°, 목표={}°, 차이={}°, 대기시간={}ms",
+                            String.format("%.3f", currentTrainAngle),
+                            String.format("%.3f", targetTrainAngle),
                             String.format("%.3f", angleDifference),
                             stabilizationDuration)
                         
                         // ✅ 실패 시에도 추적 시작
                         sunTrackState = SunTrackState.TRACKING
-                        isInitialTiltMovementCompleted = true
-                        logger.info("Rotator 안정화 실패했지만 추적 시작")
+                        isInitialTrainMovementCompleted = true
+                        logger.info("Train 안정화 실패했지만 추적 시작")
                     }
                 }
             } else {
                 // ✅ 각도 데이터가 없으면 SunTrack을 정지
-                logger.error("Rotator 각도 데이터 없음. 현재={}, 목표={}. SunTrack을 정지합니다.", 
-                    currentRotatorAngle, targetRotatorAngle)
+                logger.error("Train 각도 데이터 없음. 현재={}, 목표={}. SunTrack을 정지합니다.",
+                    currentTrainAngle, targetTrainAngle)
                 sunTrackState = SunTrackState.IDLE
-                targetRotatorAngle = null
-                tiltStabilizationStartTime = null
+                targetTrainAngle = null
+                trainStabilizationStartTime = null
             }
         } catch (e: Exception) {
-            logger.error("Rotator 안정화 처리 중 오류: {}", e.message, e)
+            logger.error("Train 안정화 처리 중 오류: {}", e.message, e)
             sunTrackState = SunTrackState.IDLE
         }
     }
@@ -511,7 +511,7 @@ class SunTrackService(
         val totalStartTime = System.currentTimeMillis()
         
         try {
-            if (targetRotatorAngle?.toFloat() != null) {
+            if (targetTrainAngle?.toFloat() != null) {
                 // 1단계: Cal Time 계산
                 val calTimeStart = System.currentTimeMillis()
                 val calTime = GlobalData.Time.resultTimeOffsetCalTime
@@ -525,11 +525,11 @@ class SunTrackService(
                 
                 // 3단계: 3축 좌표 변환
                 val transformStart = System.currentTimeMillis()
-                val (transformedAz, transformedEl) = CoordinateTransformer.transformCoordinatesWithRotator(
+                val (transformedAz, transformedEl) = CoordinateTransformer.transformCoordinatesWithTrain(
                     azimuth = sunPosition.azimuthDegrees,
                     elevation = sunPosition.elevationDegrees,
-                    tiltAngle = -6.98,
-                    trainAngle = targetRotatorAngle!!
+                    tiltAngle = settingsService.tiltAngle,
+                    trainAngle = targetTrainAngle!!
                 )
                 val transformDuration = System.currentTimeMillis() - transformStart
                 
@@ -543,8 +543,8 @@ class SunTrackService(
                     azimuthSpeed,
                     transformedEl.toFloat(), 
                     elevationSpeed,
-                    targetRotatorAngle!!.toFloat(),
-                    tiltSpeed
+                    targetTrainAngle!!.toFloat(),
+                    trainSpeed
                 )
                 val commandDuration = System.currentTimeMillis() - commandStart
                 
@@ -580,14 +580,14 @@ class SunTrackService(
                 logger.info("[CalTime] 3축 변환 후: Az={}°, El={}° (Tilt={}°, Train={}°)", 
                     String.format("%.3f", transformedAz),
                     String.format("%.3f", transformedEl),
-                    String.format("%.3f", -6.98),
-                    String.format("%.3f", targetRotatorAngle?.toFloat()!!))
+                    String.format("%.3f", settingsService.tiltAngle),
+                    String.format("%.3f", targetTrainAngle?.toFloat()!!))
                 logger.info("[CalTime] 연속 추적: {}° → {}°", 
                     String.format("%.3f", transformedAz),
                     String.format("%.3f", pathAdjustedAzimuth))
                 
             } else {
-                logger.error("Train 회전 각도 정보를 가져올 수 없습니다: targetRotatorAngle?.toFloat()가 null입니다")
+                logger.error("Train 회전 각도 정보를 가져올 수 없습니다: targetTrainAngle?.toFloat()가 null입니다")
                 dataStoreService.setSunTracking(false)
             }
             
@@ -598,13 +598,13 @@ class SunTrackService(
         }
     }
 
-  fun getRotatorOffsetCalculator(): Double? {
-        val offsetAppliedAngle = targetRotatorAngle?.let { targetAngle ->
-            targetAngle.toFloat() + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
+  fun getTrainOffsetCalculator(): Double? {
+        val offsetAppliedAngle = targetTrainAngle?.let { targetAngle ->
+            targetAngle.toFloat() + GlobalData.Offset.trainPositionOffset + GlobalData.Offset.trueNorthOffset
         }
         
         return if (offsetAppliedAngle != null) {
-            //CMD.cmdTiltAngle = offsetAppliedAngle
+            //CMD.cmdTrainAngle = offsetAppliedAngle
             offsetAppliedAngle.toDouble()
         } else {
             null
@@ -614,8 +614,8 @@ class SunTrackService(
     /**
      * ✅ Azimuth와 Elevation 축 명령 전송
      */
-    fun sendAzimuthAndElevationAxisCommand(cmdAzimuthAngle: Float, cmdAzimuthSpeed: Float, cmdElevationAngle: Float, cmdElevationSpeed: Float, cmdTiltAngle: Float, cmdTiltSpeed: Float) {
-        //CMD.cmdTiltAngle = targetRotatorAngle!!.toFloat()
+    fun sendAzimuthAndElevationAxisCommand(cmdAzimuthAngle: Float, cmdAzimuthSpeed: Float, cmdElevationAngle: Float, cmdElevationSpeed: Float, cmdTrainAngle: Float, cmdTrainSpeed: Float) {
+        //CMD.cmdTiltAngle = targetTrainAngle!!.toFloat()
         //CMD.cmdAzimuthAngle = cmdAzimuthAngle
         //CMD.cmdElevationAngle = cmdElevationAngle
         val multiAxis = BitSet()
@@ -630,61 +630,61 @@ class SunTrackService(
             cmdAzimuthSpeed,
             cmdElevationAngle,
             cmdElevationSpeed,
-            cmdTiltAngle,
-            cmdTiltSpeed
+            cmdTrainAngle,
+            cmdTrainSpeed
         )
     }
 
     /**
-     * ✅ Rotator 이동 명령 전송
+     * ✅ Train 이동 명령 전송
      */
-    private fun sendTiltMovementCommand(targetAngle: Float, tiltSpeed: Float) {
+    private fun sendTrainMovementCommand(targetAngle: Float, trainSpeed: Float) {
         try {
             val multiAxis = BitSet()
-            multiAxis.set(2) // rotator만 이동
-            GlobalData.SunTrackingData.tiltSpeed = tiltSpeed
+            multiAxis.set(2) // Train만 이동
+            GlobalData.SunTrackingData.trainSpeed = trainSpeed
             udpFwICDService.singleManualCommand(
                 multiAxis,
-                targetAngle, // 목표 Rotator 각도
-                tiltSpeed // Rotator 속도
+                targetAngle, // 목표 Train 각도
+                trainSpeed // Train 속도
             )
 
-            logger.info("Rotator 이동 명령 전송: {}도", String.format("%.6f", targetAngle))
+            logger.info("Train 이동 명령 전송: {}도", String.format("%.6f", targetAngle))
             
         } catch (e: Exception) {
-            logger.error("Rotator 이동 명령 전송 실패: {}", e.message, e)
+            logger.error("Train 이동 명령 전송 실패: {}", e.message, e)
             throw e
         }
     }
     // ✅ 속도 설정 메서드 추가
-    fun setSpeeds(azimuthSpeed: Float, elevationSpeed: Float, tiltSpeed: Float) {
+    fun setSpeeds(azimuthSpeed: Float, elevationSpeed: Float, trainSpeed: Float) {
         this.azimuthSpeed = azimuthSpeed
         this.elevationSpeed = elevationSpeed
-        this.tiltSpeed = tiltSpeed
-        logger.info("Sun Track 속도 설정: Az={}°/s, El={}°/s, Tilt={}°/s", 
-            azimuthSpeed, elevationSpeed, tiltSpeed)
+        this.trainSpeed = trainSpeed
+        logger.info("Sun Track 속도 설정: Az={}°/s, El={}°/s, Train={}°/s",
+            azimuthSpeed, elevationSpeed, trainSpeed)
     }
     /**
      * ✅ Sun Track 시작
      */
    // ✅ startSunTrack 메서드 수정
-   fun startSunTrack(azimuthSpeed: Float, elevationSpeed: Float, tiltSpeed: Float) {
+   fun startSunTrack(azimuthSpeed: Float, elevationSpeed: Float, trainSpeed: Float) {
     try {
         logger.info("Sun Track 시작 (개선된 버전)")
         
         // ✅ 속도 설정
-        setSpeeds(azimuthSpeed, elevationSpeed, tiltSpeed)
+        setSpeeds(azimuthSpeed, elevationSpeed, trainSpeed)
         
             
             // ✅ 상태 초기화
-            sunTrackState = SunTrackState.INITIAL_TILT
-            targetRotatorAngle = null
-            tiltStabilizationStartTime = null
-            isInitialTiltMovementCompleted = false
+            sunTrackState = SunTrackState.INITIAL_Train
+            targetTrainAngle = null
+            trainStabilizationStartTime = null
+            isInitialTrainMovementCompleted = false
             
             // ✅ 추적 상태 설정
             trackingStatus.sunTrackStatus = true
-            trackingStatus.sunTrackTrackingState = "TILT_MOVING_TO_ZERO"
+            trackingStatus.sunTrackTrackingState = "TRAIN_MOVING_TO_ZERO"
             
             logger.info("☀️ Sun Track 시작 - 상태 설정: status={}, trackingState={}", 
                 trackingStatus.sunTrackStatus, trackingStatus.sunTrackTrackingState)
@@ -698,7 +698,7 @@ class SunTrackService(
             // 상태 업데이트
             dataStoreService.setSunTracking(true)
             
-            logger.info("Sun Track 시작 완료 - 초기 Rotator 이동 단계로 진입")
+            logger.info("Sun Track 시작 완료 - 초기 Train 이동 단계로 진입")
 
         } catch (e: Exception) {
             logger.error("Sun Track 시작 실패: {}", e.message, e)
@@ -721,9 +721,9 @@ class SunTrackService(
             
             // ✅ 상태 초기화
             sunTrackState = SunTrackState.IDLE
-            targetRotatorAngle = null
-            tiltStabilizationStartTime = null
-            isInitialTiltMovementCompleted = false
+            targetTrainAngle = null
+            trainStabilizationStartTime = null
+            isInitialTrainMovementCompleted = false
             
             // ✅ 추적 상태 초기화
             trackingStatus.sunTrackStatus = false
@@ -733,7 +733,7 @@ class SunTrackService(
             val allAxes = BitSet()
             allAxes.set(0) // azimuth
             allAxes.set(1) // elevation
-            allAxes.set(2) // rotator
+            allAxes.set(2) // Train
             
             udpFwICDService.stopCommand(allAxes)
 
@@ -765,40 +765,40 @@ class SunTrackService(
             "threadName" to "SunTrackMonitor",
             "monitoringInterval" to "100ms",
             "sunTrackState" to sunTrackState.name,
-            "isInitialTiltMovementCompleted" to isInitialTiltMovementCompleted
+            "isInitialTrainMovementCompleted" to isInitialTrainMovementCompleted
         )
     }
 
     /**
-     * ✅ Rotator 각도 정보 조회
+     * ✅ Train 각도 정보 조회
      */
-    fun getTiltAngleInfo(): Map<String, Any?> {
-        val currentRotatorAngle = dataStoreService.getLatestData().tiltAngle
+    fun getTrainAngleInfo(): Map<String, Any?> {
+        val currentTrainAngle = dataStoreService.getLatestData().trainAngle
         
         return mapOf(
-            "currentRotatorAngle" to currentRotatorAngle,
-            "targetRotatorAngle" to targetRotatorAngle,
-            "angleDifference" to if (currentRotatorAngle != null && targetRotatorAngle != null) {
-                Math.abs(currentRotatorAngle - targetRotatorAngle!!)
+            "currentTrainAngle" to currentTrainAngle,
+            "targetTrainAngle" to targetTrainAngle,
+            "angleDifference" to if (currentTrainAngle != null && targetTrainAngle != null) {
+                Math.abs(currentTrainAngle - targetTrainAngle!!)
             } else null,
-            "isReached" to isRotatorAngleReached(),
+            "isReached" to isTrainAngleReached(),
             "sunTrackState" to sunTrackState.name,
-            "stabilizationStartTime" to tiltStabilizationStartTime,
-            "stabilizationDuration" to if (tiltStabilizationStartTime != null) {
-                System.currentTimeMillis() - tiltStabilizationStartTime!!
+            "stabilizationStartTime" to trainStabilizationStartTime,
+            "stabilizationDuration" to if (trainStabilizationStartTime != null) {
+                System.currentTimeMillis() - trainStabilizationStartTime!!
             } else null
         )
     }
 
     /**
-     * ✅ Rotator 각도 도착 확인
+     * ✅ Train 각도 도착 확인
      */
-    private fun isRotatorAngleReached(): Boolean {
-        val currentRotatorAngle = dataStoreService.getLatestData().tiltAngle
+    private fun isTrainAngleReached(): Boolean {
+        val currentTrainAngle = dataStoreService.getLatestData().trainAngle
         val tolerance = 0.5 // ±0.5도 허용 오차
         
-        return if (currentRotatorAngle != null && targetRotatorAngle != null) {
-            val angleDifference = Math.abs(currentRotatorAngle - targetRotatorAngle!!)
+        return if (currentTrainAngle != null && targetTrainAngle != null) {
+            val angleDifference = Math.abs(currentTrainAngle - targetTrainAngle!!)
             angleDifference <= tolerance
         } else {
             false

@@ -356,7 +356,7 @@ class UdpFwICDService(
         multiAxis: BitSet,
         azAngle: Float, azSpeed: Float,
         elAngle: Float, elSpeed: Float,
-        tiAngle: Float, tiSpeed: Float
+        trainAngle: Float, trainSpeed: Float
     ) {
         Mono.fromCallable {
             val setDataFrameInstance = ICDService.MultiManualControl.SetDataFrame(
@@ -367,8 +367,8 @@ class UdpFwICDService(
                 azimuthSpeed = azSpeed,
                 elevationAngle = elAngle,
                 elevationSpeed = elSpeed,
-                tiltAngle = tiAngle,
-                tiltSpeed = tiSpeed,
+                trainAngle = trainAngle,
+                trainSpeed = trainSpeed,
                 crc16 = 0u,
                 etx = 0x03
             )
@@ -377,27 +377,27 @@ class UdpFwICDService(
             PushData.CMD.apply {
                 cmdAzimuthAngle = azAngle + GlobalData.Offset.azimuthPositionOffset
                 cmdElevationAngle = elAngle + GlobalData.Offset.elevationPositionOffset
-                cmdTiltAngle = tiAngle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
+                cmdTrainAngle = trainAngle + GlobalData.Offset.trainPositionOffset + GlobalData.Offset.trueNorthOffset
             }
             /* 
             if(PushData.TRACKING_STATUS.sunTrackTrackingState == "TRACKING") {
                 PushData.CMD.apply {
                     cmdAzimuthAngle = azAngle + GlobalData.Offset.azimuthPositionOffset
                     cmdElevationAngle = elAngle + GlobalData.Offset.elevationPositionOffset
-                    cmdTiltAngle = tiAngle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
+                    cmdTrainAngle = trainAngle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
                 }   
             }
             else{
                 PushData.CMD.apply {
                     cmdAzimuthAngle = azAngle + GlobalData.Offset.azimuthPositionOffset
                     cmdElevationAngle = elAngle + GlobalData.Offset.elevationPositionOffset
-                    cmdTiltAngle = tiAngle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
+                    cmdTrainAngle = trainAngle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
                 }   
             } 
             */
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
-            logger.info("Manual 제어 명령 전송 완료: Az={}°, El={}°, Ti={}°", azAngle, elAngle, tiAngle)
+            logger.info("Manual 제어 명령 전송 완료: Az={}°, El={}°, Train={}°", azAngle, elAngle, trainAngle)
             logger.debug("Manual 제어 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
         }
             .subscribeOn(Schedulers.boundedElastic())
@@ -440,8 +440,8 @@ class UdpFwICDService(
                         //cmdElevationAngle = angle
                     }
 
-                    singleAxis.get(2) -> {  // Tilt (0x04)
-                        //cmdTiltAngle = angle
+                    singleAxis.get(2) -> {  // Train (0x04)
+                        //cmdTrainAngle = angle
                     }
                 }
             }
@@ -451,7 +451,7 @@ class UdpFwICDService(
             val axisStr = when {
                 singleAxis.get(0) -> "Azimuth"
                 singleAxis.get(1) -> "Elevation"
-                singleAxis.get(2) -> "Tilt"
+                singleAxis.get(2) -> "Train"
                 else -> "Unknown"
             }
 
@@ -505,7 +505,7 @@ class UdpFwICDService(
             )
     }
 
-    // BitSet helper for axis selection (0: Azimuth, 1: Elevation, 2: Tilt)
+    // BitSet helper for axis selection (0: Azimuth, 1: Elevation, 2: train)
     private fun bitsetOf(index: Int): BitSet {
         val bs = BitSet(3)
         bs.set(index)
@@ -515,7 +515,7 @@ class UdpFwICDService(
     /**
      * 위치 오프셋 명령 - Mono 비동기 처리
      */
-    fun positionOffsetCommand(azOffset: Float, elOffset: Float, tiOffset: Float) {
+    fun positionOffsetCommand(azOffset: Float, elOffset: Float, trainOffset: Float) {
         Mono.fromCallable {
             val setDataFrameInstance = ICDService.PositionOffset.SetDataFrame(
                 stx = 0x02,
@@ -523,7 +523,7 @@ class UdpFwICDService(
                 cmdTwo = 'P',
                 azimuthOffset = azOffset,
                 elevationOffset = elOffset,
-                tiltOffset = tiOffset,
+                trainOffset = trainOffset,
                 crc16 = 0u,
                 etx = 0x03
             )
@@ -535,12 +535,12 @@ class UdpFwICDService(
             // 변경 여부 판단 (현재 GlobalData 값과 비교)
             val azChanged = azOffset != GlobalData.Offset.azimuthPositionOffset
             val elChanged = elOffset != GlobalData.Offset.elevationPositionOffset
-            val tiChanged = tiOffset != GlobalData.Offset.tiltPositionOffset
+            val trainChanged = trainOffset != GlobalData.Offset.trainPositionOffset
 
             // 오프셋 갱신
             GlobalData.Offset.azimuthPositionOffset = azOffset
             GlobalData.Offset.elevationPositionOffset = elOffset
-            GlobalData.Offset.tiltPositionOffset = tiOffset
+            GlobalData.Offset.trainPositionOffset = trainOffset
             // 의미 있는 조건 변수로 분리 추적 여부 확인.
             val isAnyModeOn =
                 trackingStatus.ephemerisStatus == true ||
@@ -561,17 +561,17 @@ class UdpFwICDService(
 
             if (isAnyModeOn && isTracking) {
                 var angle = 0f
-                if (trackingStatus.ephemerisStatus == true && tiChanged) {
-                    angle = GlobalData.EphemerisTrakingAngle.tiltAngle
+                if (trackingStatus.ephemerisStatus == true && trainChanged) {
+                    angle = GlobalData.EphemerisTrakingAngle.trainAngle
                     singleManualCommand(bitsetOf(2), angle, 5f)
-                    PushData.CMD.cmdTiltAngle =
-                        angle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
+                    PushData.CMD.cmdTrainAngle =
+                        angle + GlobalData.Offset.trainPositionOffset + GlobalData.Offset.trueNorthOffset
 
-                } else if (trackingStatus.sunTrackStatus == true && tiChanged) {
-                    angle = GlobalData.SunTrackingData.tiltAngle
+                } else if (trackingStatus.sunTrackStatus == true && trainChanged) {
+                    angle = GlobalData.SunTrackingData.trainAngle
                     singleManualCommand(bitsetOf(2), angle, 5f)
-                    PushData.CMD.cmdTiltAngle =
-                        angle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
+                    PushData.CMD.cmdTrainAngle =
+                        angle + GlobalData.Offset.trainPositionOffset + GlobalData.Offset.trueNorthOffset
                 }
             }
 
@@ -587,15 +587,15 @@ class UdpFwICDService(
                     singleManualCommand(bitsetOf(1), angle, 5f)
                     PushData.CMD.cmdElevationAngle = angle + GlobalData.Offset.elevationPositionOffset
                 }
-                if (tiChanged) {
-                    val angle = GlobalData.EphemerisTrakingAngle.tiltAngle
+                if (trainChanged) {
+                    val angle = GlobalData.EphemerisTrakingAngle.trainAngle
                     singleManualCommand(bitsetOf(2), angle, 5f)
-                    PushData.CMD.cmdTiltAngle =
-                        angle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
+                    PushData.CMD.cmdTrainAngle =
+                        angle + GlobalData.Offset.trainPositionOffset + GlobalData.Offset.trueNorthOffset
                 }
             }
 
-            logger.info("PositionOffset 명령 전송 완료: Az={}°, El={}°, Ti={}°", azOffset, elOffset, tiOffset)
+            logger.info("PositionOffset 명령 전송 완료: Az={}°, El={}°, Ti={}°", azOffset, elOffset, trainOffset)
         }
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe(
@@ -718,7 +718,7 @@ class UdpFwICDService(
                 timeOffset = GlobalData.Offset.TimeOffset,
                 azimuthOffset = GlobalData.Offset.azimuthPositionOffset,
                 elevationOffset = GlobalData.Offset.elevationPositionOffset,
-                tiltOffset = GlobalData.Offset.tiltPositionOffset,
+                trainOffset = GlobalData.Offset.trainPositionOffset,
                 crc16 = 0u
             )
 
@@ -812,8 +812,8 @@ class UdpFwICDService(
         stowCommandDisposable?.dispose()
         stopAllCommand()
 
-        val stowTiltAngle = 0.0f
-        val stowTiltSpeed = 5.0f
+        val stowTrainAngle = 0.0f
+        val stowTrainSpeed = 5.0f
         val stowAzimuthAngle = 0.0f
         val stowAzimuthSpeed = 5.0f
         val stowElevationAngle = 90.0f
@@ -822,22 +822,22 @@ class UdpFwICDService(
         logger.info("Stow 명령 시작")
 
         // 1단계: 틸트 축 제어
-        val tiltAxis = BitSet().apply {
+        val trainAxis = BitSet().apply {
             set(2) // 틸트 축
             set(7) // STOW 비트
         }
 
         Mono.fromCallable {
-            PushData.CMD.cmdTiltAngle = stowTiltAngle
-            stowTiltCommand(tiltAxis, stowTiltAngle, stowTiltSpeed)
+            PushData.CMD.cmdTrainAngle = stowTrainAngle
+            stowTrainCommand(trainAxis, stowTrainAngle, stowTrainSpeed)
             logger.info("Stow 1단계: 틸트 축 제어 명령 전송 완료")
         }
             .subscribeOn(Schedulers.boundedElastic())
             .delayElement(Duration.ofMillis(100)) // 명령 전송 후 잠시 대기
             .flatMap {
                 // 2단계: 틸트 안정화 대기
-                logger.info("Stow 2단계: 틸트 안정화 대기 시작 (목표: {}°)", stowTiltAngle)
-                waitForTiltStabilization(stowTiltAngle)
+                logger.info("Stow 2단계: 틸트 안정화 대기 시작 (목표: {}°)", stowTrainAngle)
+                waitForTrainStabilization(stowTrainAngle)
             }
             .flatMap {
                 // 3단계: 방위각/고도각 제어
@@ -873,7 +873,7 @@ class UdpFwICDService(
     /**
      * 틸트 안정화 대기 - 단순한 Mono 방식
      */
-    private fun waitForTiltStabilization(targetAngle: Float): Mono<String> {
+    private fun waitForTrainStabilization(targetAngle: Float): Mono<String> {
         return Mono.create { sink ->
             val startTime = System.currentTimeMillis()
             val maxWaitTime = 30000L // 30초 최대 대기
@@ -891,7 +891,7 @@ class UdpFwICDService(
                         }
 
                         // ✅ 변경: readData 대신 getCurrentReadData() 사용
-                        val currentAngle = getCurrentReadData().tiltAngle ?: 0.0f
+                        val currentAngle = getCurrentReadData().trainAngle ?: 0.0f
                         val isStable = Math.abs(currentAngle - targetAngle) <= 0.1f
 
                         if (isStable) {
@@ -923,10 +923,10 @@ class UdpFwICDService(
     /**
      * 틸트 축 제어 명령 (Stow용)
      */
-    private fun stowTiltCommand(
+    private fun stowTrainCommand(
         multiAxis: BitSet,
-        tiAngle: Float,
-        tiSpeed: Float
+        trainAngle: Float,
+        trainSpeed: Float
     ) {
         try {
             // ✅ 변경: readData 대신 getCurrentReadData() 사용
@@ -940,15 +940,15 @@ class UdpFwICDService(
                 azimuthSpeed = 0.0f,  // 틸트만 제어
                 elevationAngle = currentData.elevationAngle ?: 0.0f,
                 elevationSpeed = 0.0f,  // 틸트만 제어
-                tiltAngle = tiAngle,
-                tiltSpeed = tiSpeed,
+                trainAngle = trainAngle,
+                trainSpeed = trainSpeed,
                 crc16 = 0u,
                 etx = 0x03
             )
             val dataToSend = setDataFrameInstance.setDataFrame()
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
-            logger.info("Stow 틸트 제어: 각도={}°, 속도={}°/s", tiAngle, tiSpeed)
+            logger.info("Stow 틸트 제어: 각도={}°, 속도={}°/s", trainAngle, trainSpeed)
             logger.debug("Stow 틸트 제어 전송 데이터: {}", JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend))
 
         } catch (e: Exception) {
@@ -979,8 +979,8 @@ class UdpFwICDService(
                 azimuthSpeed = azSpeed,
                 elevationAngle = elAngle,
                 elevationSpeed = elSpeed,
-                tiltAngle = currentData.tiltAngle ?: 0.0f,
-                tiltSpeed = 0.0f,  // 방위각/고도각만 제어
+                trainAngle = currentData.trainAngle ?: 0.0f,
+                trainSpeed = 0.0f,  // 방위각/고도각만 제어
                 crc16 = 0u,
                 etx = 0x03
             )

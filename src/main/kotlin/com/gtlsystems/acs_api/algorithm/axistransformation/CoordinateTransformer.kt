@@ -14,10 +14,10 @@ class CoordinateTransformer {
          * @param azimuth 표준 방위각 (도, 북쪽이 0도, 동쪽이 90도)
          * @param elevation 표준 고도각 (도, 수평이 0도, 천정이 90도)
          * @param tiltAngle 기구물의 기울기 각도 (도, 양수는 오른쪽, 음수는 왼쪽)
-         * @param rotatorAngle 회전체의 회전 각도 (도, 0도는 북쪽, 90도는 동쪽)
+         * @param trainAngle 회전체의 회전 각도 (도, 0도는 북쪽, 90도는 동쪽)
          * @return 기울어진 회전체 좌표계에서의 방위각과 고도각 쌍 (도)
          */
-        fun transformCoordinatesWithRotator(
+        fun transformCoordinatesWithTrain(
             azimuth: Double,
             elevation: Double,
             tiltAngle: Double,
@@ -63,20 +63,20 @@ class CoordinateTransformer {
          * @param azimuthFinal 기울어진 회전체 좌표계의 방위각 (도)
          * @param elevationFinal 기울어진 회전체 좌표계의 고도각 (도)
          * @param tiltAngle 기구물의 기울기 각도 (도, 양수는 오른쪽, 음수는 왼쪽)
-         * @param rotatorAngle 회전체의 회전 각도 (도, 0도는 북쪽, 90도는 동쪽)
+         * @param trainAngle 회전체의 회전 각도 (도, 0도는 북쪽, 90도는 동쪽)
          * @return 표준 좌표계에서의 방위각과 고도각 쌍 (도)
          */
         fun inverseTransformCoordinatesWithRotator(
             azimuthFinal: Double,
             elevationFinal: Double,
             tiltAngle: Double,
-            rotatorAngle: Double
+            trainAngle: Double
         ): Pair<Double, Double> {
             // 1. 기울어진 방위각과 고도각을 라디안으로 변환
             val azFinalRad = Math.toRadians(azimuthFinal)
             val elFinalRad = Math.toRadians(elevationFinal)
             val tiltRad = Math.toRadians(tiltAngle)
-            val rotatorRad = Math.toRadians(rotatorAngle)
+            val rotatorRad = Math.toRadians(trainAngle)
 
             // 2. 기울어진 방위각과 고도각을 3D 직교 좌표로 변환
             val xFinal = cos(elFinalRad) * sin(azFinalRad)
@@ -114,7 +114,7 @@ class CoordinateTransformer {
          * @return 기울어진 좌표계에서의 방위각과 고도각 쌍 (도)
          */
         fun transformCoordinates(azimuth: Double, elevation: Double, tiltAngle: Double): Pair<Double, Double> {
-            return transformCoordinatesWithRotator(azimuth, elevation, tiltAngle, 0.0)
+            return transformCoordinatesWithTrain(azimuth, elevation, tiltAngle, 0.0)
         }
 
         /**
@@ -135,29 +135,28 @@ class CoordinateTransformer {
          * @param azimuth 표준 방위각 (도)
          * @param elevation 표준 고도각 (도)
          * @param tiltAngle 기구물의 기울기 각도 (도)
-         * @param rotatorStepDegrees 회전체 각도 간격 (도)
+         * @param trainStepDegrees 회전체 각도 간격 (도)
          * @return 회전체 각도별 방위각/고도각 테이블
          */
         fun generateRotatorAngleTable(
             azimuth: Double,
             elevation: Double,
             tiltAngle: Double,
-            rotatorStepDegrees: Double = 0.0
+            trainStepDegrees: Double = 0.0
         ): List<Triple<Double, Double, Double>> {
             val result = mutableListOf<Triple<Double, Double, Double>>()
 
-            var rotatorAngle = 0.0
-            while (rotatorAngle < 360.0) {
-                val (transformedAz, transformedEl) = transformCoordinatesWithRotator(
-                    azimuth, elevation, tiltAngle, rotatorAngle
+            var trainAngle = 0.0
+            while (trainAngle < 360.0) {
+                val (transformedAz, transformedEl) = transformCoordinatesWithTrain(
+                    azimuth, elevation, tiltAngle, trainAngle
                 )
 
-                result.add(Triple(rotatorAngle, transformedAz, transformedEl))
-                rotatorAngle += rotatorStepDegrees
+                result.add(Triple(trainAngle, transformedAz, transformedEl))
+                trainAngle += trainStepDegrees
             }
 
             return result
         }
-
     }
 }

@@ -1,7 +1,6 @@
 ﻿package com.gtlsystems.acs_api.controller.mode
 
 import com.gtlsystems.acs_api.algorithm.satellitetracker.impl.OrekitCalculator
-import com.gtlsystems.acs_api.algorithm.satellitetracker.model.SatelliteTrackData
 import com.gtlsystems.acs_api.service.mode.EphemerisService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -10,11 +9,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import reactor.core.publisher.Mono
-import java.io.ByteArrayOutputStream
-import java.io.OutputStreamWriter
 import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
-import java.nio.charset.StandardCharsets
 
 @RestController
 @RequestMapping("/api/ephemeris")
@@ -258,7 +253,7 @@ class EphemerisController(
 
 
     /**
-     * 축 변환을 계산합니다.ㅉㅉㅉ
+     * 축 변환을 계산합니다.
      */
     @PostMapping("/calculate-axis-transform")
     @Operation(
@@ -266,16 +261,16 @@ class EphemerisController(
     )
     fun calculateAxisTransform(
         @Parameter(
-            description = "축 변환 계산 요청 데이터 (azimuth, elevation, tilt, rotator)", required = true
+            description = "축 변환 계산 요청 데이터 (azimuth, elevation, tilt, train)", required = true
         ) @RequestBody request: Map<String, Double>
     ): ResponseEntity<Map<String, Any>> {
         try {
             val azimuth = request["azimuth"] ?: 0.0
             val elevation = request["elevation"] ?: 0.0
             val tilt = request["tilt"] ?: 0.0
-            val rotator = request["rotator"] ?: 0.0
+            val train = request["train"] ?: 0.0
 
-            val result = ephemerisService.calculateAxisTransform(azimuth, elevation, tilt, rotator)
+            val result = ephemerisService.calculateAxisTransform(azimuth, elevation, tilt, train)
 
             return ResponseEntity.ok(result)
         } catch (error: Exception) {
@@ -969,11 +964,11 @@ data class EphemerisTrackRequest(
 /**
  * 추적 데이터 요청 데이터
  */
-data class EphemerisTrackWithTiltRequest(
+data class EphemerisTrackWithTrainRequest(
     val tleLine1: String,
     val tleLine2: String,
     val satelliteName: String? = null,
-    val tiltAngle: Double = -6.98  // 기본값 회전각
+    val tiltAngle: Double = -7.0  // 기본값 회전각
 )
 
 /**

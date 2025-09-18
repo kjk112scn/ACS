@@ -42,7 +42,7 @@ class PushDataService(
                 "resultTimeOffsetCalTime" to GlobalData.Time.resultTimeOffsetCalTime,
                 "cmdAzimuthAngle" to PushData.CMD.cmdAzimuthAngle,
                 "cmdElevationAngle" to PushData.CMD.cmdElevationAngle,
-                "cmdTiltAngle" to PushData.CMD.cmdTiltAngle,
+                "cmdTrainAngle" to PushData.CMD.cmdTrainAngle,
                 "udpConnected" to isUdpConnected,
                 "lastUdpUpdateTime" to dataStoreService.getLastUdpUpdateTime().toString(),
                 // ✅ mstId 정보 추가
