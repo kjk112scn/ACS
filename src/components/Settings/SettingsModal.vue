@@ -12,43 +12,37 @@
           <!-- 좌측 탭 컨트롤 -->
           <div class="col-3 col-md-2 settings-tabs">
             <q-list padding>
-              <q-item
-                clickable
-                v-ripple
-                :active="activeTab === 'general'"
-                @click="activeTab = 'general'"
-                active-class="active-tab"
-              >
+              <q-item clickable v-ripple :active="activeTab === 'general'" @click="activeTab = 'general'"
+                active-class="active-tab">
                 <q-item-section avatar>
                   <q-icon name="settings" />
                 </q-item-section>
                 <q-item-section>일반 설정</q-item-section>
               </q-item>
 
-              <q-item
-                clickable
-                v-ripple
-                :active="activeTab === 'servo-preset'"
-                @click="activeTab = 'servo-preset'"
-                active-class="active-tab"
-              >
+              <q-item clickable v-ripple :active="activeTab === 'servo-preset'" @click="activeTab = 'servo-preset'"
+                active-class="active-tab">
                 <q-item-section avatar>
                   <q-icon name="tune" />
                 </q-item-section>
                 <q-item-section>Servo Preset</q-item-section>
               </q-item>
 
-              <q-item
-                clickable
-                v-ripple
-                :active="activeTab === 'connection'"
-                @click="activeTab = 'connection'"
-                active-class="active-tab"
-              >
+              <q-item clickable v-ripple :active="activeTab === 'connection'" @click="activeTab = 'connection'"
+                active-class="active-tab">
                 <q-item-section avatar>
                   <q-icon name="wifi" />
                 </q-item-section>
                 <q-item-section>연결 설정</q-item-section>
+              </q-item>
+
+              <!-- 시스템 설정 탭 추가 -->
+              <q-item clickable v-ripple :active="activeTab === 'system'" @click="activeTab = 'system'"
+                active-class="active-tab">
+                <q-item-section avatar>
+                  <q-icon name="engineering" />
+                </q-item-section>
+                <q-item-section>시스템 설정</q-item-section>
               </q-item>
             </q-list>
           </div>
@@ -56,32 +50,25 @@
           <!-- 우측 컨텐츠 영역 -->
           <div class="col settings-content-area q-pa-md">
             <!-- 일반 설정 탭 -->
-
-            <GeneralSettings
-              v-if="activeTab === 'general'"
-              :dark-mode="localDarkMode"
-              @update:dark-mode="localDarkMode = $event"
-            />
+            <GeneralSettings v-if="activeTab === 'general'" :dark-mode="localDarkMode"
+              @update:dark-mode="localDarkMode = $event" />
 
             <!-- Server Preset 탭 -->
-
             <ServoEncoderPresetSettings v-if="activeTab === 'servo-preset'" />
 
             <!-- 연결 설정 탭 -->
             <div v-if="activeTab === 'connection'">
               <h5 class="q-mt-none q-mb-md">연결 설정</h5>
 
-              <q-input
-                outlined
-                v-model="localServerAddress"
-                label="WebSocket 서버 주소"
-                class="q-mb-md"
-              />
+              <q-input outlined v-model="localServerAddress" label="WebSocket 서버 주소" class="q-mb-md" />
 
               <q-input outlined v-model="apiBaseUrl" label="API 기본 URL" class="q-mb-md" />
 
               <q-toggle v-model="autoReconnect" label="연결 끊김 시 자동 재연결" />
             </div>
+
+            <!-- 시스템 설정 탭 추가 -->
+            <SystemSettings v-if="activeTab === 'system'" />
           </div>
         </div>
       </q-card-section>
@@ -100,6 +87,7 @@ import { useQuasar } from 'quasar'
 
 import GeneralSettings from './GeneralSettings.vue'
 import ServoEncoderPresetSettings from './ServoEncoderPresetSettings.vue'
+import SystemSettings from './SystemSettings/SystemSettings.vue'
 
 const $q = useQuasar()
 

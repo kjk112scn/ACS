@@ -5,15 +5,7 @@
         <!-- 좌측 섹션: 메뉴 버튼과 GTL ACS 로고 -->
 
         <div class="row items-center no-wrap">
-          <q-btn
-            flat
-            dense
-            round
-            icon="menu"
-            aria-label="Menu"
-            @click="toggleLeftDrawer"
-            class="q-mr-sm"
-          />
+          <q-btn flat dense round icon="menu" aria-label="Menu" @click="toggleLeftDrawer" class="q-mr-sm" />
           <div class="text-h6 no-ellipsis">GTL ACS</div>
         </div>
 
@@ -22,32 +14,9 @@
 
         <!-- 우측 섹션: 설정 버튼과 테마 변경 버튼 -->
         <div class="row items-center">
-          <q-btn
-            flat
-            dense
-            round
-            icon="settings"
-            aria-label="Settings"
-            @click="settingsModal = true"
-            class="q-mr-sm"
-          />
-          <q-btn
-            flat
-            dense
-            round
-            icon="brightness_4"
-            aria-label="Toggle Dark Mode"
-            @click="toggleDarkMode"
-          />
-          <q-btn
-            flat
-            dense
-            round
-            icon="info"
-            aria-label="SystemsInfo"
-            size="md"
-            @click="handleSystemInfo"
-          />
+          <q-btn flat dense round icon="settings" aria-label="Settings" @click="settingsModal = true" class="q-mr-sm" />
+          <q-btn flat dense round icon="brightness_4" aria-label="Toggle Dark Mode" @click="toggleDarkMode" />
+          <q-btn flat dense round icon="info" aria-label="SystemsInfo" size="md" @click="handleSystemInfo" />
         </div>
       </q-toolbar>
     </q-header>
@@ -65,19 +34,15 @@
     </q-page-container>
 
     <!-- 설정 모달 컴포넌트 사용 -->
-    <SettingsModal
-      v-model="settingsModal"
-      :dark-mode="isDarkMode"
-      :server-address="serverAddress"
-      @save="handleSettingsSave"
-    />
+    <SettingsModal v-model="settingsModal" :dark-mode="isDarkMode" :server-address="serverAddress"
+      @save="handleSettingsSave" />
   </q-layout>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import EssentialLink, { type EssentialLinkProps } from 'components/EssentialLink.vue'
-import SettingsModal from 'src/components/modals/Settings/SettingsModal.vue'
+import SettingsModal from 'src/components/Settings/SettingsModal.vue'
 import { openComponent } from '../utils/windowUtils' // ✅ windowUtils import 추가
 import { useQuasar } from 'quasar'
 

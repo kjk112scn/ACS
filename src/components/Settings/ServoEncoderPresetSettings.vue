@@ -61,7 +61,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useQuasar } from 'quasar'
-import { useICDStore } from '../../../stores/icd/icdStore'
+import { useICDStore } from '../../stores/icd/icdStore'
 
 const $q = useQuasar()
 const icdStore = useICDStore() // ICD 스토어 사용
