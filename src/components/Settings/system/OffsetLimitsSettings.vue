@@ -1,6 +1,14 @@
 <template>
   <div class="offset-limits-settings">
-    <h5 class="q-mt-none q-mb-md">오프셋 제한 설정</h5>
+    <h5 class="q-mt-none q-mb-md">
+      오프셋 제한 설정
+      <q-badge v-if="hasUnsavedChanges" color="orange" class="q-ml-sm">
+        변경됨
+      </q-badge>
+      <q-badge v-else-if="isSaved" color="green" class="q-ml-sm">
+        저장됨
+      </q-badge>
+    </h5>
 
     <q-tabs v-model="activeTab" class="text-primary">
       <q-tab name="angle" label="각도 오프셋" icon="rotate_3d" />
@@ -25,7 +33,7 @@
 
           <div class="row q-gutter-sm q-mt-md">
             <q-btn type="submit" color="primary" label="각도 오프셋 저장" :loading="loadingStates.offsetLimits"
-              :disable="!isAngleOffsetFormValid" icon="save" />
+              :disable="!isAngleOffsetFormValid || !hasUnsavedChangesAngle" icon="save" />
             <q-btn color="secondary" label="각도 오프셋 초기화" @click="onResetAngleOffset"
               :disable="loadingStates.offsetLimits" icon="refresh" />
           </div>
@@ -45,7 +53,7 @@
 
           <div class="row q-gutter-sm q-mt-md">
             <q-btn type="submit" color="primary" label="시간 오프셋 저장" :loading="loadingStates.offsetLimits"
-              :disable="!isTimeOffsetFormValid" icon="save" />
+              :disable="!isTimeOffsetFormValid || !hasUnsavedChangesTime" icon="save" />
             <q-btn color="secondary" label="시간 오프셋 초기화" @click="onResetTimeOffset" :disable="loadingStates.offsetLimits"
               icon="refresh" />
           </div>
@@ -74,24 +82,72 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
-import { useSettingsStore } from '@/stores'
+import { useOffsetLimitsSettingsStore } from '@/stores'
 import type { AngleOffsetLimitsSettings, TimeOffsetLimitsSettings } from '@/services'
 
 const $q = useQuasar()
-const settingsStore = useSettingsStore()
+const offsetLimitsSettingsStore = useOffsetLimitsSettingsStore()
+
+// 스토어 상태 가져오기
+const { loadingStates, errorStates, updateChangeStatus, pendingChanges } = offsetLimitsSettingsStore
 
 // 로컬 상태
 const activeTab = ref('angle')
-const localAngleOffsetSettings = ref<AngleOffsetLimitsSettings>({
-  azimuth: 50.0,
-  elevation: 50.0,
-  train: 50.0
+
+// 각도 오프셋 로컬 상태
+const getInitialAngleOffsetSettings = (): AngleOffsetLimitsSettings => {
+  if (pendingChanges.angle) {
+    return { ...pendingChanges.angle }
+  }
+  return {
+    azimuth: offsetLimitsSettingsStore.angleOffsetLimitsSettings.azimuth || 50.0,
+    elevation: offsetLimitsSettingsStore.angleOffsetLimitsSettings.elevation || 50.0,
+    train: offsetLimitsSettingsStore.angleOffsetLimitsSettings.train || 50.0
+  }
+}
+
+const localAngleOffsetSettings = ref<AngleOffsetLimitsSettings>(getInitialAngleOffsetSettings())
+
+// 시간 오프셋 로컬 상태
+const getInitialTimeOffsetSettings = (): TimeOffsetLimitsSettings => {
+  if (pendingChanges.time) {
+    return { ...pendingChanges.time }
+  }
+  return {
+    min: offsetLimitsSettingsStore.timeOffsetLimitsSettings.min || 0.1,
+    max: offsetLimitsSettingsStore.timeOffsetLimitsSettings.max || 99999
+  }
+}
+
+const localTimeOffsetSettings = ref<TimeOffsetLimitsSettings>(getInitialTimeOffsetSettings())
+
+// 원본 상태
+const originalAngleOffsetSettings = ref<AngleOffsetLimitsSettings>({
+  azimuth: offsetLimitsSettingsStore.angleOffsetLimitsSettings.azimuth || 50.0,
+  elevation: offsetLimitsSettingsStore.angleOffsetLimitsSettings.elevation || 50.0,
+  train: offsetLimitsSettingsStore.angleOffsetLimitsSettings.train || 50.0
 })
 
-const localTimeOffsetSettings = ref<TimeOffsetLimitsSettings>({
-  min: 0.1,
-  max: 99999
+const originalTimeOffsetSettings = ref<TimeOffsetLimitsSettings>({
+  min: offsetLimitsSettingsStore.timeOffsetLimitsSettings.min || 0.1,
+  max: offsetLimitsSettingsStore.timeOffsetLimitsSettings.max || 99999
 })
+
+// 변경사항 상태를 로컬 상태로 직접 계산
+const hasUnsavedChangesAngle = computed(() => {
+  return JSON.stringify(localAngleOffsetSettings.value) !== JSON.stringify(originalAngleOffsetSettings.value)
+})
+
+const hasUnsavedChangesTime = computed(() => {
+  return JSON.stringify(localTimeOffsetSettings.value) !== JSON.stringify(originalTimeOffsetSettings.value)
+})
+
+const hasUnsavedChanges = computed(() => {
+  return hasUnsavedChangesAngle.value || hasUnsavedChangesTime.value
+})
+
+// 저장 상태
+const isSaved = ref(true)
 
 const successMessage = ref<string>('')
 
@@ -128,30 +184,97 @@ const isTimeOffsetFormValid = computed(() => {
     localTimeOffsetSettings.value.max >= localTimeOffsetSettings.value.min
 })
 
-// 스토어 상태 가져오기
-const { angleOffsetLimitsSettings, timeOffsetLimitsSettings, loadingStates, errorStates } = settingsStore
+// 변경사항 감지 watch - Store 상태 업데이트
+watch(
+  localAngleOffsetSettings,
+  (newSettings) => {
+    const hasChanges = JSON.stringify(newSettings) !== JSON.stringify(originalAngleOffsetSettings.value)
+    updateChangeStatus('angle', hasChanges, newSettings)
+  },
+  { deep: true }
+)
 
-// 스토어 상태와 로컬 상태 동기화
-watch(angleOffsetLimitsSettings, (newSettings) => {
-  localAngleOffsetSettings.value = { ...newSettings }
-}, { deep: true })
+watch(
+  localTimeOffsetSettings,
+  (newSettings) => {
+    const hasChanges = JSON.stringify(newSettings) !== JSON.stringify(originalTimeOffsetSettings.value)
+    updateChangeStatus('time', hasChanges, newSettings)
+  },
+  { deep: true }
+)
 
-watch(timeOffsetLimitsSettings, (newSettings) => {
-  localTimeOffsetSettings.value = { ...newSettings }
-}, { deep: true })
+// 스토어 상태와 로컬 상태 동기화 (변경사항이 있을 때는 절대 덮어쓰지 않음)
+watch(
+  () => offsetLimitsSettingsStore.angleOffsetLimitsSettings,
+  (newSettings) => {
+    if (hasUnsavedChangesAngle.value) {
+      console.log('각도 오프셋 변경사항이 있어서 서버 값으로 덮어쓰지 않음')
+      return
+    }
+    localAngleOffsetSettings.value = { ...newSettings }
+    originalAngleOffsetSettings.value = { ...newSettings }
+  },
+  { deep: true, immediate: true }
+)
+
+watch(
+  () => offsetLimitsSettingsStore.timeOffsetLimitsSettings,
+  (newSettings) => {
+    if (hasUnsavedChangesTime.value) {
+      console.log('시간 오프셋 변경사항이 있어서 서버 값으로 덮어쓰지 않음')
+      return
+    }
+    localTimeOffsetSettings.value = { ...newSettings }
+    originalTimeOffsetSettings.value = { ...newSettings }
+  },
+  { deep: true, immediate: true }
+)
 
 // 컴포넌트 마운트 시 설정 로드
 onMounted(async () => {
-  await Promise.all([
-    settingsStore.loadAngleOffsetLimitsSettings(),
-    settingsStore.loadTimeOffsetLimitsSettings()
-  ])
+  try {
+    if (hasUnsavedChanges.value) {
+      console.log('변경사항이 있어서 서버에서 로드하지 않음')
+      return
+    }
+
+    const currentAngleData = offsetLimitsSettingsStore.angleOffsetLimitsSettings
+    const currentTimeData = offsetLimitsSettingsStore.timeOffsetLimitsSettings
+    const isInitialAngleData = currentAngleData.azimuth === 50.0 &&
+      currentAngleData.elevation === 50.0 &&
+      currentAngleData.train === 50.0
+    const isInitialTimeData = currentTimeData.min === 0.1 &&
+      currentTimeData.max === 99999
+
+    if (isInitialAngleData || isInitialTimeData) {
+      console.log('초기 데이터이므로 서버에서 로드')
+      await Promise.all([
+        offsetLimitsSettingsStore.loadAngleOffsetLimitsSettings(),
+        offsetLimitsSettingsStore.loadTimeOffsetLimitsSettings()
+      ])
+      originalAngleOffsetSettings.value = { ...offsetLimitsSettingsStore.angleOffsetLimitsSettings }
+      localAngleOffsetSettings.value = { ...offsetLimitsSettingsStore.angleOffsetLimitsSettings }
+      originalTimeOffsetSettings.value = { ...offsetLimitsSettingsStore.timeOffsetLimitsSettings }
+      localTimeOffsetSettings.value = { ...offsetLimitsSettingsStore.timeOffsetLimitsSettings }
+    } else {
+      localAngleOffsetSettings.value = { ...offsetLimitsSettingsStore.angleOffsetLimitsSettings }
+      originalAngleOffsetSettings.value = { ...offsetLimitsSettingsStore.angleOffsetLimitsSettings }
+      localTimeOffsetSettings.value = { ...offsetLimitsSettingsStore.timeOffsetLimitsSettings }
+      originalTimeOffsetSettings.value = { ...offsetLimitsSettingsStore.timeOffsetLimitsSettings }
+    }
+  } catch (error) {
+    console.error('오프셋 제한 설정 로드 실패:', error)
+  }
 })
 
 // 각도 오프셋 저장 함수
 const onSaveAngleOffset = async () => {
   try {
-    await settingsStore.saveAngleOffsetLimitsSettings(localAngleOffsetSettings.value)
+    await offsetLimitsSettingsStore.saveAngleOffsetLimitsSettings(localAngleOffsetSettings.value)
+    updateChangeStatus('angle', false)
+    originalAngleOffsetSettings.value = { ...localAngleOffsetSettings.value }
+    isSaved.value = true
+
     successMessage.value = '각도 오프셋 제한 설정이 성공적으로 저장되었습니다'
 
     setTimeout(() => {
@@ -172,7 +295,11 @@ const onSaveAngleOffset = async () => {
 // 시간 오프셋 저장 함수
 const onSaveTimeOffset = async () => {
   try {
-    await settingsStore.saveTimeOffsetLimitsSettings(localTimeOffsetSettings.value)
+    await offsetLimitsSettingsStore.saveTimeOffsetLimitsSettings(localTimeOffsetSettings.value)
+    updateChangeStatus('time', false)
+    originalTimeOffsetSettings.value = { ...localTimeOffsetSettings.value }
+    isSaved.value = true
+
     successMessage.value = '시간 오프셋 제한 설정이 성공적으로 저장되었습니다'
 
     setTimeout(() => {
@@ -191,34 +318,43 @@ const onSaveTimeOffset = async () => {
 }
 
 // 각도 오프셋 초기화 함수
-const onResetAngleOffset = () => {
-  localAngleOffsetSettings.value = {
-    azimuth: 50.0,
-    elevation: 50.0,
-    train: 50.0
-  }
+const onResetAngleOffset = async () => {
+  try {
+    await offsetLimitsSettingsStore.loadAngleOffsetLimitsSettings()
+    localAngleOffsetSettings.value = { ...offsetLimitsSettingsStore.angleOffsetLimitsSettings }
+    originalAngleOffsetSettings.value = { ...offsetLimitsSettingsStore.angleOffsetLimitsSettings }
+    updateChangeStatus('angle', false)
+    isSaved.value = true
 
-  $q.notify({
-    color: 'info',
-    message: '각도 오프셋 제한 설정이 초기화되었습니다',
-    icon: 'refresh',
-    position: 'top'
-  })
+    $q.notify({
+      color: 'info',
+      message: '각도 오프셋 제한 설정이 초기화되었습니다',
+      icon: 'refresh',
+      position: 'top'
+    })
+  } catch (error) {
+    console.error('각도 오프셋 제한 설정 초기화 실패:', error)
+  }
 }
 
 // 시간 오프셋 초기화 함수
-const onResetTimeOffset = () => {
-  localTimeOffsetSettings.value = {
-    min: 0.1,
-    max: 99999
-  }
+const onResetTimeOffset = async () => {
+  try {
+    await offsetLimitsSettingsStore.loadTimeOffsetLimitsSettings()
+    localTimeOffsetSettings.value = { ...offsetLimitsSettingsStore.timeOffsetLimitsSettings }
+    originalTimeOffsetSettings.value = { ...offsetLimitsSettingsStore.timeOffsetLimitsSettings }
+    updateChangeStatus('time', false)
+    isSaved.value = true
 
-  $q.notify({
-    color: 'info',
-    message: '시간 오프셋 제한 설정이 초기화되었습니다',
-    icon: 'refresh',
-    position: 'top'
-  })
+    $q.notify({
+      color: 'info',
+      message: '시간 오프셋 제한 설정이 초기화되었습니다',
+      icon: 'refresh',
+      position: 'top'
+    })
+  } catch (error) {
+    console.error('시간 오프셋 제한 설정 초기화 실패:', error)
+  }
 }
 </script>
 

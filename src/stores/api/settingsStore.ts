@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { settingsService } from '@/services'
+import { useErrorHandler } from '@/composables/useErrorHandler'
 import type {
   LocationSettings,
   TrackingSettings,
@@ -18,11 +19,11 @@ import type {
 export const useSettingsStore = defineStore('settings', () => {
   // === 상태 (State) ===
 
-  // Location Settings
+  // Location Settings - 초기값을 0으로 변경
   const locationSettings = ref<LocationSettings>({
-    latitude: 35.31754,
-    longitude: 128.60851,
-    altitude: 0.0,
+    latitude: 0,
+    longitude: 0,
+    altitude: 0,
   })
 
   // Tracking Settings
@@ -123,6 +124,61 @@ export const useSettingsStore = defineStore('settings', () => {
     all: null as string | null,
   })
 
+  // 변경사항 상태 추가 (loadingStates 다음에 추가)
+  const hasUnsavedChanges = ref({
+    location: false,
+    tracking: false,
+    stowAngle: false,
+    stowSpeed: false,
+    antennaSpec: false,
+    angleLimits: false,
+    speedLimits: false,
+    angleOffsetLimits: false,
+    timeOffsetLimits: false,
+    algorithm: false,
+    stepSizeLimit: false,
+  })
+
+  // 변경된 값 저장을 위한 상태 추가
+  const pendingChanges = ref({
+    location: null as LocationSettings | null,
+    tracking: null as TrackingSettings | null,
+    stowAngle: null as StowAngleSettings | null,
+    stowSpeed: null as StowSpeedSettings | null,
+    antennaSpec: null as AntennaSpecSettings | null,
+    angleLimits: null as AngleLimitsSettings | null,
+    speedLimits: null as SpeedLimitsSettings | null,
+    angleOffsetLimits: null as AngleOffsetLimitsSettings | null,
+    timeOffsetLimits: null as TimeOffsetLimitsSettings | null,
+    algorithm: null as AlgorithmSettings | null,
+    stepSizeLimit: null as StepSizeLimitSettings | null,
+  })
+
+  // 변경된 값 저장 함수 추가
+  const setPendingChanges = (settingsType: string, changes: unknown) => {
+    pendingChanges.value[settingsType] = changes
+  }
+
+  // 변경된 값 가져오기 함수 추가
+  const getPendingChanges = (settingsType: string) => {
+    return pendingChanges.value[settingsType]
+  }
+
+  // 변경사항 상태 업데이트 함수 수정
+  const updateChangeStatus = (settingsType: string, hasChanges: boolean, changes?: unknown) => {
+    hasUnsavedChanges.value[settingsType] = hasChanges
+    if (hasChanges && changes) {
+      setPendingChanges(settingsType, changes)
+    } else if (!hasChanges) {
+      setPendingChanges(settingsType, null)
+    }
+  }
+
+  // 변경사항 상태 가져오기 함수 추가
+  const getChangeStatus = (settingsType: string) => {
+    return hasUnsavedChanges.value[settingsType]
+  }
+
   // === 게터 (Getters) ===
 
   // 전체 로딩 상태
@@ -140,13 +196,24 @@ export const useSettingsStore = defineStore('settings', () => {
   // Location Settings 액션들
   const loadLocationSettings = async () => {
     try {
+      console.log('=== Store: 위치 설정 로드 시작 ===')
       loadingStates.value.location = true
       errorStates.value.location = null
+
+      console.log('서비스 호출 전 Store 상태:', locationSettings.value)
       const settings = await settingsService.getLocationSettings()
+      console.log('서비스에서 받은 데이터:', settings)
+
       locationSettings.value = settings
+      console.log('업데이트 후 Store 상태:', locationSettings.value)
     } catch (error) {
-      errorStates.value.location = error instanceof Error ? error.message : '위치 설정 로드 실패'
+      const errorMessage = error instanceof Error ? error.message : '위치 설정 로드 실패'
+      errorStates.value.location = errorMessage
       console.error('위치 설정 로드 실패:', error)
+
+      // 사용자에게 알림 표시
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, '위치 설정 로드')
     } finally {
       loadingStates.value.location = false
     }
@@ -158,9 +225,22 @@ export const useSettingsStore = defineStore('settings', () => {
       errorStates.value.location = null
       await settingsService.setLocationSettings(settings)
       locationSettings.value = settings
+
+      // 성공 알림
+      const { addError } = useErrorHandler()
+      addError('user', '위치 설정이 성공적으로 저장되었습니다.', undefined, {
+        showNotification: true,
+        autoResolve: true,
+        resolveTimeout: 3000,
+      })
     } catch (error) {
-      errorStates.value.location = error instanceof Error ? error.message : '위치 설정 저장 실패'
+      const errorMessage = error instanceof Error ? error.message : '위치 설정 저장 실패'
+      errorStates.value.location = errorMessage
       console.error('위치 설정 저장 실패:', error)
+
+      // 실패 알림
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, '위치 설정 저장')
     } finally {
       loadingStates.value.location = false
     }
@@ -174,8 +254,12 @@ export const useSettingsStore = defineStore('settings', () => {
       const settings = await settingsService.getTrackingSettings()
       trackingSettings.value = settings
     } catch (error) {
-      errorStates.value.tracking = error instanceof Error ? error.message : '추적 설정 로드 실패'
+      const errorMessage = error instanceof Error ? error.message : '추적 설정 로드 실패'
+      errorStates.value.tracking = errorMessage
       console.error('추적 설정 로드 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, '추적 설정 로드')
     } finally {
       loadingStates.value.tracking = false
     }
@@ -187,9 +271,20 @@ export const useSettingsStore = defineStore('settings', () => {
       errorStates.value.tracking = null
       await settingsService.setTrackingSettings(settings)
       trackingSettings.value = settings
+
+      const { addError } = useErrorHandler()
+      addError('user', '추적 설정이 성공적으로 저장되었습니다.', undefined, {
+        showNotification: true,
+        autoResolve: true,
+        resolveTimeout: 3000,
+      })
     } catch (error) {
-      errorStates.value.tracking = error instanceof Error ? error.message : '추적 설정 저장 실패'
+      const errorMessage = error instanceof Error ? error.message : '추적 설정 저장 실패'
+      errorStates.value.tracking = errorMessage
       console.error('추적 설정 저장 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, '추적 설정 저장')
     } finally {
       loadingStates.value.tracking = false
     }
@@ -203,8 +298,12 @@ export const useSettingsStore = defineStore('settings', () => {
       const settings = await settingsService.getStowAngleSettings()
       stowAngleSettings.value = settings
     } catch (error) {
-      errorStates.value.stow = error instanceof Error ? error.message : 'Stow 각도 설정 로드 실패'
+      const errorMessage = error instanceof Error ? error.message : 'Stow 각도 설정 로드 실패'
+      errorStates.value.stow = errorMessage
       console.error('Stow 각도 설정 로드 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, 'Stow 각도 설정 로드')
     } finally {
       loadingStates.value.stow = false
     }
@@ -216,9 +315,20 @@ export const useSettingsStore = defineStore('settings', () => {
       errorStates.value.stow = null
       await settingsService.setStowAngleSettings(settings)
       stowAngleSettings.value = settings
+
+      const { addError } = useErrorHandler()
+      addError('user', 'Stow 각도 설정이 성공적으로 저장되었습니다.', undefined, {
+        showNotification: true,
+        autoResolve: true,
+        resolveTimeout: 3000,
+      })
     } catch (error) {
-      errorStates.value.stow = error instanceof Error ? error.message : 'Stow 각도 설정 저장 실패'
+      const errorMessage = error instanceof Error ? error.message : 'Stow 각도 설정 저장 실패'
+      errorStates.value.stow = errorMessage
       console.error('Stow 각도 설정 저장 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, 'Stow 각도 설정 저장')
     } finally {
       loadingStates.value.stow = false
     }
@@ -231,8 +341,12 @@ export const useSettingsStore = defineStore('settings', () => {
       const settings = await settingsService.getStowSpeedSettings()
       stowSpeedSettings.value = settings
     } catch (error) {
-      errorStates.value.stow = error instanceof Error ? error.message : 'Stow 속도 설정 로드 실패'
+      const errorMessage = error instanceof Error ? error.message : 'Stow 속도 설정 로드 실패'
+      errorStates.value.stow = errorMessage
       console.error('Stow 속도 설정 로드 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, 'Stow 속도 설정 로드')
     } finally {
       loadingStates.value.stow = false
     }
@@ -244,9 +358,20 @@ export const useSettingsStore = defineStore('settings', () => {
       errorStates.value.stow = null
       await settingsService.setStowSpeedSettings(settings)
       stowSpeedSettings.value = settings
+
+      const { addError } = useErrorHandler()
+      addError('user', 'Stow 속도 설정이 성공적으로 저장되었습니다.', undefined, {
+        showNotification: true,
+        autoResolve: true,
+        resolveTimeout: 3000,
+      })
     } catch (error) {
-      errorStates.value.stow = error instanceof Error ? error.message : 'Stow 속도 설정 저장 실패'
+      const errorMessage = error instanceof Error ? error.message : 'Stow 속도 설정 저장 실패'
+      errorStates.value.stow = errorMessage
       console.error('Stow 속도 설정 저장 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, 'Stow 속도 설정 저장')
     } finally {
       loadingStates.value.stow = false
     }
@@ -260,9 +385,12 @@ export const useSettingsStore = defineStore('settings', () => {
       const settings = await settingsService.getAntennaSpecSettings()
       antennaSpecSettings.value = settings
     } catch (error) {
-      errorStates.value.antennaSpec =
-        error instanceof Error ? error.message : '안테나 사양 설정 로드 실패'
+      const errorMessage = error instanceof Error ? error.message : '안테나 사양 설정 로드 실패'
+      errorStates.value.antennaSpec = errorMessage
       console.error('안테나 사양 설정 로드 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, '안테나 사양 설정 로드')
     } finally {
       loadingStates.value.antennaSpec = false
     }
@@ -274,10 +402,20 @@ export const useSettingsStore = defineStore('settings', () => {
       errorStates.value.antennaSpec = null
       await settingsService.setAntennaSpecSettings(settings)
       antennaSpecSettings.value = settings
+
+      const { addError } = useErrorHandler()
+      addError('user', '안테나 사양 설정이 성공적으로 저장되었습니다.', undefined, {
+        showNotification: true,
+        autoResolve: true,
+        resolveTimeout: 3000,
+      })
     } catch (error) {
-      errorStates.value.antennaSpec =
-        error instanceof Error ? error.message : '안테나 사양 설정 저장 실패'
+      const errorMessage = error instanceof Error ? error.message : '안테나 사양 설정 저장 실패'
+      errorStates.value.antennaSpec = errorMessage
       console.error('안테나 사양 설정 저장 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, '안테나 사양 설정 저장')
     } finally {
       loadingStates.value.antennaSpec = false
     }
@@ -291,9 +429,12 @@ export const useSettingsStore = defineStore('settings', () => {
       const settings = await settingsService.getAngleLimitsSettings()
       angleLimitsSettings.value = settings
     } catch (error) {
-      errorStates.value.angleLimits =
-        error instanceof Error ? error.message : '각도 제한 설정 로드 실패'
+      const errorMessage = error instanceof Error ? error.message : '각도 제한 설정 로드 실패'
+      errorStates.value.angleLimits = errorMessage
       console.error('각도 제한 설정 로드 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, '각도 제한 설정 로드')
     } finally {
       loadingStates.value.angleLimits = false
     }
@@ -305,10 +446,20 @@ export const useSettingsStore = defineStore('settings', () => {
       errorStates.value.angleLimits = null
       await settingsService.setAngleLimitsSettings(settings)
       angleLimitsSettings.value = settings
+
+      const { addError } = useErrorHandler()
+      addError('user', '각도 제한 설정이 성공적으로 저장되었습니다.', undefined, {
+        showNotification: true,
+        autoResolve: true,
+        resolveTimeout: 3000,
+      })
     } catch (error) {
-      errorStates.value.angleLimits =
-        error instanceof Error ? error.message : '각도 제한 설정 저장 실패'
+      const errorMessage = error instanceof Error ? error.message : '각도 제한 설정 저장 실패'
+      errorStates.value.angleLimits = errorMessage
       console.error('각도 제한 설정 저장 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, '각도 제한 설정 저장')
     } finally {
       loadingStates.value.angleLimits = false
     }
@@ -322,9 +473,12 @@ export const useSettingsStore = defineStore('settings', () => {
       const settings = await settingsService.getSpeedLimitsSettings()
       speedLimitsSettings.value = settings
     } catch (error) {
-      errorStates.value.speedLimits =
-        error instanceof Error ? error.message : '속도 제한 설정 로드 실패'
+      const errorMessage = error instanceof Error ? error.message : '속도 제한 설정 로드 실패'
+      errorStates.value.speedLimits = errorMessage
       console.error('속도 제한 설정 로드 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, '속도 제한 설정 로드')
     } finally {
       loadingStates.value.speedLimits = false
     }
@@ -336,10 +490,20 @@ export const useSettingsStore = defineStore('settings', () => {
       errorStates.value.speedLimits = null
       await settingsService.setSpeedLimitsSettings(settings)
       speedLimitsSettings.value = settings
+
+      const { addError } = useErrorHandler()
+      addError('user', '속도 제한 설정이 성공적으로 저장되었습니다.', undefined, {
+        showNotification: true,
+        autoResolve: true,
+        resolveTimeout: 3000,
+      })
     } catch (error) {
-      errorStates.value.speedLimits =
-        error instanceof Error ? error.message : '속도 제한 설정 저장 실패'
+      const errorMessage = error instanceof Error ? error.message : '속도 제한 설정 저장 실패'
+      errorStates.value.speedLimits = errorMessage
       console.error('속도 제한 설정 저장 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, '속도 제한 설정 저장')
     } finally {
       loadingStates.value.speedLimits = false
     }
@@ -353,9 +517,13 @@ export const useSettingsStore = defineStore('settings', () => {
       const settings = await settingsService.getAngleOffsetLimitsSettings()
       angleOffsetLimitsSettings.value = settings
     } catch (error) {
-      errorStates.value.offsetLimits =
+      const errorMessage =
         error instanceof Error ? error.message : '각도 오프셋 제한 설정 로드 실패'
+      errorStates.value.offsetLimits = errorMessage
       console.error('각도 오프셋 제한 설정 로드 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, '각도 오프셋 제한 설정 로드')
     } finally {
       loadingStates.value.offsetLimits = false
     }
@@ -367,10 +535,21 @@ export const useSettingsStore = defineStore('settings', () => {
       errorStates.value.offsetLimits = null
       await settingsService.setAngleOffsetLimitsSettings(settings)
       angleOffsetLimitsSettings.value = settings
+
+      const { addError } = useErrorHandler()
+      addError('user', '각도 오프셋 제한 설정이 성공적으로 저장되었습니다.', undefined, {
+        showNotification: true,
+        autoResolve: true,
+        resolveTimeout: 3000,
+      })
     } catch (error) {
-      errorStates.value.offsetLimits =
+      const errorMessage =
         error instanceof Error ? error.message : '각도 오프셋 제한 설정 저장 실패'
+      errorStates.value.offsetLimits = errorMessage
       console.error('각도 오프셋 제한 설정 저장 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, '각도 오프셋 제한 설정 저장')
     } finally {
       loadingStates.value.offsetLimits = false
     }
@@ -384,9 +563,13 @@ export const useSettingsStore = defineStore('settings', () => {
       const settings = await settingsService.getTimeOffsetLimitsSettings()
       timeOffsetLimitsSettings.value = settings
     } catch (error) {
-      errorStates.value.offsetLimits =
+      const errorMessage =
         error instanceof Error ? error.message : '시간 오프셋 제한 설정 로드 실패'
+      errorStates.value.offsetLimits = errorMessage
       console.error('시간 오프셋 제한 설정 로드 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, '시간 오프셋 제한 설정 로드')
     } finally {
       loadingStates.value.offsetLimits = false
     }
@@ -398,10 +581,21 @@ export const useSettingsStore = defineStore('settings', () => {
       errorStates.value.offsetLimits = null
       await settingsService.setTimeOffsetLimitsSettings(settings)
       timeOffsetLimitsSettings.value = settings
+
+      const { addError } = useErrorHandler()
+      addError('user', '시간 오프셋 제한 설정이 성공적으로 저장되었습니다.', undefined, {
+        showNotification: true,
+        autoResolve: true,
+        resolveTimeout: 3000,
+      })
     } catch (error) {
-      errorStates.value.offsetLimits =
+      const errorMessage =
         error instanceof Error ? error.message : '시간 오프셋 제한 설정 저장 실패'
+      errorStates.value.offsetLimits = errorMessage
       console.error('시간 오프셋 제한 설정 저장 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, '시간 오프셋 제한 설정 저장')
     } finally {
       loadingStates.value.offsetLimits = false
     }
@@ -415,9 +609,12 @@ export const useSettingsStore = defineStore('settings', () => {
       const settings = await settingsService.getAlgorithmSettings()
       algorithmSettings.value = settings
     } catch (error) {
-      errorStates.value.algorithm =
-        error instanceof Error ? error.message : '알고리즘 설정 로드 실패'
+      const errorMessage = error instanceof Error ? error.message : '알고리즘 설정 로드 실패'
+      errorStates.value.algorithm = errorMessage
       console.error('알고리즘 설정 로드 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, '알고리즘 설정 로드')
     } finally {
       loadingStates.value.algorithm = false
     }
@@ -429,10 +626,20 @@ export const useSettingsStore = defineStore('settings', () => {
       errorStates.value.algorithm = null
       await settingsService.setAlgorithmSettings(settings)
       algorithmSettings.value = settings
+
+      const { addError } = useErrorHandler()
+      addError('user', '알고리즘 설정이 성공적으로 저장되었습니다.', undefined, {
+        showNotification: true,
+        autoResolve: true,
+        resolveTimeout: 3000,
+      })
     } catch (error) {
-      errorStates.value.algorithm =
-        error instanceof Error ? error.message : '알고리즘 설정 저장 실패'
+      const errorMessage = error instanceof Error ? error.message : '알고리즘 설정 저장 실패'
+      errorStates.value.algorithm = errorMessage
       console.error('알고리즘 설정 저장 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, '알고리즘 설정 저장')
     } finally {
       loadingStates.value.algorithm = false
     }
@@ -446,9 +653,13 @@ export const useSettingsStore = defineStore('settings', () => {
       const settings = await settingsService.getStepSizeLimitSettings()
       stepSizeLimitSettings.value = settings
     } catch (error) {
-      errorStates.value.stepSize =
+      const errorMessage =
         error instanceof Error ? error.message : '스텝 사이즈 제한 설정 로드 실패'
+      errorStates.value.stepSize = errorMessage
       console.error('스텝 사이즈 제한 설정 로드 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, '스텝 사이즈 제한 설정 로드')
     } finally {
       loadingStates.value.stepSize = false
     }
@@ -460,10 +671,21 @@ export const useSettingsStore = defineStore('settings', () => {
       errorStates.value.stepSize = null
       await settingsService.setStepSizeLimitSettings(settings)
       stepSizeLimitSettings.value = settings
+
+      const { addError } = useErrorHandler()
+      addError('user', '스텝 사이즈 제한 설정이 성공적으로 저장되었습니다.', undefined, {
+        showNotification: true,
+        autoResolve: true,
+        resolveTimeout: 3000,
+      })
     } catch (error) {
-      errorStates.value.stepSize =
+      const errorMessage =
         error instanceof Error ? error.message : '스텝 사이즈 제한 설정 저장 실패'
+      errorStates.value.stepSize = errorMessage
       console.error('스텝 사이즈 제한 설정 저장 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, '스텝 사이즈 제한 설정 저장')
     } finally {
       loadingStates.value.stepSize = false
     }
@@ -490,8 +712,12 @@ export const useSettingsStore = defineStore('settings', () => {
         loadStepSizeLimitSettings(),
       ])
     } catch (error) {
-      errorStates.value.all = error instanceof Error ? error.message : '전체 설정 로드 실패'
+      const errorMessage = error instanceof Error ? error.message : '전체 설정 로드 실패'
+      errorStates.value.all = errorMessage
       console.error('전체 설정 로드 실패:', error)
+
+      const { handleApiError } = useErrorHandler()
+      handleApiError(error, '전체 설정 로드')
     } finally {
       loadingStates.value.all = false
     }
@@ -520,6 +746,12 @@ export const useSettingsStore = defineStore('settings', () => {
     stepSizeLimitSettings,
     loadingStates,
     errorStates,
+    hasUnsavedChanges,
+    updateChangeStatus,
+    getChangeStatus,
+    pendingChanges,
+    setPendingChanges,
+    getPendingChanges,
 
     // 게터
     isLoading,

@@ -1,6 +1,14 @@
 <template>
   <div class="location-settings">
-    <h5 class="q-mt-none q-mb-md">위치 설정</h5>
+    <h5 class="q-mt-none q-mb-md">
+      위치 설정
+      <q-badge v-if="hasUnsavedChanges" color="orange" class="q-ml-sm">
+        변경됨
+      </q-badge>
+      <q-badge v-else-if="isSaved" color="green" class="q-ml-sm">
+        저장됨
+      </q-badge>
+    </h5>
 
     <q-form @submit="onSave" class="q-gutter-md">
       <!-- 위도 입력 -->
@@ -17,8 +25,8 @@
 
       <!-- 버튼들 -->
       <div class="row q-gutter-sm q-mt-md">
-        <q-btn type="submit" color="primary" label="저장" :loading="loadingStates.location" :disable="!isFormValid"
-          icon="save" />
+        <q-btn type="submit" color="primary" label="저장" :loading="loadingStates.location"
+          :disable="!isFormValid || !hasUnsavedChanges" icon="save" />
         <q-btn color="secondary" label="초기화" @click="onReset" :disable="loadingStates.location" icon="refresh" />
         <q-btn color="info" label="현재 위치 가져오기" @click="onGetCurrentLocation" :disable="loadingStates.location"
           icon="my_location" />
@@ -46,18 +54,43 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
-import { useSettingsStore } from '@/stores'
+import { useLocationSettingsStore } from '@/stores'
 import type { LocationSettings } from '@/services'
 
 const $q = useQuasar()
-const settingsStore = useSettingsStore()
+const locationSettingsStore = useLocationSettingsStore()
 
-// 로컬 상태
-const localSettings = ref<LocationSettings>({
-  latitude: 35.317540,
-  longitude: 128.608510,
-  altitude: 0.0
+// 스토어 상태 가져오기
+const { loadingStates, errorStates, updateChangeStatus, pendingChanges } = locationSettingsStore
+
+// 로컬 상태 - Store에서 변경된 값이 있으면 사용, 없으면 초기값
+const getInitialLocalSettings = (): LocationSettings => {
+  if (pendingChanges) {
+    return { ...pendingChanges }
+  }
+  return {
+    latitude: locationSettingsStore.locationSettings.latitude || 0,
+    longitude: locationSettingsStore.locationSettings.longitude || 0,
+    altitude: locationSettingsStore.locationSettings.altitude || 0
+  }
+}
+
+const localSettings = ref<LocationSettings>(getInitialLocalSettings())
+
+// 원본 상태 - Store에서 초기값 가져오기
+const originalSettings = ref<LocationSettings>({
+  latitude: locationSettingsStore.locationSettings.latitude || 0,
+  longitude: locationSettingsStore.locationSettings.longitude || 0,
+  altitude: locationSettingsStore.locationSettings.altitude || 0
 })
+
+// 변경사항 상태를 로컬 상태로 직접 계산
+const hasUnsavedChanges = computed(() => {
+  return JSON.stringify(localSettings.value) !== JSON.stringify(originalSettings.value)
+})
+
+// 저장 상태
+const isSaved = ref(true)
 
 const successMessage = ref<string>('')
 
@@ -84,23 +117,74 @@ const isFormValid = computed(() => {
     localSettings.value.altitude >= 0
 })
 
-// 스토어 상태 가져오기
-const { locationSettings, loadingStates, errorStates } = settingsStore
+// 변경사항 감지 watch - Store 상태 업데이트
+watch(
+  localSettings,
+  (newSettings) => {
+    const hasChanges = JSON.stringify(newSettings) !== JSON.stringify(originalSettings.value)
+    updateChangeStatus(hasChanges, newSettings)
+  },
+  { deep: true }
+)
 
-// 스토어 상태와 로컬 상태 동기화
-watch(locationSettings, (newSettings) => {
-  localSettings.value = { ...newSettings }
-}, { deep: true })
+// 스토어 상태와 로컬 상태 동기화 (변경사항이 있을 때는 절대 덮어쓰지 않음)
+watch(
+  () => locationSettingsStore.locationSettings,
+  (newSettings) => {
+    // 변경사항이 있을 때는 절대 서버 값으로 덮어쓰지 않음
+    if (hasUnsavedChanges.value) {
+      console.log('변경사항이 있어서 서버 값으로 덮어쓰지 않음')
+      return
+    }
+
+    // 변경사항이 없을 때만 서버 값으로 동기화
+    localSettings.value = { ...newSettings }
+    originalSettings.value = { ...newSettings }
+  },
+  { deep: true, immediate: true }
+)
 
 // 컴포넌트 마운트 시 설정 로드
 onMounted(async () => {
-  await settingsStore.loadLocationSettings()
+  try {
+    // 변경사항이 있을 때는 서버에서 로드하지 않음
+    if (hasUnsavedChanges.value) {
+      console.log('변경사항이 있어서 서버에서 로드하지 않음')
+      return
+    }
+
+    // Store에 데이터가 없거나 초기값일 때만 서버에서 로드
+    const currentStoreData = locationSettingsStore.locationSettings
+    const isInitialData = currentStoreData.latitude === 0 &&
+      currentStoreData.longitude === 0 &&
+      currentStoreData.altitude === 0
+
+    if (isInitialData) {
+      console.log('초기 데이터이므로 서버에서 로드')
+      await locationSettingsStore.loadLocationSettings()
+      // 초기 로드 시에는 원본 값 설정
+      originalSettings.value = { ...locationSettingsStore.locationSettings }
+      localSettings.value = { ...locationSettingsStore.locationSettings }
+    } else {
+      // Store에 이미 데이터가 있으면 그 값을 사용
+      localSettings.value = { ...locationSettingsStore.locationSettings }
+      originalSettings.value = { ...locationSettingsStore.locationSettings }
+    }
+  } catch (error) {
+    console.error('위치 설정 로드 실패:', error)
+  }
 })
 
 // 저장 함수
 const onSave = async () => {
   try {
-    await settingsStore.saveLocationSettings(localSettings.value)
+    await locationSettingsStore.saveLocationSettings(localSettings.value)
+
+    // 저장 성공 시 변경사항 상태 업데이트
+    updateChangeStatus(false)
+    originalSettings.value = { ...localSettings.value }
+    isSaved.value = true
+
     successMessage.value = '위치 설정이 성공적으로 저장되었습니다'
 
     // 3초 후 성공 메시지 숨기기
@@ -119,20 +203,24 @@ const onSave = async () => {
   }
 }
 
-// 초기화 함수
-const onReset = () => {
-  localSettings.value = {
-    latitude: 35.317540,
-    longitude: 128.608510,
-    altitude: 0.0
-  }
+// 초기화 함수 - 서버에서 로드된 값으로 초기화
+const onReset = async () => {
+  try {
+    await locationSettingsStore.loadLocationSettings()
+    localSettings.value = { ...locationSettingsStore.locationSettings }
+    originalSettings.value = { ...locationSettingsStore.locationSettings }
+    updateChangeStatus(false)
+    isSaved.value = true
 
-  $q.notify({
-    color: 'info',
-    message: '위치 설정이 초기화되었습니다',
-    icon: 'refresh',
-    position: 'top'
-  })
+    $q.notify({
+      color: 'info',
+      message: '위치 설정이 서버 값으로 초기화되었습니다',
+      icon: 'refresh',
+      position: 'top'
+    })
+  } catch (error) {
+    console.error('위치 설정 초기화 실패:', error)
+  }
 }
 
 // 현재 위치 가져오기 함수

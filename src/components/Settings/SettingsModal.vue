@@ -75,21 +75,24 @@
 
       <q-card-actions align="right" class="q-pa-md">
         <q-btn flat label="취소" color="primary" v-close-popup />
-        <q-btn flat label="저장" color="primary" @click="saveSettings" v-close-popup />
+        <q-btn flat label="저장" color="primary" :loading="loadingStates.saveAll" :disable="!hasAnyUnsavedChanges"
+          @click="onSaveAll" />
       </q-card-actions>
     </q-card>
   </q-dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, defineProps, defineEmits } from 'vue'
+import { ref, watch, defineProps, defineEmits, computed } from 'vue'
 import { useQuasar } from 'quasar'
+import { useSettingsStore } from '@/stores'
 
 import GeneralSettings from './GeneralSettings.vue'
 import ServoEncoderPresetSettings from './ServoEncoderPresetSettings.vue'
 import SystemSettings from './system/SystemSettings.vue'
 
 const $q = useQuasar()
+const settingsStore = useSettingsStore()
 
 // Props 정의
 const props = defineProps({
@@ -118,6 +121,23 @@ const activeTab = ref('general')
 const apiBaseUrl = ref('http://localhost:8080/api')
 const autoReconnect = ref(true)
 
+// Store 상태 가져오기
+const { loadingStates } = settingsStore
+
+// 변경사항 감지를 위한 로컬 computed
+const hasAnyUnsavedChanges = computed(() => {
+  // 시스템 설정 탭이 활성화되어 있을 때만 Store의 변경사항 확인
+  if (activeTab.value === 'system') {
+    return settingsStore.hasAnyUnsavedChanges
+  }
+
+  // 다른 탭에서는 기존 설정 변경사항 확인
+  return localDarkMode.value !== props.darkMode ||
+    localServerAddress.value !== props.serverAddress ||
+    apiBaseUrl.value !== 'http://localhost:8080/api' ||
+    autoReconnect.value !== true
+})
+
 // props 변경 감지
 watch(
   () => props.modelValue,
@@ -145,30 +165,44 @@ const onHide = () => {
   emit('update:modelValue', false)
 }
 
-// 설정 저장
-const saveSettings = () => {
-  // Quasar 다크 모드 설정 직접 변경
-  $q.dark.set(localDarkMode.value)
+// 일괄 저장 함수
+const onSaveAll = async () => {
+  try {
+    // 시스템 설정 탭이 활성화되어 있으면 Store의 일괄 저장 실행
+    if (activeTab.value === 'system') {
+      await settingsStore.saveAllSettings()
+    }
 
-  // 로컬 스토리지에 설정 저장
-  localStorage.setItem('isDarkMode', String(localDarkMode.value))
+    // 기존 설정도 함께 저장
+    $q.dark.set(localDarkMode.value)
+    localStorage.setItem('isDarkMode', String(localDarkMode.value))
 
-  // 부모 컴포넌트에 저장 이벤트 발생
-  emit('save', {
-    darkMode: localDarkMode.value,
-    serverAddress: localServerAddress.value,
-    apiBaseUrl: apiBaseUrl.value,
-    autoReconnect: autoReconnect.value,
-    // 여기에 다른 설정들도 추가할 수 있습니다
-  })
+    // 부모 컴포넌트에 저장 이벤트 발생
+    emit('save', {
+      darkMode: localDarkMode.value,
+      serverAddress: localServerAddress.value,
+      apiBaseUrl: apiBaseUrl.value,
+      autoReconnect: autoReconnect.value,
+    })
 
-  // 저장 완료 알림
-  $q.notify({
-    color: 'positive',
-    message: '설정이 저장되었습니다',
-    icon: 'check',
-    position: 'top',
-  })
+    $q.notify({
+      color: 'positive',
+      message: '모든 설정이 저장되었습니다',
+      icon: 'check_circle',
+      position: 'top',
+    })
+
+    // 모달 닫기
+    isOpen.value = false
+  } catch (error) {
+    console.error('일괄 저장 실패:', error)
+    $q.notify({
+      color: 'negative',
+      message: '설정 저장에 실패했습니다',
+      icon: 'error',
+      position: 'top'
+    })
+  }
 }
 
 // 내부 상태 변경 감지 및 부모에게 알림
