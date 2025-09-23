@@ -311,7 +311,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch, onActivated, onDeactivated } from 'vue'
 import { useQuasar } from 'quasar'
-import { usePassScheduleStore, type ScheduleItem } from '../../stores/mode/passScheduleStore'
+import { usePassScheduleModeStore, type ScheduleItem } from '@/stores'
 import { useICDStore } from '../../stores/icd/icdStore'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
@@ -320,7 +320,7 @@ import { openModal } from '../../utils/windowUtils'
 import { formatToLocalTime, formatTimeRemaining, getCalTimeTimestamp } from '../../utils/times'
 
 const $q = useQuasar()
-const passScheduleStore = usePassScheduleStore()
+const passScheduleStore = usePassScheduleModeStore()
 const icdStore = useICDStore()
 // 차트 관련 변수
 const chartRef = ref<HTMLElement | null>(null)

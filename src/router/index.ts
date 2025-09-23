@@ -7,7 +7,7 @@ import {
 } from 'vue-router'
 
 import routes from './routes'
-import { useAuthStore } from '../stores/auth'
+import { useAuthStore } from '../stores/common/auth'
 
 export default route(function (/* { store, ssrContext } */) {
   const createHistory = process.env.SERVER

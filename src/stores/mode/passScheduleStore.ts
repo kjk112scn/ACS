@@ -76,7 +76,7 @@ const offsetValues = ref({
   time: '0.00',
   timeResult: '0.00', // ✅ timeResult 추가
 })
-export const usePassScheduleStore = defineStore('passSchedule', () => {
+export const usePassScheduleModeStore = defineStore('passSchedule', () => {
   const $q = useQuasar()
 
   // 상태

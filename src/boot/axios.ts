@@ -1,4 +1,3 @@
-import { defineBoot } from '#q-app/wrappers'
 import axios, { type AxiosInstance } from 'axios'
 
 declare module 'vue' {
@@ -25,7 +24,7 @@ const api = axios.create({
   },
 })
 
-export default defineBoot(({ app }) => {
+export default ({ app }) => {
   // for use inside Vue files (Options API) through this.$axios and this.$api
 
   app.config.globalProperties.$axios = axios
@@ -35,6 +34,6 @@ export default defineBoot(({ app }) => {
   app.config.globalProperties.$api = api
   // ^ ^ ^ this will allow you to use this.$api (for Vue Options API form)
   //       so you can easily perform requests against your app's API
-})
+}
 
 export { api }

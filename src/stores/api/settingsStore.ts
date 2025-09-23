@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { settingsService } from '../services/settingsService'
+import { settingsService } from '@/services'
 import type {
   LocationSettings,
   TrackingSettings,
@@ -13,7 +13,7 @@ import type {
   TimeOffsetLimitsSettings,
   AlgorithmSettings,
   StepSizeLimitSettings,
-} from '../services/settingsService'
+} from '@/services/api/settingsService'
 
 export const useSettingsStore = defineStore('settings', () => {
   // === 상태 (State) ===

@@ -104,7 +104,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import { useICDStore } from '../../stores/icd/icdStore'
-import { usePedestalPositionStore } from '../../stores/mode/pedestalPositionStore'
+import { usePedestalPositionModeStore } from '@/stores'
 import { useQuasar } from 'quasar'
 
 interface CommandParams {
@@ -119,7 +119,7 @@ interface CommandParams {
 
 const $q = useQuasar()
 const icdStore = useICDStore()
-const pedestalStore = usePedestalPositionStore()
+const pedestalStore = usePedestalPositionModeStore()
 
 const isGoLoading = ref(false)
 const isStopLoading = ref(false)

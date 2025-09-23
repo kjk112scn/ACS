@@ -62,7 +62,7 @@
 <script setup lang="ts">
 import { defineComponent } from 'vue'
 import { useICDStore } from '../../stores/icd/icdStore'
-import { useSlewStore } from '../../stores/mode/slewStore'
+import { useSlewModeStore } from '@/stores'
 
 // 컴포넌트 이름 정의
 defineComponent({
@@ -71,7 +71,7 @@ defineComponent({
 
 // 스토어 인스턴스 생성
 const icdStore = useICDStore()
-const slewStore = useSlewStore()
+const slewStore = useSlewModeStore()
 
 // Go 버튼 핸들러
 const handleGo = async () => {

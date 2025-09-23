@@ -1,4 +1,4 @@
-import { api } from 'boot/axios'
+import { api } from '@/boot/axios'
 
 // 타입 정의 (기존 타입들과 함께)
 export interface TLEItem {

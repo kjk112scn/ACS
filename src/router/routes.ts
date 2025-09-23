@@ -28,11 +28,11 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/',
-    component: () => import('layouts/MainLayout.vue'),
+    component: () => import('@/layouts/MainLayout.vue'),
     children: [
       {
         path: 'dashboard',
-        component: () => import('pages/DashboardPage.vue'),
+        component: () => import('@/pages/DashboardPage.vue'),
         children: [
           {
             path: '',
@@ -40,52 +40,52 @@ const routes: RouteRecordRaw[] = [
           },
           {
             path: 'standby',
-            component: () => import('pages/mode/StandbyPage.vue'),
+            component: () => import('@/pages/mode/StandbyPage.vue'),
           },
           {
             path: 'step',
-            component: () => import('pages/mode/StepPage.vue'),
+            component: () => import('@/pages/mode/StepPage.vue'),
           },
           {
             path: 'slew',
-            component: () => import('pages/mode/SlewPage.vue'),
+            component: () => import('@/pages/mode/SlewPage.vue'),
           },
           {
             path: 'pedestal',
-            component: () => import('pages/mode/PedestalPositionPage.vue'),
+            component: () => import('@/pages/mode/PedestalPositionPage.vue'),
           },
           {
             path: 'ephemeris',
-            component: () => import('pages/mode/EphemerisDesignationPage.vue'),
+            component: () => import('@/pages/mode/EphemerisDesignationPage.vue'),
           },
           {
             path: 'pass-schedule',
-            component: () => import('pages/mode/PassSchedulePage.vue'),
+            component: () => import('@/pages/mode/PassSchedulePage.vue'),
           },
           {
             path: 'suntrack',
-            component: () => import('pages/mode/SunTrackPage.vue'),
+            component: () => import('@/pages/mode/SunTrackPage.vue'),
           },
           {
             path: 'feed',
-            component: () => import('pages/mode/FeedPage.vue'),
+            component: () => import('@/pages/mode/FeedPage.vue'),
           },
         ],
       },
-      { path: 'test', component: () => import('pages/DashboardPage_Test.vue') },
+      { path: 'test', component: () => import('@/pages/DashboardPage_Test.vue') },
     ],
   },
   {
     path: '/',
-    component: () => import('layouts/LoginLayout.vue'),
-    children: [{ path: 'login', component: () => import('pages/LoginPage.vue') }],
+    component: () => import('@/layouts/LoginLayout.vue'),
+    children: [{ path: 'login', component: () => import('@/pages/LoginPage.vue') }],
   },
 
   // Always leave this as last one,
   // but you can also remove it
   {
     path: '/:catchAll(.*)*',
-    component: () => import('pages/ErrorNotFound.vue'),
+    component: () => import('@/pages/ErrorNotFound.vue'),
   },
 ]
 

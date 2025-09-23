@@ -54,8 +54,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
-import { useSettingsStore } from '../../../stores/settingsStore'
-import type { AlgorithmSettings } from '../../../services/settingsService'
+import { useSettingsStore } from '@/stores'
+import type { AlgorithmSettings } from '@/services'
 
 const $q = useQuasar()
 const settingsStore = useSettingsStore()

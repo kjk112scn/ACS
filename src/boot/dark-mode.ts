@@ -1,6 +1,4 @@
-import { boot } from 'quasar/wrappers'
-
-export default boot(({ app }) => {
+export default ({ app }) => {
   const $q = app.config.globalProperties.$q
   const savedDarkMode = localStorage.getItem('isDarkMode')
   if (savedDarkMode === null) {
@@ -9,4 +7,4 @@ export default boot(({ app }) => {
   } else {
     $q.dark.set(savedDarkMode === 'true')
   }
-})
+}

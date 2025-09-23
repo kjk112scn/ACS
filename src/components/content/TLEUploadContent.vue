@@ -171,7 +171,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, getCurrentInstance } from 'vue'
 import { useQuasar } from 'quasar'
-import { usePassScheduleStore } from '../../stores/mode/passScheduleStore'
+import { usePassScheduleModeStore } from '@/stores'
 import { closeWindow } from '../../utils/windowUtils'
 import type { QTableProps } from 'quasar'
 
@@ -193,7 +193,7 @@ interface TLEUploadResult {
 const props = defineProps<Props>()
 
 const $q = useQuasar()
-const passScheduleStore = usePassScheduleStore()
+const passScheduleStore = usePassScheduleModeStore()
 
 // 현재 인스턴스 가져오기
 const instance = getCurrentInstance()

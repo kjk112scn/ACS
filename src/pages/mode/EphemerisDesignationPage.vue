@@ -311,7 +311,7 @@ import type { QTableProps } from 'quasar'
 import { useICDStore } from '../../stores/icd/icdStore'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
-import { useEphemerisTrackStore } from '../../stores/mode/ephemerisTrackStore'
+import { useEphemerisTrackModeStore } from '@/stores'
 import { formatToLocalTime, formatTimeRemaining, getCalTimeTimestamp } from '../../utils/times'
 // 인터페이스 정의 - 서비스의 타입과 동일하게 사용
 import {
@@ -321,7 +321,7 @@ import {
 } from '../../services/mode/ephemerisTrackService'
 import { openPopup } from '../../utils/windowUtils'
 // ✅ 스토어 연동 추가
-const ephemerisStore = useEphemerisTrackStore()
+const ephemerisStore = useEphemerisTrackModeStore()
 
 // ECharts 데이터 포인트 타입 정의
 interface EChartsScatterParam {

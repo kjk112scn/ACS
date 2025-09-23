@@ -54,7 +54,7 @@ interface TrackingPath {
   sampledPath: [number, number][]
   lastUpdateTime: number
 }
-export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
+export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
   // ===== 상태 정의 =====
   const masterData = ref<ScheduleItem[]>([])
   const detailData = ref<ScheduleDetailItem[]>([])
@@ -266,7 +266,7 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
 
         let isInitialized = false
 
-        trackingWorker!.onmessage = (e: MessageEvent<WorkerResponse>) => {
+        trackingWorker.onmessage = (e: MessageEvent<WorkerResponse>) => {
           if (!isInitialized) {
             clearTimeout(initTimeout)
             isInitialized = true
@@ -312,7 +312,7 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
           }
         }
 
-        trackingWorker!.onerror = (error: ErrorEvent) => {
+        trackingWorker.onerror = (error: ErrorEvent) => {
           clearTimeout(initTimeout)
 
           console.error('🚫 Worker 오류:', error.message)
@@ -323,7 +323,7 @@ export const useEphemerisTrackStore = defineStore('ephemerisTrack', () => {
         }
 
         // 초기화 테스트 메시지
-        trackingWorker!.postMessage({
+        trackingWorker.postMessage({
           azimuth: 0,
           elevation: 0,
           currentPath: [],

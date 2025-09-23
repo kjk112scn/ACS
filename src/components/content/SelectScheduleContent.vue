@@ -135,13 +135,13 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, getCurrentInstance, onUnmounted } from 'vue'
 import { useQuasar } from 'quasar'
-import { usePassScheduleStore, type ScheduleItem } from '../../stores/mode/passScheduleStore'
+import { usePassScheduleModeStore, type ScheduleItem } from '@/stores'
 import type { QTableProps } from 'quasar'
 import { formatToLocalTime } from '../../utils/times'
 import { closeWindow } from '../../utils/windowUtils'
 
 const $q = useQuasar()
-const passScheduleStore = usePassScheduleStore()
+const passScheduleStore = usePassScheduleModeStore()
 
 
 

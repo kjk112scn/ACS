@@ -13,7 +13,7 @@ export interface SlewSpeeds {
   train: string
 }
 
-export const useSlewStore = defineStore('slew', () => {
+export const useSlewModeStore = defineStore('slew', () => {
   // 선택된 축 상태
   const selectedAxes = ref<SlewAxes>({
     azimuth: false,

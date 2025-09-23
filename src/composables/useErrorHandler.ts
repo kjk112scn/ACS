@@ -82,7 +82,7 @@ export const useErrorHandler = () => {
   const resolveError = (errorId: string) => {
     const errorIndex = errors.value.findIndex((error) => error.id === errorId)
     if (errorIndex !== -1) {
-      errors.value[errorIndex]!.resolved = true
+      errors.value[errorIndex].resolved = true
     }
   }
 

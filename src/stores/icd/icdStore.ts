@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, onScopeDispose, readonly } from 'vue'
-import { icdService, type MessageData, type MultiControlCommand } from '../../services/icdService'
+import { icdService, type MessageData, type MultiControlCommand } from '@/services'
 
 // 값을 안전하게 문자열로 변환하는 헬퍼 함수
 const safeToString = (value: unknown): string => {

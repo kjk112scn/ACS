@@ -55,7 +55,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useSettingsStore } from '../../../stores/settingsStore'
+import { useSettingsStore } from '@/stores'
 
 // 개별 설정 컴포넌트들 import
 import LocationSettings from './LocationSettings.vue'

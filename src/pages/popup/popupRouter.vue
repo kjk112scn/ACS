@@ -37,7 +37,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '../../stores/auth'
+import { useAuthStore } from '@/stores'
 import { useQuasar } from 'quasar'
 
 const route = useRoute()
@@ -262,6 +262,7 @@ onMounted(() => {
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }
@@ -274,12 +275,15 @@ onMounted(() => {
 
 /* 모달일 때 컨텐츠 스타일 */
 .modal-content {
-  overflow: auto; /* 모달에서는 스크롤 허용 */
-  padding: 0; /* 모달에서는 패딩 제거 */
+  overflow: auto;
+  /* 모달에서는 스크롤 허용 */
+  padding: 0;
+  /* 모달에서는 패딩 제거 */
 }
 
 /* 반응형 디자인 */
 @media (max-width: 768px) {
+
   .loading-content,
   .redirect-content {
     min-width: 90%;

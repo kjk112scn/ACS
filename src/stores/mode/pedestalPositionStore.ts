@@ -19,7 +19,7 @@ export interface PedestalSpeeds {
   train: string
 }
 
-export const usePedestalPositionStore = defineStore('pedestalPosition', () => {
+export const usePedestalPositionModeStore = defineStore('pedestalPosition', () => {
   // 선택된 축 상태
   const selectedAxes = ref<PedestalAxes>({
     azimuth: false,

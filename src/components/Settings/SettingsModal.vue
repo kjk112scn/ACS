@@ -87,7 +87,7 @@ import { useQuasar } from 'quasar'
 
 import GeneralSettings from './GeneralSettings.vue'
 import ServoEncoderPresetSettings from './ServoEncoderPresetSettings.vue'
-import SystemSettings from './SystemSettings/SystemSettings.vue'
+import SystemSettings from './system/SystemSettings.vue'
 
 const $q = useQuasar()
 

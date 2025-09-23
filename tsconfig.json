@@ -1,13 +1,23 @@
-﻿{ 
-  "extends": "./.quasar/tsconfig.json", 
-  "compilerOptions": { 
-    "ignoreDeprecations": "5.0", 
-    "newLine": "lf", 
-    "lib": ["ES2020", "DOM", "WebWorker"], 
-    "types": ["vite/client"] 
-  }, 
-  "include": [ 
-    "src/**/*", 
-    "src/workers/**/*" 
-  ] 
-} 
+﻿{
+  "compilerOptions": {
+    "ignoreDeprecations": "5.0",
+    "newLine": "lf",
+    "lib": ["ES2020", "DOM", "WebWorker"],
+    "types": ["vite/client"],
+    "module": "ES2020",
+    "moduleResolution": "bundler",
+    "target": "ES2020",
+    "baseUrl": ".",
+    "skipLibCheck": true,
+    "paths": {
+      "@/*": ["src/*"],
+      "@/types/*": ["src/types/*"],
+      "@/services/*": ["src/services/*"],
+      "@/stores/*": ["src/stores/*"],
+      "@/components/*": ["src/components/*"],
+      "@/composables/*": ["src/composables/*"],
+      "@/i18n/*": ["src/i18n/*"]
+    }
+  },
+  "include": ["src/**/*", "src/workers/**/*", "quasar.config.ts"]
+}

@@ -1,4 +1,4 @@
-import { api } from 'boot/axios'
+import { api } from '@/boot/axios'
 
 // 타입 정의
 export interface ScheduleItem {

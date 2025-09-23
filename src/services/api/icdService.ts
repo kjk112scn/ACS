@@ -1,4 +1,4 @@
-import { api } from 'boot/axios'
+import { api } from '@/boot/axios'
 export interface TrackingStatus {
   ephemerisStatus?: boolean | null
   ephemerisTrackingState?: string | null
@@ -102,7 +102,7 @@ class WebSocketService {
         // WebSocket 이벤트 리스너 추가
         this.websocket.onopen = () => {
           console.log(
-            `[WebSocket] 연결 열림 - readyState: ${this.getReadyStateString(this.websocket!.readyState)}`,
+            `[WebSocket] 연결 열림 - readyState: ${this.getReadyStateString(this.websocket.readyState)}`,
           )
           console.log('WebSocket 연결 성공')
           this.reconnectAttempts = 0
@@ -219,7 +219,7 @@ class WebSocketService {
       console.log(`재연결 시도 중... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
 
       setTimeout(() => {
-        this.connect(this.currentUrl, this.messageHandler!).catch((error) =>
+        this.connect(this.currentUrl, this.messageHandler).catch((error) =>
           console.error('재연결 실패:', error),
         )
       }, this.reconnectDelay)
@@ -316,7 +316,7 @@ export const icdService = {
    * @param onMessage 메시지 수신 핸들러
    */
   async connectWebSocket(url: string, onMessage: WebSocketMessageHandler): Promise<void> {
-    return this.webSocketService.connect(url, onMessage)
+    return await this.webSocketService.connect(url, onMessage)
   },
 
   /**

@@ -1,10 +1,10 @@
 ﻿// Configuration for your app
 // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file
 
-import { defineConfig } from '#q-app/wrappers'
 import { fileURLToPath } from 'node:url'
+import path from 'path'
 
-export default defineConfig((ctx) => {
+export default function (ctx) {
   return {
     // https://v2.quasar.dev/quasar-cli-vite/prefetch-feature
     // preFetch: true,
@@ -60,7 +60,20 @@ export default defineConfig((ctx) => {
       // polyfillModulePreload: true,
       // distDir
 
-      // extendViteConf (viteConf) {},
+      // Vite 설정을 build 섹션 안으로 이동
+      extendViteConf(viteConf) {
+        viteConf.resolve = viteConf.resolve || {}
+        viteConf.resolve.alias = {
+          ...viteConf.resolve.alias,
+          '@': path.resolve(__dirname, './src'),
+          '@/types': path.resolve(__dirname, './src/types'),
+          '@/services': path.resolve(__dirname, './src/services'),
+          '@/stores': path.resolve(__dirname, './src/stores'),
+          '@/components': path.resolve(__dirname, './src/components'),
+          '@/composables': path.resolve(__dirname, './src/composables'),
+          '@/i18n': path.resolve(__dirname, './src/i18n'),
+        }
+      },
       // viteVuePluginOptions: {},
 
       vitePlugins: [
@@ -124,17 +137,17 @@ export default defineConfig((ctx) => {
     animations: [],
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#sourcefiles
-    // sourceFiles: {
-    //   rootComponent: 'src/App.vue',
-    //   router: 'src/router/index',
-    //   store: 'src/store/index',
-    //   pwaRegisterServiceWorker: 'src-pwa/register-service-worker',
-    //   pwaServiceWorker: 'src-pwa/custom-service-worker',
-    //   pwaManifestFile: 'src-pwa/manifest.json',
-    //   electronMain: 'src-electron/electron-main',
-    //   electronPreload: 'src-electron/electron-preload'
-    //   bexManifestFile: 'src-bex/manifest.json
-    // },
+    sourceFiles: {
+      rootComponent: 'src/App.vue',
+      router: 'src/router/index',
+      store: 'src/stores/index', // stores로 수정
+      // pwaRegisterServiceWorker: 'src-pwa/register-service-worker',
+      // pwaServiceWorker: 'src-pwa/custom-service-worker',
+      // pwaManifestFile: 'src-pwa/manifest.json',
+      // electronMain: 'src-electron/electron-main',
+      // electronPreload: 'src-electron/electron-preload'
+      // bexManifestFile: 'src-bex/manifest.json
+    },
 
     // https://v2.quasar.dev/quasar-cli-vite/developing-ssr/configuring-ssr
     ssr: {
@@ -232,4 +245,4 @@ export default defineConfig((ctx) => {
       extraScripts: [],
     },
   }
-})
+}
