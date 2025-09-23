@@ -1,337 +1,310 @@
-# ACS 프로젝트 리팩토링 진행방식 A
+# ACS 프로젝트 리팩토링 계획 V2 (실용적 접근)
 
 ## 📋 프로젝트 개요
 
 - **프로젝트명**: ACS (안테나 제어 시스템)
 - **기술스택**: Vue 3 + Quasar + TypeScript + Kotlin Spring Boot
 - **현재 상태**: 기능적으로는 작동하지만 구조적으로 리팩토링 필요
-- **목표**: 코드 일관성, 재사용성, 유지보수성 향상
+- **목표**: 실용적이고 단순한 구조로 개선, UI 재사용성 향상
 
-## 🎯 주요 문제점
+## 🎯 핵심 요구사항
 
-1. **거대한 파일들**: DashboardPage.vue (1805줄), icdStore.ts (2258줄)
-2. **일관성 없는 패턴**: 에러 처리, API 호출, 상태 관리
-3. **분산된 구조**: 타입 정의, 공통 기능들이 여러 곳에 분산
-4. **공통 컴포넌트 부족**: 유사한 UI 패턴이 반복 구현
-5. **알림 시스템 분산**: 각 컴포넌트마다 개별 구현
+1. **한글 인코딩 문제** 해결 (최우선)
+2. **에러 관리 기능** 통합
+3. **UI 재사용성** 개선 (notify, dialog, loading 등)
+4. **한영 호환** 시스템 구축
+5. **폴더 구조** 정리 (기능별 분리)
+6. **과도한 분할** 피하기 (기존 기능 유지)
 
-## ⚠️ 시작 전 필수 작업
+## ⚠️ 핵심 원칙
 
-### **Settings 기능 완성** (30-45분)
+- **기존 기능 유지** - 동작하는 코드는 건드리지 않음
+- **점진적 개선** - 한 번에 하나씩만 수정
+- **실용적 접근** - 복잡한 분할보다는 통합에 집중
+- **테스트 우선** - 각 단계마다 빌드 및 기능 테스트
 
-- [ ] `src/services/settingsService.ts`에서 API 응답 처리 로직 수정
-- [ ] 백엔드 응답 형식에 맞게 에러 처리 개선
-- [ ] 각 설정별 저장/로드 테스트
-- [ ] UI 반응성 테스트
+##  한글 인코딩 문제 해결 방안
 
-## 📊 전체 진행 계획
+### **문제 원인 분석**
+1. **파일 인코딩 불일치** - UTF-8과 CP949 혼재
+2. **Windows 명령어 한글 처리** - echo 명령어 한글 깨짐
+3. **빌드 시스템 인코딩** - Vite/Quasar 빌드 시 한글 처리 문제
+4. **Git 설정** - Git LFS 또는 인코딩 설정 문제
 
-### **-1단계: 프로젝트 정리** (예상 소요시간: 1시간)
+### **해결 방안**
+1. **파일 인코딩 통일**
+   - 모든 `.vue`, `.ts`, `.js` 파일을 UTF-8 BOM 없이 저장
+   - VS Code 설정에서 `"files.encoding": "utf8"` 설정
+   - `.editorconfig` 파일 생성하여 인코딩 규칙 정의
 
-- [ ] 백엔드 코드 제거 (`src/main/` 폴더)
-- [ ] `build.gradle.kts`, `gradle/` 폴더 제거
-- [ ] `orekit-data/` 폴더 제거
-- [ ] `logs/` 폴더 제거
-- [ ] `csv_exports/` 폴더 제거
-- [ ] `docs/` 폴더 제거
-- [ ] `src/test-sendbox/` 폴더 제거
-- [ ] `.gitignore` 최적화
-- [ ] 불필요한 파일들 Git에서 제거
+2. **빌드 환경 설정**
+   - `quasar.config.ts`에서 Vite 인코딩 설정 추가
+   - `tsconfig.json`에서 컴파일러 옵션 조정
+   - `package.json` 스크립트에 인코딩 옵션 추가
 
-### **0단계: 불필요한 파일 정리** (예상 소요시간: 30분)
+3. **Git 설정 최적화**
+   - `.gitattributes` 파일 생성하여 텍스트 파일 인코딩 규칙 정의
+   - Git LFS 설정 확인 및 조정
+   - `core.autocrlf` 설정 조정
 
-- [ ] `src/components/models.ts` 제거 (사용되지 않음)
-- [ ] `src/components/ExampleComponent.vue` 제거 (예제용)
-- [ ] `src/stores/example-store.ts` 제거 (예제용)
-- [ ] `void` 파일 제거 (빈 파일)
-- [ ] `src/pages/DashboardPage_Test.vue` 제거 (테스트용)
-- [ ] `src/pages/ErrorNotFound.vue` 개선 (기본 에러 페이지)
+4. **개발 도구 설정**
+   - VS Code 확장 프로그램 설치 (Korean Language Pack)
+   - 터미널 인코딩 설정 (chcp 65001)
+   - 파일 탐색기에서 한글 파일명 처리 확인
 
-### **0.5단계: 라우터 구조 개선** (예상 소요시간: 1시간)
+##  전체 진행 계획
 
-- [ ] 팝업 라우터 구조 개선 (`/popup/` 경로들)
-- [ ] 중첩 라우터 정리 (`dashboard` 하위 모드들)
-- [ ] 라우터 가드 최적화
-- [ ] 불필요한 리다이렉트 정리
-- [ ] 라우터 타입 정의 개선
+### **0단계: 한글 인코딩 문제 해결** (예상 소요시간: 1-2시간) - 최우선
 
-### **1단계: 폴더 구조 정리** (예상 소요시간: 2-3시간)
+#### **0.1 환경 설정**
+- [ ] VS Code 인코딩 설정 확인 및 수정
+- [ ] `.editorconfig` 파일 생성
+- [ ] `.gitattributes` 파일 생성
+- [ ] 터미널 인코딩 설정 (chcp 65001)
 
-- [ ] `src/types/` 디렉토리 생성 및 하위 폴더 구성
-  - [ ] `src/types/common.ts` - 공통 타입들
-  - [ ] `src/types/settings.ts` - 설정 관련 타입들
-  - [ ] `src/types/icd.ts` - ICD 관련 타입들
-  - [ ] `src/types/mode.ts` - 모드 관련 타입들
-  - [ ] `src/types/ephemeris.ts` - 위성 추적 관련 타입들
-  - [ ] `src/types/index.ts` - 모든 타입 export
-- [ ] 컴포넌트 폴더 재구성
-  - [ ] `src/components/common/` 디렉토리 생성
-  - [ ] `src/components/dashboard/` 디렉토리 생성
-  - [ ] `src/components/settings/` 디렉토리 생성 (대소문자 통일)
-  - [ ] `src/components/content/` → `src/components/dashboard/`로 이동
-  - [ ] `src/components/Settings/` → `src/components/settings/`로 이동
-- [ ] 서비스 폴더 정리
-  - [ ] `src/services/api/` 디렉토리 생성
-  - [ ] `src/services/mode/` → `src/services/api/mode/`로 이동
-  - [ ] `src/services/settingsService.ts` → `src/services/api/settingsService.ts`로 이동
-  - [ ] `src/services/icdService.ts` → `src/services/api/icdService.ts`로 이동
-- [ ] 스토어 폴더 정리
-  - [ ] `src/stores/mode/` → `src/stores/api/mode/`로 이동
-  - [ ] `src/stores/icd/` → `src/stores/api/icd/`로 이동
-  - [ ] `src/stores/modeStore.ts` → `src/stores/api/modeStore.ts`로 이동
+#### **0.2 빌드 환경 설정**
+- [ ] `quasar.config.ts`에 Vite 인코딩 설정 추가
+- [ ] `tsconfig.json` 컴파일러 옵션 조정
+- [ ] `package.json` 스크립트에 인코딩 옵션 추가
 
-### **2단계: 타입 시스템 통합** (예상 소요시간: 2-3시간)
+#### **0.3 파일 인코딩 통일**
+- [ ] 모든 `.vue` 파일을 UTF-8로 재저장
+- [ ] 모든 `.ts` 파일을 UTF-8로 재저장
+- [ ] 모든 `.js` 파일을 UTF-8로 재저장
+- [ ] `????` 패턴 검색 및 수정
 
-- [ ] `src/services/api/settingsService.ts`에서 타입 정의들을 `src/types/settings.ts`로 이동
-- [ ] `src/services/api/icdService.ts`에서 타입 정의들을 `src/types/icd.ts`로 이동
-- [ ] `src/stores/api/modeStore.ts`에서 타입 정의들을 `src/types/mode.ts`로 이동
-- [ ] `src/types/ephemerisTrack.ts`를 `src/types/ephemeris.ts`로 이름 변경
-- [ ] `src/types/index.ts` 생성하여 모든 타입 export
-- [ ] 중복된 인터페이스들 통합
-- [ ] 공통 타입들 `src/types/common.ts`로 이동
-- [ ] 타입 네이밍 컨벤션 통일
+#### **0.4 구문 오류 수정**
+- [ ] TrajectoryPoint 인터페이스 구문 오류 수정
+- [ ] 기타 구문 오류 수정
+- [ ] 빌드 성공 확인
 
-### **3단계: 공통 유틸리티 시스템 구축** (예상 소요시간: 3-4시간)
+### **1단계: 긴급 문제 해결** (예상 소요시간: 1-2시간)
 
-- [ ] **에러 핸들링 시스템**
-  - [ ] `src/utils/errorHandler.ts` 개선
-  - [ ] `src/utils/apiError.ts` 생성 (API 에러 전용)
-  - [ ] `src/utils/validationError.ts` 생성 (유효성 검사 에러 전용)
-  - [ ] `src/utils/errorHandler.ts`에 통합된 에러 처리 로직 추가
-- [ ] **API 호출 시스템**
-  - [ ] `src/services/apiClient.ts` 생성 (통합 API 클라이언트)
-  - [ ] `src/services/api/` 폴더의 모든 서비스에서 공통 클라이언트 사용
-  - [ ] `src/services/api/` 폴더의 모든 서비스에서 공통 에러 처리 사용
-- [ ] **로딩 상태 관리 시스템**
-  - [ ] `src/composables/useLoading.ts` 생성
-  - [ ] `src/composables/useLoading.ts`에 통합된 로딩 상태 관리 로직 추가
-  - [ ] 모든 페이지에서 개별 로딩 상태를 통합 시스템으로 교체
-- [ ] **알림 시스템**
-  - [ ] `src/composables/useNotification.ts` 생성
-  - [ ] `src/composables/useNotification.ts`에 통합된 알림 시스템 추가
-  - [ ] 모든 컴포넌트에서 개별 알림을 통합 시스템으로 교체
-- [ ] **다이얼로그 시스템**
-  - [ ] `src/composables/useDialog.ts` 생성
-  - [ ] `src/composables/useDialog.ts`에 통합된 다이얼로그 시스템 추가
-  - [ ] 모든 컴포넌트에서 개별 다이얼로그를 통합 시스템으로 교체
-- [ ] **폼 유효성 검사 시스템**
-  - [ ] `src/composables/useValidation.ts` 생성
-  - [ ] `src/composables/useValidation.ts`에 통합된 유효성 검사 로직 추가
-  - [ ] 모든 폼에서 개별 유효성 검사를 통합 시스템으로 교체
+#### **1.1 빌드 환경 정리**
+- [ ] `npm run build` 성공 확인
+- [ ] `npm run dev` 정상 실행 확인
+- [ ] 주요 페이지 접근 테스트
 
-### **3.5단계: 타입 안전한 i18n 시스템 구축** (예상 소요시간: 2-3시간)
+#### **1.2 기본 기능 동작 확인**
+- [ ] 로그인 기능 테스트
+- [ ] 대시보드 로딩 테스트
+- [ ] 주요 모드 페이지 테스트
 
-- [ ] **타입 정의 생성**
-  - [ ] `src/i18n/types.ts` 생성
-  - [ ] `TranslationKeys` 인터페이스 정의
-  - [ ] 모든 번역 키 타입 정의
-- [ ] **번역 파일 구축**
-  - [ ] `src/i18n/ko-KR/index.ts` 생성
-  - [ ] `src/i18n/en-US/index.ts` 생성
-  - [ ] 타입 안전한 번역 객체 정의
-- [ ] **번역 유틸리티 생성**
-  - [ ] `src/composables/useI18n.ts` 생성
-  - [ ] 타입 안전한 번역 함수 구현
-  - [ ] 언어 변경 기능
-- [ ] **개발자 도구 구축**
-  - [ ] `src/utils/i18nDevTools.ts` 생성
-  - [ ] VS Code 설정 파일 생성
-  - [ ] 개발 모드 도구 추가
-- [ ] **기존 메시지 변환**
-  - [ ] 주요 메시지들을 타입 안전한 키로 변환
-  - [ ] 템플릿에서 번역 함수 사용
-  - [ ] 에러 메시지 번역화
+### **2단계: 통합 관리 시스템 구축** (예상 소요시간: 3-4시간)
 
-### **4단계: 대형 파일 분할** (예상 소요시간: 4-5시간)
+#### **2.1 에러 관리 시스템**
+- [ ] `src/composables/useErrorHandler.ts` 생성
+- [ ] 통합된 에러 처리 로직 구현
+- [ ] API 에러, 유효성 검사 에러, 일반 에러 분류
+- [ ] 에러 로깅 시스템 구축
 
-- [ ] **DashboardPage.vue 분할**
-  - [ ] `src/components/dashboard/DashboardHeader.vue` 생성
-  - [ ] `src/components/dashboard/DashboardAxes.vue` 생성
-  - [ ] `src/components/dashboard/DashboardCharts.vue` 생성
-  - [ ] `src/components/dashboard/DashboardControls.vue` 생성
-  - [ ] `src/components/dashboard/DashboardStatus.vue` 생성
-  - [ ] `src/pages/DashboardPage.vue`를 분할된 컴포넌트들로 재구성
-- [ ] **icdStore.ts 분할**
-  - [ ] `src/stores/api/icd/icdDataStore.ts` 생성
-  - [ ] `src/stores/api/icd/icdControlStore.ts` 생성
-  - [ ] `src/stores/api/icd/icdStatusStore.ts` 생성
-  - [ ] `src/stores/api/icd/icdStore.ts`를 분할된 스토어들로 재구성
-- [ ] **settingsStore.ts 분할**
-  - [ ] `src/stores/api/settings/settingsDataStore.ts` 생성
-  - [ ] `src/stores/api/settings/settingsControlStore.ts` 생성
-  - [ ] `src/stores/api/settings/settingsValidationStore.ts` 생성
-  - [ ] `src/stores/api/settings/settingsStore.ts`를 분할된 스토어들로 재구성
+#### **2.2 알림 시스템 통합**
+- [ ] `src/composables/useNotification.ts` 생성
+- [ ] Quasar Notify 통합 관리
+- [ ] 성공, 경고, 에러, 정보 알림 타입별 처리
+- [ ] 기존 개별 notify 코드 통합
 
-### **5단계: 공통 컴포넌트 구축** (예상 소요시간: 3-4시간)
+#### **2.3 다이얼로그 시스템 통합**
+- [ ] `src/composables/useDialog.ts` 생성
+- [ ] 확인, 취소, 입력 다이얼로그 통합
+- [ ] 기존 개별 dialog 코드 통합
 
-- [ ] **공통 UI 컴포넌트**
-  - [ ] `src/components/common/BaseButton.vue` 생성
-  - [ ] `src/components/common/BaseInput.vue` 생성
-  - [ ] `src/components/common/BaseSelect.vue` 생성
-  - [ ] `src/components/common/BaseCard.vue` 생성
-  - [ ] `src/components/common/BaseModal.vue` 생성
-- [ ] **공통 차트 컴포넌트**
-  - [ ] `src/components/common/BaseChart.vue` 생성
-  - [ ] `src/components/common/BaseGauge.vue` 생성
-  - [ ] `src/components/common/BaseStatus.vue` 생성
-- [ ] **공통 폼 컴포넌트**
-  - [ ] `src/components/common/BaseForm.vue` 생성
-  - [ ] `src/components/common/BaseField.vue` 생성
-  - [ ] `src/components/common/BaseValidation.vue` 생성
+#### **2.4 로딩 시스템 통합**
+- [ ] `src/composables/useLoading.ts` 생성
+- [ ] 전역 로딩 상태 관리
+- [ ] 개별 컴포넌트 로딩 상태 통합
 
-### **6단계: Window Utils 개선** (예상 소요시간: 2-3시간)
+#### **2.5 폼 검증 시스템 통합**
+- [ ] `src/composables/useValidation.ts` 생성
+- [ ] 공통 유효성 검사 규칙 정의
+- [ ] 에러 메시지 통합 관리
 
-- [ ] **통합된 컴포넌트 열기 시스템**
-  - [ ] `src/utils/windowUtils.ts` 개선
-  - [ ] `src/utils/windowUtils.ts`에 통합된 옵션 인터페이스 추가
-  - [ ] `src/utils/windowUtils.ts`에 자동 모드 선택 로직 추가
-  - [ ] `src/utils/windowUtils.ts`에 간편한 API 추가
-- [ ] **모달/팝업 통합 관리**
-  - [ ] `src/composables/useWindowManager.ts` 생성
-  - [ ] `src/composables/useWindowManager.ts`에 통합된 윈도우 관리 로직 추가
-  - [ ] 모든 컴포넌트에서 개별 윈도우 관리를 통합 시스템으로 교체
+### **3단계: 한영 호환 시스템 구축** (예상 소요시간: 2-3시간)
 
-### **7단계: 성능 최적화** (예상 소요시간: 2-3시간)
+#### **3.1 i18n 시스템 구축**
+- [ ] `src/i18n/ko-KR/index.ts` 생성
+- [ ] `src/i18n/en-US/index.ts` 생성
+- [ ] `src/composables/useI18n.ts` 생성
+- [ ] 언어 변경 기능 구현
 
-- [ ] **지연 로딩 구현**
-  - [ ] 모든 페이지에 지연 로딩 적용
-  - [ ] 모든 컴포넌트에 지연 로딩 적용
-  - [ ] 모든 차트에 지연 로딩 적용
-- [ ] **번들 크기 최적화**
-  - [ ] 불필요한 라이브러리 제거
-  - [ ] 공통 라이브러리 통합
-  - [ ] 코드 분할 최적화
+#### **3.2 기존 메시지 변환**
+- [ ] 하드코딩된 한글 메시지를 i18n 키로 변환
+- [ ] 에러 메시지 번역화
+- [ ] UI 텍스트 번역화
 
-### **8단계: 테스트 및 검증** (예상 소요시간: 2-3시간)
+### **4단계: 폴더 구조 정리** (예상 소요시간: 2-3시간)
 
-- [ ] **기능 테스트**
-  - [ ] 모든 페이지 기능 테스트
-  - [ ] 모든 API 연동 테스트
-  - [ ] 모든 에러 처리 테스트
-- [ ] **성능 테스트**
-  - [ ] 로딩 속도 테스트
-  - [ ] 메모리 사용량 테스트
-  - [ ] 번들 크기 테스트
+#### **4.1 타입 시스템 정리**
+- [ ] `src/types/common.ts` - 공통 타입들
+- [ ] `src/types/settings.ts` - 설정 관련 타입들
+- [ ] `src/types/icd.ts` - ICD 관련 타입들
+- [ ] `src/types/mode.ts` - 모드 관련 타입들
+- [ ] `src/types/index.ts` - 모든 타입 export
 
-### **9단계: 문서화** (예상 소요시간: 1-2시간)
+#### **4.2 서비스 폴더 정리**
+- [ ] `src/services/api/` 디렉토리 생성
+- [ ] API 관련 서비스들 통합
+- [ ] 공통 API 클라이언트 구축
 
-- [ ] **코드 문서화**
-  - [ ] 모든 컴포넌트에 JSDoc 추가
-  - [ ] 모든 함수에 JSDoc 추가
-  - [ ] 모든 타입에 JSDoc 추가
-- [ ] **사용법 문서화**
-  - [ ] `README.md` 업데이트
-  - [ ] `docs/` 폴더 생성 및 사용법 문서 작성
-  - [ ] `docs/` 폴더에 컴포넌트 사용법 문서 작성
+#### **4.3 스토어 폴더 정리**
+- [ ] `src/stores/api/` 디렉토리 생성
+- [ ] 관련 스토어들 그룹화
+- [ ] 공통 스토어 로직 통합
 
-### **10단계: 최종 정리** (예상 소요시간: 1-2시간)
+### **5단계: 성능 최적화** (예상 소요시간: 2-3시간)
 
-- [ ] **코드 정리**
-  - [ ] 불필요한 파일 제거
-  - [ ] 사용하지 않는 import 제거
-  - [ ] 코드 포맷팅 통일
-- [ ] **최종 검증**
-  - [ ] 전체 프로젝트 빌드 테스트
-  - [ ] 전체 프로젝트 실행 테스트
-  - [ ] 전체 프로젝트 기능 테스트
+#### **5.1 번들 크기 최적화**
+- [ ] 불필요한 라이브러리 제거
+- [ ] 공통 라이브러리 통합
+- [ ] 코드 분할 최적화
+
+#### **5.2 지연 로딩 구현**
+- [ ] 페이지별 지연 로딩 적용
+- [ ] 컴포넌트별 지연 로딩 적용
+- [ ] 차트 지연 로딩 적용
+
+### **6단계: 테스트 및 검증** (예상 소요시간: 2-3시간)
+
+#### **6.1 기능 테스트**
+- [ ] 모든 페이지 기능 테스트
+- [ ] 모든 API 연동 테스트
+- [ ] 모든 에러 처리 테스트
+- [ ] 한영 전환 테스트
+
+#### **6.2 성능 테스트**
+- [ ] 로딩 속도 테스트
+- [ ] 메모리 사용량 테스트
+- [ ] 번들 크기 테스트
+
+### **7단계: 공통 UI 컴포넌트 구축** (예상 소요시간: 4-5시간) - 마지막 단계
+
+#### **7.1 공통 UI 컴포넌트 구축**
+- [ ] `src/components/common/BaseButton.vue` 생성
+- [ ] `src/components/common/BaseInput.vue` 생성
+- [ ] `src/components/common/BaseSelect.vue` 생성
+- [ ] `src/components/common/BaseCard.vue` 생성
+- [ ] `src/components/common/BaseModal.vue` 생성
+- [ ] `src/components/common/BaseForm.vue` 생성
+
+#### **7.2 공통 차트 컴포넌트 구축**
+- [ ] `src/components/common/BaseChart.vue` 생성
+- [ ] `src/components/common/BaseGauge.vue` 생성
+- [ ] `src/components/common/BaseStatus.vue` 생성
+
+#### **7.3 기존 컴포넌트 통합**
+- [ ] 유사한 UI 패턴을 공통 컴포넌트로 교체
+- [ ] 중복 코드 제거
+- [ ] 일관성 있는 스타일 적용
+
+### **8단계: 문서화** (예상 소요시간: 1-2시간)
+
+#### **8.1 코드 문서화**
+- [ ] 모든 컴포넌트에 JSDoc 추가
+- [ ] 모든 함수에 JSDoc 추가
+- [ ] 모든 타입에 JSDoc 추가
+
+#### **8.2 사용법 문서화**
+- [ ] `README.md` 업데이트
+- [ ] 컴포넌트 사용법 문서 작성
+- [ ] API 사용법 문서 작성
 
 ## 📈 예상 효과
 
 ### **단기 효과 (1-2주)**
-
-- 코드 일관성 향상
-- 개발 속도 20-30% 향상
-- 버그 발생률 40-50% 감소
+- 한글 인코딩 문제 완전 해결
+- UI 일관성 향상
+- 에러 처리 통합으로 디버깅 용이
 
 ### **중기 효과 (1-3개월)**
-
-- 새 기능 개발 시간 50% 단축
-- 유지보수 비용 60% 감소
-- 코드 이해도 대폭 향상
+- 개발 속도 30-40% 향상
+- 버그 발생률 50% 감소
+- 유지보수 비용 40% 감소
 
 ### **장기 효과 (6개월+)**
-
-- 팀 생산성 2-3배 향상
+- 팀 생산성 2배 향상
 - 기술 부채 대폭 감소
 - 확장성 크게 향상
 
-## 📊 전체 요약
+##  시작 방법
 
-- **총 단계**: 13단계 (-1단계 ~ 10단계)
-- **총 예상 소요시간**: 29-40시간
-- **우선순위**: Settings 기능 완성 → 진행방식 A 시작
+1. **현재 상태 백업** (Git commit)
+2. **0단계부터 순차적으로 진행** (한글 인코딩 문제 해결)
+3. **각 단계 완료 후 테스트** 필수
+4. **문제 발생 시 즉시 중단**하고 이전 단계로 롤백
 
-## 🚀 시작 방법
+## 📋 진행 상황 체크
 
-1. **Settings 기능 완성** (30-45분) - 필수!
-2. 진행방식 A -1단계부터 순차적으로 진행
-3. 각 단계 완료 후 다음 단계로 진행
-4. 문제 발생 시 이전 단계로 롤백
-
-## 진행 상황 체크
-
-- [ ] **Settings 기능 완성** (필수)
-- [ ] -1단계: 프로젝트 정리
-- [ ] 0단계: 불필요한 파일 정리
-- [ ] 0.5단계: 라우터 구조 개선
-- [ ] 1단계: 폴더 구조 정리
-- [ ] 2단계: 타입 시스템 통합
-- [ ] 3단계: 공통 유틸리티 시스템 구축
-- [ ] 3.5단계: 타입 안전한 i18n 시스템 구축
-- [ ] 4단계: 대형 파일 분할
-- [ ] 5단계: 공통 컴포넌트 구축
-- [ ] 6단계: Window Utils 개선
-- [ ] 7단계: 성능 최적화
-- [ ] 8단계: 테스트 및 검증
-- [ ] 9단계: 문서화
-- [ ] 10단계: 최종 정리
+- [ ] **0단계: 한글 인코딩 문제 해결** (최우선)
+  - [ ] 0.1 환경 설정
+  - [ ] 0.2 빌드 환경 설정
+  - [ ] 0.3 파일 인코딩 통일
+  - [ ] 0.4 구문 오류 수정
+- [ ] **1단계: 긴급 문제 해결**
+  - [ ] 1.1 빌드 환경 정리
+  - [ ] 1.2 기본 기능 동작 확인
+- [ ] **2단계: 통합 관리 시스템 구축**
+  - [ ] 2.1 에러 관리 시스템
+  - [ ] 2.2 알림 시스템 통합
+  - [ ] 2.3 다이얼로그 시스템 통합
+  - [ ] 2.4 로딩 시스템 통합
+  - [ ] 2.5 폼 검증 시스템 통합
+- [ ] **3단계: 한영 호환 시스템 구축**
+  - [ ] 3.1 i18n 시스템 구축
+  - [ ] 3.2 기존 메시지 변환
+- [ ] **4단계: 폴더 구조 정리**
+  - [ ] 4.1 타입 시스템 정리
+  - [ ] 4.2 서비스 폴더 정리
+  - [ ] 4.3 스토어 폴더 정리
+- [ ] **5단계: 성능 최적화**
+  - [ ] 5.1 번들 크기 최적화
+  - [ ] 5.2 지연 로딩 구현
+- [ ] **6단계: 테스트 및 검증**
+  - [ ] 6.1 기능 테스트
+  - [ ] 6.2 성능 테스트
+- [ ] **7단계: 공통 UI 컴포넌트 구축** (마지막)
+  - [ ] 7.1 공통 UI 컴포넌트 구축
+  - [ ] 7.2 공통 차트 컴포넌트 구축
+  - [ ] 7.3 기존 컴포넌트 통합
+- [ ] **8단계: 문서화**
+  - [ ] 8.1 코드 문서화
+  - [ ] 8.2 사용법 문서화
 
 ## 🔧 새 PC에서 이어서 진행하는 방법
 
 ### **1. 프로젝트 복사**
-
 ```bash
-# Git 클론 또는 프로젝트 폴더 복사
 git clone [repository-url]
 cd ACS
 ```
 
 ### **2. 의존성 설치**
-
 ```bash
 npm install
 ```
 
-### **3. 진행방식 A 파일 확인**
-
-```bash
-# ACS_REFACTORING_PLAN.md 파일 확인
-cat ACS_REFACTORING_PLAN.md
-```
-
-### **4. 현재 진행 상황 확인**
-
-- Settings 기능 완성 여부 확인
-- 진행방식 A에서 완료된 단계 체크
+### **3. 현재 진행 상황 확인**
+- Git 히스토리에서 완료된 단계 확인
 - 다음 단계부터 진행
 
-### **5. 새 대화에서 이어서 진행**
-
+### **4. 새 대화에서 이어서 진행**
 ```
-"ACS_REFACTORING_PLAN.md 파일을 참고해서 [단계번호] 단계부터 시작해주세요"
-예: "ACS_REFACTORING_PLAN.md 파일을 참고해서 -1단계부터 시작해주세요"
+"ACS_REFACTORING_PLAN_V2.md 파일을 참고해서 [단계번호] 단계부터 시작해주세요"
+예: "ACS_REFACTORING_PLAN_V2.md 파일을 참고해서 0단계부터 시작해주세요"
 ```
 
 ## ⚠️ 주의사항
 
 - **각 단계는 순차적으로 진행**해야 함
-- **Settings 기능을 먼저 완성**해야 함
+- **0단계(한글 인코딩 문제 해결)를 먼저 완료**해야 함
 - **각 단계 완료 후 테스트** 필수
 - **문제 발생 시 즉시 중단**하고 이전 단계로 롤백
 - **백업을 자주 생성**할 것
+- **과도한 분할 피하기** - 기존 기능 유지 우선
+- **공통 UI 컴포넌트는 마지막 단계**에서 구축
 
 ---
 
 **생성일**: 2024년 12월 19일  
-**버전**: 1.1  
-**상태**: 완성
+**버전**: 2.2  
+**상태**: 완성  
+**특징**: 실용적 접근, UI 재사용성 중심, 한영 호환 시스템, 공통 컴포넌트 마지막 단계, 한글 인코딩 문제 해결 방안 포함
