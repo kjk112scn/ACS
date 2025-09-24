@@ -12,6 +12,10 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.util.BitSet
+import org.springframework.http.HttpStatus
+import org.springframework.web.bind.annotation.GetMapping
+import com.gtlsystems.acs_api.model.SystemInfo
+import reactor.core.publisher.Mono
 
 @RestController
 @RequestMapping("/api/icd")
@@ -61,20 +65,25 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
 
             logger.info("ServoPreset 명령 요청 완료: {}", axesStr)
 
-            ResponseEntity.ok(mapOf(
-                "status" to "success",
-                "message" to "ServoPreset 명령이 성공적으로 전송되었습니다",
-                "command" to "ServoPreset",
-                "axes" to axesStr
-            ))
+            ResponseEntity.ok(
+                mapOf(
+                    "status" to "success",
+                    "message" to "ServoPreset 명령이 성공적으로 전송되었습니다",
+                    "command" to "ServoPreset",
+                    "axes" to axesStr
+                )
+            )
         } catch (e: Exception) {
             logger.error("ServoPreset 명령 요청 실패: {}", e.message, e)
-            ResponseEntity.internalServerError().body(mapOf(
-                "status" to "error",
-                "message" to "ServoPreset 명령 전송 실패: ${e.message}"
-            ))
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "ServoPreset 명령 전송 실패: ${e.message}"
+                )
+            )
         }
     }
+
     @PostMapping("/standby-command")
     @Operation(
         operationId = "standbyCommand",
@@ -116,18 +125,22 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
 
             logger.info("Standby 명령 요청 완료: {}", axesStr)
 
-            ResponseEntity.ok(mapOf(
-                "status" to "success",
-                "message" to "Standby 명령이 성공적으로 전송되었습니다",
-                "command" to "Standby",
-                "axes" to axesStr
-            ))
+            ResponseEntity.ok(
+                mapOf(
+                    "status" to "success",
+                    "message" to "Standby 명령이 성공적으로 전송되었습니다",
+                    "command" to "Standby",
+                    "axes" to axesStr
+                )
+            )
         } catch (e: Exception) {
             logger.error("Standby 명령 요청 실패: {}", e.message, e)
-            ResponseEntity.internalServerError().body(mapOf(
-                "status" to "error",
-                "message" to "Standby 명령 전송 실패: ${e.message}"
-            ))
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "Standby 명령 전송 실패: ${e.message}"
+                )
+            )
         }
     }
 
@@ -148,10 +161,12 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
             // commandType이 'E' 또는 'S'인지 검증
             if (commandType != 'E' && commandType != 'S') {
                 logger.warn("유효하지 않은 비상 명령 타입: {}", commandType)
-                return ResponseEntity.badRequest().body(mapOf(
-                    "status" to "error",
-                    "message" to "명령 타입은 'E' 또는 'S'여야 합니다"
-                ))
+                return ResponseEntity.badRequest().body(
+                    mapOf(
+                        "status" to "error",
+                        "message" to "명령 타입은 'E' 또는 'S'여야 합니다"
+                    )
+                )
             }
 
             udpFwICDService.onEmergencyCommand(commandType)
@@ -159,18 +174,22 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
             val status = if (commandType == 'E') "활성화" else "비활성화"
             logger.info("비상 명령 요청 완료: {}", status)
 
-            ResponseEntity.ok(mapOf(
-                "status" to "success",
-                "message" to "비상 명령이 성공적으로 ${status} 되었습니다",
-                "command" to "Emergency",
-                "type" to commandType.toString()
-            ))
+            ResponseEntity.ok(
+                mapOf(
+                    "status" to "success",
+                    "message" to "비상 명령이 성공적으로 ${status} 되었습니다",
+                    "command" to "Emergency",
+                    "type" to commandType.toString()
+                )
+            )
         } catch (e: Exception) {
             logger.error("비상 명령 요청 실패: {}", e.message, e)
-            ResponseEntity.internalServerError().body(mapOf(
-                "status" to "error",
-                "message" to "비상 명령 전송 실패: ${e.message}"
-            ))
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "비상 명령 전송 실패: ${e.message}"
+                )
+            )
         }
     }
 
@@ -185,18 +204,22 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
 
             logger.info("TimeOffset 명령 요청 완료: {}s", inputTimeOffset)
 
-            ResponseEntity.ok(mapOf(
-                "status" to "success",
-                "message" to "TimeOffset 명령이 성공적으로 전송되었습니다",
-                "command" to "TimeOffset",
-                "timeOffset" to inputTimeOffset.toString()
-            ))
+            ResponseEntity.ok(
+                mapOf(
+                    "status" to "success",
+                    "message" to "TimeOffset 명령이 성공적으로 전송되었습니다",
+                    "command" to "TimeOffset",
+                    "timeOffset" to inputTimeOffset.toString()
+                )
+            )
         } catch (e: Exception) {
             logger.error("TimeOffset 명령 요청 실패: {}", e.message, e)
-            ResponseEntity.internalServerError().body(mapOf(
-                "status" to "error",
-                "message" to "TimeOffset 명령 전송 실패: ${e.message}"
-            ))
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "TimeOffset 명령 전송 실패: ${e.message}"
+                )
+            )
         }
     }
 
@@ -237,19 +260,23 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
 
             logger.info("MultiManual 제어 명령 요청 완료: {}", axesStr)
 
-            ResponseEntity.ok(mapOf(
-                "status" to "success",
-                "message" to "MultiManual 제어 명령이 성공적으로 전송되었습니다",
-                "command" to "MultiManualControl",
-                "axes" to axesStr,
-                "angles" to "Az:${azAngle}°, El:${elAngle}°, Train:${trainAngle}°"
-            ))
+            ResponseEntity.ok(
+                mapOf(
+                    "status" to "success",
+                    "message" to "MultiManual 제어 명령이 성공적으로 전송되었습니다",
+                    "command" to "MultiManualControl",
+                    "axes" to axesStr,
+                    "angles" to "Az:${azAngle}°, El:${elAngle}°, Train:${trainAngle}°"
+                )
+            )
         } catch (e: Exception) {
             logger.error("MultiManual 제어 명령 요청 실패: {}", e.message, e)
-            ResponseEntity.internalServerError().body(mapOf(
-                "status" to "error",
-                "message" to "MultiManual 제어 명령 전송 실패: ${e.message}"
-            ))
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "MultiManual 제어 명령 전송 실패: ${e.message}"
+                )
+            )
         }
     }
 
@@ -288,18 +315,22 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
 
             logger.info("FeedOnOff 명령 요청 완료: {}", bitStr)
 
-            ResponseEntity.ok(mapOf(
-                "status" to "success",
-                "message" to "FeedOnOff 명령이 성공적으로 전송되었습니다",
-                "command" to "FeedOnOff",
-                "feeds" to bitStr
-            ))
+            ResponseEntity.ok(
+                mapOf(
+                    "status" to "success",
+                    "message" to "FeedOnOff 명령이 성공적으로 전송되었습니다",
+                    "command" to "FeedOnOff",
+                    "feeds" to bitStr
+                )
+            )
         } catch (e: Exception) {
             logger.error("FeedOnOff 명령 요청 실패: {}", e.message, e)
-            ResponseEntity.internalServerError().body(mapOf(
-                "status" to "error",
-                "message" to "FeedOnOff 명령 전송 실패: ${e.message}"
-            ))
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "FeedOnOff 명령 전송 실패: ${e.message}"
+                )
+            )
         }
     }
 
@@ -318,18 +349,22 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
 
             logger.info("PositionOffset 명령 요청 완료: Az={}°, El={}°, Ti={}°", azOffset, elOffset, tiOffset)
 
-            ResponseEntity.ok(mapOf(
-                "status" to "success",
-                "message" to "PositionOffset 명령이 성공적으로 전송되었습니다",
-                "command" to "PositionOffset",
-                "offsets" to "Az:${azOffset}°, El:${elOffset}°, Ti:${tiOffset}°"
-            ))
+            ResponseEntity.ok(
+                mapOf(
+                    "status" to "success",
+                    "message" to "PositionOffset 명령이 성공적으로 전송되었습니다",
+                    "command" to "PositionOffset",
+                    "offsets" to "Az:${azOffset}°, El:${elOffset}°, Ti:${tiOffset}°"
+                )
+            )
         } catch (e: Exception) {
             logger.error("PositionOffset 명령 요청 실패: {}", e.message, e)
-            ResponseEntity.internalServerError().body(mapOf(
-                "status" to "error",
-                "message" to "PositionOffset 명령 전송 실패: ${e.message}"
-            ))
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "PositionOffset 명령 전송 실패: ${e.message}"
+                )
+            )
         }
     }
 
@@ -359,18 +394,22 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
 
             logger.info("Stop 명령 요청 완료: {}", bitStr)
 
-            ResponseEntity.ok(mapOf(
-                "status" to "success",
-                "message" to "Stop 명령이 성공적으로 전송되었습니다",
-                "command" to "Stop",
-                "axes" to bitStr
-            ))
+            ResponseEntity.ok(
+                mapOf(
+                    "status" to "success",
+                    "message" to "Stop 명령이 성공적으로 전송되었습니다",
+                    "command" to "Stop",
+                    "axes" to bitStr
+                )
+            )
         } catch (e: Exception) {
             logger.error("Stop 명령 요청 실패: {}", e.message, e)
-            ResponseEntity.internalServerError().body(mapOf(
-                "status" to "error",
-                "message" to "Stop 명령 전송 실패: ${e.message}"
-            ))
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "Stop 명령 전송 실패: ${e.message}"
+                )
+            )
         }
     }
 
@@ -385,22 +424,27 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
             udpFwICDService.defaultInfoCommand()
             logger.info("DefaultInfo 명령 요청 완료")
 
-            ResponseEntity.ok(mapOf(
-                "status" to "success",
-                "message" to "DefaultInfo 명령이 성공적으로 전송되었습니다",
-                "command" to "DefaultInfo",
-                "utcTime" to GlobalData.Time.utcNow.toString(),
-                "timeOffset" to GlobalData.Offset.TimeOffset.toString(),
-                "offsets" to "Az:${GlobalData.Offset.azimuthPositionOffset}°, El:${GlobalData.Offset.elevationPositionOffset}°, Ti:${GlobalData.Offset.trainPositionOffset}°"
-            ))
+            ResponseEntity.ok(
+                mapOf(
+                    "status" to "success",
+                    "message" to "DefaultInfo 명령이 성공적으로 전송되었습니다",
+                    "command" to "DefaultInfo",
+                    "utcTime" to GlobalData.Time.utcNow.toString(),
+                    "timeOffset" to GlobalData.Offset.TimeOffset.toString(),
+                    "offsets" to "Az:${GlobalData.Offset.azimuthPositionOffset}°, El:${GlobalData.Offset.elevationPositionOffset}°, Ti:${GlobalData.Offset.trainPositionOffset}°"
+                )
+            )
         } catch (e: Exception) {
             logger.error("DefaultInfo 명령 요청 실패: {}", e.message, e)
-            ResponseEntity.internalServerError().body(mapOf(
-                "status" to "error",
-                "message" to "DefaultInfo 명령 전송 실패: ${e.message}"
-            ))
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "DefaultInfo 명령 전송 실패: ${e.message}"
+                )
+            )
         }
     }
+
     @PostMapping("/write-ntp-command")
     @Operation(
         operationId = "writeNtpCommand",
@@ -412,18 +456,22 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
             udpFwICDService.writeNTPCommand()
             logger.info("writeNTPCommand 명령 요청 완료")
 
-            ResponseEntity.ok(mapOf(
-                "status" to "success",
-                "message" to "writeNTPCommand 명령이 성공적으로 전송되었습니다",
-                "command" to "writeNTPCommand",
-                "timeOffset" to GlobalData.Offset.TimeOffset.toString(),
-            ))
+            ResponseEntity.ok(
+                mapOf(
+                    "status" to "success",
+                    "message" to "writeNTPCommand 명령이 성공적으로 전송되었습니다",
+                    "command" to "writeNTPCommand",
+                    "timeOffset" to GlobalData.Offset.TimeOffset.toString(),
+                )
+            )
         } catch (e: Exception) {
             logger.error("writeNTPCommand 명령 요청 실패: {}", e.message, e)
-            ResponseEntity.internalServerError().body(mapOf(
-                "status" to "error",
-                "message" to "writeNTPCommand 명령 전송 실패: ${e.message}"
-            ))
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "writeNTPCommand 명령 전송 실패: ${e.message}"
+                )
+            )
         }
     }
 
@@ -438,17 +486,59 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
 
             logger.info("Stow 명령 요청 완료")
 
-            ResponseEntity.ok(mapOf(
-                "status" to "success",
-                "message" to "Stow 명령이 성공적으로 시작되었습니다",
-                "command" to "Stow"
-            ))
+            ResponseEntity.ok(
+                mapOf(
+                    "status" to "success",
+                    "message" to "Stow 명령이 성공적으로 시작되었습니다",
+                    "command" to "Stow"
+                )
+            )
         } catch (e: Exception) {
             logger.error("Stow 명령 요청 실패: {}", e.message, e)
-            ResponseEntity.internalServerError().body(mapOf(
-                "status" to "error",
-                "message" to "Stow 명령 시작 실패: ${e.message}"
-            ))
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "Stow 명령 시작 실패: ${e.message}"
+                )
+            )
+        }
+    }
+
+    @PostMapping("/mc-on-off-command")
+    @Operation(
+        operationId = "mcOnOffCommand",
+        tags = ["ICD - Communication"]
+    )
+    fun mcOnOffCommand(
+        @Parameter(
+            description = "M/C On/Off 상태 (true: ON, false: OFF)",
+            example = "true",
+            required = true
+        )
+        @RequestParam onOff: Boolean
+    ): ResponseEntity<Map<String, String>> {
+        return try {
+            udpFwICDService.mcOnOffCommand(onOff)
+
+            val status = if (onOff) "ON" else "OFF"
+            logger.info("M/C On/Off 명령 요청 완료: {}", status)
+
+            ResponseEntity.ok(
+                mapOf(
+                    "status" to "success",
+                    "message" to "M/C On/Off 명령이 성공적으로 전송되었습니다",
+                    "command" to "MCOnOff",
+                    "state" to status
+                )
+            )
+        } catch (e: Exception) {
+            logger.error("M/C On/Off 명령 요청 실패: {}", e.message, e)
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "M/C On/Off 명령 전송 실패: ${e.message}"
+                )
+            )
         }
     }
 
@@ -464,18 +554,109 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
             val stats = udpFwICDService.getUdpPerformanceStats()
             val isHealthy = udpFwICDService.isCommunicationHealthy()
 
-            ResponseEntity.ok(mapOf(
-                "status" to "success",
-                "healthy" to isHealthy,
-                "statistics" to stats,
-                "timestamp" to System.currentTimeMillis()
-            ))
+            ResponseEntity.ok(
+                mapOf(
+                    "status" to "success",
+                    "healthy" to isHealthy,
+                    "statistics" to stats,
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
         } catch (e: Exception) {
             logger.error("통신 상태 조회 실패: {}", e.message, e)
-            ResponseEntity.internalServerError().body(mapOf(
-                "status" to "error",
-                "message" to "통신 상태 조회 실패: ${e.message}"
-            ))
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "통신 상태 조회 실패: ${e.message}"
+                )
+            )
         }
+    }
+
+    @PostMapping("/servo-alarm-reset")
+    @Operation(
+        operationId = "servoAlarmResetCommand",
+        tags = ["ICD - Communication"]
+    )
+    fun servoAlarmResetCommand(
+        @Parameter(
+            description = "Azimuth 축 알람 리셋 여부",
+            example = "false",
+            required = true
+        )
+        @RequestParam azimuth: Boolean,
+        @Parameter(
+            description = "Elevation 축 알람 리셋 여부",
+            example = "false",
+            required = true
+        )
+        @RequestParam elevation: Boolean,
+        @Parameter(
+            description = "Train 축 알람 리셋 여부",
+            example = "false",
+            required = true
+        )
+        @RequestParam train: Boolean
+    ): ResponseEntity<Map<String, String>> {
+        return try {
+            val bitAxis = BitSet()
+            if (azimuth) bitAxis.set(0)
+            if (elevation) bitAxis.set(1)
+            if (train) bitAxis.set(2)
+
+            udpFwICDService.servoAlarmResetCommand(bitAxis)
+
+            val axisList = mutableListOf<String>()
+            if (azimuth) axisList.add("Azimuth")
+            if (elevation) axisList.add("Elevation")
+            if (train) axisList.add("Train")
+
+            ResponseEntity.ok(
+                mapOf(
+                    "success" to "true",
+                    "message" to "Servo Alarm Reset 명령 전송 완료: ${axisList.joinToString(", ")}"
+                )
+            )
+        } catch (e: Exception) {
+            logger.error("Servo Alarm Reset 명령 실패", e)
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                mapOf(
+                    "success" to "false",
+                    "message" to "Servo Alarm Reset 명령 실패: ${e.message}"
+                )
+            )
+        }
+    }
+
+    @GetMapping("/firmware-version-serial-no")
+    @Operation(
+        operationId = "getFirmwareVersionSerialNo",
+        tags = ["ICD - Communication"]
+    )
+    fun getFirmwareVersionSerialNo(): Mono<ResponseEntity<Map<String, Any>>> {
+        return udpFwICDService.readFwVerSerialNoStatusCommand()
+            .map { result ->
+                // SystemInfo에서 실제 데이터 조회
+                val firmwareData = SystemInfo.FIRMWARE_VERSION_SERIAL_NO
+                
+                ResponseEntity.ok(mapOf(
+                    "success" to true,
+                    "message" to "Firmware Version/Serial Number 조회 성공",
+                    "data" to mapOf(
+                        "scanAvailable" to true,
+                        "firmwareData" to firmwareData,
+                        "commandResult" to result
+                    )
+                ))
+            }
+            .onErrorResume { e ->
+                logger.error("Firmware Version/Serial Number 조회 실패", e)
+                Mono.just(
+                    ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(mapOf(
+                        "success" to false,
+                        "message" to "Firmware Version/Serial Number 조회 실패: ${e.message}"
+                    ))
+                )
+            }
     }
 }

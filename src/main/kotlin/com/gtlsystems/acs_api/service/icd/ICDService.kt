@@ -4,6 +4,7 @@ import com.gtlsystems.acs_api.event.ACSEvent
 import com.gtlsystems.acs_api.event.ACSEventBus
 import com.gtlsystems.acs_api.model.GlobalData
 import com.gtlsystems.acs_api.model.PushData
+import com.gtlsystems.acs_api.model.SystemInfo
 import com.gtlsystems.acs_api.service.datastore.DataStoreService
 import com.gtlsystems.acs_api.util.Crc16
 import com.gtlsystems.acs_api.util.JKUtil
@@ -28,8 +29,8 @@ class ICDService {
         private fun monitorPacketTiming(data: ByteArray) {
             val now = System.nanoTime()
             val interval = (now - lastPacketTime) / 1_000_000.0 // ms로 변환
-            if (interval > 60.0) { // 예상보다 지연된 경우
-                // logger.warn("패킷 지연 감지: ${interval}ms")
+            if (interval > 80.0) { // 예상보다 지연된 경우
+                 logger.warn("패킷 지연 감지: ${interval}ms")
             }
             lastPacketTime = now
         }
@@ -128,7 +129,81 @@ class ICDService {
                     }
                     //2.4 Read Firmware Version/Serial Number Info
                     else if (receiveData[2] == 'F'.code.toByte()) {
-
+                        val parsedData = ReadFwVerSerialNoStatus.GetDataFrame.fromByteArray(receiveData)
+                        parsedData?.let {
+                            // SystemInfo에 저장
+                            val newData = SystemInfo.FirmwareVersionSerialNoData(
+                                // Main Board F/W Version
+                                mainFwVerBitAll = it.mainFwVerBitAll,
+                                mainFwVerReserved = it.mainFwVerReserved,
+                                mainFwVerOne = it.mainFwVerOne,
+                                mainFwVerTwo = it.mainFwVerTwo,
+                                mainFwVerThree = it.mainFwVerThree,
+                                
+                                // Azimuth Board F/W Version
+                                azimuthFwVerBitAll = it.azimuthFwVerBitAll,
+                                azimuthFwVerReserved = it.azimuthFwVerReserved,
+                                azimuthFwVerOne = it.azimuthFwVerOne,
+                                azimuthFwVerTwo = it.azimuthFwVerTwo,
+                                azimuthFwVerThree = it.azimuthFwVerThree,
+                                
+                                // Elevation Board F/W Version
+                                elevationFwVerBitAll = it.elevationFwVerBitAll,
+                                elevationFwVerReserved = it.elevationFwVerReserved,
+                                elevationFwVerOne = it.elevationFwVerOne,
+                                elevationFwVerTwo = it.elevationFwVerTwo,
+                                elevationFwVerThree = it.elevationFwVerThree,
+                                
+                                // Tilt Board F/W Version
+                                trainFwVerBitAll = it.trainFwVerBitAll,
+                                trainFwVerReserved = it.trainFwVerReserved,
+                                trainFwVerOne = it.trainFwVerOne,
+                                trainFwVerTwo = it.trainFwVerTwo,
+                                trainFwVerThree = it.trainFwVerThree,
+                                
+                                // Feed Board F/W Version
+                                feedFwVerBitAll = it.feedFwVerBitAll,
+                                feedFwVerReserved = it.feedFwVerReserved,
+                                feedFwVerOne = it.feedFwVerOne,
+                                feedFwVerTwo = it.feedFwVerTwo,
+                                feedFwVerThree = it.feedFwVerThree,
+                                
+                                // Main Board Serial Number
+                                mainSerialBitAll = it.mainSerialBitAll,
+                                mainSerialYear = it.mainSerialYear,
+                                mainSerialMonth = it.mainSerialMonth,
+                                mainSerialNumber = it.mainSerialNumber,
+                                
+                                // Azimuth Board Serial Number
+                                azimuthSerialBitAll = it.azimuthSerialBitAll,
+                                azimuthSerialYear = it.azimuthSerialYear,
+                                azimuthSerialMonth = it.azimuthSerialMonth,
+                                azimuthSerialNumber = it.azimuthSerialNumber,
+                                
+                                // Elevation Board Serial Number
+                                elevationSerialBitAll = it.elevationSerialBitAll,
+                                elevationSerialYear = it.elevationSerialYear,
+                                elevationSerialMonth = it.elevationSerialMonth,
+                                elevationSerialNumber = it.elevationSerialNumber,
+                                
+                                // Tilt Board Serial Number
+                                trainSerialBitAll = it.trainSerialBitAll,
+                                trainSerialYear = it.trainSerialYear,
+                                trainSerialMonth = it.trainSerialMonth,
+                                trainSerialNumber = it.trainSerialNumber,
+                                
+                                // Feed Board Serial Number
+                                feedSerialBitAll = it.feedSerialBitAll,
+                                feedSerialYear = it.feedSerialYear,
+                                feedSerialMonth = it.feedSerialMonth,
+                                feedSerialNumber = it.feedSerialNumber,
+                            )
+                            
+                            // SystemInfo 업데이트
+                            SystemInfo.FIRMWARE_VERSION_SERIAL_NO = newData
+                            
+                            logger.info("Read Firmware Version/Serial Number Info 파싱 완료")
+                        }
                     }
                 }
                 //2.1 Default Info (TBD)
@@ -2173,6 +2248,424 @@ class ICDService {
                         return null
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * 2.17 M/C On/Off
+     * 서보 모터의 구동 전원 제어용 M/C를 On/Off하기 위한 프로토콜이다.
+     * 주요 정보: M/C On/Off 제어 정보
+     * 주요 사용처: 서보 모터 전원 제어
+     */
+    class MCOnOff {
+        data class SetDataFrame(
+            var stx: Byte = ICD_STX,
+            var cmdOne: Char,
+            var cmdOnOff: Boolean,
+            var crc16: UShort = 0u,
+            var etx: Byte = ICD_ETX
+        ) {
+            fun setDataFrame(): ByteArray {
+                val dataFrame = ByteArray(6)
+                val byteCrc16Target = ByteArray(dataFrame.size - 4)
+
+                dataFrame[0] = ICD_STX
+                dataFrame[1] = cmdOne.code.toByte()
+                dataFrame[2] = if (cmdOnOff) 1 else 0
+
+                // CRC 대상 복사
+                dataFrame.copyInto(byteCrc16Target, 0, 1, 1 + byteCrc16Target.size)
+
+                // CRC16 계산 및 엔디안 변환
+                val crc16s = Crc16.computeCrc(byteCrc16Target)
+                val crc16Buffer = JKUtil.JKConvert.Companion.shortToByteArray(crc16s, false)
+
+                // CRC16 값 설정
+                dataFrame[3] = crc16Buffer[0]
+                dataFrame[4] = crc16Buffer[1]
+                dataFrame[5] = ICD_ETX
+
+                return dataFrame
+            }
+        }
+
+        data class GetDataFrame(
+            var stx: Byte = ICD_STX,
+            var cmdOne: Byte = 0x00,
+            var cmdOnOff: Byte = 0x00,
+            var checkSum: UShort = 0u,
+            var etx: Byte = ICD_ETX
+        ) {
+            companion object {
+                const val FRAME_LENGTH = 6
+
+                fun fromByteArray(data: ByteArray): GetDataFrame? {
+                    if (data.size < FRAME_LENGTH) {
+                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        return null
+                    }
+
+                    // CRC 체크섬 추출 (리틀 엔디안)
+                    val rxChecksum = ByteBuffer.wrap(byteArrayOf(data[FRAME_LENGTH - 3], data[FRAME_LENGTH - 2]))
+                        .short.toUShort()
+                    val crc16Target = data.copyOfRange(1, FRAME_LENGTH - 3)
+                    val crc16Check = Crc16.computeCrc(crc16Target).toUShort()
+
+                    // CRC 검증 및 ETX 확인
+                    if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
+                        return GetDataFrame(
+                            stx = data[0],
+                            cmdOne = data[1],
+                            cmdOnOff = data[2],
+                            checkSum = rxChecksum,
+                            etx = data.last()
+                        )
+                    } else {
+                        println("CRC 체크 실패 또는 ETX 불일치")
+                        return null
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 2.16 Servo Alarm Reset
+     * 서보 드라이버의 Alarm 초기화 명령을 송신하기 위한 프로토콜이다.
+     * 주요 정보: 서보 알람 리셋 제어 정보
+     * 주요 사용처: 서보 드라이버 알람 초기화
+     */
+    class ServoAlarmReset {
+        data class SetDataFrame(
+            var stx: Byte = ICD_STX,
+            var cmdOne: Char,
+            var cmdTwo: Char,
+            var axis: BitSet,
+            var crc16: UShort = 0u,
+            var etx: Byte = ICD_ETX
+        ) {
+            fun setDataFrame(): ByteArray {
+                val dataFrame = ByteArray(7)
+                val byteCrc16Target = ByteArray(dataFrame.size - 4)
+
+                // BitSet을 바이트 배열로 변환
+                val byteAxis = if (axis.isEmpty) {
+                    0x00.toByte()
+                } else {
+                    axis.toByteArray().getOrElse(0) { 0x00.toByte() }
+                }
+
+                dataFrame[0] = ICD_STX
+                dataFrame[1] = cmdOne.code.toByte()
+                dataFrame[2] = cmdTwo.code.toByte()
+                dataFrame[3] = byteAxis
+
+                // CRC 대상 복사
+                dataFrame.copyInto(byteCrc16Target, 0, 1, 1 + byteCrc16Target.size)
+
+                // CRC16 계산 및 엔디안 변환
+                val crc16s = Crc16.computeCrc(byteCrc16Target)
+                val crc16Buffer = JKUtil.JKConvert.Companion.shortToByteArray(crc16s, false)
+
+                // CRC16 값 설정
+                dataFrame[4] = crc16Buffer[0]
+                dataFrame[5] = crc16Buffer[1]
+                dataFrame[6] = ICD_ETX
+
+                return dataFrame
+            }
+        }
+
+        data class GetDataFrame(
+            var stx: Byte = ICD_STX,
+            var cmdOne: Byte = 0x00,
+            var cmdTwo: Byte = 0x00,
+            var axis: Byte = 0x00,
+            var ack: Byte = 0x00,
+            var checkSum: UShort = 0u,
+            var etx: Byte = ICD_ETX
+        ) {
+            companion object {
+                const val FRAME_LENGTH = 8
+
+                fun fromByteArray(data: ByteArray): GetDataFrame? {
+                    if (data.size < FRAME_LENGTH) {
+                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        return null
+                    }
+
+                    // CRC 체크섬 추출 (리틀 엔디안)
+                    val rxChecksum = ByteBuffer.wrap(byteArrayOf(data[FRAME_LENGTH - 3], data[FRAME_LENGTH - 2]))
+                        .short.toUShort()
+                    val crc16Target = data.copyOfRange(1, FRAME_LENGTH - 3)
+                    val crc16Check = Crc16.computeCrc(crc16Target).toUShort()
+
+                    // CRC 검증 및 ETX 확인
+                    if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
+                        return GetDataFrame(
+                            stx = data[0],
+                            cmdOne = data[1],
+                            cmdTwo = data[2],
+                            axis = data[3],
+                            ack = data[4],
+                            checkSum = rxChecksum,
+                            etx = data.last()
+                        )
+                    } else {
+                        println("CRC 체크 실패 또는 ETX 불일치")
+                        return null
+                    }
+                }
+            }
+        }
+    }
+    /**
+     * 2.4 Read Firmware Version/Serial Number Info
+     * 각 축의 Board F/W Version, Serial Number 정보를 수신 받기 위한 프로토콜이다.
+     * 주요 정보: Board F/W Version, Serial Number
+     * 주요 사용처: 설정모드
+     */
+    class ReadFwVerSerialNoStatus {
+        data class SetDataFrame(
+            var stx: Byte = ICD_STX,
+            var cmdOne: Char,
+            var cmdTwo: Char,
+            var crc16: UShort = 0u,
+            var etx: Byte = ICD_ETX
+        ) {
+            fun setDataFrame(): ByteArray {
+                val dataFrame = ByteArray(6)
+                val byteCrc16Target = ByteArray(dataFrame.size - 4)
+
+                dataFrame[0] = stx
+                dataFrame[1] = cmdOne.code.toByte()
+                dataFrame[2] = cmdTwo.code.toByte()
+
+                System.arraycopy(dataFrame, 1, byteCrc16Target, 0, byteCrc16Target.size)
+                val crc16s = Crc16.computeCrc(byteCrc16Target)
+                val crc16Buffer = JKUtil.JKConvert.Companion.shortToByteArray(crc16s, false)
+                
+                dataFrame[3] = crc16Buffer[0]
+                dataFrame[4] = crc16Buffer[1]
+                dataFrame[5] = etx
+
+                return dataFrame
+            }
+        }
+
+        data class GetDataFrame(
+            var stx: Byte = 0,
+            var commandOne: Byte = 0,
+            var commandTwo: Byte = 0,
+            
+            // Main FW Version
+            var mainFwVerBitAll: UInt = 0u,
+            var mainFwVerReserved: Byte = 0,
+            var mainFwVerOne: Byte = 0,
+            var mainFwVerTwo: Byte = 0,
+            var mainFwVerThree: Byte = 0,
+            
+            // Azimuth FW Version
+            var azimuthFwVerBitAll: UInt = 0u,
+            var azimuthFwVerReserved: Byte = 0,
+            var azimuthFwVerOne: Byte = 0,
+            var azimuthFwVerTwo: Byte = 0,
+            var azimuthFwVerThree: Byte = 0,
+            
+            // Elevation FW Version
+            var elevationFwVerBitAll: UInt = 0u,
+            var elevationFwVerReserved: Byte = 0,
+            var elevationFwVerOne: Byte = 0,
+            var elevationFwVerTwo: Byte = 0,
+            var elevationFwVerThree: Byte = 0,
+            
+            // Tilt FW Version
+            var trainFwVerBitAll: UInt = 0u,
+            var trainFwVerReserved: Byte = 0,
+            var trainFwVerOne: Byte = 0,
+            var trainFwVerTwo: Byte = 0,
+            var trainFwVerThree: Byte = 0,
+            
+            // Feed FW Version
+            var feedFwVerBitAll: UInt = 0u,
+            var feedFwVerReserved: Byte = 0,
+            var feedFwVerOne: Byte = 0,
+            var feedFwVerTwo: Byte = 0,
+            var feedFwVerThree: Byte = 0,
+            
+            // Main Serial Number
+            var mainSerialBitAll: UInt = 0u,
+            var mainSerialYear: Byte = 0,
+            var mainSerialMonth: Byte = 0,
+            var mainSerialNumber: UShort = 0u,
+            
+            // Azimuth Serial Number
+            var azimuthSerialBitAll: UInt = 0u,
+            var azimuthSerialYear: Byte = 0,
+            var azimuthSerialMonth: Byte = 0,
+            var azimuthSerialNumber: UShort = 0u,
+            
+            // Elevation Serial Number
+            var elevationSerialBitAll: UInt = 0u,
+            var elevationSerialYear: Byte = 0,
+            var elevationSerialMonth: Byte = 0,
+            var elevationSerialNumber: UShort = 0u,
+            
+            // Tilt Serial Number
+            var trainSerialBitAll: UInt = 0u,
+            var trainSerialYear: Byte = 0,
+            var trainSerialMonth: Byte = 0,
+            var trainSerialNumber: UShort = 0u,
+            
+            // Feed Serial Number
+            var feedSerialBitAll: UInt = 0u,
+            var feedSerialYear: Byte = 0,
+            var feedSerialMonth: Byte = 0,
+            var feedSerialNumber: UShort = 0u,
+            
+            var checkSum: UShort = 0u,
+            var etx: Byte = 0
+        ) {
+            companion object {
+                const val FRAME_LENGTH = 46
+
+                fun fromByteArray(data: ByteArray): GetDataFrame? {
+    if (data.size < FRAME_LENGTH) {
+        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+        return null
+    }
+
+    // CRC 체크섬 추출 (리틀 엔디안)
+    val rxChecksum = ByteBuffer.wrap(byteArrayOf(data[FRAME_LENGTH - 3], data[FRAME_LENGTH - 2]))
+        .short.toUShort()
+    val crc16Target = data.copyOfRange(1, FRAME_LENGTH - 3)
+    val crc16Check = Crc16.computeCrc(crc16Target).toUShort()
+
+    // CRC 검증 및 ETX 확인
+    if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
+        // ✅ 올바른 펌웨어 버전 파싱
+        val mainFwVer = (data[3].toUByte().toUInt() shl 24) or 
+                       (data[4].toUByte().toUInt() shl 16) or 
+                       (data[5].toUByte().toUInt() shl 8) or 
+                       data[6].toUByte().toUInt()
+        
+        val azimuthFwVer = (data[7].toUByte().toUInt() shl 24) or 
+                          (data[8].toUByte().toUInt() shl 16) or 
+                          (data[9].toUByte().toUInt() shl 8) or 
+                          data[10].toUByte().toUInt()
+        
+        val elevationFwVer = (data[11].toUByte().toUInt() shl 24) or 
+                            (data[12].toUByte().toUInt() shl 16) or 
+                            (data[13].toUByte().toUInt() shl 8) or 
+                            data[14].toUByte().toUInt()
+        
+        val trainFwVer = (data[15].toUByte().toUInt() shl 24) or 
+                       (data[16].toUByte().toUInt() shl 16) or 
+                       (data[17].toUByte().toUInt() shl 8) or 
+                       data[18].toUByte().toUInt()
+        
+        val feedFwVer = (data[19].toUByte().toUInt() shl 24) or 
+                       (data[20].toUByte().toUInt() shl 16) or 
+                       (data[21].toUByte().toUInt() shl 8) or 
+                       data[22].toUByte().toUInt()
+        
+        // ✅ 올바른 시리얼 넘버 파싱
+        val mainSerialNo = (data[23].toUByte().toUInt() shl 24) or
+                          (data[24].toUByte().toUInt() shl 16) or
+                          (data[25].toUByte().toUInt() shl 8) or
+                          data[26].toUByte().toUInt()
+        
+        val azimuthSerialNo = (data[27].toUByte().toUInt() shl 24) or 
+                             (data[28].toUByte().toUInt() shl 16) or 
+                             (data[29].toUByte().toUInt() shl 8) or 
+                             data[30].toUByte().toUInt()
+        
+        val elevationSerialNo = (data[31].toUByte().toUInt() shl 24) or 
+                               (data[32].toUByte().toUInt() shl 16) or 
+                               (data[33].toUByte().toUInt() shl 8) or 
+                               data[34].toUByte().toUInt()
+        
+        val trainSerialNo = (data[35].toUByte().toUInt() shl 24) or 
+                          (data[36].toUByte().toUInt() shl 16) or 
+                          (data[37].toUByte().toUInt() shl 8) or 
+                          data[38].toUByte().toUInt()
+        
+        val feedSerialNo = (data[39].toUByte().toUInt() shl 24) or 
+                          (data[40].toUByte().toUInt() shl 16) or 
+                          (data[41].toUByte().toUInt() shl 8) or 
+                          data[42].toUByte().toUInt()
+        
+        return GetDataFrame(
+            stx = data[0],
+            commandOne = data[1],
+            commandTwo = data[2],
+            
+            // ✅ 올바른 펌웨어 버전 설정
+            mainFwVerBitAll = mainFwVer,
+            mainFwVerReserved = data[3],
+            mainFwVerOne = data[4],
+            mainFwVerTwo = data[5],
+            mainFwVerThree = data[6],
+            
+            azimuthFwVerBitAll = azimuthFwVer,
+            azimuthFwVerReserved = data[7],
+            azimuthFwVerOne = data[8],
+            azimuthFwVerTwo = data[9],
+            azimuthFwVerThree = data[10],
+            
+            elevationFwVerBitAll = elevationFwVer,
+            elevationFwVerReserved = data[11],
+            elevationFwVerOne = data[12],
+            elevationFwVerTwo = data[13],
+            elevationFwVerThree = data[14],
+            
+            trainFwVerBitAll = trainFwVer,
+            trainFwVerReserved = data[15],
+            trainFwVerOne = data[16],
+            trainFwVerTwo = data[17],
+            trainFwVerThree = data[18],
+            
+            feedFwVerBitAll = feedFwVer,
+            feedFwVerReserved = data[19],
+            feedFwVerOne = data[20],
+            feedFwVerTwo = data[21],
+            feedFwVerThree = data[22],
+            
+            // ✅ 올바른 시리얼 넘버 설정
+            mainSerialBitAll = mainSerialNo,
+            mainSerialYear = data[23],
+            mainSerialMonth = data[24],
+            mainSerialNumber = JKUtil.JKConvert.byteArrayToUShort(byteArrayOf(data[25], data[26])),
+            
+            azimuthSerialBitAll = azimuthSerialNo,
+            azimuthSerialYear = data[27],
+            azimuthSerialMonth = data[28],
+            azimuthSerialNumber = JKUtil.JKConvert.byteArrayToUShort(byteArrayOf(data[29], data[30])),
+            
+            elevationSerialBitAll = elevationSerialNo,
+            elevationSerialYear = data[31],
+            elevationSerialMonth = data[32],
+            elevationSerialNumber = JKUtil.JKConvert.byteArrayToUShort(byteArrayOf(data[33], data[34])),
+            
+            trainSerialBitAll = trainSerialNo,
+            trainSerialYear = data[35],
+            trainSerialMonth = data[36],
+            trainSerialNumber = JKUtil.JKConvert.byteArrayToUShort(byteArrayOf(data[37], data[38])),
+            
+            feedSerialBitAll = feedSerialNo,
+            feedSerialYear = data[39],
+            feedSerialMonth = data[40],
+            feedSerialNumber = JKUtil.JKConvert.byteArrayToUShort(byteArrayOf(data[41], data[42])),
+            
+            checkSum = rxChecksum,
+            etx = data.last()
+        )
+    } else {
+        println("CRC 체크 실패 또는 ETX 불일치")
+        return null
+    }
+}
             }
         }
     }
