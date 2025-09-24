@@ -20,14 +20,6 @@
                 <q-item-section>일반 설정</q-item-section>
               </q-item>
 
-              <q-item clickable v-ripple :active="activeTab === 'servo-preset'" @click="activeTab = 'servo-preset'"
-                active-class="active-tab">
-                <q-item-section avatar>
-                  <q-icon name="tune" />
-                </q-item-section>
-                <q-item-section>Servo Preset</q-item-section>
-              </q-item>
-
               <q-item clickable v-ripple :active="activeTab === 'connection'" @click="activeTab = 'connection'"
                 active-class="active-tab">
                 <q-item-section avatar>
@@ -36,13 +28,22 @@
                 <q-item-section>연결 설정</q-item-section>
               </q-item>
 
-              <!-- 시스템 설정 탭 추가 -->
+              <!-- 시스템 설정 탭 -->
               <q-item clickable v-ripple :active="activeTab === 'system'" @click="activeTab = 'system'"
                 active-class="active-tab">
                 <q-item-section avatar>
                   <q-icon name="engineering" />
                 </q-item-section>
                 <q-item-section>시스템 설정</q-item-section>
+              </q-item>
+
+              <!-- ✅ 관리자 설정 탭 추가 -->
+              <q-item clickable v-ripple :active="activeTab === 'admin'" @click="activeTab = 'admin'"
+                active-class="active-tab">
+                <q-item-section avatar>
+                  <q-icon name="admin_panel_settings" />
+                </q-item-section>
+                <q-item-section>관리자 설정</q-item-section>
               </q-item>
             </q-list>
           </div>
@@ -52,9 +53,6 @@
             <!-- 일반 설정 탭 -->
             <GeneralSettings v-if="activeTab === 'general'" :dark-mode="localDarkMode"
               @update:dark-mode="localDarkMode = $event" />
-
-            <!-- Server Preset 탭 -->
-            <ServoEncoderPresetSettings v-if="activeTab === 'servo-preset'" />
 
             <!-- 연결 설정 탭 -->
             <div v-if="activeTab === 'connection'">
@@ -67,8 +65,11 @@
               <q-toggle v-model="autoReconnect" label="연결 끊김 시 자동 재연결" />
             </div>
 
-            <!-- 시스템 설정 탭 추가 -->
+            <!-- 시스템 설정 탭 -->
             <SystemSettings v-if="activeTab === 'system'" />
+
+            <!-- ✅ 관리자 설정 탭 -->
+            <AdminSettings v-if="activeTab === 'admin'" />
           </div>
         </div>
       </q-card-section>
@@ -84,15 +85,15 @@
 
 <script setup lang="ts">
 import { ref, watch, defineProps, defineEmits, computed } from 'vue'
-import { useQuasar } from 'quasar'
 import { useSettingsStore } from '@/stores'
+import { useNotification } from '@/composables/useNotification'
 
 import GeneralSettings from './GeneralSettings.vue'
-import ServoEncoderPresetSettings from './ServoEncoderPresetSettings.vue'
 import SystemSettings from './system/SystemSettings.vue'
+import AdminSettings from './admin/AdminSettings.vue'
 
-const $q = useQuasar()
 const settingsStore = useSettingsStore()
+const { success, error: showError } = useNotification()
 
 // Props 정의
 const props = defineProps({
@@ -115,7 +116,7 @@ const emit = defineEmits(['update:modelValue', 'save'])
 
 // 로컬 상태 관리
 const isOpen = ref(props.modelValue)
-const localDarkMode = ref($q.dark.isActive)
+const localDarkMode = ref(false)
 const localServerAddress = ref(props.serverAddress)
 const activeTab = ref('general')
 const apiBaseUrl = ref('http://localhost:8080/api')
@@ -174,7 +175,6 @@ const onSaveAll = async () => {
     }
 
     // 기존 설정도 함께 저장
-    $q.dark.set(localDarkMode.value)
     localStorage.setItem('isDarkMode', String(localDarkMode.value))
 
     // 부모 컴포넌트에 저장 이벤트 발생
@@ -185,23 +185,15 @@ const onSaveAll = async () => {
       autoReconnect: autoReconnect.value,
     })
 
-    $q.notify({
-      color: 'positive',
-      message: '모든 설정이 저장되었습니다',
-      icon: 'check_circle',
-      position: 'top',
-    })
+    // ✅ useNotification 사용
+    success('모든 설정이 저장되었습니다')
 
     // 모달 닫기
     isOpen.value = false
   } catch (error) {
     console.error('일괄 저장 실패:', error)
-    $q.notify({
-      color: 'negative',
-      message: '설정 저장에 실패했습니다',
-      icon: 'error',
-      position: 'top'
-    })
+    // ✅ useNotification 사용
+    showError('설정 저장에 실패했습니다')
   }
 }
 

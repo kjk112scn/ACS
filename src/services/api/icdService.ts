@@ -700,4 +700,78 @@ export const icdService = {
       return null
     }
   },
+
+  async sendMCOnOffCommand(onOff: boolean = true) {
+    try {
+      const response = await api.post('/icd/mc-on-off-command', null, {
+        params: {
+          onOff: onOff.toString(),
+        },
+      })
+
+      console.log('M/C On/Off 명령 성공:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('M/C On/Off 명령 오류:', error)
+      throw error
+    }
+  },
+
+  async sendServoAlarmResetCommand(
+    azimuth: boolean = false,
+    elevation: boolean = false,
+    train: boolean = false,
+  ) {
+    try {
+      const response = await api.post('/icd/servo-alarm-reset', null, {
+        params: {
+          azimuth: azimuth.toString(),
+          elevation: elevation.toString(),
+          train: train.toString(),
+        },
+      })
+
+      console.log('Servo Alarm Reset 명령 성공:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('Servo Alarm Reset 명령 오류:', error)
+      throw error
+    }
+  },
+
+  /**
+   * 2.3 Read Positioner Status
+   * 3-Axis의 각도 정보를 수신 받기 위한 프로토콜이다.
+   * 주요 정보: 3-Axis 각도 정보(Azimuth / Elevation / Tilt)
+   * 주요 사용처: 상시
+   */
+  async sendReadPositionerStatusCommand() {
+    try {
+      const response = await api.post('/icd/read-positioner-status')
+
+      console.log('Read Positioner Status 명령 성공:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('Read Positioner Status 명령 오류:', error)
+      throw error
+    }
+  },
+
+  /**
+   * 2.4 Read Firmware Version/Serial Number Info
+   * 각 축의 Board F/W Version, Serial Number 정보를 수신 받기 위한 프로토콜이다.
+   * 주요 정보: Board F/W Version, Serial Number
+   * 주요 사용처: 설정모드
+   */
+  async sendReadFwVerSerialNoStatusCommand() {
+    try {
+      const response = await api.get('/icd/firmware-version-serial-no')
+
+      console.log('Read Firmware Version/Serial Number Info 성공:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('Read Firmware Version/Serial Number Info 오류:', error)
+      throw error
+    }
+  },
 }

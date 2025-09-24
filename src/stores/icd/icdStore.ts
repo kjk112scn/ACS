@@ -1961,6 +1961,42 @@ export const useICDStore = defineStore('icd', () => {
       }
     }
   }
+  const sendMCOnOffCommand = async (onOff: boolean = true) => {
+    try {
+      const result = await icdService.sendMCOnOffCommand(onOff)
+
+      // 성공 시 UI 업데이트
+      const status = onOff ? 'ON' : 'OFF'
+      console.log(`M/C 전원 ${status} 명령 완료`)
+
+      return result
+    } catch (error) {
+      console.error('M/C On/Off 명령 오류:', error)
+      throw error
+    }
+  }
+  const sendServoAlarmResetCommand = async (
+    azimuth: boolean = false,
+    elevation: boolean = false,
+    train: boolean = false,
+  ) => {
+    try {
+      const result = await icdService.sendServoAlarmResetCommand(azimuth, elevation, train)
+
+      // 성공 시 UI 업데이트
+      const axes = []
+      if (azimuth) axes.push('AZIMUTH')
+      if (elevation) axes.push('ELEVATION')
+      if (train) axes.push('TRAIN')
+
+      console.log(`Servo Alarm Reset 명령 완료: ${axes.join(', ')}`)
+
+      return result
+    } catch (error) {
+      console.error('Servo Alarm Reset 명령 오류:', error)
+      throw error
+    }
+  }
 
   // 정지 명령 전송
   const stopCommand = async (azimuth: boolean, elevation: boolean, train: boolean) => {
@@ -1983,7 +2019,18 @@ export const useICDStore = defineStore('icd', () => {
       return { success: false, error: String(error), message: 'Stow 명령 전송에 실패했습니다.' }
     }
   }
+  const sendReadFwVerSerialNoStatusCommand = async () => {
+    try {
+      const result = await icdService.sendReadFwVerSerialNoStatusCommand()
 
+      console.log('Firmware Version/Serial Number 조회 완료')
+
+      return result
+    } catch (error) {
+      console.error('Firmware Version/Serial Number 조회 오류:', error)
+      throw error
+    }
+  }
   // Feed On/Off 명령 전송
   const sendFeedOnOffCommand = async (
     sLHCP: boolean,
@@ -2028,7 +2075,7 @@ export const useICDStore = defineStore('icd', () => {
       return { success: false, error: String(error), message: 'Sun Track 시작에 실패했습니다.' }
     }
   }
-  // Sun Track 중지지
+  // Sun Track 중지
   /* const stopSunTrack = async () => {
     try {
       const response = await icdService.stopSunTrack()
@@ -2255,5 +2302,8 @@ export const useICDStore = defineStore('icd', () => {
     sendTimeOffsetCommand,
     resetMessageDelayStats,
     resetUpdateIntervalStats,
+    sendMCOnOffCommand,
+    sendServoAlarmResetCommand,
+    sendReadFwVerSerialNoStatusCommand,
   }
 })
