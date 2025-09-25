@@ -1,16 +1,16 @@
 <template>
   <div>
-    <h5 class="q-mt-none q-mb-md">M/C On/Off</h5>
+    <h5 class="q-mt-none q-mb-md">{{ $t('settings.admin.mcOnOff') }}</h5>
 
     <q-card class="command-card">
       <q-card-section>
-        <div class="text-h6">M/C 상태 제어</div>
-        <div class="text-caption text-grey-6 q-mb-md">M/C On/Off 명령 실행</div>
+        <div class="text-h6">{{ $t('settings.admin.mcOnOffDetails.title') }}</div>
+        <div class="text-caption text-grey-6 q-mb-md">{{ $t('settings.admin.mcOnOffDetails.description') }}</div>
 
         <div class="q-mt-md">
           <q-btn-toggle v-model="mcState" :options="[
-            { label: 'OFF', value: false },
-            { label: 'ON', value: true }
+            { label: $t('settings.admin.states.off'), value: false },
+            { label: $t('settings.admin.states.on'), value: true }
           ]" color="primary" class="full-width" :loading="isLoading" @click="showConfirmation" />
         </div>
       </q-card-section>
@@ -20,16 +20,20 @@
     <q-dialog v-model="confirmationDialog" persistent>
       <q-card style="min-width: 350px">
         <q-card-section class="row items-center">
-          <div class="text-h6">M/C On/Off 확인</div>
+          <div class="text-h6">{{ $t('settings.admin.mcOnOffDetails.confirmTitle') }}</div>
         </q-card-section>
 
         <q-card-section>
-          <p>M/C {{ mcState ? 'ON' : 'OFF' }} 명령을 실행하시겠습니까?</p>
+          <p>{{ $t('settings.admin.mcOnOffDetails.confirmMessage', {
+            state: $t(`settings.admin.states.${mcState ? 'on' : 'off'}`)
+          }) }}</p>
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn flat label="아니오" color="negative" v-close-popup @click="cancelConfirmation" :disable="isLoading" />
-          <q-btn flat label="예" color="positive" @click="confirmExecution" :loading="isLoading" :disable="isLoading" />
+          <q-btn flat :label="$t('buttons.no')" color="negative" v-close-popup @click="cancelConfirmation"
+            :disable="isLoading" />
+          <q-btn flat :label="$t('buttons.yes')" color="positive" @click="confirmExecution" :loading="isLoading"
+            :disable="isLoading" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -38,9 +42,11 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useICDStore } from '@/stores/icd/icdStore'
 import { useNotification } from '@/composables/useNotification'
 
+const { t } = useI18n()
 const icdStore = useICDStore()
 const { success, error: showError } = useNotification()
 
@@ -48,7 +54,7 @@ const { success, error: showError } = useNotification()
 const isLoading = ref(false)
 const mcState = ref(false)
 
-// 확인 모달 관련 상태
+// 확인 모달 상태
 const confirmationDialog = ref(false)
 
 // 확인 모달 표시
@@ -56,33 +62,23 @@ const showConfirmation = () => {
   confirmationDialog.value = true
 }
 
-// 확인 취소
+// 확인 모달 취소
 const cancelConfirmation = () => {
   confirmationDialog.value = false
 }
 
-// 확인 및 명령 실행
+// 실행 확인
 const confirmExecution = async () => {
+  isLoading.value = true
+
   try {
-    isLoading.value = true
+    await icdStore.sendMCOnOffCommand(mcState.value)
 
-    // M/C On/Off 명령 실행
-    const result = await icdStore.sendMCOnOffCommand(mcState.value)
-
-    console.log('🔍 M/C 명령 결과:', result) // 디버깅용
-
-    // ✅ status 필드로 확인
-    if (result && result.status === 'success') {
-      success(`M/C ${mcState.value ? 'ON' : 'OFF'} 명령이 성공적으로 실행되었습니다.`)
-
-      // 모달 닫기
-      confirmationDialog.value = false
-    } else {
-      showError(result?.message || '명령 실행 중 오류가 발생했습니다.')
-    }
+    success(t('settings.admin.success'))
+    confirmationDialog.value = false
   } catch (error) {
-    console.error('M/C On/Off error:', error)
-    showError('명령 처리 중 오류가 발생했습니다.')
+    console.error('M/C On/Off 실행 실패:', error)
+    showError(t('settings.admin.error'))
   } finally {
     isLoading.value = false
   }
@@ -91,6 +87,15 @@ const confirmExecution = async () => {
 
 <style scoped>
 .command-card {
-  min-height: 200px;
+  transition: all 0.3s ease;
+}
+
+.command-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 다크테마에서 호버 효과 개선 */
+body.body--dark .command-card:hover {
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
 }
 </style>

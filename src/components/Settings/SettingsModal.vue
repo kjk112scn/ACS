@@ -2,7 +2,7 @@
   <q-dialog v-model="isOpen" @hide="onHide" maximized>
     <q-card class="settings-modal-card">
       <q-card-section class="row items-center q-pb-none">
-        <div class="text-h6">Settings</div>
+        <div class="text-h6">{{ $t('settings.title') }}</div>
         <q-space />
         <q-btn icon="close" flat round dense v-close-popup />
       </q-card-section>
@@ -17,7 +17,7 @@
                 <q-item-section avatar>
                   <q-icon name="settings" />
                 </q-item-section>
-                <q-item-section>일반 설정</q-item-section>
+                <q-item-section>{{ $t('settings.generalTab') }}</q-item-section>
               </q-item>
 
               <q-item clickable v-ripple :active="activeTab === 'connection'" @click="activeTab = 'connection'"
@@ -25,7 +25,7 @@
                 <q-item-section avatar>
                   <q-icon name="wifi" />
                 </q-item-section>
-                <q-item-section>연결 설정</q-item-section>
+                <q-item-section>{{ $t('settings.connectionTab') }}</q-item-section>
               </q-item>
 
               <!-- 시스템 설정 탭 -->
@@ -34,7 +34,16 @@
                 <q-item-section avatar>
                   <q-icon name="engineering" />
                 </q-item-section>
-                <q-item-section>시스템 설정</q-item-section>
+                <q-item-section>{{ $t('settings.systemTab') }}</q-item-section>
+              </q-item>
+
+              <!-- ✅ 언어 설정 탭 추가 -->
+              <q-item clickable v-ripple :active="activeTab === 'language'" @click="activeTab = 'language'"
+                active-class="active-tab">
+                <q-item-section avatar>
+                  <q-icon name="language" />
+                </q-item-section>
+                <q-item-section>{{ $t('settings.languageTab') }}</q-item-section>
               </q-item>
 
               <!-- ✅ 관리자 설정 탭 추가 -->
@@ -43,7 +52,7 @@
                 <q-item-section avatar>
                   <q-icon name="admin_panel_settings" />
                 </q-item-section>
-                <q-item-section>관리자 설정</q-item-section>
+                <q-item-section>{{ $t('settings.adminTab') }}</q-item-section>
               </q-item>
 
               <!-- ✅ 버전 정보 탭 추가 -->
@@ -52,7 +61,7 @@
                 <q-item-section avatar>
                   <q-icon name="info" />
                 </q-item-section>
-                <q-item-section>버전 정보</q-item-section>
+                <q-item-section>{{ $t('settings.versionTab') }}</q-item-section>
               </q-item>
             </q-list>
           </div>
@@ -65,17 +74,21 @@
 
             <!-- 연결 설정 탭 -->
             <div v-if="activeTab === 'connection'">
-              <h5 class="q-mt-none q-mb-md">연결 설정</h5>
+              <h5 class="q-mt-none q-mb-md">{{ $t('settings.connection.title') }}</h5>
 
-              <q-input outlined v-model="localServerAddress" label="WebSocket 서버 주소" class="q-mb-md" />
+              <q-input outlined v-model="localServerAddress" :label="$t('settings.connection.websocket')"
+                class="q-mb-md" />
 
-              <q-input outlined v-model="apiBaseUrl" label="API 기본 URL" class="q-mb-md" />
+              <q-input outlined v-model="apiBaseUrl" :label="$t('settings.connection.api')" class="q-mb-md" />
 
-              <q-toggle v-model="autoReconnect" label="연결 끊김 시 자동 재연결" />
+              <q-toggle v-model="autoReconnect" :label="$t('settings.connection.autoReconnect')" />
             </div>
 
             <!-- 시스템 설정 탭 -->
             <SystemSettings v-if="activeTab === 'system'" />
+
+            <!-- ✅ 언어 설정 탭 -->
+            <LanguageSettings v-if="activeTab === 'language'" />
 
             <!-- ✅ 관리자 설정 탭 -->
             <AdminSettings v-if="activeTab === 'admin'" />
@@ -87,9 +100,9 @@
       </q-card-section>
 
       <q-card-actions align="right" class="q-pa-md">
-        <q-btn flat label="취소" color="primary" v-close-popup />
-        <q-btn flat label="저장" color="primary" :loading="loadingStates.saveAll" :disable="!hasAnyUnsavedChanges"
-          @click="onSaveAll" />
+        <q-btn flat :label="$t('buttons.cancel')" color="primary" v-close-popup />
+        <q-btn flat :label="$t('buttons.save')" color="primary" :loading="loadingStates.saveAll"
+          :disable="!hasAnyUnsavedChanges" @click="onSaveAll" />
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -104,6 +117,7 @@ import GeneralSettings from './GeneralSettings.vue'
 import SystemSettings from './system/SystemSettings.vue'
 import AdminSettings from './admin/AdminSettings.vue'
 import VersionInfoSettings from './VersionInfoSettings.vue'
+import LanguageSettings from './LanguageSettings.vue'
 
 const settingsStore = useSettingsStore()
 const { success, error: showError } = useNotification()

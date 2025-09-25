@@ -1,31 +1,46 @@
 <template>
-  <div>
-    <h5 class="q-mt-none q-mb-md">관리자 설정</h5>
+  <div class="admin-settings">
+    <h5 class="q-mt-none q-mb-md">{{ $t('settings.admin.title') }}</h5>
 
-    <!-- 서브 탭 -->
+    <!-- ✅ 탭 라벨을 하드코딩된 영어로 변경 -->
     <q-tabs v-model="activeSubTab" class="text-grey" active-color="primary" indicator-color="primary" align="left">
-      <q-tab name="servo-preset" label="Servo Preset" />
-      <q-tab name="servo-alarm-reset" label="Servo Alarm Reset" />
-      <q-tab name="mc-onoff" label="M/C On/Off" />
+      <q-tab name="servoPreset" label="Servo Preset" />
+      <q-tab name="servoAlarmReset" label="Servo Alarm Reset" />
+      <q-tab name="mcOnOff" label="M/C On/Off" />
+      <q-tab name="maintenance" label="Maintenance" />
     </q-tabs>
 
-    <q-separator />
+    <!-- 탭 내용 -->
+    <q-tab-panels v-model="activeSubTab" animated>
+      <q-tab-panel name="servoPreset">
+        <ServoEncoderPresetSettings />
+      </q-tab-panel>
 
-    <!-- 서브 탭 컨텐츠 -->
-    <div class="q-mt-md">
-      <ServoEncoderPresetSettings v-if="activeSubTab === 'servo-preset'" />
-      <ServoAlarmResetSettings v-if="activeSubTab === 'servo-alarm-reset'" />
-      <MCOffSettings v-if="activeSubTab === 'mc-onoff'" />
-    </div>
+      <q-tab-panel name="servoAlarmReset">
+        <ServoAlarmResetSettings />
+      </q-tab-panel>
+
+      <q-tab-panel name="mcOnOff">
+        <MCOffSettings />
+      </q-tab-panel>
+
+      <!-- ✅ Maintenance 탭 추가 -->
+      <q-tab-panel name="maintenance">
+        <MaintenanceSettings />
+      </q-tab-panel>
+    </q-tab-panels>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ServoEncoderPresetSettings, ServoAlarmResetSettings, MCOffSettings } from '../../../components'
+import ServoEncoderPresetSettings from './ServoEncoderPresetSettings.vue'
+import ServoAlarmResetSettings from './ServoAlarmResetSettings.vue'
+import MCOffSettings from './MCOffSettings.vue'
+// ✅ MaintenanceSettings 컴포넌트 import 추가
+import MaintenanceSettings from './MaintenanceSettings.vue'
 
-// 서브 탭 상태
-const activeSubTab = ref('servo-preset')
+const activeSubTab = ref('servoPreset')
 </script>
 
 <style scoped>

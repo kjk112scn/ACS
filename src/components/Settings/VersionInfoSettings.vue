@@ -1,10 +1,11 @@
 <template>
   <div class="version-info-settings">
-    <h5 class="q-mt-none q-mb-sm">펌웨어 버전/ 제품 번호 정보</h5>
+    <h5 class="q-mt-none q-mb-sm">{{ $t('settings.version.title') }}</h5>
 
     <!-- 새로고침 버튼 -->
     <div class="q-mb-sm">
-      <q-btn color="primary" icon="refresh" label="버전 정보 새로고침" :loading="loading" @click="loadVersionInfo" size="sm" />
+      <q-btn color="primary" icon="refresh" :label="$t('settings.version.refresh')" :loading="loading"
+        @click="loadVersionInfo" size="sm" />
     </div>
 
     <!-- 펌웨어 및 제품번호 정보 표시 -->
@@ -25,7 +26,7 @@
           <div class="row q-col-gutter-sm">
             <!-- 펌웨어 버전 -->
             <div class="col-12 col-md-6">
-              <div class="text-weight-bold text-grey-8 q-mb-xs">펌웨어 버전</div>
+              <div class="text-weight-bold text-grey-8 q-mb-xs">{{ $t('settings.version.firmware') }}</div>
               <q-chip :color="board.firmwareVersion && board.firmwareVersion !== 'N/A' ? 'primary' : 'grey-5'"
                 text-color="white" size="md">
                 {{ board.firmwareVersion || 'N/A' }}
@@ -34,7 +35,7 @@
 
             <!-- 제품번호 -->
             <div class="col-12 col-md-6">
-              <div class="text-weight-bold text-grey-8 q-mb-xs">제품번호</div>
+              <div class="text-weight-bold text-grey-8 q-mb-xs">{{ $t('settings.version.serial') }}</div>
               <q-chip :color="board.serialNumber && board.serialNumber !== 'N/A' ? 'secondary' : 'grey-5'"
                 text-color="white" size="md">
                 {{ board.serialNumber || 'N/A' }}
@@ -48,26 +49,27 @@
     <!-- 로딩 상태 -->
     <div v-else-if="loading" class="text-center q-pa-md">
       <q-spinner size="32px" color="primary" />
-      <div class="q-mt-sm">버전 정보를 불러오는 중...</div>
+      <div class="q-mt-sm">{{ $t('settings.version.loading') }}</div>
     </div>
 
     <!-- 에러 상태 -->
     <div v-else-if="error" class="text-center q-pa-md">
       <q-icon name="error" size="32px" color="negative" />
       <div class="q-mt-sm text-negative">{{ error }}</div>
-      <q-btn color="primary" label="다시 시도" class="q-mt-sm" size="sm" @click="loadVersionInfo" />
+      <q-btn color="primary" :label="$t('settings.version.retry')" class="q-mt-sm" size="sm" @click="loadVersionInfo" />
     </div>
 
     <!-- 데이터 없음 -->
     <div v-else class="text-center q-pa-md">
       <q-icon name="info" size="32px" color="grey-5" />
-      <div class="q-mt-sm text-grey-6">버전 정보를 불러오려면 새로고침 버튼을 클릭하세요</div>
+      <div class="q-mt-sm text-grey-6">{{ $t('settings.version.noData') }}</div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useICDStore } from '@/stores/icd/icdStore'
 import { useNotification } from '@/composables/useNotification'
 
@@ -79,6 +81,7 @@ interface VersionBoard {
   serialNumber: string
 }
 
+const { t } = useI18n()
 const icdStore = useICDStore()
 const { success, error: showError } = useNotification()
 
@@ -100,6 +103,14 @@ const formatSerialNumber = (year: number, month: number, number: number): string
   return `${yearStr}${monthStr}${numberStr}`
 }
 
+// 펌웨어 버전 포맷팅 함수 (one.two.three 형식)
+const formatVersion = (one: number, two: number, three: number): string => {
+  if (one === undefined || two === undefined || three === undefined) {
+    return 'N/A'
+  }
+  return `${one}.${two}.${three}`
+}
+
 // 버전 정보 로드
 const loadVersionInfo = async () => {
   loading.value = true
@@ -112,13 +123,13 @@ const loadVersionInfo = async () => {
 
     if (result && result.success && result.data?.firmwareData) {
       const firmwareData = result.data.firmwareData
-      console.log(' 펌웨어 데이터:', firmwareData)
+      console.log('📡 펌웨어 데이터:', firmwareData)
 
       // 펌웨어 버전 및 제품번호 데이터 파싱
       versionData.value = {
         mainboard: {
-          name: 'Mainboard',
-          description: '메인보드 펌웨어 및 제품번호',
+          name: t('settings.version.boards.mainboard'),
+          description: t('settings.version.boards.mainboardDesc'),
           firmwareVersion: formatVersion(
             firmwareData.mainFwVerOne,
             firmwareData.mainFwVerTwo,
@@ -131,8 +142,8 @@ const loadVersionInfo = async () => {
           )
         },
         azimuth: {
-          name: 'Azimuth',
-          description: '방위각 축 펌웨어 및 제품번호',
+          name: t('settings.version.boards.azimuth'),
+          description: t('settings.version.boards.azimuthDesc'),
           firmwareVersion: formatVersion(
             firmwareData.azimuthFwVerOne,
             firmwareData.azimuthFwVerTwo,
@@ -145,8 +156,8 @@ const loadVersionInfo = async () => {
           )
         },
         elevation: {
-          name: 'Elevation',
-          description: '고도각 축 펌웨어 및 제품번호',
+          name: t('settings.version.boards.elevation'),
+          description: t('settings.version.boards.elevationDesc'),
           firmwareVersion: formatVersion(
             firmwareData.elevationFwVerOne,
             firmwareData.elevationFwVerTwo,
@@ -159,22 +170,22 @@ const loadVersionInfo = async () => {
           )
         },
         tilt: {
-          name: 'Tilt',
-          description: '기울기 축 펌웨어 및 제품번호',
+          name: t('settings.version.boards.tilt'),
+          description: t('settings.version.boards.tiltDesc'),
           firmwareVersion: formatVersion(
             firmwareData.trainFwVerOne,
             firmwareData.trainFwVerTwo,
             firmwareData.trainFwVerThree
           ),
           serialNumber: formatSerialNumber(
-            firmwareData.trainSerialYear,
-            firmwareData.trainSerialMonth,
-            firmwareData.trainSerialNumber
+            firmwareData.tiltSerialYear,
+            firmwareData.tiltSerialMonth,
+            firmwareData.tiltSerialNumber
           )
         },
         feed: {
-          name: 'Feed',
-          description: '피드 펌웨어 및 제품번호',
+          name: t('settings.version.boards.feed'),
+          description: t('settings.version.boards.feedDesc'),
           firmwareVersion: formatVersion(
             firmwareData.feedFwVerOne,
             firmwareData.feedFwVerTwo,
@@ -188,33 +199,24 @@ const loadVersionInfo = async () => {
         }
       }
 
-      console.log('✅ 버전 데이터 파싱 완료:', versionData.value)
-      success('버전 정보를 성공적으로 불러왔습니다')
+      console.log('📡 파싱된 버전 데이터:', versionData.value)
+      success(t('settings.version.success'))
     } else {
-      console.warn('⚠️ 응답 데이터 구조가 예상과 다름:', result)
-      throw new Error('버전 정보를 불러올 수 없습니다')
+      throw new Error('Invalid response format')
     }
   } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : '버전 정보 로드 중 오류가 발생했습니다'
     console.error('❌ 버전 정보 로드 실패:', err)
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error'
     error.value = errorMessage
-    showError(errorMessage)
+    showError(t('settings.version.error'))
   } finally {
     loading.value = false
   }
 }
 
-// 버전 포맷팅 (one.two.three 형태)
-const formatVersion = (one: number, two: number, three: number): string => {
-  if (one === undefined || two === undefined || three === undefined) {
-    return 'N/A'
-  }
-  return `${one}.${two}.${three}`
-}
-
-// 컴포넌트 마운트 시 자동 로드
+// 컴포넌트 마운트 시 자동 로드하지 않음 (사용자가 버튼을 클릭해야 로드)
 onMounted(() => {
-  void loadVersionInfo()
+  // 자동 로드 비활성화
 })
 </script>
 
@@ -225,8 +227,7 @@ onMounted(() => {
 
 .version-cards {
   display: grid;
-  gap: 12px;
-  /* 간격 줄임 */
+  gap: 8px;
 }
 
 .version-card {
@@ -234,44 +235,41 @@ onMounted(() => {
 }
 
 .version-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-/* 카드 섹션 패딩 줄임 */
-.version-card .q-card-section {
-  padding: 12px 16px;
-  /* 기존 20px에서 줄임 */
+/* 다크테마에서 호버 효과 개선 */
+body.body--dark .version-card:hover {
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.1);
 }
 
-/* 제목과 설명 간격 줄임 */
-.version-card .text-h6 {
-  margin-bottom: 4px;
+/* 컴팩트한 레이아웃을 위한 스타일 조정 */
+.version-card .q-card__section {
+  padding: 8px 12px;
+}
+
+.version-card .text-subtitle1 {
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .version-card .text-caption {
-  margin-bottom: 8px;
+  font-size: 0.75rem;
 }
 
-/* 구분선과 섹션 간격 줄임 */
-.version-card .q-separator {
-  margin: 8px 0;
-}
-
-/* 칩 크기 줄임 */
 .version-card .q-chip {
-  font-size: 0.875rem;
-  /* 약간 작게 */
+  font-size: 0.8rem;
+  height: 24px;
 }
 
-/* 행 간격 줄임 */
-.version-card .row.q-col-gutter-md {
-  --q-col-gutter-md: 8px;
-  /* 16px에서 8px로 줄임 */
-}
+/* 반응형 레이아웃 */
+@media (max-width: 768px) {
+  .version-cards {
+    gap: 6px;
+  }
 
-/* 라벨과 칩 간격 줄임 */
-.version-card .text-weight-bold {
-  margin-bottom: 4px;
-  /* 8px에서 4px로 줄임 */
+  .version-card .q-card__section {
+    padding: 6px 8px;
+  }
 }
 </style>
