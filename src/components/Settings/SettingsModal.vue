@@ -45,6 +45,15 @@
                 </q-item-section>
                 <q-item-section>관리자 설정</q-item-section>
               </q-item>
+
+              <!-- ✅ 버전 정보 탭 추가 -->
+              <q-item clickable v-ripple :active="activeTab === 'version'" @click="activeTab = 'version'"
+                active-class="active-tab">
+                <q-item-section avatar>
+                  <q-icon name="info" />
+                </q-item-section>
+                <q-item-section>버전 정보</q-item-section>
+              </q-item>
             </q-list>
           </div>
 
@@ -70,6 +79,9 @@
 
             <!-- ✅ 관리자 설정 탭 -->
             <AdminSettings v-if="activeTab === 'admin'" />
+
+            <!-- ✅ 버전 정보 탭 -->
+            <VersionInfoSettings v-if="activeTab === 'version'" />
           </div>
         </div>
       </q-card-section>
@@ -91,6 +103,7 @@ import { useNotification } from '@/composables/useNotification'
 import GeneralSettings from './GeneralSettings.vue'
 import SystemSettings from './system/SystemSettings.vue'
 import AdminSettings from './admin/AdminSettings.vue'
+import VersionInfoSettings from './VersionInfoSettings.vue'
 
 const settingsStore = useSettingsStore()
 const { success, error: showError } = useNotification()
