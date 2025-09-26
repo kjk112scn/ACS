@@ -3,30 +3,18 @@
     <!-- 상단 부분: 실시간 ICD 데이터 표시 (3축으로 구분) -->
     <q-card class="icd-data-section">
       <q-card-section>
-        <div class="header-section">
-          <!-- 명령 시간 (좌측 최상단으로 이동) -->
-          <div class="cmd-time">
-            <span class="adaptive-text time-value">{{ displayServerTime }}</span>
-          </div>
-
-          <!-- 상태 메시지들을 우측으로 이동 -->
-          <div class="status-messages">
-            <p v-if="icdStore.error" class="text-negative">Server : Error: {{ icdStore.error }}</p>
-            <p v-if="!icdStore.isConnected" class="text-warning">Server : WebSocket Connecting...</p>
-            <p v-if="icdStore.isConnected && !icdStore.error" class="text-positive">Server : Connected</p>
-            <p v-if="icdStore.communicationStatus" class="text-info">Communication : {{ icdStore.communicationStatus }}
-            </p>
-          </div>
-        </div>
+        <!-- header-section 전체 제거 -->
 
         <div class="axis-grid">
           <!-- Azimuth 축 데이터 -->
           <q-card class="axis-card azimuth-card">
-            <q-card-section>
-              <div class="text-subtitle1 text-weight-bold text-primary">Azimuth</div>
+            <q-card-section style="padding: 0 !important;">
+              <div class="text-subtitle1 text-weight-bold text-center"
+                style="margin: 0 !important; padding: 0.1rem 0 1rem 0 !important;">Azimuth</div>
 
               <!-- Azimuth 차트 영역 추가 -->
-              <div class="axis-chart" ref="azimuthChartRef"></div>
+              <div class="axis-chart" ref="azimuthChartRef"
+                style="height: 200px !important; min-height: 200px !important;"></div>
 
               <div class="axis-data-row">
                 <div class="axis-data-item">
@@ -49,11 +37,13 @@
 
           <!-- Elevation 축 데이터 -->
           <q-card class="axis-card elevation-card">
-            <q-card-section>
-              <div class="text-subtitle1 text-weight-bold text-primary">Elevation</div>
+            <q-card-section style="padding: 0 !important;">
+              <div class="text-subtitle1 text-weight-bold text-center"
+                style="margin: 0 !important; padding: 0.1rem 0 1rem 0 !important;">Elevation</div>
 
               <!-- Elevation 차트 영역 추가 -->
-              <div class="axis-chart" ref="elevationChartRef"></div>
+              <div class="axis-chart" ref="elevationChartRef"
+                style="height: 200px !important; min-height: 200px !important;"></div>
 
               <div class="axis-data-row">
                 <div class="axis-data-item">
@@ -76,11 +66,13 @@
 
           <!-- Tilt 축 데이터 -->
           <q-card class="axis-card tilt-card">
-            <q-card-section>
-              <div class="text-subtitle1 text-weight-bold text-primary">Tilt</div>
+            <q-card-section style="padding: 0 !important;">
+              <div class="text-subtitle1 text-weight-bold text-center"
+                style="margin: 0 !important; padding: 0.1rem 0 1rem 0 !important;">Tilt</div>
 
               <!-- Tilt 차트 영역 추가 -->
-              <div class="axis-chart" ref="trainChartRef"></div>
+              <div class="axis-chart" ref="trainChartRef"
+                style="height: 200px !important; min-height: 200px !important;"></div>
 
               <div class="axis-data-row">
                 <div class="axis-data-item">
@@ -276,13 +268,16 @@ import { useICDStore } from '../stores/icd/icdStore'
 import { useRouter, useRoute } from 'vue-router'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
-import { formatToLocalTimeWithMs } from '../utils/times'
 import { openComponent } from '../utils/windowUtils'
 //import AllStatus from '../components/modal/status/AllStatus.vue'
+import { useTheme } from '../composables/useTheme'
 
 const icdStore = useICDStore()
 const router = useRouter()
 const route = useRoute()
+
+// 테마 관련 추가
+const { initializeTheme } = useTheme()
 
 // 차트 관련
 const azimuthChartRef = ref<HTMLElement | null>(null)
@@ -396,14 +391,6 @@ const stowPinActive = computed(() => icdStore.stowPinStatus === 'active')
 let uiUpdateTimer: number | null = null
 const uiUpdateCount = ref(0)
 ///computed
-// ✅ 서버 시간 표시용 computed 속성 (icdStore에서 직접)
-const displayServerTime = computed(() => {
-  if (!icdStore.serverTime) {
-    return '서버 시간 대기 중...'
-  }
-
-  return formatToLocalTimeWithMs(icdStore.serverTime)
-})
 
 // ✅ 값 표시 헬퍼 함수
 const displayValue = (value: string | number | null | undefined) => {
@@ -537,6 +524,9 @@ const stopChartUpdates = () => {
 let debugTimer: number | null = null
 onMounted(async () => {
   console.log('📱 DashboardPage 컴포넌트 마운트됨')
+
+  // 테마 초기화 추가
+  initializeTheme()
 
   // 라우트 설정
   const pathParts = route.path.split('/')
@@ -871,7 +861,7 @@ const initCharts = () => {
           rich: {
             vAlign: {
               align: 'center',
-              padding: [0, 0, 2, 0],
+              padding: [0, 0, 1, 0],
               verticalAlign: 'bottom',
             },
           },
@@ -1428,20 +1418,26 @@ const handleAllStatus = () => {
   color: rgba(0, 0, 0, 0.9) !important;
   text-shadow: 0 0 2px rgba(255, 255, 255, 0.5) !important;
 }
-</style>
 
-<style scoped>
+
+/* 기존 dashboard-container 스타일 */
 .dashboard-container {
   max-width: 1880px;
   margin: 0 auto;
+  background-color: var(--theme-background);
+  min-height: 100vh;
 }
 
 .header-section {
   display: flex;
   justify-content: space-between;
-  /* flex-start에서 space-between으로 변경 */
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.1rem;
+  padding: 1rem;
+  background-color: var(--theme-surface);
+  border-radius: 8px;
+  border: 1px solid var(--theme-border);
+  /* 밝은 회색 테두리 */
 }
 
 .cmd-time {
@@ -1449,29 +1445,37 @@ const handleAllStatus = () => {
   align-items: center;
 }
 
-.time-label {
-  font-weight: 500;
-  font-size: 1rem;
-  margin-right: 0.25rem;
-}
-
 .time-value {
   font-weight: 500;
   font-size: 1rem;
+  color: var(--theme-text);
 }
 
 .axis-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0,
-      0.8fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 0.8fr);
   gap: 1rem;
   margin-top: 1rem;
 }
 
+/* 모든 패널의 기본 테두리를 밝은 회색으로 변경 */
 .axis-card {
-  border: 1px solid var(--q-primary);
+  background-color: var(--theme-card-background);
+  border: 1px solid var(--theme-border);
+  /* 밝은 회색 테두리 */
+  border-radius: 8px;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 2px 4px var(--theme-shadow-light);
+  transition: none;
+  /* 애니메이션 제거 */
+}
+
+.axis-card:hover {
+  box-shadow: 0 2px 4px var(--theme-shadow-light);
+  /* 기본 그림자 유지 */
+  transform: none;
+  /* 올라오는 효과 제거 */
 }
 
 .axis-card .q-card-section {
@@ -1481,23 +1485,120 @@ const handleAllStatus = () => {
   padding: 0.25rem 1rem 0.5rem 1rem;
 }
 
-/* 각 축 카드에 고유한 스타일 적용 */
-.axis-card {
-  grid-column: span 1;
-  border-top: 3px solid var(--q-primary);
-  padding: 0.5rem 0;
+/* 각 축 카드의 상단 테두리만 색상 유지, 나머지는 밝은 회색 */
+.azimuth-card {
+  border-top: 3px solid var(--theme-azimuth-color);
+  /* 주황색 상단만 */
+  border-left: 1px solid var(--theme-border);
+  /* 밝은 회색 */
+  border-right: 1px solid var(--theme-border);
+  /* 밝은 회색 */
+  border-bottom: 1px solid var(--theme-border);
+  /* 밝은 회색 */
+  background-color: #15282f;
+  /* 내부 색상 통일 */
+  transition: none;
+  /* 애니메이션 제거 */
+}
+
+/* Azimuth 카드 호버 효과 제거 */
+.azimuth-card:hover {
+  box-shadow: 0 2px 4px var(--theme-shadow-light);
+  /* 기본 그림자 유지 */
+  transform: none;
+  /* 올라오는 효과 제거 */
+}
+
+/* Azimuth 카드 전용 스타일 - 상단 테두리 색상 제거 */
+.q-card.azimuth-card .q-card-section {
+  padding: 0 !important;
 }
 
 .azimuth-card {
-  border-top-color: #ff5722;
+  background-color: #15282f !important;
+  border-top: 1px solid var(--theme-border) !important;
+  /* 주황색 제거하고 일반 테두리로 변경 */
 }
 
-.tilt-card {
-  border-top-color: #4caf50;
+/* Elevation 카드 전용 스타일 */
+.q-card.elevation-card .q-card-section {
+  padding: 0 !important;
 }
 
 .elevation-card {
-  border-top-color: #2196f3;
+  background-color: #15282f !important;
+  border-top: 1px solid var(--theme-border) !important;
+  /* 파란색 제거하고 일반 테두리로 변경 */
+}
+
+/* Tilt 카드 전용 스타일 */
+.q-card.tilt-card .q-card-section {
+  padding: 0 !important;
+}
+
+.tilt-card {
+  background-color: #15282f !important;
+  border-top: 1px solid var(--theme-border) !important;
+  /* 녹색 제거하고 일반 테두리로 변경 */
+}
+
+/* 모든 축 카드의 텍스트 높이 통일 */
+.q-card.azimuth-card .q-card-section,
+.q-card.elevation-card .q-card-section,
+.q-card.tilt-card .q-card-section {
+  padding: 0 !important;
+}
+
+.azimuth-card,
+.elevation-card,
+.tilt-card {
+  background-color: #15282f !important;
+  border-top: 1px solid var(--theme-border) !important;
+}
+
+/* Azimuth의 정확한 위치를 Elevation, Tilt에 정확히 적용 */
+.azimuth-card .text-subtitle1,
+.elevation-card .text-subtitle1,
+.tilt-card .text-subtitle1 {
+  margin: 0 !important;
+  padding: 0.1rem 0 1rem 0 !important;
+  /* Azimuth의 정확한 위치로 통일 */
+  text-align: center !important;
+  color: var(--theme-text) !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  /* 라인 높이도 통일 */
+}
+
+/* Azimuth와 Tilt 차트 높이 동일하게 설정 */
+.azimuth-card .axis-chart,
+.tilt-card .axis-chart {
+  height: 300px !important;
+  /* 동일한 높이 */
+  min-height: 300px !important;
+  width: 100%;
+  margin: 1rem 0 0.25rem 0 !important;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #15282f !important;
+  border-radius: 4px;
+  border: none !important;
+}
+
+/* Elevation은 기존 높이 유지 */
+.elevation-card .axis-chart {
+  height: 240px !important;
+  min-height: 240px !important;
+  width: 100%;
+  margin: 1rem 0 0.25rem 0 !important;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #15282f !important;
+  border-radius: 4px;
+  border: none !important;
 }
 
 .axis-data-row {
@@ -1509,6 +1610,8 @@ const handleAllStatus = () => {
 .axis-card .text-subtitle1 {
   margin-bottom: 0.15rem;
   font-size: 1rem;
+  color: var(--theme-text);
+  font-weight: 600;
 }
 
 /* Emergency와 Control 컨테이너 */
@@ -1520,11 +1623,14 @@ const handleAllStatus = () => {
   height: 100%;
 }
 
-/* Emergency 카드 */
+/* Emergency 카드 - 밝은 회색 테두리 */
 .emergency-card {
-  border: 1px solid var(--q-negative);
-  border-top: 1px solid var(--q-negative);
+  background-color: var(--theme-card-background);
+  border: 1px solid var(--theme-border);
+  /* 밝은 회색 테두리 */
+  border-radius: 8px;
   flex: 1;
+  box-shadow: 0 2px 4px var(--theme-shadow-light);
 }
 
 .emergency-content {
@@ -1535,11 +1641,16 @@ const handleAllStatus = () => {
   padding: 0.1rem 0;
 }
 
-/* Control 카드 */
+/* Control 카드 - 밝은 회색 테두리 */
 .control-card {
-  border: 1px solid var(--q-primary);
-  border-top: 3px solid var(--q-primary);
+  background-color: var(--theme-card-background);
+  border: 1px solid var(--theme-border);
+  /* 밝은 회색 테두리 */
+  border-top: 3px solid var(--theme-primary);
+  /* 파란색 상단만 */
+  border-radius: 8px;
   flex: 1;
+  box-shadow: 0 2px 4px var(--theme-shadow-light);
 }
 
 .control-content {
@@ -1554,12 +1665,17 @@ const handleAllStatus = () => {
   width: 100%;
 }
 
-/* Status 카드 */
+/* Status 카드 - 밝은 회색 테두리 */
 .status-card {
   grid-column: span 1;
-  border: 1px solid var(--q-primary);
-  border-top: 3px solid var(--q-primary);
+  background-color: var(--theme-card-background);
+  border: 1px solid var(--theme-border);
+  /* 밝은 회색 테두리 */
+  border-top: 3px solid var(--theme-primary);
+  /* 파란색 상단만 */
+  border-radius: 8px;
   height: 100%;
+  box-shadow: 0 2px 4px var(--theme-shadow-light);
 }
 
 .status-content {
@@ -1579,6 +1695,7 @@ const handleAllStatus = () => {
   margin: 0;
   font-size: 0.9rem;
   font-weight: 500;
+  color: var(--theme-text);
 }
 
 /* 차트 영역 스타일 */
@@ -1590,6 +1707,11 @@ const handleAllStatus = () => {
   display: flex;
   justify-content: center;
   align-items: center;
+  background-color: #15282f;
+  /* 차트 배경색 통일 */
+  border-radius: 4px;
+  border: 1px solid var(--theme-border-light);
+  /* 밝은 회색 테두리 */
 }
 
 .axis-data-row {
@@ -1605,9 +1727,21 @@ const handleAllStatus = () => {
   padding: 0.25rem 0.5rem;
 }
 
-.mode-toggle {
-  width: 100%;
-  max-width: 500px;
+/* 모드 선택 섹션 - 밝은 회색 테두리 */
+.mode-selection-section {
+  background-color: var(--theme-card-background);
+  border: 1px solid var(--theme-border);
+  /* 밝은 회색 테두리 */
+  border-radius: 8px;
+  box-shadow: 0 2px 4px var(--theme-shadow-light);
+}
+
+.mode-content-section {
+  background-color: var(--theme-card-background);
+  border: 1px solid var(--theme-border);
+  /* 밝은 회색 테두리 */
+  border-radius: 8px;
+  box-shadow: 0 2px 4px var(--theme-shadow-light);
 }
 
 /* 컴팩트 탭 스타일 */
@@ -1618,9 +1752,72 @@ const handleAllStatus = () => {
 .compact-tabs .q-tab {
   padding: 0 12px;
   min-height: 42px;
+  color: var(--theme-text-secondary);
 }
 
-/* 큰 태블릿 화면 (1280px 미만) */
+.compact-tabs .q-tab--active {
+  color: var(--theme-primary);
+}
+
+/* Status LED 스타일 */
+.status-item {
+  display: flex;
+  align-items: center;
+}
+
+.status-led-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-led {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
+/* LED 색상 */
+.led-normal {
+  background-color: var(--theme-led-normal);
+  box-shadow: 0 0 8px var(--theme-led-normal), 0 0 16px var(--theme-led-normal);
+}
+
+.led-error {
+  background-color: var(--theme-led-error);
+  box-shadow: 0 0 12px var(--theme-led-error), 0 0 24px var(--theme-led-error);
+}
+
+.led-stow-active {
+  background-color: var(--theme-led-stow-active);
+  box-shadow: 0 0 8px var(--theme-led-stow-active), 0 0 16px var(--theme-led-stow-active);
+}
+
+.led-inactive {
+  background-color: var(--theme-led-inactive);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
+.status-label {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--theme-text);
+}
+
+.all-status-button {
+  margin-top: 1rem;
+}
+
+.all-status-button .q-btn {
+  font-size: 0.9rem;
+  padding: 8px 16px;
+  background-color: var(--theme-button-primary);
+  color: white;
+}
+
+/* 반응형 디자인 유지 */
 @media (max-width: 1279px) {
   .axis-grid {
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 0.8fr);
@@ -1632,7 +1829,6 @@ const handleAllStatus = () => {
   }
 }
 
-/* 태블릿 화면 (1024px 미만) */
 @media (max-width: 1023px) {
   .axis-grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
@@ -1654,7 +1850,6 @@ const handleAllStatus = () => {
   }
 }
 
-/* 작은 태블릿 화면 (768px 미만) */
 @media (max-width: 767px) {
   .axis-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -1666,7 +1861,6 @@ const handleAllStatus = () => {
   }
 }
 
-/* 모바일 화면 (480px 미만) */
 @media (max-width: 479px) {
   .axis-grid {
     grid-template-columns: 1fr;
@@ -1706,7 +1900,7 @@ const handleAllStatus = () => {
   }
 }
 
-/* CSS 수정 */
+/* Elevation 차트 특별 스타일 유지 */
 .elevation-card .axis-chart {
   height: 240px;
   min-height: 240px;
@@ -1727,78 +1921,25 @@ const handleAllStatus = () => {
   pointer-events: none;
 }
 
-/* Status LED 스타일 */
-.status-item {
-  display: flex;
-  align-items: center;
+/* 더 강력한 선택자로 차트 높이 줄이기 */
+.q-card.azimuth-card .axis-chart,
+.q-card.elevation-card .axis-chart,
+.q-card.tilt-card .axis-chart {
+  height: 200px !important;
+  min-height: 200px !important;
+  background-color: #15282f !important;
+  border: none !important;
+  margin: 1rem 0 0.25rem 0 !important;
 }
 
-.status-led-container {
-  display: flex;
-  align-items: center;
-
-  gap: 12px;
-}
-
-/* Status LED 스타일 수정 */
-.status-led {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  transition: all 0.3s ease;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
-}
-
-/* ✅ 기본 녹색 (정상 상태) */
-.led-normal {
-  background-color: #4caf50;
-  box-shadow:
-    0 0 8px #4caf50,
-    0 0 16px #4caf50;
-}
-
-/* ✅ 빨간색 (에러/활성 상태) */
-.led-error {
-  background-color: #f44336;
-  box-shadow:
-    0 0 12px #f44336,
-    0 0 24px #f44336;
-}
-
-/* ✅ Stow용 녹색 (활성 상태) */
-.led-stow-active {
-  background-color: #4caf50;
-  box-shadow:
-    0 0 8px #4caf50,
-    0 0 16px #4caf50;
-}
-
-/* ✅ 기본 회색 (비활성 상태) */
-.led-inactive {
-  background-color: #666;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
-}
-
-.status-label {
-  font-size: 1rem;
-  font-weight: 500;
-}
-
-/* 다크 모드와 라이트 모드에 따른 라벨 색상 조정 */
-.body--dark .status-label {
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.body--light .status-label {
-  color: rgba(0, 0, 0, 0.8);
-}
-
-.all-status-button {
-  margin-top: 1rem;
-}
-
-.all-status-button .q-btn {
-  font-size: 0.9rem;
-  padding: 8px 16px;
+/* 또는 더 구체적인 선택자 */
+.axis-card.azimuth-card .axis-chart,
+.axis-card.elevation-card .axis-chart,
+.axis-card.tilt-card .axis-chart {
+  height: 200px !important;
+  min-height: 200px !important;
+  background-color: #15282f !important;
+  border: none !important;
+  margin: 1rem 0 0.25rem 0 !important;
 }
 </style>

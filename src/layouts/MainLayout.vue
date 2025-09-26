@@ -1,22 +1,43 @@
 <template>
   <q-layout view="lHh Lpr lFf">
-    <q-header elevated>
-      <q-toolbar>
-        <!-- 좌측 섹션: 메뉴 버튼과 GTL ACS 로고 -->
-
-        <div class="row items-center no-wrap">
+    <q-header elevated class="custom-header">
+      <q-toolbar class="header-toolbar">
+        <!-- 좌측 섹션: 메뉴 버튼과 로고 -->
+        <div class="left-section">
           <q-btn flat dense round icon="menu" aria-label="Menu" @click="toggleLeftDrawer" class="q-mr-sm" />
-          <div class="text-h6 no-ellipsis">GTL ACS</div>
+          <img src="/logo/GTL_LOGO.png" alt="GTL Logo" class="header-logo q-mr-md" />
         </div>
 
-        <!-- 우측으로 밀어내기 위한 공간 -->
-        <q-space />
+        <!-- 가운데 섹션: Antenna Control System -->
+        <div class="center-section">
+          <div class="text-h4 no-ellipsis text-center">Antenna Control System</div>
+        </div>
 
-        <!-- 우측 섹션: 설정 버튼과 테마 변경 버튼 -->
-        <div class="row items-center">
-          <q-btn flat dense round icon="settings" aria-label="Settings" @click="settingsModal = true" class="q-mr-sm" />
-          <q-btn flat dense round icon="brightness_4" aria-label="Toggle Dark Mode" @click="toggleDarkMode" />
-          <q-btn flat dense round icon="info" aria-label="SystemsInfo" size="md" @click="handleSystemInfo" />
+        <!-- 우측 섹션: 시간 정보 + 설정 버튼들 (2행) -->
+        <div class="right-section">
+          <!-- 시간 정보 (1행) -->
+          <div class="time-row">
+            <div class="time-info">
+              <div class="utc-time">UTC: {{ displayUTCTime }}</div>
+              <div class="local-time">Local: {{ displayLocalTime }}</div>
+            </div>
+          </div>
+
+          <!-- 설정 버튼들 (2행) -->
+          <div class="buttons-row">
+            <!-- 서버 상태 표시 부분 완전 제거 -->
+            <!-- <div class="server-status">
+              <span v-if="icdStore.error" class="text-negative">Server : Error: {{ icdStore.error }}</span>
+              <span v-else-if="!icdStore.isConnected" class="text-warning">Server : WebSocket Connecting...</span>
+              <span v-else-if="icdStore.isConnected && !icdStore.error" class="text-positive">Server : Connected</span>
+            </div> -->
+
+            <!-- 설정 버튼들만 남기기 -->
+            <q-btn flat dense round icon="settings" aria-label="Settings" @click="settingsModal = true"
+              class="q-mr-sm" />
+            <q-btn flat dense round icon="brightness_4" aria-label="Toggle Dark Mode" @click="toggleDarkMode" />
+            <q-btn flat dense round icon="info" aria-label="SystemsInfo" size="md" @click="handleSystemInfo" />
+          </div>
         </div>
       </q-toolbar>
     </q-header>
@@ -40,13 +61,54 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import EssentialLink, { type EssentialLinkProps } from '@/components/common/EssentialLink.vue'
 import SettingsModal from '@/components/settings/SettingsModal.vue'
 import { openComponent } from '../utils/windowUtils' // ✅ windowUtils import 추가
 import { useQuasar } from 'quasar'
+import { useICDStore } from '@/stores/icd/icdStore' // ICD Store import 추가
 
 const $q = useQuasar()
+const icdStore = useICDStore() // Store 사용
+
+// UTC 시간 표시용 computed (24시간 형식) - Local 시간 기준으로 실시간 업데이트
+const displayUTCTime = computed(() => {
+  if (!icdStore.serverTime) {
+    return '서버 시간 대기 중...'
+  }
+
+  // ICD Store에서 가져온 서버 시간을 UTC로 변환
+  const serverTime = new Date(icdStore.serverTime)
+  const year = serverTime.getUTCFullYear()
+  const month = String(serverTime.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(serverTime.getUTCDate()).padStart(2, '0')
+  const hours = String(serverTime.getUTCHours()).padStart(2, '0')
+  const minutes = String(serverTime.getUTCMinutes()).padStart(2, '0')
+  const seconds = String(serverTime.getUTCSeconds()).padStart(2, '0')
+  const milliseconds = String(serverTime.getUTCMilliseconds()).padStart(3, '0')
+
+  return `${year}. ${month}. ${day}. ${hours}:${minutes}:${seconds}.${milliseconds} UTC`
+})
+
+// 로컬 시간 표시용 computed (24시간 형식, ms 포함) - ICD Store 서버 시간 사용
+const displayLocalTime = computed(() => {
+  if (!icdStore.serverTime) {
+    return '서버 시간 대기 중...'
+  }
+
+  // ICD Store에서 가져온 서버 시간을 로컬 시간으로 변환
+  const serverTime = new Date(icdStore.serverTime)
+  const year = serverTime.getFullYear()
+  const month = String(serverTime.getMonth() + 1).padStart(2, '0')
+  const day = String(serverTime.getDate()).padStart(2, '0')
+  const hours = String(serverTime.getHours()).padStart(2, '0')
+  const minutes = String(serverTime.getMinutes()).padStart(2, '0')
+  const seconds = String(serverTime.getSeconds()).padStart(2, '0')
+  const milliseconds = String(serverTime.getMilliseconds()).padStart(3, '0')
+
+  return `${year}. ${month}. ${day}. ${hours}:${minutes}:${seconds}.${milliseconds} KST`
+})
+
 const linksList: EssentialLinkProps[] = [
   {
     title: 'Docs',
@@ -160,3 +222,120 @@ onMounted(() => {
   }
 })
 </script>
+
+<style scoped>
+.custom-header {
+  background-color: var(--theme-primary) !important;
+}
+
+/* 다크 테마일 때 */
+.body--dark .custom-header {
+  background-color: #091d24 !important;
+}
+
+/* 라이트 테마일 때 */
+.body--light .custom-header {
+  background-color: #1976d2 !important;
+}
+
+/* 툴바 레이아웃 */
+.header-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 64px;
+  /* 높이 증가 */
+}
+
+/* 좌측 섹션 */
+.left-section {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* 중앙 섹션 */
+.center-section {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 우측 섹션 (2행) */
+.right-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+/* 시간 정보 행 */
+.time-row {
+  display: flex;
+  align-items: center;
+}
+
+/* 버튼들 행 */
+.buttons-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 시간 정보 스타일 */
+.time-info {
+  color: white;
+  font-size: 13px;
+  /* 11px에서 13px로 증가 */
+  font-weight: 500;
+  text-align: right;
+  line-height: 1.2;
+  /* 줄 간격 통일 */
+}
+
+.utc-time {
+  margin-bottom: 2px;
+  font-size: 13px;
+  /* UTC 시간 폰트 크기 명시적으로 설정 */
+  font-weight: 500;
+  /* 폰트 두께 통일 */
+}
+
+.local-time {
+  font-size: 13px;
+  /* 10px에서 13px로 증가하여 UTC와 동일하게 */
+  font-weight: 500;
+  /* 폰트 두께 통일 */
+  opacity: 0.9;
+}
+
+/* 서버 상태 스타일 */
+.server-status {
+  margin-right: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.server-status .text-positive {
+  color: #4caf50 !important;
+}
+
+.server-status .text-warning {
+  color: #ff9800 !important;
+}
+
+.server-status .text-negative {
+  color: #f44336 !important;
+}
+
+/* GTL 로고 스타일 */
+.header-logo {
+  height: 80px;
+  width: auto;
+  background-color: transparent;
+}
+</style>
