@@ -1562,15 +1562,15 @@ const handleAllStatus = () => {
 
 /* 각 축 카드의 상단 테두리만 색상 유지, 나머지는 밝은 회색 */
 .azimuth-card {
-  border-top: 3px solid var(--theme-azimuth-color);
-  /* 주황색 상단만 */
+  border-top: 5px solid var(--theme-border) !important;
+  /* 흰색 상단 테두리로 통일하되 두께는 5px로 증가 */
   border-left: 1px solid var(--theme-border);
   /* 밝은 회색 */
   border-right: 1px solid var(--theme-border);
   /* 밝은 회색 */
   border-bottom: 1px solid var(--theme-border);
   /* 밝은 회색 */
-  background-color: #15282f;
+  background-color: #091d24 !important;
   /* 내부 색상 통일 */
   transition: none;
   /* 애니메이션 제거 */
@@ -1590,9 +1590,9 @@ const handleAllStatus = () => {
 }
 
 .azimuth-card {
-  background-color: #15282f !important;
-  border-top: 1px solid var(--theme-border) !important;
-  /* 주황색 제거하고 일반 테두리로 변경 */
+  background-color: #091d24 !important;
+  border-top: 5px solid var(--theme-border) !important;
+  /* 흰색 테두리로 통일하되 두께는 5px로 증가 */
 }
 
 /* Elevation 카드 전용 스타일 */
@@ -1601,9 +1601,9 @@ const handleAllStatus = () => {
 }
 
 .elevation-card {
-  background-color: #15282f !important;
-  border-top: 1px solid var(--theme-border) !important;
-  /* 파란색 제거하고 일반 테두리로 변경 */
+  background-color: #091d24 !important;
+  border-top: 5px solid var(--theme-border) !important;
+  /* 흰색 테두리로 통일하되 두께는 5px로 증가 */
 }
 
 /* Tilt 카드 전용 스타일 */
@@ -1612,9 +1612,9 @@ const handleAllStatus = () => {
 }
 
 .tilt-card {
-  background-color: #15282f !important;
-  border-top: 1px solid var(--theme-border) !important;
-  /* 녹색 제거하고 일반 테두리로 변경 */
+  background-color: #091d24 !important;
+  border-top: 5px solid var(--theme-border) !important;
+  /* 흰색 테두리로 통일하되 두께는 5px로 증가 */
 }
 
 /* 모든 축 카드의 텍스트 높이 통일 */
@@ -1627,8 +1627,9 @@ const handleAllStatus = () => {
 .azimuth-card,
 .elevation-card,
 .tilt-card {
-  background-color: #15282f !important;
-  border-top: 1px solid var(--theme-border) !important;
+  background-color: #091d24 !important;
+  border-top: 5px solid var(--theme-border) !important;
+  /* 흰색 테두리로 통일하되 두께는 5px로 증가 */
 }
 
 /* Azimuth의 정확한 위치를 Elevation, Tilt에 정확히 적용 */
@@ -1657,7 +1658,7 @@ const handleAllStatus = () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #15282f !important;
+  background-color: #091d24 !important;
   border-radius: 4px;
   border: none !important;
 }
@@ -1671,7 +1672,7 @@ const handleAllStatus = () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #15282f !important;
+  background-color: #091d24 !important;
   border-radius: 4px;
   border: none !important;
 }
@@ -1698,11 +1699,13 @@ const handleAllStatus = () => {
   height: 100%;
 }
 
-/* Emergency 카드 - 밝은 회색 테두리 */
+/* Emergency 카드 - 빨간색 상단 테두리 유지 */
 .emergency-card {
   background-color: var(--theme-card-background);
   border: 1px solid var(--theme-border);
   /* 밝은 회색 테두리 */
+  border-top: 5px solid #f44336 !important;
+  /* 빨간색 상단 테두리 유지하되 두께는 5px로 증가 */
   border-radius: 8px;
   flex: 1;
   box-shadow: 0 2px 4px var(--theme-shadow-light);
@@ -1713,7 +1716,8 @@ const handleAllStatus = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.1rem 0;
+  padding: 0.5rem 0;
+  /* Control과 동일한 패딩으로 간격 조정 */
 }
 
 /* Control 카드 - 밝은 회색 테두리 */
@@ -1721,8 +1725,8 @@ const handleAllStatus = () => {
   background-color: var(--theme-card-background);
   border: 1px solid var(--theme-border);
   /* 밝은 회색 테두리 */
-  border-top: 3px solid var(--theme-primary);
-  /* 파란색 상단만 */
+  border-top: 5px solid var(--theme-border) !important;
+  /* 흰색 테두리로 통일하되 두께는 5px로 증가 */
   border-radius: 8px;
   flex: 1;
   box-shadow: 0 2px 4px var(--theme-shadow-light);
@@ -1746,8 +1750,8 @@ const handleAllStatus = () => {
   background-color: var(--theme-card-background);
   border: 1px solid var(--theme-border);
   /* 밝은 회색 테두리 */
-  border-top: 3px solid var(--theme-primary);
-  /* 파란색 상단만 */
+  border-top: 5px solid var(--theme-border) !important;
+  /* 흰색 테두리로 통일하되 두께는 5px로 증가 */
   border-radius: 8px;
   height: 100%;
   box-shadow: 0 2px 4px var(--theme-shadow-light);
@@ -1782,7 +1786,7 @@ const handleAllStatus = () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #15282f;
+  background-color: #091d24;
   /* 차트 배경색 통일 */
   border-radius: 4px;
   border: 1px solid var(--theme-border-light);
@@ -2002,7 +2006,7 @@ const handleAllStatus = () => {
 .q-card.tilt-card .axis-chart {
   height: 200px !important;
   min-height: 200px !important;
-  background-color: #15282f !important;
+  background-color: #091d24 !important;
   border: none !important;
   margin: 1rem 0 0.25rem 0 !important;
 }
@@ -2013,7 +2017,7 @@ const handleAllStatus = () => {
 .axis-card.tilt-card .axis-chart {
   height: 200px !important;
   min-height: 200px !important;
-  background-color: #15282f !important;
+  background-color: #091d24 !important;
   border: none !important;
   margin: 1rem 0 0.25rem 0 !important;
 }
