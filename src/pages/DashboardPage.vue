@@ -25,7 +25,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.azimuthSpeed)
-              }}</q-item-label>
+                }}</q-item-label>
             </div>
           </div>
         </q-card-section>
@@ -53,7 +53,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.elevationSpeed)
-              }}</q-item-label>
+                }}</q-item-label>
             </div>
           </div>
         </q-card-section>
@@ -81,7 +81,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.trainSpeed)
-              }}</q-item-label>
+                }}</q-item-label>
             </div>
           </div>
         </q-card-section>
@@ -132,9 +132,24 @@
             <div class="text-subtitle1 text-weight-bold text-white">Control</div>
             <div class="control-content">
               <div class="control-buttons q-gutter-y-sm">
-                <q-btn color="primary" label="Initialize" class="full-width" />
-                <q-btn color="warning" label="Reset" class="full-width" />
-                <q-btn color="info" label="Calibrate" class="full-width" />
+                <!-- 1행: Control LED 인디케이터 -->
+                <div class="control-status-item">
+                  <div class="control-led-container">
+                    <div class="control-led led-control"></div>
+                    <span class="control-label">Control</span>
+                  </div>
+                </div>
+
+                <!-- 2행: Monitoring LED 인디케이터 -->
+                <div class="control-status-item">
+                  <div class="control-led-container">
+                    <div class="control-led led-monitoring"></div>
+                    <span class="control-label">Monitoring</span>
+                  </div>
+                </div>
+
+                <!-- 3행: Control Request 버튼 -->
+                <q-btn color="info" label="Control Request" class="full-width" />
               </div>
             </div>
           </q-card-section>
@@ -1723,9 +1738,7 @@ const handleAllStatus = () => {
 .control-card {
   background-color: var(--theme-card-background);
   border: 1px solid var(--theme-border);
-  /* 밝은 회색 테두리 */
   border-top: 5px solid var(--theme-border) !important;
-  /* 흰색 테두리로 통일하되 두께는 5px로 증가 */
   border-radius: 8px;
   flex: 1;
   box-shadow: 0 2px 4px var(--theme-shadow-light);
@@ -1741,6 +1754,52 @@ const handleAllStatus = () => {
 
 .control-buttons {
   width: 100%;
+}
+
+/* Control LED 인디케이터 스타일 - 좌측 정렬 및 크기 더 증가 */
+.control-status-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  /* 좌측 정렬로 변경 */
+  margin-bottom: 0.5rem;
+}
+
+.control-led-container {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  /* 간격을 더 넓게 */
+}
+
+.control-led {
+  width: 24px;
+  /* 18px에서 24px로 더 증가 */
+  height: 24px;
+  /* 18px에서 24px로 더 증가 */
+  border-radius: 50%;
+  border: 4px solid;
+  /* 테두리를 더 두껍게 */
+}
+
+.control-led.led-control {
+  background-color: #4caf50;
+  /* 녹색 유지 */
+  border-color: #4caf50;
+}
+
+.control-led.led-monitoring {
+  background-color: #9e9e9e;
+  /* 파란색을 회색으로 변경 */
+  border-color: #9e9e9e;
+}
+
+.control-label {
+  color: white;
+  font-size: 1.3rem;
+  /* 1.1rem에서 1.3rem으로 더 증가 */
+  font-weight: 700;
+  /* 폰트 굵기를 더 굵게 */
 }
 
 /* Status 카드 - 밝은 회색 테두리 */
