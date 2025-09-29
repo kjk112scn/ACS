@@ -1,6 +1,6 @@
 <template>
   <q-layout view="lHh Lpr lFf">
-    <q-header elevated class="custom-header">
+    <q-header class="custom-header">
       <q-toolbar class="header-toolbar">
         <!-- 좌측 섹션: 메뉴 버튼과 로고 -->
         <div class="left-section">
@@ -26,11 +26,11 @@
           <!-- 설정 버튼들 (2행) -->
           <div class="buttons-row">
             <!-- 서버 상태 표시 부분 완전 제거 -->
-            <!-- <div class="server-status">
+            <div class="server-status">
               <span v-if="icdStore.error" class="text-negative">Server : Error: {{ icdStore.error }}</span>
               <span v-else-if="!icdStore.isConnected" class="text-warning">Server : WebSocket Connecting...</span>
               <span v-else-if="icdStore.isConnected && !icdStore.error" class="text-positive">Server : Connected</span>
-            </div> -->
+            </div>
 
             <!-- 설정 버튼들만 남기기 -->
             <q-btn flat dense round icon="settings" aria-label="Settings" @click="settingsModal = true"
@@ -226,16 +226,22 @@ onMounted(() => {
 <style scoped>
 .custom-header {
   background-color: var(--theme-primary) !important;
+  box-shadow: none !important;
+  border-bottom: 1px solid var(--theme-border) !important;
 }
 
 /* 다크 테마일 때 */
 .body--dark .custom-header {
   background-color: #091d24 !important;
+  box-shadow: none !important;
+  border-bottom: 1px solid var(--theme-border) !important;
 }
 
 /* 라이트 테마일 때 */
 .body--light .custom-header {
   background-color: #1976d2 !important;
+  box-shadow: none !important;
+  border-bottom: 1px solid var(--theme-border) !important;
 }
 
 /* 툴바 레이아웃 */
@@ -246,6 +252,8 @@ onMounted(() => {
   width: 100%;
   min-height: 64px;
   /* 높이 증가 */
+  box-shadow: none !important;
+  border-bottom: none !important;
 }
 
 /* 좌측 섹션 */

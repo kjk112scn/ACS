@@ -59,6 +59,35 @@ export interface ThemeConfig {
     statusInactive: string
     statusWarning: string
     statusError: string
+
+    // 테마 시스템 전용 색상
+    borderColor: string
+    borderColorEmergency: string
+    chartBackground: string
+  }
+
+  // 간격 시스템
+  spacing: {
+    xs: string // 0.25rem (4px)
+    sm: string // 0.5rem (8px)
+    md: string // 1rem (16px)
+    lg: string // 1.5rem (24px)
+    xl: string // 2rem (32px)
+  }
+
+  // 테두리 시스템
+  borders: {
+    width: string
+    widthThick: string
+    radius: string
+    radiusSm: string
+  }
+
+  // 그림자 시스템
+  shadows: {
+    sm: string
+    md: string
+    lg: string
   }
 }
 
@@ -122,6 +151,35 @@ export const THEME_PRESETS: Record<string, ThemeConfig> = {
       statusInactive: '#78909C', // 비활성 상태
       statusWarning: '#FFC107', // 경고 상태
       statusError: '#F44336', // 에러 상태
+
+      // 테마 시스템 전용 색상
+      borderColor: '#5c6a67', // 통일된 테두리 색상
+      borderColorEmergency: '#f44336', // 긴급 테두리 색상
+      chartBackground: '#091d24', // 차트 배경 색상
+    },
+
+    // 간격 시스템
+    spacing: {
+      xs: '0.25rem', // 4px
+      sm: '0.5rem', // 8px
+      md: '1rem', // 16px
+      lg: '1.5rem', // 24px
+      xl: '2rem', // 32px
+    },
+
+    // 테두리 시스템
+    borders: {
+      width: '1px',
+      widthThick: '3px',
+      radius: '8px',
+      radiusSm: '4px',
+    },
+
+    // 그림자 시스템
+    shadows: {
+      sm: '0 1px 2px rgba(0, 0, 0, 0.1)',
+      md: '0 2px 4px rgba(0, 0, 0, 0.1)',
+      lg: '0 4px 8px rgba(0, 0, 0, 0.1)',
     },
   },
 
@@ -167,6 +225,33 @@ export const THEME_PRESETS: Record<string, ThemeConfig> = {
       statusInactive: '#757575',
       statusWarning: '#F2C037',
       statusError: '#C10015',
+      borderColor: '#5c6a67',
+      borderColorEmergency: '#f44336',
+      chartBackground: '#f5f5f5',
+    },
+
+    // 간격 시스템
+    spacing: {
+      xs: '0.25rem',
+      sm: '0.5rem',
+      md: '1rem',
+      lg: '1.5rem',
+      xl: '2rem',
+    },
+
+    // 테두리 시스템
+    borders: {
+      width: '1px',
+      widthThick: '3px',
+      radius: '8px',
+      radiusSm: '4px',
+    },
+
+    // 그림자 시스템
+    shadows: {
+      sm: '0 1px 2px rgba(0, 0, 0, 0.1)',
+      md: '0 2px 4px rgba(0, 0, 0, 0.1)',
+      lg: '0 4px 8px rgba(0, 0, 0, 0.1)',
     },
   },
 }
@@ -193,6 +278,21 @@ export function useTheme() {
     // 모든 색상 변수를 CSS 변수로 설정
     Object.entries(config.colors).forEach(([key, value]) => {
       root.style.setProperty(`--theme-${key}`, value)
+    })
+
+    // 간격 변수 설정
+    Object.entries(config.spacing).forEach(([key, value]) => {
+      root.style.setProperty(`--theme-spacing-${key}`, value)
+    })
+
+    // 테두리 변수 설정
+    Object.entries(config.borders).forEach(([key, value]) => {
+      root.style.setProperty(`--theme-border-${key}`, value)
+    })
+
+    // 그림자 변수 설정
+    Object.entries(config.shadows).forEach(([key, value]) => {
+      root.style.setProperty(`--theme-shadow-${key}`, value)
     })
 
     // Quasar 색상 변수도 업데이트

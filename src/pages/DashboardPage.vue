@@ -1,237 +1,228 @@
 <template>
   <q-page class="dashboard-container q-pa-md">
     <!-- 상단 부분: 실시간 ICD 데이터 표시 (3축으로 구분) -->
-    <q-card class="icd-data-section">
-      <q-card-section>
-        <!-- header-section 전체 제거 -->
+    <!-- 기존의 q-card와 q-card-section 제거하고 axis-grid만 남기기 -->
+    <div class="axis-grid">
+      <!-- Azimuth 축 데이터 -->
+      <q-card class="axis-card azimuth-card">
+        <q-card-section>
+          <div class="text-subtitle1 text-weight-bold text-center">Azimuth</div>
 
-        <div class="axis-grid">
-          <!-- Azimuth 축 데이터 -->
-          <q-card class="axis-card azimuth-card">
-            <q-card-section style="padding: 0 !important;">
-              <div class="text-subtitle1 text-weight-bold text-center"
-                style="margin: 0 !important; padding: 0.1rem 0 1rem 0 !important;">Azimuth</div>
-
-              <!-- Azimuth 차트 영역 추가 -->
-              <div class="axis-chart" ref="azimuthChartRef"
-                style="height: 200px !important; min-height: 200px !important;"></div>
-
-              <div class="axis-data-row">
-                <div class="axis-data-item">
-                  <q-item-label class="adaptive-caption">CMD</q-item-label>
-                  <q-item-label class="adaptive-text">{{ displayValue(azimuthCmdValue) }}</q-item-label>
-                </div>
-                <div class="axis-data-item">
-                  <q-item-label class="adaptive-caption">Actual</q-item-label>
-                  <q-item-label class="adaptive-text">{{ displayValue(azimuthActualValue) }}</q-item-label>
-                </div>
-                <div class="axis-data-item">
-                  <q-item-label class="adaptive-caption">Speed</q-item-label>
-                  <q-item-label class="adaptive-text">{{
-                    displayValue(icdStore.azimuthSpeed)
-                  }}</q-item-label>
-                </div>
-              </div>
-            </q-card-section>
-          </q-card>
-
-          <!-- Elevation 축 데이터 -->
-          <q-card class="axis-card elevation-card">
-            <q-card-section style="padding: 0 !important;">
-              <div class="text-subtitle1 text-weight-bold text-center"
-                style="margin: 0 !important; padding: 0.1rem 0 1rem 0 !important;">Elevation</div>
-
-              <!-- Elevation 차트 영역 추가 -->
-              <div class="axis-chart" ref="elevationChartRef"
-                style="height: 200px !important; min-height: 200px !important;"></div>
-
-              <div class="axis-data-row">
-                <div class="axis-data-item">
-                  <q-item-label class="adaptive-caption">CMD</q-item-label>
-                  <q-item-label class="adaptive-text">{{ displayValue(elevationCmdValue) }}</q-item-label>
-                </div>
-                <div class="axis-data-item">
-                  <q-item-label class="adaptive-caption">Actual</q-item-label>
-                  <q-item-label class="adaptive-text">{{ displayValue(elevationActualValue) }}</q-item-label>
-                </div>
-                <div class="axis-data-item">
-                  <q-item-label class="adaptive-caption">Speed</q-item-label>
-                  <q-item-label class="adaptive-text">{{
-                    displayValue(icdStore.elevationSpeed)
-                  }}</q-item-label>
-                </div>
-              </div>
-            </q-card-section>
-          </q-card>
-
-          <!-- Tilt 축 데이터 -->
-          <q-card class="axis-card tilt-card">
-            <q-card-section style="padding: 0 !important;">
-              <div class="text-subtitle1 text-weight-bold text-center"
-                style="margin: 0 !important; padding: 0.1rem 0 1rem 0 !important;">Tilt</div>
-
-              <!-- Tilt 차트 영역 추가 -->
-              <div class="axis-chart" ref="trainChartRef"
-                style="height: 200px !important; min-height: 200px !important;"></div>
-
-              <div class="axis-data-row">
-                <div class="axis-data-item">
-                  <q-item-label class="adaptive-caption">CMD</q-item-label>
-                  <q-item-label class="adaptive-text">{{ displayValue(trainCmdValue) }}</q-item-label>
-                </div>
-                <div class="axis-data-item">
-                  <q-item-label class="adaptive-caption">Actual</q-item-label>
-                  <q-item-label class="adaptive-text">{{ displayValue(trainActualValue) }}</q-item-label>
-                </div>
-                <div class="axis-data-item">
-                  <q-item-label class="adaptive-caption">Speed</q-item-label>
-                  <q-item-label class="adaptive-text">{{
-                    displayValue(icdStore.trainSpeed)
-                  }}</q-item-label>
-                </div>
-              </div>
-            </q-card-section>
-          </q-card>
-
-          <!-- Emergency와 Control 컨테이너 -->
-          <div class="control-container">
-            <!-- Emergency 카드 -->
-            <q-card class="emergency-card">
-              <q-card-section>
-                <div class="text-subtitle1 text-weight-bold text-negative">Emergency</div>
-                <div class="emergency-content">
-                  <q-btn class="full-width" :color="acsEmergencyActive ? 'grey-8' : 'negative'"
-                    :label="acsEmergencyActive ? 'Emergency Active' : 'Emergency Stop'" @click="handleEmergencyClick"
-                    size="lg" />
-                </div>
-              </q-card-section>
-            </q-card>
-
-            <!-- Emergency 해제 모달 -->
-            <q-dialog v-model="emergencyModal">
-              <q-card style="min-width: 350px">
-                <q-card-section class="row items-center">
-                  <div class="text-h6">비상 정지 해제</div>
-                  <q-space />
-                  <q-btn icon="close" flat round dense v-close-popup />
-                </q-card-section>
-
-                <q-card-section>
-                  <p>이 버튼을 선택하기 전 확인 후 해제 버튼을 선택해주세요.</p>
-                </q-card-section>
-
-                <q-card-actions align="right">
-                  <q-btn flat label="닫기" color="grey-7" v-close-popup />
-                  <q-btn flat label="해제" color="primary" @click="
-                    () => {
-                      releaseEmergency()
-                      emergencyModal = false
-                    }
-                  " v-close-popup />
-                </q-card-actions>
-              </q-card>
-            </q-dialog>
-
-            <!-- Control 카드 -->
-            <q-card class="control-card">
-              <q-card-section>
-                <div class="text-subtitle1 text-weight-bold text-primary">Control</div>
-                <div class="control-content">
-                  <div class="control-buttons q-gutter-y-sm">
-                    <q-btn color="primary" label="Initialize" class="full-width" />
-                    <q-btn color="warning" label="Reset" class="full-width" />
-                    <q-btn color="info" label="Calibrate" class="full-width" />
-                  </div>
-                </div>
-              </q-card-section>
-            </q-card>
+          <!-- Azimuth 차트 영역 추가 -->
+          <div class="axis-chart" ref="azimuthChartRef" style="height: 220px !important; min-height: 220px !important;">
           </div>
 
-          <!-- Status 카드 -->
-          <q-card class="status-card">
-            <q-card-section>
-              <div class="text-subtitle1 text-weight-bold text-primary">Status</div>
-              <div class="status-content">
-                <!-- Emergency LED - TRUE면 빨간색, FALSE면 녹색 -->
-                <div class="status-item q-mb-sm">
-                  <div class="status-led-container">
-                    <div class="status-led" :class="{
-                      'led-error': errorEmergencyActive,
-                      'led-normal': !errorEmergencyActive,
-                    }"></div>
-                    <span class="status-label">Emergency</span>
-                  </div>
-                </div>
+          <div class="axis-data-row">
+            <div class="axis-data-item">
+              <q-item-label class="adaptive-caption">CMD</q-item-label>
+              <q-item-label class="adaptive-text">{{ displayValue(azimuthCmdValue) }}</q-item-label>
+            </div>
+            <div class="axis-data-item">
+              <q-item-label class="adaptive-caption">Actual</q-item-label>
+              <q-item-label class="adaptive-text">{{ displayValue(azimuthActualValue) }}</q-item-label>
+            </div>
+            <div class="axis-data-item">
+              <q-item-label class="adaptive-caption">Speed</q-item-label>
+              <q-item-label class="adaptive-text">{{
+                displayValue(icdStore.azimuthSpeed)
+              }}</q-item-label>
+            </div>
+          </div>
+        </q-card-section>
+      </q-card>
 
-                <!-- Positioner LED - TRUE면 빨간색, FALSE면 녹색 -->
-                <div class="status-item q-mb-sm">
-                  <div class="status-led-container">
-                    <div class="status-led" :class="{
-                      'led-error': errorPositionerActive,
-                      'led-normal': !errorPositionerActive,
-                    }"></div>
-                    <span class="status-label">Positioner</span>
-                  </div>
-                </div>
+      <!-- Elevation 축 데이터 -->
+      <q-card class="axis-card elevation-card">
+        <q-card-section>
+          <div class="text-subtitle1 text-weight-bold text-center">Elevation</div>
 
-                <!-- Feed LED - TRUE면 빨간색, FALSE면 녹색 -->
-                <div class="status-item q-mb-sm">
-                  <div class="status-led-container">
-                    <div class="status-led" :class="{ 'led-error': errorFeedActive, 'led-normal': !errorFeedActive }">
-                    </div>
-                    <span class="status-label">Feed</span>
-                  </div>
-                </div>
+          <!-- Elevation 차트 영역 추가 -->
+          <div class="axis-chart" ref="elevationChartRef"
+            style="height: 220px !important; min-height: 220px !important;"></div>
 
-                <!-- Protocol LED - TRUE면 빨간색, FALSE면 녹색 -->
-                <div class="status-item q-mb-sm">
-                  <div class="status-led-container">
-                    <div class="status-led" :class="{
-                      'led-error': errorProtocolActive,
-                      'led-normal': !errorProtocolActive,
-                    }"></div>
-                    <span class="status-label">Protocol</span>
-                  </div>
-                </div>
+          <div class="axis-data-row">
+            <div class="axis-data-item">
+              <q-item-label class="adaptive-caption">CMD</q-item-label>
+              <q-item-label class="adaptive-text">{{ displayValue(elevationCmdValue) }}</q-item-label>
+            </div>
+            <div class="axis-data-item">
+              <q-item-label class="adaptive-caption">Actual</q-item-label>
+              <q-item-label class="adaptive-text">{{ displayValue(elevationActualValue) }}</q-item-label>
+            </div>
+            <div class="axis-data-item">
+              <q-item-label class="adaptive-caption">Speed</q-item-label>
+              <q-item-label class="adaptive-text">{{
+                displayValue(icdStore.elevationSpeed)
+              }}</q-item-label>
+            </div>
+          </div>
+        </q-card-section>
+      </q-card>
 
-                <!-- Power LED - TRUE면 빨간색, FALSE면 녹색 -->
-                <div class="status-item q-mb-sm">
-                  <div class="status-led-container">
-                    <div class="status-led" :class="{ 'led-error': errorPowerActive, 'led-normal': !errorPowerActive }">
-                    </div>
-                    <span class="status-label">Power</span>
-                  </div>
-                </div>
+      <!-- Tilt 축 데이터 -->
+      <q-card class="axis-card tilt-card">
+        <q-card-section>
+          <div class="text-subtitle1 text-weight-bold text-center">Tilt</div>
 
-                <!-- ✅ Stow LED - TRUE면 녹색, FALSE면 회색 -->
-                <div class="status-item q-mb-sm">
-                  <div class="status-led-container">
-                    <div class="status-led" :class="{ 'led-stow-active': stowActive, 'led-inactive': !stowActive }">
-                    </div>
-                    <span class="status-label">Stow</span>
-                  </div>
-                </div>
+          <!-- Tilt 차트 영역 추가 -->
+          <div class="axis-chart" ref="trainChartRef" style="height: 220px !important; min-height: 220px !important;">
+          </div>
 
-                <!-- ✅ Stow Pin LED - TRUE면 녹색, FALSE면 회색 -->
-                <div class="status-item q-mb-sm">
-                  <div class="status-led-container">
-                    <div class="status-led"
-                      :class="{ 'led-stow-active': stowPinActive, 'led-inactive': !stowPinActive }"></div>
-                    <span class="status-label">Stow Pin</span>
-                  </div>
-                </div>
+          <div class="axis-data-row">
+            <div class="axis-data-item">
+              <q-item-label class="adaptive-caption">CMD</q-item-label>
+              <q-item-label class="adaptive-text">{{ displayValue(trainCmdValue) }}</q-item-label>
+            </div>
+            <div class="axis-data-item">
+              <q-item-label class="adaptive-caption">Actual</q-item-label>
+              <q-item-label class="adaptive-text">{{ displayValue(trainActualValue) }}</q-item-label>
+            </div>
+            <div class="axis-data-item">
+              <q-item-label class="adaptive-caption">Speed</q-item-label>
+              <q-item-label class="adaptive-text">{{
+                displayValue(icdStore.trainSpeed)
+              }}</q-item-label>
+            </div>
+          </div>
+        </q-card-section>
+      </q-card>
 
-                <!-- All Status 버튼 -->
-                <div class="all-status-button q-mt-md">
-                  <q-btn color="primary" label="All Status" size="sm" outline @click="handleAllStatus"
-                    class="full-width" />
-                </div>
-              </div>
+      <!-- Emergency와 Control 컨테이너 -->
+      <div class="control-container">
+        <!-- Emergency 카드 -->
+        <q-card class="emergency-card">
+          <q-card-section>
+            <div class="text-subtitle1 text-weight-bold text-negative">Emergency</div>
+            <div class="emergency-content">
+              <q-btn class="full-width" :color="acsEmergencyActive ? 'grey-8' : 'negative'"
+                :label="acsEmergencyActive ? 'Emergency Active' : 'Emergency Stop'" @click="handleEmergencyClick"
+                size="lg" />
+            </div>
+          </q-card-section>
+        </q-card>
+
+        <!-- Emergency 해제 모달 -->
+        <q-dialog v-model="emergencyModal">
+          <q-card style="min-width: 350px">
+            <q-card-section class="row items-center">
+              <div class="text-h6">비상 정지 해제</div>
+              <q-space />
+              <q-btn icon="close" flat round dense v-close-popup />
             </q-card-section>
+
+            <q-card-section>
+              <p>이 버튼을 선택하기 전 확인 후 해제 버튼을 선택해주세요.</p>
+            </q-card-section>
+
+            <q-card-actions align="right">
+              <q-btn flat label="닫기" color="grey-7" v-close-popup />
+              <q-btn flat label="해제" color="primary" @click="
+                () => {
+                  releaseEmergency()
+                  emergencyModal = false
+                }
+              " v-close-popup />
+            </q-card-actions>
           </q-card>
-        </div>
-      </q-card-section>
-    </q-card>
+        </q-dialog>
+
+        <!-- Control 카드 -->
+        <q-card class="control-card">
+          <q-card-section>
+            <div class="text-subtitle1 text-weight-bold text-primary">Control</div>
+            <div class="control-content">
+              <div class="control-buttons q-gutter-y-sm">
+                <q-btn color="primary" label="Initialize" class="full-width" />
+                <q-btn color="warning" label="Reset" class="full-width" />
+                <q-btn color="info" label="Calibrate" class="full-width" />
+              </div>
+            </div>
+          </q-card-section>
+        </q-card>
+      </div>
+
+      <!-- Status 카드 -->
+      <q-card class="status-card">
+        <q-card-section>
+          <div class="text-subtitle1 text-weight-bold text-primary">Status</div>
+          <div class="status-content">
+            <!-- Emergency LED - TRUE면 빨간색, FALSE면 녹색 -->
+            <div class="status-item q-mb-sm">
+              <div class="status-led-container">
+                <div class="status-led" :class="{
+                  'led-error': errorEmergencyActive,
+                  'led-normal': !errorEmergencyActive,
+                }"></div>
+                <span class="status-label">Emergency</span>
+              </div>
+            </div>
+
+            <!-- Positioner LED - TRUE면 빨간색, FALSE면 녹색 -->
+            <div class="status-item q-mb-sm">
+              <div class="status-led-container">
+                <div class="status-led" :class="{
+                  'led-error': errorPositionerActive,
+                  'led-normal': !errorPositionerActive,
+                }"></div>
+                <span class="status-label">Positioner</span>
+              </div>
+            </div>
+
+            <!-- Feed LED - TRUE면 빨간색, FALSE면 녹색 -->
+            <div class="status-item q-mb-sm">
+              <div class="status-led-container">
+                <div class="status-led" :class="{ 'led-error': errorFeedActive, 'led-normal': !errorFeedActive }">
+                </div>
+                <span class="status-label">Feed</span>
+              </div>
+            </div>
+
+            <!-- Protocol LED - TRUE면 빨간색, FALSE면 녹색 -->
+            <div class="status-item q-mb-sm">
+              <div class="status-led-container">
+                <div class="status-led" :class="{
+                  'led-error': errorProtocolActive,
+                  'led-normal': !errorProtocolActive,
+                }"></div>
+                <span class="status-label">Protocol</span>
+              </div>
+            </div>
+
+            <!-- Power LED - TRUE면 빨간색, FALSE면 녹색 -->
+            <div class="status-item q-mb-sm">
+              <div class="status-led-container">
+                <div class="status-led" :class="{ 'led-error': errorPowerActive, 'led-normal': !errorPowerActive }">
+                </div>
+                <span class="status-label">Power</span>
+              </div>
+            </div>
+
+            <!-- ✅ Stow LED - TRUE면 녹색, FALSE면 회색 -->
+            <div class="status-item q-mb-sm">
+              <div class="status-led-container">
+                <div class="status-led" :class="{ 'led-stow-active': stowActive, 'led-inactive': !stowActive }">
+                </div>
+                <span class="status-label">Stow</span>
+              </div>
+            </div>
+
+            <!-- ✅ Stow Pin LED - TRUE면 녹색, FALSE면 회색 -->
+            <div class="status-item q-mb-sm">
+              <div class="status-led-container">
+                <div class="status-led" :class="{ 'led-stow-active': stowPinActive, 'led-inactive': !stowPinActive }">
+                </div>
+                <span class="status-label">Stow Pin</span>
+              </div>
+            </div>
+
+            <!-- All Status 버튼 -->
+            <div class="all-status-button q-mt-md">
+              <q-btn color="primary" label="All Status" size="sm" outline @click="handleAllStatus" class="full-width" />
+            </div>
+          </div>
+        </q-card-section>
+      </q-card>
+    </div>
 
     <!-- 모드 선택 탭 -->
     <q-card class="mode-selection-section q-mt-md">
@@ -1426,6 +1417,8 @@ const handleAllStatus = () => {
   margin: 0 auto;
   background-color: var(--theme-background);
   min-height: 100vh;
+  padding-top: 0.1rem !important;
+  /* 상단 패딩을 다시 늘림 */
 }
 
 .header-section {
@@ -1455,7 +1448,89 @@ const handleAllStatus = () => {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 0.8fr);
   gap: 1rem;
-  margin-top: 1rem;
+  margin-top: 1rem !important;
+  /* 2행과 3행 사이 간격과 동일하게 */
+}
+
+/* 헤더 그림자 제거 - 더 강력한 선택자 사용 */
+.q-header,
+.q-toolbar,
+.q-layout__header,
+.q-page__header,
+.q-layout__section--marginal,
+.q-layout__section--marginal .q-toolbar,
+.q-layout__header .q-toolbar,
+.q-page__header .q-toolbar,
+.q-layout__header .q-toolbar__content,
+.q-page__header .q-toolbar__content {
+  box-shadow: none !important;
+  border-bottom: none !important;
+  background: transparent !important;
+}
+
+/* 헤더 하단 그림자 효과 제거 - 더 구체적인 선택자 */
+.q-layout__header,
+.q-page__header,
+.q-toolbar,
+.q-header,
+.q-layout__header .q-toolbar,
+.q-page__header .q-toolbar {
+  box-shadow: none !important;
+  border-bottom: none !important;
+  background: transparent !important;
+}
+
+/* 페이지 전체 헤더 관련 그림자 제거 */
+.q-layout,
+.q-page {
+  box-shadow: none !important;
+}
+
+/* 헤더 배경과 그림자 완전 제거 */
+.q-layout__header .q-toolbar,
+.q-page__header .q-toolbar {
+  box-shadow: none !important;
+  border-bottom: none !important;
+  background: transparent !important;
+}
+
+/* 추가 헤더 관련 요소들 */
+.q-layout__header .q-toolbar__content,
+.q-page__header .q-toolbar__content,
+.q-layout__header .q-toolbar__title,
+.q-page__header .q-toolbar__title {
+  box-shadow: none !important;
+  border-bottom: none !important;
+}
+
+/* 헤더의 모든 하위 요소 */
+.q-layout__header *,
+.q-page__header * {
+  box-shadow: none !important;
+  border-bottom: none !important;
+}
+
+/* 전역 헤더 스타일 오버라이드 */
+.q-layout__header::after,
+.q-page__header::after,
+.q-toolbar::after {
+  display: none !important;
+}
+
+/* 헤더 관련 모든 그림자와 테두리 제거 */
+.q-layout__header,
+.q-page__header,
+.q-toolbar,
+.q-header,
+.q-layout__header .q-toolbar,
+.q-page__header .q-toolbar,
+.q-layout__header .q-toolbar__content,
+.q-page__header .q-toolbar__content {
+  box-shadow: none !important;
+  border-bottom: none !important;
+  background: transparent !important;
+  text-shadow: none !important;
+  filter: none !important;
 }
 
 /* 모든 패널의 기본 테두리를 밝은 회색으로 변경 */
