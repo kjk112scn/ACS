@@ -129,7 +129,7 @@
         <!-- Control 카드 -->
         <q-card class="control-card">
           <q-card-section>
-            <div class="text-subtitle1 text-weight-bold text-primary">Control</div>
+            <div class="text-subtitle1 text-weight-bold text-white">Control</div>
             <div class="control-content">
               <div class="control-buttons q-gutter-y-sm">
                 <q-btn color="primary" label="Initialize" class="full-width" />
@@ -144,7 +144,7 @@
       <!-- Status 카드 -->
       <q-card class="status-card">
         <q-card-section>
-          <div class="text-subtitle1 text-weight-bold text-primary">Status</div>
+          <div class="text-subtitle1 text-weight-bold text-white">Status</div>
           <div class="status-content">
             <!-- Emergency LED - TRUE면 빨간색, FALSE면 녹색 -->
             <div class="status-item q-mb-sm">
@@ -217,7 +217,7 @@
 
             <!-- All Status 버튼 -->
             <div class="all-status-button q-mt-md">
-              <q-btn color="primary" label="All Status" size="sm" outline @click="handleAllStatus" class="full-width" />
+              <q-btn color="primary" label="All Status" class="full-width" @click="handleAllStatus" />
             </div>
           </div>
         </q-card-section>
@@ -818,7 +818,7 @@ const initCharts = () => {
       backgroundColor: 'transparent',
       grid: { containLabel: true },
       polar: {
-        radius: ['0%', '80%'],
+        radius: ['0%', '70%'], // 80%에서 70%로 줄여서 여백 확보
         center: ['50%', '50%'],
       },
       angleAxis: {
@@ -834,7 +834,6 @@ const initCharts = () => {
         axisTick: {
           show: true,
           interval: 30,
-
           lineStyle: { color: '#555' },
         },
         axisLabel: {
@@ -847,8 +846,8 @@ const initCharts = () => {
             return value + '°'
           },
           color: '#999',
-          fontSize: 13,
-          distance: 25,
+          fontSize: 12, // 13에서 12로 줄여서 공간 확보
+          distance: 20, // 25에서 20으로 줄여서 공간 확보
           rich: {
             vAlign: {
               align: 'center',
@@ -882,7 +881,7 @@ const initCharts = () => {
           type: 'scatter',
           coordinateSystem: 'polar',
           symbol: 'circle',
-          symbolSize: 12,
+          symbolSize: 10, // 12에서 10으로 줄여서 공간 확보
           itemStyle: { color: '#ff5722' },
           data: [[1, azimuth]], // [radius, angle] 형식으로 변경
           zlevel: 2,
@@ -896,10 +895,10 @@ const initCharts = () => {
               return '0.00°'
             },
             position: 'top',
-            distance: 0,
+            distance: 5, // 0에서 5로 증가하여 여백 확보
             color: '#ff5722',
-            fontSize: 15,
-            padding: [4, 8],
+            fontSize: 13, // 15에서 13으로 줄여서 공간 확보
+            padding: [2, 6], // [4, 8]에서 [2, 6]으로 줄여서 공간 확보
             backgroundColor: 'rgba(0,0,0,0.5)',
             borderRadius: 4,
             align: 'center',
@@ -935,7 +934,7 @@ const initCharts = () => {
       backgroundColor: 'transparent',
       grid: { containLabel: true },
       polar: {
-        radius: ['0%', '80%'],
+        radius: ['0%', '70%'], // 80%에서 70%로 줄여서 여백 확보
         center: ['50%', '50%'],
       },
       angleAxis: {
@@ -962,12 +961,12 @@ const initCharts = () => {
             return value + '°'
           },
           color: '#999',
-          fontSize: 13,
-          distance: 25,
+          fontSize: 12, // 13에서 12로 줄여서 공간 확보
+          distance: 20, // 25에서 20으로 줄여서 공간 확보
           rich: {
             upLabel: {
               align: 'center',
-              padding: [0, 0, 10, 0],
+              padding: [0, 0, 8, 0], // 10에서 8로 줄여서 공간 확보
               verticalAlign: 'bottom',
             },
           },
@@ -997,7 +996,7 @@ const initCharts = () => {
           type: 'scatter',
           coordinateSystem: 'polar',
           symbol: 'circle',
-          symbolSize: 12,
+          symbolSize: 10, // 12에서 10으로 줄여서 공간 확보
           itemStyle: { color: '#2196f3' },
           data: [[0, normalizedInitialElevation]],
           zlevel: 2,
@@ -1007,10 +1006,10 @@ const initCharts = () => {
               return `${elevation.toFixed(2)}°`
             },
             position: 'top',
-            distance: 0,
+            distance: 5, // 0에서 5로 증가하여 여백 확보
             color: '#2196f3',
-            fontSize: 15,
-            padding: [4, 8],
+            fontSize: 13, // 15에서 13으로 줄여서 공간 확보
+            padding: [2, 6], // [4, 8]에서 [2, 6]으로 줄여서 공간 확보
             backgroundColor: 'rgba(0,0,0,0.5)',
             borderRadius: 4,
           },
@@ -1041,7 +1040,7 @@ const initCharts = () => {
       backgroundColor: 'transparent',
       grid: { containLabel: true },
       polar: {
-        radius: ['0%', '80%'],
+        radius: ['0%', '70%'], // 80%에서 70%로 줄여서 여백 확보
         center: ['50%', '50%'],
       },
       angleAxis: {
@@ -1069,12 +1068,12 @@ const initCharts = () => {
             return value + '°'
           },
           color: '#999',
-          fontSize: 13,
-          distance: 25,
+          fontSize: 12, // 13에서 12로 줄여서 공간 확보
+          distance: 20, // 25에서 20으로 줄여서 공간 확보
           rich: {
             vAlign: {
               align: 'center',
-              padding: [0, 0, 2, 0],
+              padding: [0, 0, 1, 0], // 2에서 1로 줄여서 공간 확보
             },
           },
         },
@@ -1103,7 +1102,7 @@ const initCharts = () => {
           type: 'scatter',
           coordinateSystem: 'polar',
           symbol: 'circle',
-          symbolSize: 12,
+          symbolSize: 10, // 12에서 10으로 줄여서 공간 확보
           itemStyle: { color: '#4caf50' },
           data: [[1, normalizedInitialTrain]], // 초기값을 현재 train 값으로 설정
           zlevel: 2,
@@ -1113,10 +1112,10 @@ const initCharts = () => {
               return `${train.toFixed(2)}°`
             },
             position: 'top',
-            distance: 0,
+            distance: 5, // 0에서 5로 증가하여 여백 확보
             color: '#4caf50',
-            fontSize: 15,
-            padding: [4, 8],
+            fontSize: 13, // 15에서 13으로 줄여서 공간 확보
+            padding: [2, 6], // [4, 8]에서 [2, 6]으로 줄여서 공간 확보
             backgroundColor: 'rgba(0,0,0,0.5)',
             borderRadius: 4,
           },
@@ -1762,6 +1761,8 @@ const handleAllStatus = () => {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  padding: 0.5rem 0;
+  /* Control과 동일한 패딩으로 간격 조정 */
 }
 
 .status-messages {
@@ -1890,10 +1891,14 @@ const handleAllStatus = () => {
 }
 
 .all-status-button .q-btn {
-  font-size: 0.9rem;
-  padding: 8px 16px;
+  font-size: 1rem;
+  /* INITIALIZE 버튼과 동일한 폰트 크기 */
+  padding: 12px 16px;
+  /* INITIALIZE 버튼과 동일한 패딩 */
   background-color: var(--theme-button-primary);
   color: white;
+  font-weight: 600;
+  /* INITIALIZE 버튼과 동일한 폰트 두께 */
 }
 
 /* 반응형 디자인 유지 */
