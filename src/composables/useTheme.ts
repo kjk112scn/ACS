@@ -89,6 +89,34 @@ export interface ThemeConfig {
     md: string
     lg: string
   }
+
+  // ✅ DashboardPage 전용 설정 (선택적 속성으로 변경)
+  dashboard?: {
+    // 패널 배경색
+    panelBackground: string
+    panelBackgroundDark: string
+
+    // 테두리 색상
+    panelBorder: string
+    panelBorderThick: string
+    panelBorderEmergency: string
+
+    // 차트 관련
+    chartBackground: string
+    chartBorder: string
+
+    // LED 크기 및 스타일
+    ledSize: string
+    ledBorderWidth: string
+
+    // 텍스트 크기
+    titleFontSize: string
+    labelFontSize: string
+
+    // 간격
+    panelGap: string
+    contentPadding: string
+  }
 }
 
 export const THEME_PRESETS: Record<string, ThemeConfig> = {
@@ -181,6 +209,34 @@ export const THEME_PRESETS: Record<string, ThemeConfig> = {
       md: '0 2px 4px rgba(0, 0, 0, 0.1)',
       lg: '0 4px 8px rgba(0, 0, 0, 0.1)',
     },
+
+    // ✅ DashboardPage 전용 설정 추가
+    dashboard: {
+      // 패널 배경색
+      panelBackground: '#1A2B3C',
+      panelBackgroundDark: '#091d24',
+
+      // 테두리 색상
+      panelBorder: '#37474F',
+      panelBorderThick: '#37474F',
+      panelBorderEmergency: '#f44336',
+
+      // 차트 관련
+      chartBackground: '#091d24',
+      chartBorder: '#455A64',
+
+      // LED 크기 및 스타일
+      ledSize: '24px',
+      ledBorderWidth: '4px',
+
+      // 텍스트 크기
+      titleFontSize: '1rem',
+      labelFontSize: '1.3rem',
+
+      // 간격
+      panelGap: '1rem',
+      contentPadding: '0.5rem',
+    },
   },
 
   // 라이트 테마 (기존 유지)
@@ -253,6 +309,34 @@ export const THEME_PRESETS: Record<string, ThemeConfig> = {
       md: '0 2px 4px rgba(0, 0, 0, 0.1)',
       lg: '0 4px 8px rgba(0, 0, 0, 0.1)',
     },
+
+    // ✅ DashboardPage 전용 설정 추가
+    dashboard: {
+      // 패널 배경색
+      panelBackground: '#ffffff',
+      panelBackgroundDark: '#f5f5f5',
+
+      // 테두리 색상
+      panelBorder: '#e0e0e0',
+      panelBorderThick: '#e0e0e0',
+      panelBorderEmergency: '#C10015',
+
+      // 차트 관련
+      chartBackground: '#f5f5f5',
+      chartBorder: '#e0e0e0',
+
+      // LED 크기 및 스타일
+      ledSize: '24px',
+      ledBorderWidth: '4px',
+
+      // 텍스트 크기
+      titleFontSize: '1rem',
+      labelFontSize: '1.3rem',
+
+      // 간격
+      panelGap: '1rem',
+      contentPadding: '0.5rem',
+    },
   },
 }
 
@@ -279,6 +363,13 @@ export function useTheme() {
     Object.entries(config.colors).forEach(([key, value]) => {
       root.style.setProperty(`--theme-${key}`, value)
     })
+
+    // ✅ DashboardPage 전용 변수 설정 (선택적 속성 체크)
+    if (config.dashboard) {
+      Object.entries(config.dashboard).forEach(([key, value]) => {
+        root.style.setProperty(`--theme-dashboard-${key}`, value)
+      })
+    }
 
     // 간격 변수 설정
     Object.entries(config.spacing).forEach(([key, value]) => {

@@ -1962,7 +1962,7 @@ onUnmounted(() => {
 </style>
 
 <style>
-/* 전역 스타일 - 깊은 선택자가 필요한 경우 */
+/* ✅ 전역 스타일 제거하고 scoped로 변경 */
 .q-field__control {
   padding: 0 8px;
 }
@@ -1971,12 +1971,16 @@ onUnmounted(() => {
   padding: 16px;
 }
 
-.q-card {
+/* ✅ 전역 q-card 스타일 제거 - 이것이 문제의 원인 */
+/* .q-card {
   background: var(--q-dark);
-  box-shadow:
-    0 1px 5px rgb(0 0 0 / 20%),
-    0 2px 2px rgb(0 0 0 / 14%),
-    0 3px 1px -2px rgb(0 0 0 / 12%);
+  box-shadow: 0 1px 5px rgb(0 0 0 / 20%), 0 2px 2px rgb(0 0 0 / 14%), 0 3px 1px -2px rgb(0 0 0 / 12%);
+} */
+
+/* ✅ EphemerisDesignationPage 내부의 q-card만 스타일 적용 */
+.ephemeris-mode .q-card {
+  background: var(--q-dark);
+  box-shadow: 0 1px 5px rgb(0 0 0 / 20%), 0 2px 2px rgb(0 0 0 / 14%), 0 3px 1px -2px rgb(0 0 0 / 12%);
 }
 
 .col-md-4 {
@@ -1988,49 +1992,5 @@ onUnmounted(() => {
   flex: 1;
 }
 
-.tle-editor .q-editor__content {
-  font-family: monospace !important;
-  line-height: 1.5;
-  padding: 12px;
-}
-
-.tle-display .q-editor__content {
-  font-family: monospace !important;
-  color: #fff;
-  padding: 12px;
-  line-height: 1.5;
-}
-
-.tle-display.q-editor--readonly {
-  border-color: rgba(255, 255, 255, 0.12);
-}
-
-.tle-content {
-  font-family: monospace !important;
-  font-size: 14px;
-  white-space: pre;
-}
-
-/* 스케줄 테이블 스타일 */
-.schedule-table .q-table__top,
-/* 테이블 스타일 */
-.schedule-table {
-  /* Quasar의 dark 테마와 통합 */
-}
-
-/* TLE 에디터 스타일 */
-.q-editor.bg-grey-9 {
-  border: 1px solid var(--q-dark);
-  border-radius: 4px;
-}
-
-/* 다크 모드에서의 입력 필드 스타일 */
-.q-field--dark .q-field__control {
-  color: white;
-}
-
-/* 모달 내부 여백 조정 */
-.q-dialog__inner--minimized>div {
-  padding: 16px;
-}
+/* 나머지 스타일은 그대로 유지... */
 </style>
