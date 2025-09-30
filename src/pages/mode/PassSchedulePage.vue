@@ -2071,7 +2071,7 @@ const formattedCalTime = computed(() => {
 .control-section {
   height: 500px;
   width: 100%;
-  background-color: var(--q-dark);
+  background-color: var(--theme-card-background);
   border: 1px solid rgba(255, 255, 255, 0.12);
   display: flex;
   flex-direction: column;
@@ -2274,14 +2274,14 @@ const formattedCalTime = computed(() => {
 
 .info-label {
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--theme-text-secondary);
   font-size: 13px;
   min-width: 80px;
 }
 
 .info-value {
   font-weight: 600;
-  color: white;
+  color: var(--theme-text);
   font-size: 13px;
   text-align: right;
 }
@@ -2346,7 +2346,7 @@ const formattedCalTime = computed(() => {
 
 /* ===== 9. 테이블 기본 스타일 ===== */
 .schedule-table {
-  background-color: var(--q-dark);
+  background-color: var(--theme-card-background);
   color: white;
   flex: 1;
   border-radius: 6px;

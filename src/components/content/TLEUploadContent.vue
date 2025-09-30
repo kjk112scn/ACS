@@ -982,7 +982,7 @@ onUnmounted(() => {
   flex-direction: column;
   height: 100%;
   width: 100%;
-  background-color: var(--q-dark);
+  background-color: var(--theme-card-background);
   color: white;
   padding: 1rem;
   overflow: hidden;
@@ -1022,7 +1022,7 @@ onUnmounted(() => {
 
 .tle-table {
   flex: 1;
-  background-color: var(--q-dark);
+  background-color: var(--theme-card-background);
   color: white;
   height: 100%;
   overflow: hidden;
@@ -1052,7 +1052,7 @@ onUnmounted(() => {
 /* 테이블 기본 구조 강화 */
 .tle-table :deep(.q-table__container) {
   flex: 1;
-  background-color: var(--q-dark);
+  background-color: var(--theme-card-background);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 4px;
   overflow: hidden;
@@ -1243,7 +1243,7 @@ onUnmounted(() => {
 
 /* 테이블 바디 */
 .tle-table :deep(.q-table tbody) {
-  background-color: var(--q-dark);
+  background-color: var(--theme-card-background);
   width: 100% !important;
 }
 
@@ -1398,7 +1398,7 @@ onUnmounted(() => {
 /* 빈 데이터 상태 */
 .tle-table :deep(.q-table__bottom--nodata) {
   padding: 2rem;
-  background-color: var(--q-dark);
+  background-color: var(--theme-card-background);
 }
 
 .tle-table :deep(.q-inner-loading) {

@@ -1,7 +1,7 @@
 <template>
   <div class="select-schedule-content">
     <!-- ✅ X 아이콘 추가 -->
-    <q-btn flat round dense icon="close" color="grey-5" size="sm" @click="handleClose" class="close-btn">
+    <q-btn flat round dense icon="close" size="sm" @click="handleClose" class="close-btn">
       <q-tooltip>닫기</q-tooltip>
     </q-btn>
 
@@ -19,8 +19,8 @@
       <!-- 스케줄 테이블 -->
       <q-table flat bordered dark :rows="scheduleData" :columns="scheduleColumns" row-key="no" :loading="loading"
         selection="multiple" v-model:selected="selectedRows" @row-click="onRowClick" class="schedule-table"
-        style="height: 400px; background-color: var(--q-dark);" virtual-scroll :virtual-scroll-sticky-size-start="48"
-        hide-pagination :rows-per-page-options="[0]" :row-class="getRowClass">
+        style="height: 400px; background-color: var(--theme-card-background);" virtual-scroll
+        :virtual-scroll-sticky-size-start="48" hide-pagination :rows-per-page-options="[0]" :row-class="getRowClass">
 
         <template v-slot:loading>
           <q-inner-loading showing color="primary">
@@ -745,15 +745,44 @@ onUnmounted(async () => {
   top: 1rem;
   right: 1rem;
   z-index: 100;
-  background-color: rgba(0, 0, 0, 0.3);
+
+  /* ✅ 기본 상태: 회색 배경에 흰색 X */
+  background-color: rgba(0, 0, 0, 0.6) !important;
+  color: white !important;
   border-radius: 50%;
   width: 32px;
   height: 32px;
+
+  /* ✅ 호버 효과 강화 */
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
 }
 
 .close-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: white;
+  /* ✅ 호버 시: 더 진한 배경에 흰색 X 유지 */
+  background-color: rgba(0, 0, 0, 0.8) !important;
+  color: white !important;
+
+  /* ✅ 호버 시 테두리 추가 */
+  border: 2px solid rgba(255, 255, 255, 0.3);
+
+  /* ✅ 호버 시 약간 확대 효과 */
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* ✅ 포커스 상태도 추가 */
+.close-btn:focus {
+  background-color: rgba(0, 0, 0, 0.8) !important;
+  color: white !important;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  outline: none;
+}
+
+/* ✅ 활성 상태 (클릭 시) */
+.close-btn:active {
+  background-color: rgba(0, 0, 0, 0.9) !important;
+  transform: scale(0.95);
 }
 
 .select-schedule-content {
@@ -763,18 +792,28 @@ onUnmounted(async () => {
   flex-direction: column;
   height: 100%;
   width: 100%;
-  background-color: var(--q-dark) !important;
+  background-color: var(--theme-card-background) !important;
   color: white !important;
   padding: 1rem;
   overflow: hidden;
   box-sizing: border-box;
+
+  /* ✅ 외곽 테두리 추가 */
+  border: 2px solid var(--theme-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .content-header {
   flex-shrink: 0;
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 2px solid var(--theme-border);
+
+  /* ✅ 헤더 배경 강화 */
+  background-color: rgba(255, 255, 255, 0.02);
+  padding: 1rem;
+  border-radius: 6px 6px 0 0;
 }
 
 .content-body {
@@ -793,9 +832,14 @@ onUnmounted(async () => {
   align-items: center;
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 2px solid var(--theme-border);
   flex-wrap: wrap;
   gap: 1rem;
+
+  /* ✅ 푸터 배경 강화 */
+  background-color: rgba(255, 255, 255, 0.02);
+  padding: 1rem;
+  border-radius: 0 0 6px 6px;
 }
 
 .selection-info {
@@ -836,23 +880,30 @@ onUnmounted(async () => {
 }
 
 .schedule-table {
-  background-color: var(--q-dark) !important;
+  background-color: var(--theme-card-background) !important;
   color: white !important;
   flex: 1;
   width: 100%;
+
+  /* ✅ 테이블 테두리 추가 */
+  border: 1px solid var(--theme-border);
+  border-radius: 6px;
 }
 
 /* ✅ 가상 스크롤 및 고정 헤더 스타일 */
 .schedule-table :deep(.q-table__container) {
-  background-color: var(--q-dark) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 4px;
+  background-color: var(--theme-card-background) !important;
+  border: 1px solid var(--theme-border);
+  border-radius: 6px;
   max-height: 100%;
+
+  /* ✅ 내부 테두리 강화 */
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 /* ✅ 테이블 헤더 고정 및 불투명 배경 설정 */
 .schedule-table :deep(.q-table thead) {
-  background-color: #1d1d1d !important;
+  background-color: var(--theme-card-background) !important;
   position: sticky;
   top: 0;
   z-index: 10;
@@ -860,7 +911,7 @@ onUnmounted(async () => {
 }
 
 .schedule-table :deep(.q-table thead th) {
-  background-color: #1d1d1d !important;
+  background-color: var(--theme-card-background) !important;
   color: white !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
   position: sticky;
@@ -877,11 +928,11 @@ onUnmounted(async () => {
 
 /* ✅ 테이블 바디 스크롤 영역 */
 .schedule-table :deep(.q-table tbody) {
-  background-color: var(--q-dark) !important;
+  background-color: var(--theme-card-background) !important;
 }
 
 .schedule-table :deep(.q-table tbody tr) {
-  background-color: var(--q-dark) !important;
+  background-color: var(--theme-card-background) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
@@ -1144,7 +1195,7 @@ onUnmounted(async () => {
 }
 
 .angle-label {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--theme-text-secondary);
   font-weight: 600 !important;
   min-width: 35px;
   font-size: 13px !important;
@@ -1175,7 +1226,7 @@ onUnmounted(async () => {
 }
 
 .schedule-table :deep(.q-virtual-scroll__content) {
-  background-color: var(--q-dark) !important;
+  background-color: var(--theme-card-background) !important;
 }
 
 /* ✅ 스크롤바 스타일링 */
@@ -1201,7 +1252,7 @@ onUnmounted(async () => {
 
 /* ✅ 로딩 및 빈 데이터 상태 배경 설정 */
 .schedule-table :deep(.q-table__bottom--nodata) {
-  background-color: var(--q-dark) !important;
+  background-color: var(--theme-card-background) !important;
   color: white !important;
 }
 
@@ -1214,7 +1265,7 @@ onUnmounted(async () => {
 }
 
 .schedule-table :deep(.full-width) {
-  background-color: var(--q-dark) !important;
+  background-color: var(--theme-card-background) !important;
   color: white !important;
   padding: 2rem;
 }
@@ -1228,7 +1279,7 @@ onUnmounted(async () => {
 @media (max-width: 768px) {
   .select-schedule-content {
     padding: 0.5rem;
-    background-color: var(--q-dark) !important;
+    background-color: var(--theme-card-background) !important;
   }
 
   .content-header,
@@ -1313,7 +1364,7 @@ onUnmounted(async () => {
 
 @media (max-width: 480px) {
   .select-schedule-content {
-    background-color: var(--q-dark) !important;
+    background-color: var(--theme-card-background) !important;
     padding: 0.25rem;
   }
 

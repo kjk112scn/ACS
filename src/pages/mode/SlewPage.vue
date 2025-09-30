@@ -181,7 +181,7 @@ const handleBlur = (axis: 'azimuth' | 'elevation' | 'train') => {
 }
 
 .control-section {
-  background-color: var(--q-dark);
+  background-color: var(--theme-card-background);
   border: 1px solid rgba(255, 255, 255, 0.12);
   height: 100%;
   display: flex;
@@ -200,7 +200,7 @@ const handleBlur = (axis: 'azimuth' | 'elevation' | 'train') => {
 }
 
 .text-subtitle2 {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--theme-text-secondary);
   font-weight: 500;
 }
 
@@ -227,7 +227,7 @@ const handleBlur = (axis: 'azimuth' | 'elevation' | 'train') => {
 
 :deep(.q-checkbox__label) {
   font-size: 1.2rem;
-  color: white;
+  color: var(--theme-text);
   padding-left: 8px;
 }
 
@@ -244,12 +244,12 @@ const handleBlur = (axis: 'azimuth' | 'elevation' | 'train') => {
 
 :deep(.q-field__label) {
   font-size: 1rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--theme-text-secondary);
 }
 
 :deep(.q-field__native) {
   padding: 0.5rem;
-  color: white;
+  color: var(--theme-text);
 }
 
 /* 숫자 입력 필드의 화살표 버튼 숨기기 */

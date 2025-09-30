@@ -101,7 +101,7 @@ const handleStow = async () => {
 }
 
 .control-section {
-  background-color: var(--q-dark);
+  background-color: var(--theme-card-background);
   border: 1px solid rgba(255, 255, 255, 0.12);
   max-width: 800px;
   margin: 0 auto;
@@ -131,7 +131,7 @@ const handleStow = async () => {
 
 :deep(.q-checkbox__label) {
   font-size: 1.2rem;
-  color: white;
+  color: var(--theme-text);
   padding-left: 8px;
 }
 

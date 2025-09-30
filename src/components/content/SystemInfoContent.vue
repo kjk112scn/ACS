@@ -1044,7 +1044,7 @@ onUnmounted(() => {
 .body--dark .status-card,
 .body--dark .stat-card,
 .body--dark .action-section {
-  background: var(--q-dark);
+  background: var(--theme-card-background);
   color: white;
   border-color: var(--q-primary);
 }
@@ -1062,7 +1062,7 @@ onUnmounted(() => {
 }
 
 .body--dark .memory-bar {
-  background: #424242;
+  background: var(--theme-card-background);
   border-color: #616161;
 }
 

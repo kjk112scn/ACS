@@ -1,1 +1,256 @@
-# ACS ������Ʈ ��Ģ (2024.12 ���� ����) 
+ 
+# ACS 프로젝트 개발 규칙 (2024.12 최신 버전)
+
+## 🎯 프로젝트 개요
+- **프로젝트명**: GTL ACS (Antenna Control System)
+- **기술 스택**: Vue 3 + Quasar + TypeScript + Pinia
+- **아키텍처**: SPA (Single Page Application) with WebSocket 통신
+- **테마 시스템**: 중앙화된 테마 관리 (useTheme.ts)
+
+## 🏗️ 프로젝트 구조
+
+### 디렉토리 구조
+src/
+├── components/ # 재사용 가능한 컴포넌트
+│ ├── common/ # 공통 컴포넌트
+│ ├── content/ # 콘텐츠 컴포넌트 (모달, 팝업)
+│ └── settings/ # 설정 관련 컴포넌트
+├── pages/ # 페이지 컴포넌트
+│ ├── mode/ # 모드별 페이지 (Standby, Step, Slew 등)
+│ └── popup/ # 팝업 페이지
+├── layouts/ # 레이아웃 컴포넌트
+├── stores/ # Pinia 스토어
+├── services/ # API 서비스
+├── composables/ # Vue 3 Composables
+├── router/ # Vue Router 설정
+├── css/ # 스타일 파일
+└── types/ # TypeScript 타입 정의
+## 🎨 테마 관리 시스템
+
+### 핵심 원칙
+- **중앙화된 관리**: 모든 테마는 `useTheme.ts`에서 관리
+- **CSS 변수 사용**: `--theme-*` 변수로 일관된 색상 제어
+- **자동 적용**: 테마 변경 시 전체 프로젝트에 자동 적용
+
+### 테마 변수 사용 규칙
+```scss
+// ✅ 올바른 사용법
+background-color: var(--theme-card-background);
+color: var(--theme-text);
+border: 1px solid var(--theme-border);
+
+// ❌ 금지된 사용법
+background-color: #091d24;  // 하드코딩된 색상
+color: white;               // 하드코딩된 색상
+background: var(--q-dark);  // Quasar 변수 직접 사용
+```
+
+### 주요 테마 변수
+- `--theme-card-background`: 카드/패널 배경
+- `--theme-text`: 주 텍스트 색상
+- `--theme-text-secondary`: 보조 텍스트 색상
+- `--theme-border`: 테두리 색상
+- `--theme-background`: 메인 배경
+
+## 🧩 컴포넌트 개발 규칙
+
+### 컴포넌트 구조
+```vue
+<template>
+  <!-- 템플릿 -->
+</template>
+
+<script setup lang="ts">
+// 스크립트
+</script>
+
+<style scoped>
+/* 스타일 */
+</style>
+```
+
+### 네이밍 컨벤션
+- **컴포넌트**: PascalCase (예: `DashboardPage.vue`)
+- **파일명**: PascalCase (예: `SystemSettings.vue`)
+- **변수**: camelCase (예: `currentMode`)
+- **상수**: UPPER_SNAKE_CASE (예: `WEBSOCKET_URL`)
+
+### 컴포넌트 분류
+- **common/**: 재사용 가능한 공통 컴포넌트
+- **content/**: 모달, 팝업 등 콘텐츠 컴포넌트
+- **settings/**: 설정 관련 컴포넌트
+
+## 🔧 코딩 컨벤션
+
+### TypeScript 사용
+- **필수**: 모든 컴포넌트는 TypeScript 사용
+- **타입 정의**: `types/` 디렉토리에 타입 정의
+- **인터페이스**: Props, Emits 등에 인터페이스 사용
+
+### Vue 3 Composition API
+- **필수**: Composition API 사용
+- **Composables**: 공통 로직은 `composables/`에 분리
+- **Reactivity**: `ref()`, `reactive()`, `computed()` 적극 활용
+
+### 스타일링 규칙
+- **Scoped CSS**: 컴포넌트별 스타일은 `<style scoped>` 사용
+- **테마 변수**: 모든 색상은 테마 변수 사용
+- **Quasar 클래스**: Quasar 유틸리티 클래스 우선 사용
+
+## 📡 상태 관리 (Pinia)
+
+### 스토어 구조
+stores/
+├── common/ # 공통 스토어 (auth, mode)
+├── icd/ # ICD 관련 스토어
+├── mode/ # 모드별 스토어
+└── api/ # API 관련 스토어
+### 스토어 네이밍
+- **파일명**: `*Store.ts` (예: `icdStore.ts`)
+- **함수명**: `use*Store` (예: `useICDStore`)
+
+## 🌐 국제화 (i18n)
+
+### 다국어 지원
+- **기본 언어**: 한국어 (ko-KR)
+- **보조 언어**: 영어 (en-US)
+- **사용법**: `$t('key')` 또는 `useI18n()` composable
+
+### 번역 키 규칙
+- **계층 구조**: `category.section.key` (예: `settings.admin.title`)
+- **네이밍**: kebab-case (예: `system-info`)
+
+## 🔌 API 통신
+
+### 서비스 구조
+services/
+├── api/ # REST API 서비스
+├── common/ # 공통 서비스
+└── mode/ # 모드별 서비스
+### WebSocket 통신
+- **URL**: `ws://localhost:8080/ws`
+- **업데이트 주기**: 30ms
+- **에러 처리**: 자동 재연결 및 에러 핸들링
+
+## 🎯 모드 시스템
+
+### 모드 페이지
+- **StandbyPage**: 대기 모드
+- **StepPage**: 스텝 모드
+- **SlewPage**: 슬루 모드
+- **EphemerisDesignationPage**: 위성 궤도 지정
+- **PassSchedulePage**: 패스 스케줄
+- **SunTrackPage**: 태양 추적
+- **FeedPage**: 피드 모드
+
+### 모드 전환
+- **라우터 기반**: `/dashboard/{mode}` 경로로 전환
+- **상태 관리**: `modeStore`에서 현재 모드 관리
+
+## 🚀 개발 워크플로우
+
+### 필수 사항
+1. **테마 변수 사용**: 모든 색상은 `--theme-*` 변수 사용
+2. **TypeScript**: 모든 컴포넌트에 타입 정의
+3. **Composition API**: Vue 3 Composition API 사용
+4. **에러 처리**: 적절한 에러 핸들링 구현
+
+### 금지 사항
+1. **하드코딩된 색상**: `#091d24`, `white` 등 직접 색상 사용 금지
+2. **Quasar 변수 직접 사용**: `var(--q-dark)` 등 직접 사용 금지
+3. **Options API**: Vue 2 스타일 Options API 사용 금지
+4. **전역 변수**: window 객체에 직접 할당 금지
+
+## 🔍 디버깅 및 로깅
+
+### 콘솔 로깅
+- **이모지 사용**: 로그 구분을 위해 이모지 사용
+- **구조화된 로그**: 객체 형태로 로그 출력
+- **레벨 구분**: `console.log`, `console.error` 적절히 사용
+
+### 예시
+```typescript
+console.log('🚀 시스템 초기화 시작')
+console.error('❌ 시스템 초기화 실패:', error)
+console.log('✅ 시스템 초기화 완료')
+```
+
+## 📝 주석 및 문서화
+
+### 주석 규칙
+- **한국어 주석**: 코드 이해를 위해 한국어 주석 사용
+- **JSDoc**: 함수에 JSDoc 주석 추가
+- **TODO**: 임시 코드는 `// TODO:` 주석 추가
+
+### 예시
+```typescript
+/**
+ * 테마를 초기화하고 CSS 변수를 설정합니다.
+ * @param themeName - 적용할 테마 이름
+ */
+const initializeTheme = (themeName: string) => {
+  // TODO: 테마 검증 로직 추가 필요
+}
+```
+
+## 🎨 UI/UX 가이드라인
+
+### 모달 및 팝업
+- **외곽 테두리**: 모달은 반드시 테두리 포함
+- **닫기 버튼**: 우상단에 명확한 닫기 버튼
+- **반응형**: 다양한 화면 크기 지원
+
+### 버튼 및 인터랙션
+- **호버 효과**: 마우스 오버 시 시각적 피드백
+- **포커스 상태**: 키보드 네비게이션 지원
+- **로딩 상태**: 비동기 작업 시 로딩 표시
+
+## 🔧 개발 도구
+
+### 필수 도구
+- **ESLint**: 코드 품질 관리
+- **Prettier**: 코드 포맷팅
+- **TypeScript**: 타입 체크
+- **Vue DevTools**: Vue 개발 도구
+
+### 스크립트
+```bash
+npm run dev      # 개발 서버 실행
+npm run build    # 프로덕션 빌드
+npm run lint     # 코드 검사
+npm run format   # 코드 포맷팅
+```
+
+## 📋 체크리스트
+
+### 새 컴포넌트 개발 시
+- [ ] TypeScript 타입 정의
+- [ ] 테마 변수 사용
+- [ ] Composition API 사용
+- [ ] 에러 처리 구현
+- [ ] 반응형 디자인 적용
+
+### 테마 관련 작업 시
+- [ ] `useTheme.ts`에서 색상 정의
+- [ ] CSS 변수 사용
+- [ ] 다크/라이트 테마 모두 테스트
+- [ ] 하드코딩된 색상 제거
+
+### API 통신 시
+- [ ] 적절한 에러 처리
+- [ ] 로딩 상태 관리
+- [ ] 타입 정의
+- [ ] WebSocket 연결 상태 확인
+
+---
+
+소통 규칙 
+1. 이해 안되거나 모르는 것은 질문해라.
+2. 수정되는 파일이 있다면 경로를 같이 안내하고, 경로를 선택 시 파일로 이동하도록 작성해라.
+3. 코드 작성 시 주석을 자세히 작성해라
+4. kdoc 형식으로 작성하라
+5. 파일 수정이 어렵다면 파일 경로와 수정 코드를를 같이 안내하고, 파일 경로를 선택 시 파일로 이동하도록 작성해라.
+
+
+
+**이 규칙들을 따라 개발하면 일관되고 유지보수 가능한 코드를 작성할 수 있습니다.**

@@ -155,14 +155,14 @@
                       <span class="info-label">시작 시간:</span>
                       <span class="info-value">{{
                         formatToLocalTime(selectedScheduleInfo.startTime)
-                        }}</span>
+                      }}</span>
                     </div>
 
                     <div class="info-row">
                       <span class="info-label">종료 시간:</span>
                       <span class="info-value">{{
                         formatToLocalTime(selectedScheduleInfo.endTime)
-                        }}</span>
+                      }}</span>
                     </div>
 
                     <div class="info-row">
@@ -1871,7 +1871,7 @@ onUnmounted(() => {
 .control-section {
   height: 100%;
   width: 100%;
-  background-color: var(--q-dark);
+  background-color: var(--theme-card-background);
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
@@ -1915,7 +1915,7 @@ onUnmounted(() => {
 
 .tle-display {
   font-family: monospace !important;
-  background-color: var(--q-dark);
+  background-color: var(--theme-card-background);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 4px;
   min-height: 80px;
@@ -1923,7 +1923,7 @@ onUnmounted(() => {
 
 /* 스케줄 테이블 스타일 */
 .schedule-table {
-  background-color: var(--q-dark);
+  background-color: var(--theme-card-background);
   color: white;
 }
 
@@ -1979,7 +1979,7 @@ onUnmounted(() => {
 
 /* ✅ EphemerisDesignationPage 내부의 q-card만 스타일 적용 */
 .ephemeris-mode .q-card {
-  background: var(--q-dark);
+  background: var(--theme-card-background);
   box-shadow: 0 1px 5px rgb(0 0 0 / 20%), 0 2px 2px rgb(0 0 0 / 14%), 0 3px 1px -2px rgb(0 0 0 / 12%);
 }
 

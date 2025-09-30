@@ -129,7 +129,7 @@
         <!-- Control 카드 -->
         <q-card class="control-card">
           <q-card-section>
-            <div class="text-subtitle1 text-weight-bold text-white">Control</div>
+            <div class="text-subtitle1 text-weight-bold">Control</div>
             <div class="control-content">
               <div class="control-buttons q-gutter-y-sm">
                 <!-- 1행: Control LED 인디케이터 -->
@@ -159,7 +159,7 @@
       <!-- Status 카드 -->
       <q-card class="status-card">
         <q-card-section>
-          <div class="text-subtitle1 text-weight-bold text-white">Status</div>
+          <div class="text-subtitle1 text-weight-bold">Status</div>
           <div class="status-content">
             <!-- Emergency LED - TRUE면 빨간색, FALSE면 녹색 -->
             <div class="status-item q-mb-sm">
@@ -1584,7 +1584,7 @@ const handleAllStatus = () => {
   /* 밝은 회색 */
   border-bottom: 1px solid var(--theme-border);
   /* 밝은 회색 */
-  background-color: #091d24 !important;
+  background-color: var(--theme-card-background) !important;
   /* 내부 색상 통일 */
   transition: none;
   /* 애니메이션 제거 */
@@ -1604,7 +1604,7 @@ const handleAllStatus = () => {
 }
 
 .azimuth-card {
-  background-color: #091d24 !important;
+  background-color: var(--theme-card-background) !important;
   border-top: 5px solid var(--theme-border) !important;
   /* 흰색 테두리로 통일하되 두께는 5px로 증가 */
 }
@@ -1615,7 +1615,7 @@ const handleAllStatus = () => {
 }
 
 .elevation-card {
-  background-color: #091d24 !important;
+  background-color: var(--theme-card-background) !important;
   border-top: 5px solid var(--theme-border) !important;
   /* 흰색 테두리로 통일하되 두께는 5px로 증가 */
 }
@@ -1626,7 +1626,7 @@ const handleAllStatus = () => {
 }
 
 .tilt-card {
-  background-color: #091d24 !important;
+  background-color: var(--theme-card-background) !important;
   border-top: 5px solid var(--theme-border) !important;
   /* 흰색 테두리로 통일하되 두께는 5px로 증가 */
 }
@@ -1641,7 +1641,7 @@ const handleAllStatus = () => {
 .azimuth-card,
 .elevation-card,
 .tilt-card {
-  background-color: #091d24 !important;
+  background-color: var(--theme-card-background) !important;
   border-top: 5px solid var(--theme-border) !important;
   /* 흰색 테두리로 통일하되 두께는 5px로 증가 */
 }
@@ -1672,7 +1672,7 @@ const handleAllStatus = () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #091d24 !important;
+  background-color: var(--theme-card-background) !important;
   border-radius: 4px;
   border: none !important;
 }
@@ -1686,7 +1686,7 @@ const handleAllStatus = () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #091d24 !important;
+  background-color: var(--theme-card-background) !important;
   border-radius: 4px;
   border: none !important;
 }
@@ -1795,11 +1795,9 @@ const handleAllStatus = () => {
 }
 
 .control-label {
-  color: white;
+  color: var(--theme-text);
   font-size: 1.3rem;
-  /* 1.1rem에서 1.3rem으로 더 증가 */
   font-weight: 700;
-  /* 폰트 굵기를 더 굵게 */
 }
 
 /* Status 카드 - 밝은 회색 테두리 */
@@ -1846,7 +1844,7 @@ const handleAllStatus = () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #091d24;
+  background-color: var(--theme-card-background);
   /* 차트 배경색 통일 */
   border-radius: 4px;
   border: 1px solid var(--theme-border-light);
@@ -2070,7 +2068,7 @@ const handleAllStatus = () => {
 .q-card.tilt-card .axis-chart {
   height: 200px !important;
   min-height: 200px !important;
-  background-color: #091d24 !important;
+  background-color: var(--theme-card-background) !important;
   border: none !important;
   margin: 1rem 0 0.25rem 0 !important;
 }
@@ -2081,7 +2079,7 @@ const handleAllStatus = () => {
 .axis-card.tilt-card .axis-chart {
   height: 200px !important;
   min-height: 200px !important;
-  background-color: #091d24 !important;
+  background-color: var(--theme-card-background) !important;
   border: none !important;
   margin: 1rem 0 0.25rem 0 !important;
 }
