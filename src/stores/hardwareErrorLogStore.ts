@@ -1,11 +1,8 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { ref, computed } from 'vue'
 import type { HardwareErrorLog } from '@/types/hardwareError'
 
 export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
-  const { locale } = useI18n()
-
   // 상태
   const errorLogs = ref<HardwareErrorLog[]>([])
   const isLogPanelOpen = ref(false)
@@ -118,39 +115,6 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
     void loadHistoryFromBackend()
   }
 
-  // 다국어 지원
-  const getCurrentMessage = (message: { ko: string; en: string }) => {
-    return locale.value === 'ko' ? message.ko : message.en
-  }
-
-  const getCategoryName = (category: string) => {
-    const categoryMap: Record<string, string> = {
-      POWER: 'Power Status',
-      PROTOCOL: 'Protocol Status',
-      EMERGENCY: 'Emergency Stop Status',
-      SERVO_POWER: 'Servo Power Status',
-      STOW: 'Stow Pin Status',
-      POSITIONER: 'Positioner Status',
-      FEED: 'Feed Status',
-    }
-    return categoryMap[category] || category
-  }
-
-  const getSeverityName = (severity: string) => {
-    const severityMap: Record<string, string> = {
-      INFO: '정보',
-      WARNING: '경고',
-      ERROR: '오류',
-      CRITICAL: '심각',
-    }
-    return severityMap[severity] || severity
-  }
-
-  // 언어 변경 감지
-  watch(locale, () => {
-    // 언어가 변경되면 UI가 자동으로 업데이트됨 (computed 속성 사용)
-  })
-
   return {
     // 상태
     errorLogs,
@@ -171,10 +135,5 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
     // 초기화
     initialize,
     loadHistoryFromBackend,
-
-    // 다국어 지원
-    getCurrentMessage,
-    getCategoryName,
-    getSeverityName,
   }
 })

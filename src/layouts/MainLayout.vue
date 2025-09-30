@@ -236,13 +236,20 @@ onMounted(() => {
   }
 })
 
-// 표시할 메시지
+// displayMessage computed에서 getCurrentMessage 함수 정의
 const displayMessage = computed(() => {
   if (hardwareErrorLogStore.activeErrorCount === 0) {
     return '시스템 정상'
   }
   const latestLog = hardwareErrorLogStore.errorLogs.find(log => !log.isResolved)
-  return latestLog ? hardwareErrorLogStore.getCurrentMessage(latestLog.message) : '에러가 발생했습니다.'
+
+  // ✅ 로컬에서 getCurrentMessage 함수 정의
+  const getCurrentMessage = (message: { ko: string; en: string }) => {
+    const currentLanguage = localStorage.getItem('language') || 'ko-KR'
+    return currentLanguage === 'ko-KR' ? message.ko : message.en
+  }
+
+  return latestLog ? getCurrentMessage(latestLog.message) : '에러가 발생했습니다.'
 })
 
 // 에러 로그 팝업 열기
