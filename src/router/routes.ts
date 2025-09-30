@@ -20,6 +20,14 @@ const routes: RouteRecordRaw[] = [
         name: 'PopupAxisTransformCalculator',
         component: () => import('../components/content/AxisTransformCalculator.vue'),
       },
+      {
+        path: 'hardware-error-log',
+        name: 'hardware-error-log',
+        component: () => import('@/components/HardwareErrorLogPanel.vue'),
+        meta: {
+          isPopup: true,
+        },
+      },
     ],
   },
   {

@@ -57,6 +57,17 @@
     <!-- 설정 모달 컴포넌트 사용 -->
     <SettingsModal v-model="settingsModal" :dark-mode="isDarkMode" :server-address="serverAddress"
       @save="handleSettingsSave" />
+    <!-- 하드웨어 에러 로그 패널 (하단 고정) -->
+    <HardwareErrorLogPanel />
+
+    <!-- 하단 고정 바 - 임시로 항상 표시 -->
+    <div class="error-status-bar" v-if="true">
+      <div class="error-message">
+        <q-icon name="warning" color="red" class="q-mr-sm" />
+        <span>{{ displayMessage }}</span>
+      </div>
+      <q-btn icon="bug_report" color="primary" round dense @click="openErrorLogPopup" class="log-button" />
+    </div>
   </q-layout>
 </template>
 
@@ -64,12 +75,15 @@
 import { ref, onMounted, computed } from 'vue'
 import EssentialLink, { type EssentialLinkProps } from '@/components/common/EssentialLink.vue'
 import SettingsModal from '@/components/settings/SettingsModal.vue'
-import { openComponent } from '../utils/windowUtils' // ✅ windowUtils import 추가
+import { openComponent } from '@/utils/windowUtils' // ✅ 기존 함수 사용
 import { useQuasar } from 'quasar'
 import { useICDStore } from '@/stores/icd/icdStore' // ICD Store import 추가
+import HardwareErrorLogPanel from '@/components/HardwareErrorLogPanel.vue'
+import { useHardwareErrorLogStore } from '@/stores/hardwareErrorLogStore'
 
 const $q = useQuasar()
 const icdStore = useICDStore() // Store 사용
+const hardwareErrorLogStore = useHardwareErrorLogStore()
 
 // UTC 시간 표시용 computed (24시간 형식) - Local 시간 기준으로 실시간 업데이트
 const displayUTCTime = computed(() => {
@@ -176,7 +190,7 @@ const toggleDarkMode = () => {
 const handleSystemInfo = () => {
   console.log('🔧 시스템 정보 버튼 클릭됨')
 
-  void openComponent('system-info', {
+  void openComponent('hardware-error-log', {
     mode: 'popup', // 'popup' | 'modal' | 'auto'
     width: 1100,
     height: 550,
@@ -221,8 +235,25 @@ onMounted(() => {
     $q.dark.set(isDarkMode)
   }
 })
-</script>
 
+// 표시할 메시지
+const displayMessage = computed(() => {
+  if (hardwareErrorLogStore.activeErrorCount === 0) {
+    return '시스템 정상'
+  }
+  const latestLog = hardwareErrorLogStore.errorLogs.find(log => !log.isResolved)
+  return latestLog ? hardwareErrorLogStore.getCurrentMessage(latestLog.message) : '에러가 발생했습니다.'
+})
+
+// 에러 로그 팝업 열기
+const openErrorLogPopup = () => {
+  void openComponent('hardware-error-log', {
+    mode: 'popup',
+    width: 1200,
+    height: 800
+  })
+}
+</script>
 <style scoped>
 .custom-header {
   background-color: var(--theme-primary) !important;
@@ -345,5 +376,32 @@ onMounted(() => {
   height: 80px;
   width: auto;
   background-color: transparent;
+}
+
+.error-status-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: var(--theme-card-background);
+  border-top: 1px solid var(--theme-border);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 1000;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.error-message {
+  display: flex;
+  align-items: center;
+  color: var(--theme-text);
+  font-size: 14px;
+  flex: 1;
+}
+
+.log-button {
+  margin-left: 12px;
 }
 </style>

@@ -56,6 +56,15 @@ export const POPUP_COMPONENTS: Record<string, ComponentConfig> = {
     defaultHeight: 600,
     component: () => import('../components/content/AxisTransformCalculator.vue'),
   },
+  'hardware-error-log': {
+    name: 'hardware-error-log',
+    title: '하드웨어 에러 로그',
+    description: '실시간 하드웨어 에러 로그 모니터링',
+    icon: '🐛',
+    defaultWidth: 1200,
+    defaultHeight: 800,
+    component: () => import('@/components/HardwareErrorLogPanel.vue'),
+  },
 }
 
 export type ComponentName = keyof typeof POPUP_COMPONENTS

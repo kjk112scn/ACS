@@ -1051,3 +1051,7 @@ export const closeAllModalWindows = () => {
   console.log('🚪 모든 모달 닫기')
   ModalManager.getInstance().closeAllModals()
 }
+
+// 하드웨어 에러 로그 팝업
+export const openHardwareErrorLog = (options: DisplayOptions = {}) =>
+  openComponent('hardware-error-log', options)

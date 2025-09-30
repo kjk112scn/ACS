@@ -7,20 +7,34 @@ const safeToString = (value: unknown): string => {
   if (value === null || value === undefined) {
     return ''
   }
-  if (typeof value === 'string') return value
-  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+  if (typeof value === 'string') {
+    return value
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
     return String(value)
   }
   if (typeof value === 'object') {
     try {
       return JSON.stringify(value)
     } catch {
-      return '[복잡한 객체]'
+      // JSON.stringify 실패 시 객체의 toString() 메서드 사용
+      if (value && typeof value === 'object' && 'toString' in value) {
+        const toStringResult = (value as { toString(): string }).toString()
+        // [object Object]가 아닌 경우에만 반환
+        if (toStringResult !== '[object Object]') {
+          return toStringResult
+        }
+      }
+      // 그 외의 경우 타입 정보와 함께 반환
+      return `[${typeof value}]`
     }
   }
-  if (typeof value === 'function') return '[함수]'
-  if (typeof value === 'symbol') return value.toString()
-  return `[알 수 없는 타입: ${typeof value}]`
+  // 기본 타입의 경우 타입을 명시적으로 체크
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
+  // 알 수 없는 타입의 경우 타입 정보 반환
+  return `[${typeof value}]`
 }
 
 // WebSocket 서버 URL
@@ -1085,11 +1099,48 @@ export const useICDStore = defineStore('icd', () => {
     console.log('📊 메시지 지연 통계 및 업데이트 카운트 초기화됨')
   }
   // WebSocket 메시지 핸들러 - 데이터를 버퍼에만 저장
-  const handleWebSocketMessage = (message: MessageData) => {
+  const handleWebSocketMessage = async (message: MessageData) => {
     try {
       // 받은 데이터를 버퍼에 저장만 하고 즉시 UI 업데이트하지 않음
       latestDataBuffer.value = message.data as MessageData
       bufferUpdateTime.value = Date.now()
+
+      // ✅ 하드웨어 에러 로그 처리 추가
+      if (message.data && typeof message.data === 'object' && 'hardwareErrorLogs' in message.data) {
+        const hardwareErrorLogs = (message.data as Record<string, unknown>).hardwareErrorLogs
+        if (Array.isArray(hardwareErrorLogs)) {
+          // 하드웨어 에러 로그 스토어에 추가
+          const { useHardwareErrorLogStore } = await import('@/stores/hardwareErrorLogStore')
+          const hardwareErrorLogStore = useHardwareErrorLogStore()
+
+          // 새로운 에러 로그만 추가 (중복 방지)
+          hardwareErrorLogs.forEach((log: Record<string, unknown>) => {
+            const existingLog = hardwareErrorLogStore.errorLogs.find(
+              (existing) => existing.id === log.id,
+            )
+            if (!existingLog) {
+              hardwareErrorLogStore.addErrorLog({
+                id: log.id as string,
+                timestamp: log.timestamp as string,
+                category: log.category as
+                  | 'POWER'
+                  | 'PROTOCOL'
+                  | 'EMERGENCY'
+                  | 'SERVO_POWER'
+                  | 'STOW'
+                  | 'POSITIONER'
+                  | 'FEED',
+                severity: log.severity as 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL',
+                message: log.message as { ko: string; en: string },
+                component: log.component as string,
+                isResolved: log.isResolved as boolean,
+                resolvedAt: log.resolvedAt as string | undefined,
+                resolvedMessage: log.resolvedMessage as { ko: string; en: string } | undefined,
+              })
+            }
+          })
+        }
+      }
 
       // 디버깅용 (가끔씩만 로그)
       if (Math.random() < 0.01) {
@@ -1753,7 +1804,10 @@ export const useICDStore = defineStore('icd', () => {
       console.log('🔌 WebSocket 연결 시작')
 
       // WebSocket 연결 (메시지는 버퍼에만 저장)
-      await icdService.connectWebSocket(WEBSOCKET_URL, handleWebSocketMessage)
+      await icdService.connectWebSocket(
+        WEBSOCKET_URL,
+        handleWebSocketMessage as (message: MessageData) => void,
+      )
       isConnected.value = true
 
       console.log('✅ WebSocket 연결 성공')

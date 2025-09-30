@@ -243,6 +243,164 @@ npm run format   # 코드 포맷팅
 - [ ] WebSocket 연결 상태 확인
 
 ---
+## 🛠️ Composables 활용 규칙
+
+### 필수 Composables 사용
+- **useErrorHandler**: 모든 에러 처리는 `useErrorHandler` 사용
+- **useNotification**: 사용자 알림은 `useNotification` 사용
+- **useDialog**: 확인/입력 다이얼로그는 `useDialog` 사용
+- **useLoading**: 로딩 상태 관리는 `useLoading` 사용
+- **useTheme**: 테마 관리는 `useTheme` 사용
+- **useValidation**: 입력 검증은 `useValidation` 사용
+
+### 에러 처리 통합 규칙
+```typescript
+// ✅ 올바른 사용법
+import { useErrorHandler } from '@/composables/useErrorHandler'
+
+const { handleSystemError, handleApiError, handleNetworkError } = useErrorHandler()
+
+try {
+  await someAsyncOperation()
+} catch (error) {
+  handleSystemError(error, '작업 컨텍스트')
+}
+
+// ❌ 금지된 사용법
+console.error('에러 발생:', error)
+alert('에러가 발생했습니다.')
+```
+
+### 알림 시스템 통합 규칙
+```typescript
+// ✅ 올바른 사용법
+import { useNotification } from '@/composables/useNotification'
+
+const { success, error, warning, info } = useNotification()
+
+success('작업이 완료되었습니다.')
+error('오류가 발생했습니다.')
+warning('주의가 필요합니다.')
+
+// ❌ 금지된 사용법
+Notify.create({ type: 'positive', message: '성공' })
+alert('알림')
+```
+
+### 다이얼로그 통합 규칙
+```typescript
+// ✅ 올바른 사용법
+import { useDialog } from '@/composables/useDialog'
+
+const { confirm, alert, prompt } = useDialog()
+
+const result = await confirm('정말 삭제하시겠습니까?')
+const input = await prompt('값을 입력하세요', { defaultValue: '기본값' })
+
+// ❌ 금지된 사용법
+if (confirm('정말 삭제하시겠습니까?')) { }
+const input = prompt('값을 입력하세요')
+```
+
+### 로딩 상태 통합 규칙
+```typescript
+// ✅ 올바른 사용법
+import { useLoading } from '@/composables/useLoading'
+
+const { setLoading, isLoading, withLoading } = useLoading()
+
+// 개별 로딩
+setLoading('data-loading', true)
+
+// 전역 로딩
+setGlobalLoading(true, { message: '데이터 로딩 중...' })
+
+// 비동기 작업 래퍼
+await withLoading('api-call', async () => {
+  return await apiCall()
+})
+
+// ❌ 금지된 사용법
+const isLoading = ref(false)
+Loading.show()
+```
+
+### 테마 관리 통합 규칙
+```typescript
+// ✅ 올바른 사용법
+import { useTheme } from '@/composables/useTheme'
+
+const { currentTheme, setTheme, themeConfig } = useTheme()
+
+// 테마 변경
+setTheme('dark')
+
+// 테마 변수 사용
+const backgroundColor = themeConfig.value.colors.cardBackground
+
+// ❌ 금지된 사용법
+document.documentElement.style.setProperty('--theme-primary', '#091d24')
+```
+
+### 입력 검증 통합 규칙
+```typescript
+// ✅ 올바른 사용법
+import { useValidation } from '@/composables/useValidation'
+
+const { validateEmail, validateNumber, validateRequired } = useValidation()
+
+const emailError = validateEmail(email.value)
+const numberError = validateNumber(age.value, { min: 0, max: 120 })
+
+// ❌ 금지된 사용법
+if (!email.value.includes('@')) { }
+if (age.value < 0 || age.value > 120) { }
+```
+
+## 🔧 Composables 활용 체크리스트
+
+### 새 컴포넌트 개발 시
+- [ ] `useErrorHandler`로 에러 처리
+- [ ] `useNotification`으로 사용자 알림
+- [ ] `useLoading`으로 로딩 상태 관리
+- [ ] `useTheme`으로 테마 변수 사용
+- [ ] `useValidation`으로 입력 검증
+
+### 기존 컴포넌트 개선 시
+- [ ] `console.error` → `useErrorHandler`로 변경
+- [ ] `alert` → `useDialog`로 변경
+- [ ] `Notify.create` → `useNotification`로 변경
+- [ ] 개별 로딩 상태 → `useLoading`로 통합
+- [ ] 하드코딩된 색상 → `useTheme` 변수로 변경
+
+### API 통신 시
+- [ ] `useErrorHandler.handleApiError` 사용
+- [ ] `useLoading.withLoading`으로 래핑
+- [ ] `useNotification`으로 성공/실패 알림
+
+## 🚫 금지사항
+
+### 에러 처리 금지
+- `console.error` 직접 사용 금지
+- `alert` 사용 금지
+- `throw new Error` 후 처리 없음 금지
+
+### 알림 금지
+- `Notify.create` 직접 사용 금지
+- `alert` 사용 금지
+- 하드코딩된 알림 메시지 금지
+
+### 로딩 관리 금지
+- `ref(false)` 로딩 상태 직접 관리 금지
+- `Loading.show/hide` 직접 사용 금지
+- 중복 로딩 상태 관리 금지
+
+### 테마 관리 금지
+- CSS 변수 직접 설정 금지
+- 하드코딩된 색상 사용 금지
+- Quasar 변수 직접 사용 금지
+
+---
 
 소통 규칙 
 1. 이해 안되거나 모르는 것은 질문해라.
@@ -250,7 +408,5 @@ npm run format   # 코드 포맷팅
 3. 코드 작성 시 주석을 자세히 작성해라
 4. kdoc 형식으로 작성하라
 5. 파일 수정이 어렵다면 파일 경로와 수정 코드를를 같이 안내하고, 파일 경로를 선택 시 파일로 이동하도록 작성해라.
-
-
 
 **이 규칙들을 따라 개발하면 일관되고 유지보수 가능한 코드를 작성할 수 있습니다.**
