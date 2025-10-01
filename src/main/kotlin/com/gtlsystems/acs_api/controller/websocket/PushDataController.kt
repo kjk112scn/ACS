@@ -39,8 +39,8 @@ class PushDataController(
     private val transmissionCount = AtomicLong(0)
 
     // === 실시간 전송 설정 (ConfigurationService에서 로드) ===
-    private val REALTIME_TRANSMISSION_INTERVAL_MS: Long get() = settingsService.systemTrackingTransmissionInterval
-    private val MAX_PROCESSING_TIME_MS: Long get() = settingsService.systemTrackingPerformanceThreshold
+    private val REALTIME_TRANSMISSION_INTERVAL_MS: Long get() = settingsService.systemWebsocketTransmissionInterval
+    private val MAX_PROCESSING_TIME_MS: Long get() = settingsService.systemPerformanceThreshold
     private val SESSION_TIMEOUT_MS: Long get() = settingsService.systemUdpTimeout
 
     // === 세션 정보 클래스 (실시간 전송 전용) ===

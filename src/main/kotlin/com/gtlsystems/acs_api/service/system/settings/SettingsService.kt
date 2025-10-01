@@ -120,7 +120,6 @@ class SettingsService(
         "system.tracking.transmissionInterval" to SettingDefinition("system.tracking.transmissionInterval", 100L, SettingType.LONG, "전송 간격"),
         "system.tracking.fineInterval" to SettingDefinition("system.tracking.fineInterval", 100L, SettingType.LONG, "정밀 계산 간격"),
         "system.tracking.coarseInterval" to SettingDefinition("system.tracking.coarseInterval", 1000L, SettingType.LONG, "일반 계산 간격"),
-        "system.tracking.performanceThreshold" to SettingDefinition("system.tracking.performanceThreshold", 100L, SettingType.LONG, "성능 임계값"),
         "system.tracking.stabilizationTimeout" to SettingDefinition("system.tracking.stabilizationTimeout", 5000L, SettingType.LONG, "안정화 타임아웃"),
 
         // 데이터 저장 설정
@@ -132,7 +131,25 @@ class SettingsService(
         "system.suntrack.highAccuracyThreshold" to SettingDefinition("system.suntrack.highAccuracyThreshold", 0.000278, SettingType.DOUBLE, "태양 추적 높은 정확도 임계값"),
         "system.suntrack.mediumAccuracyThreshold" to SettingDefinition("system.suntrack.mediumAccuracyThreshold", 0.002778, SettingType.DOUBLE, "태양 추적 중간 정확도 임계값"),
         "system.suntrack.lowAccuracyThreshold" to SettingDefinition("system.suntrack.lowAccuracyThreshold", 0.016667, SettingType.DOUBLE, "태양 추적 낮은 정확도 임계값"),
-        "system.suntrack.searchHours" to SettingDefinition("system.suntrack.searchHours", 48.0, SettingType.DOUBLE, "태양 추적 검색 시간")
+        "system.suntrack.searchHours" to SettingDefinition("system.suntrack.searchHours", 48.0, SettingType.DOUBLE, "태양 추적 검색 시간"),
+
+        // WebSocket 전송 간격 설정
+        "system.websocket.transmissionInterval" to SettingDefinition("system.websocket.transmissionInterval", 30L, SettingType.LONG, "WebSocket 전송 간격"),
+        "system.performance.threshold" to SettingDefinition("system.performance.threshold", 100L, SettingType.LONG, "성능 임계값"),
+
+        // 성능 등급 기준 설정
+        "system.performance.ultraCores" to SettingDefinition("system.performance.ultraCores", 8, SettingType.INTEGER, "ULTRA 등급 최소 CPU 코어 수"),
+        "system.performance.highCores" to SettingDefinition("system.performance.highCores", 6, SettingType.INTEGER, "HIGH 등급 최소 CPU 코어 수"),
+        "system.performance.mediumCores" to SettingDefinition("system.performance.mediumCores", 4, SettingType.INTEGER, "MEDIUM 등급 최소 CPU 코어 수"),
+        "system.performance.ultraMemory" to SettingDefinition("system.performance.ultraMemory", 8L, SettingType.LONG, "ULTRA 등급 최소 메모리(GB)"),
+        "system.performance.highMemory" to SettingDefinition("system.performance.highMemory", 4L, SettingType.LONG, "HIGH 등급 최소 메모리(GB)"),
+        "system.performance.mediumMemory" to SettingDefinition("system.performance.mediumMemory", 2L, SettingType.LONG, "MEDIUM 등급 최소 메모리(GB)"),
+
+        // JVM 튜닝 설정
+        "system.jvm.gcPause" to SettingDefinition("system.jvm.gcPause", 10L, SettingType.LONG, "GC 일시정지 시간 (ms)"),
+        "system.jvm.heapRegionSize" to SettingDefinition("system.jvm.heapRegionSize", 16L, SettingType.LONG, "힙 영역 크기 (MB)"),
+        "system.jvm.concurrentThreads" to SettingDefinition("system.jvm.concurrentThreads", 4L, SettingType.LONG, "동시 스레드 수"),
+        "system.jvm.parallelThreads" to SettingDefinition("system.jvm.parallelThreads", 8L, SettingType.LONG, "병렬 스레드 수"),
     )
 
     // 기본값과 타입 매핑 자동 생성
@@ -563,7 +580,7 @@ class SettingsService(
      * WebSocket을 통한 실시간 데이터 전송 주기를 설정합니다.
      * 기본값: 100ms
      */
-    var systemTrackingTransmissionInterval: Long by createSettingProperty("system.tracking.transmissionInterval", "전송 간격")
+    var systemWebsocketTransmissionInterval: Long by createSettingProperty("system.websocket.transmissionInterval", "WebSocket 전송 간격")
 
     /**
      * 시스템 추적 정밀 계산 간격 (밀리초)
@@ -584,7 +601,7 @@ class SettingsService(
      * 데이터 처리 시 허용되는 최대 시간을 설정합니다.
      * 기본값: 100ms
      */
-    var systemTrackingPerformanceThreshold: Long by createSettingProperty("system.tracking.performanceThreshold", "성능 임계값")
+    var systemPerformanceThreshold: Long by createSettingProperty("system.performance.threshold", "성능 임계값")
 
     /**
      * 시스템 추적 안정화 타임아웃 (밀리초)
@@ -642,6 +659,46 @@ class SettingsService(
      * 기본값: 48시간
      */
     var systemSuntrackSearchHours: Double by createSettingProperty("system.suntrack.searchHours", "태양 추적 검색 시간")
+
+    // 성능 등급 기준 설정
+    /**
+     * 성능 등급 기준 설정들
+     */
+    var systemPerformanceUltraCores: Int by createSettingProperty("system.performance.ultraCores", "ULTRA 등급 최소 CPU 코어 수")
+    var systemPerformanceHighCores: Int by createSettingProperty("system.performance.highCores", "HIGH 등급 최소 CPU 코어 수")
+    var systemPerformanceMediumCores: Int by createSettingProperty("system.performance.mediumCores", "MEDIUM 등급 최소 CPU 코어 수")
+    var systemPerformanceUltraMemory: Long by createSettingProperty("system.performance.ultraMemory", "ULTRA 등급 최소 메모리(GB)")
+    var systemPerformanceHighMemory: Long by createSettingProperty("system.performance.highMemory", "HIGH 등급 최소 메모리(GB)")
+    var systemPerformanceMediumMemory: Long by createSettingProperty("system.performance.mediumMemory", "MEDIUM 등급 최소 메모리(GB)")
+
+    // JVM 튜닝 설정 프로퍼티들
+    /**
+     * JVM GC 일시정지 시간 (밀리초)
+     * 가비지 컬렉션 시 허용되는 최대 일시정지 시간을 설정합니다.
+     * 기본값: 10ms
+     */
+    var systemJvmGcPause: Long by createSettingProperty("system.jvm.gcPause", "GC 일시정지 시간")
+
+    /**
+     * JVM 힙 영역 크기 (MB)
+     * 힙 메모리 영역의 크기를 설정합니다.
+     * 기본값: 16MB
+     */
+    var systemJvmHeapRegionSize: Long by createSettingProperty("system.jvm.heapRegionSize", "힙 영역 크기")
+
+    /**
+     * JVM 동시 스레드 수
+     * 동시에 실행될 수 있는 스레드 수를 설정합니다.
+     * 기본값: 4
+     */
+    var systemJvmConcurrentThreads: Long by createSettingProperty("system.jvm.concurrentThreads", "동시 스레드 수")
+
+    /**
+     * JVM 병렬 스레드 수
+     * 병렬 처리에 사용될 스레드 수를 설정합니다.
+     * 기본값: 8
+     */
+    var systemJvmParallelThreads: Long by createSettingProperty("system.jvm.parallelThreads", "병렬 스레드 수")
 
     // LocationData 객체 제공
     val locationData: LocationData
@@ -931,6 +988,7 @@ class SettingsService(
             event.key.startsWith("system.tracking.") -> "ms"
             event.key.startsWith("system.storage.") -> "ms"
             event.key.startsWith("system.suntrack.") -> "도"
+            event.key.startsWith("system.jvm.") -> "ms" // JVM 튜닝 설정 단위 추가
             else -> ""
         }
         
@@ -977,6 +1035,9 @@ class SettingsService(
             }
             event.key.startsWith("system.suntrack.") -> {
                 // 시스템 태양 추적 설정 변경 시 처리 로직
+            }
+            event.key.startsWith("system.jvm.") -> { // JVM 튜닝 설정 변경 시 처리 로직
+                // 시스템 JVM 설정 변경 시 처리 로직
             }
         }
     }

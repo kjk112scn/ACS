@@ -43,6 +43,7 @@ class ICDService {
                     if (receiveData[2] == 'R'.code.toByte()) {
                         val parsedData = ReadStatus.GetDataFrame.fromByteArray(receiveData)
                         parsedData?.let {
+                            //logger.info("🔍 [ICD] elevationBoardStatusBits 수신: {}", it.elevationBoardStatusBits)
                             // 디버깅 로그 추가
                             /*logger.info("[ICD] 파싱된 각도 데이터: Azimuth={}, Elevation={}, Tilt={}",
                                 it.azimuthAngle, it.elevationAngle, it.tiltAngle)*/

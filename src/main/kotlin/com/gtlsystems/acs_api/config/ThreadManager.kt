@@ -82,12 +82,12 @@ class ThreadManager(
      */
     fun classifyPerformanceTier(specs: SystemSpecs): PerformanceTier {
         // 설정에서 성능 등급 기준 로드
-        val ultraCores = settingsService.systemTrackingPerformanceThreshold
-        val highCores = settingsService.systemTrackingPerformanceThreshold
-        val mediumCores = settingsService.systemTrackingPerformanceThreshold
-        val ultraMemory = settingsService.systemUdpMaxBufferSize.toLong()
-        val highMemory = settingsService.systemUdpMaxBufferSize.toLong()
-        val mediumMemory = settingsService.systemUdpMaxBufferSize.toLong()
+        val ultraCores = settingsService.systemPerformanceUltraCores
+        val highCores = settingsService.systemPerformanceHighCores
+        val mediumCores = settingsService.systemPerformanceMediumCores
+        val ultraMemory = settingsService.systemPerformanceUltraMemory * 1024 * 1024 * 1024  // GB를 바이트로 변환
+        val highMemory = settingsService.systemPerformanceHighMemory * 1024 * 1024 * 1024
+        val mediumMemory = settingsService.systemPerformanceMediumMemory * 1024 * 1024 * 1024
         
         return when {
             specs.cpuCores >= ultraCores && specs.totalMemory >= ultraMemory -> PerformanceTier.ULTRA
@@ -121,10 +121,10 @@ class ThreadManager(
         System.setProperty("spring.jvm.memory.maximum", "9g")
         
         // ✅ 실시간 성능 최우선 JVM 최적화 (설정에서 값 로드)
-        val gcPause = settingsService.systemTrackingPerformanceThreshold
-        val heapRegionSize = settingsService.systemUdpMaxBufferSize
-        val concurrentThreads = settingsService.systemTrackingPerformanceThreshold
-        val parallelThreads = settingsService.systemTrackingPerformanceThreshold
+        val gcPause = settingsService.systemJvmGcPause
+        val heapRegionSize = settingsService.systemJvmHeapRegionSize
+        val concurrentThreads = settingsService.systemJvmConcurrentThreads
+        val parallelThreads = settingsService.systemJvmParallelThreads
         
         System.setProperty("spring.jvm.gc", "G1GC")
         System.setProperty("spring.jvm.gc.pause", gcPause.toString())  // 설정에서 GC 일시정지 시간 로드

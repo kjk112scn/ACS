@@ -1,6 +1,8 @@
 package com.gtlsystems.acs_api.service.datastore
 
+import com.gtlsystems.acs_api.controller.websocket.PushDataController
 import com.gtlsystems.acs_api.model.PushData
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicLong
@@ -8,7 +10,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 @Service
 class DataStoreService {
-
+    private val logger = LoggerFactory.getLogger(PushDataController::class.java)
     // === 최적화된 데이터 저장 ===
     private val latestData = AtomicReference(PushData.ReadData())
     private val dataVersion = AtomicLong(0) // 버전 기반 변경 감지
@@ -25,9 +27,20 @@ class DataStoreService {
      * - 기존 데이터 보존 (null 필드는 덮어쓰지 않음)
      */
     fun updateDataFromUdp(newData: PushData.ReadData) {
-        val currentData = latestData.get()
+        /*
+        logger.info("🔍 [DataStore] elevationBoardStatusBits 수신: {}", newData.elevationBoardStatusBits)
 
-        // 🔄 기존 mergedData 로직 복원 (null 안전 병합)
+        // ✅ 상세 디버깅 로그 추가
+        logger.info("🔍 [DataStore] newData.elevationBoardStatusBits 원본: '{}'", newData.elevationBoardStatusBits)
+        logger.info("🔍 [DataStore] newData.elevationBoardStatusBits null 체크: {}", newData.elevationBoardStatusBits != null)
+        logger.info("🔍 [DataStore] newData.elevationBoardStatusBits isEmpty 체크: {}", newData.elevationBoardStatusBits?.isEmpty() ?: true)
+        logger.info("🔍 [DataStore] newData.elevationBoardStatusBits 길이: {}", newData.elevationBoardStatusBits?.length ?: -1)
+        */
+
+        val currentData = latestData.get()
+        //logger.info("🔍 [DataStore] elevationBoardStatusBits 기존: {}", currentData.elevationBoardStatusBits)
+
+        //  기존 mergedData 로직 복원 (null 안전 병합)
         val mergedData = PushData.ReadData(
             modeStatusBits = newData.modeStatusBits ?: currentData.modeStatusBits,
             azimuthAngle = newData.azimuthAngle ?: currentData.azimuthAngle,
@@ -84,14 +97,15 @@ class DataStoreService {
         )
 
         // ⚡ 최적화: 실제로 변경된 경우에만 업데이트
-        if (!isDataEqual(currentData, mergedData)) {
+       // if (!isDataEqual(currentData, mergedData)) {
             latestData.set(mergedData)
+            //logger.info("🔍 [DataStore] elevationBoardStatusBits 업데이트: {}", mergedData.elevationBoardStatusBits)
             dataVersion.incrementAndGet() // 버전 증가
 
             // 연결 상태 업데이트
             lastUdpUpdateTime.set(Instant.now())
             udpConnected.set(true)
-        }
+        //}
     }
     /**
      * ✅ 전체 추적 데이터를 Map으로 반환하는 메서드 추가
@@ -273,18 +287,18 @@ class DataStoreService {
      * ✅ 데이터 동등성 체크 (성능 최적화)
      * - 실제 변경이 있을 때만 업데이트
      */
-    private fun isDataEqual(data1: PushData.ReadData, data2: PushData.ReadData): Boolean {
-        return data1.azimuthAngle == data2.azimuthAngle &&
-               data1.elevationAngle == data2.elevationAngle &&
-               data1.trainAngle == data2.trainAngle &&
-               data1.azimuthSpeed == data2.azimuthSpeed &&
-               data1.elevationSpeed == data2.elevationSpeed &&
-               data1.trainSpeed == data2.trainSpeed &&
-               data1.modeStatusBits == data2.modeStatusBits &&
-               data1.windSpeed == data2.windSpeed &&
-               data1.windDirection == data2.windDirection
-               // 주요 필드들만 체크 (성능 고려)
-    }
+    // private fun isDataEqual(data1: PushData.ReadData, data2: PushData.ReadData): Boolean {
+    //     return data1.azimuthAngle == data2.azimuthAngle &&
+    //            data1.elevationAngle == data2.elevationAngle &&
+    //            data1.trainAngle == data2.trainAngle &&
+    //            data1.azimuthSpeed == data2.azimuthSpeed &&
+    //            data1.elevationSpeed == data2.elevationSpeed &&
+    //            data1.trainSpeed == data2.trainSpeed &&
+    //            data1.modeStatusBits == data2.modeStatusBits &&
+    //            data1.windSpeed == data2.windSpeed &&
+    //            data1.windDirection == data2.windDirection
+    //            // 주요 필드들만 체크 (성능 고려)
+    // }
 
     /**
      * ✅ 최신 데이터 가져오기 (버전 정보 포함)
@@ -413,5 +427,9 @@ class DataStoreService {
             trackingStatus.get().sunTrackStatus == true -> "sunTrack"
             else -> null
         }
+    }
+
+    fun debugElevationBoardStatusBits(): String? {
+        return latestData.get().elevationBoardStatusBits
     }
 }
