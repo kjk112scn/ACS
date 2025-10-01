@@ -1101,45 +1101,67 @@ export const useICDStore = defineStore('icd', () => {
   // WebSocket 메시지 핸들러 - 데이터를 버퍼에만 저장
   const handleWebSocketMessage = async (message: MessageData) => {
     try {
+      console.log('🔍 [Frontend] WebSocket 메시지 수신:', message)
+      console.log('🔍 [Frontend] 메시지 구조 분석:', {
+        hasServerTime: 'serverTime' in message,
+        serverTimeValue: message.serverTime,
+        serverTimeType: typeof message.serverTime,
+        messageType: typeof message,
+        messageKeys: Object.keys(message),
+      })
+
       // 받은 데이터를 버퍼에 저장만 하고 즉시 UI 업데이트하지 않음
-      latestDataBuffer.value = message.data as MessageData
+      latestDataBuffer.value = message
       bufferUpdateTime.value = Date.now()
 
-      // ✅ 하드웨어 에러 로그 처리 추가
-      if (message.data && typeof message.data === 'object' && 'hardwareErrorLogs' in message.data) {
-        const hardwareErrorLogs = (message.data as Record<string, unknown>).hardwareErrorLogs
-        if (Array.isArray(hardwareErrorLogs)) {
-          // 하드웨어 에러 로그 스토어에 추가
-          const { useHardwareErrorLogStore } = await import('@/stores/hardwareErrorLogStore')
-          const hardwareErrorLogStore = useHardwareErrorLogStore()
+      // ✅ 하드웨어 에러 로그 처리 추가 (예외 처리로 안전하게)
+      try {
+        if (
+          message.data &&
+          typeof message.data === 'object' &&
+          'hardwareErrorLogs' in message.data
+        ) {
+          const hardwareErrorLogs = (message.data as Record<string, unknown>).hardwareErrorLogs
+          if (Array.isArray(hardwareErrorLogs)) {
+            // 하드웨어 에러 로그 스토어에 추가
+            const { useHardwareErrorLogStore } = await import('@/stores/hardwareErrorLogStore')
+            const hardwareErrorLogStore = useHardwareErrorLogStore()
 
-          // 새로운 에러 로그만 추가 (중복 방지)
-          hardwareErrorLogs.forEach((log: Record<string, unknown>) => {
-            const existingLog = hardwareErrorLogStore.errorLogs.find(
-              (existing) => existing.id === log.id,
-            )
-            if (!existingLog) {
-              hardwareErrorLogStore.addErrorLog({
-                id: log.id as string,
-                timestamp: log.timestamp as string,
-                category: log.category as
-                  | 'POWER'
-                  | 'PROTOCOL'
-                  | 'EMERGENCY'
-                  | 'SERVO_POWER'
-                  | 'STOW'
-                  | 'POSITIONER'
-                  | 'FEED',
-                severity: log.severity as 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL',
-                message: log.message as { ko: string; en: string },
-                component: log.component as string,
-                isResolved: log.isResolved as boolean,
-                resolvedAt: log.resolvedAt as string | undefined,
-                resolvedMessage: log.resolvedMessage as { ko: string; en: string } | undefined,
-              })
-            }
-          })
+            // 새로운 에러 로그만 추가 (중복 방지)
+            hardwareErrorLogs.forEach((log: Record<string, unknown>) => {
+              try {
+                const existingLog = hardwareErrorLogStore.errorLogs.find(
+                  (existing) => existing.id === log.id,
+                )
+                if (!existingLog) {
+                  hardwareErrorLogStore.addErrorLog({
+                    id: log.id as string,
+                    timestamp: log.timestamp as string,
+                    category: log.category as
+                      | 'POWER'
+                      | 'PROTOCOL'
+                      | 'EMERGENCY'
+                      | 'SERVO_POWER'
+                      | 'STOW'
+                      | 'POSITIONER'
+                      | 'FEED',
+                    severity: log.severity as 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL',
+                    message: log.message as { ko: string; en: string },
+                    component: log.component as string,
+                    isResolved: log.isResolved as boolean,
+                    resolvedAt: log.resolvedAt as string | undefined,
+                    resolvedMessage: log.resolvedMessage as { ko: string; en: string } | undefined,
+                  })
+                }
+              } catch (logError) {
+                console.error('❌ 하드웨어 에러 로그 개별 처리 실패:', logError, log)
+              }
+            })
+          }
         }
+      } catch (hardwareLogError) {
+        console.error('❌ 하드웨어 에러 로그 처리 실패:', hardwareLogError)
+        // 하드웨어 로그 처리 실패해도 웹소켓 메시지 처리는 계속 진행
       }
 
       // 디버깅용 (가끔씩만 로그)
@@ -1232,20 +1254,36 @@ export const useICDStore = defineStore('icd', () => {
       lastUpdateTime.value = Date.now()
 
       // serverTime 업데이트 (최우선)
-      if (message.serverTime !== undefined) {
-        const oldTime = serverTime.value
+      if (message.data && typeof message.data === 'object' && 'serverTime' in message.data) {
+        const dataServerTime = (message.data as Record<string, unknown>).serverTime
+        if (dataServerTime !== undefined && dataServerTime !== null) {
+          const oldTime = serverTime.value
+          serverTime.value = safeToString(dataServerTime)
 
-        serverTime.value = safeToString(message.serverTime)
-
-        // 100번마다 로그
-        if (updateCount.value % 100 === 0) {
-          console.log(`🕐 [${updateCount.value}] serverTime: ${oldTime} → ${serverTime.value}`)
+          // 100번마다 로그
+          if (updateCount.value % 100 === 0) {
+            console.log(`🕐 [${updateCount.value}] serverTime: ${oldTime} → ${serverTime.value}`)
+          }
         }
+      } else {
+        console.log('❌ [Frontend] serverTime을 찾을 수 없습니다:', {
+          messageServerTime: message.serverTime,
+          messageData: message.data,
+          hasData: !!message.data,
+          dataKeys: message.data ? Object.keys(message.data) : 'no data',
+        })
       }
 
-      // resultTimeOffsetCalTime 업데이트
-      if (message.resultTimeOffsetCalTime !== undefined) {
-        resultTimeOffsetCalTime.value = safeToString(message.resultTimeOffsetCalTime)
+      // resultTimeOffsetCalTime 업데이트 - data 객체 안에서 찾기
+      if (
+        message.data &&
+        typeof message.data === 'object' &&
+        'resultTimeOffsetCalTime' in message.data
+      ) {
+        const dataResultTime = (message.data as Record<string, unknown>).resultTimeOffsetCalTime
+        if (dataResultTime !== undefined && dataResultTime !== null) {
+          resultTimeOffsetCalTime.value = safeToString(dataResultTime)
+        }
       }
 
       // 명령 데이터 업데이트
@@ -1260,9 +1298,10 @@ export const useICDStore = defineStore('icd', () => {
       if (message.cmdTrainAngle !== undefined) {
         cmdTrainAngle.value = safeToString(message.cmdTrainAngle)
       }
+
       // 🆕 추적 스케줄 정보 업데이트
       if (message.currentTrackingMstId !== undefined) {
-        const newCurrentMstId = message.currentTrackingMstId as number | null
+        const newCurrentMstId = message.currㅋntTrackingMstId as number | null
         if (currentTrackingMstId.value !== newCurrentMstId) {
           console.log(`📋 현재 추적 MstId 변경: ${currentTrackingMstId.value} → ${newCurrentMstId}`)
           currentTrackingMstId.value = newCurrentMstId
@@ -1276,9 +1315,15 @@ export const useICDStore = defineStore('icd', () => {
           nextTrackingMstId.value = newNextMstId
         }
       }
-      // 안테나 데이터 업데이트
-      if (message.data && typeof message.data === 'object') {
-        updataAntennaData(message.data)
+
+      // ✅ 안테나 데이터 업데이트 - 타입 안전한 수정
+      if (message.data && typeof message.data === 'object' && 'data' in message.data) {
+        const messageData = message.data as Record<string, unknown>
+        const antennaData = messageData.data
+
+        if (antennaData && typeof antennaData === 'object') {
+          updataAntennaData(antennaData as Record<string, unknown>)
+        }
       }
 
       // 추적 상태 데이터 업데이트
