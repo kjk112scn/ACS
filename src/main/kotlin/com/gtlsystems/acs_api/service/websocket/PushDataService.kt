@@ -46,7 +46,12 @@ class PushDataService(
 
 			// ✅ 하드웨어 에러 로그 수집 (예외 보호)
 			val hardwareErrorLogs = try {
-				hardwareErrorLogService.getAllErrorLogs()
+				val logs = hardwareErrorLogService.getAllErrorLogs()
+				logger.info("📋 하드웨어 에러 로그 수집: {}개", logs.size)
+				if (logs.isNotEmpty()) {
+					logger.info("📋 첫 번째 로그: {}", logs.first())
+				}
+				logs
 			} catch (e: Exception) {
 				logger.warn("하드웨어 에러 로그 조회 실패: {}", e.message)
 				emptyList()

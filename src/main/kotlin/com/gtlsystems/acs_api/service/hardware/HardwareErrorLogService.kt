@@ -29,42 +29,51 @@ class HardwareErrorLogService {
      */
     fun processAntennaData(antennaData: Map<String, Any>) {
         try {
+            logger.info("🔍 하드웨어 로그 처리 시작 - 데이터 크기: {}", antennaData.size)
+            
             // ✅ 모든 비트 타입 처리 (AllStatusContent.vue 기반)
             val bitTypes = listOf(
-                // Main Board Status
                 "mainBoardProtocolStatusBits",
                 "mainBoardStatusBits", 
                 "mainBoardMCOnOffBits",
-                "mainBoardReserveBits",
-                
-                // Azimuth Board Status
                 "azimuthBoardServoStatusBits",
                 "azimuthBoardStatusBits",
-                
-                // Elevation Board Status  
-                "elevationBoardServoStatusBits",
+                "elevationBoardServoStatusBits", // ✅ Elevation Servo Alarm 포함
                 "elevationBoardStatusBits",
-                
-                // Train Board Status
                 "trainBoardServoStatusBits",
                 "trainBoardStatusBits",
-                
-                // Feed Board Status
                 "feedSBoardStatusBits",
                 "feedXBoardStatusBits"
             )
             
             bitTypes.forEach { bitType ->
                 val currentBits = antennaData[bitType] as? String
+                logger.info("🔍 {} 현재 비트: {}", bitType, currentBits)
+                
                 if (currentBits != null) {
                     val previousBits = previousBitStates[bitType]
-                    if (previousBits != null && previousBits != currentBits) {
+                    
+                    if (previousBits == null) {
+                        // ✅ 첫 번째 수신 - 모든 비트를 현재 상태로 기록
+                        logger.info("🆕 {} 첫 수신 - 현재 상태 기록", bitType)
+                        previousBitStates[bitType] = currentBits
+                        
+                        // ✅ 첫 수신 시에도 현재 상태를 에러로 기록 (초기 상태 감지)
+                        val initialErrors = analyzeBitChanges(currentBits, "00000000", bitType)
+                        initialErrors.forEach { error ->
+                            addErrorLog(error)
+                            logger.info("📝 초기 에러 로그 추가: {}", error.message)
+                        }
+                    } else if (previousBits != currentBits) {
+                        // ✅ 변화 감지
+                        logger.info("✅ {} 비트 변화 감지: {} -> {}", bitType, previousBits, currentBits)
                         val errors = analyzeBitChanges(currentBits, previousBits, bitType)
                         errors.forEach { error ->
                             addErrorLog(error)
+                            logger.info("📝 에러 로그 추가: {}", error.message)
                         }
+                        previousBitStates[bitType] = currentBits
                     }
-                    previousBitStates[bitType] = currentBits
                 }
             }
         } catch (e: Exception) {
@@ -77,8 +86,14 @@ class HardwareErrorLogService {
      */
     private fun analyzeBitChanges(currentBits: String, previousBits: String, bitType: String): List<HardwareErrorLog> {
         val errors = mutableListOf<HardwareErrorLog>()
+        
+        // ✅ 디버깅 로그 추가
+        logger.info("�� 비트 분석 시작: {} -> {} -> {}", bitType, previousBits, currentBits)
+        
         val currentBitArray = currentBits.padStart(8, '0').split("").filter { it.isNotEmpty() }.reversed()
         val previousBitArray = previousBits.padStart(8, '0').split("").filter { it.isNotEmpty() }.reversed()
+        
+        logger.info("�� 비트 배열: 현재={}, 이전={}", currentBitArray, previousBitArray)
         
         val errorMappings = getErrorMappings(bitType)
         
@@ -86,7 +101,9 @@ class HardwareErrorLogService {
             val currentBit = currentBitArray.getOrNull(bitPosition) == "1"
             val previousBit = previousBitArray.getOrNull(bitPosition) == "1"
             
-            // 비트 변화 감지
+            logger.info("�� 비트 {}: 현재={}, 이전={}, 변화={}", bitPosition, currentBit, previousBit, currentBit != previousBit)
+            
+            // ✅ 비트 변화 감지
             if (currentBit != previousBit) {
                 val error = HardwareErrorLog(
                     id = UUID.randomUUID().toString(),
@@ -100,9 +117,11 @@ class HardwareErrorLogService {
                     resolvedMessage = if (!currentBit) errorConfig.resolvedMessage else null
                 )
                 errors.add(error)
+                logger.info("📝 에러 생성: {} - {}", errorConfig.component, error.message)
             }
         }
         
+        logger.info("🔍 총 에러 개수: {}", errors.size)
         return errors
     }
     
@@ -172,7 +191,7 @@ class HardwareErrorLogService {
                     2 to ErrorConfig("SERVO_POWER", "ERROR", "ELEVATION_SERVO_ALARM_CODE3", "Elevation Servo Alarm Code 3"),
                     3 to ErrorConfig("SERVO_POWER", "ERROR", "ELEVATION_SERVO_ALARM_CODE4", "Elevation Servo Alarm Code 4"),
                     4 to ErrorConfig("SERVO_POWER", "ERROR", "ELEVATION_SERVO_ALARM_CODE5", "Elevation Servo Alarm Code 5"),
-                    5 to ErrorConfig("SERVO_POWER", "ERROR", "ELEVATION_SERVO_ALARM", "Elevation Servo Alarm"),
+                    5 to ErrorConfig("SERVO_POWER", "ERROR", "ELEVATION_SERVO_ALARM", "Elevation Servo Alarm"), // ✅ 이것이 5번째 비트
                     6 to ErrorConfig("SERVO_POWER", "WARNING", "ELEVATION_SERVO_BRAKE_ENGAGED", "Elevation Servo Brake"),
                     7 to ErrorConfig("SERVO_POWER", "INFO", "ELEVATION_SERVO_MOTOR_ON", "Elevation Servo Motor")
                 )
@@ -266,6 +285,30 @@ class HardwareErrorLogService {
      */
     fun getActiveErrorLogs(): List<HardwareErrorLog> {
         return errorLogs.filter { !it.isResolved }
+    }
+
+    fun createTestErrorLog() {
+        logger.info("�� createTestErrorLog() 메서드 호출됨")
+        
+        val testError = HardwareErrorLog(
+            id = UUID.randomUUID().toString(),
+            timestamp = LocalDateTime.now().toString(),
+            category = "TEST",
+            severity = "INFO",
+            message = mapOf("ko" to "테스트 에러", "en" to "Test Error"),
+            component = "Test Component",
+            isResolved = false,
+            resolvedAt = null,
+            resolvedMessage = null
+        )
+        
+        logger.info("🔍 테스트 에러 객체 생성됨: {}", testError.id)
+        
+        addErrorLog(testError)
+        
+        logger.info("�� addErrorLog() 호출 완료")
+        logger.info("🔍 현재 에러 로그 개수: {}", errorLogs.size)
+        logger.info("✅ 테스트 에러 로그 생성됨")
     }
 }
 
