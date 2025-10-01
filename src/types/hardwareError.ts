@@ -7,7 +7,15 @@ export interface HardwareErrorLog {
   /** 발생 시간 */
   timestamp: string
   /** 대분류 카테고리 */
-  category: 'POWER' | 'PROTOCOL' | 'EMERGENCY' | 'SERVO_POWER' | 'STOW' | 'POSITIONER' | 'FEED'
+  category:
+    | 'POWER'
+    | 'PROTOCOL'
+    | 'EMERGENCY'
+    | 'SERVO_POWER'
+    | 'STOW'
+    | 'POSITIONER'
+    | 'FEED'
+    | 'TEST'
   /** 심각도 */
   severity: 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL'
   /** 에러 메시지 (다국어) */
@@ -39,6 +47,7 @@ export const ERROR_CATEGORIES = {
   STOW: 'Stow Pin Status',
   POSITIONER: 'Positioner Status',
   FEED: 'Feed Status',
+  TEST: 'Test Status',
 } as const
 
 /**

@@ -74,8 +74,10 @@ const hardwareErrorLogStore = useHardwareErrorLogStore()
 const { locale } = useI18n()
 const { initializeTheme } = useTheme()
 
-// Store에서 가져온 데이터
-const { errorLogs, activeErrorCount } = hardwareErrorLogStore
+// ✅ hardwareErrorLogStore에서 직접 데이터 가져오기
+const errorLogs = computed(() => hardwareErrorLogStore.errorLogs)
+const activeErrorCount = computed(() => hardwareErrorLogStore.activeErrorCount)
+const resolvedErrorCount = computed(() => hardwareErrorLogStore.resolvedErrorCount)
 
 // ✅ 필터 변수들 정의
 const selectedCategory = ref<string | null>(null)
@@ -156,14 +158,14 @@ const getSeverityName = (severity: string) => {
   return severityNames[locale.value]?.[severity] || severity
 }
 
-// ✅ 해결된 에러 개수 계산
-const resolvedErrorCount = computed(() => {
-  return errorLogs.filter(log => log.isResolved).length
-})
+// ✅ 해결된 에러 개수 계산 - 이 부분을 완전히 제거하세요
+// const resolvedErrorCount = computed(() => {
+//   return errorLogs.value.filter(log => log.isResolved).length
+// })
 
 // ✅ 필터링된 에러 로그
 const filteredErrorLogs = computed(() => {
-  let filtered = [...errorLogs]
+  let filtered = [...errorLogs.value] // ✅ .value 추가
 
   // 카테고리 필터
   if (selectedCategory.value) {

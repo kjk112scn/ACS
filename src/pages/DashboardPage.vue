@@ -275,7 +275,6 @@ import { useRouter, useRoute } from 'vue-router'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 import { openComponent } from '../utils/windowUtils'
-//import AllStatus from '../components/modal/status/AllStatus.vue'
 import { useTheme } from '../composables/useTheme'
 
 const icdStore = useICDStore()
@@ -531,7 +530,7 @@ let debugTimer: number | null = null
 onMounted(async () => {
   console.log('📱 DashboardPage 컴포넌트 마운트됨')
 
-  // 테마 초기화 추가
+  // 테마 초기화
   initializeTheme()
 
   // 라우트 설정

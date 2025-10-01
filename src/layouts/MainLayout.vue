@@ -58,7 +58,7 @@
     <SettingsModal v-model="settingsModal" :dark-mode="isDarkMode" :server-address="serverAddress"
       @save="handleSettingsSave" />
     <!-- 하드웨어 에러 로그 패널 (하단 고정) -->
-    <HardwareErrorLogPanel />
+    <!--     <HardwareErrorLogPanel /> -->
 
     <!-- 하단 고정 바 - 임시로 항상 표시 -->
     <div class="error-status-bar" v-if="true">
@@ -78,7 +78,7 @@ import SettingsModal from '@/components/settings/SettingsModal.vue'
 import { openComponent } from '@/utils/windowUtils' // ✅ 기존 함수 사용
 import { useQuasar } from 'quasar'
 import { useICDStore } from '@/stores/icd/icdStore' // ICD Store import 추가
-import HardwareErrorLogPanel from '@/components/HardwareErrorLogPanel.vue'
+//import HardwareErrorLogPanel from '@/components/HardwareErrorLogPanel.vue'
 import { useHardwareErrorLogStore } from '@/stores/hardwareErrorLogStore'
 
 const $q = useQuasar()

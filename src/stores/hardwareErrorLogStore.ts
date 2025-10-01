@@ -9,6 +9,7 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
 
   // 계산된 속성
   const activeErrorCount = computed(() => errorLogs.value.filter((log) => !log.isResolved).length)
+  const resolvedErrorCount = computed(() => errorLogs.value.filter((log) => log.isResolved).length)
 
   const errorLogsByCategory = computed(() => {
     const categories = [
@@ -19,6 +20,7 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
       'STOW',
       'POSITIONER',
       'FEED',
+      'TEST',
     ]
     return categories.reduce(
       (acc, category) => {
@@ -42,12 +44,27 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
 
   // 액션
   const addErrorLog = (error: HardwareErrorLog) => {
-    errorLogs.value.unshift(error)
+    console.log('🔍 addErrorLog 호출됨:', error)
+    console.log('🔍 추가 전 로그 개수:', errorLogs.value.length)
+
+    // 중복 ID 체크
+    const existingIndex = errorLogs.value.findIndex((existingLog) => existingLog.id === error.id)
+
+    if (existingIndex !== -1) {
+      // 기존 로그 업데이트
+      errorLogs.value[existingIndex] = error
+    } else {
+      // 새 로그 추가
+      errorLogs.value.unshift(error) // 최신순으로 추가
+    }
 
     // 최대 1000개로 제한
     if (errorLogs.value.length > 1000) {
       errorLogs.value = errorLogs.value.slice(0, 1000)
     }
+
+    console.log('🔍 추가 후 로그 개수:', errorLogs.value.length)
+    console.log('🔍 최신 로그:', errorLogs.value[0])
 
     // 로컬 스토리지에 저장
     saveToLocalStorage()
@@ -61,6 +78,15 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
     }
   }
 
+  // ✅ deleteErrorLog 메서드 추가
+  const deleteErrorLog = (id: string) => {
+    const index = errorLogs.value.findIndex((log) => log.id === id)
+    if (index !== -1) {
+      errorLogs.value.splice(index, 1)
+      saveToLocalStorage()
+    }
+  }
+
   const clearAllLogs = () => {
     errorLogs.value = []
     saveToLocalStorage()
@@ -68,6 +94,20 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
 
   const clearResolvedLogs = () => {
     errorLogs.value = errorLogs.value.filter((log) => !log.isResolved)
+    saveToLocalStorage()
+  }
+
+  const resolveAllErrors = () => {
+    errorLogs.value.forEach((log) => {
+      if (!log.isResolved) {
+        log.isResolved = true
+        log.resolvedAt = new Date().toISOString()
+        log.resolvedMessage = {
+          ko: '일괄 해결 처리됨',
+          en: 'Bulk resolved',
+        }
+      }
+    })
     saveToLocalStorage()
   }
 
@@ -122,14 +162,17 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
 
     // 계산된 속성
     activeErrorCount,
+    resolvedErrorCount,
     errorLogsByCategory,
     errorLogsBySeverity,
 
     // 액션
     addErrorLog,
     updateErrorLog,
+    deleteErrorLog, // ✅ 추가
     clearAllLogs,
     clearResolvedLogs,
+    resolveAllErrors,
     toggleLogPanel,
 
     // 초기화

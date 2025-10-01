@@ -1122,6 +1122,12 @@ export const useICDStore = defineStore('icd', () => {
           'hardwareErrorLogs' in message.data
         ) {
           const hardwareErrorLogs = (message.data as Record<string, unknown>).hardwareErrorLogs
+          console.log('🔍 하드웨어 에러 로그 수신:', hardwareErrorLogs)
+          console.log(
+            '🔍 로그 개수:',
+            Array.isArray(hardwareErrorLogs) ? hardwareErrorLogs.length : '배열이 아님',
+          )
+
           if (Array.isArray(hardwareErrorLogs)) {
             // 하드웨어 에러 로그 스토어에 추가
             const { useHardwareErrorLogStore } = await import('@/stores/hardwareErrorLogStore')
@@ -1158,6 +1164,8 @@ export const useICDStore = defineStore('icd', () => {
               }
             })
           }
+        } else {
+          console.log('❌ 하드웨어 에러 로그 데이터 없음')
         }
       } catch (hardwareLogError) {
         console.error('❌ 하드웨어 에러 로그 처리 실패:', hardwareLogError)
@@ -1301,7 +1309,7 @@ export const useICDStore = defineStore('icd', () => {
 
       // 🆕 추적 스케줄 정보 업데이트
       if (message.currentTrackingMstId !== undefined) {
-        const newCurrentMstId = message.currㅋntTrackingMstId as number | null
+        const newCurrentMstId = message.currentTrackingMstId as number | null
         if (currentTrackingMstId.value !== newCurrentMstId) {
           console.log(`📋 현재 추적 MstId 변경: ${currentTrackingMstId.value} → ${newCurrentMstId}`)
           currentTrackingMstId.value = newCurrentMstId
