@@ -1129,13 +1129,21 @@ export const useICDStore = defineStore('icd', () => {
           )
 
           if (Array.isArray(hardwareErrorLogs)) {
+            console.log('🔍 하드웨어 에러 로그 배열 확인:', hardwareErrorLogs)
+
             // 하드웨어 에러 로그 스토어에 추가
             const { useHardwareErrorLogStore } = await import('@/stores/hardwareErrorLogStore')
             const hardwareErrorLogStore = useHardwareErrorLogStore()
 
+            console.log('🔍 하드웨어 에러 로그 스토어 현재 상태:', {
+              로그개수: hardwareErrorLogStore.errorLogs.length,
+              활성에러: hardwareErrorLogStore.activeErrorCount,
+            })
+
             // 새로운 에러 로그만 추가 (중복 방지)
             hardwareErrorLogs.forEach((log: Record<string, unknown>) => {
               try {
+                console.log('🔍 로그 처리 중:', log)
                 const existingLog = hardwareErrorLogStore.errorLogs.find(
                   (existing) => existing.id === log.id,
                 )
@@ -1150,7 +1158,8 @@ export const useICDStore = defineStore('icd', () => {
                       | 'SERVO_POWER'
                       | 'STOW'
                       | 'POSITIONER'
-                      | 'FEED',
+                      | 'FEED'
+                      | 'TEST',
                     severity: log.severity as 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL',
                     message: log.message as { ko: string; en: string },
                     component: log.component as string,

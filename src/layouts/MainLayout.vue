@@ -60,19 +60,33 @@
     <!-- 하드웨어 에러 로그 패널 (하단 고정) -->
     <!--     <HardwareErrorLogPanel /> -->
 
-    <!-- 하단 고정 바 - 임시로 항상 표시 -->
+    <!-- 하단 고정 바 - 여러 에러 표시 -->
     <div class="error-status-bar" v-if="true">
       <div class="error-message">
         <q-icon name="warning" color="red" class="q-mr-sm" />
-        <span>{{ displayMessage }}</span>
+        <!-- 여러 에러 표시 -->
+        <span v-if="activeErrorMessages.length > 0">
+          {{ activeErrorMessages[currentErrorIndex] }}
+          <span v-if="activeErrorMessages.length > 1" class="error-counter">
+            ({{ currentErrorIndex + 1 }}/{{ activeErrorMessages.length }})
+          </span>
+        </span>
+        <span v-else>시스템 정상</span>
       </div>
+
+      <!-- 에러가 여러 개일 경우 이전/다음 버튼 -->
+      <div class="error-navigation" v-if="activeErrorMessages.length > 1">
+        <q-btn icon="navigate_before" flat dense round @click="prevError" />
+        <q-btn icon="navigate_next" flat dense round @click="nextError" />
+      </div>
+
       <q-btn icon="bug_report" color="primary" round dense @click="openErrorLogPopup" class="log-button" />
     </div>
   </q-layout>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, onBeforeUnmount } from 'vue'
 import EssentialLink, { type EssentialLinkProps } from '@/components/common/EssentialLink.vue'
 import SettingsModal from '@/components/settings/SettingsModal.vue'
 import { openComponent } from '@/utils/windowUtils' // ✅ 기존 함수 사용
@@ -224,6 +238,49 @@ function toggleLeftDrawer() {
   leftDrawerOpen.value = !leftDrawerOpen.value
 }
 
+// 현재 표시 중인 에러 인덱스
+const currentErrorIndex = ref(0)
+
+// 활성화된 모든 에러 메시지 목록
+const activeErrorMessages = computed(() => {
+  if (hardwareErrorLogStore.activeErrorCount === 0) {
+    return []
+  }
+
+  // 모든 미해결 로그 가져오기
+  const activeLogs = hardwareErrorLogStore.errorLogs.filter(log => !log.isResolved)
+
+  // 심각도별 정렬 (CRITICAL > ERROR > WARNING > INFO)
+  const severityOrder = { 'CRITICAL': 0, 'ERROR': 1, 'WARNING': 2, 'INFO': 3 }
+  const sortedLogs = [...activeLogs].sort((a, b) => {
+    return severityOrder[a.severity] - severityOrder[b.severity]
+  })
+
+  // 메시지 추출
+  return sortedLogs.map(log => {
+    const currentLanguage = localStorage.getItem('language') || 'ko-KR'
+    const message = currentLanguage === 'ko-KR' ? log.message.ko : log.message.en
+    return `[${log.component}] ${message}`
+  })
+})
+
+// 이전 에러 표시
+const prevError = () => {
+  if (activeErrorMessages.value.length > 0) {
+    currentErrorIndex.value = (currentErrorIndex.value - 1 + activeErrorMessages.value.length) % activeErrorMessages.value.length
+  }
+}
+
+// 다음 에러 표시
+const nextError = () => {
+  if (activeErrorMessages.value.length > 0) {
+    currentErrorIndex.value = (currentErrorIndex.value + 1) % activeErrorMessages.value.length
+  }
+}
+
+// 자동 순환 표시 (옵션)
+let errorRotationInterval: number | null = null
+
 // 컴포넌트가 마운트될 때 로컬 스토리지에서 다크 모드 설정 불러오기
 onMounted(() => {
   leftDrawerOpen.value = false
@@ -234,22 +291,19 @@ onMounted(() => {
     const isDarkMode = savedDarkMode === 'true'
     $q.dark.set(isDarkMode)
   }
+
+  // 5초마다 다음 에러 표시 (옵션)
+  errorRotationInterval = window.setInterval(() => {
+    if (activeErrorMessages.value.length > 1) {
+      nextError()
+    }
+  }, 5000)
 })
 
-// displayMessage computed에서 getCurrentMessage 함수 정의
-const displayMessage = computed(() => {
-  if (hardwareErrorLogStore.activeErrorCount === 0) {
-    return '시스템 정상'
+onBeforeUnmount(() => {
+  if (errorRotationInterval !== null) {
+    clearInterval(errorRotationInterval)
   }
-  const latestLog = hardwareErrorLogStore.errorLogs.find(log => !log.isResolved)
-
-  // ✅ 로컬에서 getCurrentMessage 함수 정의
-  const getCurrentMessage = (message: { ko: string; en: string }) => {
-    const currentLanguage = localStorage.getItem('language') || 'ko-KR'
-    return currentLanguage === 'ko-KR' ? message.ko : message.en
-  }
-
-  return latestLog ? getCurrentMessage(latestLog.message) : '에러가 발생했습니다.'
 })
 
 // 에러 로그 팝업 열기
@@ -410,5 +464,17 @@ const openErrorLogPopup = () => {
 
 .log-button {
   margin-left: 12px;
+}
+
+.error-counter {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-left: 8px;
+}
+
+.error-navigation {
+  display: flex;
+  align-items: center;
+  margin-right: 12px;
 }
 </style>
