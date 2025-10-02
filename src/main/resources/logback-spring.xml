@@ -201,6 +201,14 @@
         <appender-ref ref="FILE-PERFORMANCE"/>
     </logger>
     
+    <!-- 하드웨어 에러 로그 관련 로그 -->
+    <logger name="com.gtlsystems.acs_api.service.hardware" level="DEBUG" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE-ALL"/>
+        <appender-ref ref="FILE-ERROR"/>
+        <appender-ref ref="FILE-BUSINESS"/>
+    </logger>
+    
     <!-- 위성 추적 알고리즘 로그 -->
     <logger name="com.gtlsystems.acs_api.algorithm.satellitetracker" level="INFO" additivity="false">
         <appender-ref ref="CONSOLE"/>

@@ -38,8 +38,9 @@ class PushDataService(
 
 			// ✅ 하드웨어 에러 로그 처리 (예외로 전체 흐름이 깨지지 않도록 보호)
 			try {
-				val antennaDataMap = currentData as? Map<String, Any> ?: emptyMap()
-				hardwareErrorLogService.processAntennaData(antennaDataMap)
+				val currentData = dataStoreService.getLatestData() // ✅ PushData.ReadData 직접 사용
+				logger.debug("🔍 하드웨어 에러 로그 처리 - elevationBoardStatusBits: {}", currentData.elevationBoardStatusBits)
+				hardwareErrorLogService.processAntennaData(currentData) // ✅ 타입 안전한 전달
 			} catch (e: Exception) {
 				logger.warn("하드웨어 에러 로그 처리 실패: {}", e.message)
 			}
