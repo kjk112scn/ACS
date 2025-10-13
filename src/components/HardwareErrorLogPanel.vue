@@ -8,6 +8,24 @@
       <div class="stats-section">
         <q-chip color="red" text-color="white" :label="`활성 에러: ${activeErrorCount}`" />
         <q-chip color="green" text-color="white" :label="`해결됨: ${resolvedErrorCount}`" />
+        
+        <!-- 실시간 업데이트 상태 표시 -->
+        <q-chip 
+          v-if="isRealtimeUpdating" 
+          color="blue" 
+          text-color="white" 
+          icon="sync" 
+          :label="'실시간 업데이트'"
+        />
+        
+        <!-- 초기 로딩 상태 표시 -->
+        <q-spinner 
+          v-if="!hardwareErrorLogStore.isInitialLoad" 
+          color="primary" 
+          size="20px" 
+          class="q-ml-sm"
+        />
+        <span v-if="!hardwareErrorLogStore.isInitialLoad" class="text-caption q-ml-sm">초기 로딩 중...</span>
       </div>
     </div>
 
@@ -65,7 +83,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useHardwareErrorLogStore } from '@/stores/hardwareErrorLogStore'
 import { useI18n } from 'vue-i18n'
 import { useTheme } from '@/composables/useTheme'
@@ -113,6 +131,21 @@ const resolvedStatusOptions = [
 const getCurrentMessage = (message: { ko: string; en: string }) => {
   return locale.value === 'ko-KR' ? message.ko : message.en
 }
+
+// 실시간 업데이트 상태
+const isRealtimeUpdating = computed(() => {
+  return hardwareErrorLogStore.isPopupOpen && hardwareErrorLogStore.isInitialLoad
+})
+
+// 컴포넌트 마운트 시 팝업 상태 설정
+onMounted(async () => {
+  await hardwareErrorLogStore.setPopupOpen(true)
+})
+
+// 컴포넌트 언마운트 시 팝업 상태 해제
+onUnmounted(async () => {
+  await hardwareErrorLogStore.setPopupOpen(false)
+})
 
 const getCategoryName = (category: string) => {
   const categoryNames = {

@@ -60,24 +60,22 @@
     <!-- 하드웨어 에러 로그 패널 (하단 고정) -->
     <!--     <HardwareErrorLogPanel /> -->
 
-    <!-- 하단 고정 바 - 여러 에러 표시 -->
+    <!-- 하단 고정 바 - 실시간 에러 상태 표시 -->
     <div class="error-status-bar" v-if="true">
       <div class="error-message">
-        <q-icon name="warning" color="red" class="q-mr-sm" />
-        <!-- 여러 에러 표시 -->
-        <span v-if="activeErrorMessages.length > 0">
-          {{ activeErrorMessages[currentErrorIndex] }}
-          <span v-if="activeErrorMessages.length > 1" class="error-counter">
-            ({{ currentErrorIndex + 1 }}/{{ activeErrorMessages.length }})
+        <q-icon
+          :name="getSeverityIcon()"
+          :color="getSeverityColor()"
+          class="q-mr-sm"
+        />
+        <!-- 실시간 에러 상태 표시 -->
+        <span v-if="currentErrorMessage">
+          {{ currentErrorMessage }}
+          <span v-if="errorCount > 1" class="error-counter">
+            ({{ errorCount }}개 활성)
           </span>
         </span>
         <span v-else>시스템 정상</span>
-      </div>
-
-      <!-- 에러가 여러 개일 경우 이전/다음 버튼 -->
-      <div class="error-navigation" v-if="activeErrorMessages.length > 1">
-        <q-btn icon="navigate_before" flat dense round @click="prevError" />
-        <q-btn icon="navigate_next" flat dense round @click="nextError" />
       </div>
 
       <q-btn icon="bug_report" color="primary" round dense @click="openErrorLogPopup" class="log-button" />
@@ -136,6 +134,61 @@ const displayLocalTime = computed(() => {
 
   return `${year}. ${month}. ${day}. ${hours}:${minutes}:${seconds}.${milliseconds} KST`
 })
+
+// 에러 상태 관련 computed 속성들
+const errorCount = computed(() => {
+  return icdStore.errorStatusBarData?.activeErrorCount || 0
+})
+
+const currentErrorMessage = computed(() => {
+  const latestError = icdStore.errorStatusBarData?.latestError
+  if (latestError) {
+    if (latestError.isResolved) {
+      // 해결된 에러의 경우 해결 메시지 표시
+      return latestError.resolvedMessage?.ko || latestError.resolvedMessage?.en || '에러가 해결되었습니다'
+    } else {
+      // 활성 에러의 경우 에러 메시지 표시
+      return latestError.message?.ko || latestError.message?.en || '알 수 없는 에러'
+    }
+  }
+  return null
+})
+
+// ✅ severity에 따른 아이콘 결정
+const getSeverityIcon = () => {
+  if (errorCount.value === 0) return 'check_circle'
+
+  const severity = icdStore.errorStatusBarData?.latestError?.severity
+  switch (severity) {
+    case 'ERROR':
+    case 'CRITICAL':
+      return 'error'
+    case 'WARNING':
+      return 'warning'
+    case 'INFO':
+      return 'info'
+    default:
+      return 'warning'
+  }
+}
+
+// ✅ severity에 따른 색상 결정
+const getSeverityColor = () => {
+  if (errorCount.value === 0) return 'green'
+
+  const severity = icdStore.errorStatusBarData?.latestError?.severity
+  switch (severity) {
+    case 'ERROR':
+    case 'CRITICAL':
+      return 'red'
+    case 'WARNING':
+      return 'orange'
+    case 'INFO':
+      return 'blue'
+    default:
+      return 'red'
+  }
+}
 
 const linksList: EssentialLinkProps[] = [
   {
@@ -238,48 +291,41 @@ function toggleLeftDrawer() {
   leftDrawerOpen.value = !leftDrawerOpen.value
 }
 
-// 현재 표시 중인 에러 인덱스
-const currentErrorIndex = ref(0)
+// 에러 로그 팝업 열기
+const openErrorLogPopup = async () => {
+  try {
+    console.log('🔍 에러 로그 팝업 열기 요청')
 
-// 활성화된 모든 에러 메시지 목록
-const activeErrorMessages = computed(() => {
-  if (hardwareErrorLogStore.activeErrorCount === 0) {
-    return []
-  }
+    // 팝업 상태 설정
+    await hardwareErrorLogStore.setPopupOpen(true)
 
-  // 모든 미해결 로그 가져오기
-  const activeLogs = hardwareErrorLogStore.errorLogs.filter(log => !log.isResolved)
-
-  // 심각도별 정렬 (CRITICAL > ERROR > WARNING > INFO)
-  const severityOrder = { 'CRITICAL': 0, 'ERROR': 1, 'WARNING': 2, 'INFO': 3 }
-  const sortedLogs = [...activeLogs].sort((a, b) => {
-    return severityOrder[a.severity] - severityOrder[b.severity]
-  })
-
-  // 메시지 추출
-  return sortedLogs.map(log => {
-    const currentLanguage = localStorage.getItem('language') || 'ko-KR'
-    const message = currentLanguage === 'ko-KR' ? log.message.ko : log.message.en
-    return `[${log.component}] ${message}`
-  })
-})
-
-// 이전 에러 표시
-const prevError = () => {
-  if (activeErrorMessages.value.length > 0) {
-    currentErrorIndex.value = (currentErrorIndex.value - 1 + activeErrorMessages.value.length) % activeErrorMessages.value.length
-  }
-}
-
-// 다음 에러 표시
-const nextError = () => {
-  if (activeErrorMessages.value.length > 0) {
-    currentErrorIndex.value = (currentErrorIndex.value + 1) % activeErrorMessages.value.length
+    // 팝업 창 열기
+    await openComponent('hardware-error-log', {
+      mode: 'popup',
+      width: 1200,
+      height: 600,
+      onClose: () => {
+        console.log('🔍 에러 로그 팝업 닫기')
+        void hardwareErrorLogStore.setPopupOpen(false)
+      },
+      onError: (error) => {
+        console.error('❌ 에러 로그 팝업 오류:', error)
+        $q.notify({
+          type: 'negative',
+          message: '에러 로그 팝업을 열 수 없습니다.',
+          position: 'top'
+        })
+      }
+    })
+  } catch (error) {
+    console.error('❌ 에러 로그 팝업 열기 실패:', error)
+    $q.notify({
+      type: 'negative',
+      message: '에러 로그 팝업 열기에 실패했습니다.',
+      position: 'top'
+    })
   }
 }
-
-// 자동 순환 표시 (옵션)
-let errorRotationInterval: number | null = null
 
 // 컴포넌트가 마운트될 때 로컬 스토리지에서 다크 모드 설정 불러오기
 onMounted(() => {
@@ -292,28 +338,11 @@ onMounted(() => {
     $q.dark.set(isDarkMode)
   }
 
-  // 5초마다 다음 에러 표시 (옵션)
-  errorRotationInterval = window.setInterval(() => {
-    if (activeErrorMessages.value.length > 1) {
-      nextError()
-    }
-  }, 5000)
 })
 
 onBeforeUnmount(() => {
-  if (errorRotationInterval !== null) {
-    clearInterval(errorRotationInterval)
-  }
+  // 정리 작업
 })
-
-// 에러 로그 팝업 열기
-const openErrorLogPopup = () => {
-  void openComponent('hardware-error-log', {
-    mode: 'popup',
-    width: 1200,
-    height: 800
-  })
-}
 </script>
 <style scoped>
 .custom-header {
