@@ -230,7 +230,7 @@ export const useICDStore = defineStore('icd', () => {
   const nextTrackingMstId = ref<number | null>(null)
   const udpConnected = ref<boolean>(false)
   const lastUdpUpdateTime = ref<string>('')
-  
+
   // 에러 데이터 상태
   const errorStatusBarData = ref<{
     activeErrorCount: number
@@ -264,7 +264,7 @@ export const useICDStore = defineStore('icd', () => {
     lastUpdateTime: number
   } | null>(null)
   const clientId = ref<string>('')
-  
+
   // 클라이언트 ID 생성
   const generateClientId = () => {
     if (!clientId.value) {
@@ -1165,7 +1165,7 @@ export const useICDStore = defineStore('icd', () => {
 
           if (errorData && typeof errorData === 'object') {
             const errorDataObj = errorData as Record<string, unknown>
-            
+
             // 상태바 데이터 업데이트 (항상)
             if ('statusBarData' in errorDataObj) {
               errorStatusBarData.value = errorDataObj.statusBarData as {
@@ -1183,10 +1183,10 @@ export const useICDStore = defineStore('icd', () => {
                 } | null
                 hasNewErrors: boolean
               }
-              
+
               // 하드웨어 에러 로그 스토어에 상태바 데이터 반영
-            const { useHardwareErrorLogStore } = await import('@/stores/hardwareErrorLogStore')
-            const hardwareErrorLogStore = useHardwareErrorLogStore()
+              const { useHardwareErrorLogStore } = await import('@/stores/hardwareErrorLogStore')
+              const hardwareErrorLogStore = useHardwareErrorLogStore()
 
               const statusBarData = errorDataObj.statusBarData as {
                 activeErrorCount: number
@@ -1204,10 +1204,12 @@ export const useICDStore = defineStore('icd', () => {
                 hasNewErrors: boolean
               }
               if (statusBarData?.hasNewErrors && statusBarData?.latestError) {
-                hardwareErrorLogStore.addErrorLog(statusBarData.latestError as unknown as HardwareErrorLog)
+                hardwareErrorLogStore.addErrorLog(
+                  statusBarData.latestError as unknown as HardwareErrorLog,
+                )
               }
             }
-            
+
             // 팝업 데이터 업데이트 (팝업이 열려있을 때만)
             if ('popupData' in errorDataObj) {
               errorPopupData.value = errorDataObj.popupData as {
@@ -1226,10 +1228,10 @@ export const useICDStore = defineStore('icd', () => {
                 totalLogCount: number
                 lastUpdateTime: number
               }
-              
+
               const { useHardwareErrorLogStore } = await import('@/stores/hardwareErrorLogStore')
               const hardwareErrorLogStore = useHardwareErrorLogStore()
-              
+
               const popupData = errorDataObj.popupData as {
                 isInitialLoad: boolean
                 newLogs: {
@@ -1939,7 +1941,7 @@ export const useICDStore = defineStore('icd', () => {
       error.value = ''
 
       console.log('🔌 WebSocket 연결 시작')
-      
+
       // 클라이언트 ID 생성
       generateClientId()
       console.log('🆔 클라이언트 ID 생성:', clientId.value)
@@ -2476,7 +2478,7 @@ export const useICDStore = defineStore('icd', () => {
     nextTrackingMstId: readonly(nextTrackingMstId),
     udpConnected: readonly(udpConnected),
     lastUdpUpdateTime: readonly(lastUdpUpdateTime),
-    
+
     // 에러 데이터
     errorStatusBarData: readonly(errorStatusBarData),
     errorPopupData: readonly(errorPopupData),

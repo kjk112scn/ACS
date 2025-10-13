@@ -8,21 +8,21 @@
       <div class="stats-section">
         <q-chip color="red" text-color="white" :label="`활성 에러: ${activeErrorCount}`" />
         <q-chip color="green" text-color="white" :label="`해결됨: ${resolvedErrorCount}`" />
-        
+
         <!-- 실시간 업데이트 상태 표시 -->
-        <q-chip 
-          v-if="isRealtimeUpdating" 
-          color="blue" 
-          text-color="white" 
-          icon="sync" 
+        <q-chip
+          v-if="isRealtimeUpdating"
+          color="blue"
+          text-color="white"
+          icon="sync"
           :label="'실시간 업데이트'"
         />
-        
+
         <!-- 초기 로딩 상태 표시 -->
-        <q-spinner 
-          v-if="!hardwareErrorLogStore.isInitialLoad" 
-          color="primary" 
-          size="20px" 
+        <q-spinner
+          v-if="!hardwareErrorLogStore.isInitialLoad"
+          color="primary"
+          size="20px"
           class="q-ml-sm"
         />
         <span v-if="!hardwareErrorLogStore.isInitialLoad" class="text-caption q-ml-sm">초기 로딩 중...</span>

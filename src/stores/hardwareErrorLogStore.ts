@@ -116,12 +116,12 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
   const toggleLogPanel = () => {
     isLogPanelOpen.value = !isLogPanelOpen.value
   }
-  
+
   // 팝업 상태 관리
   const setPopupOpen = async (isOpen: boolean) => {
     try {
       isPopupOpen.value = isOpen
-      
+
       if (isOpen) {
         // 팝업 열기 - 백엔드에서 전체 로그 히스토리 가져오기
         const clientId = 'client-' + Date.now() // 임시 클라이언트 ID
@@ -132,7 +132,7 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
           },
           body: `clientId=${encodeURIComponent(clientId)}&isOpen=true`
         })
-        
+
         if (response.ok) {
           const data = await response.json()
           if (data.allLogs && Array.isArray(data.allLogs)) {
@@ -152,7 +152,7 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
           },
           body: `clientId=${encodeURIComponent(clientId)}&isOpen=false`
         })
-        
+
         isInitialLoad.value = false
         console.log('📱 팝업 닫기 완료')
       }
@@ -160,16 +160,16 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
       console.error('❌ 팝업 상태 설정 실패:', error)
     }
   }
-  
+
   // 새로운 로그들 추가 (팝업이 열려있을 때 실시간 업데이트용)
   const addNewLogs = (newLogs: HardwareErrorLog[]) => {
     if (!isPopupOpen.value || !isInitialLoad.value) {
       return // 팝업이 닫혀있거나 초기 로드가 완료되지 않았으면 무시
     }
-    
+
     newLogs.forEach(newLog => {
       const existingIndex = errorLogs.value.findIndex(log => log.id === newLog.id)
-      
+
       if (existingIndex !== -1) {
         // 기존 로그 업데이트 (해결 상태 변경 등)
         errorLogs.value[existingIndex] = newLog
@@ -178,15 +178,15 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
         errorLogs.value.unshift(newLog)
       }
     })
-    
+
     // 시간순 정렬 (최신순)
     errorLogs.value.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-    
+
     // 최대 1000개로 제한
     if (errorLogs.value.length > 1000) {
       errorLogs.value = errorLogs.value.slice(0, 1000)
     }
-    
+
     saveToLocalStorage()
     console.log('📱 실시간 로그 업데이트:', newLogs.length, '개')
   }
