@@ -63,11 +63,7 @@
     <!-- 하단 고정 바 - 실시간 에러 상태 표시 -->
     <div class="error-status-bar" v-if="true">
       <div class="error-message">
-        <q-icon
-          :name="getSeverityIcon()"
-          :color="getSeverityColor()"
-          class="q-mr-sm"
-        />
+        <q-icon :name="getSeverityIcon()" :color="getSeverityColor()" class="q-mr-sm" />
         <!-- 실시간 에러 상태 표시 -->
         <span v-if="currentErrorMessage">
           {{ currentErrorMessage }}

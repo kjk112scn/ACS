@@ -10,21 +10,10 @@
         <q-chip color="green" text-color="white" :label="`해결됨: ${resolvedErrorCount}`" />
 
         <!-- 실시간 업데이트 상태 표시 -->
-        <q-chip
-          v-if="isRealtimeUpdating"
-          color="blue"
-          text-color="white"
-          icon="sync"
-          :label="'실시간 업데이트'"
-        />
+        <q-chip v-if="isRealtimeUpdating" color="blue" text-color="white" icon="sync" :label="'실시간 업데이트'" />
 
         <!-- 초기 로딩 상태 표시 -->
-        <q-spinner
-          v-if="!hardwareErrorLogStore.isInitialLoad"
-          color="primary"
-          size="20px"
-          class="q-ml-sm"
-        />
+        <q-spinner v-if="!hardwareErrorLogStore.isInitialLoad" color="primary" size="20px" class="q-ml-sm" />
         <span v-if="!hardwareErrorLogStore.isInitialLoad" class="text-caption q-ml-sm">초기 로딩 중...</span>
       </div>
     </div>
@@ -33,20 +22,21 @@
     <div class="filter-section">
       <!-- 카테고리 필터 -->
       <q-select v-model="selectedCategory" :options="categoryOptions" label="카테고리" dense outlined
-        style="min-width: 150px" clearable display-value="전체" />
+        style="min-width: 150px" clearable emit-value map-options />
 
       <!-- 심각도 필터 -->
       <q-select v-model="selectedSeverity" :options="severityOptions" label="심각도" dense outlined
-        style="min-width: 120px" clearable display-value="전체" />
+        style="min-width: 120px" clearable emit-value map-options />
 
       <!-- 날짜 범위 필터 -->
-      <q-input v-model="startDate" label="시작 날짜" type="date" dense outlined style="min-width: 150px" clearable />
+      <q-input v-model="startDate" label="시작 날짜" type="date" dense outlined style="min-width: 150px"
+        class="date-input" />
 
-      <q-input v-model="endDate" label="종료 날짜" type="date" dense outlined style="min-width: 150px" clearable />
+      <q-input v-model="endDate" label="종료 날짜" type="date" dense outlined style="min-width: 150px" class="date-input" />
 
       <!-- 해결 상태 필터 -->
       <q-select v-model="selectedResolvedStatus" :options="resolvedStatusOptions" label="해결 상태" dense outlined
-        style="min-width: 120px" clearable display-value="전체" />
+        style="min-width: 150px" clearable emit-value map-options />
 
       <!-- 조회 버튼 -->
       <q-btn color="primary" label="조회" @click="applyFilters" />
@@ -83,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useHardwareErrorLogStore } from '@/stores/hardwareErrorLogStore'
 import { useI18n } from 'vue-i18n'
 import { useTheme } from '@/composables/useTheme'
@@ -104,8 +94,9 @@ const selectedResolvedStatus = ref<string | null>(null)
 const startDate = ref<string>('')
 const endDate = ref<string>('')
 
-// ✅ 옵션들 정의
+// ✅ 옵션들 정의 - 실제 데이터에 맞게 수정
 const categoryOptions = [
+  { label: '전체', value: null },
   { label: '전원', value: 'POWER' },
   { label: '프로토콜', value: 'PROTOCOL' },
   { label: '비상', value: 'EMERGENCY' },
@@ -116,6 +107,7 @@ const categoryOptions = [
 ]
 
 const severityOptions = [
+  { label: '전체', value: null },
   { label: '정보', value: 'INFO' },
   { label: '경고', value: 'WARNING' },
   { label: '오류', value: 'ERROR' },
@@ -123,6 +115,7 @@ const severityOptions = [
 ]
 
 const resolvedStatusOptions = [
+  { label: '전체', value: null },
   { label: '해결됨', value: 'resolved' },
   { label: '미해결', value: 'unresolved' }
 ]
@@ -137,9 +130,27 @@ const isRealtimeUpdating = computed(() => {
   return hardwareErrorLogStore.isPopupOpen && hardwareErrorLogStore.isInitialLoad
 })
 
+// ✅ 필터 값 변경 감지
+watch([selectedCategory, selectedSeverity, selectedResolvedStatus, startDate, endDate], () => {
+  console.log('🔍 필터 값 변경 감지:', {
+    category: selectedCategory.value,
+    severity: selectedSeverity.value,
+    resolvedStatus: selectedResolvedStatus.value,
+    startDate: startDate.value,
+    endDate: endDate.value
+  })
+}, { deep: true })
+
 // 컴포넌트 마운트 시 팝업 상태 설정
 onMounted(async () => {
+  console.log('🔍 HardwareErrorLogPanel 마운트됨')
+  console.log('🔍 현재 errorLogs:', hardwareErrorLogStore.errorLogs)
+  console.log('🔍 현재 isInitialLoad:', hardwareErrorLogStore.isInitialLoad)
+
   await hardwareErrorLogStore.setPopupOpen(true)
+
+  console.log('🔍 팝업 열기 후 errorLogs:', hardwareErrorLogStore.errorLogs)
+  console.log('🔍 팝업 열기 후 isInitialLoad:', hardwareErrorLogStore.isInitialLoad)
 })
 
 // 컴포넌트 언마운트 시 팝업 상태 해제
@@ -200,43 +211,66 @@ const getSeverityName = (severity: string) => {
 const filteredErrorLogs = computed(() => {
   let filtered = [...errorLogs.value] // ✅ .value 추가
 
+  console.log('🔍 필터링 시작 - 전체 로그 개수:', filtered.length)
+  console.log('🔍 현재 필터 조건:', {
+    category: selectedCategory.value,
+    severity: selectedSeverity.value,
+    resolvedStatus: selectedResolvedStatus.value,
+    startDate: startDate.value,
+    endDate: endDate.value
+  })
+
   // 카테고리 필터
   if (selectedCategory.value) {
+    const beforeCount = filtered.length
     filtered = filtered.filter(log => log.category === selectedCategory.value)
+    console.log('🔍 카테고리 필터 적용:', selectedCategory.value, `${beforeCount} → ${filtered.length}`)
   }
 
   // 심각도 필터
   if (selectedSeverity.value) {
+    const beforeCount = filtered.length
     filtered = filtered.filter(log => log.severity === selectedSeverity.value)
+    console.log('🔍 심각도 필터 적용:', selectedSeverity.value, `${beforeCount} → ${filtered.length}`)
   }
 
   // 해결 상태 필터
   if (selectedResolvedStatus.value) {
+    const beforeCount = filtered.length
     if (selectedResolvedStatus.value === 'resolved') {
       filtered = filtered.filter(log => log.isResolved)
     } else if (selectedResolvedStatus.value === 'unresolved') {
       filtered = filtered.filter(log => !log.isResolved)
     }
+    console.log('🔍 해결 상태 필터 적용:', selectedResolvedStatus.value, `${beforeCount} → ${filtered.length}`)
   }
 
   // 날짜 범위 필터
   if (startDate.value) {
+    const beforeCount = filtered.length
     const start = new Date(startDate.value)
     filtered = filtered.filter(log => {
       const logDate = new Date(log.timestamp)
       return logDate >= start
     })
+    console.log('🔍 시작 날짜 필터 적용:', startDate.value, `${beforeCount} → ${filtered.length}`)
   }
 
   if (endDate.value) {
+    const beforeCount = filtered.length
     const end = new Date(endDate.value)
     end.setHours(23, 59, 59, 999) // 하루 끝까지 포함
     filtered = filtered.filter(log => {
       const logDate = new Date(log.timestamp)
       return logDate <= end
     })
+    console.log('🔍 종료 날짜 필터 적용:', endDate.value, `${beforeCount} → ${filtered.length}`)
   }
 
+  // ✅ 최신 로그가 위로 오도록 시간순 정렬 (최신순)
+  filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+
+  console.log('🔍 필터링 완료 - 최종 로그 개수:', filtered.length)
   return filtered
 })
 
@@ -254,6 +288,8 @@ const applyFilters = () => {
 
 // ✅ 필터 초기화
 const resetFilters = () => {
+  console.log('🔍 필터 초기화 실행')
+
   // 기본값으로 설정 (전체)
   selectedCategory.value = null
   selectedSeverity.value = null
@@ -265,6 +301,8 @@ const resetFilters = () => {
 
   startDate.value = oneMonthAgo.toISOString().split('T')[0]
   endDate.value = today.toISOString().split('T')[0]
+
+  console.log('🔍 필터 초기화 완료 - 모든 필터가 전체로 설정됨')
 }
 
 // ✅ 심각도별 색상
@@ -304,6 +342,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 달력 아이콘 스타일링은 전역 CSS에서 관리 */
 .hardware-error-log-panel {
   padding: 20px;
   background-color: var(--theme-card-background);
@@ -366,4 +405,6 @@ onMounted(() => {
   margin-top: 16px;
   font-size: 1.1em;
 }
+
+/* 달력 아이콘 스타일링은 공통 CSS 파일에서 관리 */
 </style>

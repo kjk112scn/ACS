@@ -120,38 +120,50 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
   // 팝업 상태 관리
   const setPopupOpen = async (isOpen: boolean) => {
     try {
+      console.log('🔍 setPopupOpen 호출됨:', isOpen)
       isPopupOpen.value = isOpen
 
       if (isOpen) {
         // 팝업 열기 - 백엔드에서 전체 로그 히스토리 가져오기
         const clientId = 'client-' + Date.now() // 임시 클라이언트 ID
-        const response = await fetch('/api/hardware-error-logs/popup-state', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
+        console.log('🔍 팝업 열기 요청 - 클라이언트 ID:', clientId)
+
+        const response = await fetch(
+          `http://localhost:8080/api/hardware-error-logs/popup-state?clientId=${encodeURIComponent(clientId)}&isOpen=true`,
+          {
+            method: 'POST',
           },
-          body: `clientId=${encodeURIComponent(clientId)}&isOpen=true`
-        })
+        )
+
+        console.log('🔍 팝업 열기 응답 상태:', response.status, response.statusText)
 
         if (response.ok) {
           const data = await response.json()
+          console.log('🔍 팝업 열기 응답 데이터:', data)
+
           if (data.allLogs && Array.isArray(data.allLogs)) {
             errorLogs.value = data.allLogs
             isInitialLoad.value = true
             saveToLocalStorage()
             console.log('📱 팝업 열기 - 전체 로그 로드 완료:', data.allLogs.length)
+            console.log('📱 로드된 로그들:', data.allLogs)
+          } else {
+            console.error('❌ allLogs가 없거나 배열이 아님:', data)
           }
+        } else {
+          console.error('❌ 팝업 열기 API 실패:', response.status, response.statusText)
         }
       } else {
         // 팝업 닫기 - 백엔드에 알림
         const clientId = 'client-' + Date.now() // 임시 클라이언트 ID
-        await fetch('/api/hardware-error-logs/popup-state', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
+        console.log('🔍 팝업 닫기 요청 - 클라이언트 ID:', clientId)
+
+        await fetch(
+          `http://localhost:8080/api/hardware-error-logs/popup-state?clientId=${encodeURIComponent(clientId)}&isOpen=false`,
+          {
+            method: 'POST',
           },
-          body: `clientId=${encodeURIComponent(clientId)}&isOpen=false`
-        })
+        )
 
         isInitialLoad.value = false
         console.log('📱 팝업 닫기 완료')
@@ -167,8 +179,8 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
       return // 팝업이 닫혀있거나 초기 로드가 완료되지 않았으면 무시
     }
 
-    newLogs.forEach(newLog => {
-      const existingIndex = errorLogs.value.findIndex(log => log.id === newLog.id)
+    newLogs.forEach((newLog) => {
+      const existingIndex = errorLogs.value.findIndex((log) => log.id === newLog.id)
 
       if (existingIndex !== -1) {
         // 기존 로그 업데이트 (해결 상태 변경 등)
@@ -180,7 +192,9 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
     })
 
     // 시간순 정렬 (최신순)
-    errorLogs.value.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    errorLogs.value.sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    )
 
     // 최대 1000개로 제한
     if (errorLogs.value.length > 1000) {
@@ -214,7 +228,7 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
   // 백엔드에서 히스토리 로드
   const loadHistoryFromBackend = async () => {
     try {
-      const response = await fetch('/api/hardware-error-logs')
+      const response = await fetch('http://localhost:8080/api/hardware-error-logs')
       if (response.ok) {
         const data = await response.json()
         errorLogs.value = data

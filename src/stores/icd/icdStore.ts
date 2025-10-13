@@ -1165,9 +1165,11 @@ export const useICDStore = defineStore('icd', () => {
 
           if (errorData && typeof errorData === 'object') {
             const errorDataObj = errorData as Record<string, unknown>
+            console.log('🔍 WebSocket 에러 데이터 수신:', errorDataObj)
 
             // 상태바 데이터 업데이트 (항상)
             if ('statusBarData' in errorDataObj) {
+              console.log('🔍 상태바 데이터 업데이트:', errorDataObj.statusBarData)
               errorStatusBarData.value = errorDataObj.statusBarData as {
                 activeErrorCount: number
                 latestError: {
@@ -1185,8 +1187,8 @@ export const useICDStore = defineStore('icd', () => {
               }
 
               // 하드웨어 에러 로그 스토어에 상태바 데이터 반영
-              const { useHardwareErrorLogStore } = await import('@/stores/hardwareErrorLogStore')
-              const hardwareErrorLogStore = useHardwareErrorLogStore()
+            const { useHardwareErrorLogStore } = await import('@/stores/hardwareErrorLogStore')
+            const hardwareErrorLogStore = useHardwareErrorLogStore()
 
               const statusBarData = errorDataObj.statusBarData as {
                 activeErrorCount: number
@@ -1212,6 +1214,7 @@ export const useICDStore = defineStore('icd', () => {
 
             // 팝업 데이터 업데이트 (팝업이 열려있을 때만)
             if ('popupData' in errorDataObj) {
+              console.log('🔍 팝업 데이터 업데이트:', errorDataObj.popupData)
               errorPopupData.value = errorDataObj.popupData as {
                 isInitialLoad: boolean
                 newLogs: {
