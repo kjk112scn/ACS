@@ -22,9 +22,9 @@ class PushDataService(
 	private val activeClients = AtomicInteger(0)
 
 	/**
-	 * ✅ 실시간 데이터 생성 (mstId 포함 + 하드웨어 로그 포함)
+	 * ✅ 실시간 데이터 생성 (클라이언트별 맞춤 데이터)
 	 */
-	fun generateRealtimeData(): String {
+	fun generateRealtimeData(clientId: String): String {
 		return try {
 			// DataStoreService에서 최신 데이터 가져오기
 			val currentData = dataStoreService.getLatestData()
@@ -36,26 +36,16 @@ class PushDataService(
 				logger.debug("☀️ WebSocket 전송 - Sun Track 추적 상태: {}", trackingStatus.sunTrackTrackingState)
 			}
 
-			// ✅ 하드웨어 에러 로그 처리 (예외로 전체 흐름이 깨지지 않도록 보호)
-			try {
-				val currentData = dataStoreService.getLatestData() // ✅ PushData.ReadData 직접 사용
-				logger.debug("🔍 하드웨어 에러 로그 처리 - elevationBoardStatusBits: {}", currentData.elevationBoardStatusBits)
-				hardwareErrorLogService.processAntennaData(currentData) // ✅ 타입 안전한 전달
+			// ✅ 하드웨어 에러 로그 처리 및 클라이언트별 데이터 생성
+			val errorData = try {
+				val errorUpdateResult = hardwareErrorLogService.processAntennaData(currentData)
+				val clientErrorData = hardwareErrorLogService.getClientData(clientId)
+				
+				logger.debug("🔍 에러 데이터 생성 - 클라이언트: {}, 상태변경: {}", clientId, errorUpdateResult.hasStateChanged)
+				clientErrorData
 			} catch (e: Exception) {
 				logger.warn("하드웨어 에러 로그 처리 실패: {}", e.message)
-			}
-
-			// ✅ 하드웨어 에러 로그 수집 (예외 보호)
-			val hardwareErrorLogs = try {
-				val logs = hardwareErrorLogService.getAllErrorLogs()
-				logger.info("📋 하드웨어 에러 로그 수집: {}개", logs.size)
-				if (logs.isNotEmpty()) {
-					logger.info("📋 첫 번째 로그: {}", logs.first())
-				}
-				logs
-			} catch (e: Exception) {
-				logger.warn("하드웨어 에러 로그 조회 실패: {}", e.message)
-				emptyList()
+				null
 			}
 
 			// 필수 데이터만 포함하여 처리 시간 최소화
@@ -72,8 +62,8 @@ class PushDataService(
 				// ✅ mstId 정보 추가
 				"currentTrackingMstId" to dataStoreService.getCurrentTrackingMstId(),
 				"nextTrackingMstId" to dataStoreService.getNextTrackingMstId(),
-				// ✅ 하드웨어 에러 로그 추가
-				"hardwareErrorLogs" to hardwareErrorLogs
+				// ✅ 에러 데이터 추가 (클라이언트별 맞춤)
+				"errorData" to errorData
 			)
 
 			val jsonData = objectMapper.writeValueAsString(dataWithInfo)
@@ -88,12 +78,19 @@ class PushDataService(
 	/**
 	 * ✅ 클라이언트 연결 알림
 	 */
-	fun clientConnected(): String {
+	fun clientConnected(clientId: String): String {
 		val count = activeClients.incrementAndGet()
-		logger.info("📈 클라이언트 연결. 활성: {}", count)
+		logger.info("📈 클라이언트 연결. 활성: {}, 클라이언트: {}", count, clientId)
 
 		// 즉시 최신 데이터 반환
-		return generateRealtimeData()
+		return generateRealtimeData(clientId)
+	}
+	
+	/**
+	 * ✅ 팝업 상태 설정
+	 */
+	fun setPopupState(clientId: String, isOpen: Boolean): com.gtlsystems.acs_api.service.hardware.PopupResponse? {
+		return hardwareErrorLogService.setPopupState(clientId, isOpen)
 	}
 
 	/**
@@ -144,6 +141,10 @@ class PushDataService(
 	}
 
 	// === 기존 호환성 메서드들 (Controller에서 호출) ===
-	fun startSimulation() = clientConnected()
+	fun startSimulation() = clientConnected("legacy-client")
 	fun stopSimulation() = clientDisconnected()
+	
+	// === 기존 호환성 메서드 (클라이언트 ID 없이 호출) ===
+	fun generateRealtimeData(): String = generateRealtimeData("legacy-client")
+	fun clientConnected(): String = clientConnected("legacy-client")
 }
