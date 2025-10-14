@@ -136,16 +136,15 @@ class HardwareErrorLogService {
                     id = "${bitType}-${bitPosition}-${System.currentTimeMillis()}",
                     timestamp = LocalDateTime.now().toString(),
                     category = errorConfig.category,
-                        severity = if (currentBit == "1") errorConfig.severity else "INFO",
-                        message = if (currentBit == "1") errorConfig.errorMessage else errorConfig.resolvedMessage,
+                    severity = if (currentBit == "1") errorConfig.severity else "INFO",
+                    errorKey = errorConfig.errorKey,  // ✅ 에러 키만 저장
                     component = errorConfig.component,
-                        isResolved = currentBit == "0",
-                        resolvedAt = if (currentBit == "0") LocalDateTime.now().toString() else null,
-                        resolvedMessage = if (currentBit == "0") errorConfig.resolvedMessage else null
+                    isResolved = currentBit == "0",
+                    resolvedAt = if (currentBit == "0") LocalDateTime.now().toString() else null
+                    // message, resolvedMessage 제거 - 프론트엔드에서 처리
                 )
                 errors.add(error)
-                logger.info("📝 에러 생성: {} - {}", errorConfig.component, 
-                               if (currentBit == "1") errorConfig.errorMessage["ko"] else errorConfig.resolvedMessage["ko"])
+                logger.info("📝 에러 생성: {} - {}", errorConfig.component, errorConfig.errorKey)
                 }
             }
         }
@@ -296,7 +295,7 @@ class HardwareErrorLogService {
             errorLogs.poll()
         }
         
-        logger.info("📝 에러 로그 추가: {} - {}", error.component, error.message["ko"])
+        logger.info("📝 에러 로그 추가: {} - {}", error.component, error.errorKey)
     }
     
     /**
@@ -365,6 +364,7 @@ class HardwareErrorLogService {
             null
         }
         
+        // WebSocket 전송용 데이터 반환 (이미 메시지가 제거된 상태)
         return ClientErrorData(statusBarData, popupData)
     }
     
@@ -419,11 +419,10 @@ class HardwareErrorLogService {
             timestamp = LocalDateTime.now().toString(),
             category = "TEST",
             severity = "ERROR",
-            message = mapOf("ko" to "테스트 에러 발생", "en" to "Test Error Occurred"),
+            errorKey = "TEST_ERROR",  // ✅ 에러 키 추가
             component = "Test Component",
             isResolved = false,
-            resolvedAt = null,
-            resolvedMessage = null
+            resolvedAt = null
         )
         
         logger.info("🔍 테스트 에러 객체 생성됨: {}", testError.id)
@@ -446,11 +445,10 @@ class HardwareErrorLogService {
             timestamp = LocalDateTime.now().toString(),
             category = "TEST",
             severity = "INFO",
-            message = mapOf("ko" to "테스트 에러 해결됨", "en" to "Test Error Resolved"),
+            errorKey = "TEST_ERROR_RESOLVED",  // ✅ 에러 키 추가
             component = "Test Component",
             isResolved = true,
-            resolvedAt = LocalDateTime.now().toString(),
-            resolvedMessage = mapOf("ko" to "테스트 에러가 해결되었습니다", "en" to "Test error has been resolved")
+            resolvedAt = LocalDateTime.now().toString()
         )
         
         logger.info("🔍 테스트 해결 에러 객체 생성됨: {}", testResolvedError.id)
@@ -471,287 +469,7 @@ data class ErrorConfig(
     val severity: String,
     val errorKey: String,
     val component: String
-) {
-    val errorMessage: Map<String, String>
-        get() = mapOf(
-            "ko" to getErrorMessage(errorKey, "ko"),
-            "en" to getErrorMessage(errorKey, "en")
-        )
-    
-    val resolvedMessage: Map<String, String>
-        get() = mapOf(
-            "ko" to getResolvedMessage(errorKey, "ko"),
-            "en" to getResolvedMessage(errorKey, "en")
-        )
-    
-    private fun getErrorMessage(key: String, lang: String): String {
-        return when (lang) {
-            "ko" -> when (key) {
-                "ELEVATION_SERVO_ALARM" -> "Elevation 서보 알람"
-                "ELEVATION_SERVO_ALARM_CODE1" -> "Elevation 서보 알람 코드 1"
-                "ELEVATION_SERVO_ALARM_CODE2" -> "Elevation 서보 알람 코드 2"
-                "ELEVATION_SERVO_ALARM_CODE3" -> "Elevation 서보 알람 코드 3"
-                "ELEVATION_SERVO_ALARM_CODE4" -> "Elevation 서보 알람 코드 4"
-                "ELEVATION_SERVO_ALARM_CODE5" -> "Elevation 서보 알람 코드 5"
-                "AZIMUTH_SERVO_ALARM" -> "Azimuth 서보 알람"
-                "AZIMUTH_SERVO_ALARM_CODE1" -> "Azimuth 서보 알람 코드 1"
-                "AZIMUTH_SERVO_ALARM_CODE2" -> "Azimuth 서보 알람 코드 2"
-                "AZIMUTH_SERVO_ALARM_CODE3" -> "Azimuth 서보 알람 코드 3"
-                "AZIMUTH_SERVO_ALARM_CODE4" -> "Azimuth 서보 알람 코드 4"
-                "AZIMUTH_SERVO_ALARM_CODE5" -> "Azimuth 서보 알람 코드 5"
-                "TRAIN_SERVO_ALARM" -> "Train 서보 알람"
-                "TRAIN_SERVO_ALARM_CODE1" -> "Train 서보 알람 코드 1"
-                "TRAIN_SERVO_ALARM_CODE2" -> "Train 서보 알람 코드 2"
-                "TRAIN_SERVO_ALARM_CODE3" -> "Train 서보 알람 코드 3"
-                "TRAIN_SERVO_ALARM_CODE4" -> "Train 서보 알람 코드 4"
-                "TRAIN_SERVO_ALARM_CODE5" -> "Train 서보 알람 코드 5"
-                "ELEVATION_ENCODER_ERROR" -> "Elevation 인코더 에러"
-                "AZIMUTH_ENCODER_ERROR" -> "Azimuth 인코더 에러"
-                "TRAIN_ENCODER_ERROR" -> "Train 인코더 에러"
-                "POWER_SURGE_PROTECTOR_FAULT" -> "전력 서지 보호기 고장"
-                "POWER_REVERSE_PHASE_FAULT" -> "전력 역상 고장"
-                "EMERGENCY_STOP_ACU" -> "비상 정지 ACU"
-                "EMERGENCY_STOP_POSITIONER" -> "비상 정지 포지셔너"
-                "ELEVATION_SERVO_BRAKE_ENGAGED" -> "Elevation 서보 브레이크 작동"
-                "AZIMUTH_SERVO_BRAKE_ENGAGED" -> "Azimuth 서보 브레이크 작동"
-                "TRAIN_SERVO_BRAKE_ENGAGED" -> "Train 서보 브레이크 작동"
-                "ELEVATION_SERVO_MOTOR_ON" -> "Elevation 서보 모터 켜짐"
-                "AZIMUTH_SERVO_MOTOR_ON" -> "Azimuth 서보 모터 켜짐"
-                "TRAIN_SERVO_MOTOR_ON" -> "Train 서보 모터 켜짐"
-                "ELEVATION_LIMIT_SWITCH_POSITIVE_180" -> "Elevation 한계 스위치 +180°"
-                "ELEVATION_LIMIT_SWITCH_POSITIVE_185" -> "Elevation 한계 스위치 +185°"
-                "ELEVATION_LIMIT_SWITCH_NEGATIVE_0" -> "Elevation 한계 스위치 -0°"
-                "ELEVATION_LIMIT_SWITCH_NEGATIVE_5" -> "Elevation 한계 스위치 -5°"
-                "AZIMUTH_LIMIT_SWITCH_NEGATIVE_275" -> "Azimuth 한계 스위치 -275°"
-                "AZIMUTH_LIMIT_SWITCH_POSITIVE_275" -> "Azimuth 한계 스위치 +275°"
-                "TRAIN_LIMIT_SWITCH_NEGATIVE_275" -> "Train 한계 스위치 -275°"
-                "TRAIN_LIMIT_SWITCH_POSITIVE_275" -> "Train 한계 스위치 +275°"
-                "ELEVATION_STOW_PIN_ACTIVE" -> "Elevation 스토우 핀 활성"
-                "AZIMUTH_STOW_PIN_ACTIVE" -> "Azimuth 스토우 핀 활성"
-                "TRAIN_STOW_PIN_ACTIVE" -> "Train 스토우 핀 활성"
-                "SERVO_TRAIN_POWER_OFF" -> "Train 서보 전원 꺼짐"
-                "SERVO_ELEVATION_POWER_OFF" -> "Elevation 서보 전원 꺼짐"
-                "SERVO_AZIMUTH_POWER_OFF" -> "Azimuth 서보 전원 꺼짐"
-                "PROTOCOL_ELEVATION_ERROR" -> "Elevation 프로토콜 에러"
-                "PROTOCOL_AZIMUTH_ERROR" -> "Azimuth 프로토콜 에러"
-                "PROTOCOL_TRAIN_ERROR" -> "Train 프로토콜 에러"
-                "PROTOCOL_FEED_ERROR" -> "Feed 프로토콜 에러"
-                "S_BAND_LNA_LHCP_ERROR" -> "S-Band LNA LHCP 에러"
-                "S_BAND_LNA_RHCP_ERROR" -> "S-Band LNA RHCP 에러"
-                "S_BAND_RF_SWITCH_ERROR" -> "S-Band RF 스위치 에러"
-                "X_BAND_LNA_LHCP_ERROR" -> "X-Band LNA LHCP 에러"
-                "X_BAND_LNA_RHCP_ERROR" -> "X-Band LNA RHCP 에러"
-                "FAN_ERROR" -> "팬 에러"
-                "S_BAND_LNA_LHCP_POWER_ON" -> "S-Band LNA LHCP 전원 켜짐"
-                "S_BAND_LNA_RHCP_POWER_ON" -> "S-Band LNA RHCP 전원 켜짐"
-                "S_BAND_RF_SWITCH_RHCP" -> "S-Band RF 스위치 RHCP"
-                "X_BAND_LNA_LHCP_POWER_ON" -> "X-Band LNA LHCP 전원 켜짐"
-                "X_BAND_LNA_RHCP_POWER_ON" -> "X-Band LNA RHCP 전원 켜짐"
-                "FAN_POWER_ON" -> "팬 전원 켜짐"
-                else -> "알 수 없는 에러"
-            }
-            "en" -> when (key) {
-                "ELEVATION_SERVO_ALARM" -> "Elevation Servo Alarm"
-                "ELEVATION_SERVO_ALARM_CODE1" -> "Elevation Servo Alarm Code 1"
-                "ELEVATION_SERVO_ALARM_CODE2" -> "Elevation Servo Alarm Code 2"
-                "ELEVATION_SERVO_ALARM_CODE3" -> "Elevation Servo Alarm Code 3"
-                "ELEVATION_SERVO_ALARM_CODE4" -> "Elevation Servo Alarm Code 4"
-                "ELEVATION_SERVO_ALARM_CODE5" -> "Elevation Servo Alarm Code 5"
-                "AZIMUTH_SERVO_ALARM" -> "Azimuth Servo Alarm"
-                "AZIMUTH_SERVO_ALARM_CODE1" -> "Azimuth Servo Alarm Code 1"
-                "AZIMUTH_SERVO_ALARM_CODE2" -> "Azimuth Servo Alarm Code 2"
-                "AZIMUTH_SERVO_ALARM_CODE3" -> "Azimuth Servo Alarm Code 3"
-                "AZIMUTH_SERVO_ALARM_CODE4" -> "Azimuth Servo Alarm Code 4"
-                "AZIMUTH_SERVO_ALARM_CODE5" -> "Azimuth Servo Alarm Code 5"
-                "TRAIN_SERVO_ALARM" -> "Train Servo Alarm"
-                "TRAIN_SERVO_ALARM_CODE1" -> "Train Servo Alarm Code 1"
-                "TRAIN_SERVO_ALARM_CODE2" -> "Train Servo Alarm Code 2"
-                "TRAIN_SERVO_ALARM_CODE3" -> "Train Servo Alarm Code 3"
-                "TRAIN_SERVO_ALARM_CODE4" -> "Train Servo Alarm Code 4"
-                "TRAIN_SERVO_ALARM_CODE5" -> "Train Servo Alarm Code 5"
-                "ELEVATION_ENCODER_ERROR" -> "Elevation Encoder Error"
-                "AZIMUTH_ENCODER_ERROR" -> "Azimuth Encoder Error"
-                "TRAIN_ENCODER_ERROR" -> "Train Encoder Error"
-                "POWER_SURGE_PROTECTOR_FAULT" -> "Power Surge Protector Fault"
-                "POWER_REVERSE_PHASE_FAULT" -> "Power Reverse Phase Fault"
-                "EMERGENCY_STOP_ACU" -> "Emergency Stop ACU"
-                "EMERGENCY_STOP_POSITIONER" -> "Emergency Stop Positioner"
-                "ELEVATION_SERVO_BRAKE_ENGAGED" -> "Elevation Servo Brake Engaged"
-                "AZIMUTH_SERVO_BRAKE_ENGAGED" -> "Azimuth Servo Brake Engaged"
-                "TRAIN_SERVO_BRAKE_ENGAGED" -> "Train Servo Brake Engaged"
-                "ELEVATION_SERVO_MOTOR_ON" -> "Elevation Servo Motor On"
-                "AZIMUTH_SERVO_MOTOR_ON" -> "Azimuth Servo Motor On"
-                "TRAIN_SERVO_MOTOR_ON" -> "Train Servo Motor On"
-                "ELEVATION_LIMIT_SWITCH_POSITIVE_180" -> "Elevation Limit Switch +180°"
-                "ELEVATION_LIMIT_SWITCH_POSITIVE_185" -> "Elevation Limit Switch +185°"
-                "ELEVATION_LIMIT_SWITCH_NEGATIVE_0" -> "Elevation Limit Switch -0°"
-                "ELEVATION_LIMIT_SWITCH_NEGATIVE_5" -> "Elevation Limit Switch -5°"
-                "AZIMUTH_LIMIT_SWITCH_NEGATIVE_275" -> "Azimuth Limit Switch -275°"
-                "AZIMUTH_LIMIT_SWITCH_POSITIVE_275" -> "Azimuth Limit Switch +275°"
-                "TRAIN_LIMIT_SWITCH_NEGATIVE_275" -> "Train Limit Switch -275°"
-                "TRAIN_LIMIT_SWITCH_POSITIVE_275" -> "Train Limit Switch +275°"
-                "ELEVATION_STOW_PIN_ACTIVE" -> "Elevation Stow Pin Active"
-                "AZIMUTH_STOW_PIN_ACTIVE" -> "Azimuth Stow Pin Active"
-                "TRAIN_STOW_PIN_ACTIVE" -> "Train Stow Pin Active"
-                "SERVO_TRAIN_POWER_OFF" -> "Train Servo Power Off"
-                "SERVO_ELEVATION_POWER_OFF" -> "Elevation Servo Power Off"
-                "SERVO_AZIMUTH_POWER_OFF" -> "Azimuth Servo Power Off"
-                "PROTOCOL_ELEVATION_ERROR" -> "Elevation Protocol Error"
-                "PROTOCOL_AZIMUTH_ERROR" -> "Azimuth Protocol Error"
-                "PROTOCOL_TRAIN_ERROR" -> "Train Protocol Error"
-                "PROTOCOL_FEED_ERROR" -> "Feed Protocol Error"
-                "S_BAND_LNA_LHCP_ERROR" -> "S-Band LNA LHCP Error"
-                "S_BAND_LNA_RHCP_ERROR" -> "S-Band LNA RHCP Error"
-                "S_BAND_RF_SWITCH_ERROR" -> "S-Band RF Switch Error"
-                "X_BAND_LNA_LHCP_ERROR" -> "X-Band LNA LHCP Error"
-                "X_BAND_LNA_RHCP_ERROR" -> "X-Band LNA RHCP Error"
-                "FAN_ERROR" -> "Fan Error"
-                "S_BAND_LNA_LHCP_POWER_ON" -> "S-Band LNA LHCP Power On"
-                "S_BAND_LNA_RHCP_POWER_ON" -> "S-Band LNA RHCP Power On"
-                "S_BAND_RF_SWITCH_RHCP" -> "S-Band RF Switch RHCP"
-                "X_BAND_LNA_LHCP_POWER_ON" -> "X-Band LNA LHCP Power On"
-                "X_BAND_LNA_RHCP_POWER_ON" -> "X-Band LNA RHCP Power On"
-                "FAN_POWER_ON" -> "Fan Power On"
-                else -> "Unknown Error"
-            }
-            else -> "알 수 없는 에러"
-        }
-    }
-    
-    private fun getResolvedMessage(key: String, lang: String): String {
-        return when (lang) {
-            "ko" -> when (key) {
-                "ELEVATION_SERVO_ALARM" -> "Elevation 서보 알람 해제"
-                "ELEVATION_SERVO_ALARM_CODE1" -> "Elevation 서보 알람 코드 1 해제"
-                "ELEVATION_SERVO_ALARM_CODE2" -> "Elevation 서보 알람 코드 2 해제"
-                "ELEVATION_SERVO_ALARM_CODE3" -> "Elevation 서보 알람 코드 3 해제"
-                "ELEVATION_SERVO_ALARM_CODE4" -> "Elevation 서보 알람 코드 4 해제"
-                "ELEVATION_SERVO_ALARM_CODE5" -> "Elevation 서보 알람 코드 5 해제"
-                "AZIMUTH_SERVO_ALARM" -> "Azimuth 서보 알람 해제"
-                "AZIMUTH_SERVO_ALARM_CODE1" -> "Azimuth 서보 알람 코드 1 해제"
-                "AZIMUTH_SERVO_ALARM_CODE2" -> "Azimuth 서보 알람 코드 2 해제"
-                "AZIMUTH_SERVO_ALARM_CODE3" -> "Azimuth 서보 알람 코드 3 해제"
-                "AZIMUTH_SERVO_ALARM_CODE4" -> "Azimuth 서보 알람 코드 4 해제"
-                "AZIMUTH_SERVO_ALARM_CODE5" -> "Azimuth 서보 알람 코드 5 해제"
-                "TRAIN_SERVO_ALARM" -> "Train 서보 알람 해제"
-                "TRAIN_SERVO_ALARM_CODE1" -> "Train 서보 알람 코드 1 해제"
-                "TRAIN_SERVO_ALARM_CODE2" -> "Train 서보 알람 코드 2 해제"
-                "TRAIN_SERVO_ALARM_CODE3" -> "Train 서보 알람 코드 3 해제"
-                "TRAIN_SERVO_ALARM_CODE4" -> "Train 서보 알람 코드 4 해제"
-                "TRAIN_SERVO_ALARM_CODE5" -> "Train 서보 알람 코드 5 해제"
-                "ELEVATION_ENCODER_ERROR" -> "Elevation 인코더 에러 해결됨"
-                "AZIMUTH_ENCODER_ERROR" -> "Azimuth 인코더 에러 해결됨"
-                "TRAIN_ENCODER_ERROR" -> "Train 인코더 에러 해결됨"
-                "POWER_SURGE_PROTECTOR_FAULT" -> "전력 서지 보호기 정상"
-                "POWER_REVERSE_PHASE_FAULT" -> "전력 역상 정상"
-                "EMERGENCY_STOP_ACU" -> "비상 정지 ACU 해제됨"
-                "EMERGENCY_STOP_POSITIONER" -> "비상 정지 포지셔너 해제됨"
-                "ELEVATION_SERVO_BRAKE_ENGAGED" -> "Elevation 서보 브레이크 해제됨"
-                "AZIMUTH_SERVO_BRAKE_ENGAGED" -> "Azimuth 서보 브레이크 해제됨"
-                "TRAIN_SERVO_BRAKE_ENGAGED" -> "Train 서보 브레이크 해제됨"
-                "ELEVATION_SERVO_MOTOR_ON" -> "Elevation 서보 모터 꺼짐"
-                "AZIMUTH_SERVO_MOTOR_ON" -> "Azimuth 서보 모터 꺼짐"
-                "TRAIN_SERVO_MOTOR_ON" -> "Train 서보 모터 꺼짐"
-                "ELEVATION_LIMIT_SWITCH_POSITIVE_180" -> "Elevation 한계 스위치 +180° 비활성"
-                "ELEVATION_LIMIT_SWITCH_POSITIVE_185" -> "Elevation 한계 스위치 +185° 비활성"
-                "ELEVATION_LIMIT_SWITCH_NEGATIVE_0" -> "Elevation 한계 스위치 -0° 비활성"
-                "ELEVATION_LIMIT_SWITCH_NEGATIVE_5" -> "Elevation 한계 스위치 -5° 비활성"
-                "AZIMUTH_LIMIT_SWITCH_NEGATIVE_275" -> "Azimuth 한계 스위치 -275° 비활성"
-                "AZIMUTH_LIMIT_SWITCH_POSITIVE_275" -> "Azimuth 한계 스위치 +275° 비활성"
-                "TRAIN_LIMIT_SWITCH_NEGATIVE_275" -> "Train 한계 스위치 -275° 비활성"
-                "TRAIN_LIMIT_SWITCH_POSITIVE_275" -> "Train 한계 스위치 +275° 비활성"
-                "ELEVATION_STOW_PIN_ACTIVE" -> "Elevation 스토우 핀 비활성"
-                "AZIMUTH_STOW_PIN_ACTIVE" -> "Azimuth 스토우 핀 비활성"
-                "TRAIN_STOW_PIN_ACTIVE" -> "Train 스토우 핀 비활성"
-                "SERVO_TRAIN_POWER_OFF" -> "Train 서보 전원 켜짐"
-                "SERVO_ELEVATION_POWER_OFF" -> "Elevation 서보 전원 켜짐"
-                "SERVO_AZIMUTH_POWER_OFF" -> "Azimuth 서보 전원 켜짐"
-                "PROTOCOL_ELEVATION_ERROR" -> "Elevation 프로토콜 정상"
-                "PROTOCOL_AZIMUTH_ERROR" -> "Azimuth 프로토콜 정상"
-                "PROTOCOL_TRAIN_ERROR" -> "Train 프로토콜 정상"
-                "PROTOCOL_FEED_ERROR" -> "Feed 프로토콜 정상"
-                "S_BAND_LNA_LHCP_ERROR" -> "S-Band LNA LHCP 정상"
-                "S_BAND_LNA_RHCP_ERROR" -> "S-Band LNA RHCP 정상"
-                "S_BAND_RF_SWITCH_ERROR" -> "S-Band RF 스위치 정상"
-                "X_BAND_LNA_LHCP_ERROR" -> "X-Band LNA LHCP 정상"
-                "X_BAND_LNA_RHCP_ERROR" -> "X-Band LNA RHCP 정상"
-                "FAN_ERROR" -> "팬 정상"
-                "S_BAND_LNA_LHCP_POWER_ON" -> "S-Band LNA LHCP 전원 꺼짐"
-                "S_BAND_LNA_RHCP_POWER_ON" -> "S-Band LNA RHCP 전원 꺼짐"
-                "S_BAND_RF_SWITCH_RHCP" -> "S-Band RF 스위치 LHCP"
-                "X_BAND_LNA_LHCP_POWER_ON" -> "X-Band LNA LHCP 전원 꺼짐"
-                "X_BAND_LNA_RHCP_POWER_ON" -> "X-Band LNA RHCP 전원 꺼짐"
-                "FAN_POWER_ON" -> "팬 전원 꺼짐"
-                else -> "에러가 해결되었습니다"
-            }
-            "en" -> when (key) {
-                "ELEVATION_SERVO_ALARM" -> "Elevation Servo Alarm Resolved"
-                "ELEVATION_SERVO_ALARM_CODE1" -> "Elevation Servo Alarm Code 1 Resolved"
-                "ELEVATION_SERVO_ALARM_CODE2" -> "Elevation Servo Alarm Code 2 Resolved"
-                "ELEVATION_SERVO_ALARM_CODE3" -> "Elevation Servo Alarm Code 3 Resolved"
-                "ELEVATION_SERVO_ALARM_CODE4" -> "Elevation Servo Alarm Code 4 Resolved"
-                "ELEVATION_SERVO_ALARM_CODE5" -> "Elevation Servo Alarm Code 5 Resolved"
-                "AZIMUTH_SERVO_ALARM" -> "Azimuth Servo Alarm Resolved"
-                "AZIMUTH_SERVO_ALARM_CODE1" -> "Azimuth Servo Alarm Code 1 Resolved"
-                "AZIMUTH_SERVO_ALARM_CODE2" -> "Azimuth Servo Alarm Code 2 Resolved"
-                "AZIMUTH_SERVO_ALARM_CODE3" -> "Azimuth Servo Alarm Code 3 Resolved"
-                "AZIMUTH_SERVO_ALARM_CODE4" -> "Azimuth Servo Alarm Code 4 Resolved"
-                "AZIMUTH_SERVO_ALARM_CODE5" -> "Azimuth Servo Alarm Code 5 Resolved"
-                "TRAIN_SERVO_ALARM" -> "Train Servo Alarm Resolved"
-                "TRAIN_SERVO_ALARM_CODE1" -> "Train Servo Alarm Code 1 Resolved"
-                "TRAIN_SERVO_ALARM_CODE2" -> "Train Servo Alarm Code 2 Resolved"
-                "TRAIN_SERVO_ALARM_CODE3" -> "Train Servo Alarm Code 3 Resolved"
-                "TRAIN_SERVO_ALARM_CODE4" -> "Train Servo Alarm Code 4 Resolved"
-                "TRAIN_SERVO_ALARM_CODE5" -> "Train Servo Alarm Code 5 Resolved"
-                "ELEVATION_ENCODER_ERROR" -> "Elevation Encoder Error Resolved"
-                "AZIMUTH_ENCODER_ERROR" -> "Azimuth Encoder Error Resolved"
-                "TRAIN_ENCODER_ERROR" -> "Train Encoder Error Resolved"
-                "POWER_SURGE_PROTECTOR_FAULT" -> "Power Surge Protector Normal"
-                "POWER_REVERSE_PHASE_FAULT" -> "Power Reverse Phase Normal"
-                "EMERGENCY_STOP_ACU" -> "Emergency Stop ACU Released"
-                "EMERGENCY_STOP_POSITIONER" -> "Emergency Stop Positioner Released"
-                "ELEVATION_SERVO_BRAKE_ENGAGED" -> "Elevation Servo Brake Disengaged"
-                "AZIMUTH_SERVO_BRAKE_ENGAGED" -> "Azimuth Servo Brake Disengaged"
-                "TRAIN_SERVO_BRAKE_ENGAGED" -> "Train Servo Brake Disengaged"
-                "ELEVATION_SERVO_MOTOR_ON" -> "Elevation Servo Motor Off"
-                "AZIMUTH_SERVO_MOTOR_ON" -> "Azimuth Servo Motor Off"
-                "TRAIN_SERVO_MOTOR_ON" -> "Train Servo Motor Off"
-                "ELEVATION_LIMIT_SWITCH_POSITIVE_180" -> "Elevation Limit Switch +180° Inactive"
-                "ELEVATION_LIMIT_SWITCH_POSITIVE_185" -> "Elevation Limit Switch +185° Inactive"
-                "ELEVATION_LIMIT_SWITCH_NEGATIVE_0" -> "Elevation Limit Switch -0° Inactive"
-                "ELEVATION_LIMIT_SWITCH_NEGATIVE_5" -> "Elevation Limit Switch -5° Inactive"
-                "AZIMUTH_LIMIT_SWITCH_NEGATIVE_275" -> "Azimuth Limit Switch -275° Inactive"
-                "AZIMUTH_LIMIT_SWITCH_POSITIVE_275" -> "Azimuth Limit Switch +275° Inactive"
-                "TRAIN_LIMIT_SWITCH_NEGATIVE_275" -> "Train Limit Switch -275° Inactive"
-                "TRAIN_LIMIT_SWITCH_POSITIVE_275" -> "Train Limit Switch +275° Inactive"
-                "ELEVATION_STOW_PIN_ACTIVE" -> "Elevation Stow Pin Inactive"
-                "AZIMUTH_STOW_PIN_ACTIVE" -> "Azimuth Stow Pin Inactive"
-                "TRAIN_STOW_PIN_ACTIVE" -> "Train Stow Pin Inactive"
-                "SERVO_TRAIN_POWER_OFF" -> "Train Servo Power On"
-                "SERVO_ELEVATION_POWER_OFF" -> "Elevation Servo Power On"
-                "SERVO_AZIMUTH_POWER_OFF" -> "Azimuth Servo Power On"
-                "PROTOCOL_ELEVATION_ERROR" -> "Elevation Protocol Normal"
-                "PROTOCOL_AZIMUTH_ERROR" -> "Azimuth Protocol Normal"
-                "PROTOCOL_TRAIN_ERROR" -> "Train Protocol Normal"
-                "PROTOCOL_FEED_ERROR" -> "Feed Protocol Normal"
-                "S_BAND_LNA_LHCP_ERROR" -> "S-Band LNA LHCP Normal"
-                "S_BAND_LNA_RHCP_ERROR" -> "S-Band LNA RHCP Normal"
-                "S_BAND_RF_SWITCH_ERROR" -> "S-Band RF Switch Normal"
-                "X_BAND_LNA_LHCP_ERROR" -> "X-Band LNA LHCP Normal"
-                "X_BAND_LNA_RHCP_ERROR" -> "X-Band LNA RHCP Normal"
-                "FAN_ERROR" -> "Fan Normal"
-                "S_BAND_LNA_LHCP_POWER_ON" -> "S-Band LNA LHCP Power Off"
-                "S_BAND_LNA_RHCP_POWER_ON" -> "S-Band LNA RHCP Power Off"
-                "S_BAND_RF_SWITCH_RHCP" -> "S-Band RF Switch LHCP"
-                "X_BAND_LNA_LHCP_POWER_ON" -> "X-Band LNA LHCP Power Off"
-                "X_BAND_LNA_RHCP_POWER_ON" -> "X-Band LNA RHCP Power Off"
-                "FAN_POWER_ON" -> "Fan Power Off"
-                else -> "Error has been resolved"
-            }
-            else -> "에러가 해결되었습니다"
-        }
-    }
-}
+)
 
 /**
  * 하드웨어 에러 로그 데이터 클래스
@@ -761,11 +479,10 @@ data class HardwareErrorLog(
     val timestamp: String,
     val category: String,
     val severity: String,
-    val message: Map<String, String>,
+    val errorKey: String,        // ✅ 에러 키만 유지
     val component: String,
     val isResolved: Boolean,
-    val resolvedAt: String?,
-    val resolvedMessage: Map<String, String>?
+    val resolvedAt: String?
 )
 
 /**
