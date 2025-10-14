@@ -244,6 +244,165 @@ export default {
     error: '오류',
   },
 
+  // 하드웨어 에러 메시지
+  hardwareErrors: {
+    // 서보 알람
+    ELEVATION_SERVO_ALARM: 'Elevation 서보 알람',
+    ELEVATION_SERVO_ALARM_CODE1: 'Elevation 서보 알람 코드 1',
+    ELEVATION_SERVO_ALARM_CODE2: 'Elevation 서보 알람 코드 2',
+    ELEVATION_SERVO_ALARM_CODE3: 'Elevation 서보 알람 코드 3',
+    ELEVATION_SERVO_ALARM_CODE4: 'Elevation 서보 알람 코드 4',
+    ELEVATION_SERVO_ALARM_CODE5: 'Elevation 서보 알람 코드 5',
+    AZIMUTH_SERVO_ALARM: 'Azimuth 서보 알람',
+    AZIMUTH_SERVO_ALARM_CODE1: 'Azimuth 서보 알람 코드 1',
+    AZIMUTH_SERVO_ALARM_CODE2: 'Azimuth 서보 알람 코드 2',
+    AZIMUTH_SERVO_ALARM_CODE3: 'Azimuth 서보 알람 코드 3',
+    AZIMUTH_SERVO_ALARM_CODE4: 'Azimuth 서보 알람 코드 4',
+    AZIMUTH_SERVO_ALARM_CODE5: 'Azimuth 서보 알람 코드 5',
+    TRAIN_SERVO_ALARM: 'Train 서보 알람',
+    TRAIN_SERVO_ALARM_CODE1: 'Train 서보 알람 코드 1',
+    TRAIN_SERVO_ALARM_CODE2: 'Train 서보 알람 코드 2',
+    TRAIN_SERVO_ALARM_CODE3: 'Train 서보 알람 코드 3',
+    TRAIN_SERVO_ALARM_CODE4: 'Train 서보 알람 코드 4',
+    TRAIN_SERVO_ALARM_CODE5: 'Train 서보 알람 코드 5',
+
+    // 인코더 에러
+    ELEVATION_ENCODER_ERROR: 'Elevation 인코더 에러',
+    AZIMUTH_ENCODER_ERROR: 'Azimuth 인코더 에러',
+    TRAIN_ENCODER_ERROR: 'Train 인코더 에러',
+
+    // 전력 관련
+    POWER_SURGE_PROTECTOR_FAULT: '전력 서지 보호기 고장',
+    POWER_REVERSE_PHASE_FAULT: '전력 역상 고장',
+
+    // 비상 정지
+    EMERGENCY_STOP_ACU: '비상 정지 ACU',
+    EMERGENCY_STOP_POSITIONER: '비상 정지 포지셔너',
+
+    // 서보 브레이크
+    ELEVATION_SERVO_BRAKE_ENGAGED: 'Elevation 서보 브레이크 작동',
+    AZIMUTH_SERVO_BRAKE_ENGAGED: 'Azimuth 서보 브레이크 작동',
+    TRAIN_SERVO_BRAKE_ENGAGED: 'Train 서보 브레이크 작동',
+
+    // 서보 모터
+    ELEVATION_SERVO_MOTOR_ON: 'Elevation 서보 모터 켜짐',
+    AZIMUTH_SERVO_MOTOR_ON: 'Azimuth 서보 모터 켜짐',
+    TRAIN_SERVO_MOTOR_ON: 'Train 서보 모터 켜짐',
+
+    // 한계 스위치
+    ELEVATION_LIMIT_SWITCH_POSITIVE_180: 'Elevation 한계 스위치 +180°',
+    ELEVATION_LIMIT_SWITCH_POSITIVE_185: 'Elevation 한계 스위치 +185°',
+    ELEVATION_LIMIT_SWITCH_NEGATIVE_0: 'Elevation 한계 스위치 -0°',
+    ELEVATION_LIMIT_SWITCH_NEGATIVE_5: 'Elevation 한계 스위치 -5°',
+    AZIMUTH_LIMIT_SWITCH_NEGATIVE_275: 'Azimuth 한계 스위치 -275°',
+    AZIMUTH_LIMIT_SWITCH_POSITIVE_275: 'Azimuth 한계 스위치 +275°',
+    TRAIN_LIMIT_SWITCH_NEGATIVE_275: 'Train 한계 스위치 -275°',
+    TRAIN_LIMIT_SWITCH_POSITIVE_275: 'Train 한계 스위치 +275°',
+
+    // 스토우 핀
+    ELEVATION_STOW_PIN_ACTIVE: 'Elevation 스토우 핀 활성',
+    AZIMUTH_STOW_PIN_ACTIVE: 'Azimuth 스토우 핀 활성',
+    TRAIN_STOW_PIN_ACTIVE: 'Train 스토우 핀 활성',
+
+    // 서보 전원
+    SERVO_TRAIN_POWER_OFF: 'Train 서보 전원 꺼짐',
+    SERVO_ELEVATION_POWER_OFF: 'Elevation 서보 전원 꺼짐',
+    SERVO_AZIMUTH_POWER_OFF: 'Azimuth 서보 전원 꺼짐',
+
+    // 프로토콜 에러
+    PROTOCOL_ELEVATION_ERROR: 'Elevation 프로토콜 에러',
+    PROTOCOL_AZIMUTH_ERROR: 'Azimuth 프로토콜 에러',
+    PROTOCOL_TRAIN_ERROR: 'Train 프로토콜 에러',
+    PROTOCOL_FEED_ERROR: 'Feed 프로토콜 에러',
+
+    // S-Band 에러
+    S_BAND_LNA_LHCP_ERROR: 'S-Band LNA LHCP 에러',
+    S_BAND_LNA_RHCP_ERROR: 'S-Band LNA RHCP 에러',
+    S_BAND_RF_SWITCH_ERROR: 'S-Band RF 스위치 에러',
+
+    // X-Band 에러
+    X_BAND_LNA_LHCP_ERROR: 'X-Band LNA LHCP 에러',
+    X_BAND_LNA_RHCP_ERROR: 'X-Band LNA RHCP 에러',
+
+    // 팬 에러
+    FAN_ERROR: '팬 에러',
+
+    // 전원 켜짐 상태
+    S_BAND_LNA_LHCP_POWER_ON: 'S-Band LNA LHCP 전원 켜짐',
+    S_BAND_LNA_RHCP_POWER_ON: 'S-Band LNA RHCP 전원 켜짐',
+    S_BAND_RF_SWITCH_RHCP: 'S-Band RF 스위치 RHCP',
+    X_BAND_LNA_LHCP_POWER_ON: 'X-Band LNA LHCP 전원 켜짐',
+    X_BAND_LNA_RHCP_POWER_ON: 'X-Band LNA RHCP 전원 켜짐',
+    FAN_POWER_ON: '팬 전원 켜짐',
+
+    // 해결된 메시지
+    ELEVATION_SERVO_ALARM_RESOLVED: 'Elevation 서보 알람 해제',
+    ELEVATION_SERVO_ALARM_CODE1_RESOLVED: 'Elevation 서보 알람 코드 1 해제',
+    ELEVATION_SERVO_ALARM_CODE2_RESOLVED: 'Elevation 서보 알람 코드 2 해제',
+    ELEVATION_SERVO_ALARM_CODE3_RESOLVED: 'Elevation 서보 알람 코드 3 해제',
+    ELEVATION_SERVO_ALARM_CODE4_RESOLVED: 'Elevation 서보 알람 코드 4 해제',
+    ELEVATION_SERVO_ALARM_CODE5_RESOLVED: 'Elevation 서보 알람 코드 5 해제',
+    AZIMUTH_SERVO_ALARM_RESOLVED: 'Azimuth 서보 알람 해제',
+    AZIMUTH_SERVO_ALARM_CODE1_RESOLVED: 'Azimuth 서보 알람 코드 1 해제',
+    AZIMUTH_SERVO_ALARM_CODE2_RESOLVED: 'Azimuth 서보 알람 코드 2 해제',
+    AZIMUTH_SERVO_ALARM_CODE3_RESOLVED: 'Azimuth 서보 알람 코드 3 해제',
+    AZIMUTH_SERVO_ALARM_CODE4_RESOLVED: 'Azimuth 서보 알람 코드 4 해제',
+    AZIMUTH_SERVO_ALARM_CODE5_RESOLVED: 'Azimuth 서보 알람 코드 5 해제',
+    TRAIN_SERVO_ALARM_RESOLVED: 'Train 서보 알람 해제',
+    TRAIN_SERVO_ALARM_CODE1_RESOLVED: 'Train 서보 알람 코드 1 해제',
+    TRAIN_SERVO_ALARM_CODE2_RESOLVED: 'Train 서보 알람 코드 2 해제',
+    TRAIN_SERVO_ALARM_CODE3_RESOLVED: 'Train 서보 알람 코드 3 해제',
+    TRAIN_SERVO_ALARM_CODE4_RESOLVED: 'Train 서보 알람 코드 4 해제',
+    TRAIN_SERVO_ALARM_CODE5_RESOLVED: 'Train 서보 알람 코드 5 해제',
+    ELEVATION_ENCODER_ERROR_RESOLVED: 'Elevation 인코더 에러 해결됨',
+    AZIMUTH_ENCODER_ERROR_RESOLVED: 'Azimuth 인코더 에러 해결됨',
+    TRAIN_ENCODER_ERROR_RESOLVED: 'Train 인코더 에러 해결됨',
+    POWER_SURGE_PROTECTOR_FAULT_RESOLVED: '전력 서지 보호기 정상',
+    POWER_REVERSE_PHASE_FAULT_RESOLVED: '전력 역상 정상',
+    EMERGENCY_STOP_ACU_RESOLVED: '비상 정지 ACU 해제됨',
+    EMERGENCY_STOP_POSITIONER_RESOLVED: '비상 정지 포지셔너 해제됨',
+    ELEVATION_SERVO_BRAKE_ENGAGED_RESOLVED: 'Elevation 서보 브레이크 해제됨',
+    AZIMUTH_SERVO_BRAKE_ENGAGED_RESOLVED: 'Azimuth 서보 브레이크 해제됨',
+    TRAIN_SERVO_BRAKE_ENGAGED_RESOLVED: 'Train 서보 브레이크 해제됨',
+    ELEVATION_SERVO_MOTOR_ON_RESOLVED: 'Elevation 서보 모터 꺼짐',
+    AZIMUTH_SERVO_MOTOR_ON_RESOLVED: 'Azimuth 서보 모터 꺼짐',
+    TRAIN_SERVO_MOTOR_ON_RESOLVED: 'Train 서보 모터 꺼짐',
+    ELEVATION_LIMIT_SWITCH_POSITIVE_180_RESOLVED: 'Elevation 한계 스위치 +180° 비활성',
+    ELEVATION_LIMIT_SWITCH_POSITIVE_185_RESOLVED: 'Elevation 한계 스위치 +185° 비활성',
+    ELEVATION_LIMIT_SWITCH_NEGATIVE_0_RESOLVED: 'Elevation 한계 스위치 -0° 비활성',
+    ELEVATION_LIMIT_SWITCH_NEGATIVE_5_RESOLVED: 'Elevation 한계 스위치 -5° 비활성',
+    AZIMUTH_LIMIT_SWITCH_NEGATIVE_275_RESOLVED: 'Azimuth 한계 스위치 -275° 비활성',
+    AZIMUTH_LIMIT_SWITCH_POSITIVE_275_RESOLVED: 'Azimuth 한계 스위치 +275° 비활성',
+    TRAIN_LIMIT_SWITCH_NEGATIVE_275_RESOLVED: 'Train 한계 스위치 -275° 비활성',
+    TRAIN_LIMIT_SWITCH_POSITIVE_275_RESOLVED: 'Train 한계 스위치 +275° 비활성',
+    ELEVATION_STOW_PIN_ACTIVE_RESOLVED: 'Elevation 스토우 핀 비활성',
+    AZIMUTH_STOW_PIN_ACTIVE_RESOLVED: 'Azimuth 스토우 핀 비활성',
+    TRAIN_STOW_PIN_ACTIVE_RESOLVED: 'Train 스토우 핀 비활성',
+    SERVO_TRAIN_POWER_OFF_RESOLVED: 'Train 서보 전원 켜짐',
+    SERVO_ELEVATION_POWER_OFF_RESOLVED: 'Elevation 서보 전원 켜짐',
+    SERVO_AZIMUTH_POWER_OFF_RESOLVED: 'Azimuth 서보 전원 켜짐',
+    PROTOCOL_ELEVATION_ERROR_RESOLVED: 'Elevation 프로토콜 정상',
+    PROTOCOL_AZIMUTH_ERROR_RESOLVED: 'Azimuth 프로토콜 정상',
+    PROTOCOL_TRAIN_ERROR_RESOLVED: 'Train 프로토콜 정상',
+    PROTOCOL_FEED_ERROR_RESOLVED: 'Feed 프로토콜 정상',
+    S_BAND_LNA_LHCP_ERROR_RESOLVED: 'S-Band LNA LHCP 정상',
+    S_BAND_LNA_RHCP_ERROR_RESOLVED: 'S-Band LNA RHCP 정상',
+    S_BAND_RF_SWITCH_ERROR_RESOLVED: 'S-Band RF 스위치 정상',
+    X_BAND_LNA_LHCP_ERROR_RESOLVED: 'X-Band LNA LHCP 정상',
+    X_BAND_LNA_RHCP_ERROR_RESOLVED: 'X-Band LNA RHCP 정상',
+    FAN_ERROR_RESOLVED: '팬 정상',
+    S_BAND_LNA_LHCP_POWER_ON_RESOLVED: 'S-Band LNA LHCP 전원 꺼짐',
+    S_BAND_LNA_RHCP_POWER_ON_RESOLVED: 'S-Band LNA RHCP 전원 꺼짐',
+    S_BAND_RF_SWITCH_RHCP_RESOLVED: 'S-Band RF 스위치 LHCP',
+    X_BAND_LNA_LHCP_POWER_ON_RESOLVED: 'X-Band LNA LHCP 전원 꺼짐',
+    X_BAND_LNA_RHCP_POWER_ON_RESOLVED: 'X-Band LNA RHCP 전원 꺼짐',
+    FAN_POWER_ON_RESOLVED: '팬 전원 꺼짐',
+
+    // 테스트 에러
+    TEST_ERROR: '테스트 에러 발생',
+    TEST_ERROR_RESOLVED: '테스트 에러 해결됨',
+  },
+
   // 차트
   charts: {
     azimuth: '방위각',

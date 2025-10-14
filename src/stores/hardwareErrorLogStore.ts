@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type { HardwareErrorLog } from '@/types/hardwareError'
+import { useI18n } from 'vue-i18n'
 
 export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
   // 상태
@@ -8,6 +9,60 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
   const isLogPanelOpen = ref(false)
   const isPopupOpen = ref(false)
   const isInitialLoad = ref(false)
+
+  // i18n 인스턴스
+  const { t, locale } = useI18n()
+
+  /**
+   * 에러 키를 현재 언어로 변환하는 함수
+   * @param errorKey - 에러 키
+   * @param isResolved - 해결 여부
+   * @returns 변환된 메시지
+   */
+  const translateErrorKey = (errorKey: string, isResolved: boolean): string => {
+    try {
+      const key = isResolved ? `${errorKey}_RESOLVED` : errorKey
+      const i18nKey = `hardwareErrors.${key}`
+      const translatedMessage = t(i18nKey)
+
+      console.log('🔍 hardwareErrorLogStore translateErrorKey:', {
+        errorKey,
+        isResolved,
+        key,
+        i18nKey,
+        translatedMessage,
+        currentLocale: locale.value,
+      })
+
+      if (translatedMessage === i18nKey) {
+        console.warn(`🚨 에러 메시지 번역 실패: ${i18nKey}`)
+        return errorKey
+      }
+
+      return translatedMessage
+    } catch (error) {
+      console.error('🚨 에러 메시지 번역 중 오류:', error)
+      return errorKey
+    }
+  }
+
+  /**
+   * 기존 에러 로그들의 메시지를 현재 언어로 업데이트
+   */
+  const updateErrorMessages = () => {
+    errorLogs.value = errorLogs.value.map((log) => ({
+      ...log,
+      message: translateErrorKey(log.errorKey, log.isResolved),
+      resolvedMessage: log.isResolved ? translateErrorKey(log.errorKey, log.isResolved) : undefined,
+    }))
+    console.log('🔄 에러 메시지 언어 업데이트 완료')
+  }
+
+  // 언어 변경 감지
+  watch(locale, () => {
+    console.log('🌐 언어 변경 감지:', locale.value)
+    updateErrorMessages()
+  })
 
   // 계산된 속성
   const activeErrorCount = computed(() => errorLogs.value.filter((log) => !log.isResolved).length)
@@ -49,15 +104,30 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
     console.log('🔍 addErrorLog 호출됨:', error)
     console.log('🔍 추가 전 로그 개수:', errorLogs.value.length)
 
+    // 에러 메시지가 이미 변환되어 있지 않은 경우 변환
+    const processedError = error.message
+      ? error
+      : {
+          ...error,
+          message: translateErrorKey(error.errorKey, error.isResolved),
+          resolvedMessage: error.isResolved
+            ? translateErrorKey(error.errorKey, error.isResolved)
+            : undefined,
+        }
+
+    console.log('🔍 processedError:', processedError)
+
     // 중복 ID 체크
-    const existingIndex = errorLogs.value.findIndex((existingLog) => existingLog.id === error.id)
+    const existingIndex = errorLogs.value.findIndex(
+      (existingLog) => existingLog.id === processedError.id,
+    )
 
     if (existingIndex !== -1) {
       // 기존 로그 업데이트
-      errorLogs.value[existingIndex] = error
+      errorLogs.value[existingIndex] = processedError
     } else {
       // 새 로그 추가
-      errorLogs.value.unshift(error) // 최신순으로 추가
+      errorLogs.value.unshift(processedError) // 최신순으로 추가
     }
 
     // 최대 1000개로 제한
@@ -104,10 +174,7 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
       if (!log.isResolved) {
         log.isResolved = true
         log.resolvedAt = new Date().toISOString()
-        log.resolvedMessage = {
-          ko: '일괄 해결 처리됨',
-          en: 'Bulk resolved',
-        }
+        log.resolvedMessage = translateErrorKey(log.errorKey, true)
       }
     })
     saveToLocalStorage()
@@ -180,14 +247,25 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
     }
 
     newLogs.forEach((newLog) => {
-      const existingIndex = errorLogs.value.findIndex((log) => log.id === newLog.id)
+      // 에러 메시지가 이미 변환되어 있지 않은 경우 변환
+      const processedLog = newLog.message
+        ? newLog
+        : {
+            ...newLog,
+            message: translateErrorKey(newLog.errorKey, newLog.isResolved),
+            resolvedMessage: newLog.isResolved
+              ? translateErrorKey(newLog.errorKey, newLog.isResolved)
+              : undefined,
+          }
+
+      const existingIndex = errorLogs.value.findIndex((log) => log.id === processedLog.id)
 
       if (existingIndex !== -1) {
         // 기존 로그 업데이트 (해결 상태 변경 등)
-        errorLogs.value[existingIndex] = newLog
+        errorLogs.value[existingIndex] = processedLog
       } else {
         // 새 로그 추가
-        errorLogs.value.unshift(newLog)
+        errorLogs.value.unshift(processedLog)
       }
     })
 
@@ -218,7 +296,26 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
     try {
       const saved = localStorage.getItem('hardwareErrorLogs')
       if (saved) {
-        errorLogs.value = JSON.parse(saved)
+        const parsedLogs = JSON.parse(saved)
+        console.log('🔍 loadFromLocalStorage - 원본 데이터:', parsedLogs)
+
+        // 로컬 스토리지에서 로드한 데이터에 다국어 변환 적용
+        errorLogs.value = parsedLogs.map((log: HardwareErrorLog) => {
+          const translatedMessage = translateErrorKey(log.errorKey, log.isResolved)
+          console.log('🔍 loadFromLocalStorage - 번역 결과:', {
+            errorKey: log.errorKey,
+            isResolved: log.isResolved,
+            translatedMessage,
+          })
+
+          return {
+            ...log,
+            message: translatedMessage,
+            resolvedMessage: log.isResolved ? translatedMessage : undefined,
+          }
+        })
+
+        console.log('🔍 loadFromLocalStorage - 최종 결과:', errorLogs.value)
       }
     } catch (e) {
       console.error('로컬 스토리지 로드 실패:', e)
@@ -231,7 +328,25 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
       const response = await fetch('http://localhost:8080/api/hardware-error-logs')
       if (response.ok) {
         const data = await response.json()
-        errorLogs.value = data
+        console.log('🔍 loadHistoryFromBackend - 원본 데이터:', data)
+
+        // 백엔드에서 받은 데이터에 다국어 변환 적용
+        errorLogs.value = data.map((log: HardwareErrorLog) => {
+          const translatedMessage = translateErrorKey(log.errorKey, log.isResolved)
+          console.log('🔍 loadHistoryFromBackend - 번역 결과:', {
+            errorKey: log.errorKey,
+            isResolved: log.isResolved,
+            translatedMessage,
+          })
+
+          return {
+            ...log,
+            message: translatedMessage,
+            resolvedMessage: log.isResolved ? translatedMessage : undefined,
+          }
+        })
+
+        console.log('🔍 loadHistoryFromBackend - 최종 결과:', errorLogs.value)
         saveToLocalStorage()
       }
     } catch (e) {
@@ -272,5 +387,6 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
     // 초기화
     initialize,
     loadHistoryFromBackend,
+    updateErrorMessages,
   }
 })

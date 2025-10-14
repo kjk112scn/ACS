@@ -18,22 +18,18 @@ export interface HardwareErrorLog {
     | 'TEST'
   /** 심각도 */
   severity: 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL'
-  /** 에러 메시지 (다국어) */
-  message: {
-    ko: string
-    en: string
-  }
+  /** 에러 키 (백엔드에서 전송) */
+  errorKey: string
+  /** 에러 메시지 (다국어 변환된 결과) */
+  message: string
   /** 컴포넌트명 */
   component: string
   /** 해결 여부 */
   isResolved: boolean
   /** 해결 시간 */
   resolvedAt?: string
-  /** 해결 메시지 (다국어) */
-  resolvedMessage?: {
-    ko: string
-    en: string
-  }
+  /** 해결 메시지 (다국어 변환된 결과) */
+  resolvedMessage?: string
 }
 
 /**

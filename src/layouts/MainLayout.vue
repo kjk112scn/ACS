@@ -67,9 +67,6 @@
         <!-- 실시간 에러 상태 표시 -->
         <span v-if="currentErrorMessage">
           {{ currentErrorMessage }}
-          <span v-if="errorCount > 1" class="error-counter">
-            ({{ errorCount }}개 활성)
-          </span>
         </span>
         <span v-else>시스템 정상</span>
       </div>
@@ -132,19 +129,19 @@ const displayLocalTime = computed(() => {
 })
 
 // 에러 상태 관련 computed 속성들
-const errorCount = computed(() => {
-  return icdStore.errorStatusBarData?.activeErrorCount || 0
-})
+// const errorCount = computed(() => {
+//   return icdStore.errorStatusBarData?.activeErrorCount || 0
+// }) // 더 이상 사용하지 않음
 
 const currentErrorMessage = computed(() => {
   const latestError = icdStore.errorStatusBarData?.latestError
   if (latestError) {
     if (latestError.isResolved) {
       // 해결된 에러의 경우 해결 메시지 표시
-      return latestError.resolvedMessage?.ko || latestError.resolvedMessage?.en || '에러가 해결되었습니다'
+      return latestError.resolvedMessage || '에러가 해결되었습니다'
     } else {
       // 활성 에러의 경우 에러 메시지 표시
-      return latestError.message?.ko || latestError.message?.en || '알 수 없는 에러'
+      return latestError.message || '알 수 없는 에러'
     }
   }
   return null
@@ -152,9 +149,10 @@ const currentErrorMessage = computed(() => {
 
 // ✅ severity에 따른 아이콘 결정
 const getSeverityIcon = () => {
-  if (errorCount.value === 0) return 'check_circle'
+  const latestError = icdStore.errorStatusBarData?.latestError
+  if (!latestError) return 'check_circle'
 
-  const severity = icdStore.errorStatusBarData?.latestError?.severity
+  const severity = latestError.severity
   switch (severity) {
     case 'ERROR':
     case 'CRITICAL':
@@ -170,9 +168,10 @@ const getSeverityIcon = () => {
 
 // ✅ severity에 따른 색상 결정
 const getSeverityColor = () => {
-  if (errorCount.value === 0) return 'green'
+  const latestError = icdStore.errorStatusBarData?.latestError
+  if (!latestError) return 'green'
 
-  const severity = icdStore.errorStatusBarData?.latestError?.severity
+  const severity = latestError.severity
   switch (severity) {
     case 'ERROR':
     case 'CRITICAL':
@@ -489,6 +488,21 @@ onBeforeUnmount(() => {
 
 .log-button {
   margin-left: 12px;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  max-width: 40px !important;
+  max-height: 40px !important;
+}
+
+.log-button .q-btn__wrapper {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  max-width: 40px !important;
+  max-height: 40px !important;
 }
 
 .error-counter {

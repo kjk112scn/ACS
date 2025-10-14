@@ -232,6 +232,165 @@ export default {
     error: 'Error',
   },
 
+  // Hardware Error Messages
+  hardwareErrors: {
+    // Servo Alarms
+    ELEVATION_SERVO_ALARM: 'Elevation Servo Alarm',
+    ELEVATION_SERVO_ALARM_CODE1: 'Elevation Servo Alarm Code 1',
+    ELEVATION_SERVO_ALARM_CODE2: 'Elevation Servo Alarm Code 2',
+    ELEVATION_SERVO_ALARM_CODE3: 'Elevation Servo Alarm Code 3',
+    ELEVATION_SERVO_ALARM_CODE4: 'Elevation Servo Alarm Code 4',
+    ELEVATION_SERVO_ALARM_CODE5: 'Elevation Servo Alarm Code 5',
+    AZIMUTH_SERVO_ALARM: 'Azimuth Servo Alarm',
+    AZIMUTH_SERVO_ALARM_CODE1: 'Azimuth Servo Alarm Code 1',
+    AZIMUTH_SERVO_ALARM_CODE2: 'Azimuth Servo Alarm Code 2',
+    AZIMUTH_SERVO_ALARM_CODE3: 'Azimuth Servo Alarm Code 3',
+    AZIMUTH_SERVO_ALARM_CODE4: 'Azimuth Servo Alarm Code 4',
+    AZIMUTH_SERVO_ALARM_CODE5: 'Azimuth Servo Alarm Code 5',
+    TRAIN_SERVO_ALARM: 'Train Servo Alarm',
+    TRAIN_SERVO_ALARM_CODE1: 'Train Servo Alarm Code 1',
+    TRAIN_SERVO_ALARM_CODE2: 'Train Servo Alarm Code 2',
+    TRAIN_SERVO_ALARM_CODE3: 'Train Servo Alarm Code 3',
+    TRAIN_SERVO_ALARM_CODE4: 'Train Servo Alarm Code 4',
+    TRAIN_SERVO_ALARM_CODE5: 'Train Servo Alarm Code 5',
+
+    // Encoder Errors
+    ELEVATION_ENCODER_ERROR: 'Elevation Encoder Error',
+    AZIMUTH_ENCODER_ERROR: 'Azimuth Encoder Error',
+    TRAIN_ENCODER_ERROR: 'Train Encoder Error',
+
+    // Power Related
+    POWER_SURGE_PROTECTOR_FAULT: 'Power Surge Protector Fault',
+    POWER_REVERSE_PHASE_FAULT: 'Power Reverse Phase Fault',
+
+    // Emergency Stop
+    EMERGENCY_STOP_ACU: 'Emergency Stop ACU',
+    EMERGENCY_STOP_POSITIONER: 'Emergency Stop Positioner',
+
+    // Servo Brake
+    ELEVATION_SERVO_BRAKE_ENGAGED: 'Elevation Servo Brake Engaged',
+    AZIMUTH_SERVO_BRAKE_ENGAGED: 'Azimuth Servo Brake Engaged',
+    TRAIN_SERVO_BRAKE_ENGAGED: 'Train Servo Brake Engaged',
+
+    // Servo Motor
+    ELEVATION_SERVO_MOTOR_ON: 'Elevation Servo Motor On',
+    AZIMUTH_SERVO_MOTOR_ON: 'Azimuth Servo Motor On',
+    TRAIN_SERVO_MOTOR_ON: 'Train Servo Motor On',
+
+    // Limit Switches
+    ELEVATION_LIMIT_SWITCH_POSITIVE_180: 'Elevation Limit Switch +180°',
+    ELEVATION_LIMIT_SWITCH_POSITIVE_185: 'Elevation Limit Switch +185°',
+    ELEVATION_LIMIT_SWITCH_NEGATIVE_0: 'Elevation Limit Switch -0°',
+    ELEVATION_LIMIT_SWITCH_NEGATIVE_5: 'Elevation Limit Switch -5°',
+    AZIMUTH_LIMIT_SWITCH_NEGATIVE_275: 'Azimuth Limit Switch -275°',
+    AZIMUTH_LIMIT_SWITCH_POSITIVE_275: 'Azimuth Limit Switch +275°',
+    TRAIN_LIMIT_SWITCH_NEGATIVE_275: 'Train Limit Switch -275°',
+    TRAIN_LIMIT_SWITCH_POSITIVE_275: 'Train Limit Switch +275°',
+
+    // Stow Pins
+    ELEVATION_STOW_PIN_ACTIVE: 'Elevation Stow Pin Active',
+    AZIMUTH_STOW_PIN_ACTIVE: 'Azimuth Stow Pin Active',
+    TRAIN_STOW_PIN_ACTIVE: 'Train Stow Pin Active',
+
+    // Servo Power
+    SERVO_TRAIN_POWER_OFF: 'Train Servo Power Off',
+    SERVO_ELEVATION_POWER_OFF: 'Elevation Servo Power Off',
+    SERVO_AZIMUTH_POWER_OFF: 'Azimuth Servo Power Off',
+
+    // Protocol Errors
+    PROTOCOL_ELEVATION_ERROR: 'Elevation Protocol Error',
+    PROTOCOL_AZIMUTH_ERROR: 'Azimuth Protocol Error',
+    PROTOCOL_TRAIN_ERROR: 'Train Protocol Error',
+    PROTOCOL_FEED_ERROR: 'Feed Protocol Error',
+
+    // S-Band Errors
+    S_BAND_LNA_LHCP_ERROR: 'S-Band LNA LHCP Error',
+    S_BAND_LNA_RHCP_ERROR: 'S-Band LNA RHCP Error',
+    S_BAND_RF_SWITCH_ERROR: 'S-Band RF Switch Error',
+
+    // X-Band Errors
+    X_BAND_LNA_LHCP_ERROR: 'X-Band LNA LHCP Error',
+    X_BAND_LNA_RHCP_ERROR: 'X-Band LNA RHCP Error',
+
+    // Fan Error
+    FAN_ERROR: 'Fan Error',
+
+    // Power On States
+    S_BAND_LNA_LHCP_POWER_ON: 'S-Band LNA LHCP Power On',
+    S_BAND_LNA_RHCP_POWER_ON: 'S-Band LNA RHCP Power On',
+    S_BAND_RF_SWITCH_RHCP: 'S-Band RF Switch RHCP',
+    X_BAND_LNA_LHCP_POWER_ON: 'X-Band LNA LHCP Power On',
+    X_BAND_LNA_RHCP_POWER_ON: 'X-Band LNA RHCP Power On',
+    FAN_POWER_ON: 'Fan Power On',
+
+    // Resolved Messages
+    ELEVATION_SERVO_ALARM_RESOLVED: 'Elevation Servo Alarm Resolved',
+    ELEVATION_SERVO_ALARM_CODE1_RESOLVED: 'Elevation Servo Alarm Code 1 Resolved',
+    ELEVATION_SERVO_ALARM_CODE2_RESOLVED: 'Elevation Servo Alarm Code 2 Resolved',
+    ELEVATION_SERVO_ALARM_CODE3_RESOLVED: 'Elevation Servo Alarm Code 3 Resolved',
+    ELEVATION_SERVO_ALARM_CODE4_RESOLVED: 'Elevation Servo Alarm Code 4 Resolved',
+    ELEVATION_SERVO_ALARM_CODE5_RESOLVED: 'Elevation Servo Alarm Code 5 Resolved',
+    AZIMUTH_SERVO_ALARM_RESOLVED: 'Azimuth Servo Alarm Resolved',
+    AZIMUTH_SERVO_ALARM_CODE1_RESOLVED: 'Azimuth Servo Alarm Code 1 Resolved',
+    AZIMUTH_SERVO_ALARM_CODE2_RESOLVED: 'Azimuth Servo Alarm Code 2 Resolved',
+    AZIMUTH_SERVO_ALARM_CODE3_RESOLVED: 'Azimuth Servo Alarm Code 3 Resolved',
+    AZIMUTH_SERVO_ALARM_CODE4_RESOLVED: 'Azimuth Servo Alarm Code 4 Resolved',
+    AZIMUTH_SERVO_ALARM_CODE5_RESOLVED: 'Azimuth Servo Alarm Code 5 Resolved',
+    TRAIN_SERVO_ALARM_RESOLVED: 'Train Servo Alarm Resolved',
+    TRAIN_SERVO_ALARM_CODE1_RESOLVED: 'Train Servo Alarm Code 1 Resolved',
+    TRAIN_SERVO_ALARM_CODE2_RESOLVED: 'Train Servo Alarm Code 2 Resolved',
+    TRAIN_SERVO_ALARM_CODE3_RESOLVED: 'Train Servo Alarm Code 3 Resolved',
+    TRAIN_SERVO_ALARM_CODE4_RESOLVED: 'Train Servo Alarm Code 4 Resolved',
+    TRAIN_SERVO_ALARM_CODE5_RESOLVED: 'Train Servo Alarm Code 5 Resolved',
+    ELEVATION_ENCODER_ERROR_RESOLVED: 'Elevation Encoder Error Resolved',
+    AZIMUTH_ENCODER_ERROR_RESOLVED: 'Azimuth Encoder Error Resolved',
+    TRAIN_ENCODER_ERROR_RESOLVED: 'Train Encoder Error Resolved',
+    POWER_SURGE_PROTECTOR_FAULT_RESOLVED: 'Power Surge Protector Normal',
+    POWER_REVERSE_PHASE_FAULT_RESOLVED: 'Power Reverse Phase Normal',
+    EMERGENCY_STOP_ACU_RESOLVED: 'Emergency Stop ACU Released',
+    EMERGENCY_STOP_POSITIONER_RESOLVED: 'Emergency Stop Positioner Released',
+    ELEVATION_SERVO_BRAKE_ENGAGED_RESOLVED: 'Elevation Servo Brake Disengaged',
+    AZIMUTH_SERVO_BRAKE_ENGAGED_RESOLVED: 'Azimuth Servo Brake Disengaged',
+    TRAIN_SERVO_BRAKE_ENGAGED_RESOLVED: 'Train Servo Brake Disengaged',
+    ELEVATION_SERVO_MOTOR_ON_RESOLVED: 'Elevation Servo Motor Off',
+    AZIMUTH_SERVO_MOTOR_ON_RESOLVED: 'Azimuth Servo Motor Off',
+    TRAIN_SERVO_MOTOR_ON_RESOLVED: 'Train Servo Motor Off',
+    ELEVATION_LIMIT_SWITCH_POSITIVE_180_RESOLVED: 'Elevation Limit Switch +180° Inactive',
+    ELEVATION_LIMIT_SWITCH_POSITIVE_185_RESOLVED: 'Elevation Limit Switch +185° Inactive',
+    ELEVATION_LIMIT_SWITCH_NEGATIVE_0_RESOLVED: 'Elevation Limit Switch -0° Inactive',
+    ELEVATION_LIMIT_SWITCH_NEGATIVE_5_RESOLVED: 'Elevation Limit Switch -5° Inactive',
+    AZIMUTH_LIMIT_SWITCH_NEGATIVE_275_RESOLVED: 'Azimuth Limit Switch -275° Inactive',
+    AZIMUTH_LIMIT_SWITCH_POSITIVE_275_RESOLVED: 'Azimuth Limit Switch +275° Inactive',
+    TRAIN_LIMIT_SWITCH_NEGATIVE_275_RESOLVED: 'Train Limit Switch -275° Inactive',
+    TRAIN_LIMIT_SWITCH_POSITIVE_275_RESOLVED: 'Train Limit Switch +275° Inactive',
+    ELEVATION_STOW_PIN_ACTIVE_RESOLVED: 'Elevation Stow Pin Inactive',
+    AZIMUTH_STOW_PIN_ACTIVE_RESOLVED: 'Azimuth Stow Pin Inactive',
+    TRAIN_STOW_PIN_ACTIVE_RESOLVED: 'Train Stow Pin Inactive',
+    SERVO_TRAIN_POWER_OFF_RESOLVED: 'Train Servo Power On',
+    SERVO_ELEVATION_POWER_OFF_RESOLVED: 'Elevation Servo Power On',
+    SERVO_AZIMUTH_POWER_OFF_RESOLVED: 'Azimuth Servo Power On',
+    PROTOCOL_ELEVATION_ERROR_RESOLVED: 'Elevation Protocol Normal',
+    PROTOCOL_AZIMUTH_ERROR_RESOLVED: 'Azimuth Protocol Normal',
+    PROTOCOL_TRAIN_ERROR_RESOLVED: 'Train Protocol Normal',
+    PROTOCOL_FEED_ERROR_RESOLVED: 'Feed Protocol Normal',
+    S_BAND_LNA_LHCP_ERROR_RESOLVED: 'S-Band LNA LHCP Normal',
+    S_BAND_LNA_RHCP_ERROR_RESOLVED: 'S-Band LNA RHCP Normal',
+    S_BAND_RF_SWITCH_ERROR_RESOLVED: 'S-Band RF Switch Normal',
+    X_BAND_LNA_LHCP_ERROR_RESOLVED: 'X-Band LNA LHCP Normal',
+    X_BAND_LNA_RHCP_ERROR_RESOLVED: 'X-Band LNA RHCP Normal',
+    FAN_ERROR_RESOLVED: 'Fan Normal',
+    S_BAND_LNA_LHCP_POWER_ON_RESOLVED: 'S-Band LNA LHCP Power Off',
+    S_BAND_LNA_RHCP_POWER_ON_RESOLVED: 'S-Band LNA RHCP Power Off',
+    S_BAND_RF_SWITCH_RHCP_RESOLVED: 'S-Band RF Switch LHCP',
+    X_BAND_LNA_LHCP_POWER_ON_RESOLVED: 'X-Band LNA LHCP Power Off',
+    X_BAND_LNA_RHCP_POWER_ON_RESOLVED: 'X-Band LNA RHCP Power Off',
+    FAN_POWER_ON_RESOLVED: 'Fan Power Off',
+
+    // Test Errors
+    TEST_ERROR: 'Test Error Occurred',
+    TEST_ERROR_RESOLVED: 'Test Error Resolved',
+  },
+
   // Charts
   charts: {
     azimuth: 'Azimuth',

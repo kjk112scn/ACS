@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, onScopeDispose, readonly } from 'vue'
 import { icdService, type MessageData, type MultiControlCommand } from '@/services'
 import type { HardwareErrorLog } from '@/types/hardwareError'
+import { useI18n } from 'vue-i18n'
 
 // 값을 안전하게 문자열로 변환하는 헬퍼 함수
 const safeToString = (value: unknown): string => {
@@ -54,6 +55,62 @@ export const useICDStore = defineStore('icd', () => {
   const error = ref('')
   const isConnected = ref(false)
   const messageDelay = ref(0)
+
+  // i18n 인스턴스 가져오기
+  const { t } = useI18n()
+
+  /**
+   * 하드웨어 에러 키를 다국어 메시지로 변환하는 함수
+   * @param errorKey - 에러 키 (예: 'ELEVATION_SERVO_ALARM')
+   * @param isResolved - 에러가 해결되었는지 여부
+   * @returns 변환된 메시지
+   */
+  const translateHardwareError = (errorKey: string, isResolved: boolean): string => {
+    try {
+      // 해결된 에러인 경우 _RESOLVED 접미사 추가
+      const key = isResolved ? `${errorKey}_RESOLVED` : errorKey
+
+      // i18n 키 생성
+      const i18nKey = `hardwareErrors.${key}`
+
+      // 번역 시도
+      const translatedMessage = t(i18nKey)
+
+      console.log('🔍 translateHardwareError:', {
+        errorKey,
+        isResolved,
+        key,
+        i18nKey,
+        translatedMessage,
+      })
+
+      // 번역이 실패한 경우 (키가 없으면 키 자체를 반환)
+      if (translatedMessage === i18nKey) {
+        console.warn(`🚨 하드웨어 에러 메시지 번역 실패: ${i18nKey}`)
+        return errorKey // 원본 키 반환
+      }
+
+      return translatedMessage
+    } catch (error) {
+      console.error('🚨 에러 메시지 번역 중 오류:', error)
+      return errorKey // 오류 시 원본 키 반환
+    }
+  }
+
+  /**
+   * HardwareErrorLog 객체에 다국어 메시지를 추가하는 함수
+   * @param errorLog - 하드웨어 에러 로그 객체
+   * @returns 메시지가 추가된 에러 로그 객체
+   */
+  const addLocalizedMessage = (errorLog: HardwareErrorLog): HardwareErrorLog => {
+    const translatedMessage = translateHardwareError(errorLog.errorKey, errorLog.isResolved)
+
+    return {
+      ...errorLog,
+      message: translatedMessage,
+      resolvedMessage: errorLog.isResolved ? translatedMessage : undefined,
+    }
+  }
 
   // 안테나 데이터 전체 필드 추가
   const modeStatusBits = ref('')
@@ -239,11 +296,12 @@ export const useICDStore = defineStore('icd', () => {
       timestamp: string
       category: string
       severity: string
-      message: { ko: string; en: string }
+      errorKey: string
+      message: string
       component: string
       isResolved: boolean
       resolvedAt: string | null
-      resolvedMessage: { ko: string; en: string } | null
+      resolvedMessage: string | null
     } | null
     hasNewErrors: boolean
   } | null>(null)
@@ -254,11 +312,12 @@ export const useICDStore = defineStore('icd', () => {
       timestamp: string
       category: string
       severity: string
-      message: { ko: string; en: string }
+      errorKey: string
+      message: string
       component: string
       isResolved: boolean
       resolvedAt: string | null
-      resolvedMessage: { ko: string; en: string } | null
+      resolvedMessage: string | null
     }[]
     totalLogCount: number
     lastUpdateTime: number
@@ -1167,92 +1226,121 @@ export const useICDStore = defineStore('icd', () => {
             const errorDataObj = errorData as Record<string, unknown>
             console.log('🔍 WebSocket 에러 데이터 수신:', errorDataObj)
 
+            // 현재 언어 설정 가져오기 (사용하지 않으므로 제거)
+
             // 상태바 데이터 업데이트 (항상)
             if ('statusBarData' in errorDataObj) {
               console.log('🔍 상태바 데이터 업데이트:', errorDataObj.statusBarData)
-              errorStatusBarData.value = errorDataObj.statusBarData as {
+
+              const rawStatusBarData = errorDataObj.statusBarData as {
                 activeErrorCount: number
                 latestError: {
                   id: string
                   timestamp: string
                   category: string
                   severity: string
-                  message: { ko: string; en: string }
+                  errorKey: string // ✅ 에러 키만 받음
                   component: string
                   isResolved: boolean
                   resolvedAt: string | null
-                  resolvedMessage: { ko: string; en: string } | null
                 } | null
                 hasNewErrors: boolean
+              }
+
+              // latestError가 있으면 다국어 변환 적용
+              if (rawStatusBarData.latestError) {
+                const translatedMessage = translateHardwareError(
+                  rawStatusBarData.latestError.errorKey,
+                  rawStatusBarData.latestError.isResolved,
+                )
+
+                // 변환된 메시지로 상태바 데이터 구성
+                errorStatusBarData.value = {
+                  ...rawStatusBarData,
+                  latestError: {
+                    ...rawStatusBarData.latestError,
+                    message: translatedMessage,
+                    resolvedMessage: rawStatusBarData.latestError.isResolved
+                      ? translatedMessage
+                      : undefined,
+                  },
+                }
+              } else {
+                errorStatusBarData.value = {
+                  ...rawStatusBarData,
+                  latestError: rawStatusBarData.latestError
+                    ? {
+                        ...rawStatusBarData.latestError,
+                        message: translateHardwareError(
+                          rawStatusBarData.latestError.errorKey,
+                          rawStatusBarData.latestError.isResolved,
+                        ),
+                        resolvedMessage: rawStatusBarData.latestError.isResolved
+                          ? translateHardwareError(
+                              rawStatusBarData.latestError.errorKey,
+                              rawStatusBarData.latestError.isResolved,
+                            )
+                          : undefined,
+                      }
+                    : null,
+                }
               }
 
               // 하드웨어 에러 로그 스토어에 상태바 데이터 반영
-            const { useHardwareErrorLogStore } = await import('@/stores/hardwareErrorLogStore')
-            const hardwareErrorLogStore = useHardwareErrorLogStore()
+              const { useHardwareErrorLogStore } = await import('@/stores/hardwareErrorLogStore')
+              const hardwareErrorLogStore = useHardwareErrorLogStore()
 
-              const statusBarData = errorDataObj.statusBarData as {
-                activeErrorCount: number
-                latestError: {
-                  id: string
-                  timestamp: string
-                  category: string
-                  severity: string
-                  message: { ko: string; en: string }
-                  component: string
-                  isResolved: boolean
-                  resolvedAt: string | null
-                  resolvedMessage: { ko: string; en: string } | null
-                } | null
-                hasNewErrors: boolean
-              }
-              if (statusBarData?.hasNewErrors && statusBarData?.latestError) {
-                hardwareErrorLogStore.addErrorLog(
-                  statusBarData.latestError as unknown as HardwareErrorLog,
+              if (rawStatusBarData?.hasNewErrors && rawStatusBarData?.latestError) {
+                // 다국어 변환된 에러 로그를 스토어에 추가
+                const localizedErrorLog = addLocalizedMessage(
+                  rawStatusBarData.latestError as HardwareErrorLog,
                 )
+                console.log('🔍 icdStore - localizedErrorLog:', localizedErrorLog)
+                hardwareErrorLogStore.addErrorLog(localizedErrorLog)
               }
             }
 
             // 팝업 데이터 업데이트 (팝업이 열려있을 때만)
             if ('popupData' in errorDataObj) {
               console.log('🔍 팝업 데이터 업데이트:', errorDataObj.popupData)
-              errorPopupData.value = errorDataObj.popupData as {
+
+              const rawPopupData = errorDataObj.popupData as {
                 isInitialLoad: boolean
                 newLogs: {
                   id: string
                   timestamp: string
                   category: string
                   severity: string
-                  message: { ko: string; en: string }
+                  errorKey: string // ✅ 에러 키만 받음
                   component: string
                   isResolved: boolean
                   resolvedAt: string | null
-                  resolvedMessage: { ko: string; en: string } | null
                 }[]
                 totalLogCount: number
                 lastUpdateTime: number
+              }
+
+              // newLogs에 다국어 변환 적용
+              const localizedNewLogs = rawPopupData.newLogs.map((log) =>
+                addLocalizedMessage(log as HardwareErrorLog),
+              )
+
+              errorPopupData.value = {
+                ...rawPopupData,
+                newLogs: localizedNewLogs.map((log) => ({
+                  ...log,
+                  resolvedAt: log.resolvedAt || '',
+                  resolvedMessage: log.resolvedMessage || '',
+                })),
               }
 
               const { useHardwareErrorLogStore } = await import('@/stores/hardwareErrorLogStore')
               const hardwareErrorLogStore = useHardwareErrorLogStore()
 
-              const popupData = errorDataObj.popupData as {
-                isInitialLoad: boolean
-                newLogs: {
-                  id: string
-                  timestamp: string
-                  category: string
-                  severity: string
-                  message: { ko: string; en: string }
-                  component: string
-                  isResolved: boolean
-                  resolvedAt: string | null
-                  resolvedMessage: { ko: string; en: string } | null
-                }[]
-                totalLogCount: number
-                lastUpdateTime: number
-              }
-              if (popupData?.newLogs && Array.isArray(popupData.newLogs)) {
-                hardwareErrorLogStore.addNewLogs(popupData.newLogs as unknown as HardwareErrorLog[])
+              if (rawPopupData?.newLogs && Array.isArray(rawPopupData.newLogs)) {
+                // 다국어 변환된 로그들을 스토어에 추가
+                console.log('🔍 icdStore - localizedNewLogs:', localizedNewLogs)
+                hardwareErrorLogStore.addNewLogs(localizedNewLogs)
               }
             }
           }
@@ -2510,5 +2598,9 @@ export const useICDStore = defineStore('icd', () => {
     sendMCOnOffCommand,
     sendServoAlarmResetCommand,
     sendReadFwVerSerialNoStatusCommand,
+
+    // 하드웨어 에러 변환 함수들
+    translateHardwareError,
+    addLocalizedMessage,
   }
 })
