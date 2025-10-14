@@ -403,6 +403,28 @@ export default {
     TEST_ERROR_RESOLVED: '테스트 에러 해결됨',
   },
 
+  // 하드웨어 에러 로그 패널
+  hardwareErrorLog: {
+    title: 'Hardware Error Log',
+    category: '카테고리',
+    severity: '심각도',
+    startDate: '시작 날짜',
+    endDate: '종료 날짜',
+    resolutionStatus: '해결 상태',
+    search: '검색',
+    reset: '초기화',
+    realtimeUpdate: '실시간 업데이트',
+    updating: '업데이트 중...',
+    loadMoreLogs: '더 많은 로그 로드',
+    loadingMoreLogs: '더 많은 로그 로딩 중...',
+    showingLogs: '{current}개 중 {total}개 로그 표시 중',
+    scrollHint: '또는 스크롤하여 더 로드',
+    allLogsLoaded: '모든 {total}개 로그 로드 완료',
+    noLogsToDisplay: '표시할 에러 로그가 없습니다.',
+    resolved: '해결됨',
+    active: '활성',
+  },
+
   // 차트
   charts: {
     azimuth: '방위각',

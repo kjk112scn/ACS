@@ -391,6 +391,28 @@ export default {
     TEST_ERROR_RESOLVED: 'Test Error Resolved',
   },
 
+  // Hardware Error Log Panel
+  hardwareErrorLog: {
+    title: 'Hardware Error Log',
+    category: 'Category',
+    severity: 'Severity',
+    startDate: 'Start Date',
+    endDate: 'End Date',
+    resolutionStatus: 'Resolution Status',
+    search: 'Search',
+    reset: 'Reset',
+    realtimeUpdate: 'Real-time Update',
+    updating: 'Updating...',
+    loadMoreLogs: 'Load More Logs',
+    loadingMoreLogs: 'Loading more logs...',
+    showingLogs: 'Showing {current} of {total} logs',
+    scrollHint: 'or scroll to load more',
+    allLogsLoaded: 'All {total} logs loaded',
+    noLogsToDisplay: 'No error logs to display.',
+    resolved: 'Resolved',
+    active: 'Active',
+  },
+
   // Charts
   charts: {
     azimuth: 'Azimuth',

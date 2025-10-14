@@ -255,7 +255,7 @@ const handleSystemInfo = () => {
   void openComponent('hardware-error-log', {
     mode: 'popup', // 'popup' | 'modal' | 'auto'
     width: 1100,
-    height: 550,
+    height: 900,
     onClose: () => {
       console.log('시스템 정보 창이 닫혔습니다')
     },
@@ -298,7 +298,7 @@ const openErrorLogPopup = async () => {
     await openComponent('hardware-error-log', {
       mode: 'popup',
       width: 1200,
-      height: 600,
+      height: 616,
       onClose: () => {
         console.log('🔍 에러 로그 팝업 닫기')
         void hardwareErrorLogStore.setPopupOpen(false)

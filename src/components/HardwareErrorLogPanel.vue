@@ -2,15 +2,20 @@
   <div class="hardware-error-log-panel">
     <!-- 헤더 -->
     <div class="header-section">
-      <h5 class="q-mt-none q-mb-md">Hardware Error Log</h5>
+      <h5 class="q-mt-none q-mb-md">
+        Hardware Error Log
+        <span v-if="totalLogCount > 0" class="text-caption text-grey-6 q-ml-sm">
+          (Total: {{ totalLogCount }} logs)
+        </span>
+      </h5>
 
       <!-- 통계 정보 -->
       <div class="stats-section">
         <!-- 수동 실시간 업데이트 버튼 -->
         <q-chip :color="isManualRealtimeUpdate ? 'orange' : 'blue'" text-color="white"
           :icon="isManualRealtimeUpdate ? 'stop' : 'sync'"
-          :label="isManualRealtimeUpdate ? 'Updating...' : 'Real-time Update'" clickable
-          @click="toggleRealtimeUpdate" />
+          :label="isManualRealtimeUpdate ? t('hardwareErrorLog.updating') : t('hardwareErrorLog.realtimeUpdate')"
+          clickable @click="toggleRealtimeUpdate" />
 
         <!-- 초기 로딩 상태 표시 -->
         <q-spinner v-if="!hardwareErrorLogStore.isInitialLoad" color="primary" size="20px" class="q-ml-sm" />
@@ -21,55 +26,86 @@
     <!-- 필터 섹션 -->
     <div class="filter-section">
       <!-- 카테고리 필터 -->
-      <q-select v-model="selectedCategory" :options="categoryOptions" label="Category" dense outlined
-        style="min-width: 150px" clearable emit-value map-options />
-
-      <!-- 심각도 필터 -->
-      <q-select v-model="selectedSeverity" :options="severityOptions" label="Severity" dense outlined
-        style="min-width: 120px" clearable emit-value map-options />
-
-      <!-- 날짜 범위 필터 -->
-      <q-input v-model="startDate" label="Start Date" type="date" dense outlined style="min-width: 150px"
-        class="date-input" />
-
-      <q-input v-model="endDate" label="End Date" type="date" dense outlined style="min-width: 150px"
-        class="date-input" />
-
-      <!-- 해결 상태 필터 -->
-      <q-select v-model="selectedResolvedStatus" :options="resolvedStatusOptions" label="Resolution Status" dense
+      <q-select v-model="selectedCategory" :options="categoryOptions" :label="t('hardwareErrorLog.category')" dense
         outlined style="min-width: 150px" clearable emit-value map-options />
 
+      <!-- 심각도 필터 -->
+      <q-select v-model="selectedSeverity" :options="severityOptions" :label="t('hardwareErrorLog.severity')" dense
+        outlined style="min-width: 120px" clearable emit-value map-options />
+
+      <!-- 날짜 범위 필터 -->
+      <q-input v-model="startDate" :label="t('hardwareErrorLog.startDate')" type="date" dense outlined
+        style="min-width: 150px" class="date-input" />
+
+      <q-input v-model="endDate" :label="t('hardwareErrorLog.endDate')" type="date" dense outlined
+        style="min-width: 150px" class="date-input" />
+
+      <!-- 해결 상태 필터 -->
+      <q-select v-model="selectedResolvedStatus" :options="resolvedStatusOptions"
+        :label="t('hardwareErrorLog.resolutionStatus')" dense outlined style="min-width: 150px" clearable emit-value
+        map-options />
+
       <!-- 조회 버튼 -->
-      <q-btn color="primary" label="Search" @click="applyFilters" />
+      <q-btn color="primary" :label="t('hardwareErrorLog.search')" @click="manualSearch" />
 
       <!-- 필터 초기화 -->
-      <q-btn color="grey" label="Reset" @click="resetFilters" />
+      <q-btn color="grey" :label="t('hardwareErrorLog.reset')" @click="resetFilters" />
     </div>
 
-    <!-- 에러 로그 목록 -->
-    <q-list v-if="filteredErrorLogs.length > 0" class="error-log-list">
-      <q-item v-for="log in filteredErrorLogs" :key="log.id" class="error-log-item">
-        <q-item-section>
-          <q-item-label class="error-message">
-            {{ log.message || `[메시지 없음] ${log.errorKey}` }}
-          </q-item-label>
-          <q-item-label caption class="error-details">
-            {{ getCategoryName(log.category) }} • {{ getSeverityName(log.severity) }} • {{
-              formatTimestamp(log.timestamp) }}
-          </q-item-label>
-        </q-item-section>
-        <q-item-section side>
-          <q-chip :color="getStatusChipColor(log.severity, log.isResolved)"
-            :text-color="getStatusChipTextColor(log.severity, log.isResolved)"
-            :label="getStatusChipLabel(log.severity, log.isResolved)" size="sm" />
-        </q-item-section>
-      </q-item>
-    </q-list>
+    <!-- 스크롤 가능한 에러 로그 목록 -->
+    <div class="log-container" ref="logContainer" @scroll="handleScroll">
+      <!-- 에러 로그 목록 -->
+      <q-list v-if="errorLogs.length > 0" class="error-log-list">
+        <q-item v-for="log in errorLogs" :key="log.id" class="error-log-item">
+          <q-item-section>
+            <q-item-label class="error-message">
+              {{ log.message || `[No Message] ${log.errorKey}` }}
+            </q-item-label>
+            <q-item-label caption class="error-details">
+              {{ getCategoryName(log.category) }} • {{ getSeverityName(log.severity) }} • {{
+                formatTimestamp(log.timestamp) }}
+            </q-item-label>
+          </q-item-section>
+          <q-item-section side>
+            <q-chip :color="getStatusChipColor(log.severity, log.isResolved)"
+              :text-color="getStatusChipTextColor(log.severity, log.isResolved)"
+              :label="getStatusChipLabel(log.severity, log.isResolved)" size="sm" />
+          </q-item-section>
+        </q-item>
+      </q-list>
 
-    <!-- 로그가 없을 때 -->
-    <div v-else class="no-logs">
-      <q-icon name="info" size="48px" color="grey" />
-      <p>No error logs to display.</p>
+      <!-- 로딩 상태 표시 -->
+      <div v-if="isLoadingMore" class="loading-more">
+        <q-spinner color="primary" size="20px" />
+        <span class="q-ml-sm">{{ t('hardwareErrorLog.loadingMoreLogs') }}</span>
+      </div>
+
+      <!-- 더 보기 버튼 (스크롤과 버튼 모두 지원) -->
+      <div v-else-if="hasMorePages && !isLoadingMore" class="load-more-section">
+        <q-btn color="primary" outline :label="t('hardwareErrorLog.loadMoreLogs')" icon="expand_more"
+          @click="loadMoreLogs" class="load-more-btn" />
+        <div class="load-more-info">
+          <span class="text-caption text-grey-6">
+            {{ t('hardwareErrorLog.showingLogs', { current: allLoadedLogs.length, total: totalLogCount }) }}
+          </span>
+          <div class="scroll-hint">
+            <q-icon name="mouse" size="18px" class="q-mr-sm" />
+            <span>{{ t('hardwareErrorLog.scrollHint') }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 더 이상 로드할 데이터가 없을 때 -->
+      <div v-else-if="!hasMorePages && allLoadedLogs.length > 0" class="no-more-data">
+        <q-icon name="check_circle" size="20px" color="green" />
+        <span class="q-ml-sm text-grey-6">{{ t('hardwareErrorLog.allLogsLoaded', { total: totalLogCount }) }}</span>
+      </div>
+
+      <!-- 로그가 없을 때 -->
+      <div v-else-if="allLoadedLogs.length === 0" class="no-logs">
+        <q-icon name="info" size="48px" color="grey" />
+        <p>{{ t('hardwareErrorLog.noLogsToDisplay') }}</p>
+      </div>
     </div>
   </div>
 </template>
@@ -78,9 +114,12 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useHardwareErrorLogStore } from '@/stores/hardwareErrorLogStore'
 import { useTheme } from '@/composables/useTheme'
+import { useI18n } from 'vue-i18n'
+import type { HardwareErrorLog } from '@/types/hardwareError'
 
 const hardwareErrorLogStore = useHardwareErrorLogStore()
 const { initializeTheme } = useTheme()
+const { t } = useI18n()
 
 // 직접 번역 함수 테스트 (사용하지 않으므로 제거)
 // const testTranslate = (errorKey: string, isResolved: boolean) => {
@@ -99,11 +138,19 @@ const { initializeTheme } = useTheme()
 //   return translatedMessage
 // }
 
+// ✅ 무한 스크롤 관련 변수들
+const totalLogCount = ref<number>(0)
+const currentPage = ref<number>(0)
+const pageSize = ref<number>(5) // 한 번에 로드할 로그 개수
+const isLoadingMore = ref<boolean>(false)
+const hasMorePages = ref<boolean>(true)
+const allLoadedLogs = ref<HardwareErrorLog[]>([]) // 모든 로드된 로그들
+const logContainer = ref<HTMLElement>() // 스크롤 컨테이너 참조
+
 // ✅ hardwareErrorLogStore에서 직접 데이터 가져오기
 const errorLogs = computed(() => {
-  console.log('🔍 HardwareErrorLogPanel - errorLogs computed:', hardwareErrorLogStore.errorLogs)
-  console.log('🔍 HardwareErrorLogPanel - 첫 번째 로그:', hardwareErrorLogStore.errorLogs[0])
-  return hardwareErrorLogStore.errorLogs
+  console.log('🔍 HardwareErrorLogPanel - errorLogs computed:', allLoadedLogs.value)
+  return allLoadedLogs.value
 })
 // 활성 에러와 해결됨 카운터 제거 (사용하지 않음)
 // const activeErrorCount = computed(() => hardwareErrorLogStore.activeErrorCount)
@@ -187,14 +234,122 @@ const stopRealtimeUpdate = () => {
   }
 }
 
-// 에러 로그 새로고침 함수
+// ✅ 페이징 API 호출 함수 - pageSize 변수로 동적 로드
+const loadErrorLogsPage = async (page: number, reset: boolean = false) => {
+  try {
+    console.log('📄 페이지 로드 시작:', {
+      page,
+      reset,
+      pageSize: pageSize.value,
+      currentLoadedCount: allLoadedLogs.value.length,
+      hasMorePages: hasMorePages.value
+    })
+
+    if (reset) {
+      isLoadingMore.value = true
+      currentPage.value = 0
+      allLoadedLogs.value = []
+    } else {
+      isLoadingMore.value = true
+    }
+
+    // API 파라미터 구성 - pageSize 변수 사용
+    const params = new URLSearchParams({
+      page: page.toString(),
+      size: pageSize.value.toString() // pageSize 변수로 동적 설정
+    })
+
+    if (selectedCategory.value) params.append('category', selectedCategory.value)
+    if (selectedSeverity.value) params.append('severity', selectedSeverity.value)
+    if (selectedResolvedStatus.value) params.append('resolvedStatus', selectedResolvedStatus.value)
+    if (startDate.value) params.append('startDate', startDate.value)
+    if (endDate.value) params.append('endDate', endDate.value)
+
+    console.log('📄 API 요청 URL:', `http://localhost:8080/api/hardware-error-logs/paginated?${params}`)
+    const response = await fetch(`http://localhost:8080/api/hardware-error-logs/paginated?${params}`)
+
+    if (response.ok) {
+      const data = await response.json()
+      console.log('📄 페이지 로드 응답:', {
+        content: data.content,
+        totalElements: data.totalElements,
+        totalPages: data.totalPages,
+        last: data.last,
+        first: data.first,
+        numberOfElements: data.numberOfElements
+      })
+
+      // 받은 데이터에 번역 적용
+      const translatedLogs = (data.content || []).map((log: HardwareErrorLog) => ({
+        ...log,
+        message: hardwareErrorLogStore.translateErrorKey(log.errorKey, log.isResolved),
+        resolvedMessage: log.isResolved ? hardwareErrorLogStore.translateErrorKey(log.errorKey, log.isResolved) : undefined,
+      }))
+
+      if (reset) {
+        allLoadedLogs.value = translatedLogs
+        totalLogCount.value = data.totalElements || 0
+        currentPage.value = 0
+      } else {
+        allLoadedLogs.value = [...allLoadedLogs.value, ...translatedLogs]
+        currentPage.value = page
+      }
+
+      hasMorePages.value = !data.last
+
+      // 로드된 데이터에 번역 적용
+      hardwareErrorLogStore.updateErrorMessages()
+
+      console.log('📄 로드 완료:', {
+        totalCount: totalLogCount.value,
+        loadedCount: allLoadedLogs.value.length,
+        hasMore: hasMorePages.value,
+        loadedItems: translatedLogs.length,
+        currentPage: currentPage.value,
+        isLastPage: data.last
+      })
+    } else {
+      console.error('❌ 페이지 로드 실패:', response.status, response.statusText)
+    }
+  } catch (error) {
+    console.error('❌ 페이지 로드 에러:', error)
+  } finally {
+    isLoadingMore.value = false
+  }
+}
+
+// 에러 로그 새로고침 함수 - 실시간 업데이트용
 const refreshErrorLogs = async () => {
   try {
-    console.log('🔄 에러 로그 새로고침 중...')
+    console.log('🔄 실시간 에러 로그 새로고침 중...')
+
+    // 스토어에서 전체 데이터 새로고침
     await hardwareErrorLogStore.loadHistoryFromBackend()
-    console.log('✅ 에러 로그 새로고침 완료')
+
+    // 현재 로드된 로그 개수와 총 개수 비교
+    const storeLogs = hardwareErrorLogStore.errorLogs || []
+    const currentTotal = totalLogCount.value
+    const newTotal = storeLogs.length
+
+    console.log('🔄 실시간 업데이트 비교:', {
+      currentLoaded: allLoadedLogs.value.length,
+      currentTotal,
+      newTotal,
+      hasNewLogs: newTotal > currentTotal
+    })
+
+    // 새로운 로그가 있으면 첫 페이지부터 다시 로드
+    if (newTotal > currentTotal) {
+      console.log('🆕 새로운 로그 발견! 첫 페이지부터 다시 로드')
+      totalLogCount.value = newTotal
+      await loadErrorLogsPage(0, true) // 첫 페이지부터 리셋하여 로드
+    } else {
+      console.log('📊 새로운 로그 없음')
+    }
+
+    console.log('✅ 실시간 에러 로그 새로고침 완료')
   } catch (error) {
-    console.error('❌ 에러 로그 새로고침 실패:', error)
+    console.error('❌ 실시간 에러 로그 새로고침 실패:', error)
   }
 }
 
@@ -207,21 +362,60 @@ watch([selectedCategory, selectedSeverity, selectedResolvedStatus, startDate, en
     startDate: startDate.value,
     endDate: endDate.value
   })
+  // 필터 변경 시 첫 페이지부터 새로 로드
+  void loadErrorLogsPage(0, true)
 }, { deep: true })
+
+// ✅ 스크롤 이벤트 핸들러 - 무한 스크롤 지원
+const handleScroll = (event: Event) => {
+  const target = event.target as HTMLElement
+  if (!target) return
+
+  const { scrollTop, scrollHeight, clientHeight } = target
+  const isNearBottom = scrollTop + clientHeight >= scrollHeight - 50 // 50px 전에 로드
+
+  console.log('🔄 스크롤 이벤트:', {
+    scrollTop,
+    scrollHeight,
+    clientHeight,
+    isNearBottom,
+    hasMorePages: hasMorePages.value,
+    isLoadingMore: isLoadingMore.value,
+    currentPage: currentPage.value,
+    loadedCount: allLoadedLogs.value.length,
+    totalCount: totalLogCount.value
+  })
+
+  if (isNearBottom && hasMorePages.value && !isLoadingMore.value) {
+    console.log('📄 스크롤 감지 - 다음 페이지 로드:', currentPage.value + 1, `(${pageSize.value}개씩)`)
+    void loadErrorLogsPage(currentPage.value + 1, false)
+  } else if (!hasMorePages.value) {
+    console.log('📄 더 이상 로드할 페이지가 없음')
+  } else if (isLoadingMore.value) {
+    console.log('📄 이미 로딩 중...')
+  } else {
+    console.log('📄 스크롤 위치 부족:', Math.round(((scrollTop + clientHeight) / scrollHeight) * 100), '%')
+  }
+}
+
+// ✅ 더 보기 버튼 클릭 핸들러
+const loadMoreLogs = () => {
+  console.log('📄 더 보기 버튼 클릭 - 다음 페이지 로드:', currentPage.value + 1, `(${pageSize.value}개씩)`)
+  void loadErrorLogsPage(currentPage.value + 1, false)
+}
 
 // 컴포넌트 마운트 시 팝업 상태 설정
 onMounted(async () => {
-  console.log('🔍 HardwareErrorLogPanel 마운트됨')
-  console.log('🔍 현재 errorLogs:', hardwareErrorLogStore.errorLogs)
-  console.log('🔍 현재 isInitialLoad:', hardwareErrorLogStore.isInitialLoad)
+  console.log('🔍 HardwareErrorLogPanel 마운트됨 (페이징 로드 모드)')
 
-  await hardwareErrorLogStore.setPopupOpen(true)
+  // 초기 데이터 로드
+  await loadErrorLogsPage(0, true)
 
-  console.log('🔍 팝업 열기 후 errorLogs:', hardwareErrorLogStore.errorLogs)
-  console.log('🔍 팝업 열기 후 isInitialLoad:', hardwareErrorLogStore.isInitialLoad)
-
-  // 컴포넌트 마운트 후 모든 에러 메시지를 다시 번역
+  // 에러 메시지 번역 업데이트
   hardwareErrorLogStore.updateErrorMessages()
+
+  // q-scroll-area는 자동으로 스크롤 이벤트를 처리하므로 별도 리스너 불필요
+  await hardwareErrorLogStore.setPopupOpen(true)
 })
 
 // 컴포넌트 언마운트 시 팝업 상태 해제 및 타이머 정리
@@ -263,83 +457,89 @@ const getSeverityName = (severity: string) => {
 //   return errorLogs.value.filter(log => log.isResolved).length
 // })
 
-// ✅ 필터링된 에러 로그
-const filteredErrorLogs = computed(() => {
-  let filtered = [...errorLogs.value] // ✅ .value 추가
+// ✅ 필터링된 에러 로그 (사용하지 않음 - 페이징으로 대체)
+// const filteredErrorLogs = computed(() => {
+let filtered = [...errorLogs.value] // ✅ .value 추가
 
-  console.log('🔍 필터링 시작 - 전체 로그 개수:', filtered.length)
-  console.log('🔍 현재 필터 조건:', {
-    category: selectedCategory.value,
-    severity: selectedSeverity.value,
-    resolvedStatus: selectedResolvedStatus.value,
-    startDate: startDate.value,
-    endDate: endDate.value
-  })
-
-  // 카테고리 필터
-  if (selectedCategory.value) {
-    const beforeCount = filtered.length
-    filtered = filtered.filter(log => log.category === selectedCategory.value)
-    console.log('🔍 카테고리 필터 적용:', selectedCategory.value, `${beforeCount} → ${filtered.length}`)
-  }
-
-  // 심각도 필터
-  if (selectedSeverity.value) {
-    const beforeCount = filtered.length
-    filtered = filtered.filter(log => log.severity === selectedSeverity.value)
-    console.log('🔍 심각도 필터 적용:', selectedSeverity.value, `${beforeCount} → ${filtered.length}`)
-  }
-
-  // 해결 상태 필터
-  if (selectedResolvedStatus.value) {
-    const beforeCount = filtered.length
-    if (selectedResolvedStatus.value === 'resolved') {
-      filtered = filtered.filter(log => log.isResolved)
-    } else if (selectedResolvedStatus.value === 'unresolved') {
-      filtered = filtered.filter(log => !log.isResolved)
-    }
-    console.log('🔍 해결 상태 필터 적용:', selectedResolvedStatus.value, `${beforeCount} → ${filtered.length}`)
-  }
-
-  // 날짜 범위 필터
-  if (startDate.value) {
-    const beforeCount = filtered.length
-    const start = new Date(startDate.value)
-    filtered = filtered.filter(log => {
-      const logDate = new Date(log.timestamp)
-      return logDate >= start
-    })
-    console.log('🔍 시작 날짜 필터 적용:', startDate.value, `${beforeCount} → ${filtered.length}`)
-  }
-
-  if (endDate.value) {
-    const beforeCount = filtered.length
-    const end = new Date(endDate.value)
-    end.setHours(23, 59, 59, 999) // 하루 끝까지 포함
-    filtered = filtered.filter(log => {
-      const logDate = new Date(log.timestamp)
-      return logDate <= end
-    })
-    console.log('🔍 종료 날짜 필터 적용:', endDate.value, `${beforeCount} → ${filtered.length}`)
-  }
-
-  // ✅ 최신 로그가 위로 오도록 시간순 정렬 (최신순)
-  filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-
-  console.log('🔍 필터링 완료 - 최종 로그 개수:', filtered.length)
-  return filtered
+console.log('🔍 필터링 시작 - 전체 로그 개수:', filtered.length)
+console.log('🔍 현재 필터 조건:', {
+  category: selectedCategory.value,
+  severity: selectedSeverity.value,
+  resolvedStatus: selectedResolvedStatus.value,
+  startDate: startDate.value,
+  endDate: endDate.value
 })
 
-// ✅ 필터 적용
-const applyFilters = () => {
-  // 필터가 변경되면 computed 속성이 자동으로 업데이트됨
-  console.log('조회 실행:', {
-    category: selectedCategory.value,
-    severity: selectedSeverity.value,
-    resolvedStatus: selectedResolvedStatus.value,
-    startDate: startDate.value,
-    endDate: endDate.value
+// 카테고리 필터
+if (selectedCategory.value) {
+  const beforeCount = filtered.length
+  filtered = filtered.filter(log => log.category === selectedCategory.value)
+  console.log('🔍 카테고리 필터 적용:', selectedCategory.value, `${beforeCount} → ${filtered.length}`)
+}
+
+// 심각도 필터
+if (selectedSeverity.value) {
+  const beforeCount = filtered.length
+  filtered = filtered.filter(log => log.severity === selectedSeverity.value)
+  console.log('🔍 심각도 필터 적용:', selectedSeverity.value, `${beforeCount} → ${filtered.length}`)
+}
+
+// 해결 상태 필터
+if (selectedResolvedStatus.value) {
+  const beforeCount = filtered.length
+  if (selectedResolvedStatus.value === 'resolved') {
+    filtered = filtered.filter(log => log.isResolved)
+  } else if (selectedResolvedStatus.value === 'unresolved') {
+    filtered = filtered.filter(log => !log.isResolved)
+  }
+  console.log('🔍 해결 상태 필터 적용:', selectedResolvedStatus.value, `${beforeCount} → ${filtered.length}`)
+}
+
+// 날짜 범위 필터
+if (startDate.value) {
+  const beforeCount = filtered.length
+  const start = new Date(startDate.value)
+  filtered = filtered.filter(log => {
+    const logDate = new Date(log.timestamp)
+    return logDate >= start
   })
+  console.log('🔍 시작 날짜 필터 적용:', startDate.value, `${beforeCount} → ${filtered.length}`)
+}
+
+if (endDate.value) {
+  const beforeCount = filtered.length
+  const end = new Date(endDate.value)
+  end.setHours(23, 59, 59, 999) // 하루 끝까지 포함
+  filtered = filtered.filter(log => {
+    const logDate = new Date(log.timestamp)
+    return logDate <= end
+  })
+  console.log('🔍 종료 날짜 필터 적용:', endDate.value, `${beforeCount} → ${filtered.length}`)
+}
+
+// ✅ 최신 로그가 위로 오도록 시간순 정렬 (최신순)
+// filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+
+//   console.log('🔍 필터링 완료 - 최종 로그 개수:', filtered.length)
+//   return filtered
+// })
+
+// ✅ 필터 적용 (사용하지 않음 - 자동 필터링으로 대체)
+// const applyFilters = () => {
+//   // 필터가 변경되면 computed 속성이 자동으로 업데이트됨
+//   console.log('조회 실행:', {
+//     category: selectedCategory.value,
+//     severity: selectedSeverity.value,
+//     resolvedStatus: selectedResolvedStatus.value,
+//     startDate: startDate.value,
+//     endDate: endDate.value
+//   })
+// }
+
+// ✅ 수동 검색 함수
+const manualSearch = () => {
+  console.log('🔍 수동 검색 실행')
+  void loadErrorLogsPage(0, true)
 }
 
 // ✅ 필터 초기화
@@ -410,10 +610,10 @@ const getStatusChipTextColor = (severity: string, isResolved: boolean) => {
   }
 }
 
-// ✅ 상태 칩 라벨 (심각도 + 해결상태)
+// ✅ 상태 칩 라벨 (심각도 + 해결상태) - 다국어 지원
 const getStatusChipLabel = (severity: string, isResolved: boolean) => {
   const severityText = getSeverityName(severity)
-  const statusText = isResolved ? 'Resolved' : 'Active'
+  const statusText = isResolved ? t('hardwareErrorLog.resolved') : t('hardwareErrorLog.active')
   return `${severityText} ${statusText}`
 }
 
@@ -449,7 +649,17 @@ onMounted(() => {
   padding: 20px;
   background-color: var(--theme-card-background);
   color: var(--theme-text);
-  min-height: 100vh;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 로그 컨테이너 스타일링 */
+.log-container {
+  flex: 1;
+  overflow-y: auto;
+  max-height: calc(100vh - 50px);
+  /* 헤더와 필터 영역 제외 */
 }
 
 .header-section {
@@ -497,6 +707,22 @@ onMounted(() => {
   font-size: 0.9em;
 }
 
+.no-more-data {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  color: var(--theme-text-secondary);
+}
+
+.loading-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  color: var(--theme-text-secondary);
+}
+
 .no-logs {
   text-align: center;
   padding: 40px;
@@ -506,6 +732,34 @@ onMounted(() => {
 .no-logs p {
   margin-top: 16px;
   font-size: 1.1em;
+}
+
+/* 더 보기 버튼 섹션 */
+.load-more-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  gap: 10px;
+}
+
+.load-more-btn {
+  min-width: 200px;
+}
+
+.load-more-info {
+  text-align: center;
+}
+
+.scroll-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 12px;
+  opacity: 1;
+  font-size: 0.9em;
+  color: var(--theme-text-secondary);
+  font-weight: 500;
 }
 
 /* 달력 아이콘 스타일링은 공통 CSS 파일에서 관리 */

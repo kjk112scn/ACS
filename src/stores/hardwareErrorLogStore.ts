@@ -388,5 +388,6 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
     initialize,
     loadHistoryFromBackend,
     updateErrorMessages,
+    translateErrorKey,
   }
 })
