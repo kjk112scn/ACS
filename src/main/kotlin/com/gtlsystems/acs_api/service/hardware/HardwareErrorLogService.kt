@@ -36,10 +36,10 @@ class HardwareErrorLogService {
         
         try {
             // 🔍 디버깅: Elevation 관련 비트 값 상세 로그
-            logger.info("🔍 [DEBUG] elevationBoardServoStatusBits: '{}' (길이: {})", 
-                data.elevationBoardServoStatusBits, data.elevationBoardServoStatusBits?.length ?: 0)
-            logger.info("🔍 [DEBUG] elevationBoardStatusBits: '{}' (길이: {})", 
-                data.elevationBoardStatusBits, data.elevationBoardStatusBits?.length ?: 0)
+            // logger.info("🔍 [DEBUG] elevationBoardServoStatusBits: '{}' (길이: {})", 
+            //     data.elevationBoardServoStatusBits, data.elevationBoardServoStatusBits?.length ?: 0)
+            // logger.info("🔍 [DEBUG] elevationBoardStatusBits: '{}' (길이: {})", 
+            //     data.elevationBoardStatusBits, data.elevationBoardStatusBits?.length ?: 0)
             
             // 비트 타입들 정의
             val bitTypes = listOf(
@@ -310,6 +310,87 @@ class HardwareErrorLogService {
      */
     fun getActiveErrorLogs(): List<HardwareErrorLog> {
         return errorLogs.filter { !it.isResolved }
+    }
+
+    /**
+     * 페이징된 에러 로그 조회 (하이브리드 방식)
+     */
+    fun getErrorLogsPaginated(
+        page: Int,
+        size: Int,
+        startDate: String?,
+        endDate: String?,
+        category: String?,
+        severity: String?,
+        resolvedStatus: String?
+    ): Map<String, Any> {
+        // 1. 필터링된 로그 목록 생성
+        var filteredLogs = errorLogs.toList()
+        
+        // 날짜 필터링
+        if (startDate != null) {
+            val start = java.time.LocalDateTime.parse("${startDate}T00:00:00")
+            filteredLogs = filteredLogs.filter { 
+                java.time.LocalDateTime.parse(it.timestamp) >= start 
+            }
+        }
+        if (endDate != null) {
+            val end = java.time.LocalDateTime.parse("${endDate}T23:59:59")
+            filteredLogs = filteredLogs.filter { 
+                java.time.LocalDateTime.parse(it.timestamp) <= end 
+            }
+        }
+        
+        // 카테고리 필터링
+        if (category != null) {
+            filteredLogs = filteredLogs.filter { it.category == category }
+        }
+        
+        // 심각도 필터링
+        if (severity != null) {
+            filteredLogs = filteredLogs.filter { it.severity == severity }
+        }
+        
+        // 해결 상태 필터링
+        if (resolvedStatus != null) {
+            when (resolvedStatus) {
+                "resolved" -> filteredLogs = filteredLogs.filter { it.isResolved }
+                "unresolved" -> filteredLogs = filteredLogs.filter { !it.isResolved }
+            }
+        }
+        
+        // 2. 최신순 정렬
+        filteredLogs = filteredLogs.sortedByDescending { it.timestamp }
+        
+        // 3. 페이징 계산
+        val totalElements = filteredLogs.size
+        val totalPages = (totalElements + size - 1) / size
+        val startIndex = page * size
+        val endIndex = minOf(startIndex + size, totalElements)
+        
+        // 4. 현재 페이지 데이터 추출
+        val content = if (startIndex < totalElements) {
+            filteredLogs.subList(startIndex, endIndex)
+        } else {
+            emptyList()
+        }
+        
+        // 5. 페이징 정보 반환
+        return mapOf(
+            "content" to content,
+            "pageable" to mapOf(
+                "pageNumber" to page,
+                "pageSize" to size,
+                "sort" to mapOf("sorted" to true, "unsorted" to false)
+            ),
+            "totalElements" to totalElements,
+            "totalPages" to totalPages,
+            "first" to (page == 0),
+            "last" to (page >= totalPages - 1),
+            "numberOfElements" to content.size,
+            "size" to size,
+            "number" to page
+        )
     }
 
     /**

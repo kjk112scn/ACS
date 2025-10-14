@@ -80,6 +80,38 @@ class HardwareErrorLogController(
     }
     
     /**
+     * 페이징된 에러 로그 조회 API (하이브리드 방식)
+     */
+    @GetMapping("/paginated")
+    fun getErrorLogsPaginated(
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "50") size: Int,
+        @RequestParam(required = false) startDate: String?,
+        @RequestParam(required = false) endDate: String?,
+        @RequestParam(required = false) category: String?,
+        @RequestParam(required = false) severity: String?,
+        @RequestParam(required = false) resolvedStatus: String?
+    ): ResponseEntity<Map<String, Any>> {
+        return try {
+            val result = hardwareErrorLogService.getErrorLogsPaginated(
+                page = page,
+                size = size,
+                startDate = startDate,
+                endDate = endDate,
+                category = category,
+                severity = severity,
+                resolvedStatus = resolvedStatus
+            )
+            logger.info("📋 페이징된 에러 로그 조회 - 페이지: {}, 크기: {}, 총개수: {}", page, size, result["totalElements"])
+            ResponseEntity.ok(result)
+        } catch (e: Exception) {
+            logger.error("❌ 페이징된 에러 로그 조회 실패: {}", e.message, e)
+            ResponseEntity.internalServerError()
+                .body(mapOf("success" to false, "message" to "페이징된 에러 로그 조회 실패: ${e.message}"))
+        }
+    }
+    
+    /**
      * 테스트 해결된 에러 로그 생성 API
      */
     @PostMapping("/test-resolved")

@@ -28,17 +28,17 @@ class DataStoreService {
      */
     fun updateDataFromUdp(newData: PushData.ReadData) {
         
-        logger.info("🔍 [DataStore] elevationBoardStatusBits 수신: {}", newData.elevationBoardStatusBits)
+        // logger.info("🔍 [DataStore] elevationBoardStatusBits 수신: {}", newData.elevationBoardStatusBits)
 
-        // ✅ 상세 디버깅 로그 추가
-        logger.info("🔍 [DataStore] newData.elevationBoardStatusBits 원본: '{}'", newData.elevationBoardStatusBits)
-        logger.info("🔍 [DataStore] newData.elevationBoardStatusBits null 체크: {}", newData.elevationBoardStatusBits != null)
-        logger.info("🔍 [DataStore] newData.elevationBoardStatusBits isEmpty 체크: {}", newData.elevationBoardStatusBits?.isEmpty() ?: true)
-        logger.info("🔍 [DataStore] newData.elevationBoardStatusBits 길이: {}", newData.elevationBoardStatusBits?.length ?: -1)
+        // ✅ 상세 디버깅 로그 추가 (주석 처리)
+        // logger.info("🔍 [DataStore] newData.elevationBoardStatusBits 원본: '{}'", newData.elevationBoardStatusBits)
+        // logger.info("🔍 [DataStore] newData.elevationBoardStatusBits null 체크: {}", newData.elevationBoardStatusBits != null)
+        // logger.info("🔍 [DataStore] newData.elevationBoardStatusBits isEmpty 체크: {}", newData.elevationBoardStatusBits?.isEmpty() ?: true)
+        // logger.info("🔍 [DataStore] newData.elevationBoardStatusBits 길이: {}", newData.elevationBoardStatusBits?.length ?: -1)
         
 
         val currentData = latestData.get()
-        logger.info("🔍 [DataStore] elevationBoardStatusBits 기존: {}", currentData.elevationBoardStatusBits)
+        // logger.info("🔍 [DataStore] elevationBoardStatusBits 기존: {}", currentData.elevationBoardStatusBits)
 
         //  기존 mergedData 로직 복원 (null 안전 병합)
         val mergedData = PushData.ReadData(
