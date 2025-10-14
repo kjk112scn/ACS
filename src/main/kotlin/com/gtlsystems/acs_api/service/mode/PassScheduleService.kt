@@ -10,6 +10,7 @@ import com.gtlsystems.acs_api.service.datastore.DataStoreService
 import com.gtlsystems.acs_api.service.icd.ICDService
 import com.gtlsystems.acs_api.service.udp.UdpFwICDService
 import com.gtlsystems.acs_api.service.system.settings.SettingsService
+import com.gtlsystems.acs_api.config.ThreadManager
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
@@ -50,7 +51,8 @@ class PassScheduleService(
     private val acsEventBus: ACSEventBus,
     private val udpFwICDService: UdpFwICDService,
     private val dataStoreService: DataStoreService,
-    private val settingsService: SettingsService
+    private val settingsService: SettingsService,
+    private val threadManager: ThreadManager
 ) {
     private val logger = LoggerFactory.getLogger(PassScheduleService::class.java)
 
@@ -110,12 +112,8 @@ class PassScheduleService(
 
     // ✅ 새로 추가: 성능 최적화용 캐시 및 스레드 (기존 동작에 영향 없음)
     private val trackingDataCache = ConcurrentHashMap<UInt, TrackingDataCache>()
-    private val trackingDataExecutor = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "tracking-data-optimizer").apply {
-            priority = Thread.NORM_PRIORITY + 1  // 기존보다 약간 높은 우선순위
-            isDaemon = true
-        }
-    }
+    // ✅ ThreadManager 통합 사용 (LOW 우선순위)
+    private val batchExecutor = threadManager.getBatchExecutor()
 
     // ✅ 새로 추가: 성능 최적화용 데이터 클래스
     data class TrackingDataCache(
@@ -187,7 +185,7 @@ class PassScheduleService(
     }
 
     // ✅ 기존 추적 모니터링 필드들 (변경 없음)
-    private var trackingMonitorExecutor: ScheduledExecutorService? = null
+    private var trackingExecutor: ScheduledExecutorService? = null
     private var trackingMonitorTask: ScheduledFuture<*>? = null
     private var isTrackingMonitorRunning = AtomicBoolean(false)
     private var lastDisplayedSchedule: Map<String, Any?>? = null
@@ -216,9 +214,9 @@ class PassScheduleService(
         dataStoreService.stopAllTracking()
         resetTrackingState()
 
-        // 100ms 정밀 타이머로 스케줄 모니터링 시작
-        trackingMonitorExecutor = Executors.newSingleThreadScheduledExecutor(trackingMonitorThreadFactory)
-        trackingMonitorTask = trackingMonitorExecutor?.scheduleAtFixedRate(
+        // ✅ 통합 추적 실행기 사용 (NORMAL 우선순위)
+        trackingExecutor = threadManager.getTrackingExecutor()
+        trackingMonitorTask = trackingExecutor?.scheduleAtFixedRate(
             { checkTrackingScheduleWithStateMachine() }, 0, 100, TimeUnit.MILLISECONDS
         )
 
@@ -237,21 +235,16 @@ class PassScheduleService(
 
         isTrackingMonitorRunning.set(false)
         trackingMonitorTask?.cancel(false)
-        trackingMonitorExecutor?.shutdown()
-
-        try {
-            trackingMonitorExecutor?.awaitTermination(1, TimeUnit.SECONDS)
-        } catch (e: InterruptedException) {
-            trackingMonitorExecutor?.shutdownNow()
-            Thread.currentThread().interrupt()
-        }
+        
+        // ✅ ThreadManager의 trackingExecutor는 ThreadManager에서 관리되므로
+        // 여기서는 태스크만 취소하고 상태만 정리
 
         // 현재 상태에 따라 적절한 종료 액션 수행
         handleShutdownAction()
 
         // 리소스 정리
         trackingDataCache.clear()
-        trackingMonitorExecutor = null
+        trackingExecutor = null
         trackingMonitorTask = null
         lastDisplayedSchedule = null
         lastPreparedSchedule = null
@@ -898,7 +891,7 @@ class PassScheduleService(
                 // ✅ 실패 시 기존 방식으로 재시도
                 sendAdditionalTrackingDataLegacy(passId, startIndex, requestDataLength)
             }
-        }, trackingDataExecutor)
+        }, batchExecutor)
     }
     
 
@@ -1061,17 +1054,8 @@ class PassScheduleService(
         // 추적 모니터링 중지
         stopScheduleTracking()
 
-        // ✅ 최적화 스레드 정리
-        trackingDataExecutor.shutdown()
-        try {
-            if (!trackingDataExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
-                trackingDataExecutor.shutdownNow()
-                logger.warn("추적 데이터 최적화 스레드 강제 종료")
-            }
-        } catch (e: InterruptedException) {
-            trackingDataExecutor.shutdownNow()
-            Thread.currentThread().interrupt()
-        }
+        // ✅ ThreadManager의 batchExecutor는 ThreadManager에서 관리되므로
+        // 여기서는 캐시만 정리
 
         // ✅ 캐시 정리
         trackingDataCache.clear()
@@ -1095,8 +1079,8 @@ class PassScheduleService(
             "cachedPassIds" to trackingDataCache.keys.toList(),
             "totalCachedPoints" to trackingDataCache.values.sumOf { it.totalSize },
             "totalMemoryKB" to trackingDataCache.values.sumOf { it.totalSize * 12 / 1024 },
-            "executorActive" to !trackingDataExecutor.isShutdown,
-            "executorTerminated" to trackingDataExecutor.isTerminated,
+            "executorActive" to (batchExecutor != null),
+            "executorTerminated" to false, // ThreadManager에서 관리
             "cacheDetails" to cacheStats,
             "optimizationEnabled" to true
         )
@@ -1194,7 +1178,7 @@ class PassScheduleService(
             "totalSelectedSchedules" to getSelectedTrackingSchedule().size,
             "calTime" to calTime.toString(),
             "cacheSize" to trackingDataCache.size,  // ✅ 캐시 정보 추가
-            "optimizationActive" to !trackingDataExecutor.isShutdown  // ✅ 최적화 상태 추가
+            "optimizationActive" to (batchExecutor != null)  // ✅ 최적화 상태 추가
         )
     }
 
@@ -1757,9 +1741,9 @@ class PassScheduleService(
             "performanceMonitoring" to true,
             "cacheStats" to getTrackingPerformanceStats(),
             "executorStatus" to mapOf(
-                "isShutdown" to trackingDataExecutor.isShutdown,
-                "isTerminated" to trackingDataExecutor.isTerminated,
-                "activeCount" to if (!trackingDataExecutor.isShutdown) 1 else 0
+                "isShutdown" to false, // ThreadManager에서 관리
+                "isTerminated" to false, // ThreadManager에서 관리
+                "activeCount" to if (batchExecutor != null) 1 else 0
             ),
             "memoryOptimization" to mapOf(
                 "expiredCacheCleanup" to true,
@@ -1852,7 +1836,7 @@ class PassScheduleService(
             } catch (e: Exception) {
                 logger.error("추적 데이터 캐싱 실패: passId=$passId, ${e.message}", e)
             }
-        }, trackingDataExecutor)
+        }, batchExecutor)
     }
 
     /**

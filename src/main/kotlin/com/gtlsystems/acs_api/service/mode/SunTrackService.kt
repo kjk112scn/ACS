@@ -30,7 +30,7 @@ class SunTrackService(
     private val logger = LoggerFactory.getLogger(SunTrackService::class.java)
 
     // ✅ ThreadManager 통합 사용
-    private var modeExecutor: ScheduledExecutorService? = null
+    private var trackingExecutor: ScheduledExecutorService? = null
     private var modeTask: ScheduledFuture<*>? = null
 
     // ✅ 성능 모니터링
@@ -69,7 +69,8 @@ class SunTrackService(
     @PostConstruct
     fun init() {
         logger.info("SunTrackService 초기화 시작")
-        modeExecutor = threadManager.getModeExecutor()
+        // ✅ 통합 추적 실행기 사용 (NORMAL 우선순위)
+        trackingExecutor = threadManager.getTrackingExecutor()
         
         // ✅ 지상국 초기화
         try {
@@ -103,7 +104,7 @@ class SunTrackService(
         }
 
         try {
-            modeTask = modeExecutor?.scheduleAtFixedRate(
+            modeTask = trackingExecutor?.scheduleAtFixedRate(
                 {
                     try {
                         val startTime = System.currentTimeMillis()

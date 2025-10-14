@@ -32,6 +32,9 @@ class ThreadManager(
         val tier = classifyPerformanceTier(specs)
         applyHardwareOptimization(tier)
         
+        // ✅ 통합 스레드 풀 초기화
+        initializeIntegratedThreadPools(tier)
+        
         logger.info("✅ ThreadManager 초기화 완료 (성능 등급: {})", tier)
     }
     
@@ -51,17 +54,147 @@ class ThreadManager(
         LOW, MEDIUM, HIGH, ULTRA
     }
     
-    // ✅ 쓰레드 풀 인스턴스
+    // ✅ 우선순위 체계 정의
+    enum class ThreadPriority(val priority: Int) {
+        CRITICAL(Thread.MAX_PRIORITY),      // 하드웨어 통신 (10ms/30ms)
+        HIGH(Thread.MAX_PRIORITY - 1),     // WebSocket 브로드캐스트 (30ms)
+        NORMAL(Thread.NORM_PRIORITY),      // 추적 작업 (100ms)
+        LOW(Thread.MIN_PRIORITY)           // 배치 처리, 계산
+    }
+    
+    // ✅ 기존 쓰레드 풀 인스턴스 (하위 호환성)
     private var realtimeExecutor: ScheduledExecutorService? = null
     private var modeExecutor: ScheduledExecutorService? = null
     private var batchExecutor: ExecutorService? = null
+    
+    // ✅ 통합 쓰레드 풀 인스턴스
+    private var udpExecutor: ScheduledExecutorService? = null
+    private var websocketExecutor: ScheduledExecutorService? = null
+    private var trackingExecutor: ScheduledExecutorService? = null
+    private var batchScheduler: ScheduledExecutorService? = null
+    private var calculationExecutor: ScheduledExecutorService? = null
+    
+    /**
+     * ✅ 통합 스레드 풀 초기화
+     */
+    private fun initializeIntegratedThreadPools(tier: PerformanceTier) {
+        logger.info("🔧 통합 스레드 풀 초기화 시작 (등급: {})", tier)
+        
+        when (tier) {
+            PerformanceTier.ULTRA -> createUltraThreadPools()
+            PerformanceTier.HIGH -> createHighThreadPools()
+            PerformanceTier.MEDIUM -> createMediumThreadPools()
+            PerformanceTier.LOW -> createLowThreadPools()
+        }
+        
+        logger.info("✅ 통합 스레드 풀 초기화 완료")
+    }
+    
+    /**
+     * ✅ ThreadFactory 생성 메서드
+     */
+    private fun createThreadFactory(name: String, priority: ThreadPriority): ThreadFactory {
+        return ThreadFactory { runnable ->
+            Thread(runnable, name).apply {
+                this.priority = priority.priority
+                isDaemon = true
+                setUncaughtExceptionHandler { thread, ex ->
+                    logger.error("스레드 오류: ${thread.name}", ex)
+                }
+            }
+        }
+    }
+    
+    /**
+     * ✅ ULTRA 등급 통합 스레드 풀 생성
+     */
+    private fun createUltraThreadPools() {
+        logger.info("🚀 ULTRA 등급 통합 스레드 풀 생성")
+        
+        // ✅ 1. UDP 통신 (CRITICAL)
+        udpExecutor = Executors.newScheduledThreadPool(
+            2, 
+            createThreadFactory("udp-", ThreadPriority.CRITICAL)
+        )
+        
+        // ✅ 2. WebSocket 브로드캐스트 (HIGH)
+        websocketExecutor = Executors.newScheduledThreadPool(
+            2, 
+            createThreadFactory("websocket-", ThreadPriority.HIGH)
+        )
+        
+        // ✅ 3. 통합 추적 스레드 (NORMAL)
+        trackingExecutor = Executors.newScheduledThreadPool(
+            1, 
+            createThreadFactory("tracking-", ThreadPriority.NORMAL)
+        )
+        
+        // ✅ 4. 배치 저장 처리 (LOW)
+        batchExecutor = Executors.newFixedThreadPool(
+            4, 
+            createThreadFactory("batch-", ThreadPriority.LOW)
+        )
+        
+        // ✅ 5. 배치 스케줄링 (LOW)
+        batchScheduler = Executors.newScheduledThreadPool(
+            1, 
+            createThreadFactory("batch-scheduler-", ThreadPriority.LOW)
+        )
+        
+        // ✅ 6. 계산 처리 (LOW)
+        calculationExecutor = Executors.newScheduledThreadPool(
+            1, 
+            createThreadFactory("calculation-", ThreadPriority.LOW)
+        )
+    }
+    
+    /**
+     * ✅ HIGH 등급 통합 스레드 풀 생성
+     */
+    private fun createHighThreadPools() {
+        logger.info("⚡ HIGH 등급 통합 스레드 풀 생성")
+        
+        udpExecutor = Executors.newScheduledThreadPool(2, createThreadFactory("udp-", ThreadPriority.CRITICAL))
+        websocketExecutor = Executors.newScheduledThreadPool(2, createThreadFactory("websocket-", ThreadPriority.HIGH))
+        trackingExecutor = Executors.newScheduledThreadPool(1, createThreadFactory("tracking-", ThreadPriority.NORMAL))
+        batchExecutor = Executors.newFixedThreadPool(3, createThreadFactory("batch-", ThreadPriority.LOW))
+        batchScheduler = Executors.newScheduledThreadPool(1, createThreadFactory("batch-scheduler-", ThreadPriority.LOW))
+        calculationExecutor = Executors.newScheduledThreadPool(1, createThreadFactory("calculation-", ThreadPriority.LOW))
+    }
+    
+    /**
+     * ✅ MEDIUM 등급 통합 스레드 풀 생성
+     */
+    private fun createMediumThreadPools() {
+        logger.info("📊 MEDIUM 등급 통합 스레드 풀 생성")
+        
+        udpExecutor = Executors.newScheduledThreadPool(2, createThreadFactory("udp-", ThreadPriority.CRITICAL))
+        websocketExecutor = Executors.newScheduledThreadPool(1, createThreadFactory("websocket-", ThreadPriority.HIGH))
+        trackingExecutor = Executors.newScheduledThreadPool(1, createThreadFactory("tracking-", ThreadPriority.NORMAL))
+        batchExecutor = Executors.newFixedThreadPool(2, createThreadFactory("batch-", ThreadPriority.LOW))
+        batchScheduler = Executors.newScheduledThreadPool(1, createThreadFactory("batch-scheduler-", ThreadPriority.LOW))
+        calculationExecutor = Executors.newScheduledThreadPool(1, createThreadFactory("calculation-", ThreadPriority.LOW))
+    }
+    
+    /**
+     * ✅ LOW 등급 통합 스레드 풀 생성
+     */
+    private fun createLowThreadPools() {
+        logger.info("💡 LOW 등급 통합 스레드 풀 생성")
+        
+        udpExecutor = Executors.newScheduledThreadPool(1, createThreadFactory("udp-", ThreadPriority.CRITICAL))
+        websocketExecutor = Executors.newScheduledThreadPool(1, createThreadFactory("websocket-", ThreadPriority.HIGH))
+        trackingExecutor = Executors.newScheduledThreadPool(1, createThreadFactory("tracking-", ThreadPriority.NORMAL))
+        batchExecutor = Executors.newFixedThreadPool(1, createThreadFactory("batch-", ThreadPriority.LOW))
+        batchScheduler = Executors.newScheduledThreadPool(1, createThreadFactory("batch-scheduler-", ThreadPriority.LOW))
+        calculationExecutor = Executors.newScheduledThreadPool(1, createThreadFactory("calculation-", ThreadPriority.LOW))
+    }
     
     /**
      * ✅ 시스템 사양 자동 감지
      */
     fun detectSystemSpecs(): SystemSpecs {
         val runtime = Runtime.getRuntime()
-        val osBean = ManagementFactory.getOperatingSystemMXBean()
         
         val specs = SystemSpecs(
             cpuCores = runtime.availableProcessors(),
@@ -230,8 +363,8 @@ class ThreadManager(
      */
     private fun createOptimizedThreadPools(
         coreThreads: Int,
-        maxThreads: Int,
-        queueCapacity: Int
+        @Suppress("UNUSED_PARAMETER") maxThreads: Int,
+        @Suppress("UNUSED_PARAMETER") queueCapacity: Int
     ) {
         // ✅ 안정적인 UDP/WebSocket 쓰레드 풀
         realtimeExecutor = Executors.newScheduledThreadPool(
@@ -277,24 +410,106 @@ class ThreadManager(
     }
     
     /**
-     * ✅ 실시간 실행기 반환
+     * ✅ 실시간 실행기 반환 (하위 호환성)
      */
+    @Deprecated("Use getHardwareExecutor() instead")
     fun getRealtimeExecutor(): ScheduledExecutorService? {
         return realtimeExecutor
     }
     
     /**
-     * ✅ 모드 실행기 반환
+     * ✅ 모드 실행기 반환 (하위 호환성)
      */
+    @Deprecated("Use getTrackingExecutor() instead")
     fun getModeExecutor(): ScheduledExecutorService? {
         return modeExecutor
     }
     
     /**
-     * ✅ 배치 실행기 반환
+     * ✅ 배치 실행기 반환 (하위 호환성)
+     */
+    // ✅ 통합 스레드 풀 접근 메서드들
+    
+    /**
+     * ✅ UDP 통신 실행기 반환 (CRITICAL 우선순위)
+     */
+    fun getUdpExecutor(): ScheduledExecutorService? {
+        return udpExecutor
+    }
+    
+    /**
+     * ✅ WebSocket 브로드캐스트 실행기 반환 (HIGH 우선순위)
+     */
+    fun getWebsocketExecutor(): ScheduledExecutorService? {
+        return websocketExecutor
+    }
+    
+    /**
+     * ✅ 통합 추적 실행기 반환 (NORMAL 우선순위)
+     */
+    fun getTrackingExecutor(): ScheduledExecutorService? {
+        return trackingExecutor
+    }
+    
+    /**
+     * ✅ 배치 저장 실행기 반환 (LOW 우선순위)
      */
     fun getBatchExecutor(): ExecutorService? {
         return batchExecutor
+    }
+    
+    /**
+     * ✅ 배치 스케줄링 실행기 반환 (LOW 우선순위)
+     */
+    fun getBatchScheduler(): ScheduledExecutorService? {
+        return batchScheduler
+    }
+    
+    /**
+     * ✅ 계산 처리 실행기 반환 (LOW 우선순위)
+     */
+    fun getCalculationExecutor(): ScheduledExecutorService? {
+        return calculationExecutor
+    }
+    
+    /**
+     * ✅ 스레드 풀 상태 모니터링
+     */
+    fun getThreadPoolStats(): Map<String, Map<String, Any>> {
+        return mapOf(
+            "udpExecutor" to getExecutorStats(udpExecutor),
+            "websocketExecutor" to getExecutorStats(websocketExecutor),
+            "trackingExecutor" to getExecutorStats(trackingExecutor),
+            "batchExecutor" to getExecutorStats(batchExecutor),
+            "batchScheduler" to getExecutorStats(batchScheduler),
+            "calculationExecutor" to getExecutorStats(calculationExecutor)
+        )
+    }
+    
+    /**
+     * ✅ 개별 스레드 풀 상태 조회
+     */
+    private fun getExecutorStats(executor: Any?): Map<String, Any> {
+        return when (executor) {
+            is ScheduledExecutorService -> mapOf(
+                "type" to "ScheduledExecutorService",
+                "isShutdown" to executor.isShutdown,
+                "isTerminated" to executor.isTerminated,
+                "activeThreads" to "N/A" // ScheduledExecutorService는 직접적인 활성 스레드 수 조회 불가
+            )
+            is ExecutorService -> mapOf(
+                "type" to "ExecutorService",
+                "isShutdown" to executor.isShutdown,
+                "isTerminated" to executor.isTerminated,
+                "activeThreads" to "N/A" // ExecutorService는 직접적인 활성 스레드 수 조회 불가
+            )
+            else -> mapOf(
+                "type" to "null",
+                "isShutdown" to true,
+                "isTerminated" to true,
+                "activeThreads" to 0
+            )
+        }
     }
     
     /**
@@ -302,7 +517,6 @@ class ThreadManager(
      */
     private fun getCpuModel(): String {
         return try {
-            val osBean = ManagementFactory.getOperatingSystemMXBean()
             System.getProperty("os.arch") + " " + 
             Runtime.getRuntime().availableProcessors() + " cores"
         } catch (e: Exception) {
@@ -314,11 +528,22 @@ class ThreadManager(
      * ✅ 쓰레드 풀 정리
      */
     fun shutdown() {
+        logger.info("🔄 스레드 풀 정리 시작")
+        
+        // ✅ 기존 스레드 풀 정리
         realtimeExecutor?.shutdown()
         modeExecutor?.shutdown()
         batchExecutor?.shutdown()
         
+        // ✅ 통합 스레드 풀 정리
+        udpExecutor?.shutdown()
+        websocketExecutor?.shutdown()
+        trackingExecutor?.shutdown()
+        batchScheduler?.shutdown()
+        calculationExecutor?.shutdown()
+        
         try {
+            // ✅ 기존 스레드 풀 종료 대기
             if (!realtimeExecutor?.awaitTermination(5, TimeUnit.SECONDS)!!) {
                 realtimeExecutor?.shutdownNow()
             }
@@ -328,12 +553,35 @@ class ThreadManager(
             if (!batchExecutor?.awaitTermination(5, TimeUnit.SECONDS)!!) {
                 batchExecutor?.shutdownNow()
             }
+            
+            // ✅ 통합 스레드 풀 종료 대기
+            if (!udpExecutor?.awaitTermination(5, TimeUnit.SECONDS)!!) {
+                udpExecutor?.shutdownNow()
+            }
+            if (!websocketExecutor?.awaitTermination(5, TimeUnit.SECONDS)!!) {
+                websocketExecutor?.shutdownNow()
+            }
+            if (!trackingExecutor?.awaitTermination(5, TimeUnit.SECONDS)!!) {
+                trackingExecutor?.shutdownNow()
+            }
+            if (!batchScheduler?.awaitTermination(5, TimeUnit.SECONDS)!!) {
+                batchScheduler?.shutdownNow()
+            }
+            if (!calculationExecutor?.awaitTermination(5, TimeUnit.SECONDS)!!) {
+                calculationExecutor?.shutdownNow()
+            }
         } catch (e: InterruptedException) {
+            // ✅ 강제 종료
             realtimeExecutor?.shutdownNow()
             modeExecutor?.shutdownNow()
             batchExecutor?.shutdownNow()
+            udpExecutor?.shutdownNow()
+            websocketExecutor?.shutdownNow()
+            trackingExecutor?.shutdownNow()
+            batchScheduler?.shutdownNow()
+            calculationExecutor?.shutdownNow()
         }
         
-        logger.info("✅ 쓰레드 풀 정리 완료")
+        logger.info("✅ 모든 스레드 풀 정리 완료")
     }
 } 

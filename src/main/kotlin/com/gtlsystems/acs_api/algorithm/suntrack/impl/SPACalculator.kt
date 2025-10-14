@@ -15,16 +15,19 @@ import java.util.GregorianCalendar
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import com.gtlsystems.acs_api.service.system.settings.SettingsService
+import com.gtlsystems.acs_api.config.ThreadManager
 /**
  * SPA(Solar Position Algorithm) 알고리즘을 사용하여 태양 위치를 계산하는 클래스
  */
 @Service
 class SPACalculator(
-    private val settingsService: SettingsService  // 추가
+    private val settingsService: SettingsService,
+    private val threadManager: ThreadManager
 ) : SunPositionCalculator {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val isTrackingActive = AtomicBoolean(false)
-    private val scheduler = Executors.newSingleThreadScheduledExecutor()
+    // ✅ ThreadManager 통합 사용 (LOW 우선순위)
+    private val calculationExecutor = threadManager.getCalculationExecutor()
 
     // 기본 관측 위치 (필요시 업데이트)
     private var defaultLatitude: Double = settingsService.latitude

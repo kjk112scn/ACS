@@ -74,7 +74,7 @@ class EphemerisService(
     private val trackingStatus = PushData.TRACKING_STATUS
 
     // ✅ 통합 쓰레드 관리자 사용
-    private var modeExecutor: ScheduledExecutorService? = null
+    private var trackingExecutor: ScheduledExecutorService? = null
     private var modeTask: ScheduledFuture<*>? = null
 
     // ✅ 정지궤도 추적 상태 관리
@@ -914,11 +914,11 @@ class EphemerisService(
         trackingStatus.ephemerisTrackingState = "TRAIN_MOVING_TO_ZERO"
         logger.info("🚀 위성 추적 시작 - Tilt 시작 위치로 이동")
 
-        // ✅ 통합 모드 실행기 사용
-        modeExecutor = threadManager.getModeExecutor()
+        // ✅ 통합 추적 실행기 사용 (NORMAL 우선순위)
+        trackingExecutor = threadManager.getTrackingExecutor()
 
         // ✅ 안정성 우선 스케줄링
-        modeTask = modeExecutor?.scheduleAtFixedRate(
+        modeTask = trackingExecutor?.scheduleAtFixedRate(
             {
                 try {
                     val startTime = System.nanoTime()
@@ -961,14 +961,14 @@ class EphemerisService(
      * ✅ 모드 타이머 상태 확인 (기존 isTimerRunning() 메서드 수정)
      */
     fun isTimerRunning(): Boolean {
-        return modeExecutor != null && modeTask != null && !modeTask!!.isCancelled
+        return trackingExecutor != null && modeTask != null && !modeTask!!.isCancelled
     }
 
     /**
      * ✅ 모드 타이머 상세 상태 정보 (새로운 메서드)
      */
     fun getTimerStatus(): Map<String, Any> {
-        val executor = modeExecutor
+        val executor = trackingExecutor
         val task = modeTask
 
         return mapOf(
@@ -977,7 +977,7 @@ class EphemerisService(
             "taskExists" to (task != null),
             "taskCancelled" to (task?.isCancelled ?: true),
             "taskDone" to (task?.isDone ?: true),
-            "threadName" to "mode-worker"
+            "threadName" to "tracking-worker"
         )
     }
 

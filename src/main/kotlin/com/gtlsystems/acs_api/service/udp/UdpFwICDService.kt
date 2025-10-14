@@ -66,7 +66,7 @@ class UdpFwICDService(
 
     // Kotlin 방식 (동일한 효과)
     /** 설정 변경 로그 메시지 실제 메시지: "설정이 변경되었습니다: {0} ({1} → {2})" */
-    private var realtimeExecutor: ScheduledExecutorService? = null
+    private var udpExecutor: ScheduledExecutorService? = null
 
     // 통신 상태 관리
     private val isUdpRunning = AtomicBoolean(false)
@@ -119,13 +119,13 @@ class UdpFwICDService(
             logger.info("실시간 UDP 통신 시작")
             logger.debug("Send 간격: 30ms, Receive 간격: 10ms")
 
-            // ✅ 통합 실시간 실행기 사용
-            realtimeExecutor = threadManager.getRealtimeExecutor()
+            // ✅ 통합 UDP 실행기 사용 (CRITICAL 우선순위)
+            udpExecutor = threadManager.getUdpExecutor()
 
             // ✅ ThreadManager가 null인 경우 대체 타이머 생성
-            if (realtimeExecutor == null) {
-                logger.warn("⚠️ ThreadManager의 realtimeExecutor가 null입니다. 대체 타이머를 생성합니다.")
-                realtimeExecutor =
+            if (udpExecutor == null) {
+                logger.warn("⚠️ ThreadManager의 udpExecutor가 null입니다. 대체 타이머를 생성합니다.")
+                udpExecutor =
                     Executors.newScheduledThreadPool(2) { r ->
                         Thread(r, "udp-fallback").apply {
                             priority = Thread.MAX_PRIORITY
@@ -135,7 +135,7 @@ class UdpFwICDService(
             }
 
             // ✅ UDP Receive (안정성 보장, 10ms 간격)
-            realtimeExecutor?.scheduleAtFixedRate(
+            udpExecutor?.scheduleAtFixedRate(
                 {
                     try {
                         val startTime = System.nanoTime()
@@ -160,7 +160,7 @@ class UdpFwICDService(
             ) // 10ms로 안정성 보장
 
             // ✅ UDP Send (안정성 보장, 30ms 간격) - 디버깅 로그 추가
-            realtimeExecutor?.scheduleAtFixedRate(
+            udpExecutor?.scheduleAtFixedRate(
                 {
                     try {
                         val startTime = System.nanoTime()
@@ -1089,7 +1089,7 @@ class UdpFwICDService(
             "sendHealth" to (sendRate > 50), // 50% 이상이면 건강
             "receiveHealth" to (receiveRate > 25), // 50% 이상이면 건강
             "channelOpen" to (::channel.isInitialized && channel.isOpen),
-            "executorsRunning" to (realtimeExecutor != null)
+            "executorsRunning" to (udpExecutor != null)
         )
     }
 
