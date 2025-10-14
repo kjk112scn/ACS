@@ -854,12 +854,6 @@ watch(
 const handleActivated = () => {
   console.log('🔄 PassSchedulePage 활성화됨')
 
-  // 🆕 WebSocket 연결 상태 확인
-  if (!icdStore.isConnected) {
-    console.log('WebSocket 재연결 시도...')
-    void icdStore.connectWebSocket()
-  }
-
   // 🆕 차트가 없으면 재초기화
   if (!passChart || passChart.isDisposed()) {
     setTimeout(() => {
@@ -1945,12 +1939,6 @@ onMounted(async () => {
     currentTrackingMstId: icdStore.currentTrackingMstId,
     nextTrackingMstId: icdStore.nextTrackingMstId
   })
-
-  // 🆕 WebSocket 연결 상태 확인 및 재연결
-  if (!icdStore.isConnected) {
-    console.log('WebSocket 재연결 시도...')
-    void icdStore.connectWebSocket()
-  }
 
   // 🆕 Store 초기화 (기존 데이터가 있으면 건너뛰기)
   if (!hasExistingData) {

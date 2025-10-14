@@ -80,7 +80,6 @@ const routes: RouteRecordRaw[] = [
           },
         ],
       },
-      { path: 'test', component: () => import('@/pages/DashboardPage_Test.vue') },
     ],
   },
   {

@@ -73,6 +73,7 @@ export class CommandError extends Error {
 }
 
 class WebSocketService {
+  private static instance: WebSocketService | null = null
   private websocket: WebSocket | null = null
   private messageHandler: WebSocketMessageHandler | null = null
   private pingInterval: ReturnType<typeof setInterval> | null = null
@@ -80,6 +81,57 @@ class WebSocketService {
   private maxReconnectAttempts = 5
   private reconnectDelay = 3000
   private currentUrl: string = '' // 현재 연결된 WebSocket URL 저장
+  private subscribers = new Map<string, WebSocketMessageHandler[]>() // 구독자 관리
+
+  /**
+   * 싱글톤 인스턴스 반환
+   */
+  static getInstance(): WebSocketService {
+    if (!WebSocketService.instance) {
+      WebSocketService.instance = new WebSocketService()
+    }
+    return WebSocketService.instance
+  }
+
+  /**
+   * 구독자 추가
+   */
+  subscribe(key: string, handler: WebSocketMessageHandler): void {
+    if (!this.subscribers.has(key)) {
+      this.subscribers.set(key, [])
+    }
+    this.subscribers.get(key)?.push(handler)
+    console.log(`[WebSocket] 구독자 추가: ${key}, 총 구독자: ${this.subscribers.get(key)?.length}`)
+  }
+
+  /**
+   * 구독자 제거
+   */
+  unsubscribe(key: string, handler: WebSocketMessageHandler): void {
+    const handlers = this.subscribers.get(key)
+    if (handlers) {
+      const index = handlers.indexOf(handler)
+      if (index > -1) {
+        handlers.splice(index, 1)
+        console.log(`[WebSocket] 구독자 제거: ${key}, 남은 구독자: ${handlers.length}`)
+      }
+    }
+  }
+
+  /**
+   * 모든 구독자에게 메시지 브로드캐스트
+   */
+  private broadcastMessage(message: MessageData): void {
+    this.subscribers.forEach((handlers, key) => {
+      handlers.forEach((handler) => {
+        try {
+          handler(message)
+        } catch (error) {
+          console.error(`[WebSocket] 구독자 ${key} 메시지 처리 오류:`, error)
+        }
+      })
+    })
+  }
 
   /**
    * WebSocket 연결 설정
@@ -113,7 +165,12 @@ class WebSocketService {
           try {
             //console.info('WebSocket 메시지:', event.data)
             const message = JSON.parse(event.data) as MessageData
+
+            // 기존 단일 핸들러 호출 (호환성 유지)
             this.messageHandler?.(message)
+
+            // 모든 구독자에게 브로드캐스트
+            this.broadcastMessage(message)
           } catch (error) {
             console.error('WebSocket 메시지 파싱 오류:', error)
           }
@@ -308,7 +365,7 @@ class WebSocketService {
 }
 
 export const icdService = {
-  webSocketService: new WebSocketService(),
+  webSocketService: WebSocketService.getInstance(),
 
   /**
    * WebSocket 연결 설정
@@ -317,6 +374,24 @@ export const icdService = {
    */
   async connectWebSocket(url: string, onMessage: WebSocketMessageHandler): Promise<void> {
     return await this.webSocketService.connect(url, onMessage)
+  },
+
+  /**
+   * WebSocket 구독자 추가
+   * @param key 구독자 키
+   * @param handler 메시지 핸들러
+   */
+  subscribeWebSocket(key: string, handler: WebSocketMessageHandler): void {
+    this.webSocketService.subscribe(key, handler)
+  },
+
+  /**
+   * WebSocket 구독자 제거
+   * @param key 구독자 키
+   * @param handler 메시지 핸들러
+   */
+  unsubscribeWebSocket(key: string, handler: WebSocketMessageHandler): void {
+    this.webSocketService.unsubscribe(key, handler)
   },
 
   /**

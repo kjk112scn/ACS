@@ -25,7 +25,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.azimuthSpeed)
-                }}</q-item-label>
+              }}</q-item-label>
             </div>
           </div>
         </q-card-section>
@@ -53,7 +53,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.elevationSpeed)
-                }}</q-item-label>
+              }}</q-item-label>
             </div>
           </div>
         </q-card-section>
@@ -81,7 +81,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.trainSpeed)
-                }}</q-item-label>
+              }}</q-item-label>
             </div>
           </div>
         </q-card-section>
@@ -276,6 +276,7 @@ import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 import { openComponent } from '../utils/windowUtils'
 import { useTheme } from '../composables/useTheme'
+import type { MessageData } from '../services/api/icdService'
 
 const icdStore = useICDStore()
 const router = useRouter()
@@ -283,6 +284,12 @@ const route = useRoute()
 
 // 테마 관련 추가
 const { initializeTheme } = useTheme()
+
+// Dashboard 페이지용 WebSocket 메시지 핸들러
+const handleDashboardMessage = (message: MessageData) => {
+  console.log('📊 Dashboard 메시지 수신:', message)
+  // 필요시 추가 처리 로직 (예: 특정 데이터 변경 감지, 알림 등)
+}
 
 // 차트 관련
 const azimuthChartRef = ref<HTMLElement | null>(null)
@@ -558,6 +565,10 @@ onMounted(async () => {
   try {
     await icdStore.initialize()
     console.log('✅ 시스템 초기화 완료')
+
+    // Dashboard 페이지용 구독 추가
+    icdStore.subscribeWebSocket('dashboard', handleDashboardMessage)
+    console.log('📡 Dashboard WebSocket 구독 추가됨')
   } catch (error) {
     console.error('❌ 시스템 초기화 실패:', error)
   }
@@ -621,19 +632,23 @@ onMounted(async () => {
 onUnmounted(() => {
   console.log('🧹 DashboardPage 정리 시작')
 
-  // 1. 차트 업데이트 타이머 중지
+  // 1. Dashboard 페이지용 구독 제거
+  icdStore.unsubscribeWebSocket('dashboard', handleDashboardMessage)
+  console.log('📡 Dashboard WebSocket 구독 제거됨')
+
+  // 2. 차트 업데이트 타이머 중지
   stopChartUpdates()
 
-  // 2. 디버그 타이머 정리
+  // 3. 디버그 타이머 정리
   if (debugTimer) {
     clearInterval(debugTimer)
     debugTimer = null
   }
 
-  // 3. 이벤트 리스너 제거
+  // 4. 이벤트 리스너 제거
   window.removeEventListener('resize', () => { })
 
-  // 4. icdStore 정리
+  // 5. icdStore 정리
   icdStore.cleanup()
 
   console.log('✅ DashboardPage 정리 완료')

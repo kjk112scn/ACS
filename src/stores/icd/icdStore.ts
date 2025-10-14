@@ -2026,7 +2026,7 @@ export const useICDStore = defineStore('icd', () => {
     console.log('⏹️ 정밀 UI 업데이트 타이머 중지')
   }
 
-  // WebSocket 연결 설정
+  // WebSocket 연결 설정 - 구독 시스템 추가
   const connectWebSocket = async () => {
     try {
       error.value = ''
@@ -2051,6 +2051,18 @@ export const useICDStore = defineStore('icd', () => {
       isConnected.value = false
       throw e
     }
+  }
+
+  // WebSocket 구독자 추가 함수
+  const subscribeWebSocket = (key: string, handler: (message: MessageData) => void) => {
+    icdService.subscribeWebSocket(key, handler)
+    console.log(`📡 WebSocket 구독 추가: ${key}`)
+  }
+
+  // WebSocket 구독자 제거 함수
+  const unsubscribeWebSocket = (key: string, handler: (message: MessageData) => void) => {
+    icdService.unsubscribeWebSocket(key, handler)
+    console.log(`📡 WebSocket 구독 제거: ${key}`)
   }
 
   // WebSocket 연결 해제
@@ -2582,6 +2594,8 @@ export const useICDStore = defineStore('icd', () => {
     stopUIUpdates,
     connectWebSocket,
     disconnectWebSocket,
+    subscribeWebSocket,
+    unsubscribeWebSocket,
     getDebugInfo,
     sendEmergency,
     sendMultiControlCommand,
