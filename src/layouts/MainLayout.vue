@@ -50,7 +50,7 @@
       </q-list>
     </q-drawer>
 
-    <q-page-container>
+    <q-page-container class="no-padding">
       <router-view />
     </q-page-container>
 
@@ -515,5 +515,10 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   margin-right: 12px;
+}
+
+/* q-page-container 패딩 제거 */
+.no-padding {
+  padding: 0 !important;
 }
 </style>

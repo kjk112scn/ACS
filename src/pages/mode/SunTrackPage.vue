@@ -1,7 +1,7 @@
 <template>
   <div class="sun-track-mode">
     <div class="section-title-container q-mb-sm">
-      <div class="section-title text-h5 text-primary">Sun Track Control</div>
+      <div class="section-title text-h5 text-primary q-mb-xs">Sun Track Mode</div>
       <q-chip :color="icdStore.sunTrackTrackingStateInfo.displayColor" text-color="white"
         :label="icdStore.sunTrackTrackingStateInfo.displayLabel" size="sm" class="tracking-status-chip q-ml-md" />
     </div>

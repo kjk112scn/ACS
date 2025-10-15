@@ -1,6 +1,6 @@
 <template>
   <div class="feed-mode">
-    <div class="section-title text-h5 text-primary q-mb-sm">Feed Control</div>
+    <div class="section-title text-h5 text-primary q-mb-xs">Feed Mode</div>
     <div class="feed-container">
       <div class="row q-col-gutter-md">
         <!-- S-Band 섹션 -->
@@ -11,30 +11,15 @@
               <div class="row q-col-gutter-md q-mt-sm">
                 <!-- S-Band LHCP -->
                 <div class="col-12 col-sm-4">
-                  <q-toggle
-                    v-model="feedControls.sLHCP"
-                    label="LHCP"
-                    color="primary"
-                    :disable="isLoading"
-                  />
+                  <q-toggle v-model="feedControls.sLHCP" label="LHCP" color="primary" :disable="isLoading" />
                 </div>
                 <!-- S-Band RHCP -->
                 <div class="col-12 col-sm-4">
-                  <q-toggle
-                    v-model="feedControls.sRHCP"
-                    label="RHCP"
-                    color="primary"
-                    :disable="isLoading"
-                  />
+                  <q-toggle v-model="feedControls.sRHCP" label="RHCP" color="primary" :disable="isLoading" />
                 </div>
                 <!-- S-RF Switch -->
                 <div class="col-12 col-sm-4">
-                  <q-toggle
-                    v-model="feedControls.sRFSwitch"
-                    label="RF Switch"
-                    color="primary"
-                    :disable="isLoading"
-                  />
+                  <q-toggle v-model="feedControls.sRFSwitch" label="RF Switch" color="primary" :disable="isLoading" />
                 </div>
               </div>
             </q-card-section>
@@ -49,21 +34,11 @@
               <div class="row q-col-gutter-md q-mt-sm">
                 <!-- X-Band LHCP -->
                 <div class="col-12 col-sm-6">
-                  <q-toggle
-                    v-model="feedControls.xLHCP"
-                    label="LHCP"
-                    color="primary"
-                    :disable="isLoading"
-                  />
+                  <q-toggle v-model="feedControls.xLHCP" label="LHCP" color="primary" :disable="isLoading" />
                 </div>
                 <!-- X-Band RHCP -->
                 <div class="col-12 col-sm-6">
-                  <q-toggle
-                    v-model="feedControls.xRHCP"
-                    label="RHCP"
-                    color="primary"
-                    :disable="isLoading"
-                  />
+                  <q-toggle v-model="feedControls.xRHCP" label="RHCP" color="primary" :disable="isLoading" />
                 </div>
               </div>
             </q-card-section>
@@ -86,13 +61,7 @@
 
       <!-- 제어 버튼 -->
       <div class="row justify-center q-mt-md">
-        <q-btn
-          label="Apply"
-          color="primary"
-          icon="send"
-          :loading="isLoading"
-          @click="applyFeedControls"
-        />
+        <q-btn label="Apply" color="primary" icon="send" :loading="isLoading" @click="applyFeedControls" />
       </div>
 
       <!-- 상태 메시지 표시 -->

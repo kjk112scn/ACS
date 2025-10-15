@@ -1,6 +1,6 @@
 <template>
   <div class="pass-schedule-mode">
-    <div class="section-title text-h5 text-primary q-mb-sm">Pass Schedule</div>
+    <div class="section-title text-h5 text-primary q-mb-xs">Pass Schedule Mode</div>
 
     <!-- Control Section -->
     <div class="row q-col-gutter-md q-mb-md">

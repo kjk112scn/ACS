@@ -240,7 +240,7 @@
     </div>
 
     <!-- 모드 선택 탭 -->
-    <q-card class="mode-selection-section q-mt-md">
+    <q-card class="mode-selection-section">
       <q-card-section>
         <q-tabs v-model="currentMode" class="text-primary compact-tabs" active-color="primary" indicator-color="primary"
           align="left" narrow-indicator>
@@ -257,7 +257,7 @@
     </q-card>
 
     <!-- 모드 컨텐츠 섹션 -->
-    <q-card class="mode-content-section q-mt-md">
+    <q-card class="mode-content-section">
       <q-card-section>
         <!-- 라우터 뷰를 사용하여 현재 모드에 맞는 컴포넌트 표시 -->
         <router-view />
@@ -1439,14 +1439,19 @@ const handleAllStatus = () => {
 }
 
 
-/* 기존 dashboard-container 스타일 */
+/* 1920x1080 최적화된 dashboard-container 스타일 */
 .dashboard-container {
-  max-width: 1880px;
+  max-width: 100%;
+  /* 화면 전체 너비 사용 */
+  /* 스크롤 방지를 위해 조정 */
   margin: 0 auto;
   background-color: var(--theme-background);
   min-height: 100vh;
-  padding-top: 0.1rem !important;
-  /* 상단 패딩을 다시 늘림 */
+  padding: 4.4rem 0.875rem 0rem 0.875rem;
+  /* 상단 4.4rem(70.4px) 복구, 좌우 0.875rem(14px), 하단 0rem(0px) = 상단 공간 복구하고 하단은 mode 높이 최대화 */
+  display: flex;
+  flex-direction: column;
+  /* 세로 방향 flexbox로 mode-content-section이 남은 공간 사용 */
 }
 
 .header-section {
@@ -1472,12 +1477,16 @@ const handleAllStatus = () => {
   color: var(--theme-text);
 }
 
+/* 1920x1080 최적화된 axis-grid - mode-selection-section과 우측 정렬 통일 */
 .axis-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 0.8fr);
-  gap: 1rem;
-  margin-top: 1rem !important;
-  /* 2행과 3행 사이 간격과 동일하게 */
+  grid-template-columns: 1fr 1fr 1fr 0.8fr 0.8fr;
+  /* 전체 너비 사용 */
+  gap: 0.8rem;
+  margin-top: 1.5rem !important;
+  /* 상단 마진을 1.5rem(24px)로 증가 */
+  width: 100%;
+  /* 전체 너비 사용 */
 }
 
 /* 헤더 그림자 제거 - 더 강력한 선택자 사용 */
@@ -1742,10 +1751,25 @@ const handleAllStatus = () => {
 .emergency-content {
   height: 100%;
   display: flex;
-  align-items: center;
+  align-items: stretch;
+  /* 버튼이 전체 높이를 사용하도록 */
   justify-content: center;
   padding: 0.5rem 0;
-  /* Control과 동일한 패딩으로 간격 조정 */
+  /* Control과 Status와 동일한 패딩으로 통일 */
+}
+
+/* Emergency Stop 버튼 높이 확장 */
+.emergency-content .q-btn {
+  height: calc(100% + 0.5rem) !important;
+  /* 패딩 증가로 인한 보정 */
+  min-height: 80px !important;
+  /* 최소 높이 더 증가 */
+  font-size: 1.2rem !important;
+  /* 폰트 크기 더 증가 */
+  font-weight: 700 !important;
+  /* 폰트 두께 증가 */
+  padding: 1rem 0.5rem !important;
+  /* 내부 패딩 증가로 더 큰 버튼 */
 }
 
 /* Control 카드 - 밝은 회색 테두리 */
@@ -1770,48 +1794,46 @@ const handleAllStatus = () => {
   width: 100%;
 }
 
-/* Control LED 인디케이터 스타일 - 좌측 정렬 및 크기 더 증가 */
+/* Control LED 인디케이터 스타일 - Status LED와 동일한 스타일로 통일 */
 .control-status-item {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  /* 좌측 정렬로 변경 */
   margin-bottom: 0.5rem;
 }
 
 .control-led-container {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  /* 간격을 더 넓게 */
+  gap: 12px;
+  /* Status와 동일한 간격 */
 }
 
 .control-led {
-  width: 24px;
-  /* 18px에서 24px로 더 증가 */
-  height: 24px;
-  /* 18px에서 24px로 더 증가 */
+  width: 20px;
+  /* Status와 동일한 크기 */
+  height: 20px;
   border-radius: 50%;
-  border: 4px solid;
-  /* 테두리를 더 두껍게 */
+  transition: all 0.3s ease;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
 }
 
 .control-led.led-control {
-  background-color: #4caf50;
-  /* 녹색 유지 */
-  border-color: #4caf50;
+  background-color: var(--theme-led-normal);
+  /* Status와 동일한 색상 */
+  box-shadow: 0 0 8px var(--theme-led-normal), 0 0 16px var(--theme-led-normal);
 }
 
 .control-led.led-monitoring {
-  background-color: #9e9e9e;
-  /* 파란색을 회색으로 변경 */
-  border-color: #9e9e9e;
+  background-color: var(--theme-led-inactive);
+  /* Status와 동일한 색상 */
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
 }
 
 .control-label {
+  font-size: 1rem;
+  /* Status와 동일한 폰트 크기 */
+  font-weight: 500;
   color: var(--theme-text);
-  font-size: 1.3rem;
-  font-weight: 700;
 }
 
 /* Status 카드 - 밝은 회색 테두리 */
@@ -1849,7 +1871,7 @@ const handleAllStatus = () => {
   color: var(--theme-text);
 }
 
-/* 차트 영역 스타일 */
+/* 차트 영역 스타일 - 성능 최적화 */
 .axis-chart {
   height: 240px;
   min-height: 240px;
@@ -1863,6 +1885,10 @@ const handleAllStatus = () => {
   border-radius: 4px;
   border: 1px solid var(--theme-border-light);
   /* 밝은 회색 테두리 */
+  will-change: auto;
+  /* GPU 가속으로 성능 최적화 */
+  transform: translateZ(0);
+  /* 하드웨어 가속 강제 활성화 */
 }
 
 .axis-data-row {
@@ -1893,6 +1919,30 @@ const handleAllStatus = () => {
   /* 밝은 회색 테두리 */
   border-radius: 8px;
   box-shadow: 0 2px 4px var(--theme-shadow-light);
+  flex: 1;
+  /* flex: 1을 다시 추가하여 하단까지 확장 */
+  margin-bottom: -0.5rem !important;
+  /* 음수 마진을 절반으로 줄여서 적절한 하단 공간 확보 */
+  padding: 0 1rem 0 1rem;
+  /* 하단 패딩을 완전히 제거하여 푸터와의 간격 최소화 */
+  height: auto;
+  /* 자동 높이로 설정하여 내용에 맞게 조정 */
+  padding-bottom: 0;
+  /* 하단 패딩을 명시적으로 0으로 설정 */
+}
+
+/* mode-selection-section 상단/하단 마진 추가 */
+.mode-selection-section {
+  margin-top: 1rem !important;
+  /* 상단 마진 추가 */
+  margin-bottom: 1rem !important;
+  /* 하단 마진 추가 */
+}
+
+/* 모든 모드 컴포넌트가 동일한 하단 공간을 가지도록 통일 */
+.mode-content-section .q-card__section {
+  padding: 1rem !important;
+  /* q-card-section 내부 패딩 강제 적용 */
 }
 
 /* 컴팩트 탭 스타일 */
@@ -1961,15 +2011,16 @@ const handleAllStatus = () => {
   margin-top: 1rem;
 }
 
+/* Control Request와 All Status 버튼 높이 통일 */
+.control-content .q-btn,
 .all-status-button .q-btn {
   font-size: 1rem;
-  /* INITIALIZE 버튼과 동일한 폰트 크기 */
   padding: 12px 16px;
-  /* INITIALIZE 버튼과 동일한 패딩 */
   background-color: var(--theme-button-primary);
   color: white;
   font-weight: 600;
-  /* INITIALIZE 버튼과 동일한 폰트 두께 */
+  min-height: 48px;
+  /* 동일한 최소 높이 */
 }
 
 /* 반응형 디자인 유지 */

@@ -1320,10 +1320,29 @@ export const useICDStore = defineStore('icd', () => {
                 lastUpdateTime: number
               }
 
-              // newLogs에 다국어 변환 적용
-              const localizedNewLogs = rawPopupData.newLogs.map((log) =>
-                addLocalizedMessage(log as HardwareErrorLog),
-              )
+              // rawPopupData null 체크 추가
+              if (!rawPopupData || !rawPopupData.newLogs) {
+                console.warn('⚠️ rawPopupData 또는 newLogs가 null/undefined입니다:', rawPopupData)
+                return
+              }
+
+              // newLogs 배열 유효성 체크
+              if (!Array.isArray(rawPopupData.newLogs)) {
+                console.warn('⚠️ newLogs가 배열이 아닙니다:', rawPopupData.newLogs)
+                return
+              }
+
+              // newLogs에 다국어 변환 적용 (안전한 처리)
+              let localizedNewLogs: HardwareErrorLog[] = []
+              try {
+                localizedNewLogs = rawPopupData.newLogs.map((log) =>
+                  addLocalizedMessage(log as HardwareErrorLog),
+                )
+              } catch (mapError) {
+                console.error('❌ newLogs 매핑 중 오류:', mapError)
+                console.log('❌ 문제가 된 rawPopupData.newLogs:', rawPopupData.newLogs)
+                return
+              }
 
               errorPopupData.value = {
                 ...rawPopupData,

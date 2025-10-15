@@ -1,109 +1,96 @@
 <template>
   <div class="step-mode">
-    <div class="section-title text-h5 text-primary q-mb-sm">Step Mode</div>
+    <div class="section-title text-h5 text-primary q-mb-xs">Step Mode</div>
+
+    <!-- 축별 제어 패널 (중앙 집중형으로 변경) -->
     <div class="step-container">
-      <div class="row justify-center">
-        <!-- 중앙: Axis Selection 및 각도/속도 입력 섹션 -->
-        <div class="col-12 col-md-8">
-          <q-card class="control-section">
+      <div class="row q-col-gutter-md justify-center">
+        <!-- Azimuth 패널 -->
+        <div class="col-12 col-md-4">
+          <q-card class="axis-panel" :class="{ 'disabled-panel': !stepStore.selectedAxes.azimuth }">
             <q-card-section>
-              <div class="text-subtitle1 text-weight-bold text-primary q-mb-md">Axis Selection</div>
-
-              <!-- 체크박스 그룹 -->
-              <div class="checkbox-group q-gutter-x-xl q-mb-lg">
-                <q-checkbox v-model="stepStore.selectedAxes.azimuth" label="Azimuth" color="primary"
-                  class="axis-checkbox" size="lg" />
-                <q-checkbox v-model="stepStore.selectedAxes.elevation" label="Elevation" color="primary"
-                  class="axis-checkbox" size="lg" />
-                <q-checkbox v-model="stepStore.selectedAxes.train" label="Tilt" color="primary" class="axis-checkbox"
-                  size="lg" />
-              </div>
-
-              <!-- 각도 및 속도 입력 -->
-              <div class="angle-speed-inputs q-gutter-y-md">
-                <!-- Azimuth 행 -->
-                <div class="input-row">
-                  <div class="row q-col-gutter-md">
-                    <div class="col-6">
-                      <div class="input-group">
-                        <div class="text-subtitle2 q-mb-sm">Azimuth Angle</div>
-                        <q-input v-model="stepStore.angles.azimuth" type="number" outlined dense class="full-width"
-                          suffix="°" :disable="!stepStore.selectedAxes.azimuth" step="0.01" placeholder="0.00"
-                          @update:model-value="formatAngle('azimuth')" @focus="clearValue('angles', 'azimuth')"
-                          @blur="handleBlur('angles', 'azimuth')" hide-bottom-space />
-                      </div>
-                    </div>
-                    <div class="col-6">
-                      <div class="input-group">
-                        <div class="text-subtitle2 q-mb-sm">Azimuth Speed</div>
-                        <q-input v-model="stepStore.speeds.azimuth" type="number" outlined dense class="full-width"
-                          suffix="°/s" :disable="!stepStore.selectedAxes.azimuth" min="0" step="0.01" placeholder="0.00"
-                          @update:model-value="formatSpeed('azimuth')" @focus="clearValue('speeds', 'azimuth')"
-                          @blur="handleBlur('speeds', 'azimuth')" hide-bottom-space />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Elevation 행 -->
-                <div class="input-row">
-                  <div class="row q-col-gutter-md">
-                    <div class="col-6">
-                      <div class="input-group">
-                        <div class="text-subtitle2 q-mb-sm">Elevation Angle</div>
-                        <q-input v-model="stepStore.angles.elevation" type="number" outlined dense class="full-width"
-                          suffix="°" :disable="!stepStore.selectedAxes.elevation" step="0.01" placeholder="0.00"
-                          @update:model-value="formatAngle('elevation')" @focus="clearValue('angles', 'elevation')"
-                          @blur="handleBlur('angles', 'elevation')" hide-bottom-space />
-                      </div>
-                    </div>
-                    <div class="col-6">
-                      <div class="input-group">
-                        <div class="text-subtitle2 q-mb-sm">Elevation Speed</div>
-                        <q-input v-model="stepStore.speeds.elevation" type="number" outlined dense class="full-width"
-                          suffix="°/s" :disable="!stepStore.selectedAxes.elevation" min="0" step="0.01"
-                          placeholder="0.00" @update:model-value="formatSpeed('elevation')"
-                          @focus="clearValue('speeds', 'elevation')" @blur="handleBlur('speeds', 'elevation')"
-                          hide-bottom-space />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Tilt 행 -->
-                <div class="input-row">
-                  <div class="row q-col-gutter-md">
-                    <div class="col-6">
-                      <div class="input-group">
-                        <div class="text-subtitle2 q-mb-sm">Tilt Angle</div>
-                        <q-input v-model="stepStore.angles.train" type="number" outlined dense class="full-width"
-                          suffix="°" :disable="!stepStore.selectedAxes.train" step="0.01" placeholder="0.00"
-                          @update:model-value="formatAngle('train')" @focus="clearValue('angles', 'train')"
-                          @blur="handleBlur('angles', 'train')" hide-bottom-space />
-                      </div>
-                    </div>
-                    <div class="col-6">
-                      <div class="input-group">
-                        <div class="text-subtitle2 q-mb-sm">Tilt Speed</div>
-                        <q-input v-model="stepStore.speeds.train" type="number" outlined dense class="full-width"
-                          suffix="°/s" :disable="!stepStore.selectedAxes.train" min="0" step="0.01" placeholder="0.00"
-                          @update:model-value="formatSpeed('train')" @focus="clearValue('speeds', 'train')"
-                          @blur="handleBlur('speeds', 'train')" hide-bottom-space />
-                      </div>
-                    </div>
-                  </div>
+              <div class="axis-header q-mb-md">
+                <div class="checkbox-label-group">
+                  <q-checkbox v-model="stepStore.selectedAxes.azimuth" color="primary" class="axis-checkbox" />
+                  <div class="text-h6 text-primary axis-title">Azimuth</div>
                 </div>
               </div>
 
-              <!-- 버튼 그룹 -->
-              <div class="button-group q-mt-lg q-gutter-x-lg">
-                <q-btn color="positive" label="Go" size="lg" :disable="!stepStore.isAnyAxisSelected()" @click="handleGo"
-                  icon="play_arrow" />
-                <q-btn color="negative" label="Stop" size="lg" @click="handleStop" icon="stop" />
-                <q-btn color="primary" label="Stow" size="lg" @click="handleStow" icon="home" />
-              </div>
+              <div class="text-subtitle2">Angle</div>
+              <q-input v-model="stepStore.angles.azimuth" type="number" outlined dense class="q-mb-sm" suffix="°"
+                :disable="!stepStore.selectedAxes.azimuth" step="0.01" placeholder="0.00"
+                @update:model-value="formatAngle('azimuth')" @focus="clearValue('angles', 'azimuth')"
+                @blur="handleBlur('angles', 'azimuth')" hide-bottom-space />
+
+              <div class="text-subtitle2">Speed</div>
+              <q-input v-model="stepStore.speeds.azimuth" type="number" outlined dense suffix="°/s"
+                :disable="!stepStore.selectedAxes.azimuth" min="0" step="0.01" placeholder="0.00"
+                @update:model-value="formatSpeed('azimuth')" @focus="clearValue('speeds', 'azimuth')"
+                @blur="handleBlur('speeds', 'azimuth')" hide-bottom-space />
             </q-card-section>
           </q-card>
+        </div>
+
+        <!-- Elevation 패널 -->
+        <div class="col-12 col-md-4">
+          <q-card class="axis-panel" :class="{ 'disabled-panel': !stepStore.selectedAxes.elevation }">
+            <q-card-section>
+              <div class="axis-header q-mb-md">
+                <div class="checkbox-label-group">
+                  <q-checkbox v-model="stepStore.selectedAxes.elevation" color="primary" class="axis-checkbox" />
+                  <div class="text-h6 text-primary axis-title">Elevation</div>
+                </div>
+              </div>
+
+              <div class="text-subtitle2">Angle</div>
+              <q-input v-model="stepStore.angles.elevation" type="number" outlined dense class="q-mb-sm" suffix="°"
+                :disable="!stepStore.selectedAxes.elevation" step="0.01" placeholder="0.00"
+                @update:model-value="formatAngle('elevation')" @focus="clearValue('angles', 'elevation')"
+                @blur="handleBlur('angles', 'elevation')" hide-bottom-space />
+
+              <div class="text-subtitle2">Speed</div>
+              <q-input v-model="stepStore.speeds.elevation" type="number" outlined dense suffix="°/s"
+                :disable="!stepStore.selectedAxes.elevation" min="0" step="0.01" placeholder="0.00"
+                @update:model-value="formatSpeed('elevation')" @focus="clearValue('speeds', 'elevation')"
+                @blur="handleBlur('speeds', 'elevation')" hide-bottom-space />
+            </q-card-section>
+          </q-card>
+        </div>
+
+        <!-- Tilt 패널 -->
+        <div class="col-12 col-md-4">
+          <q-card class="axis-panel" :class="{ 'disabled-panel': !stepStore.selectedAxes.train }">
+            <q-card-section>
+              <div class="axis-header q-mb-md">
+                <div class="checkbox-label-group">
+                  <q-checkbox v-model="stepStore.selectedAxes.train" color="primary" class="axis-checkbox" />
+                  <div class="text-h6 text-primary axis-title">Tilt</div>
+                </div>
+              </div>
+
+              <div class="text-subtitle2">Angle</div>
+              <q-input v-model="stepStore.angles.train" type="number" outlined dense class="q-mb-sm" suffix="°"
+                :disable="!stepStore.selectedAxes.train" step="0.01" placeholder="0.00"
+                @update:model-value="formatAngle('train')" @focus="clearValue('angles', 'train')"
+                @blur="handleBlur('angles', 'train')" hide-bottom-space />
+
+              <div class="text-subtitle2">Speed</div>
+              <q-input v-model="stepStore.speeds.train" type="number" outlined dense suffix="°/s"
+                :disable="!stepStore.selectedAxes.train" min="0" step="0.01" placeholder="0.00"
+                @update:model-value="formatSpeed('train')" @focus="clearValue('speeds', 'train')"
+                @blur="handleBlur('speeds', 'train')" hide-bottom-space />
+            </q-card-section>
+          </q-card>
+        </div>
+      </div>
+
+      <!-- 제어 버튼 섹션 -->
+      <div class="button-section">
+        <div class="row justify-center q-gutter-md">
+          <q-btn label="Go" color="positive" icon="play_arrow" size="lg" :disable="!stepStore.isAnyAxisSelected()"
+            @click="handleGo" />
+          <q-btn label="Stop" color="negative" icon="stop" size="lg" @click="handleStop" />
+          <q-btn label="Stow" color="primary" icon="home" size="lg" @click="handleStow" />
         </div>
       </div>
     </div>
@@ -124,7 +111,6 @@ defineComponent({
 const icdStore = useICDStore()
 const stepStore = useStepStore()
 
-// Go 버튼 핸들러
 // Go 버튼 핸들러
 const handleGo = async () => {
   try {
@@ -276,100 +262,113 @@ const handleBlur = (type: 'speeds' | 'angles', axis: 'azimuth' | 'elevation' | '
 </script>
 
 <style scoped>
+/* StandbyMode와 동일한 중앙 집중형 스타일 */
 .step-mode {
-  max-width: 1400px;
-  margin: 0 auto;
+  height: 100%;
+  width: 100%;
 }
 
+/* 전체 섹션 간격 최소화 */
+.step-container {
+  padding: 0.25rem 0.5rem;
+  /* 상단 패딩을 0.5rem → 0.25rem으로 줄임 */
+  /* 상단/좌우 패딩만 유지하고 하단은 버튼 카드 마진으로 처리 */
+  width: 100%;
+  height: auto;
+  /* height를 auto로 변경하여 내용에 맞게 조정 */
+  max-width: 1200px;
+  /* PedestalPosition과 동일한 너비 */
+  margin: 0 auto;
+  /* 중앙 정렬 */
+}
+
+/* 섹션 제목 간격 최소화 */
 .section-title {
   font-weight: 500;
   padding-left: 0.5rem;
+  margin-bottom: 0.5rem !important;
+  /* 마진 줄임 */
 }
 
-.step-container {
-  padding: 1rem;
-  width: 100%;
-  height: 100%;
-}
-
-.control-section {
+/* 축 패널 스타일 - 공간 최적화 */
+.axis-panel {
   background-color: var(--theme-card-background);
   border: 1px solid rgba(255, 255, 255, 0.12);
   height: 100%;
-  display: flex;
-  flex-direction: column;
+  min-height: 200px;
+  /* 높이 줄임 */
+  transition: opacity 0.3s, filter 0.3s;
 }
 
-.control-section .q-card-section {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  padding: 24px;
+/* 카드 섹션 패딩 최소화 */
+.axis-panel .q-card-section {
+  padding: 0.8rem;
+  /* 패딩 줄임 */
 }
 
-.input-group {
-  margin-bottom: 1rem;
+/* 체크박스와 라벨을 함께 가운데 정렬하는 그룹 */
+.checkbox-label-group {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  justify-content: center !important;
+  /* 체크박스와 라벨을 함께 가운데 정렬 */
+  width: 100% !important;
+  margin: 0 auto !important;
+  /* 가운데 정렬 강제 */
 }
 
-.text-subtitle2 {
-  color: var(--theme-text-secondary);
-  font-weight: 500;
+/* 축 헤더 간격 최소화 */
+.axis-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  /* 헤더 전체를 가운데 정렬 */
+  margin-bottom: 0.5rem !important;
+  /* 마진 줄임 */
+  width: 100% !important;
+  /* 전체 너비 사용 */
 }
 
-.speed-inputs,
-.angle-inputs {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+.disabled-panel {
+  opacity: 0.7;
+  filter: grayscale(30%);
 }
 
-.checkbox-group {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 0;
+/* 입력 필드 간격 최소화 */
+.axis-panel .text-subtitle2 {
+  font-size: 0.9rem;
+  margin-bottom: 0.25rem !important;
+  /* 마진 최소화 */
+  margin-top: 0.5rem !important;
+  /* 첫 번째 라벨만 상단 마진 */
+}
+
+.axis-panel .text-subtitle2:first-of-type {
+  margin-top: 0 !important;
+  /* 첫 번째 라벨은 상단 마진 없음 */
+}
+
+/* 입력 필드 마진 최소화 */
+.axis-panel .q-field {
+  margin-bottom: 0.5rem !important;
+  /* 마진 줄임 */
+}
+
+.axis-panel .q-field:last-child {
+  margin-bottom: 0 !important;
+  /* 마지막 필드는 하단 마진 없음 */
 }
 
 .axis-checkbox {
-  font-size: 1.2rem;
+  margin: 0;
+  /* 체크박스 마진 제거 */
+  flex-shrink: 0;
 }
 
-.button-group {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  gap: 1.5rem;
-  padding: 1rem;
-  margin-top: 2rem;
-}
-
-:deep(.q-checkbox__label) {
-  font-size: 1.2rem;
-  color: var(--theme-text);
-  padding-left: 8px;
-}
-
-:deep(.q-btn) {
-  height: 48px;
-  font-size: 1.1rem;
-  min-width: 140px;
-  padding: 0.5rem 2.5rem;
-}
-
-:deep(.q-field) {
-  font-size: 1.1rem;
-}
-
-:deep(.q-field__label) {
-  font-size: 1rem;
-  color: var(--theme-text-secondary);
-}
-
-:deep(.q-field__native) {
-  padding: 0.5rem;
-  color: var(--theme-text);
+.axis-title {
+  margin: 0;
+  flex: 1;
 }
 
 /* 숫자 입력 필드의 화살표 버튼 숨기기 */
@@ -383,10 +382,35 @@ input[type='number'] {
   -moz-appearance: textfield;
 }
 
+/* 제어 버튼 섹션 스타일 - 배경색과 테두리 제거 */
+.button-section {
+  background: transparent;
+  /* 배경색 제거 */
+  border: none;
+  /* 테두리 제거 */
+  padding: 2rem 0 0.25rem 0;
+  /* 상단 패딩을 더 늘려서 버튼을 더 아래로 */
+  margin-top: 1.5rem;
+  /* 상단 마진을 더 늘려서 버튼을 더 아래로 */
+}
+
+/* 버튼 넓이 통일 */
+.button-section .q-btn {
+  min-width: 150px !important;
+  /* 최소 너비를 120px → 150px로 늘림 */
+  width: 150px !important;
+  /* 고정 너비를 120px → 150px로 늘림 */
+}
+
 /* 모바일 화면에서는 카드 간격 조정 */
 @media (max-width: 768px) {
   .col-12 {
     margin-bottom: 16px;
+  }
+
+  .step-container {
+    max-width: 100%;
+    padding: 0.5rem;
   }
 }
 </style>

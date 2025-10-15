@@ -1,11 +1,9 @@
 <template>
   <div class="standby-mode">
-    <div class="section-title text-h5 text-primary q-mb-sm">Standby Mode</div>
+    <div class="section-title text-h5 text-primary q-mb-xs">Standby Mode</div>
     <div class="standby-container">
       <q-card class="control-section">
         <q-card-section>
-          <div class="text-subtitle1 text-weight-bold text-primary q-mb-md">Axis Selection</div>
-
           <!-- 체크박스 그룹 -->
           <div class="checkbox-group q-gutter-x-xl">
             <q-checkbox v-model="azimuthChecked" label="Azimuth" color="primary" class="axis-checkbox" size="lg" />
@@ -95,17 +93,29 @@ const handleStow = async () => {
 }
 
 .standby-container {
-  padding: 1rem;
+  padding: 0.5rem 1rem 0 1rem;
+  /* 상단 패딩을 1rem → 0.5rem으로 더 줄여서 공간 최대화 */
   width: 100%;
   height: 100%;
+  /* height를 100%로 설정하여 전체 공간 사용 */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  /* flex-start에서 center로 변경하여 세로 가운데 정렬 */
+  align-items: center;
+  padding-top: 0;
+  /* 상단 패딩 제거하여 공간 최대화 */
 }
 
 .control-section {
   background-color: var(--theme-card-background);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  max-width: 800px;
+  max-width: 1000px;
+  /* 최대 너비를 800px → 1000px로 늘려서 더 넓게 사용 */
   margin: 0 auto;
-  padding: 1rem;
+  /* 하단 마진 제거 - DashboardPage에서 통합 관리 */
+  padding: 2rem 3rem;
+  /* 패딩을 늘려서 내부 공간 확장 */
 }
 
 .checkbox-group {
@@ -113,32 +123,54 @@ const handleStow = async () => {
   flex-direction: row;
   justify-content: center;
   align-items: center;
-  padding: 1rem;
+  padding: 1rem 2rem;
+  /* 패딩을 늘려서 공간 확장 */
+  margin-bottom: 2rem;
+  /* 하단 마진을 늘려서 버튼과의 간격 확장 */
 }
 
 .axis-checkbox {
-  font-size: 1.2rem;
-  margin: 0 1rem;
+  font-size: 1.4rem;
+  /* 폰트 크기를 1.2rem → 1.4rem으로 증가 */
+  margin: 0 1.5rem;
+  /* 마진을 1rem → 1.5rem으로 증가하여 더 넓은 간격 */
 }
 
 .button-group {
   display: flex;
   flex-direction: row;
   justify-content: center;
-  gap: 1rem;
-  padding: 0.5rem;
+  gap: 2rem;
+  /* 버튼 간격을 1rem → 2rem으로 늘림 */
+  padding: 1rem 2rem;
+  /* 패딩을 늘려서 공간 확장 */
+  margin-top: 0;
+  /* 상단 마진 제거하여 체크박스와 더 가깝게 */
 }
 
 :deep(.q-checkbox__label) {
-  font-size: 1.2rem;
+  font-size: 1.4rem;
+  /* 폰트 크기를 1.2rem → 1.4rem으로 증가 */
   color: var(--theme-text);
   padding-left: 8px;
 }
 
 :deep(.q-btn) {
-  height: 48px;
-  font-size: 1.1rem;
-  min-width: 180px;
-  padding: 0.5rem 2rem;
+  height: 56px;
+  /* 높이를 48px → 56px로 증가 */
+  font-size: 1.3rem;
+  /* 폰트 크기를 1.1rem → 1.3rem으로 증가 */
+  min-width: 200px;
+  /* 최소 너비를 180px → 200px로 증가 */
+  padding: 0.7rem 2.5rem;
+  /* 패딩을 0.5rem 2rem → 0.7rem 2.5rem으로 증가 */
+}
+
+/* 섹션 제목 스타일 */
+.section-title {
+  font-weight: 500;
+  padding-left: 0.5rem;
+  margin-bottom: 0.5rem !important;
+  /* 마진 줄임 */
 }
 </style>
