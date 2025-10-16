@@ -1,93 +1,155 @@
 <template>
   <div class="ephemeris-mode">
-    <div class="section-title text-h5 text-primary q-mb-xs">Ephemeris Designation Mode</div>
-
-    <!-- Control Section -->
-    <div class="row q-col-gutter-md q-mb-md">
-      <!-- Azimuth Control -->
-      <div class="col-6 col-sm-3">
-        <q-card flat bordered class="control-card">
-          <q-card-section class="bg-blue-1">
-            <div class="text-subtitle2 text-weight-bold text-primary">Azimuth</div>
-          </q-card-section>
-          <q-card-section>
-            <q-input v-model="inputs[0]" @input="(val: string) => onInputChange(0, val)" dense outlined type="number"
-              step="0.01" class="q-mb-sm" />
-            <div class="row q-gutter-xs">
-              <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
-              <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
-              <q-space />
-              <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(0)" />
-            </div>
-            <q-input v-model="outputs[0]" dense outlined readonly label="Output" class="q-mt-sm" />
-            <!-- 증가/감소 값 설정 -->
-          </q-card-section>
-        </q-card>
-      </div>
-
-      <!-- Elevation Control -->
-      <div class="col-6 col-sm-3">
-        <q-card flat bordered class="control-card">
-          <q-card-section class="bg-green-1">
-            <div class="text-subtitle2 text-weight-bold text-primary">Elevation</div>
-          </q-card-section>
-          <q-card-section>
-            <q-input v-model="inputs[1]" @input="(val: string) => onInputChange(1, val)" dense outlined type="number"
-              step="0.01" class="q-mb-sm" />
-            <div class="row q-gutter-xs">
-              <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(1)" />
-              <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
-              <q-space />
-              <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(1)" />
-            </div>
-            <q-input v-model="outputs[1]" dense outlined readonly label="Output" class="q-mt-sm" />
-          </q-card-section>
-        </q-card>
-      </div>
-
-      <!-- Tilt Control -->
-      <div class="col-6 col-sm-3">
-        <q-card flat bordered class="control-card">
-          <q-card-section class="bg-orange-1">
-            <div class="text-subtitle2 text-weight-bold text-primary">Tilt</div>
-          </q-card-section>
-          <q-card-section>
-            <q-input v-model="inputs[2]" @input="(val: string) => onInputChange(2, val)" dense outlined type="number"
-              step="0.01" class="q-mb-sm" />
-            <div class="row q-gutter-xs">
-              <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(2)" />
-              <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
-              <q-space />
-              <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(2)" />
-            </div>
-            <q-input v-model="outputs[2]" dense outlined readonly label="Output" class="q-mt-sm" />
-          </q-card-section>
-        </q-card>
-      </div>
-
-      <!-- Time Control -->
-      <div class="col-6 col-sm-3">
-        <q-card flat bordered class="control-card">
-          <q-card-section class="purple-1">
-            <div class="text-subtitle2 text-weight-bold text-primary">Time</div>
-          </q-card-section>
-          <q-card-section>
-            <q-input v-model="inputs[3]" @input="(val: string) => onInputChange(3, val)" dense outlined type="number"
-              step="0.01" class="q-mb-sm" />
-            <div class="row q-gutter-xs">
-              <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(3)" />
-              <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
-              <q-space />
-              <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(3)" />
-            </div>
-            <q-input v-model="outputs[3]" dense outlined readonly label="Result" class="q-mt-sm" />
-            <q-input v-model="formattedCalTime" dense outlined readonly label="Cal Time" class="q-mt-sm" />
-          </q-card-section>
-        </q-card>
-      </div>
-    </div>
     <div class="ephemeris-container">
-      <div class="row q-col-gutter-sm">
+      <!-- 1행: Offset Controls -->
+      <div class="row q-mb-sm align-center">
+        <!-- Azimuth Offset - 개별 테두리 -->
+        <div class="col-auto">
+          <q-card flat bordered class="control-card">
+            <q-card-section class="compact-control purple-1"
+              style="padding: 0px 8px !important; padding-top: 0px !important; padding-bottom: 0px !important; margin: 0px !important; min-height: auto !important; height: auto !important; line-height: 1 !important; vertical-align: top !important;">
+              <div class="row q-gutter-xs align-center"
+                style="margin: 0px !important; padding: 0px !important; min-height: auto !important; height: auto !important;">
+                <div class="col-auto position-offset-label">
+                  <div class="text-subtitle2 text-weight-bold text-primary text-center">
+                    Azimuth<br>Offset
+                  </div>
+                </div>
+                <div class="col-auto">
+                  <q-input v-model="inputs[0]" @input="(val: string) => onInputChange(0, val)" dense outlined
+                    type="number" step="0.01" label="Azimuth"
+                    style="width: 84px !important; min-width: 84px !important; max-width: 84px !important;" />
+                </div>
+                <div class="col-auto">
+                  <div class="vertical-button-group">
+                    <div class="vertical-buttons">
+                      <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
+                      <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
+                    </div>
+                    <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(0)" />
+                  </div>
+                </div>
+                <div class="col-auto">
+                  <q-input v-model="outputs[0]" dense outlined readonly label="Output"
+                    style="width: 84px !important; min-width: 84px !important; max-width: 84px !important;" />
+                </div>
+              </div>
+            </q-card-section>
+          </q-card>
+        </div>
+
+        <!-- Elevation Offset - 개별 테두리 -->
+        <div class="col-auto" style="margin-left: 8px !important;">
+          <q-card flat bordered class="control-card">
+            <q-card-section class="compact-control purple-1"
+              style="padding: 0px 8px !important; padding-top: 0px !important; padding-bottom: 0px !important; margin: 0px !important; min-height: auto !important; height: auto !important; line-height: 1 !important; vertical-align: top !important;">
+              <div class="row q-gutter-xs align-center"
+                style="margin: 0px !important; padding: 0px !important; min-height: auto !important; height: auto !important;">
+                <div class="col-auto position-offset-label">
+                  <div class="text-subtitle2 text-weight-bold text-primary text-center">
+                    Elevation<br>Offset
+                  </div>
+                </div>
+                <div class="col-auto">
+                  <q-input v-model="inputs[1]" @input="(val: string) => onInputChange(1, val)" dense outlined
+                    type="number" step="0.01" label="Elevation"
+                    style="width: 84px !important; min-width: 84px !important; max-width: 84px !important;" />
+                </div>
+                <div class="col-auto">
+                  <div class="vertical-button-group">
+                    <div class="vertical-buttons">
+                      <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(1)" />
+                      <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
+                    </div>
+                    <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(1)" />
+                  </div>
+                </div>
+                <div class="col-auto">
+                  <q-input v-model="outputs[1]" dense outlined readonly label="Output"
+                    style="width: 84px !important; min-width: 84px !important; max-width: 84px !important;" />
+                </div>
+              </div>
+            </q-card-section>
+          </q-card>
+        </div>
+
+        <!-- Tilt Offset - 개별 테두리 -->
+        <div class="col-auto" style="margin-left: 8px !important;">
+          <q-card flat bordered class="control-card">
+            <q-card-section class="compact-control purple-1"
+              style="padding: 0px 8px !important; padding-top: 0px !important; padding-bottom: 0px !important; margin: 0px !important; min-height: auto !important; height: auto !important; line-height: 1 !important; vertical-align: top !important;">
+              <div class="row q-gutter-xs align-center"
+                style="margin: 0px !important; padding: 0px !important; min-height: auto !important; height: auto !important;">
+                <div class="col-auto position-offset-label">
+                  <div class="text-subtitle2 text-weight-bold text-primary text-center">
+                    Tilt<br>Offset
+                  </div>
+                </div>
+                <div class="col-auto">
+                  <q-input v-model="inputs[2]" @input="(val: string) => onInputChange(2, val)" dense outlined
+                    type="number" step="0.01" label="Tilt"
+                    style="width: 84px !important; min-width: 84px !important; max-width: 84px !important;" />
+                </div>
+                <div class="col-auto">
+                  <div class="vertical-button-group">
+                    <div class="vertical-buttons">
+                      <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(2)" />
+                      <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
+                    </div>
+                    <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(2)" />
+                  </div>
+                </div>
+                <div class="col-auto">
+                  <q-input v-model="outputs[2]" dense outlined readonly label="Output"
+                    style="width: 84px !important; min-width: 84px !important; max-width: 84px !important;" />
+                </div>
+              </div>
+            </q-card-section>
+          </q-card>
+        </div>
+
+        <!-- Time Offset - 개별 테두리 -->
+        <div class="col-auto" style="margin-left: 8px !important;">
+          <q-card flat bordered class="control-card">
+            <q-card-section class="compact-control purple-1"
+              style="padding: 0px 8px !important; padding-top: 0px !important; padding-bottom: 0px !important; margin: 0px !important; min-height: auto !important; height: auto !important; line-height: 1 !important; vertical-align: top !important;">
+              <div class="row q-gutter-xs align-center"
+                style="margin: 0px !important; padding: 0px !important; min-height: auto !important; height: auto !important;">
+                <div class="col-auto position-offset-label">
+                  <div class="text-subtitle2 text-weight-bold text-primary text-center">
+                    Time<br>Offset
+                  </div>
+                </div>
+                <div class="col-auto">
+                  <q-input v-model="inputs[3]" @input="(val: string) => onInputChange(3, val)" dense outlined
+                    type="number" step="0.01" label="Time"
+                    style="width: 84px !important; min-width: 84px !important; max-width: 84px !important;" />
+                </div>
+                <div class="col-auto">
+                  <div class="vertical-button-group">
+                    <div class="vertical-buttons">
+                      <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(3)" />
+                      <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
+                    </div>
+                    <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(3)" />
+                  </div>
+                </div>
+                <div class="col-auto">
+                  <q-input v-model="outputs[3]" dense outlined readonly label="Result"
+                    style="width: 84px !important; min-width: 84px !important; max-width: 84px !important;" />
+                </div>
+                <div class="col-auto">
+                  <q-input v-model="formattedCalTime" dense outlined readonly label="Cal Time"
+                    style="width: 190px !important; min-width: 190px !important; max-width: 190px !important;" />
+                </div>
+              </div>
+            </q-card-section>
+          </q-card>
+        </div>
+      </div>
+
+      <!-- 2행: Main Content -->
+      <div class="row q-col-gutter-md">
         <!-- 1번 영역: 차트가 들어갈 네모난 칸 -->
         <div class="col-12 col-md-4">
           <q-card class="control-section">
@@ -155,14 +217,14 @@
                       <span class="info-label">시작 시간:</span>
                       <span class="info-value">{{
                         formatToLocalTime(selectedScheduleInfo.startTime)
-                      }}</span>
+                        }}</span>
                     </div>
 
                     <div class="info-row">
                       <span class="info-label">종료 시간:</span>
                       <span class="info-value">{{
                         formatToLocalTime(selectedScheduleInfo.endTime)
-                      }}</span>
+                        }}</span>
                     </div>
 
                     <div class="info-row">
@@ -1853,9 +1915,13 @@ onUnmounted(() => {
 }
 
 .ephemeris-container {
-  padding: 1rem;
+  padding: 0px !important;
+  padding-top: 1px !important;
+  /* 상단 패딩 1px로 설정 */
   width: 100%;
   height: 100%;
+  margin-top: 0px !important;
+  /* 상단 마진 제거 */
 }
 
 .section-title {
@@ -1863,13 +1929,10 @@ onUnmounted(() => {
   padding-left: 0.5rem;
 }
 
-.row {
-  width: 100%;
-  margin: 0;
-}
 
 .control-section {
   height: 100%;
+  max-height: 450px;
   width: 100%;
   background-color: var(--theme-card-background);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -1959,6 +2022,365 @@ onUnmounted(() => {
   text-align: right;
   flex: 1;
 }
+
+/* 컴팩트 컨트롤 스타일 */
+.compact-control {
+  padding: 0.5rem !important;
+}
+
+.compact-control .q-input {
+  margin-bottom: 0.25rem !important;
+}
+
+.compact-control .q-btn {
+  min-height: 2rem !important;
+  padding: 0.25rem !important;
+}
+
+/* 가로 배치를 위한 정렬 스타일 */
+.align-center {
+  align-items: center !important;
+}
+
+.justify-end {
+  justify-content: flex-end;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+/* 입력창과 버튼이 같은 높이에 오도록 */
+.compact-control .row.align-center {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+}
+
+.compact-control .q-field {
+  margin-bottom: 0 !important;
+}
+
+/* 모든 요소가 한 줄에 배치되도록 강제 */
+.compact-control .row {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+}
+
+.compact-control .col-3,
+.compact-control .col-6,
+.compact-control .col-2,
+.compact-control .col-4 {
+  flex-shrink: 0 !important;
+}
+
+/* 강제 가로 배치 */
+.compact-control .row {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  width: 100% !important;
+}
+
+.compact-control .col-3,
+.compact-control .col-6,
+.compact-control .col-2,
+.compact-control .col-4 {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: stretch !important;
+}
+
+/* 입력창과 버튼 컨테이너 */
+.compact-control .row .row {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 0.25rem !important;
+}
+
+/* 라벨과 입력창을 같은 높이에 배치 */
+.compact-control .text-subtitle2 {
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* 라벨 컨테이너 */
+.compact-control .col-1 {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  min-width: fit-content !important;
+}
+
+/* 라벨 텍스트 크기 조정 */
+.compact-control .text-subtitle2 {
+  font-size: 0.9rem !important;
+  white-space: nowrap !important;
+}
+
+/* 간격 제거로 더 타이트하게 */
+.compact-control .row.q-gutter-none {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.compact-control .row.q-gutter-none>div {
+  padding-left: 0.25rem !important;
+  padding-right: 0.25rem !important;
+}
+
+.compact-control .row.q-gutter-none>div:first-child {
+  padding-left: 0 !important;
+}
+
+.compact-control .row.q-gutter-none>div:last-child {
+  padding-right: 0 !important;
+}
+
+/* ✅ 새로운 세로 버튼 레이아웃 */
+.vertical-button-group {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+.vertical-buttons {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+/* ✅ 방법 1: 왼쪽 세로 라벨 (카드 안) - 높이 최적화 */
+.position-offset-label {
+  background: linear-gradient(135deg, rgba(25, 118, 210, 0.15) 0%, rgba(25, 118, 210, 0.08) 100%);
+  padding: 4px 8px;
+  /* 높이 줄임: 8px 12px → 4px 8px */
+  border-radius: 6px;
+  border-right: 3px solid var(--q-primary);
+  min-width: 50px;
+  /* 너비도 약간 줄임: 60px → 50px */
+  margin-right: 6px;
+  /* 간격도 줄임: 8px → 6px */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.position-offset-label .text-subtitle2 {
+  font-size: 0.8rem !important;
+  /* 텍스트 크기 줄임 */
+  line-height: 1.2 !important;
+  /* 줄 간격 줄임 */
+}
+
+/* ✅ 방법 1: 왼쪽 세로 라벨 (카드 안) - 높이 최적화 */
+.position-offset-label {
+  background: linear-gradient(135deg, rgba(25, 118, 210, 0.15) 0%, rgba(25, 118, 210, 0.08) 100%);
+  padding: 4px 8px;
+  /* 높이 줄임: 8px 12px → 4px 8px */
+  border-radius: 6px;
+  border-right: 3px solid var(--q-primary);
+  min-width: 50px;
+  /* 너비도 약간 줄임: 60px → 50px */
+  margin-right: 6px;
+  /* 간격도 줄임: 8px → 6px */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.position-offset-label .text-subtitle2 {
+  font-size: 0.8rem !important;
+  /* 텍스트 크기 줄임 */
+  line-height: 1.2 !important;
+  /* 줄 간격 줄임 */
+}
+
+/* ✅ 카드 테두리 위아래 패딩 완전 제거 - 더 구체적인 셀렉터 */
+.q-card.control-card .q-card-section.compact-control {
+  padding: 0px 8px !important;
+  /* 상하 패딩을 완전히 제거 */
+}
+
+/* ✅ 추가적인 강제 적용 */
+.q-card-section.compact-control {
+  padding-top: 0px !important;
+  padding-bottom: 0px !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+/* ✅ 더 강력한 강제 적용 - 모든 가능한 셀렉터 */
+.q-card-section.compact-control.purple-1,
+.q-card.control-card .q-card-section.compact-control.purple-1,
+.q-card-section[class*="compact-control"],
+.q-card-section[class*="purple-1"] {
+  padding-top: 0px !important;
+  padding-bottom: 0px !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  margin-top: 0px !important;
+  margin-bottom: 0px !important;
+  min-height: auto !important;
+  height: auto !important;
+  line-height: 1 !important;
+  vertical-align: top !important;
+  display: flex !important;
+  align-items: flex-start !important;
+}
+
+/* ✅ Quasar 기본 스타일 덮어쓰기 */
+.q-card-section {
+  padding-top: 0px !important;
+  padding-bottom: 0px !important;
+  line-height: 1 !important;
+  vertical-align: top !important;
+}
+
+/* ✅ 카드 자체 마진도 제거 */
+.q-card.control-card {
+  margin-bottom: 0px !important;
+  min-height: auto !important;
+  height: auto !important;
+  line-height: 1 !important;
+  vertical-align: top !important;
+}
+
+.q-card.control-card .q-card__section {
+  padding-top: 0px !important;
+  padding-bottom: 0px !important;
+  min-height: auto !important;
+  height: auto !important;
+  line-height: 1 !important;
+  vertical-align: top !important;
+}
+
+/* ✅ 추가 높이 줄이기 - 모든 요소의 높이 최소화 */
+.q-input {
+  min-height: auto !important;
+  /* 입력 필드 높이 원래대로 */
+}
+
+.q-field__control {
+  min-height: auto !important;
+  /* 필드 컨트롤 높이 원래대로 */
+}
+
+.q-field__native {
+  padding: auto !important;
+  /* 필드 내부 패딩 원래대로 */
+}
+
+.q-btn {
+  min-height: auto !important;
+  /* 버튼 높이 원래대로 */
+}
+
+.q-btn--dense {
+  min-height: auto !important;
+  /* 조밀한 버튼 높이 원래대로 */
+}
+
+/* ✅ 라벨 테두리 높이만 줄이기 - 내부 구성은 유지 */
+.position-offset-label {
+  padding: 4px 8px !important;
+  /* 내부 패딩 원래대로 유지 */
+  min-width: 50px !important;
+  /* 라벨 너비 원래대로 */
+  border-right: 1px solid var(--q-primary) !important;
+  /* 테두리 두께만 줄임: 3px → 1px */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+  /* 그림자도 줄임 */
+}
+
+.position-offset-label .text-subtitle2 {
+  font-size: 0.8rem !important;
+  /* 텍스트 크기 원래대로 */
+  line-height: 1.2 !important;
+  /* 줄 간격 원래대로 */
+}
+
+/* ✅ 모든 개별 테두리 스타일 - 통합 테두리와 동일하게 */
+.azimuth-control-card,
+.elevation-control-card,
+.tilt-control-card,
+.time-control-card {
+  margin-bottom: 0px !important;
+  min-height: auto !important;
+  height: auto !important;
+}
+
+.azimuth-control-section,
+.elevation-control-section,
+.tilt-control-section,
+.time-control-section {
+  padding: 0px 8px !important;
+  padding-top: 0px !important;
+  padding-bottom: 0px !important;
+  margin: 0px !important;
+  min-height: auto !important;
+  height: auto !important;
+  line-height: 1 !important;
+  vertical-align: top !important;
+}
+
+.azimuth-control-section .row,
+.elevation-control-section .row,
+.tilt-control-section .row,
+.time-control-section .row {
+  margin: 0px !important;
+  padding: 0px !important;
+  min-height: auto !important;
+  height: auto !important;
+}
+
+.azimuth-control-section .row>div,
+.elevation-control-section .row>div,
+.tilt-control-section .row>div,
+.time-control-section .row>div {
+  margin: 0px !important;
+  padding: 0px !important;
+  min-height: auto !important;
+  height: auto !important;
+}
+
+/* ✅ Quasar 기본 스타일 완전 덮어쓰기 */
+.q-row {
+  margin: 0px !important;
+  padding: 0px !important;
+}
+
+.q-col {
+  margin: 0px !important;
+  padding: 0px !important;
+}
+
+/* 간격 제거로 더 타이트하게 */
+.compact-control .row.q-gutter-none {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.compact-control .row.q-gutter-none>div {
+  padding-left: 0.25rem !important;
+  padding-right: 0.25rem !important;
+}
+
+.compact-control .row.q-gutter-none>div:first-child {
+  padding-left: 0 !important;
+}
+
+.compact-control .row.q-gutter-none>div:last-child {
+  padding-right: 0 !important;
+}
 </style>
 
 <style>
@@ -1983,13 +2405,35 @@ onUnmounted(() => {
   box-shadow: 0 1px 5px rgb(0 0 0 / 20%), 0 2px 2px rgb(0 0 0 / 14%), 0 3px 1px -2px rgb(0 0 0 / 12%);
 }
 
-.col-md-4 {
-  width: 33.3333%;
-  padding: 4px;
-}
 
 .q-btn {
   flex: 1;
+}
+
+/* ✅ 강력한 전역 스타일 오버라이드 */
+.ephemeris-mode .q-field.fixed-input,
+.ephemeris-mode .q-field.fixed-output {
+  width: 30px !important;
+  min-width: 30px !important;
+  max-width: 30px !important;
+  flex: 0 0 30px !important;
+}
+
+.ephemeris-mode .q-field.fixed-input .q-field__control,
+.ephemeris-mode .q-field.fixed-output .q-field__control {
+  width: 30px !important;
+  min-width: 30px !important;
+  max-width: 30px !important;
+  flex: 0 0 30px !important;
+}
+
+.ephemeris-mode .q-field.fixed-input .q-field__native,
+.ephemeris-mode .q-field.fixed-output .q-field__native {
+  width: 30px !important;
+  min-width: 30px !important;
+  max-width: 30px !important;
+  padding: 0 4px !important;
+  font-size: 12px !important;
 }
 
 /* 나머지 스타일은 그대로 유지... */
