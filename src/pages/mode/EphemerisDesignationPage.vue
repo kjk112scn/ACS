@@ -1,17 +1,16 @@
 <template>
   <div class="ephemeris-mode">
     <div class="ephemeris-container">
-      <!-- 1행: Offset Controls - 4개를 하나의 카드로 묶기 -->
+      <!-- 1행: Offset Controls - 원본 형태로 복원하고 반응형 적용 -->
       <div class="row q-col-gutter-md q-mb-sm">
-        <!-- 4개 Offset을 모두 하나의 카드로 묶기 -->
         <div class="col-12">
           <q-card flat bordered class="control-card">
             <q-card-section class="compact-control purple-1"
               style="padding: 0px 8px !important; padding-top: 0px !important; padding-bottom: 0px !important; margin: 0px !important; min-height: auto !important; height: auto !important; line-height: 1 !important; vertical-align: top !important;">
-              <div class="row q-gutter-xs align-center"
-                style="margin: 0px !important; padding: 0px !important; min-height: auto !important; height: auto !important;">
+              <!-- 모든 간격이 동적으로 조정되는 반응형 레이아웃 -->
+              <div class="flexible-offset-layout">
                 <!-- Azimuth Offset -->
-                <div class="col-auto">
+                <div class="offset-group">
                   <div class="row q-gutter-xs align-center">
                     <div class="col-auto position-offset-label">
                       <div class="text-subtitle2 text-weight-bold text-primary text-center">
@@ -40,7 +39,7 @@
                 </div>
 
                 <!-- Elevation Offset -->
-                <div class="col-auto" style="margin-left: 40px !important;">
+                <div class="offset-group">
                   <div class="row q-gutter-xs align-center">
                     <div class="col-auto position-offset-label">
                       <div class="text-subtitle2 text-weight-bold text-primary text-center">
@@ -69,7 +68,7 @@
                 </div>
 
                 <!-- Tilt Offset -->
-                <div class="col-auto" style="margin-left: 40px !important;">
+                <div class="offset-group">
                   <div class="row q-gutter-xs align-center">
                     <div class="col-auto position-offset-label">
                       <div class="text-subtitle2 text-weight-bold text-primary text-center">
@@ -97,8 +96,8 @@
                   </div>
                 </div>
 
-                <!-- Time Offset -->
-                <div class="col-auto" style="margin-left: 40px !important;">
+                <!-- Time Offset + Cal Time -->
+                <div class="offset-group">
                   <div class="row q-gutter-xs align-center">
                     <div class="col-auto position-offset-label">
                       <div class="text-subtitle2 text-weight-bold text-primary text-center">
@@ -123,9 +122,9 @@
                       <q-input v-model="outputs[3]" dense outlined readonly label="Result"
                         style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
                     </div>
-                    <div class="col-auto">
+                    <div class="col-auto cal-time-field">
                       <q-input v-model="formattedCalTime" dense outlined readonly label="Cal Time"
-                        style="width: 210px !important; min-width: 210px !important; max-width: 210px !important;" />
+                        style="min-width: 190px !important; max-width: 220px !important;" />
                     </div>
                   </div>
                 </div>
@@ -196,7 +195,7 @@
                       <span class="info-label">시작/종료 시간:</span>
                       <span class="info-value">{{
                         formatToLocalTime(selectedScheduleInfo.startTime)
-                      }} / {{
+                        }} / {{
                           formatToLocalTime(selectedScheduleInfo.endTime)
                         }}</span>
                     </div>
@@ -1139,65 +1138,74 @@ const initChart = () => {
 
   // 차트 크기 조정
   setTimeout(() => {
-    if (chart && !chart.isDi  osed()) {
-      char  resize({
-        width: 374          height: 374
+    if (chart && !chart.isDisposed()) {
+      chart.resize({
+        width: 374,
+        height: 374
       })
-      console.log  차트 리사이즈 완료')
+      console.log('차트 리사이즈 완료')
     }
   }, 100)
 
   // 윈도우 리사이즈 이벤트에 대응
-  window.addEventListener('resize', () =>
-    chart?.re    ({
+  window.addEventListener('resize', () => {
+    chart?.resize({
       width: 374,
-      height:
-    })   })
+      height: 374
+    })
+  })
+}
 
-// ✅    된 차트 업데이트 함수 (완전
-// ✅ 타입 안전한 객체 재사용    로 수정
+// ✅ 최적화된 차트 업데이트 함수 (완전 교체)
+// ✅ 타입 안전한 객체 재사용 변수들로 수정
 
 // ✅ 성능 측정 변수들 추가
-/* c     performanceStats = {
+/* const performanceStats = {
   updateChartTime: 0,
   trackingPathUpdateTime: 0,
   chartSetOptionTime: 0,
-  totalUpdateCount:      slowUpdateCount: 0,
+  totalUpdateCount: 0,
+  slowUpdateCount: 0,
 } */
-      updateChart 함수 - 비동기 Worker 활용
-/* const updateChart = (
+
+// ✅ updateChart 함수 - 비동기 Worker 활용
+/* const updateChart = () => {
   if (!chart) {
-    console.error('차트가 초     않았습니다.')
+    console.error('차트가 초기화되지 않았습니다.')
     return
   }
 
-  t         let azimuth = 0
+  try {
+    let azimuth = 0
     let elevation = 0
 
-    // ✅ 추적 상태에       데이터 소스 사용
-    const isTrackingActive = icdS    .ephemerisTrackingState === "TRACKING" || icdStore.passSche    StatusInfo.isActive
+    // ✅ 추적 상태에 따라 다른 데이터 소스 사용
+    const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
 
     azimuth = isTrackingActive
-      ?    seFloat(icdStore.trackingAc    AzimuthAngle) || 0
-      : parseFloat(icdStore.azimuthAng    || 0
+      ? parseFloat(icdStore.trackingActualAzimuthAngle) || 0
+      : parseFloat(icdStore.azimuthAngle) || 0
     elevation = isTrackingActive
-          rseFloat(icdStore.trackingActualElevationAngle) || 0
-      : parseFloat    Store.elevationAngle) || 0
+      ? parseFloat(icdStore.trackingActualElevationAngle) || 0
+      : parseFloat(icdStore.elevationAngle) || 0
 
-    const normalizedAz = azimuth < 0 ? azi     + 360 : azimuth
-    const normali    l = Math.max(0, Math.min(90, elevation))
+    const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
+    const normalizedEl = Math.max(0, Math.min(90, elevation))
 
-    // 현재 위치      이트 (원본 값 표시)
-    currentPosition.val      muth = azimuth  // 원본 값 (정규화 전)
-    currentPosition.value.e    tio    elevation
-    currentPosition.valu    te = date.formatDate(ne      (), 'YYYY/                    osition.value.time = date.formatDate(n        ),         s')
-        ✅           rker를 통한 비동기 경로 처리
-    if (icdSt          risTrackingState === "TRACKING") {
-      // ✅ 비동기 호출        기다리         최적화        v    ephemerisStore.updateTrackingPath(azimuth, elevation)
+    // 현재 위치 정보 업데이트 (원본 값 표시)
+    currentPosition.value.azimuth = azimuth  // 원본 값 (정규화 전)
+    currentPosition.value.elevation = elevation
+    currentPosition.value.date = date.formatDate(new Date(), 'YYYY/MM/DD')
+    currentPosition.value.time = date.formatDate(new Date(), 'HH:mm:ss')
 
+    // ✅ 추적 중일 때 Worker를 통한 비동기 경로 처리
+    if (icdStore.ephemerisTrackingState === "TRACKING") {
+      // ✅ 비동기 호출이지만 결과를 기다리지 않음 (성능 최적화)
+      void ephemerisStore.updateTrackingPath(azimuth, elevation)
+    }
 
-    // ✅ 차트 업데이트 (Worker에서 처   결과 사용)
-    const     teOption = {
+    // ✅ 차트 업데이트 (Worker에서 처리된 결과 사용)
+    const updateOption = {
       series: [
         {
           data: [[normalizedEl, normalizedAz]],
@@ -1892,6 +1900,83 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* 모든 간격이 동적으로 조정되는 반응형 레이아웃 */
+.flexible-offset-layout {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  width: 100%;
+  gap: 40px;
+  row-gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 개별 Offset 그룹 - Elevation, Tilt, Time은 좌측 공간 축소 */
+.offset-group {
+  flex: none;
+  min-width: 0;
+  padding: 8px;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.01);
+  display: flex;
+  align-items: center;
+}
+
+/* Elevation, Tilt, Time Offset 그룹 - Azimuth와 동일한 우측 정렬 */
+.offset-group:nth-child(2),
+.offset-group:nth-child(3),
+.offset-group:nth-child(4) {
+  padding-left: 12px;
+  margin-left: 0px;
+}
+
+/* 라벨 스타일 */
+.position-offset-label {
+  min-width: 80px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: rgba(25, 118, 210, 0.1);
+  border: 1px solid rgba(25, 118, 210, 0.3);
+}
+
+/* Cal Time 필드 스타일 - 확보된 공간 활용 */
+.cal-time-field {
+  flex-shrink: 0;
+  min-width: 190px;
+}
+
+/* 반응형 동작 - 더 일찍 세로 배치 */
+@media (max-width: 1000px) {
+  .flexible-offset-layout {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .offset-group {
+    flex: none;
+    width: 100%;
+    padding: 12px;
+  }
+
+  .position-offset-label {
+    min-width: 70px;
+    font-size: 0.75rem;
+  }
+
+  .cal-time-field {
+    min-width: 100%;
+    max-width: 100%;
+  }
+}
+
+@media (min-width: 1001px) {
+  .position-offset-label {
+    min-width: 80px;
+    font-size: 0.875rem;
+  }
+}
+
 .ephemeris-mode {
   height: 100%;
   width: 100%;
