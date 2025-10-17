@@ -138,7 +138,7 @@
       <!-- 2행: Main Content -->
       <div class="row q-col-gutter-md">
         <!-- 1번 영역: 차트가 들어갈 네모난 칸 -->
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-3">
           <q-card class="control-section">
             <q-card-section>
               <div class="text-subtitle1 text-weight-bold text-primary">Position View</div>
@@ -151,20 +151,20 @@
         <div class="col-12 col-md-4">
           <q-card class="control-section">
             <q-card-section>
-              <div class="text-subtitle1 text-weight-bold text-primary">위성 추적 상태</div>
-
-              <!-- ✅ 추적 상태 표시 -->
-              <div class="info-row">
-                <span class="info-label">추적 상태:</span>
-                <q-chip :color="icdStore.ephemerisTrackingStateInfo.displayColor" text-color="white"
-                  :label="icdStore.ephemerisTrackingStateInfo.displayLabel" size="sm" class="tracking-status-chip" />
+              <div class="row justify-between items-center q-mb-xs">
+                <div class="text-subtitle1 text-weight-bold text-primary">위성 추적 정보</div>
+                <div class="row items-center q-gutter-sm">
+                  <span class="info-label">추적 상태:</span>
+                  <q-chip :color="icdStore.ephemerisTrackingStateInfo.displayColor" text-color="white"
+                    :label="icdStore.ephemerisTrackingStateInfo.displayLabel" size="sm" class="tracking-status-chip" />
+                </div>
               </div>
 
               <div class="ephemeris-form">
                 <div class="form-row">
                   <!-- ✅ 정지궤도 정보 표시 -->
-                  <div v-if="selectedScheduleInfo.isGeostationary" class="schedule-info q-mt-md">
-                    <div class="text-subtitle2 text-weight-bold text-primary q-mb-sm">
+                  <div v-if="selectedScheduleInfo.isGeostationary" class="schedule-info q-mt-xs">
+                    <div class="text-subtitle2 text-weight-bold text-primary q-mb-xs">
                       정지궤도 위성 정보
                     </div>
 
@@ -185,32 +185,19 @@
                   </div>
 
                   <!-- ✅ 기존 스케줄 정보 표시 (정지궤도가 아닌 경우) -->
-                  <div v-else-if="selectedScheduleInfo.satelliteName" class="schedule-info q-mt-md">
-                    <div class="text-subtitle2 text-weight-bold text-primary q-mb-sm">
-                      선택된 스케줄 정보
+                  <div v-else-if="selectedScheduleInfo.satelliteName" class="schedule-info q-mt-xs">
+                    <div class="info-row">
+                      <span class="info-label">위성 이름/ID:</span>
+                      <span class="info-value">{{ selectedScheduleInfo.satelliteName }} / {{
+                        selectedScheduleInfo.satelliteId }}</span>
                     </div>
 
                     <div class="info-row">
-                      <span class="info-label">위성 이름:</span>
-                      <span class="info-value">{{ selectedScheduleInfo.satelliteName }}</span>
-                    </div>
-
-                    <div class="info-row">
-                      <span class="info-label">위성 ID:</span>
-                      <span class="info-value">{{ selectedScheduleInfo.satelliteId }}</span>
-                    </div>
-
-                    <div class="info-row">
-                      <span class="info-label">시작 시간:</span>
+                      <span class="info-label">시작/종료 시간:</span>
                       <span class="info-value">{{
                         formatToLocalTime(selectedScheduleInfo.startTime)
-                        }}</span>
-                    </div>
-
-                    <div class="info-row">
-                      <span class="info-label">종료 시간:</span>
-                      <span class="info-value">{{
-                        formatToLocalTime(selectedScheduleInfo.endTime)
+                        }} / {{
+                          formatToLocalTime(selectedScheduleInfo.endTime)
                         }}</span>
                     </div>
 
@@ -220,15 +207,10 @@
                     </div>
 
                     <div class="info-row">
-                      <span class="info-label">시작 방위각/고도:</span>
-                      <span class="info-value">{{ selectedScheduleInfo.startAzimuth.toFixed(2) }}° /
-                        {{ selectedScheduleInfo.startElevation.toFixed(2) }}°</span>
-                    </div>
-
-                    <div class="info-row">
-                      <span class="info-label">종료 방위각/고도:</span>
-                      <span class="info-value">{{ selectedScheduleInfo.endAzimuth.toFixed(2) }}° /
-                        {{ selectedScheduleInfo.endElevation.toFixed(2) }}°</span>
+                      <span class="info-label">시작/종료 방위각/고도:</span>
+                      <span class="info-value">{{ selectedScheduleInfo.startAzimuth.toFixed(2) }}° / {{
+                        selectedScheduleInfo.endAzimuth.toFixed(2) }}° / {{
+                          selectedScheduleInfo.startElevation.toFixed(2) }}°</span>
                     </div>
 
                     <div class="info-row">
@@ -243,7 +225,8 @@
                         'text-positive': timeRemaining > 0,
                         'text-grey': timeRemaining === 0,
                       }">
-                        {{ formatTimeRemaining(timeRemaining) }}
+                        {{ timeRemaining < 0 ? '지연됨' : timeRemaining > 0 ? `${Math.floor(timeRemaining / 60000)}분
+                          ${Math.floor((timeRemaining % 60000) / 1000)}초` : '완료' }}
                       </span>
                     </div>
                   </div>
@@ -254,18 +237,18 @@
         </div>
 
         <!-- 3번 영역: TLE Data -->
-        <div class="col-12 col-md-4">
-          <q-card class="control-section">
+        <div class="col-12 col-md-5">
+          <q-card class="control-section tle-data-card">
             <q-card-section>
               <div class="text-subtitle1 text-weight-bold text-primary">TLE Data</div>
-              <q-editor v-model="tleData.displayText" readonly flat dense class="tle-display q-mt-sm" :toolbar="[]"
+              <q-editor v-model="tleData.displayText" readonly flat dense class="tle-display q-mt-xs" :toolbar="[]"
                 :definitions="{
                   bold: undefined,
                   italic: undefined,
                   strike: undefined,
                   underline: undefined,
                 }" content-class="tle-content" />
-              <div class="button-group q-mt-md">
+              <div class="button-group q-mt-sm">
                 <q-btn color="primary" label="Text" @click="openTLEModal" class="q-mr-sm" />
                 <q-btn color="primary" label="Select Schedule" @click="openScheduleModal" class="q-mr-sm" />
                 <!-- ✅ 다운로드 버튼 추가 -->
@@ -312,7 +295,7 @@ ISS (ZARYA)
         </div>
         <div class="tle-input-container q-mb-md">
           <q-input v-model="tempTLEData.tleText" type="textarea" filled autogrow class="tle-textarea full-width"
-            style="min-height: 200px; font-family: monospace; font-size: 0.9rem" placeholder="TLE 데이터를 여기에 붙여넣으세요..."
+            style="min-height: 100px; font-family: monospace; font-size: 0.9rem" placeholder="TLE 데이터를 여기에 붙여넣으세요..."
             :input-style="'white-space: pre;'" spellcheck="false" autofocus :error="tleError !== null"
             :error-message="tleError || undefined" @keydown.ctrl.enter="addTLEData" />
         </div>
@@ -361,7 +344,7 @@ import { useICDStore } from '../../stores/icd/icdStore'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 import { useEphemerisTrackModeStore } from '@/stores'
-import { formatToLocalTime, formatTimeRemaining, getCalTimeTimestamp } from '../../utils/times'
+import { formatToLocalTime, getCalTimeTimestamp } from '../../utils/times'
 // 인터페이스 정의 - 서비스의 타입과 동일하게 사용
 import {
   ephemerisTrackService,
@@ -967,18 +950,25 @@ const initChart = () => {
     chart.dispose()
   }
 
-  // 차트 인스턴스 생성
-  chart = echarts.init(chartRef.value)
+  // 차트 인스턴스 생성 (크기 제한)
+  chart = echarts.init(chartRef.value, null, {
+    width: 374,
+    height: 374
+  })
   console.log('차트 인스턴스 생성됨')
 
   // 차트 옵션 설정
   const option = {
     backgroundColor: 'transparent',
     grid: {
-      containLabel: true,
+      left: 10,
+      right: 10,
+      top: 10,
+      bottom: 10,
+      containLabel: false
     },
     polar: {
-      radius: ['0%', '80%'],
+      radius: ['0%', '50%'],
       center: ['50%', '50%'],
     },
     angleAxis: {
@@ -996,13 +986,14 @@ const initChart = () => {
       },
       axisTick: {
         show: true,
-        interval: 30,
+        interval: 60,
+        length: 3,
         lineStyle: {
           color: '#555',
         },
       },
       axisLabel: {
-        interval: 30,
+        interval: 60,
         formatter: function (value: number) {
           if (value === 0) return 'N (0°)'
           if (value === 90) return 'E (90°)'
@@ -1012,16 +1003,16 @@ const initChart = () => {
           if (value === 135) return 'SE (135°)'
           if (value === 225) return 'SW (225°)'
           if (value === 315) return 'NW (315°)'
-          if (value % 30 === 0) return value + '°'
+          if (value % 60 === 0) return value + '°'
           return ''
         },
         color: '#999',
-        fontSize: 10,
-        distance: 10,
+        fontSize: 8,
+        distance: -8,
       },
       splitLine: {
         show: true,
-        interval: 30,
+        interval: 60,
         lineStyle: {
           color: '#555',
           type: 'dashed',
@@ -1044,6 +1035,7 @@ const initChart = () => {
       axisLabel: {
         formatter: '{value}°',
         color: '#999',
+        fontSize: 8,
       },
       splitLine: {
         show: true,
@@ -1137,18 +1129,31 @@ const initChart = () => {
     ],
   }
 
-  // 차트 옵션 적용
-  chart.setOption(option)
+  // 차트 옵션 적용 (크기 명시)
+  chart.setOption(option, true)
+  chart.resize({
+    width: 374,
+    height: 374
+  })
   console.log('차트 옵션 적용됨')
 
-  // 명시적으로 리사이즈 호출
+  // 차트 크기 조정
   setTimeout(() => {
-    chart?.resize()
-  }, 0)
+    if (chart && !chart.isDisposed()) {
+      chart.resize({
+        width: 374,
+        height: 374
+      })
+      console.log('차트 리사이즈 완료')
+    }
+  }, 100)
 
   // 윈도우 리사이즈 이벤트에 대응
   window.addEventListener('resize', () => {
-    chart?.resize()
+    chart?.resize({
+      width: 374,
+      height: 374
+    })
   })
 }
 
@@ -1919,19 +1924,30 @@ onUnmounted(() => {
 
 .control-section {
   height: 100%;
-  max-height: 450px;
+  max-height: 500px;
   width: 100%;
   background-color: var(--theme-card-background);
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .chart-area {
-  height: 400px;
+  height: 220px;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 0.5rem;
+  margin: 0.5rem auto;
+  padding: 8px;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.chart-area>div {
+  width: 374px !important;
+  height: 374px !important;
+  max-width: 374px !important;
+  max-height: 374px !important;
+  aspect-ratio: 1;
 }
 
 .ephemeris-form {
@@ -1969,6 +1985,12 @@ onUnmounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 4px;
   min-height: 80px;
+  max-height: 120px;
+}
+
+/* TLE Data 카드 패딩 축소 */
+.tle-data-card .q-card-section {
+  padding: 8px 16px !important;
 }
 
 /* 스케줄 테이블 스타일 */
