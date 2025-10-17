@@ -1,146 +1,133 @@
 <template>
   <div class="ephemeris-mode">
     <div class="ephemeris-container">
-      <!-- 1행: Offset Controls -->
-      <div class="row q-mb-sm align-center">
-        <!-- Azimuth Offset - 개별 테두리 -->
-        <div class="col-auto">
+      <!-- 1행: Offset Controls - 4개를 하나의 카드로 묶기 -->
+      <div class="row q-col-gutter-md q-mb-sm">
+        <!-- 4개 Offset을 모두 하나의 카드로 묶기 -->
+        <div class="col-12">
           <q-card flat bordered class="control-card">
             <q-card-section class="compact-control purple-1"
               style="padding: 0px 8px !important; padding-top: 0px !important; padding-bottom: 0px !important; margin: 0px !important; min-height: auto !important; height: auto !important; line-height: 1 !important; vertical-align: top !important;">
               <div class="row q-gutter-xs align-center"
                 style="margin: 0px !important; padding: 0px !important; min-height: auto !important; height: auto !important;">
-                <div class="col-auto position-offset-label">
-                  <div class="text-subtitle2 text-weight-bold text-primary text-center">
-                    Azimuth<br>Offset
-                  </div>
-                </div>
+                <!-- Azimuth Offset -->
                 <div class="col-auto">
-                  <q-input v-model="inputs[0]" @input="(val: string) => onInputChange(0, val)" dense outlined
-                    type="number" step="0.01" label="Azimuth"
-                    style="width: 84px !important; min-width: 84px !important; max-width: 84px !important;" />
-                </div>
-                <div class="col-auto">
-                  <div class="vertical-button-group">
-                    <div class="vertical-buttons">
-                      <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
-                      <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
+                  <div class="row q-gutter-xs align-center">
+                    <div class="col-auto position-offset-label">
+                      <div class="text-subtitle2 text-weight-bold text-primary text-center">
+                        Azimuth<br>Offset
+                      </div>
                     </div>
-                    <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(0)" />
+                    <div class="col-auto">
+                      <q-input v-model="inputs[0]" @input="(val: string) => onInputChange(0, val)" dense outlined
+                        type="number" step="0.01" label="Azimuth"
+                        style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                    </div>
+                    <div class="col-auto">
+                      <div class="vertical-button-group">
+                        <div class="vertical-buttons">
+                          <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
+                          <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
+                        </div>
+                        <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(0)" />
+                      </div>
+                    </div>
+                    <div class="col-auto">
+                      <q-input v-model="outputs[0]" dense outlined readonly label="Output"
+                        style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                    </div>
                   </div>
                 </div>
-                <div class="col-auto">
-                  <q-input v-model="outputs[0]" dense outlined readonly label="Output"
-                    style="width: 84px !important; min-width: 84px !important; max-width: 84px !important;" />
-                </div>
-              </div>
-            </q-card-section>
-          </q-card>
-        </div>
 
-        <!-- Elevation Offset - 개별 테두리 -->
-        <div class="col-auto" style="margin-left: 8px !important;">
-          <q-card flat bordered class="control-card">
-            <q-card-section class="compact-control purple-1"
-              style="padding: 0px 8px !important; padding-top: 0px !important; padding-bottom: 0px !important; margin: 0px !important; min-height: auto !important; height: auto !important; line-height: 1 !important; vertical-align: top !important;">
-              <div class="row q-gutter-xs align-center"
-                style="margin: 0px !important; padding: 0px !important; min-height: auto !important; height: auto !important;">
-                <div class="col-auto position-offset-label">
-                  <div class="text-subtitle2 text-weight-bold text-primary text-center">
-                    Elevation<br>Offset
-                  </div>
-                </div>
-                <div class="col-auto">
-                  <q-input v-model="inputs[1]" @input="(val: string) => onInputChange(1, val)" dense outlined
-                    type="number" step="0.01" label="Elevation"
-                    style="width: 84px !important; min-width: 84px !important; max-width: 84px !important;" />
-                </div>
-                <div class="col-auto">
-                  <div class="vertical-button-group">
-                    <div class="vertical-buttons">
-                      <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(1)" />
-                      <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
+                <!-- Elevation Offset -->
+                <div class="col-auto" style="margin-left: 40px !important;">
+                  <div class="row q-gutter-xs align-center">
+                    <div class="col-auto position-offset-label">
+                      <div class="text-subtitle2 text-weight-bold text-primary text-center">
+                        Elevation<br>Offset
+                      </div>
                     </div>
-                    <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(1)" />
+                    <div class="col-auto">
+                      <q-input v-model="inputs[1]" @input="(val: string) => onInputChange(1, val)" dense outlined
+                        type="number" step="0.01" label="Elevation"
+                        style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                    </div>
+                    <div class="col-auto">
+                      <div class="vertical-button-group">
+                        <div class="vertical-buttons">
+                          <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(1)" />
+                          <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
+                        </div>
+                        <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(1)" />
+                      </div>
+                    </div>
+                    <div class="col-auto">
+                      <q-input v-model="outputs[1]" dense outlined readonly label="Output"
+                        style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                    </div>
                   </div>
                 </div>
-                <div class="col-auto">
-                  <q-input v-model="outputs[1]" dense outlined readonly label="Output"
-                    style="width: 84px !important; min-width: 84px !important; max-width: 84px !important;" />
-                </div>
-              </div>
-            </q-card-section>
-          </q-card>
-        </div>
 
-        <!-- Tilt Offset - 개별 테두리 -->
-        <div class="col-auto" style="margin-left: 8px !important;">
-          <q-card flat bordered class="control-card">
-            <q-card-section class="compact-control purple-1"
-              style="padding: 0px 8px !important; padding-top: 0px !important; padding-bottom: 0px !important; margin: 0px !important; min-height: auto !important; height: auto !important; line-height: 1 !important; vertical-align: top !important;">
-              <div class="row q-gutter-xs align-center"
-                style="margin: 0px !important; padding: 0px !important; min-height: auto !important; height: auto !important;">
-                <div class="col-auto position-offset-label">
-                  <div class="text-subtitle2 text-weight-bold text-primary text-center">
-                    Tilt<br>Offset
-                  </div>
-                </div>
-                <div class="col-auto">
-                  <q-input v-model="inputs[2]" @input="(val: string) => onInputChange(2, val)" dense outlined
-                    type="number" step="0.01" label="Tilt"
-                    style="width: 84px !important; min-width: 84px !important; max-width: 84px !important;" />
-                </div>
-                <div class="col-auto">
-                  <div class="vertical-button-group">
-                    <div class="vertical-buttons">
-                      <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(2)" />
-                      <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
+                <!-- Tilt Offset -->
+                <div class="col-auto" style="margin-left: 40px !important;">
+                  <div class="row q-gutter-xs align-center">
+                    <div class="col-auto position-offset-label">
+                      <div class="text-subtitle2 text-weight-bold text-primary text-center">
+                        Tilt<br>Offset
+                      </div>
                     </div>
-                    <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(2)" />
+                    <div class="col-auto">
+                      <q-input v-model="inputs[2]" @input="(val: string) => onInputChange(2, val)" dense outlined
+                        type="number" step="0.01" label="Tilt"
+                        style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                    </div>
+                    <div class="col-auto">
+                      <div class="vertical-button-group">
+                        <div class="vertical-buttons">
+                          <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(2)" />
+                          <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
+                        </div>
+                        <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(2)" />
+                      </div>
+                    </div>
+                    <div class="col-auto">
+                      <q-input v-model="outputs[2]" dense outlined readonly label="Output"
+                        style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                    </div>
                   </div>
                 </div>
-                <div class="col-auto">
-                  <q-input v-model="outputs[2]" dense outlined readonly label="Output"
-                    style="width: 84px !important; min-width: 84px !important; max-width: 84px !important;" />
-                </div>
-              </div>
-            </q-card-section>
-          </q-card>
-        </div>
 
-        <!-- Time Offset - 개별 테두리 -->
-        <div class="col-auto" style="margin-left: 8px !important;">
-          <q-card flat bordered class="control-card">
-            <q-card-section class="compact-control purple-1"
-              style="padding: 0px 8px !important; padding-top: 0px !important; padding-bottom: 0px !important; margin: 0px !important; min-height: auto !important; height: auto !important; line-height: 1 !important; vertical-align: top !important;">
-              <div class="row q-gutter-xs align-center"
-                style="margin: 0px !important; padding: 0px !important; min-height: auto !important; height: auto !important;">
-                <div class="col-auto position-offset-label">
-                  <div class="text-subtitle2 text-weight-bold text-primary text-center">
-                    Time<br>Offset
-                  </div>
-                </div>
-                <div class="col-auto">
-                  <q-input v-model="inputs[3]" @input="(val: string) => onInputChange(3, val)" dense outlined
-                    type="number" step="0.01" label="Time"
-                    style="width: 84px !important; min-width: 84px !important; max-width: 84px !important;" />
-                </div>
-                <div class="col-auto">
-                  <div class="vertical-button-group">
-                    <div class="vertical-buttons">
-                      <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(3)" />
-                      <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
+                <!-- Time Offset -->
+                <div class="col-auto" style="margin-left: 40px !important;">
+                  <div class="row q-gutter-xs align-center">
+                    <div class="col-auto position-offset-label">
+                      <div class="text-subtitle2 text-weight-bold text-primary text-center">
+                        Time<br>Offset
+                      </div>
                     </div>
-                    <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(3)" />
+                    <div class="col-auto">
+                      <q-input v-model="inputs[3]" @input="(val: string) => onInputChange(3, val)" dense outlined
+                        type="number" step="0.01" label="Time"
+                        style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                    </div>
+                    <div class="col-auto">
+                      <div class="vertical-button-group">
+                        <div class="vertical-buttons">
+                          <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(3)" />
+                          <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
+                        </div>
+                        <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(3)" />
+                      </div>
+                    </div>
+                    <div class="col-auto">
+                      <q-input v-model="outputs[3]" dense outlined readonly label="Result"
+                        style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                    </div>
+                    <div class="col-auto">
+                      <q-input v-model="formattedCalTime" dense outlined readonly label="Cal Time"
+                        style="width: 210px !important; min-width: 210px !important; max-width: 210px !important;" />
+                    </div>
                   </div>
-                </div>
-                <div class="col-auto">
-                  <q-input v-model="outputs[3]" dense outlined readonly label="Result"
-                    style="width: 84px !important; min-width: 84px !important; max-width: 84px !important;" />
-                </div>
-                <div class="col-auto">
-                  <q-input v-model="formattedCalTime" dense outlined readonly label="Cal Time"
-                    style="width: 190px !important; min-width: 190px !important; max-width: 190px !important;" />
                 </div>
               </div>
             </q-card-section>
