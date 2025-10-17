@@ -196,7 +196,7 @@
                       <span class="info-label">시작/종료 시간:</span>
                       <span class="info-value">{{
                         formatToLocalTime(selectedScheduleInfo.startTime)
-                        }} / {{
+                      }} / {{
                           formatToLocalTime(selectedScheduleInfo.endTime)
                         }}</span>
                     </div>
@@ -1139,74 +1139,65 @@ const initChart = () => {
 
   // 차트 크기 조정
   setTimeout(() => {
-    if (chart && !chart.isDisposed()) {
-      chart.resize({
-        width: 374,
-        height: 374
+    if (chart && !chart.isDi  osed()) {
+      char  resize({
+        width: 374          height: 374
       })
-      console.log('차트 리사이즈 완료')
+      console.log  차트 리사이즈 완료')
     }
   }, 100)
 
   // 윈도우 리사이즈 이벤트에 대응
-  window.addEventListener('resize', () => {
-    chart?.resize({
+  window.addEventListener('resize', () =>
+    chart?.re    ({
       width: 374,
-      height: 374
-    })
-  })
-}
+      height:
+    })   })
 
-// ✅ 최적화된 차트 업데이트 함수 (완전 교체)
-// ✅ 타입 안전한 객체 재사용 변수들로 수정
+// ✅    된 차트 업데이트 함수 (완전
+// ✅ 타입 안전한 객체 재사용    로 수정
 
 // ✅ 성능 측정 변수들 추가
-/* const performanceStats = {
+/* c     performanceStats = {
   updateChartTime: 0,
   trackingPathUpdateTime: 0,
   chartSetOptionTime: 0,
-  totalUpdateCount: 0,
-  slowUpdateCount: 0,
+  totalUpdateCount:      slowUpdateCount: 0,
 } */
-
-// ✅ updateChart 함수 - 비동기 Worker 활용
-/* const updateChart = () => {
+      updateChart 함수 - 비동기 Worker 활용
+/* const updateChart = (
   if (!chart) {
-    console.error('차트가 초기화되지 않았습니다.')
+    console.error('차트가 초     않았습니다.')
     return
   }
 
-  try {
-    let azimuth = 0
+  t         let azimuth = 0
     let elevation = 0
 
-    // ✅ 추적 상태에 따라 다른 데이터 소스 사용
-    const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
+    // ✅ 추적 상태에       데이터 소스 사용
+    const isTrackingActive = icdS    .ephemerisTrackingState === "TRACKING" || icdStore.passSche    StatusInfo.isActive
 
     azimuth = isTrackingActive
-      ? parseFloat(icdStore.trackingActualAzimuthAngle) || 0
-      : parseFloat(icdStore.azimuthAngle) || 0
+      ?    seFloat(icdStore.trackingAc    AzimuthAngle) || 0
+      : parseFloat(icdStore.azimuthAng    || 0
     elevation = isTrackingActive
-      ? parseFloat(icdStore.trackingActualElevationAngle) || 0
-      : parseFloat(icdStore.elevationAngle) || 0
+          rseFloat(icdStore.trackingActualElevationAngle) || 0
+      : parseFloat    Store.elevationAngle) || 0
 
-    const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
-    const normalizedEl = Math.max(0, Math.min(90, elevation))
+    const normalizedAz = azimuth < 0 ? azi     + 360 : azimuth
+    const normali    l = Math.max(0, Math.min(90, elevation))
 
-    // 현재 위치 정보 업데이트 (원본 값 표시)
-    currentPosition.value.azimuth = azimuth  // 원본 값 (정규화 전)
-    currentPosition.value.elevation = elevation
-    currentPosition.value.date = date.formatDate(new Date(), 'YYYY/MM/DD')
-    currentPosition.value.time = date.formatDate(new Date(), 'HH:mm:ss')
+    // 현재 위치      이트 (원본 값 표시)
+    currentPosition.val      muth = azimuth  // 원본 값 (정규화 전)
+    currentPosition.value.e    tio    elevation
+    currentPosition.valu    te = date.formatDate(ne      (), 'YYYY/                    osition.value.time = date.formatDate(n        ),         s')
+        ✅           rker를 통한 비동기 경로 처리
+    if (icdSt          risTrackingState === "TRACKING") {
+      // ✅ 비동기 호출        기다리         최적화        v    ephemerisStore.updateTrackingPath(azimuth, elevation)
 
-    // ✅ 추적 중일 때 Worker를 통한 비동기 경로 처리
-    if (icdStore.ephemerisTrackingState === "TRACKING") {
-      // ✅ 비동기 호출이지만 결과를 기다리지 않음 (성능 최적화)
-      void ephemerisStore.updateTrackingPath(azimuth, elevation)
-    }
 
-    // ✅ 차트 업데이트 (Worker에서 처리된 결과 사용)
-    const updateOption = {
+    // ✅ 차트 업데이트 (Worker에서 처   결과 사용)
+    const     teOption = {
       series: [
         {
           data: [[normalizedEl, normalizedAz]],
