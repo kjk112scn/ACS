@@ -195,7 +195,7 @@
                       <span class="info-label">시작/종료 시간:</span>
                       <span class="info-value">{{
                         formatToLocalTime(selectedScheduleInfo.startTime)
-                        }} / {{
+                      }} / {{
                           formatToLocalTime(selectedScheduleInfo.endTime)
                         }}</span>
                     </div>
@@ -1904,7 +1904,7 @@ onUnmounted(() => {
 .flexible-offset-layout {
   display: flex;
   align-items: stretch;
-  justify-content: flex-start;
+  justify-content: center;
   width: 100%;
   gap: 40px;
   row-gap: 8px;
@@ -1915,7 +1915,7 @@ onUnmounted(() => {
 .offset-group {
   flex: none;
   min-width: 0;
-  padding: 8px;
+  padding: 4px 8px;
   border-radius: 4px;
   background-color: rgba(255, 255, 255, 0.01);
   display: flex;
@@ -2338,6 +2338,7 @@ onUnmounted(() => {
   line-height: 1 !important;
   vertical-align: top !important;
 }
+
 
 .q-card.control-card .q-card__section {
   padding-top: 0px !important;
