@@ -5,8 +5,7 @@
       <div class="row q-col-gutter-md q-mb-sm">
         <div class="col-12">
           <q-card flat bordered class="control-card">
-            <q-card-section class="compact-control purple-1"
-              style="padding: 0px 8px !important; padding-top: 0px !important; padding-bottom: 0px !important; margin: 0px !important; min-height: auto !important; height: auto !important; line-height: 1 !important; vertical-align: top !important;">
+            <q-card-section class="compact-control purple-1">
               <!-- 모든 간격이 동적으로 조정되는 반응형 레이아웃 -->
               <div class="flexible-offset-layout">
                 <!-- Azimuth Offset -->
@@ -19,8 +18,7 @@
                     </div>
                     <div class="col-auto">
                       <q-input v-model="inputs[0]" @input="(val: string) => onInputChange(0, val)" dense outlined
-                        type="number" step="0.01" label="Azimuth"
-                        style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                        type="number" step="0.01" label="Azimuth" class="offset-input" />
                     </div>
                     <div class="col-auto">
                       <div class="vertical-button-group">
@@ -136,8 +134,8 @@
 
       <!-- 2행: Main Content -->
       <div class="row q-col-gutter-md">
-        <!-- 1번 영역: 차트가 들어갈 네모난 칸 -->
-        <div class="col-12 col-md-3">
+        <!-- 1번 영역: 차트가 들어갈 네모난 칸 - 반응형 크기 조정 -->
+        <div class="col-12 col-md-3 col-lg-3 col-xl-3">
           <q-card class="control-section">
             <q-card-section>
               <div class="text-subtitle1 text-weight-bold text-primary">Position View</div>
@@ -940,7 +938,7 @@ const updateChart = () => {
     }
   })
 }
-// ✅ 차트 초기화 함수 수정
+// ✅ 차트 초기화 함수 수정 - 반응형 크기
 const initChart = () => {
   if (!chartRef.value) return
 
@@ -949,10 +947,21 @@ const initChart = () => {
     chart.dispose()
   }
 
-  // 차트 인스턴스 생성 (크기 제한)
+  // 화면 크기에 따른 차트 크기 결정
+  const getChartSize = () => {
+    const width = window.innerWidth
+    if (width <= 1200) return 280
+    if (width <= 1600) return 320
+    if (width <= 1900) return 360
+    return 420
+  }
+
+  const chartSize = getChartSize()
+
+  // 차트 인스턴스 생성 (반응형 크기)
   chart = echarts.init(chartRef.value, null, {
-    width: 374,
-    height: 374
+    width: chartSize,
+    height: chartSize
   })
   console.log('차트 인스턴스 생성됨')
 
@@ -1128,11 +1137,11 @@ const initChart = () => {
     ],
   }
 
-  // 차트 옵션 적용 (크기 명시)
+  // 차트 옵션 적용 (반응형 크기)
   chart.setOption(option, true)
   chart.resize({
-    width: 374,
-    height: 374
+    width: chartSize,
+    height: chartSize
   })
   console.log('차트 옵션 적용됨')
 
@@ -1140,18 +1149,19 @@ const initChart = () => {
   setTimeout(() => {
     if (chart && !chart.isDisposed()) {
       chart.resize({
-        width: 374,
-        height: 374
+        width: chartSize,
+        height: chartSize
       })
       console.log('차트 리사이즈 완료')
     }
   }, 100)
 
-  // 윈도우 리사이즈 이벤트에 대응
+  // 윈도우 리사이즈 이벤트에 대응 (반응형)
   window.addEventListener('resize', () => {
+    const newSize = getChartSize()
     chart?.resize({
-      width: 374,
-      height: 374
+      width: newSize,
+      height: newSize
     })
   })
 }
@@ -1945,32 +1955,44 @@ onUnmounted(() => {
   min-width: 190px;
 }
 
-/* 반응형 동작 - 더 일찍 세로 배치 */
-@media (max-width: 1000px) {
+/* 반응형 동작 - 1900px 기준으로 줄바꿈 */
+@media (max-width: 1900px) {
   .flexible-offset-layout {
-    flex-direction: column;
-    gap: 12px;
-    align-items: stretch;
+    flex-wrap: wrap;
+    gap: 20px;
+    row-gap: 8px;
+    justify-content: center;
   }
 
   .offset-group {
     flex: none;
-    width: 100%;
-    padding: 12px;
+    min-width: 0;
+    padding: 8px;
   }
 
   .position-offset-label {
     min-width: 70px;
-    font-size: 0.75rem;
+    font-size: 0.8rem;
   }
 
   .cal-time-field {
-    min-width: 100%;
-    max-width: 100%;
+    min-width: 180px;
+    max-width: 200px;
   }
 }
 
-@media (min-width: 1001px) {
+@media (min-width: 1901px) {
+  .flexible-offset-layout {
+    flex-wrap: nowrap;
+    gap: 40px;
+    justify-content: center;
+  }
+
+  .offset-group {
+    flex: none;
+    min-width: 0;
+  }
+
   .position-offset-label {
     min-width: 80px;
     font-size: 0.875rem;
@@ -1982,14 +2004,12 @@ onUnmounted(() => {
   width: 100%;
 }
 
-.ephemeris-container {
-  padding: 0px !important;
-  padding-top: 1px !important;
-  /* 상단 패딩 1px로 설정 */
+/* ✅ 외각 공간 제어 - 단순화 */
+.ephemeris-mode .ephemeris-container {
+  padding: 0;
   width: 100%;
   height: 100%;
-  margin-top: 0px !important;
-  /* 상단 마진 제거 */
+  margin: 0;
 }
 
 .section-title {
@@ -2006,24 +2026,63 @@ onUnmounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
+.control-section .q-card-section {
+  padding: 16px !important;
+}
+
 .chart-area {
   height: 220px;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0.5rem auto;
-  padding: 8px;
+  margin: 0 auto;
+  padding: 0;
   box-sizing: border-box;
   overflow: visible;
+  text-align: center;
+  position: relative;
 }
 
+/* ✅ 차트 컨테이너 완전 가운데 정렬 - 이전 크기로 복원, 아래로 조정 */
 .chart-area>div {
-  width: 374px !important;
-  height: 374px !important;
-  max-width: 374px !important;
-  max-height: 374px !important;
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  transform: translate(-50%, -50%);
+  width: 420px;
+  height: 420px;
+  max-width: 420px;
+  max-height: 420px;
   aspect-ratio: 1;
+}
+
+/* 반응형 차트 크기 조정 - 이전 크기로 복원, 아래로 조정 */
+@media (max-width: 1900px) {
+  .chart-area>div {
+    width: 360px;
+    height: 360px;
+    max-width: 360px;
+    max-height: 360px;
+  }
+}
+
+@media (max-width: 1600px) {
+  .chart-area>div {
+    width: 320px;
+    height: 320px;
+    max-width: 320px;
+    max-height: 320px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .chart-area>div {
+    width: 280px;
+    height: 280px;
+    max-width: 280px;
+    max-height: 280px;
+  }
 }
 
 .ephemeris-form {
@@ -2066,7 +2125,7 @@ onUnmounted(() => {
 
 /* TLE Data 카드 패딩 축소 */
 .tle-data-card .q-card-section {
-  padding: 8px 16px !important;
+  padding: 16px !important;
 }
 
 /* 스케줄 테이블 스타일 */
@@ -2108,107 +2167,90 @@ onUnmounted(() => {
   flex: 1;
 }
 
-/* 컴팩트 컨트롤 스타일 */
-.compact-control {
-  padding: 0.5rem !important;
+/* ✅ 컴팩트 컨트롤 스타일 - 정리 */
+.ephemeris-mode .compact-control {
+  padding: 0 8px;
+  margin: 0;
+  min-height: auto;
+  height: auto;
+  line-height: 1;
+  vertical-align: top;
 }
 
-.compact-control .q-input {
-  margin-bottom: 0.25rem !important;
+.ephemeris-mode .compact-control .q-input {
+  margin-bottom: 0.25rem;
 }
 
-.compact-control .q-btn {
-  min-height: 2rem !important;
-  padding: 0.25rem !important;
+.ephemeris-mode .compact-control .q-btn {
+  min-height: 2rem;
+  padding: 0.25rem;
 }
 
-/* 가로 배치를 위한 정렬 스타일 */
-.align-center {
-  align-items: center !important;
+/* ✅ 레이아웃 정렬 스타일 - 정리 */
+.ephemeris-mode .align-center {
+  align-items: center;
 }
 
-.justify-end {
+.ephemeris-mode .justify-end {
   justify-content: flex-end;
 }
 
-.justify-center {
+.ephemeris-mode .justify-center {
   justify-content: center;
 }
 
-/* 입력창과 버튼이 같은 높이에 오도록 */
-.compact-control .row.align-center {
-  display: flex !important;
-  align-items: center !important;
-  flex-wrap: nowrap !important;
+/* ✅ 컴팩트 컨트롤 레이아웃 */
+.ephemeris-mode .compact-control .row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  width: 100%;
 }
 
-.compact-control .q-field {
-  margin-bottom: 0 !important;
+.ephemeris-mode .compact-control .q-field {
+  margin-bottom: 0;
 }
 
-/* 모든 요소가 한 줄에 배치되도록 강제 */
-.compact-control .row {
-  display: flex !important;
-  flex-wrap: nowrap !important;
-  align-items: center !important;
+.ephemeris-mode .compact-control .col-auto {
+  flex-shrink: 0;
 }
 
-.compact-control .col-3,
-.compact-control .col-6,
-.compact-control .col-2,
-.compact-control .col-4 {
-  flex-shrink: 0 !important;
+/* ✅ 세부 레이아웃 스타일 - 정리 */
+.ephemeris-mode .compact-control .row .row {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 0.25rem;
 }
 
-/* 강제 가로 배치 */
-.compact-control .row {
-  display: flex !important;
-  flex-direction: row !important;
-  flex-wrap: nowrap !important;
-  align-items: center !important;
-  width: 100% !important;
+.ephemeris-mode .compact-control .text-subtitle2 {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-size: 0.9rem;
+  white-space: nowrap;
 }
 
-.compact-control .col-3,
-.compact-control .col-6,
-.compact-control .col-2,
-.compact-control .col-4 {
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: center !important;
-  align-items: stretch !important;
+.ephemeris-mode .compact-control .col-1 {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: fit-content;
 }
 
-/* 입력창과 버튼 컨테이너 */
-.compact-control .row .row {
-  display: flex !important;
-  flex-direction: row !important;
-  justify-content: center !important;
-  align-items: center !important;
-  gap: 0.25rem !important;
+/* ✅ 입력 필드 스타일 - 통일 */
+.ephemeris-mode .offset-input {
+  width: 110px;
+  min-width: 110px;
+  max-width: 110px;
 }
 
-/* 라벨과 입력창을 같은 높이에 배치 */
-.compact-control .text-subtitle2 {
-  display: flex !important;
-  align-items: center !important;
-  height: 100% !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-/* 라벨 컨테이너 */
-.compact-control .col-1 {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  min-width: fit-content !important;
-}
-
-/* 라벨 텍스트 크기 조정 */
-.compact-control .text-subtitle2 {
-  font-size: 0.9rem !important;
-  white-space: nowrap !important;
+.ephemeris-mode .cal-time-field {
+  min-width: 190px;
+  max-width: 220px;
 }
 
 /* 간격 제거로 더 타이트하게 */
