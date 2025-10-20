@@ -181,8 +181,8 @@ class PushDataController(
                 val currentSessionCount = connectedSessions.size
                 if (currentSessionCount != lastSessionCount) {
                     val count = dataGenerationCount.incrementAndGet()
-                    logger.debug("🆕 실시간 데이터 생성 및 브로드캐스트 완료 ({}자) - 세션 수 변동: {} → {}", 
-                        realtimeData.length, lastSessionCount, currentSessionCount)
+                    // logger.debug("🆕 실시간 데이터 생성 및 브로드캐스트 완료 ({}자) - 세션 수 변동: {} → {}", 
+                    //     realtimeData.length, lastSessionCount, currentSessionCount)
                 } else {
                     // 세션 수가 동일하면 카운터만 증가
                     dataGenerationCount.incrementAndGet()
