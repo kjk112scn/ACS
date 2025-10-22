@@ -1352,6 +1352,52 @@ class PassScheduleService(
 
                 logger.debug("패스 #$globalMstId: 시작=$startTimeWithMs, 종료=$endTimeWithMs")
 
+                // ✅ 메타데이터 필드 에러 해결: trackingData에서 직접 계산
+                val maxElevationData = pass.trackingData.maxByOrNull { it.elevation }
+                val startData = pass.trackingData.firstOrNull()
+                val endData = pass.trackingData.lastOrNull()
+                
+                // 속도/가속도 계산 (간단한 방식)
+                var maxAzRate = 0.0
+                var maxElRate = 0.0
+                var maxAzAccel = 0.0
+                var maxElAccel = 0.0
+                
+                if (pass.trackingData.size >= 2) {
+                    var prevAz: Double? = null
+                    var prevEl: Double? = null
+                    var prevTime: java.time.ZonedDateTime? = null
+                    var prevAzRate: Double? = null
+                    var prevElRate: Double? = null
+                    
+                    pass.trackingData.forEach { data ->
+                        if (prevAz != null && prevEl != null && prevTime != null) {
+                            val timeDiff = java.time.Duration.between(prevTime, data.timestamp).toMillis() / 1000.0
+                            if (timeDiff > 0.001) {
+                                val azRate = (data.azimuth - prevAz!!) / timeDiff
+                                val elRate = (data.elevation - prevEl!!) / timeDiff
+                                
+                                maxAzRate = maxOf(maxAzRate, kotlin.math.abs(azRate))
+                                maxElRate = maxOf(maxElRate, kotlin.math.abs(elRate))
+                                
+                                if (prevAzRate != null && prevElRate != null) {
+                                    val azAccel = (azRate - prevAzRate!!) / timeDiff
+                                    val elAccel = (elRate - prevElRate!!) / timeDiff
+                                    
+                                    maxAzAccel = maxOf(maxAzAccel, kotlin.math.abs(azAccel))
+                                    maxElAccel = maxOf(maxElAccel, kotlin.math.abs(elAccel))
+                                }
+                                
+                                prevAzRate = azRate
+                                prevElRate = elRate
+                            }
+                        }
+                        prevAz = data.azimuth
+                        prevEl = data.elevation
+                        prevTime = data.timestamp
+                    }
+                }
+
                 passScheduleTrackMst.add(
                     mapOf(
                         "No" to globalMstId.toUInt(),
@@ -1360,16 +1406,16 @@ class PassScheduleService(
                         "StartTime" to startTimeWithMs,
                         "EndTime" to endTimeWithMs,
                         "Duration" to pass.getDurationString(),
-                        "MaxElevation" to pass.maxElevation,
-                        "MaxElevationTime" to pass.maxElevationTime,
-                        "StartAzimuth" to pass.startAzimuth,
-                        "StartElevation" to pass.startElevation,
-                        "EndAzimuth" to pass.endAzimuth,
-                        "EndElevation" to pass.endElevation,
-                        "MaxAzRate" to pass.maxAzimuthRate,
-                        "MaxElRate" to pass.maxElevationRate,
-                        "MaxAzAccel" to pass.maxAzimuthAccel,
-                        "MaxElAccel" to pass.maxElevationAccel,
+                        "MaxElevation" to (maxElevationData?.elevation ?: 0.0),
+                        "MaxElevationTime" to (maxElevationData?.timestamp ?: startTimeWithMs),
+                        "StartAzimuth" to (startData?.azimuth ?: 0.0),
+                        "StartElevation" to (startData?.elevation ?: 0.0),
+                        "EndAzimuth" to (endData?.azimuth ?: 0.0),
+                        "EndElevation" to (endData?.elevation ?: 0.0),
+                        "MaxAzRate" to maxAzRate,
+                        "MaxElRate" to maxElRate,
+                        "MaxAzAccel" to maxAzAccel,
+                        "MaxElAccel" to maxElAccel,
                         "CreationDate" to creationDate,
                         "Creator" to creator
                     )

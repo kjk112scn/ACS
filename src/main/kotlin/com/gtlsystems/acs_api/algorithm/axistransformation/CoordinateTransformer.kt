@@ -1,10 +1,14 @@
 package com.gtlsystems.acs_api.algorithm.axistransformation
 
 import kotlin.math.*
+import org.springframework.stereotype.Service
 
 /**
  * 좌표계 변환을 위한 유틸리티 클래스
+ * 
+ * ✅ Spring Bean으로 등록하여 의존성 주입 가능
  */
+@Service
 class CoordinateTransformer {
 
     companion object {

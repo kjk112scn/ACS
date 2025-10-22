@@ -1,12 +1,16 @@
 package com.gtlsystems.acs_api.algorithm.axislimitangle
 
 import org.slf4j.LoggerFactory
+import org.springframework.stereotype.Service
 import kotlin.math.abs
 
 /**
  * 축 제한 각도 계산 클래스
  * 0~360도 방위각을 포지셔너 ±270도 범위로 변환 (회전 방향성 보장)
+ * 
+ * ✅ Spring Bean으로 등록하여 의존성 주입 가능
  */
+@Service
 class LimitAngleCalculator {
     private val logger = LoggerFactory.getLogger(javaClass)
 

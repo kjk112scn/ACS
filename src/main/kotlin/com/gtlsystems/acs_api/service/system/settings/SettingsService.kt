@@ -150,6 +150,11 @@ class SettingsService(
         "system.jvm.heapRegionSize" to SettingDefinition("system.jvm.heapRegionSize", 16L, SettingType.LONG, "힙 영역 크기 (MB)"),
         "system.jvm.concurrentThreads" to SettingDefinition("system.jvm.concurrentThreads", 4L, SettingType.LONG, "동시 스레드 수"),
         "system.jvm.parallelThreads" to SettingDefinition("system.jvm.parallelThreads", 8L, SettingType.LONG, "병렬 스레드 수"),
+
+        // === Ephemeris Tracking 설정 ===
+        "ephemeris.tracking.sourceMinElevationAngle" to SettingDefinition("ephemeris.tracking.sourceMinElevationAngle", -7.0, SettingType.DOUBLE, "원본 2축 위성 추적 데이터 생성 시 최소 Elevation 각도 (도). Orekit 계산 시 사용되는 2축 좌표계 기준. Tilt 각도 보정을 위해 음수 값 허용. 기본값은 -abs(tiltAngle)로 자동 계산 권장 (예: Tilt -7° → -7.0°). 사용자가 수동으로 조정 가능."),
+        "ephemeris.tracking.displayMinElevationAngle" to SettingDefinition("ephemeris.tracking.displayMinElevationAngle", 0.0, SettingType.DOUBLE, "3축 변환 및 방위각 제한 완료 후 화면에 표시할 최소 Elevation 각도 (도). 이 값 미만의 데이터는 차트 및 테이블에 표시되지 않음. 백엔드는 모든 데이터를 저장하며, 프론트엔드에서만 필터링됨."),
+        "ephemeris.tracking.keyholeAzimuthVelocityThreshold" to SettingDefinition("ephemeris.tracking.keyholeAzimuthVelocityThreshold", 10.0, SettingType.DOUBLE, "KEYHOLE 위성 판단을 위한 Azimuth 각속도 임계값 (도/초). 전체 추적 구간에서 최대 Azimuth 각속도가 이 값 이상이면 KEYHOLE 위성으로 판단. KEYHOLE 위성은 최대 Elevation 지점의 Azimuth 각도를 Train 각도로 사용."),
     )
 
     // 기본값과 타입 매핑 자동 생성
@@ -989,6 +994,11 @@ class SettingsService(
             event.key.startsWith("system.storage.") -> "ms"
             event.key.startsWith("system.suntrack.") -> "도"
             event.key.startsWith("system.jvm.") -> "ms" // JVM 튜닝 설정 단위 추가
+            event.key.startsWith("ephemeris.tracking.") -> when {
+                event.key.contains("VelocityThreshold") -> "도/초"
+                event.key.contains("ElevationAngle") -> "도"
+                else -> "도"
+            }
             else -> ""
         }
         
@@ -1039,6 +1049,77 @@ class SettingsService(
             event.key.startsWith("system.jvm.") -> { // JVM 튜닝 설정 변경 시 처리 로직
                 // 시스템 JVM 설정 변경 시 처리 로직
             }
+            event.key.startsWith("ephemeris.tracking.") -> {
+                // Ephemeris Tracking 설정 변경 시 처리 로직
+                logger.info("Ephemeris Tracking 설정 변경: ${event.key} = ${event.value}")
+            }
         }
     }
+
+    // === Ephemeris Tracking 개별 설정 프로퍼티들 ===
+    
+    /**
+     * 원본 2축 위성 추적 데이터 생성 시 최소 Elevation 각도 (도)
+     * 
+     * ## 용도
+     * - Orekit 계산 시 사용되는 2축 좌표계 기준 최소 고도각
+     * - Tilt 각도 보정을 고려하여 음수 값 허용
+     * 
+     * ## 기본값 계산 로직
+     * - 자동 계산 권장: -abs(tiltAngle)
+     * - 예: Tilt가 -7°인 경우 → sourceMinElevationAngle = -7.0°
+     * 
+     * ## 사용자 수동 조정
+     * - 필요 시 사용자가 직접 값을 변경 가능
+     * - 범위: -90.0° ~ 90.0°
+     * 
+     * @see OrekitCalculator.generateSatelliteTrackingSchedule
+     * @see displayMinElevationAngle 최종 표시용 필터링 기준
+     */
+    val sourceMinElevationAngle: Double by createSettingProperty("ephemeris.tracking.sourceMinElevationAngle", "원본 2축 위성 추적 데이터 생성 시 최소 Elevation 각도")
+
+    /**
+     * 3축 변환 및 방위각 제한 완료 후 화면에 표시할 최소 Elevation 각도 (도)
+     * 
+     * ## 용도
+     * - 최종 변환 완료된 3축 데이터의 화면 표시 필터링 기준
+     * - 차트, 테이블 등 UI 컴포넌트에서 사용
+     * 
+     * ## 데이터 저장 vs 표시
+     * - **백엔드**: 모든 데이터 저장 (음수 Elevation 포함)
+     * - **프론트엔드**: 이 설정값 기준으로 필터링하여 표시
+     * 
+     * ## 기본값
+     * - 0.0° (지평선 기준)
+     * - 범위: -90.0° ~ 90.0°
+     * 
+     * @see sourceMinElevationAngle 원본 데이터 생성 기준
+     * @see ephemerisTrackService.fetchEphemerisDetailData 프론트엔드 필터링 위치
+     */
+    val displayMinElevationAngle: Double by createSettingProperty("ephemeris.tracking.displayMinElevationAngle", "3축 변환 및 방위각 제한 완료 후 화면에 표시할 최소 Elevation 각도")
+
+    /**
+     * KEYHOLE 위성 판단을 위한 Azimuth 각속도 임계값 (도/초)
+     * 
+     * ## 용도
+     * - LEO 위성의 고속 통과(KEYHOLE) 자동 판단 기준
+     * - 전체 추적 구간에서 최대 Azimuth 각속도 비교
+     * 
+     * ## 판단 로직
+     * - maxAzimuthRate >= keyholeAzimuthVelocityThreshold → KEYHOLE 위성
+     * - KEYHOLE 위성: Train 각도를 최대 Elevation 지점의 Azimuth로 설정
+     * 
+     * ## 기본값
+     * - 10.0 도/초 (초당 10도 이상 회전)
+     * 
+     * @see EphemerisService.analyzeKeyholeStatus
+     * @see SatelliteTrackingPass.maxAzimuthRate
+     */
+    val keyholeAzimuthVelocityThreshold: Double by createSettingProperty("ephemeris.tracking.keyholeAzimuthVelocityThreshold", "KEYHOLE 위성 판단을 위한 Azimuth 각속도 임계값")
+
+    /**
+     * Ephemeris Tracking 설정 그룹 조회
+     * @return Ephemeris Tracking 설정 맵
+     */
+    fun getEphemerisTrackingSettings(): Map<String, Any> = settings.filterKeys { it.startsWith("ephemeris.tracking.") }
 }

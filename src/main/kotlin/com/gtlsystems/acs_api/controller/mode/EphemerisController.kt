@@ -171,12 +171,35 @@ class EphemerisController(
         return ephemerisService.generateEphemerisDesignationTrackAsync(
             request.tleLine1, request.tleLine2, request.satelliteName
         ).map { (mstData, dtlData) ->
-            mapOf<String, Any>(  // ? 데이터 타입 정의
-                "message" to "추적 데이터가 성공적으로 생성되었습니다.", "mstCount" to mstData.size, "dtlCount" to dtlData.size
+            // KEYHOLE 위성 분석 및 로깅
+            val keyholeSchedules = mstData.filter { it["IsKeyhole"] == true }
+            val totalSchedules = mstData.size
+            
+            logger.info("🚀 위성 추적 데이터 생성 완료:")
+            logger.info("  - 총 스케줄: ${totalSchedules}개")
+            logger.info("  - KEYHOLE 위성: ${keyholeSchedules.size}개")
+            
+            if (keyholeSchedules.isNotEmpty()) {
+                logger.info("🔍 KEYHOLE 위성 상세 정보:")
+                keyholeSchedules.forEach { schedule ->
+                    val satelliteName = schedule["SatelliteName"] as? String ?: "Unknown"
+                    val maxAzRate = schedule["MaxAzRate"] as? Double ?: 0.0
+                    val recommendedTrainAngle = schedule["RecommendedTrainAngle"] as? Double ?: 0.0
+                    logger.info("  - $satelliteName: 최대 Az 속도=${maxAzRate}°/s, 권장 Train 각도=${recommendedTrainAngle}°")
+                }
+            }
+            
+            mapOf<String, Any>(
+                "message" to "추적 데이터가 성공적으로 생성되었습니다.", 
+                "mstCount" to mstData.size, 
+                "dtlCount" to dtlData.size,
+                "keyholeCount" to keyholeSchedules.size,
+                "totalSchedules" to totalSchedules
             )
         }.onErrorReturn(
-            mapOf<String, Any>(  // ? 데이터 타입 정의
-                "message" to "추적 데이터 생성 실패", "error" to "추적 데이터 생성에 실패했습니다."
+            mapOf<String, Any>(
+                "message" to "추적 데이터 생성 실패", 
+                "error" to "추적 데이터 생성에 실패했습니다."
             )
         )
     }
@@ -284,95 +307,95 @@ class EphemerisController(
     }
 
     
-/**
+
+    /**
      * 특정 추적 데이터를 CSV 형식으로 내보냅니다.
      */
-    // ❌ 현재 사용하지 않음.
-    // @PostMapping("/export/csv/{mstId}")
-    // @Operation(
-    //     operationId = "exportephemerisdata", tags = ["Mode - Ephemeris"]
-    // )
-    // fun exportMstDataToCsv(
-    //     @Parameter(
-    //         description = "추적 데이터 목록 ID", example = "1", required = true
-    //     ) @PathVariable mstId: Int, @Parameter(
-    //         description = "CSV 내보내기 디렉토리 경로 (기본값: csv_exports)", example = "csv_exports", required = false
-    //     ) @RequestParam(defaultValue = "csv_exports") outputDirectory: String
-    // ): Mono<Map<String, Any>> {
-    //     return Mono.fromCallable {
-    //         try {
-    //             val result = ephemerisService.exportMstDataToCsv(mstId, outputDirectory)
+    @PostMapping("/export/csv/{mstId}")
+    @Operation(
+        operationId = "exportMstDataToCsv", tags = ["Mode - Ephemeris"]
+    )
+    fun exportMstDataToCsv(
+        @Parameter(
+            description = "추적 데이터 목록 ID", example = "1", required = true
+        ) @PathVariable mstId: Int, 
+        @Parameter(
+            description = "CSV 내보내기 디렉토리 경로 (기본값: csv_exports)", example = "csv_exports", required = false
+        ) @RequestParam(defaultValue = "csv_exports") outputDirectory: String
+    ): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            try {
+                val result = ephemerisService.exportMstDataToCsv(mstId, outputDirectory)
 
-    //             if (result["success"] == true) {
-    //                 mapOf(
-    //                     "success" to true,
-    //                     "message" to "MST ID $mstId 데이터가 CSV 형식으로 내보내졌습니다.",
-    //                     "filename" to (result["filename"] ?: ""),
-    //                     "filePath" to (result["filePath"] ?: ""),
-    //                     "satelliteName" to (result["satelliteName"] ?: ""),
-    //                     "originalDataCount" to (result["originalDataCount"] ?: 0),
-    //                     "axisTransformedDataCount" to (result["axisTransformedDataCount"] ?: 0),
-    //                     "finalTransformedDataCount" to (result["finalTransformedDataCount"] ?: 0)
-    //                 )
-    //             } else {
-    //                 mapOf(
-    //                     "success" to false,
-    //                     "message" to "CSV 내보내기 실패: ${result["error"] ?: "알 수 없는 오류"}",
-    //                     "error" to (result["error"] ?: "알 수 없는 오류")
-    //                 )
-    //             }
-    //         } catch (e: Exception) {
-    //             mapOf(
-    //                 "success" to false,
-    //                 "message" to "CSV 내보내기 중 오류 발생: ${e.message ?: "알 수 없는 오류"}",
-    //                 "error" to (e.message ?: "알 수 없는 오류")
-    //             )
-    //         }
-    //     }
-    // }
-/**
- * 모든 추적 데이터를 CSV 형식으로 내보냅니다.
- */
-// ❌ 현재 사용하지 않음.
-// @PostMapping("/export/csv/all")
-// @Operation(
-//     operationId = "exportallephemerisdata", tags = ["Mode - Ephemeris"]
-// )
-// fun exportAllMstDataToCsv(
-//     @Parameter(
-//         description = "CSV 내보내기 디렉토리 경로 (기본값: csv_exports)", example = "csv_exports", required = false
-//     ) @RequestParam(defaultValue = "csv_exports") outputDirectory: String
-// ): Mono<Map<String, Any>> {
-//     return Mono.fromCallable {
-//         try {
-//             val result = ephemerisService.exportAllMstDataToCsv(outputDirectory)
+                if (result["success"] == true) {
+                    mapOf(
+                        "success" to true,
+                        "message" to "MST ID $mstId 데이터가 CSV 형식으로 내보내졌습니다.",
+                        "filename" to (result["filename"] ?: ""),
+                        "filePath" to (result["filePath"] ?: ""),
+                        "satelliteName" to (result["satelliteName"] ?: ""),
+                        "originalDataCount" to (result["originalDataCount"] ?: 0),
+                        "axisTransformedDataCount" to (result["axisTransformedDataCount"] ?: 0),
+                        "finalTransformedDataCount" to (result["finalTransformedDataCount"] ?: 0)
+                    )
+                } else {
+                    mapOf(
+                        "success" to false,
+                        "message" to "CSV 내보내기 실패: ${result["error"] ?: "알 수 없는 오류"}",
+                        "error" to (result["error"] ?: "알 수 없는 오류")
+                    )
+                }
+            } catch (e: Exception) {
+                mapOf(
+                    "success" to false,
+                    "message" to "CSV 내보내기 실패: ${e.message}",
+                    "error" to (e.message ?: "알 수 없는 오류")
+                )
+            }
+        }
+    }
+    /**
+     * 모든 추적 데이터를 CSV 형식으로 내보냅니다.
+     */
+    @PostMapping("/export/csv/all")
+    @Operation(
+        operationId = "exportallephemerisdata", tags = ["Mode - Ephemeris"]
+    )
+    fun exportAllMstDataToCsv(
+        @Parameter(
+            description = "CSV 내보내기 디렉토리 경로 (기본값: csv_exports)", example = "csv_exports", required = false
+        ) @RequestParam(defaultValue = "csv_exports") outputDirectory: String
+    ): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            try {
+                val result = ephemerisService.exportAllMstDataToCsv(outputDirectory)
 
-//             if (result["success"] == true) {
-//                 mapOf(
-//                     "success" to true,
-//                     "message" to "모든 추적 데이터가 CSV 형식으로 내보내졌습니다.",
-//                     "totalMstCount" to (result["totalMstCount"] ?: 0),
-//                     "successCount" to (result["successCount"] ?: 0),
-//                     "errorCount" to (result["errorCount"] ?: 0),
-//                     "createdFiles" to (result["createdFiles"] ?: emptyList<String>()),
-//                     "outputDirectory" to (result["outputDirectory"] ?: outputDirectory)
-//                 )
-//             } else {
-//                 mapOf(
-//                     "success" to false,
-//                     "message" to "CSV 내보내기 실패: ${result["error"] ?: "알 수 없는 오류"}",
-//                     "error" to (result["error"] ?: "알 수 없는 오류")
-//                 )
-//             }
-//         } catch (e: Exception) {
-//             mapOf(
-//                 "success" to false,
-//                 "message" to "CSV 내보내기 중 오류 발생: ${e.message ?: "알 수 없는 오류"}",
-//                 "error" to (e.message ?: "알 수 없는 오류")
-//             )
-//         }
-//     }
-// }
+                if (result["success"] == true) {
+                    mapOf(
+                        "success" to true,
+                        "message" to "모든 추적 데이터가 CSV 형식으로 내보내졌습니다.",
+                        "totalMstCount" to (result["totalMstCount"] ?: 0),
+                        "successCount" to (result["successCount"] ?: 0),
+                        "errorCount" to (result["errorCount"] ?: 0),
+                        "createdFiles" to (result["createdFiles"] ?: emptyList<String>()),
+                        "outputDirectory" to (result["outputDirectory"] ?: outputDirectory)
+                    )
+                } else {
+                    mapOf(
+                        "success" to false,
+                        "message" to "CSV 내보내기 실패: ${result["error"] ?: "알 수 없는 오류"}",
+                        "error" to (result["error"] ?: "알 수 없는 오류")
+                    )
+                }
+            } catch (e: Exception) {
+                mapOf(
+                    "success" to false,
+                    "message" to "CSV 내보내기 중 오류 발생: ${e.message ?: "알 수 없는 오류"}",
+                    "error" to (e.message ?: "알 수 없는 오류")
+                )
+            }
+        }
+    }
 
     /**
      * 실시간 추적 데이터를 초기화
@@ -881,6 +904,32 @@ class EphemerisController(
     //        outputStream.close()
     //    }
     //}
+
+    @GetMapping("/tracking/mst/comparison")
+    @Operation(
+        operationId = "getAllEphemerisTrackMstWithComparison", 
+        tags = ["Mode - Ephemeris"],
+        summary = "Original과 Final Transformed 데이터 비교 조회",
+        description = "UI에서 Original(2축)과 Final Transformed 데이터를 동시에 표시하기 위한 API"
+    )
+    fun getAllEphemerisTrackMstWithComparison(): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            try {
+                val comparisonData = ephemerisService.getAllEphemerisTrackMstWithComparison()
+                mapOf(
+                    "status" to "success",
+                    "data" to comparisonData,
+                    "message" to "비교 데이터 조회 완료"
+                )
+            } catch (e: Exception) {
+                mapOf(
+                    "status" to "error",
+                    "message" to "비교 데이터 조회 실패: ${e.message}",
+                    "error" to (e.message ?: "알 수 없는 오류")
+                )
+            }
+        }
+    }
 
 }
 

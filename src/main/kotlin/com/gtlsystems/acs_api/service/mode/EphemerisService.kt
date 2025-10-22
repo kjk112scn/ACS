@@ -13,9 +13,10 @@ import com.gtlsystems.acs_api.event.ACSEvent
 import com.gtlsystems.acs_api.event.ACSEventBus
 import com.gtlsystems.acs_api.event.subscribeToType
 import com.gtlsystems.acs_api.model.PushData
-import com.gtlsystems.acs_api.service.datastore.DataStoreService
+import com.gtlsystems.acs_api.algorithm.satellitetracker.processor.SatelliteTrackingProcessor
 import com.gtlsystems.acs_api.service.icd.ICDService
 import com.gtlsystems.acs_api.service.udp.UdpFwICDService
+import com.gtlsystems.acs_api.service.datastore.DataStoreService
 import com.gtlsystems.acs_api.config.ThreadManager
 import io.netty.handler.timeout.TimeoutException
 import jakarta.annotation.PreDestroy
@@ -42,6 +43,7 @@ import kotlin.math.abs
 @Service
 class EphemerisService(
     private val orekitCalculator: OrekitCalculator,
+    private val satelliteTrackingProcessor: com.gtlsystems.acs_api.algorithm.satellitetracker.processor.SatelliteTrackingProcessor, // ✅ Phase 3: Processor 추가
     private val acsEventBus: ACSEventBus,
     private val udpFwICDService: UdpFwICDService,
     private val dataStoreService: DataStoreService, // DataStoreService 주입
@@ -372,7 +374,8 @@ class EphemerisService(
     }
 
     /**
-     * 2축 추적 데이터 생성 (축변환 적용)
+     * ✅ Phase 3: 리팩토링된 위성 궤도 추적 (Processor 사용)
+     * 
      * TLE 데이터로 위성 궤도 추적
      * 위성 이름이 제공되지 않으면 TLE에서 추출
      */
@@ -380,128 +383,80 @@ class EphemerisService(
         tleLine1: String, tleLine2: String, satelliteName: String? = null
     ): Pair<List<Map<String, Any?>>, List<Map<String, Any?>>> {
         try {
-            logger.info("🚀 위성 궤도 추적 시작 (리팩토링된 단계별 처리)")
+            logger.info("🚀 위성 궤도 추적 시작")
 
-            // ✅ 1단계: 원본 데이터 생성
-            val (originalMst, originalDtl) = generateOriginalTrackingData(tleLine1, tleLine2, satelliteName)
-            logger.info("✅ 1단계 완료: 원본 데이터 생성 - ${originalMst.size}개 마스터, ${originalDtl.size}개 세부")
+            // 1️⃣ OrekitCalculator: 순수 2축 각도만 생성
+            val today = ZonedDateTime.now().truncatedTo(ChronoUnit.DAYS)
+            val sourceMinEl = settingsService.sourceMinElevationAngle.toFloat()
 
-            // ✅ 2단계: 축변환 적용
-            val (axisTransformedMst, axisTransformedDtl) = applyAxisTransformation(originalMst, originalDtl)
-            logger.info("✅ 2단계 완료: 축변환 적용 - ${axisTransformedMst.size}개 마스터, ${axisTransformedDtl.size}개 세부")
-
-            // ✅ 3단계: 방위각 변환 (±270도 제한)
-            val (finalMst, finalDtl) = applyAngleLimitTransformation(axisTransformedMst, axisTransformedDtl)
-            logger.info("✅ 3단계 완료: 방위각 변환 - ${finalMst.size}개 마스터, ${finalDtl.size}개 세부")
-
-            // ✅ 4단계: 모든 변환 데이터 저장
-            saveAllTransformationData(
-                originalMst,
-                originalDtl,
-                axisTransformedMst,
-                axisTransformedDtl,
-                finalMst,
-                finalDtl
+            logger.info("📡 OrekitCalculator 호출 중...")
+            val schedule = orekitCalculator.generateSatelliteTrackingSchedule(
+                tleLine1 = tleLine1,
+                tleLine2 = tleLine2,
+                startDate = today.withZoneSameInstant(ZoneOffset.UTC),
+                durationDays = 2,
+                minElevation = sourceMinEl,
+                latitude = locationData.latitude,
+                longitude = locationData.longitude,
+                altitude = locationData.altitude
             )
-            logger.info("✅ 4단계 완료: 모든 변환 데이터 저장")
-            logger.info("🎉 위성 궤도 추적 완료 (리팩토링된 단계별 처리)")
-            return Pair(finalMst, finalDtl)
+            
+            if (schedule.trackingPasses.isEmpty()) {
+                logger.warn("⚠️ 가시성 패스가 없습니다.")
+                return Pair(emptyList(), emptyList())
+            }
+            
+            logger.info("✅ OrekitCalculator 완료: ${schedule.trackingPasses.size}개 패스")
+
+            // 2️⃣ Processor: 모든 변환 및 메타데이터 계산
+            logger.info("🔄 SatelliteTrackingProcessor 호출 중...")
+            val processedData = satelliteTrackingProcessor.processFullTransformation(
+                schedule,
+                satelliteName
+            )
+            logger.info("✅ Processor 완료")
+
+            // 3️⃣ ephemerisTrackMstStorage, ephemerisTrackDtlStorage에 저장
+            logger.info("💾 저장소에 데이터 저장 중...")
+            ephemerisTrackMstStorage.clear()
+            ephemerisTrackDtlStorage.clear()
+
+            // Original 데이터 저장
+            ephemerisTrackMstStorage.addAll(processedData.originalMst)
+            ephemerisTrackDtlStorage.addAll(processedData.originalDtl)
+            logger.debug("Original 저장: ${processedData.originalMst.size} Mst, ${processedData.originalDtl.size} Dtl")
+
+            // 3축 변환 데이터 저장
+            ephemerisTrackMstStorage.addAll(processedData.axisTransformedMst)
+            ephemerisTrackDtlStorage.addAll(processedData.axisTransformedDtl)
+            logger.debug("3축 변환 저장: ${processedData.axisTransformedMst.size} Mst, ${processedData.axisTransformedDtl.size} Dtl")
+
+            // 최종 변환 데이터 저장
+            ephemerisTrackMstStorage.addAll(processedData.finalTransformedMst)
+            ephemerisTrackDtlStorage.addAll(processedData.finalTransformedDtl)
+            logger.debug("최종 변환 저장: ${processedData.finalTransformedMst.size} Mst, ${processedData.finalTransformedDtl.size} Dtl")
+
+            logger.info("✅ 저장 완료: 총 ${ephemerisTrackMstStorage.size}개 Mst, ${ephemerisTrackDtlStorage.size}개 Dtl")
+            logger.info("🎉 위성 궤도 추적 완료")
+
+            // 최종 변환된 데이터 반환
+            return Pair(processedData.finalTransformedMst, processedData.finalTransformedDtl)
+
         } catch (e: Exception) {
-            logger.error("❌ 위성 궤도 추적 중 오류 발생: ${e.message}", e)
+            logger.error("❌ 위성 궤도 추적 실패: ${e.message}", e)
             throw e
         }
     }
 
     /**
-     * ✅ 1단계: 원본 데이터 생성
+     * ⏱️ 성능 측정 헬퍼 함수
      */
-    private fun generateOriginalTrackingData(
-        tleLine1: String, tleLine2: String, satelliteName: String?
-    ): Pair<List<Map<String, Any?>>, List<Map<String, Any?>>> {
-        logger.info("📊 1단계: 원본 데이터 생성 시작")
-
-        // TLE에서 위성 ID 추출
-        val satelliteId = tleLine1.substring(2, 7).trim()
-        val actualSatelliteName = satelliteName ?: getSatelliteNameFromId(satelliteId)
-        logger.info("위성 정보: ID=$satelliteId, 이름=$actualSatelliteName")
-
-        // 추적 기간 설정 (오늘 00시부터 내일 00시까지)
-        val today = ZonedDateTime.now().truncatedTo(ChronoUnit.DAYS)
-        val ephemerisTrackMst = mutableListOf<Map<String, Any?>>()
-        val ephemerisTrackDtl = mutableListOf<Map<String, Any?>>()
-
-        // 위성 추적 스케줄 생성
-        val schedule = orekitCalculator.generateSatelliteTrackingSchedule(
-            tleLine1 = tleLine1,
-            tleLine2 = tleLine2,
-            startDate = today.withZoneSameInstant(ZoneOffset.UTC),
-            durationDays = 2,
-            minElevation = settingsService.minElevationAngle,
-            latitude = locationData.latitude,
-            longitude = locationData.longitude,
-            altitude = locationData.altitude,
-        )
-        logger.info("위성 추적 스케줄 생성 완료: ${schedule.trackingPasses.size}개 패스")
-
-        // 생성 메타데이터
-        val creationDate = ZonedDateTime.now()
-        val creator = "System"
-
-        // 스케줄 정보로 마스터 리스트 채우기 (원본 데이터)
-        schedule.trackingPasses.forEachIndexed { index, pass ->
-            val mstId = index + 1
-            val startTimeWithMs = pass.startTime.withZoneSameInstant(ZoneOffset.UTC)
-            val endTimeWithMs = pass.endTime.withZoneSameInstant(ZoneOffset.UTC)
-
-            logger.info("패스 #$mstId: 시작=$startTimeWithMs, 종료=$endTimeWithMs")
-
-            val maxElevationAzimuth = pass.trackingData
-                .maxByOrNull { it.elevation }?.azimuth ?: 0.0
-            // 원본 데이터로 마스터 정보 생성
-            ephemerisTrackMst.add(
-                mapOf(
-                    "No" to mstId.toUInt(),
-                    "SatelliteID" to satelliteId,
-                    "SatelliteName" to actualSatelliteName,
-                    "StartTime" to startTimeWithMs,
-                    "EndTime" to endTimeWithMs,
-                    "Duration" to pass.getDurationString(),
-                    "MaxElevationTime" to pass.maxElevationTime,
-                    "MaxElevation" to pass.maxElevation,
-                    "MaxAzimuth" to maxElevationAzimuth,
-                    "StartAzimuth" to pass.startAzimuth,
-                    "StartElevation" to pass.startElevation,
-                    "EndAzimuth" to pass.endAzimuth,
-                    "EndElevation" to pass.endElevation,
-                    "MaxAzRate" to pass.maxAzimuthRate,
-                    "MaxElRate" to pass.maxElevationRate,
-                    "MaxAzAccel" to pass.maxAzimuthAccel,
-                    "MaxElAccel" to pass.maxElevationAccel,
-                    "CreationDate" to creationDate,
-                    "Creator" to creator,
-                    "DataType" to "original"
-                )
-            )
-
-            // 원본 추적 좌표로 세부 리스트 채우기
-            pass.trackingData.forEachIndexed { dtlIndex, data ->
-                ephemerisTrackDtl.add(
-                    mapOf(
-                        "No" to (dtlIndex + 1).toUInt(),
-                        "MstId" to mstId.toUInt(),
-                        "Time" to data.timestamp,
-                        "Azimuth" to data.azimuth,
-                        "Elevation" to data.elevation,
-                        "Range" to data.range,
-                        "Altitude" to data.altitude,
-                        "DataType" to "original"
-                    )
-                )
-            }
+    private fun <T> measurePerformance(name: String, block: () -> T): T {
+        val start = System.nanoTime()
+        return block().also {
+            val duration = (System.nanoTime() - start) / 1_000_000
+            logger.info("⏱️ $name 총 소요 시간: ${duration}ms")
         }
-
-        logger.info("📊 1단계 완료: 원본 데이터 생성 - ${ephemerisTrackMst.size}개 마스터, ${ephemerisTrackDtl.size}개 세부")
-        return Pair(ephemerisTrackMst, ephemerisTrackDtl)
     }
 
     /**
@@ -1522,8 +1477,9 @@ class EphemerisService(
             logger.info("  - null이 아닌 필드 수: {}", statusInfo["nonNullFields"])
 
             logger.info("  추적 전용 데이터:")
-            trackingData.forEach { (key, value) ->
-                logger.info("    - {}: {}", key, value)
+            // ✅ forEach 오버로드 모호성 해결: 명시적 타입 지정
+            trackingData.forEach { entry: Map.Entry<String, Any?> ->
+                logger.info("    - {}: {}", entry.key, entry.value)
             }
 
             logger.info("  일반 각도 데이터:")
@@ -2455,6 +2411,47 @@ class EphemerisService(
     }
 
     /**
+     * 📊 Original과 Final Transformed 데이터를 모두 반환하는 API
+     * UI에서 비교 표시를 위해 사용
+     */
+    fun getAllEphemerisTrackMstWithComparison(): Map<String, Any?> {
+        try {
+            logger.info("📊 Original과 Final Transformed 데이터 비교 정보 조회 시작")
+            
+            val originalMst = getAllEphemerisTrackMst().filter { it["DataType"] == "original" }
+            val finalTransformedMst = getAllEphemerisTrackMst().filter { it["DataType"] == "final_transformed" }
+            
+            if (originalMst.isEmpty() || finalTransformedMst.isEmpty()) {
+                logger.warn("⚠️ 비교할 데이터가 없습니다")
+                return mapOf(
+                    "success" to false,
+                    "error" to "비교할 데이터가 없습니다",
+                    "originalMst" to emptyList<Map<String, Any?>>(),
+                    "finalTransformedMst" to emptyList<Map<String, Any?>>()
+                )
+            }
+            
+            logger.info("✅ 비교 데이터 조회 완료: Original ${originalMst.size}개, Final ${finalTransformedMst.size}개")
+            
+            return mapOf(
+                "success" to true,
+                "originalMst" to originalMst,
+                "finalTransformedMst" to finalTransformedMst,
+                "message" to "비교 데이터 조회 완료"
+            )
+            
+        } catch (error: Exception) {
+            logger.error("❌ 비교 데이터 조회 실패: ${error.message}")
+            return mapOf(
+                "success" to false,
+                "error" to (error.message ?: "알 수 없는 오류"),
+                "originalMst" to emptyList<Map<String, Any?>>(),
+                "finalTransformedMst" to emptyList<Map<String, Any?>>()
+            )
+        }
+    }
+
+    /**
      * 📊 모든 MST ID에 대해 CSV 파일 생성
      * 원본, 축변환, 최종 변환 데이터를 매칭하여 CSV 파일로 추출
      */
@@ -2515,6 +2512,7 @@ class EphemerisService(
     /**
      * 📊 특정 MST ID의 데이터를 CSV 파일로 추출
      * 원본, 축변환, 최종 변환 데이터를 매칭하여 하나의 CSV 파일로 생성
+     * ✅ 중복 실행 방지: 기존 파일 덮어쓰기 방식으로 변경
      */
     fun exportMstDataToCsv(mstId: Int, outputDirectory: String = "csv_exports"): Map<String, Any?> {
         try {
@@ -2530,81 +2528,116 @@ class EphemerisService(
             val satelliteName = mstInfo?.get("SatelliteName") as? String ?: "Unknown"
             val startTime = mstInfo?.get("StartTime") as? java.time.ZonedDateTime
             val endTime = mstInfo?.get("EndTime") as? java.time.ZonedDateTime
-            val timestamp =
-                java.time.ZonedDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-            val filename = "MST${mstId}_${satelliteName}_${timestamp}.csv"
+            
+            // ✅ 파일명 개선: 타임스탬프 제거하고 날짜만 포함 (중복 실행 방지)
+            val dateOnly = startTime?.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")) ?: "unknown"
+            val filename = "MST${mstId}_${satelliteName}_${dateOnly}.csv"
             val filePath = "$outputDirectory/$filename"
+            
+            // ✅ 기존 파일 확인 및 덮어쓰기 로그
+            val file = java.io.File(filePath)
+            if (file.exists()) {
+                logger.info("🔄 기존 파일 덮어쓰기: $filename")
+            } else {
+                logger.info("📄 새 파일 생성: $filename")
+            }
             java.io.FileWriter(filePath).use { writer ->
-                writer.write("Index,Time,Original_Azimuth,Original_Elevation,Original_Range,Original_Altitude,")
-                writer.write("AxisTransformed_Azimuth,AxisTransformed_Elevation,AxisTransformed_Range,AxisTransformed_Altitude,")
-                writer.write("FinalTransformed_Azimuth,FinalTransformed_Elevation,FinalTransformed_Range,FinalTransformed_Altitude,")
+                // ✅ 사용자 요구사항에 맞는 CSV 헤더: 각 변환 단계별 각속도 포함
+                writer.write("Index,Time,")
+                writer.write("Original_Azimuth,Original_Elevation,Original_Azimuth_Velocity,Original_Elevation_Velocity,")
+                writer.write("Original_Range,Original_Altitude,")
+                writer.write("AxisTransformed_Azimuth,AxisTransformed_Elevation,AxisTransformed_Azimuth_Velocity,AxisTransformed_Elevation_Velocity,")
+                writer.write("FinalTransformed_Azimuth,FinalTransformed_Elevation,FinalTransformed_Azimuth_Velocity,FinalTransformed_Elevation_Velocity,")
                 writer.write("Azimuth_Transformation_Error,Elevation_Transformation_Error\n")
                 val maxSize = maxOf(originalDtl.size, axisTransformedDtl.size, finalTransformedDtl.size)
+                
+                // ✅ 각 변환 단계별 각속도 계산을 위한 이전 값 저장
+                var prevOriginalAzimuth: Double? = null
+                var prevOriginalElevation: Double? = null
+                var prevAxisTransformedAzimuth: Double? = null
+                var prevAxisTransformedElevation: Double? = null
+                var prevFinalTransformedAzimuth: Double? = null
+                var prevFinalTransformedElevation: Double? = null
+                var prevTime: java.time.ZonedDateTime? = null
+                
                 for (i in 0 until maxSize) {
                     val originalPoint = if (i < originalDtl.size) originalDtl[i] else null
                     val axisTransformedPoint = if (i < axisTransformedDtl.size) axisTransformedDtl[i] else null
                     val finalTransformedPoint = if (i < finalTransformedDtl.size) finalTransformedDtl[i] else null
+                    
                     val originalTime = originalPoint?.get("Time") as? java.time.ZonedDateTime
                     val originalAz = originalPoint?.get("Azimuth") as? Double ?: 0.0
                     val originalEl = originalPoint?.get("Elevation") as? Double ?: 0.0
                     val originalRange = originalPoint?.get("Range") as? Double ?: 0.0
                     val originalAltitude = originalPoint?.get("Altitude") as? Double ?: 0.0
+                    
                     val axisTransformedAz = axisTransformedPoint?.get("Azimuth") as? Double ?: 0.0
                     val axisTransformedEl = axisTransformedPoint?.get("Elevation") as? Double ?: 0.0
-                    val axisTransformedRange = axisTransformedPoint?.get("Range") as? Double ?: 0.0
-                    val axisTransformedAltitude = axisTransformedPoint?.get("Altitude") as? Double ?: 0.0
+                    
                     val finalTransformedAz = finalTransformedPoint?.get("Azimuth") as? Double ?: 0.0
                     val finalTransformedEl = finalTransformedPoint?.get("Elevation") as? Double ?: 0.0
-                    val finalTransformedRange = finalTransformedPoint?.get("Range") as? Double ?: 0.0
-                    val finalTransformedAltitude = finalTransformedPoint?.get("Altitude") as? Double ?: 0.0
+                    
+                    // ✅ 각 변환 단계별 각속도 계산 (도/초)
+                    var originalAzimuthVelocity = 0.0
+                    var originalElevationVelocity = 0.0
+                    var axisTransformedAzimuthVelocity = 0.0
+                    var axisTransformedElevationVelocity = 0.0
+                    var finalTransformedAzimuthVelocity = 0.0
+                    var finalTransformedElevationVelocity = 0.0
+                    
+                    if (prevTime != null && originalTime != null) {
+                        val timeDiffSeconds = java.time.Duration.between(prevTime, originalTime).toMillis() / 1000.0
+                        if (timeDiffSeconds > 0) {
+                            // ✅ Original 각속도 계산
+                            if (prevOriginalAzimuth != null && prevOriginalElevation != null) {
+                                var azDiff = originalAz - prevOriginalAzimuth
+                                if (azDiff > 180) azDiff -= 360
+                                if (azDiff < -180) azDiff += 360
+                                originalAzimuthVelocity = azDiff / timeDiffSeconds
+                                originalElevationVelocity = (originalEl - prevOriginalElevation) / timeDiffSeconds
+                            }
+                            
+                            // ✅ AxisTransformed 각속도 계산
+                            if (prevAxisTransformedAzimuth != null && prevAxisTransformedElevation != null) {
+                                var azDiff = axisTransformedAz - prevAxisTransformedAzimuth
+                                if (azDiff > 180) azDiff -= 360
+                                if (azDiff < -180) azDiff += 360
+                                axisTransformedAzimuthVelocity = azDiff / timeDiffSeconds
+                                axisTransformedElevationVelocity = (axisTransformedEl - prevAxisTransformedElevation) / timeDiffSeconds
+                            }
+                            
+                            // ✅ FinalTransformed 각속도 계산
+                            if (prevFinalTransformedAzimuth != null && prevFinalTransformedElevation != null) {
+                                var azDiff = finalTransformedAz - prevFinalTransformedAzimuth
+                                if (azDiff > 180) azDiff -= 360
+                                if (azDiff < -180) azDiff += 360
+                                finalTransformedAzimuthVelocity = azDiff / timeDiffSeconds
+                                finalTransformedElevationVelocity = (finalTransformedEl - prevFinalTransformedElevation) / timeDiffSeconds
+                            }
+                        }
+                    }
+                    
                     val azimuthTransformationError = axisTransformedAz - originalAz
                     val elevationTransformationError = axisTransformedEl - originalEl
-                    val timeString =
-                        originalTime?.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"))
-                            ?: ""
+                    
+                    val timeString = originalTime?.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")) ?: ""
+                    
+                    // ✅ 사용자 요구사항에 맞는 CSV 데이터 출력
                     writer.write("$i,$timeString,")
-                    writer.write(
-                        "${String.format("%.6f", originalAz)},${
-                            String.format(
-                                "%.6f",
-                                originalEl
-                            )
-                        },${String.format("%.6f", originalRange)},${String.format("%.6f", originalAltitude)},"
-                    )
-                    writer.write(
-                        "${String.format("%.6f", axisTransformedAz)},${
-                            String.format(
-                                "%.6f",
-                                axisTransformedEl
-                            )
-                        },${String.format("%.6f", axisTransformedRange)},${
-                            String.format(
-                                "%.6f",
-                                axisTransformedAltitude
-                            )
-                        },"
-                    )
-                    writer.write(
-                        "${String.format("%.6f", finalTransformedAz)},${
-                            String.format(
-                                "%.6f",
-                                finalTransformedEl
-                            )
-                        },${String.format("%.6f", finalTransformedRange)},${
-                            String.format(
-                                "%.6f",
-                                finalTransformedAltitude
-                            )
-                        },"
-                    )
-                    writer.write(
-                        "${String.format("%.6f", azimuthTransformationError)},${
-                            String.format(
-                                "%.6f",
-                                elevationTransformationError
-                            )
-                        }\n"
-                    )
+                    writer.write("${String.format("%.6f", originalAz)},${String.format("%.6f", originalEl)},${String.format("%.6f", originalAzimuthVelocity)},${String.format("%.6f", originalElevationVelocity)},")
+                    writer.write("${String.format("%.6f", originalRange)},${String.format("%.6f", originalAltitude)},")
+                    writer.write("${String.format("%.6f", axisTransformedAz)},${String.format("%.6f", axisTransformedEl)},${String.format("%.6f", axisTransformedAzimuthVelocity)},${String.format("%.6f", axisTransformedElevationVelocity)},")
+                    writer.write("${String.format("%.6f", finalTransformedAz)},${String.format("%.6f", finalTransformedEl)},${String.format("%.6f", finalTransformedAzimuthVelocity)},${String.format("%.6f", finalTransformedElevationVelocity)},")
+                    writer.write("${String.format("%.6f", azimuthTransformationError)},${String.format("%.6f", elevationTransformationError)}\n")
+                    
+                    // ✅ 다음 반복을 위한 값 저장
+                    prevOriginalAzimuth = originalAz
+                    prevOriginalElevation = originalEl
+                    prevAxisTransformedAzimuth = axisTransformedAz
+                    prevAxisTransformedElevation = axisTransformedEl
+                    prevFinalTransformedAzimuth = finalTransformedAz
+                    prevFinalTransformedElevation = finalTransformedEl
+                    prevTime = originalTime
                 }
             }
             logger.info("📊 MST ID $mstId CSV 파일 생성 완료: $filePath")
