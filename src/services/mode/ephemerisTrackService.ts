@@ -62,14 +62,41 @@ export interface ScheduleItem {
   recommendedTrainAngle: number
 
   /**
-   * 최대 Azimuth 각속도 (도/초)
+   * ✅ FinalTransformed 최대 Azimuth 각속도 (도/초) - 합계법
    */
-  maxAzimuthRate: number
+  FinalTransformedMaxAzRate: number
 
   /**
-   * 최대 Elevation 각속도 (도/초)
+   * ✅ FinalTransformed 최대 Elevation 각속도 (도/초) - 합계법
    */
-  maxElevationRate: number
+  FinalTransformedMaxElRate: number
+
+  /**
+   * ✅ 2축(Original) 최대 고도 (도)
+   */
+  OriginalMaxElevation?: number
+
+  /**
+   * ✅ 2축(Original) 최대 Azimuth 각속도 (도/초)
+   */
+  OriginalMaxAzRate?: number
+
+  /**
+   * ✅ 2축(Original) 최대 Elevation 각속도 (도/초)
+   */
+  OriginalMaxElRate?: number
+
+  /**
+   * ✅ 중앙차분법 최대 Azimuth 각속도 (도/초)
+   * 실시간 제어용 - 주석 처리됨
+   */
+  CentralDiffMaxAzRate?: number
+
+  /**
+   * ✅ 중앙차분법 최대 Elevation 각속도 (도/초)
+   * 실시간 제어용 - 주석 처리됨
+   */
+  CentralDiffMaxElRate?: number
 
   [key: string]: string | number | boolean | null | undefined
 }
@@ -332,9 +359,78 @@ class EphemerisTrackService {
 
   async fetchEphemerisMasterData(): Promise<ScheduleItem[]> {
     try {
+      console.log('🔍 API 호출 시작: /ephemeris/master')
       const response = await api.get('/ephemeris/master')
+      console.log('✅ API 응답 받음:', response.status, response.data?.length || 0, '개')
+
+      // 백엔드가 병합 데이터를 반환하므로 매핑 처리
+      if (Array.isArray(response.data)) {
+        const mappedData = response.data.map((item: Record<string, unknown>) => ({
+          No: item.No as number,
+          SatelliteID: item.SatelliteID as string,
+          SatelliteName: item.SatelliteName as string,
+          StartTime: item.StartTime as string,
+          EndTime: item.EndTime as string,
+          Duration: item.Duration as string,
+          MaxElevation: item.MaxElevation as number,
+
+          // ✅ FinalTransformed 속도 (풀네임)
+          FinalTransformedMaxAzRate: item.FinalTransformedMaxAzRate as number,
+          FinalTransformedMaxElRate: item.FinalTransformedMaxElRate as number,
+
+          isKeyhole: item.IsKeyhole as boolean,
+          recommendedTrainAngle: item.RecommendedTrainAngle as number,
+          CreationDate: item.CreationDate as string,
+          Creator: item.Creator as string,
+
+          // Original (2축) 메타데이터
+          OriginalMaxElevation: item.OriginalMaxElevation as number | undefined,
+          OriginalMaxAzRate: item.OriginalMaxAzRate as number | undefined,
+          OriginalMaxElRate: item.OriginalMaxElRate as number | undefined,
+
+          // ✅ 중앙차분법 데이터 (실시간 제어용 - 주석 처리)
+          CentralDiffMaxAzRate: item.CentralDiffMaxAzRate as number | undefined,
+          CentralDiffMaxElRate: item.CentralDiffMaxElRate as number | undefined,
+        }))
+
+        console.log(
+          '📊 매핑된 데이터:',
+          mappedData.length,
+          '개, Original 데이터 포함:',
+          mappedData[0]?.OriginalMaxElevation !== undefined,
+        )
+
+        // 첫 번째 데이터의 속도 값 확인
+        if (mappedData.length > 0) {
+          console.log('🔍 첫 번째 데이터 상세:')
+          console.log(
+            '  - FinalTransformedMaxAzRate (합계법):',
+            mappedData[0].FinalTransformedMaxAzRate,
+          )
+          console.log(
+            '  - FinalTransformedMaxElRate (합계법):',
+            mappedData[0].FinalTransformedMaxElRate,
+          )
+          console.log('  - OriginalMaxAzRate (합계법 - 2축):', mappedData[0].OriginalMaxAzRate)
+          console.log('  - OriginalMaxElRate (합계법 - 2축):', mappedData[0].OriginalMaxElRate)
+          console.log(
+            '  - CentralDiffMaxAzRate (중앙차분법 - 실시간 제어용):',
+            mappedData[0].CentralDiffMaxAzRate,
+          )
+          console.log(
+            '  - CentralDiffMaxElRate (중앙차분법 - 실시간 제어용):',
+            mappedData[0].CentralDiffMaxElRate,
+          )
+        }
+        return mappedData
+      }
+
+      console.log('⚠️ 응답 데이터가 배열이 아님:', typeof response.data)
       return response.data || []
     } catch (error) {
+      console.error('❌ API 호출 실패:', error)
+      console.error('❌ 요청 URL:', '/ephemeris/master')
+      console.error('❌ 에러 상세:', error.response?.status, error.response?.statusText)
       return this.handleApiError(error, '마스터 데이터 조회에 실패했습니다') as Promise<
         ScheduleItem[]
       >
@@ -478,8 +574,30 @@ class EphemerisTrackService {
   }
 
   /**
-   * 특정 MST ID의 데이터를 CSV 파일로 내보내기
+   * 모든 MST 데이터를 하나의 통합된 CSV 파일로 내보내기
+   * 사용자 요구사항: 하나의 파일로 모든 데이터 통합
    */
+  async exportAllMstDataToSingleCsv(outputDirectory: string = 'csv_exports'): Promise<{
+    success: boolean
+    message: string
+    filename?: string
+    filePath?: string
+    totalMstCount?: number
+    processedMstCount?: number
+    totalRows?: number
+    outputDirectory?: string
+    error?: string
+  }> {
+    try {
+      const response = await api.post('/ephemeris/export/csv/all', null, {
+        params: { outputDirectory },
+      })
+      return response.data
+    } catch (error) {
+      console.error('통합 CSV 내보내기 API 호출 실패:', error)
+      throw error
+    }
+  }
   async exportMstDataToCsv(
     mstId: number,
     outputDirectory: string = 'csv_exports',
@@ -740,6 +858,57 @@ class EphemerisTrackService {
     } catch (error) {
       console.error('❌ 비교 데이터 조회 중 오류:', error)
       return []
+    }
+  }
+
+  /**
+   * ✅ Original과 FinalTransformed 병합 데이터 조회
+   * UI 테이블에서 2축/최종변환 값을 동시에 표시하기 위한 API
+   *
+   * @returns 병합된 스케줄 데이터 (Original과 FinalTransformed 메타데이터 포함)
+   */
+  async getMergedScheduleData(): Promise<ScheduleItem[]> {
+    try {
+      console.log('📊 병합 스케줄 데이터 조회 시작')
+
+      const response = await api.get('/api/ephemeris/tracking/mst/merged')
+
+      if (response.data.status === 'success') {
+        const mergedData = response.data.data as Record<string, unknown>[]
+
+        const scheduleItems: ScheduleItem[] = mergedData.map((item) => ({
+          No: item.No as number,
+          SatelliteID: item.SatelliteID as string,
+          SatelliteName: item.SatelliteName as string,
+          StartTime: item.StartTime as string,
+          EndTime: item.EndTime as string,
+          Duration: item.Duration as string,
+          MaxElevation: item.MaxElevation as number,
+
+          // ✅ FinalTransformed 속도 (풀네임)
+          FinalTransformedMaxAzRate: item.FinalTransformedMaxAzRate as number,
+          FinalTransformedMaxElRate: item.FinalTransformedMaxElRate as number,
+
+          isKeyhole: item.IsKeyhole as boolean,
+          recommendedTrainAngle: item.RecommendedTrainAngle as number,
+          CreationDate: item.CreationDate as string,
+          Creator: item.Creator as string,
+
+          // ✅ Original (2축) 메타데이터
+          OriginalMaxElevation: item.OriginalMaxElevation as number | undefined,
+          OriginalMaxAzRate: item.OriginalMaxAzRate as number | undefined,
+          OriginalMaxElRate: item.OriginalMaxElRate as number | undefined,
+        }))
+
+        console.log(`✅ 병합 데이터 조회 완료: ${scheduleItems.length}개 패스`)
+        return scheduleItems
+      } else {
+        console.warn('⚠️ 병합 데이터 조회 실패:', response.data)
+        return []
+      }
+    } catch (error) {
+      console.error('❌ 병합 데이터 조회 API 호출 실패:', error)
+      throw error
     }
   }
 }

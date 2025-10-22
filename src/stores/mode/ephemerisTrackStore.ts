@@ -579,7 +579,8 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
   // ===== 기존 액션 메서드들 =====
 
   /**
-   * 마스터 데이터 로드 (캐시 고려)
+   * ✅ 마스터 데이터 로드 (Original과 FinalTransformed 병합 데이터)
+   * 캐시 고려
    */
   const loadMasterData = async (forceRefresh = false) => {
     const now = Date.now()
@@ -594,9 +595,14 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     error.value = null
 
     try {
+      // ✅ 병합 데이터 API 호출 (Original + FinalTransformed)
       const data = await ephemerisTrackService.fetchEphemerisMasterData()
       masterData.value = data
       lastFetchTime.value = now
+
+      console.log(`✅ 병합 스케줄 데이터 로드 완료: ${data.length}개 패스`)
+      console.log('📊 Original 메타데이터 포함 여부:', data[0]?.OriginalMaxElevation !== undefined)
+
       return data
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load data'

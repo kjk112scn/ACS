@@ -196,7 +196,7 @@
                       <span class="info-label">시작/종료 시간:</span>
                       <span class="info-value">{{
                         formatToLocalTime(selectedScheduleInfo.startTime)
-                      }} / {{
+                        }} / {{
                           formatToLocalTime(selectedScheduleInfo.endTime)
                         }}</span>
                     </div>
@@ -208,14 +208,14 @@
 
                     <div class="info-row">
                       <span class="info-label">시작/종료 방위각/고도:</span>
-                      <span class="info-value">{{ selectedScheduleInfo.startAzimuth.toFixed(2) }}° / {{
-                        selectedScheduleInfo.endAzimuth.toFixed(2) }}° / {{
-                          selectedScheduleInfo.startElevation.toFixed(2) }}°</span>
+                      <span class="info-value">{{ selectedScheduleInfo.startAzimuth.toFixed(6) }}° / {{
+                        selectedScheduleInfo.endAzimuth.toFixed(6) }}° / {{
+                          selectedScheduleInfo.startElevation.toFixed(6) }}°</span>
                     </div>
 
                     <div class="info-row">
                       <span class="info-label">최대 고도:</span>
-                      <span class="info-value">{{ selectedScheduleInfo.maxElevation.toFixed(2) }}°</span>
+                      <span class="info-value">{{ selectedScheduleInfo.maxElevation.toFixed(6) }}°</span>
                     </div>
 
                     <!-- KEYHOLE 정보 표시 -->
@@ -225,17 +225,17 @@
                       <div class="info-row">
                         <span class="info-label">권장 Train 각도:</span>
                         <span class="info-value text-positive">{{
-                          safeToFixed(selectedScheduleInfo.recommendedTrainAngle, 2)
-                          }}°</span>
+                          safeToFixed(selectedScheduleInfo.recommendedTrainAngle, 6)
+                        }}°</span>
                       </div>
                       <div class="info-row">
                         <span class="info-label">최대 Azimuth 속도:</span>
-                        <span class="info-value text-red">{{ safeToFixed(selectedScheduleInfo.maxAzimuthRate, 2)
-                          }}°/s</span>
+                        <span class="info-value text-red">{{ safeToFixed(selectedScheduleInfo.FinalTransformedMaxAzRate, 6)
+                        }}°/s</span>
                       </div>
                       <div class="info-row">
                         <span class="info-label">최대 Elevation 속도:</span>
-                        <span class="info-value">{{ safeToFixed(selectedScheduleInfo.maxElevationRate, 2) }}°/s</span>
+                        <span class="info-value">{{ safeToFixed(selectedScheduleInfo.FinalTransformedMaxElRate, 6) }}°/s</span>
                       </div>
                     </div>
 
@@ -342,38 +342,100 @@ ISS (ZARYA)
           :loading="isLoadingComparison" :pagination="{ rowsPerPage: 10 }" selection="single"
           v-model:selected="selectedSchedule" class="bg-grey-9 text-white" dark flat bordered>
 
-          <!-- 최대 고도 템플릿 -->
-          <template v-slot:body-cell-MaxElevation="props">
+          <!-- ✅ 2축 최대 고도 템플릿 (Original) -->
+          <template v-slot:body-cell-OriginalMaxElevation="props">
             <q-td :props="props">
               <div class="text-center">
-                <div class="text-weight-bold text-primary">
+                <div class="text-weight-bold text-blue-3">
                   {{ safeToFixed(props.value, 6) }}°
                 </div>
               </div>
             </q-td>
           </template>
 
-          <!-- 최대 Az 속도 템플릿 -->
-          <template v-slot:body-cell-MaxAzimuthRate="props">
+          <!-- ✅ 최대 고도 템플릿 (FinalTransformed) -->
+          <template v-slot:body-cell-MaxElevation="props">
             <q-td :props="props">
               <div class="text-center">
-                <div class="text-weight-bold text-primary">
-                  {{ safeToFixed(props.value) }}°/s
+                <div class="text-weight-bold text-green-3">
+                  {{ safeToFixed(props.value, 6) }}°
                 </div>
               </div>
             </q-td>
           </template>
 
-          <!-- 최대 El 속도 템플릿 -->
-          <template v-slot:body-cell-MaxElevationRate="props">
+          <!-- ✅ 2축 최대 Az 속도 템플릿 (Select Schedule 테이블용) -->
+          <template v-slot:body-cell-OriginalMaxAzRate="props">
             <q-td :props="props">
               <div class="text-center">
-                <div class="text-weight-bold text-primary">
-                  {{ safeToFixed(props.value) }}°/s
+                <div class="text-weight-bold text-blue-3">
+                  {{ safeToFixed(props.value, 6) }}°/s
                 </div>
               </div>
             </q-td>
           </template>
+
+          <!-- ✅ FinalTransformed 최대 Az 속도 템플릿 -->
+          <template v-slot:body-cell-FinalTransformedMaxAzRate="props">
+            <q-td :props="props">
+              <div class="text-center">
+                <div class="text-weight-bold text-green-3">
+                  {{ safeToFixed(props.value, 6) }}°/s
+                </div>
+              </div>
+            </q-td>
+          </template>
+
+          <!-- ✅ 2축 최대 El 속도 템플릿 (Select Schedule 테이블용) -->
+          <template v-slot:body-cell-OriginalMaxElRate="props">
+            <q-td :props="props">
+              <div class="text-center">
+                <div class="text-weight-bold text-blue-3">
+                  {{ safeToFixed(props.value, 6) }}°/s
+                </div>
+              </div>
+            </q-td>
+          </template>
+
+          <!-- ✅ FinalTransformed 최대 El 속도 템플릿 -->
+          <template v-slot:body-cell-FinalTransformedMaxElRate="props">
+            <q-td :props="props">
+              <div class="text-center">
+                <div class="text-weight-bold text-green-3">
+                  {{ safeToFixed(props.value, 6) }}°/s
+                </div>
+              </div>
+            </q-td>
+          </template>
+
+          <!-- ✅ 중앙차분법 템플릿 (실시간 제어용 - 주석 처리) -->
+          <!--
+          <template v-slot:body-cell-CentralDiffMaxAzRate="props">
+            <q-td :props="props">
+              <div class="text-center">
+                <div class="text-weight-bold text-blue-3">
+                  {{ safeToFixed(props.value) }}°/s
+                </div>
+                <div class="text-caption text-grey-6">
+                  중앙차분법
+                </div>
+              </div>
+            </q-td>
+          </template>
+
+          <template v-slot:body-cell-CentralDiffMaxElRate="props">
+            <q-td :props="props">
+              <div class="text-center">
+                <div class="text-weight-bold text-blue-3">
+                  {{ safeToFixed(props.value) }}°/s
+                </div>
+                <div class="text-caption text-grey-6">
+                  중앙차분법
+                </div>
+              </div>
+            </q-td>
+          </template>
+          -->
 
           <!-- KEYHOLE 배지 템플릿 -->
           <template v-slot:body-cell-SatelliteName="props">
@@ -567,7 +629,16 @@ const scheduleColumns: QTableColumn[] = [
     sortable: true,
     format: (val) => formatDuration(val)
   },
-  // ✅ 기존 데이터 필드들
+  // ✅ 2축 최대 고도 (Original)
+  {
+    name: 'OriginalMaxElevation',
+    label: '2축 최대 고도 (°)',
+    field: 'OriginalMaxElevation',
+    align: 'center',
+    sortable: true,
+    format: (val) => val?.toFixed(6) || '-',
+  },
+  // ✅ 최대 고도 (FinalTransformed)
   {
     name: 'MaxElevation',
     label: '최대 고도 (°)',
@@ -576,22 +647,60 @@ const scheduleColumns: QTableColumn[] = [
     sortable: true,
     format: (val) => val?.toFixed(6) || '0.000000',
   },
+  // ✅ 2축 최대 Az 속도 (Select Schedule 테이블용)
   {
-    name: 'MaxAzimuthRate',
+    name: 'OriginalMaxAzRate',
+    label: '2축 최대 Az 속도 (°/s)',
+    field: 'OriginalMaxAzRate',
+    align: 'center',
+    sortable: true,
+    format: (val) => val?.toFixed(6) || '-',
+  },
+  // ✅ FinalTransformed 최대 Az 속도
+  {
+    name: 'FinalTransformedMaxAzRate',
     label: '최대 Az 속도 (°/s)',
-    field: 'MaxAzimuthRate',
+    field: 'FinalTransformedMaxAzRate',
     align: 'center',
     sortable: true,
-    format: (val) => val?.toFixed(2) || '0.00',
+    format: (val) => val?.toFixed(6) || '0.000000',
   },
+  // ✅ 2축 최대 El 속도 (Select Schedule 테이블용)
   {
-    name: 'MaxElevationRate',
-    label: '최대 El 속도 (°/s)',
-    field: 'MaxElevationRate',
+    name: 'OriginalMaxElRate',
+    label: '2축 최대 El 속도 (°/s)',
+    field: 'OriginalMaxElRate',
     align: 'center',
     sortable: true,
-    format: (val) => val?.toFixed(2) || '0.00',
+    format: (val) => val?.toFixed(6) || '-',
   },
+  // ✅ FinalTransformed 최대 El 속도
+  {
+    name: 'FinalTransformedMaxElRate',
+    label: '최대 El 속도 (°/s)',
+    field: 'FinalTransformedMaxElRate',
+    align: 'center',
+    sortable: true,
+    format: (val) => val?.toFixed(6) || '0.000000',
+  },
+
+  // ✅ 중앙차분법 데이터 (실시간 제어용 - 주석 처리)
+  // {
+  //   name: 'CentralDiffMaxAzRate',
+  //   label: '중앙차분 Az 속도 (°/s)',
+  //   field: 'CentralDiffMaxAzRate',
+  //   align: 'center',
+  //   sortable: true,
+  //   format: (val) => val?.toFixed(6) || '0.000000',
+  // },
+  // {
+  //   name: 'CentralDiffMaxElRate',
+  //   label: '중앙차분 El 속도 (°/s)',
+  //   field: 'CentralDiffMaxElRate',
+  //   align: 'center',
+  //   sortable: true,
+  //   format: (val) => val?.toFixed(6) || '0.000000',
+  // },
   // ✅ KEYHOLE 및 Train 각도
   {
     name: 'isKeyhole',
@@ -607,7 +716,7 @@ const scheduleColumns: QTableColumn[] = [
     field: 'recommendedTrainAngle',
     align: 'center',
     sortable: true,
-    format: (val, row) => row.isKeyhole ? val?.toFixed(2) : '-',
+    format: (val, row) => row.isKeyhole ? val?.toFixed(6) : '-',
   },
 ]
 
@@ -679,8 +788,8 @@ const selectedScheduleInfo = computed(() => {
       // 정지궤도는 KEYHOLE이 아님
       isKeyhole: false,
       recommendedTrainAngle: 0,
-      maxAzimuthRate: 0,
-      maxElevationRate: 0,
+      FinalTransformedMaxAzRate: 0,
+      FinalTransformedMaxElRate: 0,
     }
   }
 
@@ -705,8 +814,8 @@ const selectedScheduleInfo = computed(() => {
       // KEYHOLE 정보 추가
       isKeyhole: selected.IsKeyhole || false,
       recommendedTrainAngle: selected.RecommendedTrainAngle || 0,
-      maxAzimuthRate: selected.MaxAzRate || 0,
-      maxElevationRate: selected.MaxElRate || 0,
+      FinalTransformedMaxAzRate: selected.FinalTransformedMaxAzRate || 0,
+      FinalTransformedMaxElRate: selected.FinalTransformedMaxElRate || 0,
     }
   }
 
@@ -728,8 +837,8 @@ const selectedScheduleInfo = computed(() => {
     // KEYHOLE 정보 기본값
     isKeyhole: false,
     recommendedTrainAngle: 0,
-    maxAzimuthRate: 0,
-    maxElevationRate: 0,
+    FinalTransformedMaxAzRate: 0,
+    FinalTransformedMaxElRate: 0,
   }
 })
 
@@ -764,8 +873,8 @@ const downloadCSVWithTransformations = (data: RealtimeTrackingDataItem[]) => {
   const selectedSchedule = ephemerisStore.selectedSchedule
   const isKeyhole = selectedSchedule?.isKeyhole || false
   const recommendedTrainAngle = selectedSchedule?.recommendedTrainAngle || 0
-  const maxAzimuthRate = selectedSchedule?.maxAzimuthRate || 0
-  const maxElevationRate = selectedSchedule?.maxElevationRate || 0
+  const maxAzimuthRate = selectedSchedule?.FinalTransformedMaxAzRate || 0
+  const maxElevationRate = selectedSchedule?.FinalTransformedMaxElRate || 0
 
   // CSV 헤더 정의 - 원본/축변환/최종 데이터 포함
   const headers = [
@@ -1483,8 +1592,8 @@ const selectSchedule = async () => {
       console.log('🚀 KEYHOLE 위성 선택됨:', {
         satelliteName: selectedItem.SatelliteName || selectedItem.SatelliteID,
         recommendedTrainAngle: selectedItem.RecommendedTrainAngle,
-        maxAzimuthRate: selectedItem.MaxAzRate,
-        maxElevationRate: selectedItem.MaxElRate,
+        FinalTransformedMaxAzRate: selectedItem.FinalTransformedMaxAzRate,
+        FinalTransformedMaxElRate: selectedItem.FinalTransformedMaxElRate,
         threshold: 10.0 // 기본 임계값
       })
     }
@@ -1744,7 +1853,7 @@ const addTLEData = async () => {
 }
 
 // 안전한 숫자 포맷팅 헬퍼 함수
-const safeToFixed = (value: unknown, decimals: number = 2): string => {
+const safeToFixed = (value: unknown, decimals: number = 6): string => {
   if (typeof value === 'number' && !isNaN(value)) {
     return value.toFixed(decimals)
   }
@@ -1885,24 +1994,25 @@ const exportAllMstDataToCsv = async () => {
   isExportingCsv.value = true
 
   try {
-    info('이론치 데이터를 CSV로 내보내는 중...')
+    info('이론치 데이터를 통합 CSV로 내보내는 중...')
 
+    // ✅ 기존 엔드포인트 사용 (이제 통합 CSV 생성)
     const response = await ephemerisTrackService.exportAllMstDataToCsv()
 
     if (response.success) {
-      console.log(`이론치 데이터 내보내기 완료! 총 ${response.totalMstCount}개 MST, ${response.successCount}개 성공`)
+      console.log(`통합 이론치 데이터 내보내기 완료! 총 ${response.totalMstCount}개 MST, ${response.successCount}개 성공`)
 
       // ✅ 성공 메시지 개선
-      success(`이론치 데이터 내보내기 완료! 총 ${response.totalMstCount}개 MST, ${response.successCount}개 성공`)
+      success(`통합 이론치 데이터 내보내기 완료! 총 ${response.totalMstCount}개 MST, ${response.successCount}개 성공`)
 
-      console.log('CSV 내보내기 결과:', response)
+      console.log('통합 CSV 내보내기 결과:', response)
     } else {
-      console.error(`이론치 데이터 내보내기 실패: ${response.error || '알 수 없는 오류'}`)
-      error(`이론치 데이터 내보내기 실패: ${response.error || '알 수 없는 오류'}`)
+      console.error(`통합 이론치 데이터 내보내기 실패: ${response.error || '알 수 없는 오류'}`)
+      error(`통합 이론치 데이터 내보내기 실패: ${response.error || '알 수 없는 오류'}`)
     }
   } catch (error) {
-    console.error('CSV 내보내기 실패:', error)
-    error('이론치 데이터 내보내기 중 오류가 발생했습니다')
+    console.error('통합 CSV 내보내기 실패:', error)
+    error('통합 이론치 데이터 내보내기 중 오류가 발생했습니다')
   } finally {
     isExportingCsv.value = false
   }
