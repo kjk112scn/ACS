@@ -2044,6 +2044,212 @@ class EphemerisService(
     }
 
     /**
+     * ✅ Original과 FinalTransformed 데이터를 병합하여 반환
+     * UI에서 2축/최종변환 값을 동시에 표시하기 위한 API
+     * 
+     * @return Original과 FinalTransformed 메타데이터가 병합된 MST 데이터 리스트
+     */
+    fun getAllEphemerisTrackMstMerged(): List<Map<String, Any?>> {
+        try {
+            logger.info("📊 Original과 FinalTransformed 데이터 병합 시작")
+            
+            val originalMst = ephemerisTrackMstStorage.filter { it["DataType"] == "original" }
+            val finalMst = ephemerisTrackMstStorage.filter { it["DataType"] == "final_transformed" }
+            
+            if (finalMst.isEmpty()) {
+                logger.warn("⚠️ FinalTransformed 데이터가 없습니다")
+                return emptyList()
+            }
+            
+            val mergedData = finalMst.map { final ->
+                val mstId = final["No"] as UInt
+                val original = originalMst.find { it["No"] == mstId }
+                
+                final.toMutableMap().apply {
+                    // Original (2축) 메타데이터 추가
+                    put("OriginalMaxElevation", original?.get("MaxElevation"))
+                    put("OriginalMaxAzAccel", original?.get("MaxAzAccel"))
+                    put("OriginalMaxElAccel", original?.get("MaxElAccel"))
+                    
+                    // ✅ 각각 별도 계산 (합계법)
+                    val originalRates = calculateOriginalSumMethodRates(mstId)
+                    val finalRates = calculateFinalTransformedSumMethodRates(mstId)
+                    
+                    // FinalTransformed 속도 (합계법) - 풀네임
+                    put("FinalTransformedMaxAzRate", finalRates["maxAzRate"])
+                    put("FinalTransformedMaxElRate", finalRates["maxElRate"])
+                    
+                    // Original (2축) 속도 (합계법) - 풀네임
+                    put("OriginalMaxAzRate", originalRates["maxAzRate"])
+                    put("OriginalMaxElRate", originalRates["maxElRate"])
+                    
+                    // ✅ 중앙차분법 데이터는 주석으로 보관 (실시간 제어용)
+                    put("CentralDiffMaxAzRate", original?.get("MaxAzRate"))  // 중앙차분법 백업
+                    put("CentralDiffMaxElRate", original?.get("MaxElRate"))  // 중앙차분법 백업
+                }
+            }
+            
+            logger.info("✅ 병합 완료: ${mergedData.size}개 MST 레코드 (이론치 합계법 포함)")
+            return mergedData
+            
+        } catch (error: Exception) {
+            logger.error("❌ 데이터 병합 실패: ${error.message}", error)
+            return emptyList()
+        }
+    }
+    
+    /**
+     * ✅ Original (2축) 합계법 최대 속도 계산
+     * 연속 10개 데이터(1초)의 변화량을 모두 더한 값 중 최대값을 반환
+     * 이론치 계산용 - 시간으로 나누지 않음!
+     * 
+     * @param mstId 마스터 ID
+     * @return 합계법으로 계산된 최대 속도 (도/초)
+     */
+    private fun calculateOriginalSumMethodRates(mstId: UInt): Map<String, Double> {
+        try {
+            val originalDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "original")
+            
+            if (originalDtl.size < 11) {
+                logger.warn("⚠️ MST ID $mstId: Original 속도 계산을 위한 데이터가 부족합니다 (${originalDtl.size}개)")
+                return mapOf("maxAzRate" to 0.0, "maxElRate" to 0.0)
+            }
+            
+            var maxAzRate = 0.0
+            var maxElRate = 0.0
+            
+            // ✅ Backward Looking: 각 index의 과거 10개 변화량 계산 (현재 index 포함, 미래 제외)
+            for (i in 9 until originalDtl.size) {
+                var currentAzSum = 0.0
+                var currentElSum = 0.0
+                
+                // Index i의 값 = (i-9)부터 i까지의 10개 변화량 합 (j-1이 유효하도록)
+                for (j in (i - 9)..i) {
+                    if (j > 0) { // j-1이 유효한 경우만 계산
+                        val prevPoint = originalDtl[j - 1]
+                        val currentPoint = originalDtl[j]
+                        
+                        val prevAz = prevPoint["Azimuth"] as Double
+                        val currentAz = currentPoint["Azimuth"] as Double
+                        val prevEl = prevPoint["Elevation"] as Double
+                        val currentEl = currentPoint["Elevation"] as Double
+                        
+                        // 방위각 변화량 계산 (360도 경계 처리)
+                        var azDiff = currentAz - prevAz
+                        if (azDiff > 180) azDiff -= 360
+                        if (azDiff < -180) azDiff += 360
+                        
+                        // 단순 합계 (시간으로 나누지 않음!)
+                        currentAzSum += kotlin.math.abs(azDiff)
+                        currentElSum += kotlin.math.abs(currentEl - prevEl)
+                    }
+                }
+                
+                // 최대값 업데이트
+                maxAzRate = maxOf(maxAzRate, currentAzSum)
+                maxElRate = maxOf(maxElRate, currentElSum)
+            }
+            
+            logger.info("✅ Original 합계법: Az=${String.format("%.6f", maxAzRate)}°/s, El=${String.format("%.6f", maxElRate)}°/s")
+            logger.info("  - 데이터 크기: ${originalDtl.size}개")
+            logger.info("  - Backward Looking 반복: ${originalDtl.size - 9}회")
+            logger.info("  - 계산 범위: Index 9 ~ ${originalDtl.size - 1}")
+            
+            // 디버깅: 첫 번째 계산 결과 확인
+            if (originalDtl.size >= 10) {
+                var debugSum = 0.0
+                for (j in 1..9) {
+                    val prevPoint = originalDtl[j - 1]
+                    val currentPoint = originalDtl[j]
+                    val prevAz = prevPoint["Azimuth"] as Double
+                    val currentAz = currentPoint["Azimuth"] as Double
+                    var azDiff = currentAz - prevAz
+                    if (azDiff > 180) azDiff -= 360
+                    if (azDiff < -180) azDiff += 360
+                    debugSum += kotlin.math.abs(azDiff)
+                }
+                logger.info("  - Index 9 디버깅: 첫 10개 변화량 합 = ${String.format("%.6f", debugSum)}")
+            }
+            
+            return mapOf(
+                "maxAzRate" to maxAzRate,
+                "maxElRate" to maxElRate
+            )
+            
+        } catch (error: Exception) {
+            logger.error("❌ Original 합계법 계산 실패: ${error.message}", error)
+            return mapOf("maxAzRate" to 0.0, "maxElRate" to 0.0)
+        }
+    }
+
+    /**
+     * ✅ FinalTransformed 합계법 최대 속도 계산
+     * 연속 10개 데이터(1초)의 변화량을 모두 더한 값 중 최대값을 반환
+     * 이론치 계산용 - 시간으로 나누지 않음!
+     * 
+     * @param mstId 마스터 ID
+     * @return 합계법으로 계산된 최대 속도 (도/초)
+     */
+    private fun calculateFinalTransformedSumMethodRates(mstId: UInt): Map<String, Double> {
+        try {
+            val finalDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "final_transformed")
+            
+            if (finalDtl.size < 11) {
+                logger.warn("⚠️ MST ID $mstId: FinalTransformed 속도 계산을 위한 데이터가 부족합니다 (${finalDtl.size}개)")
+                return mapOf("maxAzRate" to 0.0, "maxElRate" to 0.0)
+            }
+            
+            var maxAzRate = 0.0
+            var maxElRate = 0.0
+            
+            // ✅ Backward Looking: 각 index의 과거 10개 변화량 계산 (현재 index 포함, 미래 제외)
+            for (i in 9 until finalDtl.size) {
+                var currentAzSum = 0.0
+                var currentElSum = 0.0
+                
+                // Index i의 값 = (i-9)부터 i까지의 10개 변화량 합 (j-1이 유효하도록)
+                for (j in (i - 9)..i) {
+                    if (j > 0) { // j-1이 유효한 경우만 계산
+                        val prevPoint = finalDtl[j - 1]
+                        val currentPoint = finalDtl[j]
+                        
+                        val prevAz = prevPoint["Azimuth"] as Double
+                        val currentAz = currentPoint["Azimuth"] as Double
+                        val prevEl = prevPoint["Elevation"] as Double
+                        val currentEl = currentPoint["Elevation"] as Double
+                        
+                        // 방위각 변화량 계산 (360도 경계 처리)
+                        var azDiff = currentAz - prevAz
+                        if (azDiff > 180) azDiff -= 360
+                        if (azDiff < -180) azDiff += 360
+                        
+                        // 단순 합계 (시간으로 나누지 않음!)
+                        currentAzSum += kotlin.math.abs(azDiff)
+                        currentElSum += kotlin.math.abs(currentEl - prevEl)
+                    }
+                }
+                
+                // 최대값 업데이트
+                maxAzRate = maxOf(maxAzRate, currentAzSum)
+                maxElRate = maxOf(maxElRate, currentElSum)
+            }
+            
+            logger.info("✅ FinalTransformed 합계법: Az=${String.format("%.6f", maxAzRate)}°/s, El=${String.format("%.6f", maxElRate)}°/s")
+            logger.info("  - 데이터 크기: ${finalDtl.size}개")
+            logger.info("  - 슬라이딩 윈도우 반복: ${finalDtl.size - 10}회")
+            
+            return mapOf(
+                "maxAzRate" to maxAzRate,
+                "maxElRate" to maxElRate
+            )
+            
+        } catch (error: Exception) {
+            logger.error("❌ FinalTransformed 합계법 계산 실패: ${error.message}", error)
+            return mapOf("maxAzRate" to 0.0, "maxElRate" to 0.0)
+        }
+    }
+
+    /**
      * 특정 마스터 ID에 해당하는 세부 추적 데이터 조회 (최종 변환된 데이터만)
      * 축변환 후 ±270도 제한이 적용된 최종 데이터를 조회합니다.
      */
@@ -2463,7 +2669,10 @@ class EphemerisService(
                 outputDir.mkdirs()
                 logger.info("📁 출력 디렉토리 생성: $outputDirectory")
             }
-            val allMstIds = getAllEphemerisTrackMst().map { it["No"] as UInt }
+            // ✅ 중복 방지: original 데이터만 사용 (11개 스케줄)
+            logger.info("🔍 디버그: ephemerisTrackMstStorage 총 개수: ${ephemerisTrackMstStorage.size}")
+            logger.info("🔍 디버그: original 데이터 개수: ${ephemerisTrackMstStorage.filter { it["DataType"] == "original" }.size}")
+            val allMstIds = ephemerisTrackMstStorage.filter { it["DataType"] == "original" }.map { it["No"] as UInt }.sorted()
             if (allMstIds.isEmpty()) {
                 logger.warn("⚠️ 추출할 MST 데이터가 없습니다")
                 return mapOf<String, Any?>("success" to false, "error" to "추출할 데이터가 없습니다")
@@ -2510,10 +2719,220 @@ class EphemerisService(
     }
 
     /**
-     * 📊 특정 MST ID의 데이터를 CSV 파일로 추출
-     * 원본, 축변환, 최종 변환 데이터를 매칭하여 하나의 CSV 파일로 생성
-     * ✅ 중복 실행 방지: 기존 파일 덮어쓰기 방식으로 변경
+     * 📊 모든 MST 데이터를 하나의 통합된 CSV 파일로 생성
+     * 사용자 요구사항: 하나의 파일로 모든 데이터 통합
      */
+    fun exportAllMstDataToSingleCsv(outputDirectory: String = "csv_exports"): Map<String, Any?> {
+        try {
+            logger.info("📊 모든 MST 데이터를 하나의 통합 CSV 파일로 생성 시작")
+            val outputDir = java.io.File(outputDirectory)
+            if (!outputDir.exists()) {
+                outputDir.mkdirs()
+                logger.info("📁 출력 디렉토리 생성: $outputDirectory")
+            }
+            
+            val allMstIds = getAllEphemerisTrackMst().map { it["No"] as UInt }
+            if (allMstIds.isEmpty()) {
+                logger.warn("⚠️ 추출할 MST 데이터가 없습니다")
+                return mapOf<String, Any?>("success" to false, "error" to "추출할 데이터가 없습니다")
+            }
+            
+            logger.info("총 ${allMstIds.size}개의 MST ID 발견 - 통합 CSV 파일 생성")
+            
+            // 통합 CSV 파일명 생성
+            val timestamp = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+            val filename = "All_MST_Data_${timestamp}.csv"
+            val filePath = "$outputDirectory/$filename"
+            
+            // 기존 파일 확인 및 덮어쓰기 로그
+            val file = java.io.File(filePath)
+            if (file.exists()) {
+                logger.info("🔄 기존 파일 덮어쓰기: $filename")
+            } else {
+                logger.info("📄 새 파일 생성: $filename")
+            }
+            
+            var totalRows = 0
+            var processedMstCount = 0
+            
+            java.io.FileWriter(filePath).use { writer ->
+                // CSV 헤더 작성
+                writer.write("MST_ID,Satellite_Name,Index,Time,")
+                writer.write("Original_Azimuth,Original_Elevation,Original_Azimuth_Velocity,Original_Elevation_Velocity,")
+                writer.write("Original_Range,Original_Altitude,")
+                writer.write("AxisTransformed_Azimuth,AxisTransformed_Elevation,AxisTransformed_Azimuth_Velocity,AxisTransformed_Elevation_Velocity,")
+                writer.write("FinalTransformed_Azimuth,FinalTransformed_Elevation,FinalTransformed_Azimuth_Velocity,FinalTransformed_Elevation_Velocity,")
+                writer.write("Azimuth_Transformation_Error,Elevation_Transformation_Error\n")
+                
+                allMstIds.forEach { mstId ->
+                    try {
+                        val originalDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "original")
+                        val axisTransformedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "axis_transformed")
+                        val finalTransformedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "final_transformed")
+                        
+                        if (originalDtl.isEmpty()) {
+                            logger.warn("⚠️ MST ID $mstId 의 원본 데이터를 찾을 수 없습니다")
+                            return@forEach
+                        }
+                        
+                        val mstInfo = getAllEphemerisTrackMst().find { it["No"] == mstId }
+                        val satelliteName = mstInfo?.get("SatelliteName") as? String ?: "Unknown"
+                        
+                        val maxSize = maxOf(originalDtl.size, axisTransformedDtl.size, finalTransformedDtl.size)
+                        
+                        // 각 변환 단계별 각속도 계산을 위한 이전 값 저장
+                        var prevOriginalAzimuth: Double? = null
+                        var prevOriginalElevation: Double? = null
+                        var prevAxisTransformedAzimuth: Double? = null
+                        var prevAxisTransformedElevation: Double? = null
+                        var prevFinalTransformedAzimuth: Double? = null
+                        var prevFinalTransformedElevation: Double? = null
+                        var prevTime: java.time.ZonedDateTime? = null
+                        
+                        for (i in 0 until maxSize) {
+                            val originalPoint = if (i < originalDtl.size) originalDtl[i] else null
+                            val axisTransformedPoint = if (i < axisTransformedDtl.size) axisTransformedDtl[i] else null
+                            val finalTransformedPoint = if (i < finalTransformedDtl.size) finalTransformedDtl[i] else null
+                            
+                            val originalTime = originalPoint?.get("Time") as? java.time.ZonedDateTime
+                            val originalAz = originalPoint?.get("Azimuth") as? Double ?: 0.0
+                            val originalEl = originalPoint?.get("Elevation") as? Double ?: 0.0
+                            val originalRange = originalPoint?.get("Range") as? Double ?: 0.0
+                            val originalAltitude = originalPoint?.get("Altitude") as? Double ?: 0.0
+                            
+                            val axisTransformedAz = axisTransformedPoint?.get("Azimuth") as? Double ?: 0.0
+                            val axisTransformedEl = axisTransformedPoint?.get("Elevation") as? Double ?: 0.0
+                            
+                            val finalTransformedAz = finalTransformedPoint?.get("Azimuth") as? Double ?: 0.0
+                            val finalTransformedEl = finalTransformedPoint?.get("Elevation") as? Double ?: 0.0
+                            
+                            // 각 변환 단계별 각속도 계산 (이론치 합계법 - 10개 변화량의 합)
+                            var originalAzimuthVelocity = 0.0
+                            var originalElevationVelocity = 0.0
+                            var axisTransformedAzimuthVelocity = 0.0
+                            var axisTransformedElevationVelocity = 0.0
+                            var finalTransformedAzimuthVelocity = 0.0
+                            var finalTransformedElevationVelocity = 0.0
+                            
+                            // 이론치 합계법: 1초간(10개) 총 변화량 계산 (시간으로 나누지 않음)
+                            if (i >= 9) { // Index 9부터 10개 데이터 구간 형성 가능
+                                var currentOriginalAzSum = 0.0
+                                var currentOriginalElSum = 0.0
+                                var currentAxisTransformedAzSum = 0.0
+                                var currentAxisTransformedElSum = 0.0
+                                var currentFinalTransformedAzSum = 0.0
+                                var currentFinalTransformedElSum = 0.0
+                                
+                                // 10개 구간의 변화량을 모두 더함 (j-1이 유효하도록)
+                                for (j in (i - 9)..i) { // j는 현재 인덱스 i까지, 이전 9개 포함 (총 10개)
+                                    if (j > 0) { // j-1이 유효한 경우만 계산
+                                        val prevOriginalPoint = originalDtl[j - 1]
+                                        val currentOriginalPoint = originalDtl[j]
+                                        val prevAxisTransformedPoint = axisTransformedDtl[j - 1]
+                                        val currentAxisTransformedPoint = axisTransformedDtl[j]
+                                        val prevFinalTransformedPoint = finalTransformedDtl[j - 1]
+                                        val currentFinalTransformedPoint = finalTransformedDtl[j]
+                                        
+                                        // Original
+                                        val prevOriginalAz = prevOriginalPoint["Azimuth"] as Double
+                                        val currentOriginalAz = currentOriginalPoint["Azimuth"] as Double
+                                        val prevOriginalEl = prevOriginalPoint["Elevation"] as Double
+                                        val currentOriginalEl = currentOriginalPoint["Elevation"] as Double
+                                        var azDiffOriginal = currentOriginalAz - prevOriginalAz
+                                        if (azDiffOriginal > 180) azDiffOriginal -= 360
+                                        if (azDiffOriginal < -180) azDiffOriginal += 360
+                                        currentOriginalAzSum += kotlin.math.abs(azDiffOriginal)
+                                        currentOriginalElSum += kotlin.math.abs(currentOriginalEl - prevOriginalEl)
+                                        
+                                        // AxisTransformed
+                                        val prevAxisTransformedAz = prevAxisTransformedPoint["Azimuth"] as Double
+                                        val currentAxisTransformedAz = currentAxisTransformedPoint["Azimuth"] as Double
+                                        val prevAxisTransformedEl = prevAxisTransformedPoint["Elevation"] as Double
+                                        val currentAxisTransformedEl = currentAxisTransformedPoint["Elevation"] as Double
+                                        var azDiffAxis = currentAxisTransformedAz - prevAxisTransformedAz
+                                        if (azDiffAxis > 180) azDiffAxis -= 360
+                                        if (azDiffAxis < -180) azDiffAxis += 360
+                                        currentAxisTransformedAzSum += kotlin.math.abs(azDiffAxis)
+                                        currentAxisTransformedElSum += kotlin.math.abs(currentAxisTransformedEl - prevAxisTransformedEl)
+                                        
+                                        // FinalTransformed
+                                        val prevFinalTransformedAz = prevFinalTransformedPoint["Azimuth"] as Double
+                                        val currentFinalTransformedAz = currentFinalTransformedPoint["Azimuth"] as Double
+                                        val prevFinalTransformedEl = prevFinalTransformedPoint["Elevation"] as Double
+                                        val currentFinalTransformedEl = currentFinalTransformedPoint["Elevation"] as Double
+                                        var azDiffFinal = currentFinalTransformedAz - prevFinalTransformedAz
+                                        if (azDiffFinal > 180) azDiffFinal -= 360
+                                        if (azDiffFinal < -180) azDiffFinal += 360
+                                        currentFinalTransformedAzSum += kotlin.math.abs(azDiffFinal)
+                                        currentFinalTransformedElSum += kotlin.math.abs(currentFinalTransformedEl - prevFinalTransformedEl)
+                                    }
+                                }
+                                
+                                originalAzimuthVelocity = currentOriginalAzSum
+                                originalElevationVelocity = currentOriginalElSum
+                                axisTransformedAzimuthVelocity = currentAxisTransformedAzSum
+                                axisTransformedElevationVelocity = currentAxisTransformedElSum
+                                finalTransformedAzimuthVelocity = currentFinalTransformedAzSum
+                                finalTransformedElevationVelocity = currentFinalTransformedElSum
+                            }
+                            
+                            // 변환 오차 계산
+                            val azimuthTransformationError = finalTransformedAz - originalAz
+                            val elevationTransformationError = finalTransformedEl - originalEl
+                            
+                            val timeString = originalTime?.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")) ?: ""
+                            
+                            // 통합 CSV 데이터 출력
+                            writer.write("$mstId,$satelliteName,$i,$timeString,")
+                            writer.write("${String.format("%.6f", originalAz)},${String.format("%.6f", originalEl)},${String.format("%.6f", originalAzimuthVelocity)},${String.format("%.6f", originalElevationVelocity)},")
+                            writer.write("${String.format("%.6f", originalRange)},${String.format("%.6f", originalAltitude)},")
+                            writer.write("${String.format("%.6f", axisTransformedAz)},${String.format("%.6f", axisTransformedEl)},${String.format("%.6f", axisTransformedAzimuthVelocity)},${String.format("%.6f", axisTransformedElevationVelocity)},")
+                            writer.write("${String.format("%.6f", finalTransformedAz)},${String.format("%.6f", finalTransformedEl)},${String.format("%.6f", finalTransformedAzimuthVelocity)},${String.format("%.6f", finalTransformedElevationVelocity)},")
+                            writer.write("${String.format("%.6f", azimuthTransformationError)},${String.format("%.6f", elevationTransformationError)}\n")
+                            
+                            totalRows++
+                            
+                            // 다음 반복을 위한 값 저장
+                            prevOriginalAzimuth = originalAz
+                            prevOriginalElevation = originalEl
+                            prevAxisTransformedAzimuth = axisTransformedAz
+                            prevAxisTransformedElevation = axisTransformedEl
+                            prevFinalTransformedAzimuth = finalTransformedAz
+                            prevFinalTransformedElevation = finalTransformedEl
+                            prevTime = originalTime
+                        }
+                        
+                        processedMstCount++
+                        logger.info("✅ MST ID $mstId 데이터 처리 완료 (${maxSize}개 행)")
+                        
+                    } catch (e: Exception) {
+                        logger.error("❌ MST ID $mstId 처리 중 오류: ${e.message}", e)
+                    }
+                }
+            }
+            
+            logger.info("📊 통합 CSV 파일 생성 완료: $filePath")
+            logger.info("  - 처리된 MST: $processedMstCount 개")
+            logger.info("  - 총 데이터 행: $totalRows 개")
+            
+            return mapOf<String, Any?>(
+                "success" to true,
+                "filename" to filename,
+                "filePath" to filePath,
+                "totalMstCount" to allMstIds.size,
+                "processedMstCount" to processedMstCount,
+                "totalRows" to totalRows,
+                "outputDirectory" to outputDirectory
+            )
+            
+        } catch (e: Exception) {
+            logger.error("❌ 통합 CSV 파일 생성 중 오류: ${e.message}", e)
+            return mapOf<String, Any?>(
+                "success" to false,
+                "error" to e.message
+            )
+        }
+    }
     fun exportMstDataToCsv(mstId: Int, outputDirectory: String = "csv_exports"): Map<String, Any?> {
         try {
             logger.info("📊 MST ID $mstId CSV 파일 생성 시작")
@@ -2541,6 +2960,15 @@ class EphemerisService(
             } else {
                 logger.info("📄 새 파일 생성: $filename")
             }
+            
+            // ✅ 최대값 추적용 변수 (블록 밖에서 선언)
+            var maxOriginalAzVelocity = 0.0
+            var maxOriginalElVelocity = 0.0
+            var maxAxisTransformedAzVelocity = 0.0
+            var maxAxisTransformedElVelocity = 0.0
+            var maxFinalTransformedAzVelocity = 0.0
+            var maxFinalTransformedElVelocity = 0.0
+            
             java.io.FileWriter(filePath).use { writer ->
                 // ✅ 사용자 요구사항에 맞는 CSV 헤더: 각 변환 단계별 각속도 포함
                 writer.write("Index,Time,")
@@ -2577,7 +3005,7 @@ class EphemerisService(
                     val finalTransformedAz = finalTransformedPoint?.get("Azimuth") as? Double ?: 0.0
                     val finalTransformedEl = finalTransformedPoint?.get("Elevation") as? Double ?: 0.0
                     
-                    // ✅ 각 변환 단계별 각속도 계산 (도/초)
+                    // ✅ 각 변환 단계별 각속도 계산 (이론치 합계법 - 10개 변화량의 합)
                     var originalAzimuthVelocity = 0.0
                     var originalElevationVelocity = 0.0
                     var axisTransformedAzimuthVelocity = 0.0
@@ -2585,36 +3013,74 @@ class EphemerisService(
                     var finalTransformedAzimuthVelocity = 0.0
                     var finalTransformedElevationVelocity = 0.0
                     
-                    if (prevTime != null && originalTime != null) {
-                        val timeDiffSeconds = java.time.Duration.between(prevTime, originalTime).toMillis() / 1000.0
-                        if (timeDiffSeconds > 0) {
-                            // ✅ Original 각속도 계산
-                            if (prevOriginalAzimuth != null && prevOriginalElevation != null) {
-                                var azDiff = originalAz - prevOriginalAzimuth
-                                if (azDiff > 180) azDiff -= 360
-                                if (azDiff < -180) azDiff += 360
-                                originalAzimuthVelocity = azDiff / timeDiffSeconds
-                                originalElevationVelocity = (originalEl - prevOriginalElevation) / timeDiffSeconds
-                            }
-                            
-                            // ✅ AxisTransformed 각속도 계산
-                            if (prevAxisTransformedAzimuth != null && prevAxisTransformedElevation != null) {
-                                var azDiff = axisTransformedAz - prevAxisTransformedAzimuth
-                                if (azDiff > 180) azDiff -= 360
-                                if (azDiff < -180) azDiff += 360
-                                axisTransformedAzimuthVelocity = azDiff / timeDiffSeconds
-                                axisTransformedElevationVelocity = (axisTransformedEl - prevAxisTransformedElevation) / timeDiffSeconds
-                            }
-                            
-                            // ✅ FinalTransformed 각속도 계산
-                            if (prevFinalTransformedAzimuth != null && prevFinalTransformedElevation != null) {
-                                var azDiff = finalTransformedAz - prevFinalTransformedAzimuth
-                                if (azDiff > 180) azDiff -= 360
-                                if (azDiff < -180) azDiff += 360
-                                finalTransformedAzimuthVelocity = azDiff / timeDiffSeconds
-                                finalTransformedElevationVelocity = (finalTransformedEl - prevFinalTransformedElevation) / timeDiffSeconds
+                    // ✅ 이론치 합계법: 1초간(10개) 총 변화량 계산 (시간으로 나누지 않음)
+                    if (i >= 9) { // Index 9부터 10개 데이터 구간 형성 가능
+                        var currentOriginalAzSum = 0.0
+                        var currentOriginalElSum = 0.0
+                        var currentAxisTransformedAzSum = 0.0
+                        var currentAxisTransformedElSum = 0.0
+                        var currentFinalTransformedAzSum = 0.0
+                        var currentFinalTransformedElSum = 0.0
+                        
+                        // 10개 구간의 변화량을 모두 더함 (j-1이 유효하도록)
+                        for (j in (i - 9)..i) { // j는 현재 인덱스 i까지, 이전 9개 포함 (총 10개)
+                            if (j > 0) { // j-1이 유효한 경우만 계산
+                                val prevOriginalPoint = originalDtl[j - 1]
+                                val currentOriginalPoint = originalDtl[j]
+                                val prevAxisTransformedPoint = axisTransformedDtl[j - 1]
+                                val currentAxisTransformedPoint = axisTransformedDtl[j]
+                                val prevFinalTransformedPoint = finalTransformedDtl[j - 1]
+                                val currentFinalTransformedPoint = finalTransformedDtl[j]
+                                
+                                // Original
+                                val prevOriginalAz = prevOriginalPoint["Azimuth"] as Double
+                                val currentOriginalAz = currentOriginalPoint["Azimuth"] as Double
+                                val prevOriginalEl = prevOriginalPoint["Elevation"] as Double
+                                val currentOriginalEl = currentOriginalPoint["Elevation"] as Double
+                                var azDiffOriginal = currentOriginalAz - prevOriginalAz
+                                if (azDiffOriginal > 180) azDiffOriginal -= 360
+                                if (azDiffOriginal < -180) azDiffOriginal += 360
+                                currentOriginalAzSum += kotlin.math.abs(azDiffOriginal)
+                                currentOriginalElSum += kotlin.math.abs(currentOriginalEl - prevOriginalEl)
+                                
+                                // AxisTransformed
+                                val prevAxisTransformedAz = prevAxisTransformedPoint["Azimuth"] as Double
+                                val currentAxisTransformedAz = currentAxisTransformedPoint["Azimuth"] as Double
+                                val prevAxisTransformedEl = prevAxisTransformedPoint["Elevation"] as Double
+                                val currentAxisTransformedEl = currentAxisTransformedPoint["Elevation"] as Double
+                                var azDiffAxis = currentAxisTransformedAz - prevAxisTransformedAz
+                                if (azDiffAxis > 180) azDiffAxis -= 360
+                                if (azDiffAxis < -180) azDiffAxis += 360
+                                currentAxisTransformedAzSum += kotlin.math.abs(azDiffAxis)
+                                currentAxisTransformedElSum += kotlin.math.abs(currentAxisTransformedEl - prevAxisTransformedEl)
+                                
+                                // FinalTransformed
+                                val prevFinalTransformedAz = prevFinalTransformedPoint["Azimuth"] as Double
+                                val currentFinalTransformedAz = currentFinalTransformedPoint["Azimuth"] as Double
+                                val prevFinalTransformedEl = prevFinalTransformedPoint["Elevation"] as Double
+                                val currentFinalTransformedEl = currentFinalTransformedPoint["Elevation"] as Double
+                                var azDiffFinal = currentFinalTransformedAz - prevFinalTransformedAz
+                                if (azDiffFinal > 180) azDiffFinal -= 360
+                                if (azDiffFinal < -180) azDiffFinal += 360
+                                currentFinalTransformedAzSum += kotlin.math.abs(azDiffFinal)
+                                currentFinalTransformedElSum += kotlin.math.abs(currentFinalTransformedEl - prevFinalTransformedEl)
                             }
                         }
+                        
+                        originalAzimuthVelocity = currentOriginalAzSum
+                        originalElevationVelocity = currentOriginalElSum
+                        axisTransformedAzimuthVelocity = currentAxisTransformedAzSum
+                        axisTransformedElevationVelocity = currentAxisTransformedElSum
+                        finalTransformedAzimuthVelocity = currentFinalTransformedAzSum
+                        finalTransformedElevationVelocity = currentFinalTransformedElSum
+                        
+                        // 최대값 업데이트
+                        maxOriginalAzVelocity = maxOf(maxOriginalAzVelocity, originalAzimuthVelocity)
+                        maxOriginalElVelocity = maxOf(maxOriginalElVelocity, originalElevationVelocity)
+                        maxAxisTransformedAzVelocity = maxOf(maxAxisTransformedAzVelocity, axisTransformedAzimuthVelocity)
+                        maxAxisTransformedElVelocity = maxOf(maxAxisTransformedElVelocity, axisTransformedElevationVelocity)
+                        maxFinalTransformedAzVelocity = maxOf(maxFinalTransformedAzVelocity, finalTransformedAzimuthVelocity)
+                        maxFinalTransformedElVelocity = maxOf(maxFinalTransformedElVelocity, finalTransformedElevationVelocity)
                     }
                     
                     val azimuthTransformationError = axisTransformedAz - originalAz
@@ -2644,6 +3110,11 @@ class EphemerisService(
             logger.info("  - 원본 데이터: ${originalDtl.size}개")
             logger.info("  - 축변환 데이터: ${axisTransformedDtl.size}개")
             logger.info("  - 최종 변환 데이터: ${finalTransformedDtl.size}개")
+            logger.info("✅ CSV 합계법 최대값:")
+            logger.info("  - Original_Azimuth_Velocity: ${String.format("%.6f", maxOriginalAzVelocity)}°/s")
+            logger.info("  - Original_Elevation_Velocity: ${String.format("%.6f", maxOriginalElVelocity)}°/s")
+            logger.info("  - FinalTransformed_Azimuth_Velocity: ${String.format("%.6f", maxFinalTransformedAzVelocity)}°/s")
+            logger.info("  - FinalTransformed_Elevation_Velocity: ${String.format("%.6f", maxFinalTransformedElVelocity)}°/s")
             return mapOf<String, Any?>(
                 "success" to true,
                 "filename" to filename,

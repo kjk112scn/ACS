@@ -213,7 +213,7 @@ class EphemerisController(
     )
     fun getAllEphemerisTrackMst(): Mono<List<Map<String, Any?>>> {
         return Mono.fromCallable {
-            ephemerisService.getFinalTransformedEphemerisTrackMst()
+            ephemerisService.getAllEphemerisTrackMstMerged()
         }
     }
 
@@ -397,9 +397,6 @@ class EphemerisController(
         }
     }
 
-    /**
-     * 실시간 추적 데이터를 초기화
-     */
     // ❌ 현재 사용하지 않음.
     // @PostMapping("/realtime-data/clear")
     // @Operation(
@@ -925,6 +922,37 @@ class EphemerisController(
                 mapOf(
                     "status" to "error",
                     "message" to "비교 데이터 조회 실패: ${e.message}",
+                    "error" to (e.message ?: "알 수 없는 오류")
+                )
+            }
+        }
+    }
+
+    /**
+     * ✅ Original과 FinalTransformed 데이터를 병합하여 반환
+     * UI 테이블에서 2축/최종변환 데이터를 동시에 표시하기 위한 API
+     */
+    @GetMapping("/tracking/mst/merged")
+    @Operation(
+        operationId = "getAllEphemerisTrackMstMerged",
+        tags = ["Mode - Ephemeris"],
+        summary = "Original과 FinalTransformed 병합 데이터 조회",
+        description = "UI 테이블에서 2축(Original)과 최종변환(FinalTransformed) 메타데이터를 동시에 표시하기 위한 API"
+    )
+    fun getAllEphemerisTrackMstMerged(): Mono<Map<String, Any>> {
+        return Mono.fromCallable {
+            try {
+                val mergedData = ephemerisService.getAllEphemerisTrackMstMerged()
+                mapOf(
+                    "status" to "success",
+                    "data" to mergedData,
+                    "count" to mergedData.size,
+                    "message" to "병합 데이터 조회 완료"
+                )
+            } catch (e: Exception) {
+                mapOf(
+                    "status" to "error",
+                    "message" to "병합 데이터 조회 실패: ${e.message}",
                     "error" to (e.message ?: "알 수 없는 오류")
                 )
             }
