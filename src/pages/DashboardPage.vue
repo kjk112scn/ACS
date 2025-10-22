@@ -25,7 +25,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.azimuthSpeed)
-              }}</q-item-label>
+                }}</q-item-label>
             </div>
           </div>
         </q-card-section>
@@ -53,7 +53,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.elevationSpeed)
-              }}</q-item-label>
+                }}</q-item-label>
             </div>
           </div>
         </q-card-section>
@@ -81,7 +81,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.trainSpeed)
-              }}</q-item-label>
+                }}</q-item-label>
             </div>
           </div>
         </q-card-section>
@@ -286,8 +286,9 @@ const route = useRoute()
 const { initializeTheme } = useTheme()
 
 // Dashboard 페이지용 WebSocket 메시지 핸들러
-const handleDashboardMessage = (message: MessageData) => {
-  console.log('📊 Dashboard 메시지 수신:', message)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const handleDashboardMessage = (_message: MessageData) => {
+  // console.log('📊 Dashboard 메시지 수신:', _message)
   // 필요시 추가 처리 로직 (예: 특정 데이터 변경 감지, 알림 등)
 }
 

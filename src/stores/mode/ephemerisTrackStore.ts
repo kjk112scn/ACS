@@ -127,9 +127,38 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
   const lastFetchTime = ref<number>(0)
   const cacheTimeout = 5 * 60 * 1000 // 5분
 
+  // ===== 새로운 상태: 전체 데이터 저장 및 필터링 =====
+
+  /**
+   * 전체 스케줄 상세 데이터 (필터링 전)
+   * 백엔드에서 받은 모든 데이터 저장 (음수 Elevation 포함)
+   */
+  const rawDetailData = ref<ScheduleDetailItem[]>([])
+
+  /**
+   * 화면 표시용 최소 Elevation 각도 (도)
+   * SettingsService.displayMinElevationAngle 값
+   */
+  const displayMinElevation = ref<number>(0.0)
+
   // ===== 계산된 속성 =====
   const hasValidData = computed(() => masterData.value.length > 0)
   const isTrackingActive = computed(() => trackingStatus.value === 'active')
+
+  /**
+   * 화면에 표시할 필터링된 상세 데이터
+   * displayMinElevation 기준으로 필터링
+   */
+  const filteredDetailData = computed(() => {
+    return rawDetailData.value.filter((item) => item.Elevation >= displayMinElevation.value)
+  })
+
+  /**
+   * KEYHOLE 위성 스케줄들만 필터링
+   */
+  const keyholeSchedules = computed(() => {
+    return masterData.value.filter((schedule) => schedule.IsKeyhole)
+  })
 
   const currentScheduleInfo = computed(() => {
     if (!selectedSchedule.value) return null
@@ -578,7 +607,9 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
   }
 
   /**
-   * 스케줄 선택 및 세부 데이터 로드
+   * 스케줄 선택 및 상세 데이터 로드
+   *
+   * @param schedule 선택된 스케줄 아이템
    */
   const selectSchedule = async (schedule: ScheduleItem) => {
     selectedSchedule.value = schedule
@@ -586,13 +617,47 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
 
     try {
       await ephemerisTrackService.setCurrentTrackingPassId(schedule.No)
-      const details = await ephemerisTrackService.fetchEphemerisDetailData(schedule.No)
-      detailData.value = details
-      return details
+
+      // 1. 백엔드에서 전체 데이터 조회 (필터링 없음)
+      const allData = await ephemerisTrackService.fetchEphemerisDetailData(schedule.No)
+
+      // 2. 전체 데이터 저장
+      rawDetailData.value = allData
+
+      // 3. displayMinElevation 설정값 조회 및 저장
+      displayMinElevation.value = await ephemerisTrackService.getDisplayMinElevationAngle()
+
+      // 4. 기존 detailData도 업데이트 (호환성 유지)
+      detailData.value = filteredDetailData.value
+
+      console.log(`✅ 스케줄 데이터 로드 완료:
+        - 전체 데이터: ${rawDetailData.value.length}개
+        - 표시 데이터: ${filteredDetailData.value.length}개
+        - 필터 기준: ${displayMinElevation.value}°
+        - KEYHOLE: ${schedule.IsKeyhole ? 'YES' : 'NO'}
+        - Train 각도: ${schedule.RecommendedTrainAngle}°
+      `)
+
+      return filteredDetailData.value
     } catch (err) {
       error.value = 'Failed to select schedule'
       throw err
     }
+  }
+
+  /**
+   * displayMinElevation 설정값 업데이트
+   * 설정 변경 시 호출하여 즉시 필터링 반영
+   *
+   * @param newValue 새로운 최소 Elevation 값 (도)
+   */
+  const updateDisplayMinElevation = (newValue: number) => {
+    displayMinElevation.value = newValue
+    // 기존 detailData도 업데이트 (호환성 유지)
+    detailData.value = filteredDetailData.value
+    console.log(
+      `🔄 표시 필터 업데이트: ${newValue}° (표시 데이터: ${filteredDetailData.value.length}개)`,
+    )
   }
 
   /**
@@ -913,10 +978,16 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     workerStats: readonly(workerStats),
     geostationaryAngles: readonly(geostationaryAngles),
 
+    // ✅ 새로운 필터링 관련 상태
+    rawDetailData: readonly(rawDetailData),
+    displayMinElevation: readonly(displayMinElevation),
+
     // 계산된 속성
     hasValidData,
     isTrackingActive,
     currentScheduleInfo,
+    filteredDetailData, // 필터링된 데이터
+    keyholeSchedules, // KEYHOLE 위성들
 
     // 기존 액션
     loadMasterData,
@@ -942,6 +1013,9 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     startGeostationaryTracking,
     activateGeostationaryTracking,
     resetGeostationaryAngles,
+
+    // ✅ 새로운 필터링 관련 액션
+    updateDisplayMinElevation,
   }
 })
 

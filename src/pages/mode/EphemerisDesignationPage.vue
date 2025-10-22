@@ -185,22 +185,25 @@
                   <div v-else-if="selectedScheduleInfo.satelliteName" class="schedule-info q-mt-xs">
                     <div class="info-row">
                       <span class="info-label">위성 이름/ID:</span>
-                      <span class="info-value">{{ selectedScheduleInfo.satelliteName }} / {{
-                        selectedScheduleInfo.satelliteId }}</span>
+                      <span class="info-value">
+                        {{ selectedScheduleInfo.satelliteName }} / {{ selectedScheduleInfo.satelliteId }}
+                        <!-- KEYHOLE 배지 -->
+                        <q-badge v-if="selectedScheduleInfo.isKeyhole" color="red" class="q-ml-sm" label="KEYHOLE" />
+                      </span>
                     </div>
 
                     <div class="info-row">
                       <span class="info-label">시작/종료 시간:</span>
                       <span class="info-value">{{
                         formatToLocalTime(selectedScheduleInfo.startTime)
-                      }} / {{
+                        }} / {{
                           formatToLocalTime(selectedScheduleInfo.endTime)
                         }}</span>
                     </div>
 
                     <div class="info-row">
                       <span class="info-label">지속 시간:</span>
-                      <span class="info-value">{{ selectedScheduleInfo.duration }}</span>
+                      <span class="info-value">{{ formatDuration(selectedScheduleInfo.duration) }}</span>
                     </div>
 
                     <div class="info-row">
@@ -213,6 +216,27 @@
                     <div class="info-row">
                       <span class="info-label">최대 고도:</span>
                       <span class="info-value">{{ selectedScheduleInfo.maxElevation.toFixed(2) }}°</span>
+                    </div>
+
+                    <!-- KEYHOLE 정보 표시 -->
+                    <div v-if="selectedScheduleInfo.isKeyhole" class="keyhole-info q-mt-sm q-pa-sm"
+                      style="background-color: rgba(255, 0, 0, 0.1); border-left: 3px solid #f44336;">
+                      <div class="text-weight-bold text-red q-mb-xs">🚀 KEYHOLE 위성 정보</div>
+                      <div class="info-row">
+                        <span class="info-label">권장 Train 각도:</span>
+                        <span class="info-value text-positive">{{
+                          safeToFixed(selectedScheduleInfo.recommendedTrainAngle, 2)
+                        }}°</span>
+                      </div>
+                      <div class="info-row">
+                        <span class="info-label">최대 Azimuth 속도:</span>
+                        <span class="info-value text-red">{{ safeToFixed(selectedScheduleInfo.maxAzimuthRate, 2)
+                        }}°/s</span>
+                      </div>
+                      <div class="info-row">
+                        <span class="info-label">최대 Elevation 속도:</span>
+                        <span class="info-value">{{ safeToFixed(selectedScheduleInfo.maxElevationRate, 2) }}°/s</span>
+                      </div>
                     </div>
 
                     <div class="info-row">
@@ -314,9 +338,63 @@ ISS (ZARYA)
       </q-card-section>
 
       <q-card-section class="q-pa-md" style="max-height: 50vh; overflow: auto">
-        <q-table :rows="scheduleData" :columns="scheduleColumns" row-key="No" :loading="loadingSchedule"
-          :pagination="{ rowsPerPage: 10 }" selection="single" v-model:selected="selectedSchedule"
-          class="bg-grey-9 text-white" dark flat bordered>
+        <q-table :rows="ephemerisStore.masterData" :columns="scheduleColumns" row-key="No"
+          :loading="isLoadingComparison" :pagination="{ rowsPerPage: 10 }" selection="single"
+          v-model:selected="selectedSchedule" class="bg-grey-9 text-white" dark flat bordered>
+
+          <!-- 최대 고도 템플릿 -->
+          <template v-slot:body-cell-MaxElevation="props">
+            <q-td :props="props">
+              <div class="text-center">
+                <div class="text-weight-bold text-primary">
+                  {{ safeToFixed(props.value, 6) }}°
+                </div>
+              </div>
+            </q-td>
+          </template>
+
+          <!-- 최대 Az 속도 템플릿 -->
+          <template v-slot:body-cell-MaxAzimuthRate="props">
+            <q-td :props="props">
+              <div class="text-center">
+                <div class="text-weight-bold text-primary">
+                  {{ safeToFixed(props.value) }}°/s
+                </div>
+              </div>
+            </q-td>
+          </template>
+
+          <!-- 최대 El 속도 템플릿 -->
+          <template v-slot:body-cell-MaxElevationRate="props">
+            <q-td :props="props">
+              <div class="text-center">
+                <div class="text-weight-bold text-primary">
+                  {{ safeToFixed(props.value) }}°/s
+                </div>
+              </div>
+            </q-td>
+          </template>
+
+          <!-- KEYHOLE 배지 템플릿 -->
+          <template v-slot:body-cell-SatelliteName="props">
+            <q-td :props="props">
+              <div class="flex items-center">
+                <span>{{ props.value || props.row?.SatelliteID || '이름 없음' }}</span>
+                <q-badge v-if="props.row?.isKeyhole" color="red" class="q-ml-sm" label="KEYHOLE" />
+              </div>
+            </q-td>
+          </template>
+
+          <!-- Train 각도 템플릿 -->
+          <template v-slot:body-cell-recommendedTrainAngle="props">
+            <q-td :props="props">
+              <span v-if="props.row?.isKeyhole" class="text-positive">
+                {{ safeToFixed(props.value) }}°
+              </span>
+              <span v-else class="text-grey">-</span>
+            </q-td>
+          </template>
+
           <template v-slot:loading>
             <q-inner-loading showing color="primary">
               <q-spinner size="50px" color="primary" />
@@ -349,6 +427,31 @@ import {
   type RealtimeTrackingDataItem,
 } from '../../services/mode/ephemerisTrackService'
 import { openPopup } from '../../utils/windowUtils'
+import { useNotification } from '../../composables/useNotification'
+
+// ✅ 알림 시스템 사용
+const { success, error, warning, info } = useNotification()
+
+// ✅ Duration 포맷 함수 추가
+const formatDuration = (duration: string): string => {
+  if (!duration) return '0분 0초'
+
+  // ISO 8601 Duration 형식 (PT13M43.6S) 파싱
+  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/)
+  if (!match) return duration // 파싱 실패 시 원본 반환
+
+  const hours = parseInt(match[1] || '0')
+  const minutes = parseInt(match[2] || '0')
+  const seconds = parseFloat(match[3] || '0')
+
+  const parts: string[] = []
+  if (hours > 0) parts.push(`${hours}시간`)
+  if (minutes > 0) parts.push(`${minutes}분`)
+  if (seconds > 0) parts.push(`${Math.round(seconds)}초`)
+
+  return parts.length > 0 ? parts.join(' ') : '0분 0초'
+}
+
 // ✅ 스토어 연동 추가
 const ephemerisStore = useEphemerisTrackModeStore()
 
@@ -398,9 +501,17 @@ const currentPosition = ref({
 // ✅ 스토어 상태 연동 - 탭 이동 시에도 데이터 유지
 const showScheduleModal = ref(false)
 
-const scheduleData = computed(() => ephemerisStore.masterData)
+// ✅ scheduleData는 더 이상 사용하지 않음 (comparisonData로 대체)
+// const scheduleData = computed(() => {
+//   const data = ephemerisStore.masterData
+//   // 안전한 렌더링을 위해 기본값 보장
+//   if (!Array.isArray(data)) {
+//     console.warn('⚠️ masterData가 배열이 아닙니다:', data)
+//     return []
+//   }
+//   return data
+// })
 const selectedSchedule = ref<ScheduleItem[]>([])
-const loadingSchedule = ref(false)
 
 // TLE 모달 관련 상태
 const showTLEModal = ref(false)
@@ -418,7 +529,7 @@ const isExportingCsv = ref(false)
 // QTable 컬럼 타입 정의
 type QTableColumn = NonNullable<QTableProps['columns']>[0]
 
-// 스케줄 테이블 컬럼 정의
+// ✅ 기존 스케줄 테이블 컬럼 정의 (원래대로 복구)
 const scheduleColumns: QTableColumn[] = [
   { name: 'No', label: 'No', field: 'No', align: 'left', sortable: true },
   {
@@ -427,8 +538,10 @@ const scheduleColumns: QTableColumn[] = [
     field: 'SatelliteName',
     align: 'left',
     sortable: true,
-
-    format: (val, row) => val || row.SatelliteID || '이름 없음',
+    format: (val, row) => {
+      const name = val || row.SatelliteID || '이름 없음'
+      return name
+    },
   },
   {
     name: 'StartTime',
@@ -446,13 +559,55 @@ const scheduleColumns: QTableColumn[] = [
     sortable: true,
     format: (val) => formatToLocalTime(val),
   },
-  { name: 'Duration', label: '지속 시간', field: 'Duration', align: 'left', sortable: true },
+  {
+    name: 'Duration',
+    label: '지속 시간',
+    field: 'Duration',
+    align: 'left',
+    sortable: true,
+    format: (val) => formatDuration(val)
+  },
+  // ✅ 기존 데이터 필드들
   {
     name: 'MaxElevation',
     label: '최대 고도 (°)',
     field: 'MaxElevation',
-    align: 'left',
+    align: 'center',
     sortable: true,
+    format: (val) => val?.toFixed(6) || '0.000000',
+  },
+  {
+    name: 'MaxAzimuthRate',
+    label: '최대 Az 속도 (°/s)',
+    field: 'MaxAzimuthRate',
+    align: 'center',
+    sortable: true,
+    format: (val) => val?.toFixed(2) || '0.00',
+  },
+  {
+    name: 'MaxElevationRate',
+    label: '최대 El 속도 (°/s)',
+    field: 'MaxElevationRate',
+    align: 'center',
+    sortable: true,
+    format: (val) => val?.toFixed(2) || '0.00',
+  },
+  // ✅ KEYHOLE 및 Train 각도
+  {
+    name: 'isKeyhole',
+    label: 'KEYHOLE',
+    field: 'isKeyhole',
+    align: 'center',
+    sortable: true,
+    format: (val) => val ? 'YES' : 'NO',
+  },
+  {
+    name: 'recommendedTrainAngle',
+    label: 'Train 각도 (°)',
+    field: 'recommendedTrainAngle',
+    align: 'center',
+    sortable: true,
+    format: (val, row) => row.isKeyhole ? val?.toFixed(2) : '-',
   },
 ]
 
@@ -466,10 +621,28 @@ const outputs = computed(() => [
   ephemerisStore.offsetValues.train,
   ephemerisStore.offsetValues.timeResult, // ✅ 별도 관리되는 Result 값
 ])
-// Quasar 인스턴스 가져오기
-import { useQuasar } from 'quasar'
 
-const $q = useQuasar()
+// ✅ 로딩 상태 관리
+const isLoadingComparison = ref(false)
+
+// ✅ 기존 스케줄 데이터 로드 함수 (스토어 메서드 사용)
+const loadScheduleData = async () => {
+  try {
+    isLoadingComparison.value = true
+    console.log('📊 스케줄 데이터 로드 시작')
+
+    // ✅ 스토어의 loadMasterData 메서드 사용
+    await ephemerisStore.loadMasterData(true)
+
+    console.log(`✅ 스케줄 데이터 로드 완료: ${ephemerisStore.masterData.length}개 패스`)
+
+  } catch (err) {
+    console.error('❌ 스케줄 데이터 로드 실패:', err)
+    error('스케줄 데이터 로드에 실패했습니다')
+  } finally {
+    isLoadingComparison.value = false
+  }
+}
 
 // ✅ 스토어에서 선택된 스케줄 정보 가져오기 - 탭 이동 시에도 유지
 const selectedScheduleInfo = computed(() => {
@@ -503,6 +676,11 @@ const selectedScheduleInfo = computed(() => {
       startElevation: ephemerisStore.geostationaryAngles.elevation,
       endElevation: ephemerisStore.geostationaryAngles.elevation,
       isGeostationary: true, // ✅ 정지궤도 구분 플래그
+      // 정지궤도는 KEYHOLE이 아님
+      isKeyhole: false,
+      recommendedTrainAngle: 0,
+      maxAzimuthRate: 0,
+      maxElevationRate: 0,
     }
   }
 
@@ -524,6 +702,11 @@ const selectedScheduleInfo = computed(() => {
       startElevation: typeof selected.StartElevation === 'number' ? selected.StartElevation : 0,
       endElevation: typeof selected.EndElevation === 'number' ? selected.EndElevation : 0,
       isGeostationary: false,
+      // KEYHOLE 정보 추가
+      isKeyhole: selected.IsKeyhole || false,
+      recommendedTrainAngle: selected.RecommendedTrainAngle || 0,
+      maxAzimuthRate: selected.MaxAzRate || 0,
+      maxElevationRate: selected.MaxElRate || 0,
     }
   }
 
@@ -542,6 +725,11 @@ const selectedScheduleInfo = computed(() => {
     startElevation: 0,
     endElevation: 0,
     isGeostationary: false,
+    // KEYHOLE 정보 기본값
+    isKeyhole: false,
+    recommendedTrainAngle: 0,
+    maxAzimuthRate: 0,
+    maxElevationRate: 0,
   }
 })
 
@@ -572,6 +760,13 @@ const downloadCSVWithTransformations = (data: RealtimeTrackingDataItem[]) => {
     return Number(value).toFixed(digits)
   }
 
+  // 선택된 스케줄에서 KEYHOLE 정보 가져오기
+  const selectedSchedule = ephemerisStore.selectedSchedule
+  const isKeyhole = selectedSchedule?.isKeyhole || false
+  const recommendedTrainAngle = selectedSchedule?.recommendedTrainAngle || 0
+  const maxAzimuthRate = selectedSchedule?.maxAzimuthRate || 0
+  const maxElevationRate = selectedSchedule?.maxElevationRate || 0
+
   // CSV 헤더 정의 - 원본/축변환/최종 데이터 포함
   const headers = [
     'Index', 'TheoreticalIndex', 'Timestamp', 'PassId', 'ElapsedTime(s)',
@@ -600,7 +795,10 @@ const downloadCSVWithTransformations = (data: RealtimeTrackingDataItem[]) => {
     'El_CMD정확도(°)', 'El_Act정확도(°)', 'El_최종정확도(°)',
 
     // 변환 정보
-    'TrainAngle(°)', 'TransformationType', 'HasTransformation', 'InterpolationMethod', 'InterpolationAccuracy'
+    'TrainAngle(°)', 'TransformationType', 'HasTransformation', 'InterpolationMethod', 'InterpolationAccuracy',
+
+    // KEYHOLE 정보
+    'IsKeyhole', 'RecommendedTrainAngle(°)', 'MaxAzimuthRate(°/s)', 'MaxElevationRate(°/s)'
   ]
 
   // CSV 데이터 생성 (안전한 처리 적용)
@@ -668,7 +866,13 @@ const downloadCSVWithTransformations = (data: RealtimeTrackingDataItem[]) => {
         `"${item.transformationType || 'none'}"`,
         item.hasTransformation ? 'true' : 'false',
         `"${item.interpolationMethod || 'linear'}"`,
-        safeToFixed(item.interpolationAccuracy, 6)
+        safeToFixed(item.interpolationAccuracy, 6),
+
+        // KEYHOLE 정보
+        isKeyhole ? 'true' : 'false',
+        safeToFixed(recommendedTrainAngle, 6),
+        safeToFixed(maxAzimuthRate, 6),
+        safeToFixed(maxElevationRate, 6)
       ].join(','),
     ),
   ].join('\n')
@@ -697,11 +901,7 @@ const downloadCSVWithTransformations = (data: RealtimeTrackingDataItem[]) => {
 const downloadRealtimeData = async () => {
   try {
     // Loading 대신 notify로 시작 알림
-    $q.notify({
-      type: 'info',
-      message: '실시간 추적 데이터를 조회하고 있습니다...',
-      timeout: 2000,
-    })
+    info('실시간 추적 데이터를 조회하고 있습니다...')
 
     // ✅ 기존 API 호출 - generateRealtimeTrackingCsv와 연계
     const response = await ephemerisTrackService.fetchRealtimeTrackingData()
@@ -710,27 +910,15 @@ const downloadRealtimeData = async () => {
       // ✅ 클라이언트에서 CSV 생성 및 다운로드
       downloadCSVWithTransformations(response.data)
 
-      $q.notify({
-        type: 'positive',
-        message: `${response.totalCount || 0}개의 실시간 추적 데이터를 다운로드했습니다`,
-        timeout: 5000,
-      })
+      success(`${response.totalCount || 0}개의 실시간 추적 데이터를 다운로드했습니다`)
 
       console.log('실시간 추적 데이터 다운로드 결과:', response)
     } else {
-      $q.notify({
-        type: 'warning',
-        message: '다운로드할 실시간 추적 데이터가 없습니다',
-        timeout: 3000,
-      })
+      warning('다운로드할 실시간 추적 데이터가 없습니다')
     }
   } catch (error) {
     console.error('실시간 추적 데이터 다운로드 실패:', error)
-    $q.notify({
-      type: 'negative',
-      message: '실시간 추적 데이터 다운로드에 실패했습니다',
-      timeout: 5000,
-    })
+    error('실시간 추적 데이터 다운로드에 실패했습니다')
   }
 }
 
@@ -759,35 +947,9 @@ class PerformanceMonitor {
   }
 
   measureFrame(callback: () => void) {
-    const startTime = performance.now()
-
+    // 성능 모니터링 간소화 - 블로킹 방지
     callback()
-
-    const endTime = performance.now()
-    const frameTime = endTime - startTime
-
-    this.frameTimings.push(frameTime)
-    if (this.frameTimings.length > 100) {
-      this.frameTimings.shift()
-    }
-
-    this.stats.totalFrames++
-    this.stats.maxFrameTime = Math.max(this.stats.maxFrameTime, frameTime)
-    this.stats.averageFrameTime =
-      this.frameTimings.reduce((a, b) => a + b, 0) / this.frameTimings.length
-
-    if (frameTime > this.gcDetectionThreshold) {
-      this.stats.gcSuspectedFrames++
-      console.warn(`🐌 느린 프레임 감지: ${frameTime.toFixed(2)}ms`, {
-        메모리: this.getMemoryInfo(),
-        프레임비율: `${this.stats.gcSuspectedFrames}/${this.stats.totalFrames}`,
-        평균프레임시간: this.stats.averageFrameTime.toFixed(2) + 'ms',
-      })
-    }
-
-    if (this.stats.totalFrames % 100 === 0) {
-      this.takeMemorySnapshot()
-    }
+    return
   }
 
   private getMemoryInfo(): { used: string; total: string } | null {
@@ -1296,21 +1458,7 @@ const updateTimeRemaining = () => {
 
 // ===== 스토어 연동 메서드들 =====
 
-// ✅ 스케줄 데이터 로드 - 스토어 사용
-const loadScheduleData = async () => {
-  loadingSchedule.value = true
-  try {
-    await ephemerisStore.loadMasterData(true)
-  } catch (error) {
-    console.error('스케줄 데이터 로드 실패:', error)
-    $q.notify({
-      type: 'negative',
-      message: '스케줄 데이터를 불러오는데 실패했습니다',
-    })
-  } finally {
-    loadingSchedule.value = false
-  }
-}
+// ✅ 중복된 함수 제거됨 - 위에서 이미 정의됨
 
 // ✅ 스케줄 선택 - 스토어에 저장하여 탭 이동 시에도 유지
 const selectSchedule = async () => {
@@ -1330,23 +1478,28 @@ const selectSchedule = async () => {
     // 스토어의 detailData는 selectSchedule 메서드 내에서 이미 로드됨
     const detailData = ephemerisStore.detailData
 
+    // KEYHOLE 정보 로깅
+    if (selectedItem.IsKeyhole) {
+      console.log('🚀 KEYHOLE 위성 선택됨:', {
+        satelliteName: selectedItem.SatelliteName || selectedItem.SatelliteID,
+        recommendedTrainAngle: selectedItem.RecommendedTrainAngle,
+        maxAzimuthRate: selectedItem.MaxAzRate,
+        maxElevationRate: selectedItem.MaxElRate,
+        threshold: 10.0 // 기본 임계값
+      })
+    }
+
     // 차트 업데이트
     if (detailData && detailData.length > 0 && chart) {
       updateChartWithTrajectory([...detailData] as TrajectoryPoint[])
     }
 
-    $q.notify({
-      type: 'positive',
-      message: `${selectedItem.SatelliteName || selectedItem.SatelliteID} 스케줄이 선택되었습니다`,
-    })
+    success(`${selectedItem.SatelliteName || selectedItem.SatelliteID} 스케줄이 선택되었습니다`)
 
     showScheduleModal.value = false
   } catch (error) {
     console.error('스케줄 선택 실패:', error)
-    $q.notify({
-      type: 'negative',
-      message: '스케줄 선택에 실패했습니다',
-    })
+    error('스케줄 선택에 실패했습니다')
   }
 }
 
@@ -1579,10 +1732,7 @@ const addTLEData = async () => {
       await loadScheduleData()
     }
 
-    $q.notify({
-      type: 'positive',
-      message: `TLE 데이터가 성공적으로 처리되었습니다${isGEO ? ' (정지궤도)' : ''}`,
-    })
+    success(`TLE 데이터가 성공적으로 처리되었습니다${isGEO ? ' (정지궤도)' : ''}`)
 
     showTLEModal.value = false
   } catch (error) {
@@ -1593,13 +1743,48 @@ const addTLEData = async () => {
   }
 }
 
+// 안전한 숫자 포맷팅 헬퍼 함수
+const safeToFixed = (value: unknown, decimals: number = 2): string => {
+  if (typeof value === 'number' && !isNaN(value)) {
+    return value.toFixed(decimals)
+  }
+
+  // 문자열이나 숫자 문자열만 파싱 시도
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = parseFloat(String(value))
+    if (!isNaN(parsed)) {
+      return parsed.toFixed(decimals)
+    }
+  }
+
+  return '0.00'
+}
+
 // 스케줄 모달 관련
 const openScheduleModal = async () => {
-  showScheduleModal.value = true
+  console.log('🚨🚨🚨 Select Schedule 버튼 클릭됨 - 함수 시작!')
+  console.log('📋 현재 showScheduleModal 상태:', showScheduleModal.value)
+  console.log('📋 ephemerisStore 상태:', {
+    geostationaryAngles: ephemerisStore.geostationaryAngles,
+    masterData: ephemerisStore.masterData.length,
+    selectedSchedule: ephemerisStore.selectedSchedule
+  })
 
-  // ✅ 정지궤도 상태가 아닐 때만 스케줄 데이터 로드
-  if (!ephemerisStore.geostationaryAngles.isSet) {
-    await loadScheduleData()
+  try {
+    showScheduleModal.value = true
+    console.log('📋 스케줄 모달 열림 - showScheduleModal:', showScheduleModal.value)
+
+    // ✅ 정지궤도 상태가 아닐 때만 스케줄 데이터 로드
+    if (!ephemerisStore.geostationaryAngles.isSet) {
+      console.log('🔄 정지궤도가 아니므로 스케줄 데이터 로드 시작')
+      await loadScheduleData()
+    } else {
+      console.log('ℹ️ 정지궤도 상태이므로 스케줄 데이터 로드 건너뜀')
+    }
+
+    console.log('✅ openScheduleModal 함수 완료')
+  } catch (error) {
+    console.error('❌ openScheduleModal 함수에서 에러 발생:', error)
   }
 }
 
@@ -1619,19 +1804,13 @@ const handleEphemerisCommand = async () => {
         )
       }
 
-      $q.notify({
-        type: 'positive',
-        message: `정지궤도 위성(${ephemerisStore.geostationaryAngles.satelliteName}) 추적이 활성화되었습니다`,
-      })
+      success(`정지궤도 위성(${ephemerisStore.geostationaryAngles.satelliteName}) 추적이 활성화되었습니다`)
       return
     }
 
     // 기존 스케줄 추적 로직
     if (!selectedScheduleInfo.value.passId) {
-      $q.notify({
-        type: 'warning',
-        message: '먼저 스케줄을 선택하거나 TLE를 입력하세요',
-      })
+      warning('먼저 스케줄을 선택하거나 TLE를 입력하세요')
       return
     }
 
@@ -1642,16 +1821,10 @@ const handleEphemerisCommand = async () => {
     ephemerisStore.clearTrackingPath(currentAzimuth, currentElevation)
     await ephemerisStore.startTracking()
 
-    $q.notify({
-      type: 'positive',
-      message: 'Ephemeris 추적이 시작되었습니다',
-    })
+    console.log('Ephemeris 추적이 시작되었습니다')
   } catch (error) {
     console.error('Failed to start tracking:', error)
-    $q.notify({
-      type: 'negative',
-      message: '추적 시작에 실패했습니다',
-    })
+    console.error('추적 시작에 실패했습니다')
   }
 }
 
@@ -1670,16 +1843,10 @@ const handleStopCommand = async () => {
     ephemerisStore.clearTrackingPath()
     console.log('🛑 Stop 버튼 클릭 - 추적 중지 및 상태 변경')
 
-    $q.notify({
-      type: 'positive',
-      message: '정지 명령이 전송되었습니다',
-    })
+    console.log('정지 명령이 전송되었습니다')
   } catch (error) {
     console.error('Failed to send stop command:', error)
-    $q.notify({
-      type: 'negative',
-      message: '정지 명령 전송에 실패했습니다',
-    })
+    console.error('정지 명령 전송에 실패했습니다')
   }
 }
 
@@ -1687,16 +1854,10 @@ const handleStowCommand = async () => {
   try {
     await icdStore.stowCommand()
 
-    $q.notify({
-      type: 'positive',
-      message: 'Stow 명령이 전송되었습니다',
-    })
+    console.log('Stow 명령이 전송되었습니다')
   } catch (error) {
     console.error('Failed to send stow command:', error)
-    $q.notify({
-      type: 'negative',
-      message: 'Stow 명령 전송에 실패했습니다',
-    })
+    console.error('Stow 명령 전송에 실패했습니다')
   }
 }
 
@@ -1710,51 +1871,38 @@ const openAxisTransformCalculator = () => {
     })
   } catch (error) {
     console.error('ATC 팝업 열기 실패:', error)
-    $q.notify({
-      type: 'negative',
-      message: 'ATC 팝업을 열 수 없습니다',
-      timeout: 3000
-    })
+    error('ATC 팝업을 열 수 없습니다')
   }
 }
 
 // 모든 MST 데이터를 CSV로 내보내기
 const exportAllMstDataToCsv = async () => {
-  if (isExportingCsv.value) return
+  if (isExportingCsv.value) {
+    warning('이미 CSV 내보내기가 진행 중입니다. 잠시만 기다려주세요.')
+    return
+  }
 
   isExportingCsv.value = true
 
   try {
-    $q.notify({
-      type: 'info',
-      message: '이론치 데이터를 CSV로 내보내는 중...',
-      timeout: 2000
-    })
+    info('이론치 데이터를 CSV로 내보내는 중...')
 
     const response = await ephemerisTrackService.exportAllMstDataToCsv()
 
     if (response.success) {
-      $q.notify({
-        type: 'positive',
-        message: `이론치 데이터 내보내기 완료! 총 ${response.totalMstCount}개 MST, ${response.successCount}개 성공`,
-        timeout: 5000
-      })
+      console.log(`이론치 데이터 내보내기 완료! 총 ${response.totalMstCount}개 MST, ${response.successCount}개 성공`)
+
+      // ✅ 성공 메시지 개선
+      success(`이론치 데이터 내보내기 완료! 총 ${response.totalMstCount}개 MST, ${response.successCount}개 성공`)
 
       console.log('CSV 내보내기 결과:', response)
     } else {
-      $q.notify({
-        type: 'negative',
-        message: `이론치 데이터 내보내기 실패: ${response.error || '알 수 없는 오류'}`,
-        timeout: 5000
-      })
+      console.error(`이론치 데이터 내보내기 실패: ${response.error || '알 수 없는 오류'}`)
+      error(`이론치 데이터 내보내기 실패: ${response.error || '알 수 없는 오류'}`)
     }
   } catch (error) {
     console.error('CSV 내보내기 실패:', error)
-    $q.notify({
-      type: 'negative',
-      message: '이론치 데이터 내보내기 중 오류가 발생했습니다',
-      timeout: 5000
-    })
+    error('이론치 데이터 내보내기 중 오류가 발생했습니다')
   } finally {
     isExportingCsv.value = false
   }
@@ -1811,6 +1959,9 @@ onMounted(async () => {
   if (ephemerisStore.masterData.length === 0) {
     await loadScheduleData()
   }
+
+  // ✅ 스케줄 데이터 로드 (기존 API 사용)
+  await loadScheduleData()
 
   // ✅ 이미 선택된 스케줄이 있으면 차트 업데이트
   if (ephemerisStore.selectedSchedule && ephemerisStore.detailData.length > 0) {
@@ -2565,4 +2716,56 @@ onUnmounted(() => {
 }
 
 /* 나머지 스타일은 그대로 유지... */
+/* KEYHOLE 관련 스타일 */
+.keyhole-info {
+  background-color: rgba(255, 0, 0, 0.1) !important;
+  border-left: 3px solid #f44336 !important;
+  border-radius: 4px;
+  padding: 12px !important;
+  margin-top: 8px !important;
+}
+
+.keyhole-info .text-weight-bold {
+  font-weight: 600 !important;
+}
+
+.keyhole-info .text-red {
+  color: #f44336 !important;
+}
+
+.keyhole-info .text-positive {
+  color: #4caf50 !important;
+}
+
+/* KEYHOLE 배지 스타일 */
+.q-badge.keyhole-badge {
+  background-color: #f44336 !important;
+  color: white !important;
+  font-weight: 600 !important;
+  font-size: 0.75rem !important;
+  padding: 2px 6px !important;
+  border-radius: 3px !important;
+}
+
+/* KEYHOLE 테이블 행 하이라이트 */
+.q-table tbody tr.keyhole-row {
+  background-color: rgba(255, 0, 0, 0.05) !important;
+}
+
+.q-table tbody tr.keyhole-row:hover {
+  background-color: rgba(255, 0, 0, 0.1) !important;
+}
+
+/* KEYHOLE 컬럼 스타일 */
+.keyhole-column {
+  font-weight: 600 !important;
+}
+
+.keyhole-column.text-red {
+  color: #f44336 !important;
+}
+
+.keyhole-column.text-positive {
+  color: #4caf50 !important;
+}
 </style>

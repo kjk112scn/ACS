@@ -1203,14 +1203,14 @@ export const useICDStore = defineStore('icd', () => {
   // WebSocket 메시지 핸들러 - 데이터를 버퍼에만 저장
   const handleWebSocketMessage = async (message: MessageData) => {
     try {
-      console.log('🔍 [Frontend] WebSocket 메시지 수신:', message)
-      console.log('🔍 [Frontend] 메시지 구조 분석:', {
-        hasServerTime: 'serverTime' in message,
-        serverTimeValue: message.serverTime,
-        serverTimeType: typeof message.serverTime,
-        messageType: typeof message,
-        messageKeys: Object.keys(message),
-      })
+      // console.log('🔍 [Frontend] WebSocket 메시지 수신:', message)
+      // console.log('🔍 [Frontend] 메시지 구조 분석:', {
+      //   hasServerTime: 'serverTime' in message,
+      //   serverTimeValue: message.serverTime,
+      //   serverTimeType: typeof message.serverTime,
+      //   messageType: typeof message,
+      //   messageKeys: Object.keys(message),
+      // })
 
       // 받은 데이터를 버퍼에 저장만 하고 즉시 UI 업데이트하지 않음
       latestDataBuffer.value = message
@@ -1220,17 +1220,17 @@ export const useICDStore = defineStore('icd', () => {
       try {
         if (message.data && typeof message.data === 'object' && 'errorData' in message.data) {
           const errorData = (message.data as Record<string, unknown>).errorData
-          console.log('🔍 에러 데이터 수신:', errorData)
+          // console.log('🔍 에러 데이터 수신:', errorData)
 
           if (errorData && typeof errorData === 'object') {
             const errorDataObj = errorData as Record<string, unknown>
-            console.log('🔍 WebSocket 에러 데이터 수신:', errorDataObj)
+            // console.log('🔍 WebSocket 에러 데이터 수신:', errorDataObj)
 
             // 현재 언어 설정 가져오기 (사용하지 않으므로 제거)
 
             // 상태바 데이터 업데이트 (항상)
             if ('statusBarData' in errorDataObj) {
-              console.log('🔍 상태바 데이터 업데이트:', errorDataObj.statusBarData)
+              // console.log('🔍 상태바 데이터 업데이트:', errorDataObj.statusBarData)
 
               const rawStatusBarData = errorDataObj.statusBarData as {
                 activeErrorCount: number
@@ -1302,7 +1302,7 @@ export const useICDStore = defineStore('icd', () => {
 
             // 팝업 데이터 업데이트 (팝업이 열려있을 때만)
             if ('popupData' in errorDataObj) {
-              console.log('🔍 팝업 데이터 업데이트:', errorDataObj.popupData)
+              // console.log('🔍 팝업 데이터 업데이트:', errorDataObj.popupData)
 
               const rawPopupData = errorDataObj.popupData as {
                 isInitialLoad: boolean
@@ -1322,7 +1322,7 @@ export const useICDStore = defineStore('icd', () => {
 
               // rawPopupData null 체크 추가
               if (!rawPopupData || !rawPopupData.newLogs) {
-                console.warn('⚠️ rawPopupData 또는 newLogs가 null/undefined입니다:', rawPopupData)
+                // console.warn('⚠️ rawPopupData 또는 newLogs가 null/undefined입니다:', rawPopupData)
                 return
               }
 

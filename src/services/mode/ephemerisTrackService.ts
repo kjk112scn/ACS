@@ -1,5 +1,42 @@
 import { api } from '@/boot/axios'
 
+// 설정 타입 정의
+interface SettingItem {
+  key: string
+  value: string
+  type: string
+  description?: string
+}
+
+// ✅ 비교 데이터 타입 정의
+export interface ComparisonScheduleItem {
+  No: number
+  SatelliteID: string
+  SatelliteName: string
+  StartTime: string
+  EndTime: string
+  Duration: string
+
+  // ✅ Original 데이터 (2축)
+  OriginalMaxElevation: number
+  OriginalMaxAzRate: number
+  OriginalMaxElRate: number
+
+  // ✅ Final Transformed 데이터
+  FinalMaxElevation: number
+  FinalMaxAzRate: number
+  FinalMaxElRate: number
+
+  // ✅ KEYHOLE 정보 (Final 데이터 기준)
+  IsKeyhole: boolean
+  RecommendedTrainAngle: number
+
+  CreationDate: string
+  Creator: string
+
+  [key: string]: string | number | boolean | null | undefined
+}
+
 // 타입 정의
 export interface ScheduleItem {
   No: number
@@ -11,6 +48,29 @@ export interface ScheduleItem {
   MaxElevation: number
   CreationDate: string
   Creator: string
+
+  /**
+   * KEYHOLE 위성 여부
+   * maxAzimuthRate가 임계값 이상인 경우 true
+   */
+  isKeyhole: boolean
+
+  /**
+   * KEYHOLE 위성일 경우 권장 Train 각도 (도)
+   * 최대 Elevation 지점의 Azimuth 각도
+   */
+  recommendedTrainAngle: number
+
+  /**
+   * 최대 Azimuth 각속도 (도/초)
+   */
+  maxAzimuthRate: number
+
+  /**
+   * 최대 Elevation 각속도 (도/초)
+   */
+  maxElevationRate: number
+
   [key: string]: string | number | boolean | null | undefined
 }
 
@@ -18,6 +78,7 @@ export interface ScheduleDetailItem {
   Time: string
   Azimuth: number
   Elevation: number
+
   [key: string]: string | number | boolean | null | undefined
 }
 
@@ -219,9 +280,24 @@ class EphemerisTrackService {
       if (!request.tleLine1 || !request.tleLine2) {
         throw new Error('TLE 데이터가 유효하지 않습니다')
       }
-      const response = await api.post('/ephemeris/tracking/generate', request)
+
+      console.log('🚀 위성 궤도 추적 데이터 생성 API 호출:', {
+        satelliteName: request.satelliteName,
+        tleLine1Length: request.tleLine1.length,
+        tleLine2Length: request.tleLine2.length,
+        startTime: request.startTime,
+        endTime: request.endTime,
+        stepSize: request.stepSize,
+      })
+
+      const response = await api.post('/ephemeris/tracking/generate', request, {
+        timeout: 300000, // 5분 타임아웃 (기본값)
+      })
+
+      console.log('✅ 위성 궤도 추적 데이터 생성 성공:', response.data)
       return response.data
     } catch (error) {
+      console.error('❌ 위성 궤도 추적 데이터 생성 실패:', error)
       return this.handleApiError(error, '위성 궤도 추적 데이터 생성에 실패했습니다')
     }
   }
@@ -261,17 +337,6 @@ class EphemerisTrackService {
     } catch (error) {
       return this.handleApiError(error, '마스터 데이터 조회에 실패했습니다') as Promise<
         ScheduleItem[]
-      >
-    }
-  }
-
-  async fetchEphemerisDetailData(mstId: number): Promise<ScheduleDetailItem[]> {
-    try {
-      const response = await api.get<ScheduleDetailItem[]>(`/ephemeris/detail/${mstId}`)
-      return response.data || []
-    } catch (error) {
-      return this.handleApiError(error, '세부 데이터 조회에 실패했습니다') as Promise<
-        ScheduleDetailItem[]
       >
     }
   }
@@ -506,6 +571,175 @@ class EphemerisTrackService {
     } catch (error) {
       console.error('실시간 추적 데이터 조회 API 호출 실패:', error)
       throw error
+    }
+  }
+
+  /**
+   * 스케줄 상세 데이터 조회 (필터링 없이 전체 데이터 반환)
+   *
+   * 백엔드에서 모든 데이터를 가져옵니다 (음수 Elevation 포함).
+   * 필터링은 Store의 Computed에서 수행됩니다.
+   *
+   * @param mstId 스케줄 마스터 ID
+   * @returns 전체 상세 데이터 배열
+   */
+  async fetchEphemerisDetailData(mstId: number): Promise<ScheduleDetailItem[]> {
+    try {
+      const response = await api.get<ScheduleDetailItem[]>(`/ephemeris/detail/${mstId}`)
+
+      console.log(`📡 백엔드에서 전체 데이터 수신: ${response.data.length}개`)
+
+      return response.data
+    } catch (error) {
+      console.error('❌ 상세 데이터 조회 실패:', error)
+      throw error
+    }
+  }
+
+  /**
+   * displayMinElevationAngle 설정값 조회
+   *
+   * SettingsService에서 화면 표시용 최소 Elevation 각도를 조회합니다.
+   *
+   * @returns displayMinElevationAngle 값 (도)
+   */
+  async getDisplayMinElevationAngle(): Promise<number> {
+    try {
+      const response = await api.get('/settings')
+
+      const setting = response.data.find(
+        (s: SettingItem) => s.key === 'ephemeris.tracking.displayMinElevationAngle',
+      )
+
+      const value = setting?.value ? parseFloat(setting.value) : 0.0
+
+      console.log(`⚙️ displayMinElevationAngle 설정값: ${value}°`)
+
+      return value
+    } catch (error) {
+      console.error('❌ 설정값 조회 실패, 기본값 0.0 사용:', error)
+      return 0.0
+    }
+  }
+
+  /**
+   * sourceMinElevationAngle 설정값 조회
+   *
+   * @returns sourceMinElevationAngle 값 (도)
+   */
+  async getSourceMinElevationAngle(): Promise<number> {
+    try {
+      const response = await api.get('/settings')
+
+      const setting = response.data.find(
+        (s: SettingItem) => s.key === 'ephemeris.tracking.sourceMinElevationAngle',
+      )
+
+      const value = setting?.value ? parseFloat(setting.value) : -7.0
+
+      console.log(`⚙️ sourceMinElevationAngle 설정값: ${value}°`)
+
+      return value
+    } catch (error) {
+      console.error('❌ 설정값 조회 실패, 기본값 -7.0 사용:', error)
+      return -7.0
+    }
+  }
+
+  /**
+   * keyholeAzimuthVelocityThreshold 설정값 조회
+   *
+   * @returns KEYHOLE 판단 임계값 (도/초)
+   */
+  async getKeyholeAzimuthVelocityThreshold(): Promise<number> {
+    try {
+      const response = await api.get('/settings')
+
+      const setting = response.data.find(
+        (s: SettingItem) => s.key === 'ephemeris.tracking.keyholeAzimuthVelocityThreshold',
+      )
+
+      const value = setting?.value ? parseFloat(setting.value) : 10.0
+
+      console.log(`⚙️ keyholeAzimuthVelocityThreshold 설정값: ${value}°/s`)
+
+      return value
+    } catch (error) {
+      console.error('❌ 설정값 조회 실패, 기본값 10.0 사용:', error)
+      return 10.0
+    }
+  }
+
+  /**
+   * ✅ Original과 Final Transformed 데이터 비교 조회
+   *
+   * UI에서 Original(2축)과 Final Transformed 데이터를 동시에 표시하기 위한 API
+   *
+   * @returns 비교 데이터 (Original과 Final Transformed)
+   */
+  async getComparisonData(): Promise<ComparisonScheduleItem[]> {
+    try {
+      console.log('📊 Original과 Final Transformed 데이터 비교 조회 시작')
+
+      const response = await api.get('/api/ephemeris/tracking/mst/comparison')
+
+      if (response.data.status === 'success') {
+        const comparisonData = response.data.data
+
+        if (comparisonData.success) {
+          const originalMst = comparisonData.originalMst || []
+          const finalTransformedMst = comparisonData.finalTransformedMst || []
+
+          // Original과 Final 데이터를 매칭하여 비교 데이터 생성
+          const matchedData: ComparisonScheduleItem[] = []
+
+          originalMst.forEach((original: Record<string, unknown>) => {
+            const final = finalTransformedMst.find(
+              (f: Record<string, unknown>) => f.No === original.No,
+            )
+
+            if (final) {
+              matchedData.push({
+                No: original.No as number,
+                SatelliteID: original.SatelliteID as string,
+                SatelliteName: original.SatelliteName as string,
+                StartTime: original.StartTime as string,
+                EndTime: original.EndTime as string,
+                Duration: original.Duration as string,
+
+                // Original 데이터 (2축)
+                OriginalMaxElevation: (original.MaxElevation as number) || 0,
+                OriginalMaxAzRate: (original.MaxAzRate as number) || 0,
+                OriginalMaxElRate: (original.MaxElRate as number) || 0,
+
+                // Final Transformed 데이터
+                FinalMaxElevation: (final.MaxElevation as number) || 0,
+                FinalMaxAzRate: (final.MaxAzRate as number) || 0,
+                FinalMaxElRate: (final.MaxElRate as number) || 0,
+
+                // KEYHOLE 정보 (Final 데이터 기준)
+                IsKeyhole: (final.IsKeyhole as boolean) || false,
+                RecommendedTrainAngle: (final.RecommendedTrainAngle as number) || 0,
+
+                CreationDate: original.CreationDate as string,
+                Creator: original.Creator as string,
+              })
+            }
+          })
+
+          console.log(`✅ 비교 데이터 조회 완료: ${matchedData.length}개 패스`)
+          return matchedData
+        } else {
+          console.error('❌ 비교 데이터 조회 실패:', comparisonData.error)
+          return []
+        }
+      } else {
+        console.error('❌ API 호출 실패:', response.data.message)
+        return []
+      }
+    } catch (error) {
+      console.error('❌ 비교 데이터 조회 중 오류:', error)
+      return []
     }
   }
 }

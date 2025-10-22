@@ -12,6 +12,28 @@ export interface ScheduleItem {
   description?: string
   createdAt: string
   updatedAt: string
+
+  /**
+   * KEYHOLE 위성 여부
+   * MaxAzRate가 임계값 이상인 경우 true
+   */
+  IsKeyhole: boolean
+
+  /**
+   * KEYHOLE 위성일 경우 권장 Train 각도 (도)
+   * 최대 Elevation 지점의 Azimuth 각도
+   */
+  RecommendedTrainAngle: number
+
+  /**
+   * 최대 Azimuth 각속도 (도/초)
+   */
+  MaxAzRate: number
+
+  /**
+   * 최대 Elevation 각속도 (도/초)
+   */
+  MaxElRate: number
 }
 
 export interface ScheduleDetailItem {
@@ -28,6 +50,73 @@ export interface ScheduleDetailItem {
   vx: number
   vy: number
   vz: number
+
+  /**
+   * 필터링 기준으로 사용되는 Elevation 값
+   * displayMinElevationAngle과 비교하여 표시 여부 결정
+   */
+  Elevation: number
+}
+
+/**
+ * 실시간 추적 데이터 아이템
+ */
+export interface RealtimeTrackingDataItem {
+  timestamp: string
+  azimuth: number
+  elevation: number
+  range: number
+  altitude: number
+
+  /**
+   * KEYHOLE 위성 여부
+   */
+  IsKeyhole?: boolean
+
+  /**
+   * 권장 Train 각도 (도)
+   */
+  RecommendedTrainAngle?: number
+
+  /**
+   * 최대 Azimuth 각속도 (도/초)
+   */
+  MaxAzRate?: number
+
+  /**
+   * 최대 Elevation 각속도 (도/초)
+   */
+  MaxElRate?: number
+}
+
+/**
+ * KEYHOLE 위성 정보 인터페이스
+ */
+export interface KeyholeInfo {
+  /**
+   * KEYHOLE 위성 여부
+   */
+  IsKeyhole: boolean
+
+  /**
+   * 권장 Train 각도 (도)
+   */
+  RecommendedTrainAngle: number
+
+  /**
+   * 최대 Azimuth 각속도 (도/초)
+   */
+  MaxAzRate: number
+
+  /**
+   * 최대 Elevation 각속도 (도/초)
+   */
+  MaxElRate: number
+
+  /**
+   * KEYHOLE 판단 임계값 (도/초)
+   */
+  threshold: number
 }
 
 export interface TLEData {
