@@ -196,7 +196,7 @@
                       <span class="info-label">시작/종료 시간:</span>
                       <span class="info-value">{{
                         formatToLocalTime(selectedScheduleInfo.startTime)
-                        }} / {{
+                      }} / {{
                           formatToLocalTime(selectedScheduleInfo.endTime)
                         }}</span>
                     </div>
@@ -226,12 +226,12 @@
                         <span class="info-label">권장 Train 각도:</span>
                         <span class="info-value text-positive">{{
                           safeToFixed(selectedScheduleInfo.recommendedTrainAngle, 2)
-                        }}°</span>
+                          }}°</span>
                       </div>
                       <div class="info-row">
                         <span class="info-label">최대 Azimuth 속도:</span>
                         <span class="info-value text-red">{{ safeToFixed(selectedScheduleInfo.maxAzimuthRate, 2)
-                        }}°/s</span>
+                          }}°/s</span>
                       </div>
                       <div class="info-row">
                         <span class="info-label">최대 Elevation 속도:</span>
