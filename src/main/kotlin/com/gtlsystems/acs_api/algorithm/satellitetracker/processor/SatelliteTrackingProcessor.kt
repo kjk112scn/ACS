@@ -127,20 +127,58 @@ class SatelliteTrackingProcessor(
             val threshold = settingsService.keyholeAzimuthVelocityThreshold
             val isKeyhole = maxAzRate >= threshold
             
-            // Keyhole인 경우 Train 각도 계산
-            val recommendedTrainAngle = if (isKeyhole) {
+            // Keyhole인 경우 최적 Train 각도 계산
+            val (recommendedTrainAngle, selectedMethod) = if (isKeyhole) {
+                // calculateMetrics에서 반환된 값들 가져오기
                 val maxElTime = metrics["MaxElevationTime"] as? ZonedDateTime
-                maxElTime?.let { time ->
-                    passDtl
-                        .filter { it["Time"] != null }
-                        .minByOrNull { dtl ->
-                            val dtlTime = dtl["Time"] as ZonedDateTime
-                            abs(Duration.between(dtlTime, time).toMillis())
-                        }
-                        ?.get("Azimuth") as? Double
-                } ?: 0.0
+                val maxElAzimuth = metrics["MaxAzimuth"] as? Double ?: 0.0
+                
+                val maxAzRateAzimuth = metrics["MaxAzRateAzimuth"] as? Double ?: 0.0
+                val maxAzRateTime = metrics["MaxAzRateTime"] as? ZonedDateTime
+                
+                // 방법 A: 최대 Elevation 시점 Azimuth → Train 각도 계산 및 정규화
+                val trainAngleA = calculateTrainAngle(maxElAzimuth)
+                
+                // 방법 B: 최대 각속도 시점 Azimuth → Train 각도 계산 및 정규화
+                val trainAngleB = calculateTrainAngle(maxAzRateAzimuth)
+                
+                // 상세 비교 로그
+                logger.info("=".repeat(60))
+                logger.info("🔍 패스 #${index + 1} ($satelliteName) Train 각도 최적화 분석")
+                logger.info("-".repeat(60))
+                
+                logger.info("📊 방법 A (최대 Elevation 기준):")
+                logger.info("  - 시간: $maxElTime")
+                logger.info("  - Azimuth 각도: ${String.format("%.6f", maxElAzimuth)}°")
+                logger.info("  - Train 각도 (Az-90, 정규화): ${String.format("%.6f", trainAngleA)}°")
+                logger.info("  - 현재 MaxAzRate: ${String.format("%.6f", maxAzRate)}°/s")
+                
+                logger.info("")
+                logger.info("📊 방법 B (최대 각속도 기준):")
+                logger.info("  - 시간: $maxAzRateTime")
+                logger.info("  - Azimuth 각도: ${String.format("%.6f", maxAzRateAzimuth)}°")
+                logger.info("  - Train 각도 (Az-90, 정규화): ${String.format("%.6f", trainAngleB)}°")
+                logger.info("  - 현재 MaxAzRate: ${String.format("%.6f", maxAzRate)}°/s")
+                
+                // 두 방법의 시간 차이
+                if (maxElTime != null && maxAzRateTime != null) {
+                    val timeDiff = Duration.between(maxElTime, maxAzRateTime).seconds
+                    logger.info("")
+                    logger.info("⏱️ 시간 차이: ${timeDiff}초 (MaxEl → MaxAzRate)")
+                }
+                
+                // 방법 B 우선 선택 (최대 각속도 기준)
+                val selectedTrain = trainAngleB
+                val method = "MaxAzRate"
+                
+                logger.info("")
+                logger.info("✅ 선택된 Train 각도: ${String.format("%.6f", selectedTrain)}° (방법: $method)")
+                logger.info("   계산: ${String.format("%.6f", maxAzRateAzimuth)}° - 90° = ${String.format("%.6f", maxAzRateAzimuth - 90)}° → ${String.format("%.6f", selectedTrain)}° (정규화)")
+                logger.info("=".repeat(60))
+                
+                Pair(selectedTrain, method)
             } else {
-                0.0
+                Pair(0.0, "None")
             }
 
             // ✅ 마스터 데이터 생성
@@ -343,6 +381,23 @@ class SatelliteTrackingProcessor(
     }
 
     /**
+     * Train 각도 계산 및 정규화
+     * 
+     * @param azimuth 방위각
+     * @return 정규화된 Train 각도 (±270도 범위)
+     */
+    private fun calculateTrainAngle(azimuth: Double): Double {
+        // 1단계: Azimuth - 90도 계산
+        var trainAngle = azimuth - 90.0
+        
+        // 2단계: ±270도 범위로 정규화 (LimitAngleCalculator와 동일)
+        while (trainAngle > 270.0) trainAngle -= 360.0
+        while (trainAngle < -270.0) trainAngle += 360.0
+        
+        return trainAngle
+    }
+
+    /**
      * 상세 데이터에서 메타데이터 계산
      *
      * @param dtlData 상세 데이터 리스트
@@ -377,7 +432,9 @@ class SatelliteTrackingProcessor(
         val endElevation = lastPoint["Elevation"] as? Double ?: 0.0
 
         // 각속도 및 각가속도 계산
-        var maxAzRate = 0.0
+        var maxAzRate = 0.0//최대 Elevation 각도 시점의 Azimuth 각도
+        var maxAzRateAzimuth = 0.0  // 추가: 최대 각속도 시점의 Azimuth
+        var maxAzRateTime: ZonedDateTime? = null  // 추가: 시간 (디버깅용)
         var maxElRate = 0.0
         var maxAzAccel = 0.0
         var maxElAccel = 0.0
@@ -409,7 +466,13 @@ class SatelliteTrackingProcessor(
                     val azRate = azDiff / timeDiff
                     val elRate = elDiff / timeDiff
 
-                    maxAzRate = maxOf(maxAzRate, abs(azRate))
+                    // ✅ 최대 각속도 갱신 시 Azimuth 저장
+                    if (abs(azRate) > maxAzRate) {
+                        maxAzRate = abs(azRate)
+                        maxAzRateAzimuth = az  // 현재 시점의 Azimuth 저장
+                        maxAzRateTime = time
+                    }
+                    
                     maxElRate = maxOf(maxElRate, abs(elRate))
 
                     // 각가속도
@@ -444,6 +507,8 @@ class SatelliteTrackingProcessor(
             "EndAzimuth" to endAzimuth,
             "EndElevation" to endElevation,
             "MaxAzRate" to maxAzRate,
+            "MaxAzRateAzimuth" to maxAzRateAzimuth,  // ✅ 추가
+            "MaxAzRateTime" to maxAzRateTime,  // ✅ 추가
             "MaxElRate" to maxElRate,
             "MaxAzAccel" to maxAzAccel,
             "MaxElAccel" to maxElAccel
