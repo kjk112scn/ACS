@@ -42,13 +42,13 @@
         남쪽 (180°)
 
 [안테나 정면 - 사용자 관점]
-  서쪽(+7°) ← [안테나] → 동쪽(-7°)
+  동쪽(-7°) ← [안테나] → 서쪽(+7°)
     좌측              우측
 ```
 
 ### 1.3 안테나 기울기
-- **동쪽 방향**: -7° (사용자 기준 오른쪽)
-- **서쪽 방향**: +7° (사용자 기준 왼쪽)
+- **동쪽 방향**: -7° (사용자 기준 좌측)
+- **서쪽 방향**: +7° (사용자 기준 우측)
 - **시스템 tiltAngle**: 7.0
 
 ### 1.4 Train 회전 기준
@@ -161,52 +161,92 @@ logger.info("=".repeat(60))
 
 ## 4. 검증 예제
 
-### 4.1 양수 Azimuth (10개)
+### 4.1 양수 Azimuth (0° ~ 360°, 20개)
 
-| # | Azimuth | Option 1 | Option 2 | 범위 확인 | 유효 옵션 | 선택 Train | 검증 |
-|---|---------|---------|---------|---------|----------|-----------|------|
-| 1 | 10° | -260° | 100° | 둘 다 OK | 100° (작음) | **100°** | (100+270)%360=10° ✓ |
-| 2 | 45° | -225° | 135° | 둘 다 OK | 135° (작음) | **135°** | (135+270)%360=45° ✓ |
-| 3 | 90° | -180° | 180° | 둘 다 OK | -180° (같음) | **-180°** | -180+270=90° ✓ |
-| 4 | 135° | -135° | 225° | 둘 다 OK | -135° (작음) | **-135°** | -135+270=135° ✓ |
-| 5 | 180° | -90° | 270° | 둘 다 OK | -90° (작음) | **-90°** | -90+270=180° ✓ |
-| 6 | 225° | -45° | 315° | option1만 OK | -45° | **-45°** | -45+270=225° ✓ |
-| 7 | 257.197° | -12.803° | 347.197° | option1만 OK | -12.803° | **-12.803°** | -12.803+270=257.197° ✓ |
-| 8 | 270° | 0° | -360° | option1만 OK | 0° | **0°** | 0+270=270° ✓ |
-| 9 | 315° | 45° | -315° | option1만 OK | 45° | **45°** | (45+270)%360=315° ✓ |
-| 10 | 350° | 80° | -280° | option1만 OK | 80° | **80°** | (80+270)%360=350° ✓ |
+| # | Azimuth | Option 1<br>(Az-270) | Option 2 | 범위 확인 | 절댓값 비교 | 선택 Train | 검증 |
+|---|---------|---------------------|---------|---------|----------|-----------|------|
+| 1 | 0° | -270° | 90° | 둘 다 OK | 270 vs **90** | **90°** | (90+270)%360=0° ✓ |
+| 2 | 10° | -260° | 100° | 둘 다 OK | 260 vs **100** | **100°** | (100+270)%360=10° ✓ |
+| 3 | 30° | -240° | 120° | 둘 다 OK | 240 vs **120** | **120°** | (120+270)%360=30° ✓ |
+| 4 | 45° | -225° | 135° | 둘 다 OK | 225 vs **135** | **135°** | (135+270)%360=45° ✓ |
+| 5 | 60° | -210° | 150° | 둘 다 OK | 210 vs **150** | **150°** | (150+270)%360=60° ✓ |
+| 6 | 90° | -180° | 180° | 둘 다 OK | **180** vs 180 | **-180°** | -180+270=90° ✓ |
+| 7 | 120° | -150° | 210° | 둘 다 OK | **150** vs 210 | **-150°** | -150+270=120° ✓ |
+| 8 | 135° | -135° | 225° | 둘 다 OK | **135** vs 225 | **-135°** | -135+270=135° ✓ |
+| 9 | 150° | -120° | 240° | 둘 다 OK | **120** vs 240 | **-120°** | -120+270=150° ✓ |
+| 10 | 180° | -90° | 270° | 둘 다 OK | **90** vs 270 | **-90°** | -90+270=180° ✓ |
+| 11 | 210° | -60° | 300° | option1만 OK | **60** | **-60°** | -60+270=210° ✓ |
+| 12 | 225° | -45° | 315° | option1만 OK | **45** | **-45°** | -45+270=225° ✓ |
+| 13 | 240° | -30° | 330° | option1만 OK | **30** | **-30°** | -30+270=240° ✓ |
+| 14 | 257.197° | -12.803° | 347.197° | option1만 OK | **12.803** | **-12.803°** | -12.803+270=257.197° ✓ |
+| 15 | 270° | 0° | -360° | option1만 OK | **0** | **0°** | 0+270=270° ✓ |
+| 16 | 300° | 30° | -330° | option1만 OK | **30** | **30°** | 30+270=300° ✓ |
+| 17 | 315° | 45° | -315° | option1만 OK | **45** | **45°** | 45+270=315° ✓ |
+| 18 | 330° | 60° | -300° | option1만 OK | **60** | **60°** | 60+270=330° ✓ |
+| 19 | 350° | 80° | -280° | option1만 OK | **80** | **80°** | 80+270=350° ✓ |
+| 20 | 360° | 90° | -270° | 둘 다 OK | **90** vs 270 | **90°** | (90+270)%360=0° ✓ |
 
-**참고**: 9번(315°), 10번(350°)은 option2가 -270° 미만이므로 범위를 벗어남. option1(45°, 80°)만 유효하여 선택.
+### 4.2 음수 Azimuth (0° ~ -360°, 20개)
 
-### 4.2 음수 Azimuth (10개)
-
-| # | Azimuth | 정규화 (0-360) | Option 1 | Option 2 | 범위 확인 | 선택 Train | 검증 |
-|---|---------|--------------|---------|---------|---------|-----------|------|
-| 11 | -10° | 350° | 80° | -280° | option1만 OK | **80°** | (80+270)%360=350° ✓ |
-| 12 | -20° | 340° | 70° | -290° | option1만 OK | **70°** | (70+270)%360=340° ✓ |
-| 13 | -40° | 320° | 50° | -310° | option1만 OK | **50°** | (50+270)%360=320° ✓ |
-| 14 | -45° | 315° | 45° | -315° | option1만 OK | **45°** | (45+270)%360=315° ✓ |
-| 15 | -60° | 300° | 30° | -330° | option1만 OK | **30°** | (30+270)%360=300° ✓ |
-| 16 | -90° | 270° | 0° | -360° | option1만 OK | **0°** | 0+270=270° ✓ |
-| 17 | -120° | 240° | -30° | 330° | option1만 OK | **-30°** | -30+270=240° ✓ |
-| 18 | -135° | 225° | -45° | 315° | option1만 OK | **-45°** | -45+270=225° ✓ |
-| 19 | -180° | 180° | -90° | 270° | 둘 다 OK | **-90°** (작음) | -90+270=180° ✓ |
-| 20 | -225° | 135° | -135° | 225° | 둘 다 OK | **-135°** (작음) | -135+270=135° ✓ |
+| # | Azimuth | 정규화<br>(0-360) | Option 1<br>(Az-270) | Option 2 | 범위 확인 | 절댓값 비교 | 선택 Train | 검증 |
+|---|---------|------------------|---------------------|---------|---------|----------|-----------|------|
+| 21 | 0° | 0° | -270° | 90° | 둘 다 OK | 270 vs **90** | **90°** | (90+270)%360=0° ✓ |
+| 22 | -10° | 350° | 80° | -280° | option1만 OK | **80** | **80°** | 80+270=350° ✓ |
+| 23 | -30° | 330° | 60° | -300° | option1만 OK | **60** | **60°** | 60+270=330° ✓ |
+| 24 | -45° | 315° | 45° | -315° | option1만 OK | **45** | **45°** | 45+270=315° ✓ |
+| 25 | -60° | 300° | 30° | -330° | option1만 OK | **30** | **30°** | 30+270=300° ✓ |
+| 26 | -90° | 270° | 0° | -360° | option1만 OK | **0** | **0°** | 0+270=270° ✓ |
+| 27 | -120° | 240° | -30° | 330° | option1만 OK | **30** | **-30°** | -30+270=240° ✓ |
+| 28 | -135° | 225° | -45° | 315° | option1만 OK | **45** | **-45°** | -45+270=225° ✓ |
+| 29 | -150° | 210° | -60° | 300° | option1만 OK | **60** | **-60°** | -60+270=210° ✓ |
+| 30 | -180° | 180° | -90° | 270° | 둘 다 OK | **90** vs 270 | **-90°** | -90+270=180° ✓ |
+| 31 | -210° | 150° | -120° | 240° | 둘 다 OK | **120** vs 240 | **-120°** | -120+270=150° ✓ |
+| 32 | -225° | 135° | -135° | 225° | 둘 다 OK | **135** vs 225 | **-135°** | -135+270=135° ✓ |
+| 33 | -240° | 120° | -150° | 210° | 둘 다 OK | **150** vs 210 | **-150°** | -150+270=120° ✓ |
+| 34 | -257.197° | 102.803° | -167.197° | 192.803° | 둘 다 OK | **167.197** vs 192.803 | **-167.197°** | -167.197+270=102.803° ✓ |
+| 35 | -270° | 90° | -180° | 180° | 둘 다 OK | **180** vs 180 | **-180°** | -180+270=90° ✓ |
+| 36 | -300° | 60° | -210° | 150° | 둘 다 OK | 210 vs **150** | **150°** | (150+270)%360=60° ✓ |
+| 37 | -315° | 45° | -225° | 135° | 둘 다 OK | 225 vs **135** | **135°** | (135+270)%360=45° ✓ |
+| 38 | -330° | 30° | -240° | 120° | 둘 다 OK | 240 vs **120** | **120°** | (120+270)%360=30° ✓ |
+| 39 | -350° | 10° | -260° | 100° | 둘 다 OK | 260 vs **100** | **100°** | (100+270)%360=10° ✓ |
+| 40 | -360° | 0° | -270° | 90° | 둘 다 OK | 270 vs **90** | **90°** | (90+270)%360=0° ✓ |
 
 ### 4.3 특수 케이스 분석
 
-#### Case A: 둘 다 유효 (1~5번, 19~20번)
+#### Case A: 둘 다 유효, Option 2 선택 (1~5번, 21번, 36~40번)
+- **Azimuth 범위**: 0° ~ 60° (정규화 후)
 - 두 경로 모두 ±270° 범위 내
-- 절댓값이 작은 것 선택 (최단 거리)
+- Option 1(음수)의 절댓값 > Option 2(양수)
+- **최단 거리**: Option 2(양수) 선택
 
-#### Case B: Option 1만 유효 (6~18번)
-- Option 2가 범위 밖 (±270° 초과)
-- Option 1만 선택 가능
+#### Case B: 둘 다 유효, Option 1 선택 (6~10번, 30~35번)
+- **Azimuth 범위**: 90° ~ 180° (정규화 후)
+- 두 경로 모두 ±270° 범위 내
+- Option 1의 절댓값 ≤ Option 2
+- **최단 거리**: Option 1 선택
 
-#### Case C: 270° 초과 Azimuth (9~16번)
-- Azimuth > 270°인 경우
-- Option 2가 -270° 미만으로 범위 밖
-- Option 1(양수)만 유효하여 선택
+#### Case C: Option 1만 유효 (11~20번, 22~29번)
+- **Azimuth 범위**: 210° ~ 360° (정규화 후)
+- Option 2가 ±270° 범위 밖 (초과 또는 미만)
+- **Option 1만 선택 가능**
+
+#### 구간별 Train 각도 패턴
+
+| Azimuth 구간 | Train 범위 | 특징 |
+|-------------|----------|------|
+| **0° ~ 90°** | **90° ~ -180°** | Option 2 선택 (양수, 최단) |
+| **90° ~ 180°** | **-180° ~ -90°** | Option 1 선택 (음수) |
+| **180° ~ 270°** | **-90° ~ 0°** | Option 1만 유효 (음수) |
+| **270° ~ 360°** | **0° ~ 90°** | Option 1만 유효 (양수) |
+
+#### 특수 지점
+
+| Azimuth | Train | 의미 |
+|---------|-------|------|
+| **0° / 360° / -360°** | **90°** | 북쪽 → 동쪽으로 90° 회전 |
+| **90° / -270°** | **-180°** | 동쪽 → 남쪽으로 180° 회전 |
+| **180° / -180°** | **-90°** | 남쪽 → 서쪽으로 90° 회전 (반시계) |
+| **270° / -90°** | **0°** | 서쪽 → 회전 없음 (정렬 상태) |
 
 ---
 
@@ -332,9 +372,13 @@ Option 2: -12.802531 + 360 = 347.197469° (범위 NG, >270°)
 
 ### 6.3 테스트 체크리스트
 
-- [ ] 단위 테스트
-  - [ ] Azimuth 10° → Train 100° 확인
+- [ ] 단위 테스트 (40개 예제)
+  - [ ] Azimuth 0° → Train 90° 확인 (최단 거리)
+  - [ ] Azimuth 10° → Train 100° 확인 (최단 거리)
+  - [ ] Azimuth 90° → Train -180° 확인 (최단 거리)
+  - [ ] Azimuth 180° → Train -90° 확인 (최단 거리)
   - [ ] Azimuth 257.197° → Train -12.803° 확인
+  - [ ] Azimuth 270° → Train 0° 확인
   - [ ] Azimuth 315° → Train 45° 확인
   - [ ] Azimuth 350° → Train 80° 확인
 - [ ] 통합 테스트
@@ -373,6 +417,471 @@ Option 2: -12.802531 + 360 = 347.197469° (범위 NG, >270°)
 
 ---
 
+## 8. 각속도 표시 개선 계획
+
+### 8.1 현재 상태 분석
+
+#### 백엔드 데이터 흐름
+```
+1. Original 데이터
+   ↓ calculateMetrics(originalDtl)
+   - OriginalMaxAzRate (초당 각도, 2축)
+   - OriginalMaxElRate
+   
+2. AxisTransformed 데이터 (Train 적용 후)
+   ↓ calculateMetrics(axisTransformedDtl)
+   - AxisTransformedMaxAzRate (3축 변환 후)
+   - AxisTransformedMaxElRate
+   
+3. FinalTransformed 데이터 (±270° 제한 후)
+   ↓ calculateMetrics(finalTransformedDtl)
+   - FinalTransformedMaxAzRate (최종 각속도)
+   - FinalTransformedMaxElRate
+```
+
+#### 프론트엔드 현재 상태
+**파일**: `ACS/src/pages/mode/EphemerisDesignationPage.vue`
+
+**현재 표시 데이터**:
+- Line 817-818: `FinalTransformedMaxAzRate`, `FinalTransformedMaxElRate`만 저장
+- Line 876-877: CSV에서 `FinalTransformedMaxAzRate`, `FinalTransformedMaxElRate`만 사용
+- **문제**: Original (2축) 각속도가 표시되지 않음
+
+---
+
+### 8.2 개선 목표
+
+#### 표시할 데이터
+
+| 항목 | 데이터 소스 | 의미 | 표시 위치 |
+|------|-----------|------|---------|
+| **2축 최대 Az 속도** | `OriginalMaxAzRate` | Train 적용 전 원본 각속도 | 🎯 중요 (Keyhole 판단 기준) |
+| **최종 최대 Az 속도** | `FinalTransformedMaxAzRate` | 각도 제한 후 최종 각속도 | 📊 참고용 (결과 확인) |
+| **2축 최대 El 속도** | `OriginalMaxElRate` | Train 적용 전 원본 각속도 | 🎯 중요 |
+| **최종 최대 El 속도** | `FinalTransformedMaxElRate` | 각도 제한 후 최종 각속도 | 📊 참고용 |
+
+---
+
+### 8.3 백엔드 수정 계획
+
+#### 파일 1: `SatelliteTrackingProcessor.kt`
+**위치**: Line 185-210 (Original Mst 생성)
+
+**현재 코드**:
+```kotlin
+originalMst.add(
+    mapOf(
+        // ... 기존 필드들 ...
+        "MaxAzRate" to metrics["MaxAzRate"],  // ← Original MaxAzRate
+        "MaxElRate" to metrics["MaxElRate"],  // ← Original MaxElRate
+        // ... 기존 필드들 ...
+        "DataType" to "original"
+    )
+)
+```
+
+**수정 계획**:
+```kotlin
+originalMst.add(
+    mapOf(
+        // ... 기존 필드들 ...
+        "OriginalMaxAzRate" to metrics["MaxAzRate"],  // ✅ 이름 변경
+        "OriginalMaxElRate" to metrics["MaxElRate"],  // ✅ 이름 변경
+        "MaxAzRate" to metrics["MaxAzRate"],          // ← 호환성 유지
+        "MaxElRate" to metrics["MaxElRate"],          // ← 호환성 유지
+        // ... 기존 필드들 ...
+        "DataType" to "original"
+    )
+)
+```
+
+#### 파일 2: `SatelliteTrackingProcessor.kt`
+**위치**: Line 275-300 (AxisTransformed Mst 생성)
+
+**현재 코드**:
+```kotlin
+axisTransformedMst.add(
+    mapOf(
+        // ... 기존 필드들 ...
+        "MaxAzRate" to metrics["MaxAzRate"],  // ← AxisTransformed
+        "MaxElRate" to metrics["MaxElRate"],
+        // ... 기존 필드들 ...
+        "DataType" to "axis_transformed"
+    )
+)
+```
+
+**수정 계획**:
+```kotlin
+axisTransformedMst.add(
+    mapOf(
+        // ... 기존 필드들 ...
+        "AxisTransformedMaxAzRate" to metrics["MaxAzRate"],  // ✅ 추가
+        "AxisTransformedMaxElRate" to metrics["MaxElRate"],  // ✅ 추가
+        "MaxAzRate" to metrics["MaxAzRate"],                 // ← 호환성 유지
+        "MaxElRate" to metrics["MaxElRate"],                 // ← 호환성 유지
+        // ... 기존 필드들 ...
+        "DataType" to "axis_transformed"
+    )
+)
+```
+
+#### 파일 3: `SatelliteTrackingProcessor.kt`
+**위치**: Line 345-370 (FinalTransformed Mst 생성)
+
+**현재 코드**:
+```kotlin
+finalTransformedMst.add(
+    mapOf(
+        // ... 기존 필드들 ...
+        "MaxAzRate" to metrics["MaxAzRate"],
+        "MaxElRate" to metrics["MaxElRate"],
+        // ... 기존 필드들 ...
+        "DataType" to "final_transformed"
+    )
+)
+```
+
+**수정 계획**:
+```kotlin
+// ✅ Original 데이터에서 원본 각속도 가져오기
+val originalMstData = originalMst.find { it["No"] == mstId }
+val originalMaxAzRate = originalMstData?.get("OriginalMaxAzRate") as? Double ?: 0.0
+val originalMaxElRate = originalMstData?.get("OriginalMaxElRate") as? Double ?: 0.0
+
+finalTransformedMst.add(
+    mapOf(
+        // ... 기존 필드들 ...
+        "OriginalMaxAzRate" to originalMaxAzRate,           // ✅ 추가 (2축)
+        "OriginalMaxElRate" to originalMaxElRate,           // ✅ 추가 (2축)
+        "FinalTransformedMaxAzRate" to metrics["MaxAzRate"], // ✅ 추가 (최종)
+        "FinalTransformedMaxElRate" to metrics["MaxElRate"], // ✅ 추가 (최종)
+        "MaxAzRate" to metrics["MaxAzRate"],                 // ← 호환성 유지
+        "MaxElRate" to metrics["MaxElRate"],                 // ← 호환성 유지
+        // ... 기존 필드들 ...
+        "DataType" to "final_transformed"
+    )
+)
+```
+
+---
+
+### 8.4 프론트엔드 수정 계획
+
+#### 파일: `EphemerisDesignationPage.vue`
+
+**위치 1**: Line 814-819 (selectedScheduleInfo 데이터 매핑)
+
+**현재 코드**:
+```typescript
+isKeyhole: selected.IsKeyhole || false,
+recommendedTrainAngle: selected.RecommendedTrainAngle || 0,
+FinalTransformedMaxAzRate: selected.FinalTransformedMaxAzRate || 0,
+FinalTransformedMaxElRate: selected.FinalTransformedMaxElRate || 0,
+```
+
+**수정 계획**:
+```typescript
+isKeyhole: selected.IsKeyhole || false,
+recommendedTrainAngle: selected.RecommendedTrainAngle || 0,
+// ✅ 2축 각속도 추가
+OriginalMaxAzRate: selected.OriginalMaxAzRate || 0,
+OriginalMaxElRate: selected.OriginalMaxElRate || 0,
+// ✅ 최종 각속도 (기존)
+FinalTransformedMaxAzRate: selected.FinalTransformedMaxAzRate || 0,
+FinalTransformedMaxElRate: selected.FinalTransformedMaxElRate || 0,
+```
+
+**위치 2**: Line 837-842 (기본값 정의)
+
+**현재 코드**:
+```typescript
+isKeyhole: false,
+recommendedTrainAngle: 0,
+FinalTransformedMaxAzRate: 0,
+FinalTransformedMaxElRate: 0,
+```
+
+**수정 계획**:
+```typescript
+isKeyhole: false,
+recommendedTrainAngle: 0,
+// ✅ 2축 각속도 기본값 추가
+OriginalMaxAzRate: 0,
+OriginalMaxElRate: 0,
+// ✅ 최종 각속도 기본값 (기존)
+FinalTransformedMaxAzRate: 0,
+FinalTransformedMaxElRate: 0,
+```
+
+**위치 3**: KEYHOLE 정보 표시 부분 (템플릿 수정 필요)
+
+**추가할 표시 영역**:
+```vue
+<template v-if="selectedScheduleInfo.isKeyhole">
+  <div class="keyhole-info">
+    <h6>🚀 KEYHOLE 정보</h6>
+    <div class="info-grid">
+      <!-- 2축 각속도 (중요) -->
+      <div class="info-item important">
+        <span class="label">2축 최대 Az 속도:</span>
+        <span class="value">{{ safeToFixed(selectedScheduleInfo.OriginalMaxAzRate, 6) }}°/s</span>
+      </div>
+      <div class="info-item important">
+        <span class="label">2축 최대 El 속도:</span>
+        <span class="value">{{ safeToFixed(selectedScheduleInfo.OriginalMaxElRate, 6) }}°/s</span>
+      </div>
+      
+      <!-- Train 각도 -->
+      <div class="info-item">
+        <span class="label">추천 Train 각도:</span>
+        <span class="value">{{ safeToFixed(selectedScheduleInfo.recommendedTrainAngle, 6) }}°</span>
+      </div>
+      
+      <!-- 최종 각속도 (참고용) -->
+      <div class="info-item reference">
+        <span class="label">최종 최대 Az 속도:</span>
+        <span class="value">{{ safeToFixed(selectedScheduleInfo.FinalTransformedMaxAzRate, 6) }}°/s</span>
+        <span class="badge">참고</span>
+      </div>
+      <div class="info-item reference">
+        <span class="label">최종 최대 El 속도:</span>
+        <span class="value">{{ safeToFixed(selectedScheduleInfo.FinalTransformedMaxElRate, 6) }}°/s</span>
+        <span class="badge">참고</span>
+      </div>
+    </div>
+  </div>
+</template>
+```
+
+**위치 4**: CSV 다운로드 (Line 876-910)
+
+**현재 코드**:
+```typescript
+const maxAzimuthRate = selectedSchedule?.FinalTransformedMaxAzRate || 0
+const maxElevationRate = selectedSchedule?.FinalTransformedMaxElRate || 0
+
+// CSV 헤더
+'IsKeyhole', 'RecommendedTrainAngle(°)', 'MaxAzimuthRate(°/s)', 'MaxElevationRate(°/s)'
+```
+
+**수정 계획**:
+```typescript
+// ✅ 2축 각속도 추가
+const originalMaxAzRate = selectedSchedule?.OriginalMaxAzRate || 0
+const originalMaxElRate = selectedSchedule?.OriginalMaxElRate || 0
+const finalMaxAzRate = selectedSchedule?.FinalTransformedMaxAzRate || 0
+const finalMaxElRate = selectedSchedule?.FinalTransformedMaxElRate || 0
+
+// CSV 헤더
+'IsKeyhole', 'RecommendedTrainAngle(°)',
+'OriginalMaxAzRate(°/s)', 'OriginalMaxElRate(°/s)',  // ✅ 추가
+'FinalMaxAzRate(°/s)', 'FinalMaxElRate(°/s)'         // ✅ 추가
+```
+
+---
+
+### 8.5 스타일 가이드
+
+#### 중요도 표시
+```scss
+.keyhole-info {
+  .info-item {
+    &.important {
+      border-left: 3px solid #ff9800; // 오렌지 (중요)
+      background-color: rgba(255, 152, 0, 0.1);
+      
+      .label {
+        font-weight: 600;
+        color: #ff9800;
+      }
+    }
+    
+    &.reference {
+      border-left: 3px solid #2196f3; // 파랑 (참고)
+      background-color: rgba(33, 150, 243, 0.1);
+      
+      .badge {
+        background-color: #2196f3;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+      }
+    }
+  }
+}
+```
+
+---
+
+### 8.6 구현 순서
+
+#### Step 1: 백엔드 수정
+1. ✅ `SatelliteTrackingProcessor.kt` 수정
+   - Original Mst에 `OriginalMaxAzRate`, `OriginalMaxElRate` 추가
+   - AxisTransformed Mst에 `AxisTransformedMaxAzRate`, `AxisTransformedMaxElRate` 추가
+   - Final Mst에 모든 각속도 데이터 포함
+
+#### Step 2: API 응답 확인
+1. ✅ 브라우저 개발자 도구에서 응답 데이터 확인
+2. ✅ `OriginalMaxAzRate`, `FinalTransformedMaxAzRate` 값 확인
+
+#### Step 3: 프론트엔드 수정
+1. ✅ `EphemerisDesignationPage.vue` 타입 정의 수정
+2. ✅ KEYHOLE 정보 표시 템플릿 추가
+3. ✅ CSV 다운로드 헤더/데이터 수정
+
+#### Step 4: 스타일 적용
+1. ✅ 중요도에 따른 시각적 구분
+2. ✅ 반응형 레이아웃 적용
+
+#### Step 5: 테스트
+1. ✅ Keyhole 위성 선택 시 데이터 표시 확인
+2. ✅ CSV 다운로드 시 모든 각속도 포함 확인
+3. ✅ 소수점 6자리 표시 확인
+
+---
+
+### 8.7 기대 효과
+
+#### 사용자 관점
+- **Keyhole 판단 근거 명확화**: Original 각속도를 보고 왜 Keyhole인지 이해
+- **Train 효과 확인**: Original vs Final 각속도 비교로 Train 적용 효과 확인
+- **의사결정 지원**: 2개의 각속도 데이터로 더 나은 판단 가능
+
+#### 시스템 관점
+- **디버깅 용이**: 각 단계별 각속도 추적 가능
+- **검증 강화**: Train 적용 전후 비교로 알고리즘 검증
+- **데이터 투명성**: 모든 변환 단계의 각속도 기록
+
+---
+
+## 9. CSV 출력 형식 개선
+
+### 9.1 CSV 헤더 포맷 규칙
+
+- **Train=0**: 소수점 없이 `0`으로 표시
+  ```
+  FinalTransformed_train0_Azimuth
+  FinalTransformed_train0_Elevation
+  ```
+
+- **Train≠0**: 소수점 6자리 표시
+  ```
+  FinalTransformed_train167.867131_Azimuth
+  FinalTransformed_train-11.346704_Azimuth
+  ```
+
+### 9.2 CSV 헤더 예시
+
+**Keyhole 패스 (Train=167.867131°):**
+```csv
+Index,Time,Original_Azimuth,Original_Elevation,...,
+AxisTransformed_Azimuth,AxisTransformed_Elevation,...,
+FinalTransformed_train0_Azimuth,FinalTransformed_train0_Elevation,FinalTransformed_train0_Azimuth_Velocity,FinalTransformed_train0_Elevation_Velocity,
+FinalTransformed_train167.867131_Azimuth,FinalTransformed_train167.867131_Elevation,FinalTransformed_train167.867131_Azimuth_Velocity,FinalTransformed_train167.867131_Elevation_Velocity,
+Azimuth_Transformation_Error,Elevation_Transformation_Error
+```
+
+**일반 패스 (Train=0°):**
+```csv
+Index,Time,Original_Azimuth,Original_Elevation,...,
+AxisTransformed_Azimuth,AxisTransformed_Elevation,...,
+FinalTransformed_train0_Azimuth,FinalTransformed_train0_Elevation,FinalTransformed_train0_Azimuth_Velocity,FinalTransformed_train0_Elevation_Velocity,
+Azimuth_Transformation_Error,Elevation_Transformation_Error
+```
+
+**참고**: Train=0일 때는 `FinalTransformed_train0` 컬럼만 출력하고, `FinalTransformed_train0` 중복 출력하지 않음
+
+### 9.3 구현 단계
+
+#### Step 1: MST에서 recommendedTrainAngle 가져오기
+
+**파일**: `EphemerisService.kt` (Line 2936)
+
+```kotlin
+fun exportMstDataToCsv(mstId: Int, outputDirectory: String = "csv_exports"): Map<String, Any?> {
+    val mstInfo = getAllEphemerisTrackMst().find { it["No"] == mstId.toUInt() }
+    val recommendedTrainAngle = mstInfo?.get("RecommendedTrainAngle") as? Double ?: 0.0
+    
+    // Train=0일 때는 소수점 제거
+    val trainAngleFormatted = if (recommendedTrainAngle == 0.0) {
+        "0"
+    } else {
+        String.format("%.6f", recommendedTrainAngle)
+    }
+    
+    logger.info("📊 Train 각도: $trainAngleFormatted°")
+}
+```
+
+#### Step 2: CSV 헤더 업데이트
+
+```kotlin
+writer.write("Index,Time,")
+writer.write("Original_Azimuth,Original_Elevation,Original_Azimuth_Velocity,Original_Elevation_Velocity,")
+writer.write("Original_Range,Original_Altitude,")
+writer.write("AxisTransformed_Azimuth,AxisTransformed_Elevation,AxisTransformed_Azimuth_Velocity,AxisTransformed_Elevation_Velocity,")
+
+// Train=0 데이터
+writer.write("FinalTransformed_train0_Azimuth,FinalTransformed_train0_Elevation,FinalTransformed_train0_Azimuth_Velocity,FinalTransformed_train0_Elevation_Velocity,")
+
+// Train≠0일 때만 추가 컬럼 출력
+if (recommendedTrainAngle != 0.0) {
+    writer.write("FinalTransformed_train${trainAngleFormatted}_Azimuth,FinalTransformed_train${trainAngleFormatted}_Elevation,FinalTransformed_train${trainAngleFormatted}_Azimuth_Velocity,FinalTransformed_train${trainAngleFormatted}_Elevation_Velocity,")
+}
+
+writer.write("Azimuth_Transformation_Error,Elevation_Transformation_Error\n")
+```
+
+#### Step 3: 데이터 행 작성
+
+```kotlin
+writer.write("$i,${originalTime ?: ""},")
+writer.write("$originalAz,$originalEl,$originalAzimuthVelocity,$originalElevationVelocity,")
+writer.write("$originalRange,$originalAltitude,")
+writer.write("$axisTransformedAz,$axisTransformedEl,$axisTransformedAzimuthVelocity,$axisTransformedElevationVelocity,")
+
+// Train=0 데이터
+writer.write("${train0Point["Azimuth"] ?: 0.0},${train0Point["Elevation"] ?: 0.0},$train0AzimuthVelocity,$train0ElevationVelocity,")
+
+// Train≠0일 때만 추가 데이터 출력
+if (recommendedTrainAngle != 0.0) {
+    writer.write("${trainAnglePoint["Azimuth"] ?: 0.0},${trainAnglePoint["Elevation"] ?: 0.0},$trainAngleAzimuthVelocity,$trainAngleElevationVelocity,")
+}
+
+writer.write("$azError,$elError\n")
+```
+
+### 9.4 테스트 계획
+
+1. **Train=0° 테스트**
+   - 소수점 없이 `FinalTransformed_train0_*` 형식 확인
+   - 중복 컬럼 없음 확인
+   - 컬럼 수가 정확한지 확인
+
+2. **Train=167.867131° 테스트**
+   - `FinalTransformed_train0_*` 컬럼 확인
+   - `FinalTransformed_train167.867131_*` 컬럼 확인
+   - 소수점 6자리 포맷 확인
+
+3. **Train=-11.346704° 테스트**
+   - `FinalTransformed_train0_*` 컬럼 확인
+   - `FinalTransformed_train-11icycle704_*` 컬럼 확인
+   - 음수 Train 각도 포맷 확인
+
+### 9.5 체크리스트
+
+- [ ] `trainAngleFormatted` 포맷팅 로직 구현 (Train=0일 때 소수점 제거)
+- [ ] CSV 헤더 조건부 출력 구현 (Train=0일 때 중복 컬럼 제거)
+- [ ] Train=0° 테스트 수행
+- [ ] Train≠0° 테스트 수행
+- [ ] 음수 Train 각도 테스트 수행
+- [ ] CSV 파일 검증
+
+---
+
 **작성자**: AI Assistant  
 **검토자**: (검토 필요)  
 **승인자**: (승인 필요)  
@@ -383,6 +892,9 @@ Option 2: -12.802531 + 360 = 347.197469° (범위 NG, >270°)
 
 | 날짜 | 버전 | 변경 내용 | 작성자 |
 |------|------|----------|--------|
+| 2025-10-27 | 1.3 | CSV 출력 형식 개선 계획 추가 (9장) | AI Assistant |
+| 2025-10-27 | 1.2 | 각속도 표시 개선 계획 추가 (8장) | AI Assistant |
+| 2025-10-27 | 1.1 | 검증 예제 확장 (20개 → 40개), 최단 거리 알고리즘 검증 완료 | AI Assistant |
 | 2025-10-24 | 1.0 | 초안 작성 | AI Assistant |
 
 

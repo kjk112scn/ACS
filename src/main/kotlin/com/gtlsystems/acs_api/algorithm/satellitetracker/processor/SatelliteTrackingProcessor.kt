@@ -127,58 +127,72 @@ class SatelliteTrackingProcessor(
             val threshold = settingsService.keyholeAzimuthVelocityThreshold
             val isKeyhole = maxAzRate >= threshold
             
+            // ============================================================
+            // Train 계산 방법 선택
+            // 방법 A: calculateTrainAngleMethodA(metrics)  - 2축 기준
+            // 방법 B: calculateTrainAngleMethodB(passDtl) - 최종 기준
+            // ============================================================
+            val currentMethod = "B"  // ← 여기만 변경 (A 또는 B)
+            
             // Keyhole인 경우 최적 Train 각도 계산
-            val (recommendedTrainAngle, selectedMethod) = if (isKeyhole) {
-                // calculateMetrics에서 반환된 값들 가져오기
-                val maxElTime = metrics["MaxElevationTime"] as? ZonedDateTime
-                val maxElAzimuth = metrics["MaxAzimuth"] as? Double ?: 0.0
+            val recommendedTrainAngle = if (isKeyhole) {
+                val trainAngle = if (currentMethod == "A") {
+                    calculateTrainAngleMethodA(metrics)
+                } else {
+                    calculateTrainAngleMethodB(passDtl)
+                }
                 
+                // 상세 Train 각도 계산 로그
                 val maxAzRateAzimuth = metrics["MaxAzRateAzimuth"] as? Double ?: 0.0
                 val maxAzRateTime = metrics["MaxAzRateTime"] as? ZonedDateTime
                 
-                // 방법 A: 최대 Elevation 시점 Azimuth → Train 각도 계산 및 정규화
-                val trainAngleA = calculateTrainAngle(maxElAzimuth)
-                
-                // 방법 B: 최대 각속도 시점 Azimuth → Train 각도 계산 및 정규화
-                val trainAngleB = calculateTrainAngle(maxAzRateAzimuth)
-                
-                // 상세 비교 로그
                 logger.info("=".repeat(60))
-                logger.info("🔍 패스 #${index + 1} ($satelliteName) Train 각도 최적화 분석")
+                logger.info("🔍 패스 #${index + 1} ($satelliteName) Train 각도 계산 [방법 $currentMethod]")
                 logger.info("-".repeat(60))
                 
-                logger.info("📊 방법 A (최대 Elevation 기준):")
-                logger.info("  - 시간: $maxElTime")
-                logger.info("  - Azimuth 각도: ${String.format("%.6f", maxElAzimuth)}°")
-                logger.info("  - Train 각도 (Az-90, 정규화): ${String.format("%.6f", trainAngleA)}°")
-                logger.info("  - 현재 MaxAzRate: ${String.format("%.6f", maxAzRate)}°/s")
-                
-                logger.info("")
-                logger.info("📊 방법 B (최대 각속도 기준):")
-                logger.info("  - 시간: $maxAzRateTime")
-                logger.info("  - Azimuth 각도: ${String.format("%.6f", maxAzRateAzimuth)}°")
-                logger.info("  - Train 각도 (Az-90, 정규화): ${String.format("%.6f", trainAngleB)}°")
-                logger.info("  - 현재 MaxAzRate: ${String.format("%.6f", maxAzRate)}°/s")
-                
-                // 두 방법의 시간 차이
-                if (maxElTime != null && maxAzRateTime != null) {
-                    val timeDiff = Duration.between(maxElTime, maxAzRateTime).seconds
+                if (currentMethod == "A") {
+                    logger.info("📊 입력 데이터:")
+                    logger.info("  - Original MaxAzRate: ${String.format("%.6f", maxAzRate)}°/s")
+                    logger.info("  - 2축 최대 각속도 시점: $maxAzRateTime")
+                    logger.info("  - 해당 시점 Azimuth: ${String.format("%.6f", maxAzRateAzimuth)}°")
                     logger.info("")
-                    logger.info("⏱️ 시간 차이: ${timeDiff}초 (MaxEl → MaxAzRate)")
+                    logger.info("📊 Train 각도 계산 (방법 A: 2축 각속도 시점 기준):")
+                    logger.info("  - 2축 최대 각속도 시점 Azimuth로 Train 각도 계산 (최단 거리)")
+                    logger.info("")
+                } else {
+                    logger.info("📊 입력 데이터:")
+                    logger.info("  - Original MaxAzRate: ${String.format("%.6f", maxAzRate)}°/s")
+                    logger.info("  - 2축 최대 각속도 시점: $maxAzRateTime")
+                    logger.info("  - 2축 해당 시점 Azimuth: ${String.format("%.6f", maxAzRateAzimuth)}°")
+                    logger.info("")
+                    logger.info("📊 Train 각도 계산 (방법 B: 최종 각속도 시점 기준):")
+                    logger.info("  - Train=0으로 최종 변환 후 최대 각속도 시점 Azimuth 추출")
+                    logger.info("  - 해당 Azimuth로 Train 각도 계산 (최단 거리)")
+                    logger.info("")
                 }
                 
-                // 방법 B 우선 선택 (최대 각속도 기준)
-                val selectedTrain = trainAngleB
-                val method = "MaxAzRate"
-                
-                logger.info("")
-                logger.info("✅ 선택된 Train 각도: ${String.format("%.6f", selectedTrain)}° (방법: $method)")
-                logger.info("   계산: ${String.format("%.6f", maxAzRateAzimuth)}° - 90° = ${String.format("%.6f", maxAzRateAzimuth - 90)}° → ${String.format("%.6f", selectedTrain)}° (정규화)")
+                logger.info("✅ 선택된 Train 각도: ${String.format("%.6f", trainAngle)}°")
+                logger.info("   회전량: ${String.format("%.6f", Math.abs(trainAngle))}° (${if (trainAngle >= 0) "시계 방향" else "반시계 방향"})")
                 logger.info("=".repeat(60))
                 
-                Pair(selectedTrain, method)
+                trainAngle
             } else {
-                Pair(0.0, "None")
+                0.0
+            }
+
+            // ============================================================
+            // 새로 추가: 별도 분석 함수 호출 (기존 로직에 영향 없음)
+            // ============================================================
+            if (isKeyhole) {
+                // currentMethod는 위에서 정의됨 (Line 137)
+                analyzeTrainOptimization(
+                    satelliteName = satelliteName,
+                    passIndex = index,
+                    originalDtl = passDtl,
+                    originalMetrics = metrics,
+                    currentTrainAngle = recommendedTrainAngle,
+                    currentMethod = currentMethod
+                )
             }
 
             // ✅ 마스터 데이터 생성
@@ -381,20 +395,71 @@ class SatelliteTrackingProcessor(
     }
 
     /**
-     * Train 각도 계산 및 정규화
+     * 방법 A: 2축 최대 각속도 시점 기준으로 Train 각도 계산
      * 
-     * @param azimuth 방위각
-     * @return 정규화된 Train 각도 (±270도 범위)
+     * Original 데이터의 최대 각속도 시점 Azimuth를 사용
+     * 
+     * @param originalMetrics 원본 메트릭
+     * @return Train 각도
+     */
+    private fun calculateTrainAngleMethodA(
+        originalMetrics: Map<String, Any?>
+    ): Double {
+        val maxAzRateAzimuth = originalMetrics["MaxAzRateAzimuth"] as? Double ?: 0.0
+        return calculateTrainAngle(maxAzRateAzimuth)
+    }
+
+    /**
+     * 방법 B: 최종 최대 각속도 시점 기준으로 Train 각도 계산
+     * 
+     * Train=0으로 최종 변환 후 최대 각속도 시점 Azimuth를 사용
+     * 
+     * @param originalDtl 원본 상세 데이터
+     * @return Train 각도
+     */
+    private fun calculateTrainAngleMethodB(
+        originalDtl: List<Map<String, Any?>>
+    ): Double {
+        // Train=0으로 임시 변환하여 최종 각속도 시점 찾기
+        val finalMetrics0 = simulateTrainApplication(originalDtl, 0.0)
+        val finalMaxAzRateAzimuth0 = finalMetrics0["MaxAzRateAzimuth"] as? Double ?: 0.0
+        return calculateTrainAngle(finalMaxAzRateAzimuth0)
+    }
+
+    /**
+     * Train 각도 계산 (최단 거리, ±270° 범위)
+     * 
+     * 안테나 서쪽(+7°)이 위성을 향하도록 Train 각도 계산
+     * 270° 기준으로 최단 경로 선택하되, ±270° 범위 제한 준수
+     * 
+     * @param azimuth 목표 방위각
+     * @return 정규화된 Train 각도 (±270° 범위)
      */
     private fun calculateTrainAngle(azimuth: Double): Double {
-        // 1단계: Azimuth - 90도 계산
-        var trainAngle = azimuth - 90.0
+        // Azimuth를 0-360 범위로 정규화
+        var normalizedAz = azimuth % 360.0
+        if (normalizedAz < 0) normalizedAz += 360.0
         
-        // 2단계: ±270도 범위로 정규화 (LimitAngleCalculator와 동일)
-        while (trainAngle > 270.0) trainAngle -= 360.0
-        while (trainAngle < -270.0) trainAngle += 360.0
+        // 두 가지 경로 계산
+        val option1 = normalizedAz - 270.0  // 기본 계산
+        val option2 = if (option1 < 0) {
+            option1 + 360.0  // 음수면 시계 방향
+        } else {
+            option1 - 360.0  // 양수면 반시계 방향
+        }
         
-        return trainAngle
+        // ±270° 범위 내 유효한 옵션만 선택
+        val validOptions = mutableListOf<Double>()
+        
+        if (option1 >= -270.0 && option1 <= 270.0) {
+            validOptions.add(option1)
+        }
+        if (option2 >= -270.0 && option2 <= 270.0) {
+            validOptions.add(option2)
+        }
+        
+        // 유효한 옵션 중 절댓값이 작은 것 선택
+        return validOptions.minByOrNull { Math.abs(it) } ?: option1
     }
 
     /**
@@ -513,6 +578,194 @@ class SatelliteTrackingProcessor(
             "MaxAzAccel" to maxAzAccel,
             "MaxElAccel" to maxElAccel
         )
+    }
+
+    /**
+     * Keyhole Train 최적화 비교 분석 (로그 전용, 기존 로직에 영향 없음)
+     * 
+     * 방법 A (2축 기준) vs 방법 B (최종 기준) 비교하여 로그 출력
+     * 
+     * @param satelliteName 위성 이름
+     * @param passIndex 패스 인덱스
+     * @param originalDtl 원본 상세 데이터
+     * @param originalMetrics 원본 메트릭
+     * @param currentTrainAngle 현재 선택된 Train 각도 (기존 로직)
+     */
+    private fun analyzeTrainOptimization(
+        satelliteName: String,
+        passIndex: Int,
+        originalDtl: List<Map<String, Any?>>,
+        originalMetrics: Map<String, Any?>,
+        currentTrainAngle: Double,
+        currentMethod: String  // "A" or "B"
+    ) {
+        logger.info("")
+        logger.info("=".repeat(61))
+        logger.info("🔬 Train 최적화 비교 분석 (참고용)")
+        logger.info("=".repeat(61))
+        logger.info("위성: $satelliteName")
+        logger.info("패스 번호: #${passIndex + 1}")
+        logger.info("현재 적용 Train: ${String.format("%.6f", currentTrainAngle)}°")
+        logger.info("")
+        
+        try {
+            // ========================================================
+            // 방법 A: 2축 최대 각속도 시점 기준 (현재 방식)
+            // ========================================================
+            val originalMaxAzRate = originalMetrics["MaxAzRate"] as? Double ?: 0.0
+            val originalMaxAzRateAzimuth = originalMetrics["MaxAzRateAzimuth"] as? Double ?: 0.0
+            val originalMaxAzRateTime = originalMetrics["MaxAzRateTime"] as? ZonedDateTime
+            
+            val trainAngleA = calculateTrainAngleMethodA(originalMetrics)
+            val finalMetricsA = simulateTrainApplication(originalDtl, trainAngleA)
+            val finalMaxAzRateA = finalMetricsA["MaxAzRate"] as? Double ?: 0.0
+            
+            logger.info("-".repeat(61))
+            if (currentMethod == "A") {
+                logger.info("📊 방법 A: 2축 최대 각속도 시점 기준 (✅ 현재 적용)")
+            } else {
+                logger.info("📊 방법 A: 2축 최대 각속도 시점 기준 (대안)")
+            }
+            logger.info("-".repeat(61))
+            logger.info("[1단계] 2축 데이터 분석:")
+            logger.info("  - Original MaxAzRate: ${String.format("%.6f", originalMaxAzRate)}°/s")
+            logger.info("  - 최대 각속도 시점: $originalMaxAzRateTime")
+            logger.info("  - 해당 시점 Azimuth: ${String.format("%.6f", originalMaxAzRateAzimuth)}°")
+            logger.info("")
+            logger.info("[2단계] Train 각도 계산:")
+            logger.info("  - 입력 Azimuth: ${String.format("%.6f", originalMaxAzRateAzimuth)}°")
+            logger.info("  - 계산된 Train: ${String.format("%.6f", trainAngleA)}° (최단 거리)")
+            logger.info("")
+            logger.info("[3단계] Train 적용 후 최종 결과:")
+            logger.info("  - Final MaxAzRate: ${String.format("%.6f", finalMaxAzRateA)}°/s")
+            logger.info("")
+            
+            // ========================================================
+            // 방법 B: 최종 최대 각속도 시점 기준 (대안)
+            // ========================================================
+            // Train=0으로 임시 변환
+            val finalMetrics0 = simulateTrainApplication(originalDtl, 0.0)
+            val finalMaxAzRate0 = finalMetrics0["MaxAzRate"] as? Double ?: 0.0
+            val finalMaxAzRateAzimuth0 = finalMetrics0["MaxAzRateAzimuth"] as? Double ?: 0.0
+            val finalMaxAzRateTime0 = finalMetrics0["MaxAzRateTime"] as? ZonedDateTime
+            
+            val trainAngleB = calculateTrainAngleMethodB(originalDtl)
+            val finalMetricsB = simulateTrainApplication(originalDtl, trainAngleB)
+            val finalMaxAzRateB = finalMetricsB["MaxAzRate"] as? Double ?: 0.0
+            
+            logger.info("-".repeat(61))
+            if (currentMethod == "B") {
+                logger.info("📊 방법 B: 최종 최대 각속도 시점 기준 (✅ 현재 적용)")
+            } else {
+                logger.info("📊 방법 B: 최종 최대 각속도 시점 기준 (대안)")
+            }
+            logger.info("-".repeat(61))
+            logger.info("[1단계] Train=0으로 최종 변환:")
+            logger.info("  - Final MaxAzRate: ${String.format("%.6f", finalMaxAzRate0)}°/s (Train 미적용)")
+            logger.info("  - 최대 각속도 시점: $finalMaxAzRateTime0")
+            logger.info("  - 해당 시점 Azimuth: ${String.format("%.6f", finalMaxAzRateAzimuth0)}°")
+            logger.info("")
+            logger.info("[2단계] 새로운 Train 각도 계산:")
+            logger.info("  - 입력 Azimuth: ${String.format("%.6f", finalMaxAzRateAzimuth0)}°")
+            logger.info("  - 계산된 Train: ${String.format("%.6f", trainAngleB)}° (최단 거리)")
+            logger.info("")
+            logger.info("[3단계] 새 Train 적용 후 최종 결과:")
+            logger.info("  - Final MaxAzRate: ${String.format("%.6f", finalMaxAzRateB)}°/s")
+            logger.info("")
+            
+            // ========================================================
+            // 비교 결과
+            // ========================================================
+            logger.info("-".repeat(61))
+            logger.info("📈 비교 결과")
+            logger.info("-".repeat(61))
+            if (currentMethod == "A") {
+                logger.info("방법 A (✅ 현재 적용):")
+            } else {
+                logger.info("방법 A:")
+            }
+            logger.info("  - Train 각도: ${String.format("%.6f", trainAngleA)}°")
+            logger.info("  - Final MaxAzRate: ${String.format("%.6f", finalMaxAzRateA)}°/s")
+            logger.info("")
+            if (currentMethod == "B") {
+                logger.info("방법 B (✅ 현재 적용):")
+            } else {
+                logger.info("방법 B:")
+            }
+            logger.info("  - Train 각도: ${String.format("%.6f", trainAngleB)}°")
+            logger.info("  - Final MaxAzRate: ${String.format("%.6f", finalMaxAzRateB)}°/s")
+            logger.info("")
+            
+            val diff = finalMaxAzRateA - finalMaxAzRateB
+            val betterMethod = if (finalMaxAzRateA <= finalMaxAzRateB) "방법 A" else "방법 B"
+            
+            logger.info("차이: ${String.format("%.6f", Math.abs(diff))}°/s")
+            logger.info("더 나은 방법: $betterMethod ${if (diff > 0) "(방법 B가 ${String.format("%.2f", (diff/finalMaxAzRateA)*100)}% 낮음)" else "(방법 A가 ${String.format("%.2f", (Math.abs(diff)/finalMaxAzRateB)*100)}% 낮음)"}")
+            logger.info("")
+            logger.info("⚠️  참고: 실제 적용은 방법 $currentMethod 사용 중")
+            
+        } catch (e: Exception) {
+            logger.error("❌ Train 최적화 분석 중 오류 발생: ${e.message}", e)
+        }
+        
+        logger.info("=".repeat(61))
+        logger.info("")
+    }
+
+    /**
+     * Train 적용 시뮬레이션 (분석용, 실제 데이터 변경 없음)
+     * 
+     * @param originalDtl 원본 상세 데이터
+     * @param trainAngle Train 각도
+     * @return 최종 변환 후 메트릭
+     */
+    private fun simulateTrainApplication(
+        originalDtl: List<Map<String, Any?>>,
+        trainAngle: Double
+    ): Map<String, Any?> {
+        val tempTransformedDtl = mutableListOf<Map<String, Any?>>()
+        
+        // 3축 변환 적용
+        originalDtl.forEach { point ->
+            val originalAz = point["Azimuth"] as Double
+            val originalEl = point["Elevation"] as Double
+            val time = point["Time"] as ZonedDateTime
+            
+            val (transformedAz, transformedEl) = CoordinateTransformer.transformCoordinatesWithTrain(
+                azimuth = originalAz,
+                elevation = originalEl,
+                tiltAngle = settingsService.tiltAngle,
+                trainAngle = trainAngle
+            )
+            
+            tempTransformedDtl.add(
+                mapOf(
+                    "Time" to time,
+                    "Azimuth" to transformedAz,
+                    "Elevation" to transformedEl
+                )
+            )
+        }
+        
+        // 각도 제한 적용
+        val finalDtl = tempTransformedDtl.map { point ->
+            val az = point["Azimuth"] as Double
+            val el = point["Elevation"] as Double
+            val time = point["Time"] as ZonedDateTime
+            
+            var limitedAz = az
+            while (limitedAz > 270.0) limitedAz -= 360.0
+            while (limitedAz < -270.0) limitedAz += 360.0
+            
+            mapOf(
+                "Time" to time,
+                "Azimuth" to limitedAz,
+                "Elevation" to el
+            )
+        }
+        
+        // 메트릭 계산
+        return calculateMetrics(finalDtl)
     }
 }
 
