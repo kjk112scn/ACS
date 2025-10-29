@@ -1,539 +1,153 @@
-﻿# ACS 프로젝트 규칙
+﻿# ACS API 프로젝트 규칙
 
 ## 📄 프로젝트 개요
 **ACS (Antenna Control System) API** - 위성 및 태양 추적을 위한 안테나 제어 시스템 백엔드
 
-## 📄 User Rules (사용자 규칙)
+**기술 스택**: Kotlin 1.9 + Spring Boot 3.2 + WebFlux + Orekit
 
-### 1. **코딩 목표**
+---
+
+## 🎯 핵심 원칙
+
+### 1. 코딩 목표
 - **가독성 우선**: 코드는 읽기 쉽고 이해하기 쉽게 작성
 - **일관성**: 동일한 패턴으로 일관되게 구현
 - **유지보수성**: 나중에 수정하기 쉽게 구조화
 
-### 2. **코딩 스타일**
+### 2. 아키텍처
+- **계층 분리**: Controller → Service → Algorithm → Repository
+- **의존성 역전**: 인터페이스 우선 설계
+- **단일 책임**: 각 클래스는 하나의 책임만
+- **순수 함수**: Algorithm 계층은 외부 의존성 최소화
+
+### 3. 코딩 스타일
 - **Kotlin 베스트 프랙티스** 준수
-- **Spring Boot 3.x** 표준 패턴 사용
-- **WebFlux** 리액티브 프로그래밍 활용
+- **WebFlux** 리액티브 프로그래밍
 - **함수형 프로그래밍** 스타일 선호
+- **KDoc** 주석: 모든 public API에 작성
 
-### 3. **품질 기준**
-- **테스트**: 핵심 비즈니스 로직은 단위 테스트 필수
-- **검토**: 코드 리뷰 후 승인
-- **문서화**: 모든 public API에 KDoc 주석
-- **에러 처리**: 적절한 예외 처리 및 로깅
-
-### 4. **성능 고려사항**
-- **비동기 처리**: 블로킹 작업 최소화
-- **메모리 효율성**: 불필요한 객체 생성 방지
-- **실시간 처리**: 30ms WebSocket 전송 지연 최소화
-
-## 📄 Project Rules (프로젝트 규칙)
-
-### 1. **아키텍처 원칙**
-- **계층 분리**: Controller, Service, Repository 명확히 분리
-- **의존성 역전**: 구현체보다 인터페이스 우선 설계
-- **단일 책임**: 각 클래스는 하나의 책임만 가짐
-- **개방-폐쇄**: 확장에는 열려있고 수정에는 닫혀있음
-
-### 2. **데이터 처리 패턴**
-- **DTO 패턴**: API 계층 데이터 전송 객체 사용
-- **Entity 패턴**: 데이터베이스 테이블 매핑
-- **Repository 패턴**: 데이터 액세스 추상화
-- **Service 패턴**: 비즈니스 로직 캡슐화
-
-### 3. **설정 관리**
-- **외부화**: 하드코딩된 값 금지, 설정 파일 사용
-- **동적 변경**: 재시작 없이 설정 변경 가능
-- **검증**: 설정값 유효성 검사 필수
-- **기본값**: 설정 누락 시 안전한 기본값 제공
-
-### 4. **확장성 고려**
-- **마이크로서비스**: 향후 분리 가능한 구조
-- **데이터베이스**: PostgreSQL 연동 고려한 설계
-- **API 버전**: v1, v2 등 버전 관리 준비
-- **모듈화**: 기능별 독립적인 모듈 구성
-
-## 🌏 다국어 API 문서 시스템 규칙
-
-### 1. **다국어 API 문서 구조**
-- **구현 방식**: `EphemerisApiDescriptions.kt` + `OpenApiUtils.kt` 패턴
-- **언어 지원**: 한국어(KOREAN) + 영어(ENGLISH) 필수 지원
-- **적용 방식**: `operationId` 기반으로 자동 적용
-- **파일 위치**: `src/main/kotlin/com/gtlsystems/acs_api/openapi/`
-
-### 2. **API 설명 작성 규칙**
-- **한국어 우선**: 한국어로 먼저 작성 후 영어 번역
-- **구조화**: summary + description (HTML 형식)
-- **일관성**: 동일한 API는 동일한 설명 패턴 사용
-- **상세성**: 기능, 파라미터, 출력, 정밀도 등 상세 설명
-
-### 3. **OpenAPI 설정 규칙**
-- **그룹 분리**: 한국어 그룹(1korean) + 영어 그룹(2english)
-- **자동 적용**: `OpenApiConfiguration.kt`에서 자동 처리
-- **태그 순서**: 체계적인 API 태그 순서 관리
-- **커스터마이저**: 언어별 커스터마이저로 자동 적용
-
-### 4. **컨트롤러 연동 규칙**
-- **operationId**: 모든 API에 고유한 operationId 필수
-- **언어 감지**: `Language` enum 사용
-- **자동 적용**: `OpenApiUtils.applyApiDescriptions()` 자동 호출
-- **확장성**: 새로운 컨트롤러 추가 시 `OpenApiUtils`에 등록
-
-## 📄 문서화 규칙
-
-### 1. **자동 문서화**
-- **AI 기반**: 코드 변경 시 자동 문서 업데이트
-- **실시간 동기화**: 코드와 문서 항상 일치
-- **구조화**: 체계적인 문서 구조 유지
-
-### 2. **문서 종류**
-- **API 문서**: OpenAPI 3.0 스펙 준수
-- **아키텍처 문서**: 시스템 구조 및 설계 원칙
-- **사용자 가이드**: 설정 및 운영 방법
-- **개발자 가이드**: 개발 환경 및 코딩 표준
-
-### 3. **문서 품질**
-- **사용자 친화적**: 개발자와 운영자 모두 이해 가능
-- **실용적**: 실제 사용 시나리오 포함
-- **최신성**: 항상 현재 코드 상태 반영
+---
 
 ## 📁 문서 관리 시스템
 
-### 1. **폴더 구조**
+### 폴더 구조
 ```
 docs/
-├── Development_Guide.md       # 전체 통합 가이드 (개요)
+├── Development_Guide.md       # ⭐ 시작점: 전체 개발 가이드
 ├── README.md                  # 문서 시스템 설명
 ├── plans/                     # 계획 단계 (협의 중)
-├── completed/                 # 완료 단계 (작업 완료)
-└── references/                # 세부 참조 문서
-    ├── architecture/          # 시스템 아키텍처
-    ├── algorithms/            # 알고리즘 상세
-    ├── api/                   # API 참조
-    ├── deployment/            # 배포 가이드
-    └── user-guide/            # 사용자 가이드
+├── completed/                 # 완료 단계 (구현 완료)
+└── references/                # 세부 참조 (상세 문서)
 ```
 
-### 2. **문서 작성 원칙**
+### AI 협의 명령어
 
-#### Development_Guide.md (통합 가이드)
-- **목적**: 전체 개발 흐름 한눈에 보기
-- **내용**: 각 기능의 핵심만 (3-5문단)
-- **세부 사항**: references/ 링크로 참조
-- **업데이트**: 새 기능 추가 시 섹션 추가
-
-#### plans/ (계획서)
-- **목적**: 새 기능 구현 전 계획 수립
-- **형식**: Step by Step 형태
-- **내용**: 코드 예시, 파일/라인 명시
-- **상태**: 협의 중, 지속적 업데이트
-
-#### completed/ (완료 문서)
-- **목적**: 작업 완료 후 정리본
-- **형식**: 다이어그램/표 중심
-- **내용**: 구현 완료 상태, 테스트 결과
-- **상태**: 작업 완료, 참조용
-
-#### references/ (세부 문서)
-- **목적**: 상세 설명 및 기술 문서
-- **형식**: 설계 문서 (완성본)
-- **내용**: 다이어그램, 알고리즘, 코드 참조
-- **상태**: 유지보수 대상
-
-### 3. **버전 관리**
-
-#### Semantic Versioning
+#### 1. 계획 작성
 ```
-MAJOR.MINOR.PATCH
+"docs/plans/ 폴더에 {기능} 계획 만들어줘"
+→ docs/plans/{기능}_Plan.md 생성
+```
+
+#### 2. 완료 문서 생성
+```
+"@docs/plans/{기능}_Plan.md 작업 완료. completed 문서 만들어줘"
+→ docs/completed/{기능}_Completed.md 생성
+```
+
+#### 3. 개발 가이드 통합
+```
+"@docs/completed/{기능}_Completed.md Development_Guide에 통합해줘"
+→ Development_Guide.md 업데이트 (핵심만)
+→ references/{카테고리}/{기능}_Design.md 생성 (세부)
+→ 버전 및 변경 이력 업데이트
+```
+
+### 문서 작성 원칙
+- **plans/**: Step by Step 형태, 코드 예시 포함
+- **completed/**: 다이어그램/표 중심, 구현 완료 상태
+- **references/**: 설계 문서, 기술 상세
+- **Development_Guide.md**: 전체 개요, 핵심만 (3-5문단)
+
+### 버전 관리
+```
+Semantic Versioning: MAJOR.MINOR.PATCH
 
 - MAJOR: 아키텍처 대규모 변경
 - MINOR: 새 기능 추가
 - PATCH: 버그 수정
 ```
 
-#### 문서 헤더
-```markdown
 ---
-**문서 버전**: 1.1.0
-**최종 업데이트**: 2024-12-15
-**작성자**: GTL Systems
+
+## 🌏 다국어 API 문서
+
+### 구현 방식
+- `{Feature}ApiDescriptions.kt` + `OpenApiUtils.kt` 패턴
+- `operationId` 기반 자동 적용
+- 한국어 우선 작성 → 영어 번역
+
+### 필수 사항
+- 모든 API에 고유한 `operationId` 지정
+- `EphemerisApiDescriptions.kt` 등에 설명 작성
+- Swagger UI에서 한국어/영어 그룹 분리
+
 ---
-```
 
-#### 변경 이력
-Development_Guide.md에 변경 이력 섹션 유지:
+## 📝 파일 수정 안내 규칙
+
+### 경로 표시
+파일 수정 시 **전체 경로**를 명시하고 **클릭 가능**하게 작성:
+
 ```markdown
-## 7. 변경 이력
-
-| 날짜 | 버전 | 주요 변경 | 참조 |
-|------|------|----------|------|
-| 2024-12 | 1.1.0 | Train 알고리즘 | completed/Train_Algorithm_Completed.md |
+**파일**: `src/main/kotlin/com/gtlsystems/acs_api/service/EphemerisService.kt`
+**라인**: 100-120 (선택사항)
+**수정 내용**: {구체적인 수정 사항}
 ```
 
-### 4. **AI 협의 명령어**
-
-#### 계획 작성
-```
-"docs/plans/ 폴더에 {기능} 계획 만들어줘"
-→ docs/plans/{기능}_Plan.md
-```
-
-#### 완료 문서 생성
-```
-"@docs/plans/{기능}_Plan.md 작업 완료. completed 문서 만들어줘"
-→ docs/completed/{기능}_Completed.md
-```
-
-#### 개발 가이드 통합
-```
-"@docs/completed/{기능}_Completed.md Development_Guide에 통합해줘"
-→ docs/Development_Guide.md 업데이트
-   - 해당 기능 섹션 추가 (핵심만)
-   - 변경 이력 업데이트
-   - 버전 업데이트 (예: 1.0.0 → 1.1.0)
-→ docs/references/{카테고리}/{기능}_Design.md 생성 (세부)
-```
-
-#### 버전 업데이트
-```
-"Development_Guide 버전을 1.1.0으로 업데이트하고 변경 이력 추가해줘"
-→ 문서 헤더 버전 변경
-→ 변경 이력 테이블에 새 항목 추가
-```
-
-### 5. **문서 라이프사이클**
-
-```
-1. 계획 작성
-   docs/plans/{기능}_Plan.md
-   → 사용자와 협의, 계속 업데이트
-
-2. 작업 진행
-   → 코드 구현 및 테스트
-
-3. 완료 문서 생성
-   docs/completed/{기능}_Completed.md
-   → 구현 완료 상태 정리
-
-4. 개발 가이드 통합
-   docs/Development_Guide.md 업데이트
-   docs/references/{카테고리}/{기능}_Design.md 생성
-   → 전체 문서에 새 기능 반영
-```
-
-### 6. **문서 참조 규칙**
-
-- **계획서 → 완료 문서**: 작업 이력 추적
-- **완료 문서 → 개발 가이드**: 전체 개요 확인
-- **개발 가이드 → 세부 문서**: 상세 기술 확인
-- **세부 문서 → 코드**: 실제 구현 확인
-
-## 📄 프로젝트 폴더 구조 (현재 실제 구조)
-
-### **📂 전체 루트 구조**
-```
-ACS_API/
-├── 📂 docs/ # 문서화
-├── 📂 src/main/kotlin/com/gtlsystems/acs_api/ # 소스 코드
-├── 📂 src/main/resources/ # 리소스 파일
-├── 📂 .cursorrules # 프로젝트 규칙
-├── 📂 logs/ # 로그 파일
-├── 📂 .git/ # Git 저장소
-├── 📂 .idea/ # IntelliJ 설정
-├── 📂 build/ # 빌드 결과물
-├── 📂 gradle/ # Gradle 설정
-├── 📂 orekit-data/ # Orekit 데이터
-├── 📂 csv_exports/ # CSV 내보내기
-├── 📂 bin/ # 바이너리 파일
-├── 📂 .vscode/ # VS Code 설정
-├── 📂 .gradle/ # Gradle 캐시
-├── 📄 .gitignore # Git 제외 파일
-├── 📄 .gitattributes # Git 속성
-├── 📄 gradle.properties # Gradle 속성
-├── 📄 build.gradle.kts # Gradle 빌드 스크립트
-├── 📄 settings.gradle.kts # Gradle 설정
-├── 📄 gradlew # Gradle Wrapper (Linux/Mac)
-├── 📄 gradlew.bat # Gradle Wrapper (Windows)
-├── 📄 HELP.md # 도움말
-└── 📄 debug.log # 디버그 로그
-```
-
-### **📂 소스 코드 계층 (src/main/kotlin/com/gtlsystems/acs_api/)**
-```
-src/main/kotlin/com/gtlsystems/acs_api/
-├── 📄 AcsApiApplication.kt # 메인 애플리케이션 (진입점)
-├── 📂 controller/ # API 엔드포인트 (HTTP 요청/응답)
-│ ├── 📂 icd/ # ICD 통신 API
-│ │ └── 📄 ICDController.kt # ICD 프로토콜 처리
-│ ├── 📂 mode/ # 모드별 API
-│ │ ├── 📄 EphemerisController.kt # 궤도 추적 API
-│ │ ├── 📄 PassScheduleController.kt # 통과 스케줄 API
-│ │ └── 📄 SunTrackController.kt # 태양 추적 API
-│ ├── 📂 websocket/ # WebSocket API
-│ │ └── 📄 PushDataController.kt # 실시간 데이터 푸시
-│ ├── 📂 system/ # 시스템 관리 API
-│ │ ├── 📄 ConfigurationController.kt # 설정 관리 API
-│ │ ├── 📄 LoggingController.kt # 로깅 관리 API
-│ │ ├── 📄 PerformanceController.kt # 성능 모니터링 API
-│ │ └── 📂 settings/ # 설정 관련 API
-├── 📂 service/ # 비즈니스 로직 (핵심 기능)
-│ ├── 📄 InitService.kt # 시스템 초기화
-│ ├── 📂 icd/ # ICD 프로토콜 처리
-│ │ └── 📄 ICDService.kt # ICD 통신 서비스
-│ ├── 📂 mode/ # 모드별 서비스
-│ │ ├── 📄 EphemerisService.kt # 궤도 추적 서비스
-│ │ ├── 📄 PassScheduleService.kt # 통과 스케줄 서비스
-│ │ └── 📄 SunTrackService.kt # 태양 추적 서비스
-│ ├── 📂 websocket/ # WebSocket 서비스
-│ │ └── 📄 PushDataService.kt # 실시간 데이터 서비스
-│ ├── 📂 udp/ # UDP 통신 서비스
-│ │ └── 📄 UdpFwICDService.kt # UDP 통신 처리
-│ ├── 📂 datastore/ # 데이터 저장 서비스
-│ │ └── 📄 DataStoreService.kt # 데이터 저장 관리
-│ ├── 📂 system/ # 시스템 관리 서비스
-│ │ ├── 📄 ConfigurationService.kt # 설정 관리 서비스
-│ │ ├── 📄 BatchStorageManager.kt # 배치 저장 관리
-│ │ └── 📄 SettingsService.kt # 설정 서비스
-│ └── 📂 logging/ # 로깅 서비스
-│ └── 📄 LoggingService.kt # 로깅 관리
-├── 📂 algorithm/ # 위성/태양 추적 알고리즘 (순수 계산)
-│ ├── 📂 axistransformation/ # 축 변환 알고리즘
-│ │ └── 📄 CoordinateTransformer.kt # 좌표계 변환
-│ ├── 📂 satellitetracker/ # 위성 추적 알고리즘
-│ │ ├── 📂 impl/
-│ │ │ └── 📄 OrekitCalculator.kt # Orekit 기반 계산기
-│ │ └── 📂 model/
-│ │   └── 📄 SatelliteTrackData.kt # 위성 추적 데이터 모델
-│ ├── 📂 axislimitangle/ # 축 제한각 계산
-│ │ └── 📄 LimitAngleCalculator.kt # 제한각 계산기
-│ ├── 📂 elevation/ # 고도각 계산
-│ │ └── 📄 ElevationCalculator.kt # 고도각 계산기
-│ └── 📂 suntrack/ # 태양 추적 알고리즘
-│ ├── 📂 factory/
-│ │ └── 📄 SunPositionCalculatorFactory.kt # 태양 위치 계산기 팩토리
-│ ├── 📂 impl/
-│ │ ├── 📄 SolarOrekitCalculator.kt # Orekit 기반 태양 계산기
-│ │ ├── 📄 SPACalculator.kt # SPA 태양 계산기
-│ │ └── 📄 Grena3Calculator.kt # Grena3 태양 계산기
-│ ├── 📂 interfaces/
-│ │ └── 📄 SunPositionCalculator.kt # 태양 위치 계산기 인터페이스
-│ └── 📂 model/
-│   └── 📄 SunTrackData.kt # 태양 추적 데이터 모델
-├── 📂 model/ # 도메인 모델 (비즈니스 객체)
-│ ├── 📄 GlobalData.kt # 전역 데이터
-│ ├── 📄 PushData.kt # 푸시 데이터
-│ └── 📄 SatelliteTrackData.kt # 위성 추적 데이터
-├── 📂 config/ # 설정 및 구성 (시스템 설정)
-│ ├── 📄 ThreadManager.kt # 스레드 관리
-│ ├── 📄 OrekitConfig.kt # Orekit 설정
-│ ├── 📄 WebSocketConfig.kt # WebSocket 설정
-│ ├── 📄 CorsConfig.kt # CORS 설정
-│ ├── 📄 GlobalExceptionHandler.kt # 전역 예외 처리
-│ ├── 📄 Language.kt # 언어 열거형
-│ └── 📄 OpenApiConfiguration.kt # OpenAPI 설정
-├── 📂 event/ # 이벤트 처리 (시스템 이벤트)
-│ ├── 📄 ACSEvent.kt # ACS 이벤트
-│ ├── 📄 ACSEventBus.kt # 이벤트 버스
-│ ├── 📄 ConfigurationChangedEvent.kt # 설정 변경 이벤트
-│ └── 📂 settings/ # 설정 관련 이벤트
-│ └── 📄 SettingsChangedEvent.kt # 설정 변경 이벤트
-├── 📂 util/ # 유틸리티 (공통 도구)
-│ ├── 📄 CRC16Table.kt # CRC16 테이블
-│ ├── 📄 JKUtil.kt # JK 유틸리티
-│ └── 📄 ApiDescriptions.kt # API 설명 유틸리티
-├── 📂 openapi/ # OpenAPI 다국어 설명
-│ ├── 📄 EphemerisApiDescriptions.kt # 궤도 추적 API 설명
-│ ├── 📄 PassScheduleApiDescriptions.kt # 통과 스케줄 API 설명
-│ ├── 📄 SunTrackApiDescriptions.kt # 태양 추적 API 설명
-│ ├── 📄 ICDApiDescriptions.kt # ICD API 설명
-│ ├── 📄 SettingsApiDescriptions.kt # 설정 API 설명
-│ └── 📄 OpenApiUtils.kt # OpenAPI 유틸리티
-├── 📂 dto/ # 데이터 전송 객체 (API 계층)
-│ ├── 📂 request/ # 요청 DTO
-│ │ └── 📂 settings/ # 설정 관련 요청
-│ └── 📂 response/ # 응답 DTO
-│ └── 📂 settings/ # 설정 관련 응답
-├── 📂 repository/ # 데이터 액세스 (데이터 저장/조회)
-│ ├── 📂 interfaces/ # Repository 인터페이스
-│ │ └── 📂 settings/ # 설정 관련 인터페이스
-│ └── 📂 (기타 Repository 구현체들)
-└── 📂 settings/ # 설정 관련 엔티티
-└── 📂 entity/ # 설정 엔티티
-└── 📂 (설정 관련 엔티티들)
-```
-### **📁 리소스 계층 (src/main/resources/)**
-```
-src/main/resources/
-├── 📄 application.properties # 애플리케이션 설정
-├── 📂 db/migration/ # 데이터베이스 마이그레이션
-│ ├── 📄 V001Create_settings_tables.sql # 설정 테이블 생성
-│ └── 📄 V002Insert_default_settings.sql # 기본 설정 데이터
-├── 📄 logback-spring.xml # 로깅 설정
-├── 📂 static/ # 정적 리소스
-│ └── 📂 swagger-ui/ # Swagger UI
-└── 📂 orekit-data-main/ # Orekit 데이터
-├── 📂 CSSI-Space-Weather-Data/ # 우주 날씨 데이터
-├── 📂 DE-440-ephemerides/ # 위성 궤도 데이터
-├── 📂 Earth-Orientation-Parameters/ # 지구 자전 데이터
-├── 📂 MSAFE/ # 대기 데이터
-├── 📂 Potential/ # 중력장 데이터
-└── 📄 기타 천문 데이터 파일들
-```
-
-
-## 🎯 폴더별 역할 및 규칙
-
-### **📂 Controller 계층**
-- **역할**: HTTP 요청/응답 처리, 클라이언트와의 통신
-- **규칙**: 비즈니스 로직 금지, 데이터 변환만 담당
-- **파일 배치**: 새로운 API는 적절한 하위 폴더에 배치
-- **다국어**: `operationId` 기반으로 자동 다국어 설명 적용
-
-### **�� Service 계층**
-- **역할**: 핵심 비즈니스 로직, 알고리즘 실행, 데이터 처리
-- **규칙**: 데이터 액세스 금지, 순수 비즈니스 로직만
-- **파일 배치**: 새로운 비즈니스 로직은 적절한 하위 폴더에 배치
-
-### **📂 Repository 계층**
-- **역할**: 데이터 저장/조회, 데이터베이스 연동, 파일 시스템 접근
-- **규칙**: 비즈니스 로직 금지, 순수 데이터 액세스만
-- **파일 배치**: 새로운 데이터 액세스는 repository/ 하위에 배치
-
-### **�� DTO 계층**
-- **역할**: API 계층 데이터 전송, 클라이언트-서버 간 데이터 교환
-- **규칙**: 도메인 로직 금지, 순수 데이터 전송만
-- **파일 배치**: DTO는 dto/ 하위에 request/response 구분하여 배치
-
-### **📂 Algorithm 계층**
-- **역할**: 순수 알고리즘, 수학적 계산, 도메인 특화 로직
-- **규칙**: 외부 의존성 최소화, 순수 함수형 프로그래밍
-- **파일 배치**: 새로운 알고리즘은 적절한 하위 폴더에 배치
-
-### **📂 Model 계층**
-- **역할**: 비즈니스 객체, 도메인 엔티티, 핵심 데이터 구조
-- **규칙**: 순수 데이터 모델, 비즈니스 로직 금지
-- **파일 배치**: 새로운 도메인 모델은 model/ 하위에 배치
-
-### **⚙️ Config 계층**
-- **역할**: 시스템 설정, 환경 구성, 외부 설정 관리
-- **규칙**: 설정값 제공, 비즈니스 로직 금지
-- **파일 배치**: 새로운 설정 클래스는 config/ 하위에 배치
-
-### **📂 Event 계층**
-- **역할**: 시스템 이벤트, 비동기 처리, 컴포넌트 간 통신
-- **규칙**: 이벤트 정의 및 발행, 비즈니스 로직 금지
-- **파일 배치**: 새로운 이벤트는 event/ 하위에 배치
-
-### **📂 Util 계층**
-- **역할**: 공통 도구, 헬퍼 함수, 재사용 가능한 기능
-- **규칙**: 순수 함수, 외부 의존성 최소화
-- **파일 배치**: 새로운 유틸리티는 util/ 하위에 배치
-
-### **📂 OpenAPI 계층**
-- **역할**: API 다국어 설명 관리, OpenAPI 문서화
-- **규칙**: operationId 기반 설명, 한국어 우선 작성
-- **파일 배치**: 새로운 API 설명은 openapi/ 하위에 배치
-
-### **📂 Settings 계층**
-- **역할**: 설정 관련 엔티티, 설정 데이터 모델
-- **규칙**: 설정 데이터 구조 정의, 비즈니스 로직 금지
-- **파일 배치**: 설정 관련 모델은 settings/ 하위에 배치
-
-## 📄 개발 프로세스
-
-### 1. **작업 순서**
-1. **폴더 구조** 생성 및 정리
-2. **API 설명** 작성 (한국어 우선)
-3. **설정 클래스** 생성 및 기본 구조
-4. **설정화 작업** (하드코딩된 상수 제거)
-5. **데이터베이스 연동** (설정만 우선)
-6. **프론트엔드 연동** 및 테스트
-
-### 2. **코드 리뷰 기준**
-- **User Rules** 준수 여부
-- **Project Rules** 준수 여부
-- **다국어 API 규칙** 준수 여부
-- **문서화** 완성도
-- **테스트** 커버리지
-- **성능** 영향도
-
-### 3. **품질 체크**
-- **컴파일**: Kotlin 컴파일 오류 없음
-- **린팅**: 코드 스타일 규칙 준수
-- **다국어**: API 설명 자동 적용 확인
-- **테스트**: 핵심 기능 동작 확인
-- **문서**: API 문서 자동 생성 확인
-
-## 📄 코드 예시
-
-### ✅ 좋은 예시 (다국어 API 설명)
+### 코드 블록
+````markdown
 ```kotlin
-/**
- * 정지궤도 위성 각도 계산 API
- */
-@PostMapping("/3axis/tracking/geostationary/calculate-angles")
-@Operation(
-    operationId = "calculategeostationaryangles",  // ✅ 고유한 operationId
-    tags = ["Mode - Ephemeris"]
-)
-fun calculateGeostationaryAngles(
-    @RequestBody request: GeostationaryTrackingRequest
-): Mono<Map<String, Any>> {
-    // 비즈니스 로직 구현
+// 수정 코드
+fun calculateAngles() {
+    // ...
 }
 ```
+````
 
-```kotlin
-// EphemerisApiDescriptions.kt
-object EphemerisApiDescriptions {
-    fun applyDescriptions(operation: Operation, operationId: String, language: Language) {
-        when (operationId.lowercase()) {
-            "calculategeostationaryangles" -> {
-                when (language) {
-                    Language.KOREAN -> {
-                        operation.summary = "정지궤도 위성 각도 계산"
-                        operation.description = """
-                            <h4>정지궤도 위성의 경도를 기반으로 안테나 추적 각도를 계산합니다.</h4>
-                            <h4>계산되는 각도:</h4>
-                            <ul>
-                                <li>방위각: 북쪽 기준 수평각 (0° ~ 360°)</li>
-                                <li>고도각: 지평선 기준 수직각 (0° ~ 90°)</li>
-                            </ul>
-                        """.trimIndent()
-                    }
-                    Language.ENGLISH -> {
-                        operation.summary = "Calculate Geostationary Satellite Angles"
-                        operation.description = """
-                            <h4>Calculates antenna tracking angles based on geostationary satellite longitude.</h4>
-                            <h4>Calculated Angles:</h4>
-                            <ul>
-                                <li>Azimuth: Horizontal angle from North (0° ~ 360°)</li>
-                                <li>Elevation: Vertical angle from horizon (0° ~ 90°)</li>
-                            </ul>
-                        """.trimIndent()
-                    }
-                }
-            }
-        }
-    }
-}
---------------------------
-**중요**
-- 코드에 한글로 생성된 주석등 내용에 유니코드가 깨졌을 경우 다시 수정해야 함
+---
 
-### 파일 수정 안내 시 필수 사항
-1. **파일 경로**: 전체 경로 명시
-2. **라인 번호**: 수정할 라인 번호 표시 (선택사항)
-3. **수정 내용**: 구체적인 수정 사항 설명
-4. **클릭 가능**: 경로를 클릭하면 파일로 이동
+## 📄 상세 문서 참조
 
-### 코드 블록 작성 시
-```markdown
-**파일**: `ACS/src/layouts/MainLayout.vue`
-**라인**: 100-120
-```vue
-<template>
-  <!-- 수정 내용 -->
-</template>
-```
---------------------------
+### 프로젝트 구조 및 폴더 설명
+→ **`docs/Development_Guide.md`** 참조
+
+### 개발 프로세스 및 코딩 표준
+→ **`docs/references/development/`** 참조
+
+### API 문서 및 사용법
+→ **`docs/references/api/`** 참조
+
+### 배포 및 운영
+→ **`docs/references/deployment/`** 참조
+
+---
+
+## ⚠️ 주의사항
+
+### 필수 검토 사항
+1. **유니코드**: 한글 주석이 깨졌을 경우 다시 수정
+2. **컴파일**: 수정 후 반드시 `gradlew compileKotlin` 실행
+3. **린팅**: 코드 스타일 규칙 준수
+4. **문서 동기화**: 코드 변경 시 문서도 함께 업데이트
+
+### 금지 사항
+- 하드코딩된 값 (설정 파일 사용)
+- 비즈니스 로직을 Controller에 작성
+- 데이터 액세스를 Service에 작성
+- public API에 KDoc 주석 누락
+
+---
+
+**규칙 버전**: 2.0.0 (최적화)  
+**최종 업데이트**: 2024-12  
+**상세 문서**: `docs/Development_Guide.md`

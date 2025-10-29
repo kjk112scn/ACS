@@ -2061,10 +2061,11 @@ class EphemerisService(
      */
     fun getAllEphemerisTrackMstMerged(): List<Map<String, Any?>> {
         try {
-            logger.info("📊 Original, FinalTransformed, KeyholeFinalTransformed 데이터 병합 시작")
+            logger.info("📊 Original, FinalTransformed, KeyholeAxisTransformed, KeyholeFinalTransformed 데이터 병합 시작")
             
             val originalMst = ephemerisTrackMstStorage.filter { it["DataType"] == "original" }
             val finalMst = ephemerisTrackMstStorage.filter { it["DataType"] == "final_transformed" }
+            val keyholeAxisMst = ephemerisTrackMstStorage.filter { it["DataType"] == "keyhole_axis_transformed" }  // ✅ 추가
             val keyholeMst = ephemerisTrackMstStorage.filter { it["DataType"] == "keyhole_final_transformed" }
             
             if (finalMst.isEmpty()) {
@@ -2075,6 +2076,7 @@ class EphemerisService(
             val mergedData = finalMst.map { final ->
                 val mstId = final["No"] as UInt
                 val original = originalMst.find { it["No"] == mstId }
+                val keyholeAxis = keyholeAxisMst.find { it["No"] == mstId }  // ✅ 추가
                 val keyhole = keyholeMst.find { it["No"] == mstId }  // ✅ Keyhole 데이터 조회
                 
                 // ✅ Keyhole 판단: final_transformed (Train=0) 기준으로 판단
@@ -2106,11 +2108,22 @@ class EphemerisService(
                     put("OriginalMaxAzRate", originalRates["maxAzRate"])
                     put("OriginalMaxElRate", originalRates["maxElRate"])
                     
-                    // ✅ Keyhole 발생 시 KeyholeFinalTransformed 데이터로 속도 계산
-                    if (keyhole != null) {
+                    // ✅ Keyhole Axis Transformed 데이터 추가 (각도 제한 ❌, Train≠0)
+                    if (keyholeAxis != null && isKeyhole) {
+                        val keyholeAxisRates = calculateFinalTransformedSumMethodRates(mstId, "keyhole_axis_transformed")
+                        put("KeyholeAxisTransformedMaxAzRate", keyholeAxisRates["maxAzRate"])  // ✅ Keyhole Axis 데이터
+                        put("KeyholeAxisTransformedMaxElRate", keyholeAxisRates["maxElRate"])  // ✅ Keyhole Axis 데이터
+                    } else {
+                        // Keyhole 미발생 시 Train=0 값 사용
+                        put("KeyholeAxisTransformedMaxAzRate", finalRates["maxAzRate"])
+                        put("KeyholeAxisTransformedMaxElRate", finalRates["maxElRate"])
+                    }
+                    
+                    // ✅ Keyhole 발생 시 KeyholeFinalTransformed 데이터로 속도 계산 (각도 제한 ✅, Train≠0)
+                    if (keyhole != null && isKeyhole) {
                         val keyholeRates = calculateFinalTransformedSumMethodRates(mstId, "keyhole_final_transformed")
-                        put("KeyholeFinalTransformedMaxAzRate", keyholeRates["maxAzRate"])  // ✅ Keyhole 데이터
-                        put("KeyholeFinalTransformedMaxElRate", keyholeRates["maxElRate"])  // ✅ Keyhole 데이터
+                        put("KeyholeFinalTransformedMaxAzRate", keyholeRates["maxAzRate"])  // ✅ Keyhole Final 데이터
+                        put("KeyholeFinalTransformedMaxElRate", keyholeRates["maxElRate"])  // ✅ Keyhole Final 데이터
                     } else {
                         put("KeyholeFinalTransformedMaxAzRate", finalRates["maxAzRate"])  // FinalTransformed 사용
                         put("KeyholeFinalTransformedMaxElRate", finalRates["maxElRate"])  // FinalTransformed 사용
@@ -2126,7 +2139,7 @@ class EphemerisService(
                 }
             }
             
-            logger.info("✅ 병합 완료: ${mergedData.size}개 MST 레코드 (Keyhole 데이터 포함)")
+            logger.info("✅ 병합 완료: ${mergedData.size}개 MST 레코드 (KeyholeAxis + KeyholeFinal 데이터 포함)")
             return mergedData
             
         } catch (error: Exception) {
