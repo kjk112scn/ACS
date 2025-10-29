@@ -54,12 +54,20 @@ export interface ScheduleItem {
    * maxAzimuthRate가 임계값 이상인 경우 true
    */
   isKeyhole: boolean
+  IsKeyhole?: boolean // ✅ 백엔드 응답 호환성
 
   /**
    * KEYHOLE 위성일 경우 권장 Train 각도 (도)
    * 최대 Elevation 지점의 Azimuth 각도
    */
   recommendedTrainAngle: number
+  RecommendedTrainAngle?: number // ✅ 백엔드 응답 호환성
+
+  // ✅ 시작/종료 각도 (백엔드 응답 호환성)
+  StartAzimuth?: number
+  EndAzimuth?: number
+  StartElevation?: number
+  EndElevation?: number
 
   /**
    * ✅ FinalTransformed 최대 Azimuth 각속도 (도/초) - 합계법
@@ -70,6 +78,30 @@ export interface ScheduleItem {
    * ✅ FinalTransformed 최대 Elevation 각속도 (도/초) - 합계법
    */
   FinalTransformedMaxElRate: number
+
+  /**
+   * ✅ KeyholeAxisTransformed 최대 Azimuth 각속도 (도/초) - 합계법
+   * Keyhole 발생 시 Train≠0, 각도 제한 ❌
+   */
+  KeyholeAxisTransformedMaxAzRate?: number
+
+  /**
+   * ✅ KeyholeAxisTransformed 최대 Elevation 각속도 (도/초) - 합계법
+   * Keyhole 발생 시 Train≠0, 각도 제한 ❌
+   */
+  KeyholeAxisTransformedMaxElRate?: number
+
+  /**
+   * ✅ KeyholeFinalTransformed 최대 Azimuth 각속도 (도/초) - 합계법
+   * Keyhole 발생 시 Train≠0, 각도 제한 ✅
+   */
+  KeyholeFinalTransformedMaxAzRate?: number
+
+  /**
+   * ✅ KeyholeFinalTransformed 최대 Elevation 각속도 (도/초) - 합계법
+   * Keyhole 발생 시 Train≠0, 각도 제한 ✅
+   */
+  KeyholeFinalTransformedMaxElRate?: number
 
   /**
    * ✅ 2축(Original) 최대 고도 (도)
@@ -378,8 +410,17 @@ class EphemerisTrackService {
           FinalTransformedMaxAzRate: item.FinalTransformedMaxAzRate as number,
           FinalTransformedMaxElRate: item.FinalTransformedMaxElRate as number,
 
-          isKeyhole: item.IsKeyhole as boolean,
-          recommendedTrainAngle: item.RecommendedTrainAngle as number,
+          isKeyhole: (item.IsKeyhole ?? item.isKeyhole) as boolean,
+          IsKeyhole: item.IsKeyhole as boolean | undefined,
+          recommendedTrainAngle: (item.RecommendedTrainAngle ??
+            item.recommendedTrainAngle) as number,
+          RecommendedTrainAngle: item.RecommendedTrainAngle as number | undefined,
+
+          // ✅ 시작/종료 각도
+          StartAzimuth: item.StartAzimuth as number | undefined,
+          EndAzimuth: item.EndAzimuth as number | undefined,
+          StartElevation: item.StartElevation as number | undefined,
+          EndElevation: item.EndElevation as number | undefined,
           CreationDate: item.CreationDate as string,
           Creator: item.Creator as string,
 
@@ -391,6 +432,20 @@ class EphemerisTrackService {
           // ✅ 중앙차분법 데이터 (실시간 제어용 - 주석 처리)
           CentralDiffMaxAzRate: item.CentralDiffMaxAzRate as number | undefined,
           CentralDiffMaxElRate: item.CentralDiffMaxElRate as number | undefined,
+
+          // ✅ Keyhole 관련 속도 데이터
+          KeyholeAxisTransformedMaxAzRate: item.KeyholeAxisTransformedMaxAzRate as
+            | number
+            | undefined,
+          KeyholeAxisTransformedMaxElRate: item.KeyholeAxisTransformedMaxElRate as
+            | number
+            | undefined,
+          KeyholeFinalTransformedMaxAzRate: item.KeyholeFinalTransformedMaxAzRate as
+            | number
+            | undefined,
+          KeyholeFinalTransformedMaxElRate: item.KeyholeFinalTransformedMaxElRate as
+            | number
+            | undefined,
         }))
 
         console.log(

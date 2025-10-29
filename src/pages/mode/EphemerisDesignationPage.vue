@@ -230,8 +230,14 @@
                       </div>
                       <div class="info-row">
                         <span class="info-label">최대 Azimuth 속도:</span>
-                        <span class="info-value text-red">{{ safeToFixed(selectedScheduleInfo.FinalTransformedMaxAzRate, 6)
-                        }}°/s</span>
+                        <span class="info-value text-red">
+                          {{ safeToFixed(
+                            selectedScheduleInfo.isKeyhole 
+                              ? (selectedScheduleInfo.KeyholeAxisTransformedMaxAzRate ?? selectedScheduleInfo.FinalTransformedMaxAzRate ?? 0)
+                              : (selectedScheduleInfo.FinalTransformedMaxAzRate ?? 0), 
+                            6
+                          ) }}°/s
+                        </span>
                       </div>
                       <div class="info-row">
                         <span class="info-label">최대 Elevation 속도:</span>
@@ -375,12 +381,17 @@ ISS (ZARYA)
             </q-td>
           </template>
 
-          <!-- ✅ FinalTransformed 최대 Az 속도 템플릿 -->
+          <!-- ✅ FinalTransformed 최대 Az 속도 템플릿 (Keyhole에 따라 다른 값 표시) -->
           <template v-slot:body-cell-FinalTransformedMaxAzRate="props">
             <q-td :props="props">
               <div class="text-center">
-                <div class="text-weight-bold text-green-3">
-                  {{ safeToFixed(props.value, 6) }}°/s
+                <div class="text-weight-bold" :class="props.row?.isKeyhole ? 'text-red' : 'text-green-3'">
+                  {{ safeToFixed(
+                    props.row?.isKeyhole 
+                      ? (props.row?.KeyholeAxisTransformedMaxAzRate ?? props.value ?? 0)
+                      : (props.value ?? 0), 
+                    6
+                  ) }}°/s
                 </div>
               </div>
             </q-td>
@@ -790,6 +801,10 @@ const selectedScheduleInfo = computed(() => {
       recommendedTrainAngle: 0,
       FinalTransformedMaxAzRate: 0,
       FinalTransformedMaxElRate: 0,
+      KeyholeAxisTransformedMaxAzRate: undefined,
+      KeyholeAxisTransformedMaxElRate: undefined,
+      KeyholeFinalTransformedMaxAzRate: undefined,
+      KeyholeFinalTransformedMaxElRate: undefined,
     }
   }
 
@@ -816,6 +831,10 @@ const selectedScheduleInfo = computed(() => {
       recommendedTrainAngle: selected.RecommendedTrainAngle || 0,
       FinalTransformedMaxAzRate: selected.FinalTransformedMaxAzRate || 0,
       FinalTransformedMaxElRate: selected.FinalTransformedMaxElRate || 0,
+      KeyholeAxisTransformedMaxAzRate: selected.KeyholeAxisTransformedMaxAzRate,
+      KeyholeAxisTransformedMaxElRate: selected.KeyholeAxisTransformedMaxElRate,
+      KeyholeFinalTransformedMaxAzRate: selected.KeyholeFinalTransformedMaxAzRate,
+      KeyholeFinalTransformedMaxElRate: selected.KeyholeFinalTransformedMaxElRate,
     }
   }
 
@@ -839,6 +858,10 @@ const selectedScheduleInfo = computed(() => {
     recommendedTrainAngle: 0,
     FinalTransformedMaxAzRate: 0,
     FinalTransformedMaxElRate: 0,
+    KeyholeAxisTransformedMaxAzRate: undefined,
+    KeyholeAxisTransformedMaxElRate: undefined,
+    KeyholeFinalTransformedMaxAzRate: undefined,
+    KeyholeFinalTransformedMaxElRate: undefined,
   }
 })
 
