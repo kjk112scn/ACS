@@ -431,10 +431,20 @@ class EphemerisService(
             ephemerisTrackDtlStorage.addAll(processedData.axisTransformedDtl)
             logger.debug("3축 변환 저장: ${processedData.axisTransformedMst.size} Mst, ${processedData.axisTransformedDtl.size} Dtl")
 
-            // 최종 변환 데이터 저장
+            // 최종 변환 데이터 저장 (Train=0, 각도 제한 ✅)
             ephemerisTrackMstStorage.addAll(processedData.finalTransformedMst)
             ephemerisTrackDtlStorage.addAll(processedData.finalTransformedDtl)
             logger.debug("최종 변환 저장: ${processedData.finalTransformedMst.size} Mst, ${processedData.finalTransformedDtl.size} Dtl")
+
+            // ✅ Keyhole Axis 변환 데이터 저장 (Train≠0, 각도 제한 ❌)
+            ephemerisTrackMstStorage.addAll(processedData.keyholeAxisTransformedMst)
+            ephemerisTrackDtlStorage.addAll(processedData.keyholeAxisTransformedDtl)
+            logger.debug("Keyhole Axis 저장: ${processedData.keyholeAxisTransformedMst.size} Mst, ${processedData.keyholeAxisTransformedDtl.size} Dtl")
+
+            // ✅ Keyhole Final 변환 데이터 저장 (Train≠0, 각도 제한 ✅)
+            ephemerisTrackMstStorage.addAll(processedData.keyholeFinalTransformedMst)
+            ephemerisTrackDtlStorage.addAll(processedData.keyholeFinalTransformedDtl)
+            logger.debug("Keyhole Final 저장: ${processedData.keyholeFinalTransformedMst.size} Mst, ${processedData.keyholeFinalTransformedDtl.size} Dtl")
 
             logger.info("✅ 저장 완료: 총 ${ephemerisTrackMstStorage.size}개 Mst, ${ephemerisTrackDtlStorage.size}개 Dtl")
             logger.info("🎉 위성 궤도 추적 완료")
@@ -2051,10 +2061,11 @@ class EphemerisService(
      */
     fun getAllEphemerisTrackMstMerged(): List<Map<String, Any?>> {
         try {
-            logger.info("📊 Original과 FinalTransformed 데이터 병합 시작")
+            logger.info("📊 Original, FinalTransformed, KeyholeFinalTransformed 데이터 병합 시작")
             
             val originalMst = ephemerisTrackMstStorage.filter { it["DataType"] == "original" }
             val finalMst = ephemerisTrackMstStorage.filter { it["DataType"] == "final_transformed" }
+            val keyholeMst = ephemerisTrackMstStorage.filter { it["DataType"] == "keyhole_final_transformed" }
             
             if (finalMst.isEmpty()) {
                 logger.warn("⚠️ FinalTransformed 데이터가 없습니다")
@@ -2064,6 +2075,22 @@ class EphemerisService(
             val mergedData = finalMst.map { final ->
                 val mstId = final["No"] as UInt
                 val original = originalMst.find { it["No"] == mstId }
+                val keyhole = keyholeMst.find { it["No"] == mstId }  // ✅ Keyhole 데이터 조회
+                
+                // ✅ Keyhole 판단: final_transformed (Train=0) 기준으로 판단
+                val train0MaxAzRate = final["MaxAzRate"] as? Double ?: 0.0
+                val threshold = settingsService.keyholeAzimuthVelocityThreshold
+                val isKeyhole = train0MaxAzRate >= threshold
+                
+                // 백업: Original MST의 IsKeyhole도 확인 (데이터 정합성)
+                val isKeyholeFromOriginal = original?.get("IsKeyhole") as? Boolean ?: false
+                if (isKeyhole != isKeyholeFromOriginal) {
+                    logger.warn("⚠️ MST #$mstId: Keyhole 판단 불일치 (Final: $isKeyhole, Original: $isKeyholeFromOriginal)")
+                }
+                
+                // ✅ 각각 별도 계산 (합계법)
+                val originalRates = calculateOriginalSumMethodRates(mstId)
+                val finalRates = calculateFinalTransformedSumMethodRates(mstId, "final_transformed")
                 
                 final.toMutableMap().apply {
                     // Original (2축) 메타데이터 추가
@@ -2071,25 +2098,35 @@ class EphemerisService(
                     put("OriginalMaxAzAccel", original?.get("MaxAzAccel"))
                     put("OriginalMaxElAccel", original?.get("MaxElAccel"))
                     
-                    // ✅ 각각 별도 계산 (합계법)
-                    val originalRates = calculateOriginalSumMethodRates(mstId)
-                    val finalRates = calculateFinalTransformedSumMethodRates(mstId)
-                    
-                    // FinalTransformed 속도 (합계법) - 풀네임
+                    // FinalTransformed 속도 (합계법, Train=0) - 참고용
                     put("FinalTransformedMaxAzRate", finalRates["maxAzRate"])
                     put("FinalTransformedMaxElRate", finalRates["maxElRate"])
                     
-                    // Original (2축) 속도 (합계법) - 풀네임
+                    // Original (2축) 속도 (합계법)
                     put("OriginalMaxAzRate", originalRates["maxAzRate"])
                     put("OriginalMaxElRate", originalRates["maxElRate"])
                     
-                    // ✅ 중앙차분법 데이터는 주석으로 보관 (실시간 제어용)
-                    put("CentralDiffMaxAzRate", original?.get("MaxAzRate"))  // 중앙차분법 백업
-                    put("CentralDiffMaxElRate", original?.get("MaxElRate"))  // 중앙차분법 백업
+                    // ✅ Keyhole 발생 시 KeyholeFinalTransformed 데이터로 속도 계산
+                    if (keyhole != null) {
+                        val keyholeRates = calculateFinalTransformedSumMethodRates(mstId, "keyhole_final_transformed")
+                        put("KeyholeFinalTransformedMaxAzRate", keyholeRates["maxAzRate"])  // ✅ Keyhole 데이터
+                        put("KeyholeFinalTransformedMaxElRate", keyholeRates["maxElRate"])  // ✅ Keyhole 데이터
+                    } else {
+                        put("KeyholeFinalTransformedMaxAzRate", finalRates["maxAzRate"])  // FinalTransformed 사용
+                        put("KeyholeFinalTransformedMaxElRate", finalRates["maxElRate"])  // FinalTransformed 사용
+                    }
+                    
+                    // ✅ Keyhole 관련 정보
+                    put("IsKeyhole", isKeyhole)
+                    put("RecommendedTrainAngle", original?.get("RecommendedTrainAngle") ?: 0.0)
+                    
+                    // 중앙차분법 데이터는 주석으로 보관 (실시간 제어용)
+                    put("CentralDiffMaxAzRate", original?.get("MaxAzRate"))
+                    put("CentralDiffMaxElRate", original?.get("MaxElRate"))
                 }
             }
             
-            logger.info("✅ 병합 완료: ${mergedData.size}개 MST 레코드 (이론치 합계법 포함)")
+            logger.info("✅ 병합 완료: ${mergedData.size}개 MST 레코드 (Keyhole 데이터 포함)")
             return mergedData
             
         } catch (error: Exception) {
@@ -2190,12 +2227,15 @@ class EphemerisService(
      * @param mstId 마스터 ID
      * @return 합계법으로 계산된 최대 속도 (도/초)
      */
-    private fun calculateFinalTransformedSumMethodRates(mstId: UInt): Map<String, Double> {
+    private fun calculateFinalTransformedSumMethodRates(
+        mstId: UInt,
+        dataType: String = "final_transformed"  // ✅ 파라미터 추가
+    ): Map<String, Double> {
         try {
-            val finalDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "final_transformed")
+            val finalDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, dataType)  // ✅ 파라미터 사용
             
             if (finalDtl.size < 11) {
-                logger.warn("⚠️ MST ID $mstId: FinalTransformed 속도 계산을 위한 데이터가 부족합니다 (${finalDtl.size}개)")
+                logger.warn("⚠️ MST ID $mstId: $dataType 속도 계산 부족")
                 return mapOf("maxAzRate" to 0.0, "maxElRate" to 0.0)
             }
             
@@ -2939,6 +2979,26 @@ class EphemerisService(
             val originalDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "original")
             val axisTransformedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "axis_transformed")
             val finalTransformedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "final_transformed")
+            
+            // ✅ Keyhole 데이터 조회
+            val keyholeAxisDtl = try {
+                val data = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "keyhole_axis_transformed")
+                logger.info("📊 Keyhole Axis DTL 조회 성공: ${data.size}개")
+                data
+            } catch (e: Exception) {
+                logger.warn("⚠️ Keyhole Axis 데이터 조회 실패: ${e.message}")
+                emptyList()
+            }
+            
+            val keyholeFinalDtl = try {
+                val data = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "keyhole_final_transformed")
+                logger.info("📊 Keyhole Final DTL 조회 성공: ${data.size}개")
+                data
+            } catch (e: Exception) {
+                logger.warn("⚠️ Keyhole Final 데이터 조회 실패: ${e.message}")
+                emptyList()
+            }
+            
             if (originalDtl.isEmpty()) {
                 logger.error("❌ MST ID $mstId 의 원본 데이터를 찾을 수 없습니다")
                 return mapOf<String, Any?>("success" to false, "error" to "원본 데이터를 찾을 수 없습니다")
@@ -2947,6 +3007,39 @@ class EphemerisService(
             val satelliteName = mstInfo?.get("SatelliteName") as? String ?: "Unknown"
             val startTime = mstInfo?.get("StartTime") as? java.time.ZonedDateTime
             val endTime = mstInfo?.get("EndTime") as? java.time.ZonedDateTime
+            
+            // ✅ MST 정보 조회
+            val finalMst = getAllEphemerisTrackMst().find { 
+                it["No"] == mstId.toUInt() && it["DataType"] == "final_transformed" 
+            }
+            
+            // ✅ Keyhole 판단: final_transformed (Train=0)의 MaxAzRate로 판단
+            val train0MaxAzRate = finalMst?.get("MaxAzRate") as? Double ?: 0.0
+            val threshold = settingsService.keyholeAzimuthVelocityThreshold
+            val isKeyhole = train0MaxAzRate >= threshold
+            
+            logger.info("📊 Keyhole 판단: Train=0 MaxAzRate = ${"%.6f".format(train0MaxAzRate)}°/s, 임계값 = $threshold°/s")
+            logger.info("   결과: ${if (isKeyhole) "✅ Keyhole 발생" else "✅ Keyhole 미발생"}")
+            
+            // ✅ Train 각도 가져오기 및 포맷팅
+            val recommendedTrainAngle = mstInfo?.get("RecommendedTrainAngle") as? Double ?: 0.0
+            
+            val trainAngleFormatted = if (recommendedTrainAngle == 0.0) {
+                "0"
+            } else {
+                String.format("%.6f", recommendedTrainAngle)
+            }
+            
+            // ✅ 데이터 정합성 확인
+            val keyholeDataExists = keyholeFinalDtl.isNotEmpty()
+            if (isKeyhole && !keyholeDataExists) {
+                logger.warn("⚠️ Keyhole로 판단되었으나 keyhole_final_transformed 데이터가 없습니다!")
+            }
+            if (!isKeyhole && keyholeDataExists) {
+                logger.warn("⚠️ Keyhole이 아닌데 keyhole_final_transformed 데이터가 존재합니다!")
+            }
+            
+            logger.info("📊 Train 각도: $trainAngleFormatted°, Keyhole: $isKeyhole")
             
             // ✅ 파일명 개선: 타임스탬프 제거하고 날짜만 포함 (중복 실행 방지)
             val dateOnly = startTime?.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")) ?: "unknown"
@@ -2961,13 +3054,31 @@ class EphemerisService(
                 logger.info("📄 새 파일 생성: $filename")
             }
             
+            // ✅ Train=0 데이터는 finalTransformedDtl 그대로 사용 (이미 Train=0으로 변환됨)
+            val train0Dtl = finalTransformedDtl.map { point ->
+                val az = point["Azimuth"] as Double
+                val el = point["Elevation"] as Double
+                val time = point["Time"] as java.time.ZonedDateTime
+                
+                mapOf(
+                    "Time" to time,
+                    "Azimuth" to az,
+                    "Elevation" to el
+                )
+            }
+            logger.info("📊 Train=0 데이터 생성 완료: ${train0Dtl.size}개 (finalTransformedDtl 사용)")
+            
             // ✅ 최대값 추적용 변수 (블록 밖에서 선언)
             var maxOriginalAzVelocity = 0.0
             var maxOriginalElVelocity = 0.0
             var maxAxisTransformedAzVelocity = 0.0
             var maxAxisTransformedElVelocity = 0.0
-            var maxFinalTransformedAzVelocity = 0.0
-            var maxFinalTransformedElVelocity = 0.0
+            var maxTrain0AzVelocity = 0.0
+            var maxTrain0ElVelocity = 0.0
+            var maxKeyholeAxisAzVelocity = 0.0
+            var maxKeyholeAxisElVelocity = 0.0
+            var maxKeyholeFinalAzVelocity = 0.0
+            var maxKeyholeFinalElVelocity = 0.0
             
             java.io.FileWriter(filePath).use { writer ->
                 // ✅ 사용자 요구사항에 맞는 CSV 헤더: 각 변환 단계별 각속도 포함
@@ -2975,8 +3086,16 @@ class EphemerisService(
                 writer.write("Original_Azimuth,Original_Elevation,Original_Azimuth_Velocity,Original_Elevation_Velocity,")
                 writer.write("Original_Range,Original_Altitude,")
                 writer.write("AxisTransformed_Azimuth,AxisTransformed_Elevation,AxisTransformed_Azimuth_Velocity,AxisTransformed_Elevation_Velocity,")
-                writer.write("FinalTransformed_Azimuth,FinalTransformed_Elevation,FinalTransformed_Azimuth_Velocity,FinalTransformed_Elevation_Velocity,")
+                writer.write("FinalTransformed_train0_Azimuth,FinalTransformed_train0_Elevation,FinalTransformed_train0_Azimuth_Velocity,FinalTransformed_train0_Elevation_Velocity,")
+                
+                // Keyhole 발생 시만 Keyhole 컬럼 추가
+                if (isKeyhole) {
+                    writer.write("KeyholeAxisTransformed_train${trainAngleFormatted}_Azimuth,KeyholeAxisTransformed_train${trainAngleFormatted}_Elevation,KeyholeAxisTransformed_train${trainAngleFormatted}_Azimuth_Velocity,KeyholeAxisTransformed_train${trainAngleFormatted}_Elevation_Velocity,")
+                    writer.write("KeyholeFinalTransformed_train${trainAngleFormatted}_Azimuth,KeyholeFinalTransformed_train${trainAngleFormatted}_Elevation,KeyholeFinalTransformed_train${trainAngleFormatted}_Azimuth_Velocity,KeyholeFinalTransformed_train${trainAngleFormatted}_Elevation_Velocity,")
+                }
+                
                 writer.write("Azimuth_Transformation_Error,Elevation_Transformation_Error\n")
+                
                 val maxSize = maxOf(originalDtl.size, axisTransformedDtl.size, finalTransformedDtl.size)
                 
                 // ✅ 각 변환 단계별 각속도 계산을 위한 이전 값 저장
@@ -3010,8 +3129,15 @@ class EphemerisService(
                     var originalElevationVelocity = 0.0
                     var axisTransformedAzimuthVelocity = 0.0
                     var axisTransformedElevationVelocity = 0.0
-                    var finalTransformedAzimuthVelocity = 0.0
-                    var finalTransformedElevationVelocity = 0.0
+                    var train0AzimuthVelocity = 0.0
+                    var train0ElevationVelocity = 0.0
+                    var keyholeAxisAzimuthVelocity = 0.0
+                    var keyholeAxisElevationVelocity = 0.0
+                    var keyholeFinalAzimuthVelocity = 0.0
+                    var keyholeFinalElevationVelocity = 0.0
+                    
+                    // Train=0 데이터 포인트 가져오기
+                    val train0Point = if (i < train0Dtl.size) train0Dtl[i] else null
                     
                     // ✅ 이론치 합계법: 1초간(10개) 총 변화량 계산 (시간으로 나누지 않음)
                     if (i >= 9) { // Index 9부터 10개 데이터 구간 형성 가능
@@ -3019,8 +3145,12 @@ class EphemerisService(
                         var currentOriginalElSum = 0.0
                         var currentAxisTransformedAzSum = 0.0
                         var currentAxisTransformedElSum = 0.0
-                        var currentFinalTransformedAzSum = 0.0
-                        var currentFinalTransformedElSum = 0.0
+                        var currentTrain0AzSum = 0.0
+                        var currentTrain0ElSum = 0.0
+                        var currentKeyholeAxisAzSum = 0.0
+                        var currentKeyholeAxisElSum = 0.0
+                        var currentKeyholeFinalAzSum = 0.0
+                        var currentKeyholeFinalElSum = 0.0
                         
                         // 10개 구간의 변화량을 모두 더함 (j-1이 유효하도록)
                         for (j in (i - 9)..i) { // j는 현재 인덱스 i까지, 이전 9개 포함 (총 10개)
@@ -3029,8 +3159,8 @@ class EphemerisService(
                                 val currentOriginalPoint = originalDtl[j]
                                 val prevAxisTransformedPoint = axisTransformedDtl[j - 1]
                                 val currentAxisTransformedPoint = axisTransformedDtl[j]
-                                val prevFinalTransformedPoint = finalTransformedDtl[j - 1]
-                                val currentFinalTransformedPoint = finalTransformedDtl[j]
+                                val prevTrain0Point = train0Dtl[j - 1]
+                                val currentTrain0Point = train0Dtl[j]
                                 
                                 // Original
                                 val prevOriginalAz = prevOriginalPoint["Azimuth"] as Double
@@ -3054,16 +3184,46 @@ class EphemerisService(
                                 currentAxisTransformedAzSum += kotlin.math.abs(azDiffAxis)
                                 currentAxisTransformedElSum += kotlin.math.abs(currentAxisTransformedEl - prevAxisTransformedEl)
                                 
-                                // FinalTransformed
-                                val prevFinalTransformedAz = prevFinalTransformedPoint["Azimuth"] as Double
-                                val currentFinalTransformedAz = currentFinalTransformedPoint["Azimuth"] as Double
-                                val prevFinalTransformedEl = prevFinalTransformedPoint["Elevation"] as Double
-                                val currentFinalTransformedEl = currentFinalTransformedPoint["Elevation"] as Double
-                                var azDiffFinal = currentFinalTransformedAz - prevFinalTransformedAz
-                                if (azDiffFinal > 180) azDiffFinal -= 360
-                                if (azDiffFinal < -180) azDiffFinal += 360
-                                currentFinalTransformedAzSum += kotlin.math.abs(azDiffFinal)
-                                currentFinalTransformedElSum += kotlin.math.abs(currentFinalTransformedEl - prevFinalTransformedEl)
+                                // Train0
+                                val prevTrain0Az = prevTrain0Point["Azimuth"] as Double
+                                val currentTrain0Az = currentTrain0Point["Azimuth"] as Double
+                                val prevTrain0El = prevTrain0Point["Elevation"] as Double
+                                val currentTrain0El = currentTrain0Point["Elevation"] as Double
+                                var azDiffTrain0 = currentTrain0Az - prevTrain0Az
+                                if (azDiffTrain0 > 180) azDiffTrain0 -= 360
+                                if (azDiffTrain0 < -180) azDiffTrain0 += 360
+                                currentTrain0AzSum += kotlin.math.abs(azDiffTrain0)
+                                currentTrain0ElSum += kotlin.math.abs(currentTrain0El - prevTrain0El)
+                                
+                                // ✅ Keyhole Axis (Keyhole 발생 시만)
+                                if (isKeyhole && j < keyholeAxisDtl.size) {
+                                    val prevKeyholeAxisPoint = keyholeAxisDtl[j - 1]
+                                    val currentKeyholeAxisPoint = keyholeAxisDtl[j]
+                                    val prevKeyholeAxisAz = prevKeyholeAxisPoint["Azimuth"] as Double
+                                    val currentKeyholeAxisAz = currentKeyholeAxisPoint["Azimuth"] as Double
+                                    val prevKeyholeAxisEl = prevKeyholeAxisPoint["Elevation"] as Double
+                                    val currentKeyholeAxisEl = currentKeyholeAxisPoint["Elevation"] as Double
+                                    var azDiffKeyholeAxis = currentKeyholeAxisAz - prevKeyholeAxisAz
+                                    if (azDiffKeyholeAxis > 180) azDiffKeyholeAxis -= 360
+                                    if (azDiffKeyholeAxis < -180) azDiffKeyholeAxis += 360
+                                    currentKeyholeAxisAzSum += kotlin.math.abs(azDiffKeyholeAxis)
+                                    currentKeyholeAxisElSum += kotlin.math.abs(currentKeyholeAxisEl - prevKeyholeAxisEl)
+                                }
+                                
+                                // ✅ Keyhole Final (Keyhole 발생 시만)
+                                if (isKeyhole && j < keyholeFinalDtl.size) {
+                                    val prevKeyholeFinalPoint = keyholeFinalDtl[j - 1]
+                                    val currentKeyholeFinalPoint = keyholeFinalDtl[j]
+                                    val prevKeyholeFinalAz = prevKeyholeFinalPoint["Azimuth"] as Double
+                                    val currentKeyholeFinalAz = currentKeyholeFinalPoint["Azimuth"] as Double
+                                    val prevKeyholeFinalEl = prevKeyholeFinalPoint["Elevation"] as Double
+                                    val currentKeyholeFinalEl = currentKeyholeFinalPoint["Elevation"] as Double
+                                    var azDiffKeyholeFinal = currentKeyholeFinalAz - prevKeyholeFinalAz
+                                    if (azDiffKeyholeFinal > 180) azDiffKeyholeFinal -= 360
+                                    if (azDiffKeyholeFinal < -180) azDiffKeyholeFinal += 360
+                                    currentKeyholeFinalAzSum += kotlin.math.abs(azDiffKeyholeFinal)
+                                    currentKeyholeFinalElSum += kotlin.math.abs(currentKeyholeFinalEl - prevKeyholeFinalEl)
+                                }
                             }
                         }
                         
@@ -3071,16 +3231,24 @@ class EphemerisService(
                         originalElevationVelocity = currentOriginalElSum
                         axisTransformedAzimuthVelocity = currentAxisTransformedAzSum
                         axisTransformedElevationVelocity = currentAxisTransformedElSum
-                        finalTransformedAzimuthVelocity = currentFinalTransformedAzSum
-                        finalTransformedElevationVelocity = currentFinalTransformedElSum
+                        train0AzimuthVelocity = currentTrain0AzSum
+                        train0ElevationVelocity = currentTrain0ElSum
+                        keyholeAxisAzimuthVelocity = currentKeyholeAxisAzSum
+                        keyholeAxisElevationVelocity = currentKeyholeAxisElSum
+                        keyholeFinalAzimuthVelocity = currentKeyholeFinalAzSum
+                        keyholeFinalElevationVelocity = currentKeyholeFinalElSum
                         
                         // 최대값 업데이트
                         maxOriginalAzVelocity = maxOf(maxOriginalAzVelocity, originalAzimuthVelocity)
                         maxOriginalElVelocity = maxOf(maxOriginalElVelocity, originalElevationVelocity)
                         maxAxisTransformedAzVelocity = maxOf(maxAxisTransformedAzVelocity, axisTransformedAzimuthVelocity)
                         maxAxisTransformedElVelocity = maxOf(maxAxisTransformedElVelocity, axisTransformedElevationVelocity)
-                        maxFinalTransformedAzVelocity = maxOf(maxFinalTransformedAzVelocity, finalTransformedAzimuthVelocity)
-                        maxFinalTransformedElVelocity = maxOf(maxFinalTransformedElVelocity, finalTransformedElevationVelocity)
+                        maxTrain0AzVelocity = maxOf(maxTrain0AzVelocity, train0AzimuthVelocity)
+                        maxTrain0ElVelocity = maxOf(maxTrain0ElVelocity, train0ElevationVelocity)
+                        maxKeyholeAxisAzVelocity = maxOf(maxKeyholeAxisAzVelocity, keyholeAxisAzimuthVelocity)
+                        maxKeyholeAxisElVelocity = maxOf(maxKeyholeAxisElVelocity, keyholeAxisElevationVelocity)
+                        maxKeyholeFinalAzVelocity = maxOf(maxKeyholeFinalAzVelocity, keyholeFinalAzimuthVelocity)
+                        maxKeyholeFinalElVelocity = maxOf(maxKeyholeFinalElVelocity, keyholeFinalElevationVelocity)
                     }
                     
                     val azimuthTransformationError = axisTransformedAz - originalAz
@@ -3088,12 +3256,42 @@ class EphemerisService(
                     
                     val timeString = originalTime?.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")) ?: ""
                     
+                    // ✅ Train=0 데이터 가져오기
+                    val train0Az = train0Point?.get("Azimuth") as? Double ?: 0.0
+                    val train0El = train0Point?.get("Elevation") as? Double ?: 0.0
+                    
                     // ✅ 사용자 요구사항에 맞는 CSV 데이터 출력
                     writer.write("$i,$timeString,")
                     writer.write("${String.format("%.6f", originalAz)},${String.format("%.6f", originalEl)},${String.format("%.6f", originalAzimuthVelocity)},${String.format("%.6f", originalElevationVelocity)},")
                     writer.write("${String.format("%.6f", originalRange)},${String.format("%.6f", originalAltitude)},")
                     writer.write("${String.format("%.6f", axisTransformedAz)},${String.format("%.6f", axisTransformedEl)},${String.format("%.6f", axisTransformedAzimuthVelocity)},${String.format("%.6f", axisTransformedElevationVelocity)},")
-                    writer.write("${String.format("%.6f", finalTransformedAz)},${String.format("%.6f", finalTransformedEl)},${String.format("%.6f", finalTransformedAzimuthVelocity)},${String.format("%.6f", finalTransformedElevationVelocity)},")
+                    
+                    // Train=0 데이터 출력
+                    writer.write("${String.format("%.6f", train0Az)},${String.format("%.6f", train0El)},${String.format("%.6f", train0AzimuthVelocity)},${String.format("%.6f", train0ElevationVelocity)},")
+                    
+                    // Keyhole 발생 시만 Keyhole 데이터 출력
+                    if (isKeyhole) {
+                        // ✅ Keyhole Axis 데이터 (각도 제한 ❌)
+                        if (i < keyholeAxisDtl.size) {
+                            val keyholeAxisPoint = keyholeAxisDtl[i]
+                            val keyholeAxisAz = keyholeAxisPoint["Azimuth"] as? Double ?: 0.0
+                            val keyholeAxisEl = keyholeAxisPoint["Elevation"] as? Double ?: 0.0
+                            writer.write("${String.format("%.6f", keyholeAxisAz)},${String.format("%.6f", keyholeAxisEl)},${String.format("%.6f", keyholeAxisAzimuthVelocity)},${String.format("%.6f", keyholeAxisElevationVelocity)},")
+                        } else {
+                            writer.write("0.000000,0.000000,0.000000,0.000000,")
+                        }
+                        
+                        // ✅ Keyhole Final 데이터 (각도 제한 ✅)
+                        if (i < keyholeFinalDtl.size) {
+                            val keyholeFinalPoint = keyholeFinalDtl[i]
+                            val keyholeFinalAz = keyholeFinalPoint["Azimuth"] as? Double ?: 0.0
+                            val keyholeFinalEl = keyholeFinalPoint["Elevation"] as? Double ?: 0.0
+                            writer.write("${String.format("%.6f", keyholeFinalAz)},${String.format("%.6f", keyholeFinalEl)},${String.format("%.6f", keyholeFinalAzimuthVelocity)},${String.format("%.6f", keyholeFinalElevationVelocity)},")
+                        } else {
+                            writer.write("0.000000,0.000000,0.000000,0.000000,")
+                        }
+                    }
+                    
                     writer.write("${String.format("%.6f", azimuthTransformationError)},${String.format("%.6f", elevationTransformationError)}\n")
                     
                     // ✅ 다음 반복을 위한 값 저장
@@ -3113,8 +3311,14 @@ class EphemerisService(
             logger.info("✅ CSV 합계법 최대값:")
             logger.info("  - Original_Azimuth_Velocity: ${String.format("%.6f", maxOriginalAzVelocity)}°/s")
             logger.info("  - Original_Elevation_Velocity: ${String.format("%.6f", maxOriginalElVelocity)}°/s")
-            logger.info("  - FinalTransformed_Azimuth_Velocity: ${String.format("%.6f", maxFinalTransformedAzVelocity)}°/s")
-            logger.info("  - FinalTransformed_Elevation_Velocity: ${String.format("%.6f", maxFinalTransformedElVelocity)}°/s")
+            logger.info("  - Train0_Azimuth_Velocity: ${String.format("%.6f", maxTrain0AzVelocity)}°/s")
+            logger.info("  - Train0_Elevation_Velocity: ${String.format("%.6f", maxTrain0ElVelocity)}°/s")
+            if (isKeyhole) {
+                logger.info("  - KeyholeAxis_train${trainAngleFormatted}_Azimuth_Velocity: ${String.format("%.6f", maxKeyholeAxisAzVelocity)}°/s")
+                logger.info("  - KeyholeAxis_train${trainAngleFormatted}_Elevation_Velocity: ${String.format("%.6f", maxKeyholeAxisElVelocity)}°/s")
+                logger.info("  - KeyholeFinal_train${trainAngleFormatted}_Azimuth_Velocity: ${String.format("%.6f", maxKeyholeFinalAzVelocity)}°/s")
+                logger.info("  - KeyholeFinal_train${trainAngleFormatted}_Elevation_Velocity: ${String.format("%.6f", maxKeyholeFinalElVelocity)}°/s")
+            }
             return mapOf<String, Any?>(
                 "success" to true,
                 "filename" to filename,

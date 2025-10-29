@@ -58,12 +58,13 @@ class SatelliteTrackingProcessor(
         )
         logger.info("✅ Original 데이터 구조화 완료: ${originalMst.size}개 마스터, ${originalDtl.size}개 상세")
 
-        // 2️⃣ 3축 변환
+        // 2️⃣ 3축 변환 (Train=0 강제)
         val (axisTransformedMst, axisTransformedDtl) = applyAxisTransformation(
             originalMst,
-            originalDtl
+            originalDtl,
+            forcedTrainAngle = 0.0  // ✅ Train=0 강제 (DataType: axis_transformed)
         )
-        logger.info("✅ 3축 변환 완료: ${axisTransformedMst.size}개 마스터, ${axisTransformedDtl.size}개 상세")
+        logger.info("✅ 3축 변환 완료 (Train=0 적용): ${axisTransformedMst.size}개 마스터, ${axisTransformedDtl.size}개 상세")
 
         // 3️⃣ ±270° 변환
         val (finalTransformedMst, finalTransformedDtl) = applyAngleLimitTransformation(
@@ -72,7 +73,99 @@ class SatelliteTrackingProcessor(
         )
         logger.info("✅ 각도제한 변환 완료: ${finalTransformedMst.size}개 마스터, ${finalTransformedDtl.size}개 상세")
 
-        logger.info("🎉 변환 및 분석 완료")
+        // 4️⃣ Keyhole 판단 및 Train≠0 재계산
+        logger.info("📊 Keyhole 판단 및 Train≠0 데이터 생성 시작...")
+
+        val keyholeAxisTransformedMst = mutableListOf<Map<String, Any?>>()
+        val keyholeAxisTransformedDtl = mutableListOf<Map<String, Any?>>()
+        val keyholeFinalTransformedMst = mutableListOf<Map<String, Any?>>()
+        val keyholeFinalTransformedDtl = mutableListOf<Map<String, Any?>>()
+
+        finalTransformedMst.forEachIndexed { index, mstData ->
+            val mstId = mstData["No"] as UInt
+
+            // Train=0 기준 MaxAzRate로 Keyhole 판단
+            val train0MaxAzRate = mstData["MaxAzRate"] as? Double ?: 0.0
+            val threshold = settingsService.keyholeAzimuthVelocityThreshold
+            val isKeyhole = train0MaxAzRate >= threshold
+
+            logger.info("패스 #$mstId: Train=0 MaxAzRate = ${String.format("%.6f", train0MaxAzRate)}°/s")
+            logger.info("   Keyhole 임계값: $threshold°/s")
+            logger.info("   판단 결과: ${if (isKeyhole) "✅ Keyhole 발생" else "✅ Keyhole 미발생"}")
+
+            // Keyhole 발생 시 Train≠0 재계산
+            if (isKeyhole) {
+                val recommendedTrainAngle = originalMst[index]["RecommendedTrainAngle"] as? Double ?: 0.0
+                val maxAzRateAzimuth = mstData["MaxAzRateAzimuth"] as? Double ?: 0.0
+
+                logger.info("   계산된 Train 각도: ${String.format("%.6f", recommendedTrainAngle)}°")
+                logger.info("🔄 Train=${String.format("%.6f", recommendedTrainAngle)}°로 재변환 시작...")
+
+                // 해당 패스의 Original DTL 추출
+                val passOriginalDtl = originalDtl.filter { it["MstId"] == mstId }
+                val mstIdValue = mstId
+
+                // Original MST를 Train≠0으로 업데이트
+                val keyholeOriginalMst = listOf(originalMst[index].toMutableMap().apply {
+                    put("RecommendedTrainAngle", recommendedTrainAngle)
+                    put("IsKeyhole", true)
+                })
+
+                // 정규 절차로 재변환
+                logger.info("   📊 Original DTL 필터링: ${passOriginalDtl.size}개")
+                
+                val (keyholeAxisMst, keyholeAxisDtl) = applyAxisTransformation(
+                    keyholeOriginalMst,
+                    passOriginalDtl
+                )
+                logger.info("   📊 Keyhole Axis 변환 완료: MST=${keyholeAxisMst.size}개, DTL=${keyholeAxisDtl.size}개")
+
+                // ✅ Keyhole Axis 데이터 저장 (각도 제한 ❌)
+                keyholeAxisDtl.forEach { dtl ->
+                    keyholeAxisTransformedDtl.add(dtl.toMutableMap().apply {
+                        put("DataType", "keyhole_axis_transformed")
+                    })
+                }
+
+                keyholeAxisMst.forEach { mst ->
+                    keyholeAxisTransformedMst.add(mst.toMutableMap().apply {
+                        put("DataType", "keyhole_axis_transformed")
+                    })
+                }
+
+                val (keyholeFinalMst, keyholeFinalDtl) = applyAngleLimitTransformation(
+                    keyholeAxisMst,
+                    keyholeAxisDtl
+                )
+                logger.info("   📊 Keyhole Final 변환 완료: MST=${keyholeFinalMst.size}개, DTL=${keyholeFinalDtl.size}개")
+
+                // ✅ Keyhole Final 데이터 저장 (각도 제한 ✅)
+                keyholeFinalDtl.forEach { dtl ->
+                    keyholeFinalTransformedDtl.add(dtl.toMutableMap().apply {
+                        put("DataType", "keyhole_final_transformed")
+                    })
+                }
+
+                keyholeFinalMst.forEach { mst ->
+                    keyholeFinalTransformedMst.add(mst.toMutableMap().apply {
+                        put("DataType", "keyhole_final_transformed")
+                    })
+                }
+
+                logger.info("✅ Keyhole 데이터 저장 완료: Axis=${keyholeAxisDtl.size}개, Final=${keyholeFinalDtl.size}개")
+            }
+
+            logger.info("")
+        }
+
+        logger.info("=".repeat(60))
+        logger.info("🎉 전체 변환 완료")
+        logger.info("   Original: ${originalDtl.size}개")
+        logger.info("   Axis Transformed (Train=0): ${axisTransformedDtl.size}개")
+        logger.info("   Final Transformed (Train=0): ${finalTransformedDtl.size}개")
+        logger.info("   Keyhole Axis (Train≠0): ${keyholeAxisTransformedDtl.size}개")
+        logger.info("   Keyhole Final (Train≠0): ${keyholeFinalTransformedDtl.size}개")
+        logger.info("=".repeat(60))
 
         return ProcessedTrackingData(
             originalMst = originalMst,
@@ -80,7 +173,11 @@ class SatelliteTrackingProcessor(
             axisTransformedMst = axisTransformedMst,
             axisTransformedDtl = axisTransformedDtl,
             finalTransformedMst = finalTransformedMst,
-            finalTransformedDtl = finalTransformedDtl
+            finalTransformedDtl = finalTransformedDtl,
+            keyholeAxisTransformedMst = keyholeAxisTransformedMst,           // ✅ 추가
+            keyholeAxisTransformedDtl = keyholeAxisTransformedDtl,           // ✅ 추가
+            keyholeFinalTransformedMst = keyholeFinalTransformedMst,
+            keyholeFinalTransformedDtl = keyholeFinalTransformedDtl
         )
     }
 
@@ -235,7 +332,8 @@ class SatelliteTrackingProcessor(
      */
     private fun applyAxisTransformation(
         originalMst: List<Map<String, Any?>>,
-        originalDtl: List<Map<String, Any?>>
+        originalDtl: List<Map<String, Any?>>,
+        forcedTrainAngle: Double? = null  // ✅ 추가: null이면 MST에서 읽고, 값이 있으면 강제 사용
     ): Pair<List<Map<String, Any?>>, List<Map<String, Any?>>> {
 
         val axisTransformedMst = mutableListOf<Map<String, Any?>>()
@@ -243,9 +341,9 @@ class SatelliteTrackingProcessor(
 
         originalMst.forEach { mstData ->
             val mstId = mstData["No"] as UInt
-            val recommendedTrainAngle = mstData["RecommendedTrainAngle"] as? Double ?: 0.0
+            val recommendedTrainAngle = forcedTrainAngle ?: (mstData["RecommendedTrainAngle"] as? Double ?: 0.0)
 
-            logger.debug("패스 #$mstId 3축 변환 중 (Train: ${recommendedTrainAngle}°)")
+            logger.debug("패스 #$mstId 3축 변환 중 (Train: ${recommendedTrainAngle}°${if (forcedTrainAngle != null) " [강제 적용]" else " [MST에서 읽음]"})")
 
             // 해당 패스의 상세 데이터 조회 (MstId로 필터링!)
             val passDtl = originalDtl.filter { it["MstId"] == mstId }
@@ -496,68 +594,84 @@ class SatelliteTrackingProcessor(
         val endAzimuth = lastPoint["Azimuth"] as? Double ?: 0.0
         val endElevation = lastPoint["Elevation"] as? Double ?: 0.0
 
-        // 각속도 및 각가속도 계산
-        var maxAzRate = 0.0//최대 Elevation 각도 시점의 Azimuth 각도
-        var maxAzRateAzimuth = 0.0  // 추가: 최대 각속도 시점의 Azimuth
-        var maxAzRateTime: ZonedDateTime? = null  // 추가: 시간 (디버깅용)
-        var maxElRate = 0.0
+        // ✅ 각속도 계산 - 10개 구간(1초) 누적 방식
+        var maxAzRate = 0.0  // 1초간 최대 누적 Azimuth 변화량
+        var maxAzRateAzimuth = 0.0  // 최대 각속도 시점의 Azimuth
+        var maxAzRateTime: ZonedDateTime? = null  // 최대 각속도 시점의 시간
+        var maxElRate = 0.0  // 1초간 최대 누적 Elevation 변화량
         var maxAzAccel = 0.0
         var maxElAccel = 0.0
 
-        var prevAz: Double? = null
-        var prevEl: Double? = null
-        var prevTime: ZonedDateTime? = null
         var prevAzRate: Double? = null
         var prevElRate: Double? = null
 
-        dtlData.forEach { point ->
+        // 10개 구간 윈도우로 각속도 계산
+        dtlData.forEachIndexed { i, point ->
             val az = point["Azimuth"] as? Double
             val el = point["Elevation"] as? Double
             val time = point["Time"] as? ZonedDateTime
 
-            if (az != null && el != null && time != null && prevAz != null && prevEl != null && prevTime != null) {
-                val timeDiff = Duration.between(prevTime, time).toMillis() / 1000.0
+            if (i >= 9 && az != null && el != null && time != null) {
+                // 10개 구간(i-9부터 i까지)의 변화량 누적
+                var azSum = 0.0
+                var elSum = 0.0
+                var totalTimeDiff = 0.0
 
-                if (timeDiff > 0.001) {  // 최소 시간 간격 체크
-                    // 방위각 변화 (360도 경계 처리)
-                    // ✅ 스마트 캐스트 에러 해결: 명시적 언래핑 (!!)
-                    var azDiff = az - prevAz!!
-                    if (azDiff > 180) azDiff -= 360
-                    if (azDiff < -180) azDiff += 360
+                for (j in (i - 9)..i) {
+                    if (j > 0) {
+                        val prevPoint = dtlData[j - 1]
+                        val currentPoint = dtlData[j]
+                        
+                        val prevAz = prevPoint["Azimuth"] as? Double
+                        val currentAz = currentPoint["Azimuth"] as? Double
+                        val prevEl = prevPoint["Elevation"] as? Double
+                        val currentEl = currentPoint["Elevation"] as? Double
+                        val prevTime = prevPoint["Time"] as? ZonedDateTime
+                        val currentTime = currentPoint["Time"] as? ZonedDateTime
 
-                    val elDiff = el - prevEl!!
+                        if (prevAz != null && currentAz != null && prevEl != null && 
+                            currentEl != null && prevTime != null && currentTime != null) {
+                            
+                            // Azimuth 변화량 (360도 경계 처리)
+                            var azDiff = currentAz - prevAz
+                            if (azDiff > 180) azDiff -= 360
+                            if (azDiff < -180) azDiff += 360
+                            azSum += abs(azDiff)
 
-                    // 각속도
-                    val azRate = azDiff / timeDiff
-                    val elRate = elDiff / timeDiff
-
-                    // ✅ 최대 각속도 갱신 시 Azimuth 저장
-                    if (abs(azRate) > maxAzRate) {
-                        maxAzRate = abs(azRate)
-                        maxAzRateAzimuth = az  // 현재 시점의 Azimuth 저장
-                        maxAzRateTime = time
+                            // Elevation 변화량
+                            elSum += abs(currentEl - prevEl)
+                            
+                            // 시간 간격 누적
+                            totalTimeDiff += Duration.between(prevTime, currentTime).toMillis() / 1000.0
+                        }
                     }
-                    
-                    maxElRate = maxOf(maxElRate, abs(elRate))
-
-                    // 각가속도
-                    if (prevAzRate != null && prevElRate != null) {
-                        // ✅ 스마트 캐스트 에러 해결: 명시적 언래핑 (!!)
-                        val azAccel = (azRate - prevAzRate!!) / timeDiff
-                        val elAccel = (elRate - prevElRate!!) / timeDiff
-
-                        maxAzAccel = maxOf(maxAzAccel, abs(azAccel))
-                        maxElAccel = maxOf(maxElAccel, abs(elAccel))
-                    }
-
-                    prevAzRate = azRate
-                    prevElRate = elRate
                 }
-            }
 
-            prevAz = az
-            prevEl = el
-            prevTime = time
+                // 1초간 누적 각속도 (총 변화량 = deg/s로 해석)
+                val currentAzRate = azSum  // 1초간 총 변화량
+                val currentElRate = elSum
+
+                // 최대값 갱신
+                if (currentAzRate > maxAzRate) {
+                    maxAzRate = currentAzRate
+                    maxAzRateAzimuth = az  // 현재 시점의 Azimuth
+                    maxAzRateTime = time
+                }
+                
+                maxElRate = maxOf(maxElRate, currentElRate)
+
+                // 각가속도 (필요시 계산, 현재는 사용 안 함)
+                if (prevAzRate != null && prevElRate != null && totalTimeDiff > 0.001) {
+                    val azAccel = (currentAzRate - prevAzRate!!) / totalTimeDiff
+                    val elAccel = (currentElRate - prevElRate!!) / totalTimeDiff
+
+                    maxAzAccel = maxOf(maxAzAccel, abs(azAccel))
+                    maxElAccel = maxOf(maxElAccel, abs(elAccel))
+                }
+
+                prevAzRate = currentAzRate
+                prevElRate = currentElRate
+            }
         }
 
         return mapOf(
@@ -714,6 +828,9 @@ class SatelliteTrackingProcessor(
 
     /**
      * Train 적용 시뮬레이션 (분석용, 실제 데이터 변경 없음)
+     *
+     * ⚠️ 주의: 이 함수는 analyzeTrainOptimization()에서 분석 및 비교용으로만 사용됩니다.
+     * 실제 데이터 변환은 applyAxisTransformation + applyAngleLimitTransformation을 사용하세요.
      * 
      * @param originalDtl 원본 상세 데이터
      * @param trainAngle Train 각도

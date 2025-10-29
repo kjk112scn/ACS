@@ -1,0 +1,422 @@
+# ACS API 개발 가이드
+
+---
+**문서 버전**: 1.1.0  
+**최종 업데이트**: 2024-12  
+**작성자**: GTL Systems
+---
+
+> **목적**: ACS 프로젝트 전체 개발 흐름 및 핵심 기능 개요
+> 
+> **세부 문서**: 각 섹션의 상세 내용은 `references/` 폴더 참조
+
+---
+
+## 📋 목차
+1. [프로젝트 개요](#1-프로젝트-개요)
+2. [시작하기](#2-시작하기)
+3. [아키텍처](#3-아키텍처)
+4. [핵심 기능](#4-핵심-기능)
+5. [API 가이드](#5-api-가이드)
+6. [배포](#6-배포)
+7. [변경 이력](#7-변경-이력)
+8. [문서 구조](#8-문서-구조)
+
+---
+
+## 1. 프로젝트 개요
+
+### 목적
+위성 및 태양 추적을 위한 안테나 제어 시스템(ACS) 백엔드
+
+### 기술 스택
+- **언어**: Kotlin 1.9
+- **프레임워크**: Spring Boot 3.2 + WebFlux
+- **데이터베이스**: In-Memory Storage (PostgreSQL 연동 준비)
+- **외부 라이브러리**: Orekit (위성 궤도 계산)
+
+### 프로젝트 구조
+```
+src/main/kotlin/com/gtlsystems/acs_api/
+├── controller/      # API 엔드포인트
+├── service/         # 비즈니스 로직
+├── algorithm/       # 계산 알고리즘
+├── config/          # 시스템 설정
+└── model/           # 데이터 모델
+```
+
+📖 **상세**: [references/architecture/System_Architecture.md](references/architecture/System_Architecture.md)
+
+---
+
+## 2. 시작하기
+
+### 환경 설정
+```bash
+# 필수 요구사항
+- JDK 17+
+- Gradle 8.0+
+- Orekit 데이터 (src/main/resources/orekit-data-main/)
+
+# 빌드 및 실행
+./gradlew bootRun
+```
+
+### 기본 설정
+- **포트**: 8080
+- **WebSocket**: `ws://localhost:8080/ws`
+- **Swagger UI**: `http://localhost:8080/swagger-ui.html`
+
+📖 **상세**: [references/deployment/Deployment_Guide.md](references/deployment/Deployment_Guide.md)
+
+---
+
+## 3. 아키텍처
+
+### 계층 구조
+```
+Controller (HTTP/WebSocket)
+    ↓
+Service (비즈니스 로직)
+    ↓
+Algorithm (순수 계산)
+    ↓
+DataStore (In-Memory)
+```
+
+### 데이터 흐름
+```
+클라이언트 요청
+    ↓
+Controller (요청 검증)
+    ↓
+Service (비즈니스 로직)
+    ↓
+Algorithm (계산 수행)
+    ↓
+DataStore (결과 저장)
+    ↓
+응답 반환
+```
+
+📖 **상세**: 
+- [references/architecture/System_Architecture.md](references/architecture/System_Architecture.md)
+- [references/architecture/Data_Flow.md](references/architecture/Data_Flow.md)
+
+---
+
+## 4. 핵심 기능
+
+### 4.1 위성 추적 (Ephemeris Tracking)
+
+**목적**: TLE(Two-Line Element) 기반 위성 궤도 추적
+
+**핵심 기능**:
+- TLE 파싱 및 궤도 계산
+- 2축(Az/El) → 3축(Train/Az/El) 좌표 변환
+- 각도 제한 (±270°) 적용
+- Pass Schedule 생성 및 관리
+- CSV 내보내기
+
+**주요 API**:
+- `POST /api/ephemeris/tracking/calculate` - 궤도 계산
+- `GET /api/ephemeris/tracking/mst/merged` - 전체 데이터 조회
+- `GET /api/ephemeris/tracking/csv/{mstId}` - CSV 내보내기
+
+**데이터 타입**:
+- `original` - 2축 원본 데이터
+- `axis_transformed` - 3축 변환 (Train=0, 각도 제한 ❌)
+- `final_transformed` - 3축 최종 (Train=0, 각도 제한 ✅)
+
+📖 **상세**: [references/api/Ephemeris_API.md](references/api/Ephemeris_API.md)
+
+---
+
+### 4.2 Train 알고리즘 ⭐ (Keyhole 회피)
+
+**목적**: Keyhole 영역(±270° 근처) 회피를 위한 Train 각도 최적화
+
+**도입 배경**:
+- **Gimbal Lock 방지**: Azimuth ±270° 근처에서 발생하는 특이점 회피
+- **포지셔너 제한**: 물리적 회전 한계 준수
+- **추적 안정성**: 급격한 각속도 변화 최소화
+
+**핵심 개념**:
+
+#### 6가지 DataType
+| DataType | Train 각도 | 각도 제한 | 용도 |
+|----------|-----------|----------|------|
+| `original` | - | - | 2축 원본 |
+| `axis_transformed` | 0° | ❌ | 3축 변환 중간 |
+| `final_transformed` | 0° | ✅ | 3축 최종 (Train=0) |
+| `keyhole_axis_transformed` | ≠0° | ❌ | Keyhole 회피 중간 |
+| `keyhole_final_transformed` | ≠0° | ✅ | Keyhole 회피 최종 |
+
+#### Keyhole 판단 로직
+```
+1. final_transformed (Train=0) 계산
+2. MaxAzRate 확인
+3. MaxAzRate >= 임계값 (기본 3.0°/s) → Keyhole 발생
+4. Train 각도 계산 및 재변환
+```
+
+#### Train 각도 계산
+```
+Train각도 = -(최대 각속도 시점의 Azimuth)
+목표: Azimuth를 0°로 회전하여 ±270° 영역 회피
+```
+
+**데이터 흐름**:
+```
+2축 원본 (original)
+    ↓
+3축 변환 (Train=0)
+    ↓ (axis_transformed)
+각도 제한 적용
+    ↓ (final_transformed)
+Keyhole 판단 (MaxAzRate >= 임계값?)
+    ↓ YES
+Train 각도 계산
+    ↓
+3축 재변환 (Train≠0)
+    ↓ (keyhole_axis_transformed)
+각도 제한 적용
+    ↓ (keyhole_final_transformed)
+최종 출력
+```
+
+**완료 상태**: ✅ 구현 완료 (2024-12)
+
+📖 **상세**: 
+- [completed/Train_Algorithm_Completed.md](completed/Train_Algorithm_Completed.md)
+- [references/algorithms/Train_Algorithm_Design.md](references/algorithms/Train_Algorithm_Design.md)
+
+---
+
+### 4.3 설정 관리 (Settings Management)
+
+**목적**: 동적 설정 변경 및 관리 (재시작 불필요)
+
+**핵심 기능**:
+- 타입별 설정 관리 (DOUBLE, LONG, STRING, BOOLEAN)
+- 실시간 설정 변경
+- 설정 변경 이벤트 발행
+- 설정 유효성 검증
+
+**주요 설정**:
+- `keyholeAzimuthVelocityThreshold` (3.0°/s) - Keyhole 판단 임계값
+- `tiltAngle` (0.0°) - 안테나 Tilt 각도
+- `sourceMinElevationAngle` (5.0°) - 최소 고도각
+
+**주요 API**:
+- `GET /api/settings` - 전체 설정 조회
+- `PUT /api/settings/{key}` - 설정 변경
+
+📖 **상세**: [references/api/Settings_API.md](references/api/Settings_API.md)
+
+---
+
+### 4.4 태양 추적 (Sun Tracking)
+
+**목적**: 태양 위치 실시간 추적 및 계산
+
+**계산 방법**:
+- **Orekit** (기본) - 고정밀 계산
+- **SPA** (Solar Position Algorithm) - NREL 표준
+- **Grena3** - 고속 근사 계산
+
+**주요 API**:
+- `GET /api/sun/position` - 현재 태양 위치
+- `GET /api/sun/track` - 태양 추적 데이터
+
+📖 **상세**: [references/algorithms/Sun_Tracking.md](references/algorithms/Sun_Tracking.md)
+
+---
+
+### 4.5 Pass Schedule 관리
+
+**목적**: 위성 가시 구간(Pass) 스케줄링
+
+**핵심 기능**:
+- Pass 자동 감지
+- 시작/종료 시간 계산
+- 최대 고도각 추출
+- Pass 데이터 저장 및 조회
+
+**주요 API**:
+- `GET /api/ephemeris/tracking/passes` - Pass 목록
+- `GET /api/ephemeris/tracking/pass/{passId}` - Pass 상세
+
+📖 **상세**: [references/algorithms/Pass_Schedule.md](references/algorithms/Pass_Schedule.md)
+
+---
+
+## 5. API 가이드
+
+### REST API
+- **Base URL**: `http://localhost:8080/api`
+- **인증**: 없음 (내부 시스템)
+- **응답 형식**: JSON
+- **에러 처리**: 표준 HTTP 상태 코드
+
+### WebSocket
+- **URL**: `ws://localhost:8080/ws`
+- **프로토콜**: STOMP over WebSocket
+- **업데이트 주기**: 30ms (설정 가능)
+- **토픽**: `/topic/tracking`, `/topic/status`
+
+### API 문서
+- **Swagger UI**: `http://localhost:8080/swagger-ui.html`
+- **다국어 지원**: 한국어/영어
+- **실시간 테스트**: Swagger UI에서 직접 테스트 가능
+
+📖 **상세**: [references/api/API_Reference.md](references/api/API_Reference.md)
+
+---
+
+## 6. 배포
+
+### 로컬 개발
+```bash
+# 개발 서버 실행
+./gradlew bootRun
+
+# 특정 포트로 실행
+./gradlew bootRun --args='--server.port=9090'
+```
+
+### 프로덕션 빌드
+```bash
+# JAR 빌드
+./gradlew clean bootJar
+
+# 빌드 결과
+build/libs/acs_api-0.0.1-SNAPSHOT.jar
+```
+
+### 실행
+```bash
+# 기본 실행
+java -jar build/libs/acs_api-0.0.1-SNAPSHOT.jar
+
+# 프로파일 지정
+java -jar build/libs/acs_api-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod
+
+# 메모리 설정
+java -Xms512m -Xmx2048m -jar build/libs/acs_api-0.0.1-SNAPSHOT.jar
+```
+
+### Docker (준비 중)
+```bash
+# 이미지 빌드
+docker build -t acs-api:1.1.0 .
+
+# 컨테이너 실행
+docker run -d -p 8080:8080 --name acs-api acs-api:1.1.0
+```
+
+📖 **상세**: [references/deployment/Deployment_Guide.md](references/deployment/Deployment_Guide.md)
+
+---
+
+## 7. 변경 이력
+
+| 날짜 | 버전 | 주요 변경 | 참조 문서 |
+|------|------|----------|----------|
+| 2024-12 | 1.1.0 | Train 알고리즘 추가 (Keyhole 회피) | [Train_Algorithm_Completed.md](completed/Train_Algorithm_Completed.md) |
+| 2024-12 | 1.0.1 | 설정 관리 개선 | [Settings_Management.md](user-guide/settings-management.md) |
+| 2024-11 | 1.0.0 | 초기 릴리즈 | - |
+
+### v1.1.0 (2024-12) - Train 알고리즘
+- ✨ Keyhole 회피를 위한 Train 각도 최적화
+- ✨ 6가지 DataType 지원 (original, axis, final, keyhole_axis, keyhole_final)
+- ✨ CSV 내보내기에 Keyhole 데이터 포함
+- 🔧 Keyhole 판단 임계값 설정 (keyholeAzimuthVelocityThreshold)
+- 📝 완료 문서 작성
+
+### v1.0.1 (2024-12) - 설정 관리
+- 🔧 동적 설정 변경 기능 강화
+- 📝 설정 관리 가이드 작성
+
+### v1.0.0 (2024-11) - 초기 릴리즈
+- 🎉 ACS API 초기 버전
+- ✨ 위성 추적 기본 기능
+- ✨ 태양 추적 기능
+- ✨ WebSocket 실시간 업데이트
+
+📖 **상세**: [CHANGELOG.md](changelog/CHANGELOG.md)
+
+---
+
+## 8. 문서 구조
+
+```
+docs/
+├── Development_Guide.md           ← 📍 현재 문서 (전체 개요)
+├── README.md                      ← 문서 시스템 설명
+│
+├── plans/                         ← 📝 계획 단계
+│   ├── README.md
+│   └── {기능}_Plan.md
+│
+├── completed/                     ← ✅ 완료 단계
+│   ├── README.md
+│   └── Train_Algorithm_Completed.md
+│
+└── references/                    ← 📖 세부 참조
+    ├── README.md
+    ├── architecture/              ← 아키텍처
+    ├── algorithms/                ← 알고리즘
+    ├── api/                       ← API 참조
+    ├── deployment/                ← 배포 가이드
+    └── user-guide/                ← 사용자 가이드
+```
+
+### 문서 탐색 가이드
+
+#### 새로운 기능 시작
+1. `plans/` 확인 - 진행 중인 계획
+2. 없으면 새 계획 작성
+
+#### 완료된 기능 확인
+1. `completed/` 확인 - 구현 완료 문서
+2. 현재 문서(Development_Guide.md) - 전체 개요
+
+#### 상세 기술 문서
+1. `references/` 확인 - 카테고리별 상세
+
+📖 **상세**: [docs/README.md](README.md)
+
+---
+
+## 🔗 주요 링크
+
+### 외부 문서
+- [Orekit 공식 문서](https://www.orekit.org/site-orekit-12.1/index.html)
+- [Spring WebFlux](https://docs.spring.io/spring-framework/reference/web/webflux.html)
+- [Kotlin 공식 문서](https://kotlinlang.org/docs/home.html)
+
+### 프로젝트 자료
+- Frontend Repository: `ACS/` (Vue + Quasar)
+- API Swagger: `http://localhost:8080/swagger-ui.html`
+
+---
+
+## 📞 지원
+
+### 문의
+- **프로젝트**: GTL ACS
+- **관리자**: GTL Systems
+
+### 기여
+1. 새로운 기능 제안 → `plans/` 문서 작성
+2. 코드 구현 및 테스트
+3. `completed/` 문서 작성
+4. 현재 문서(Development_Guide.md) 업데이트
+
+---
+
+**문서 버전**: 1.1.0  
+**최종 업데이트**: 2024-12  
+**유지 관리자**: GTL Systems
+

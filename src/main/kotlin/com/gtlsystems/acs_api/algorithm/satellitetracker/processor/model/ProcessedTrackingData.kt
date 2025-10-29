@@ -3,14 +3,18 @@ package com.gtlsystems.acs_api.algorithm.satellitetracker.processor.model
 /**
  * 처리된 위성 추적 데이터
  * 
- * ✅ 계획 Phase 2.2: 모든 DataType의 Mst/Dtl 데이터를 담는 컨테이너
+ * ✅ 6가지 DataType의 Mst/Dtl 데이터를 담는 컨테이너
  * 
  * @property originalMst 원본 2축 데이터 (Mst)
  * @property originalDtl 원본 2축 데이터 (Dtl)
- * @property axisTransformedMst 3축 변환 데이터 (Mst)
- * @property axisTransformedDtl 3축 변환 데이터 (Dtl)
- * @property finalTransformedMst 최종 각도 제한 변환 데이터 (Mst)
- * @property finalTransformedDtl 최종 각도 제한 변환 데이터 (Dtl)
+ * @property axisTransformedMst 3축 변환 데이터 (Train=0, 각도 제한 ❌) (Mst)
+ * @property axisTransformedDtl 3축 변환 데이터 (Train=0, 각도 제한 ❌) (Dtl)
+ * @property finalTransformedMst 최종 각도 제한 변환 데이터 (Train=0, 각도 제한 ✅) (Mst)
+ * @property finalTransformedDtl 최종 각도 제한 변환 데이터 (Train=0, 각도 제한 ✅) (Dtl)
+ * @property keyholeAxisTransformedMst Keyhole 3축 변환 데이터 (Train≠0, 각도 제한 ❌, Keyhole 발생 시만) (Mst)
+ * @property keyholeAxisTransformedDtl Keyhole 3축 변환 데이터 (Train≠0, 각도 제한 ❌, Keyhole 발생 시만) (Dtl)
+ * @property keyholeFinalTransformedMst Keyhole 최종 변환 데이터 (Train≠0, 각도 제한 ✅, Keyhole 발생 시만) (Mst)
+ * @property keyholeFinalTransformedDtl Keyhole 최종 변환 데이터 (Train≠0, 각도 제한 ✅, Keyhole 발생 시만) (Dtl)
  */
 data class ProcessedTrackingData(
     val originalMst: List<Map<String, Any?>>,
@@ -18,7 +22,11 @@ data class ProcessedTrackingData(
     val axisTransformedMst: List<Map<String, Any?>>,
     val axisTransformedDtl: List<Map<String, Any?>>,
     val finalTransformedMst: List<Map<String, Any?>>,
-    val finalTransformedDtl: List<Map<String, Any?>>
+    val finalTransformedDtl: List<Map<String, Any?>>,
+    val keyholeAxisTransformedMst: List<Map<String, Any?>>,     // ✅ 추가: Train≠0, 각도 제한 ❌
+    val keyholeAxisTransformedDtl: List<Map<String, Any?>>,     // ✅ 추가: Train≠0, 각도 제한 ❌
+    val keyholeFinalTransformedMst: List<Map<String, Any?>>,
+    val keyholeFinalTransformedDtl: List<Map<String, Any?>>
 )
 
 /**
