@@ -13,27 +13,36 @@ export interface ScheduleItem {
   createdAt: string
   updatedAt: string
 
+  // 2축 (Original) 속도
+  OriginalMaxAzRate?: number
+  OriginalMaxElRate?: number
+  OriginalMaxElevation?: number
+
+  // Train=0 (FinalTransformed) 속도
+  FinalTransformedMaxAzRate: number
+  FinalTransformedMaxElRate: number
+
+  // TrainOK (KeyholeFinalTransformed) 속도
+  KeyholeFinalTransformedMaxAzRate: number
+  KeyholeFinalTransformedMaxElRate: number
+
   /**
    * KEYHOLE 위성 여부
    * MaxAzRate가 임계값 이상인 경우 true
    */
-  IsKeyhole: boolean
+  isKeyhole: boolean
 
   /**
    * KEYHOLE 위성일 경우 권장 Train 각도 (도)
    * 최대 Elevation 지점의 Azimuth 각도
    */
-  RecommendedTrainAngle: number
+  recommendedTrainAngle: number
 
-  /**
-   * 최대 Azimuth 각속도 (도/초)
-   */
-  MaxAzRate: number
-
-  /**
-   * 최대 Elevation 각속도 (도/초)
-   */
-  MaxElRate: number
+  // Legacy fields (deprecated - use new fields above)
+  IsKeyhole?: boolean
+  RecommendedTrainAngle?: number
+  MaxAzRate?: number
+  MaxElRate?: number
 }
 
 export interface ScheduleDetailItem {

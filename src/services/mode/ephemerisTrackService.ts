@@ -885,19 +885,25 @@ class EphemerisTrackService {
           Duration: item.Duration as string,
           MaxElevation: item.MaxElevation as number,
 
-          // ✅ FinalTransformed 속도 (풀네임)
+          // ✅ 2축 (Original) 속도
+          OriginalMaxAzRate: item.OriginalMaxAzRate as number | undefined,
+          OriginalMaxElRate: item.OriginalMaxElRate as number | undefined,
+          OriginalMaxElevation: item.OriginalMaxElevation as number | undefined,
+
+          // ✅ Train=0 (FinalTransformed) 속도
           FinalTransformedMaxAzRate: item.FinalTransformedMaxAzRate as number,
           FinalTransformedMaxElRate: item.FinalTransformedMaxElRate as number,
 
+          // ✅ TrainOK (KeyholeFinalTransformed) 속도
+          KeyholeFinalTransformedMaxAzRate: item.KeyholeFinalTransformedMaxAzRate as number,
+          KeyholeFinalTransformedMaxElRate: item.KeyholeFinalTransformedMaxElRate as number,
+
+          // Keyhole 관련
           isKeyhole: item.IsKeyhole as boolean,
           recommendedTrainAngle: item.RecommendedTrainAngle as number,
+
           CreationDate: item.CreationDate as string,
           Creator: item.Creator as string,
-
-          // ✅ Original (2축) 메타데이터
-          OriginalMaxElevation: item.OriginalMaxElevation as number | undefined,
-          OriginalMaxAzRate: item.OriginalMaxAzRate as number | undefined,
-          OriginalMaxElRate: item.OriginalMaxElRate as number | undefined,
         }))
 
         console.log(`✅ 병합 데이터 조회 완료: ${scheduleItems.length}개 패스`)
