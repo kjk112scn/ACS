@@ -69,6 +69,20 @@ export interface ScheduleItem {
   StartElevation?: number
   EndElevation?: number
 
+  // ✅ FinalTransformed 시작/종료 각도 및 최대 고도 (Train=0, ±270°)
+  FinalTransformedStartAzimuth?: number
+  FinalTransformedEndAzimuth?: number
+  FinalTransformedStartElevation?: number
+  FinalTransformedEndElevation?: number
+  FinalTransformedMaxElevation?: number
+
+  // ✅ KeyholeFinalTransformed 시작/종료 각도 및 최대 고도 (Train≠0, ±270°, Keyhole일 경우만)
+  KeyholeFinalTransformedStartAzimuth?: number
+  KeyholeFinalTransformedEndAzimuth?: number
+  KeyholeFinalTransformedStartElevation?: number
+  KeyholeFinalTransformedEndElevation?: number
+  KeyholeFinalTransformedMaxElevation?: number
+
   /**
    * ✅ FinalTransformed 최대 Azimuth 각속도 (도/초) - 합계법
    */
@@ -416,11 +430,36 @@ class EphemerisTrackService {
             item.recommendedTrainAngle) as number,
           RecommendedTrainAngle: item.RecommendedTrainAngle as number | undefined,
 
-          // ✅ 시작/종료 각도
+          // ✅ 시작/종료 각도 (하위 호환성)
           StartAzimuth: item.StartAzimuth as number | undefined,
           EndAzimuth: item.EndAzimuth as number | undefined,
           StartElevation: item.StartElevation as number | undefined,
           EndElevation: item.EndElevation as number | undefined,
+
+          // ✅ FinalTransformed 시작/종료 각도 및 최대 고도
+          FinalTransformedStartAzimuth: item.FinalTransformedStartAzimuth as number | undefined,
+          FinalTransformedEndAzimuth: item.FinalTransformedEndAzimuth as number | undefined,
+          FinalTransformedStartElevation: item.FinalTransformedStartElevation as number | undefined,
+          FinalTransformedEndElevation: item.FinalTransformedEndElevation as number | undefined,
+          FinalTransformedMaxElevation: item.FinalTransformedMaxElevation as number | undefined,
+
+          // ✅ KeyholeFinalTransformed 시작/종료 각도 및 최대 고도
+          KeyholeFinalTransformedStartAzimuth: item.KeyholeFinalTransformedStartAzimuth as
+            | number
+            | undefined,
+          KeyholeFinalTransformedEndAzimuth: item.KeyholeFinalTransformedEndAzimuth as
+            | number
+            | undefined,
+          KeyholeFinalTransformedStartElevation: item.KeyholeFinalTransformedStartElevation as
+            | number
+            | undefined,
+          KeyholeFinalTransformedEndElevation: item.KeyholeFinalTransformedEndElevation as
+            | number
+            | undefined,
+          KeyholeFinalTransformedMaxElevation: item.KeyholeFinalTransformedMaxElevation as
+            | number
+            | undefined,
+
           CreationDate: item.CreationDate as string,
           Creator: item.Creator as string,
 

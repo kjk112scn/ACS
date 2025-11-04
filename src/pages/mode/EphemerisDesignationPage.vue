@@ -232,16 +232,25 @@
                         <span class="info-label">최대 Azimuth 속도:</span>
                         <span class="info-value text-red">
                           {{ safeToFixed(
-                            selectedScheduleInfo.isKeyhole 
-                              ? (selectedScheduleInfo.KeyholeAxisTransformedMaxAzRate ?? selectedScheduleInfo.FinalTransformedMaxAzRate ?? 0)
-                              : (selectedScheduleInfo.FinalTransformedMaxAzRate ?? 0), 
+                            selectedScheduleInfo.isKeyhole
+                              ? (selectedScheduleInfo.KeyholeFinalTransformedMaxAzRate ??
+                                selectedScheduleInfo.FinalTransformedMaxAzRate ?? 0)
+                              : (selectedScheduleInfo.FinalTransformedMaxAzRate ?? 0),
                             6
                           ) }}°/s
                         </span>
                       </div>
                       <div class="info-row">
                         <span class="info-label">최대 Elevation 속도:</span>
-                        <span class="info-value">{{ safeToFixed(selectedScheduleInfo.FinalTransformedMaxElRate, 6) }}°/s</span>
+                        <span class="info-value text-red">
+                          {{ safeToFixed(
+                            selectedScheduleInfo.isKeyhole
+                              ? (selectedScheduleInfo.KeyholeFinalTransformedMaxElRate ??
+                                selectedScheduleInfo.FinalTransformedMaxElRate ?? 0)
+                              : (selectedScheduleInfo.FinalTransformedMaxElRate ?? 0),
+                            6
+                          ) }}°/s
+                        </span>
                       </div>
                     </div>
 
@@ -381,15 +390,26 @@ ISS (ZARYA)
             </q-td>
           </template>
 
+          <!-- ✅ 3축 최대 Az 속도 템플릿 (Train=0, ±270°, 항상 고정) -->
+          <template v-slot:body-cell-Train0MaxAzRate="props">
+            <q-td :props="props">
+              <div class="text-center">
+                <div class="text-weight-bold text-green-3">
+                  {{ safeToFixed(props.value, 6) }}°/s
+                </div>
+              </div>
+            </q-td>
+          </template>
+
           <!-- ✅ FinalTransformed 최대 Az 속도 템플릿 (Keyhole에 따라 다른 값 표시) -->
           <template v-slot:body-cell-FinalTransformedMaxAzRate="props">
             <q-td :props="props">
               <div class="text-center">
                 <div class="text-weight-bold" :class="props.row?.isKeyhole ? 'text-red' : 'text-green-3'">
                   {{ safeToFixed(
-                    props.row?.isKeyhole 
-                      ? (props.row?.KeyholeAxisTransformedMaxAzRate ?? props.value ?? 0)
-                      : (props.value ?? 0), 
+                    props.row?.isKeyhole
+                      ? (props.row?.KeyholeFinalTransformedMaxAzRate ?? props.value ?? 0)
+                      : (props.value ?? 0),
                     6
                   ) }}°/s
                 </div>
@@ -408,12 +428,28 @@ ISS (ZARYA)
             </q-td>
           </template>
 
-          <!-- ✅ FinalTransformed 최대 El 속도 템플릿 -->
-          <template v-slot:body-cell-FinalTransformedMaxElRate="props">
+          <!-- ✅ 3축 최대 El 속도 템플릿 (Train=0, ±270°, 항상 고정) -->
+          <template v-slot:body-cell-Train0MaxElRate="props">
             <q-td :props="props">
               <div class="text-center">
                 <div class="text-weight-bold text-green-3">
                   {{ safeToFixed(props.value, 6) }}°/s
+                </div>
+              </div>
+            </q-td>
+          </template>
+
+          <!-- ✅ FinalTransformed 최대 El 속도 템플릿 (Keyhole에 따라 다른 값 표시) -->
+          <template v-slot:body-cell-FinalTransformedMaxElRate="props">
+            <q-td :props="props">
+              <div class="text-center">
+                <div class="text-weight-bold" :class="props.row?.isKeyhole ? 'text-red' : 'text-green-3'">
+                  {{ safeToFixed(
+                    props.row?.isKeyhole
+                      ? (props.row?.KeyholeFinalTransformedMaxElRate ?? props.value ?? 0)
+                      : (props.value ?? 0),
+                    6
+                  ) }}°/s
                 </div>
               </div>
             </q-td>
@@ -667,7 +703,16 @@ const scheduleColumns: QTableColumn[] = [
     sortable: true,
     format: (val) => val?.toFixed(6) || '-',
   },
-  // ✅ FinalTransformed 최대 Az 속도
+  // ✅ 3축 최대 Az 속도 (Train=0, ±270°, 항상 고정)
+  {
+    name: 'Train0MaxAzRate',
+    label: '3축 최대 Az 속도 (°/s)',
+    field: 'FinalTransformedMaxAzRate',
+    align: 'center',
+    sortable: true,
+    format: (val) => val?.toFixed(6) || '0.000000',
+  },
+  // ✅ FinalTransformed 최대 Az 속도 (Keyhole 여부에 따라 동적 표시)
   {
     name: 'FinalTransformedMaxAzRate',
     label: '최대 Az 속도 (°/s)',
@@ -685,7 +730,16 @@ const scheduleColumns: QTableColumn[] = [
     sortable: true,
     format: (val) => val?.toFixed(6) || '-',
   },
-  // ✅ FinalTransformed 최대 El 속도
+  // ✅ 3축 최대 El 속도 (Train=0, ±270°, 항상 고정)
+  {
+    name: 'Train0MaxElRate',
+    label: '3축 최대 El 속도 (°/s)',
+    field: 'FinalTransformedMaxElRate',
+    align: 'center',
+    sortable: true,
+    format: (val) => val?.toFixed(6) || '0.000000',
+  },
+  // ✅ FinalTransformed 최대 El 속도 (Keyhole 여부에 따라 동적 표시)
   {
     name: 'FinalTransformedMaxElRate',
     label: '최대 El 속도 (°/s)',
@@ -818,13 +872,23 @@ const selectedScheduleInfo = computed(() => {
       startTime: selected.StartTime,
       endTime: selected.EndTime,
       duration: selected.Duration,
-      maxElevation: typeof selected.MaxElevation === 'number' ? selected.MaxElevation : 0,
+      maxElevation: selected.isKeyhole
+        ? (selected.KeyholeFinalTransformedMaxElevation ?? selected.FinalTransformedMaxElevation ?? (typeof selected.MaxElevation === 'number' ? selected.MaxElevation : 0))
+        : (selected.FinalTransformedMaxElevation ?? (typeof selected.MaxElevation === 'number' ? selected.MaxElevation : 0)),
       startTimeMs: new Date(selected.StartTime).getTime(),
       timeRemaining: 0,
-      startAzimuth: typeof selected.StartAzimuth === 'number' ? selected.StartAzimuth : 0,
-      endAzimuth: typeof selected.EndAzimuth === 'number' ? selected.EndAzimuth : 0,
-      startElevation: typeof selected.StartElevation === 'number' ? selected.StartElevation : 0,
-      endElevation: typeof selected.EndElevation === 'number' ? selected.EndElevation : 0,
+      startAzimuth: selected.isKeyhole
+        ? (selected.KeyholeFinalTransformedStartAzimuth ?? selected.FinalTransformedStartAzimuth ?? (typeof selected.StartAzimuth === 'number' ? selected.StartAzimuth : 0))
+        : (selected.FinalTransformedStartAzimuth ?? (typeof selected.StartAzimuth === 'number' ? selected.StartAzimuth : 0)),
+      endAzimuth: selected.isKeyhole
+        ? (selected.KeyholeFinalTransformedEndAzimuth ?? selected.FinalTransformedEndAzimuth ?? (typeof selected.EndAzimuth === 'number' ? selected.EndAzimuth : 0))
+        : (selected.FinalTransformedEndAzimuth ?? (typeof selected.EndAzimuth === 'number' ? selected.EndAzimuth : 0)),
+      startElevation: selected.isKeyhole
+        ? (selected.KeyholeFinalTransformedStartElevation ?? selected.FinalTransformedStartElevation ?? (typeof selected.StartElevation === 'number' ? selected.StartElevation : 0))
+        : (selected.FinalTransformedStartElevation ?? (typeof selected.StartElevation === 'number' ? selected.StartElevation : 0)),
+      endElevation: selected.isKeyhole
+        ? (selected.KeyholeFinalTransformedEndElevation ?? selected.FinalTransformedEndElevation ?? (typeof selected.EndElevation === 'number' ? selected.EndElevation : 0))
+        : (selected.FinalTransformedEndElevation ?? (typeof selected.EndElevation === 'number' ? selected.EndElevation : 0)),
       isGeostationary: false,
       // KEYHOLE 정보 추가
       isKeyhole: selected.IsKeyhole || false,
