@@ -2129,6 +2129,23 @@ class EphemerisService(
                         put("KeyholeFinalTransformedMaxElRate", finalRates["maxElRate"])  // FinalTransformed 사용
                     }
                     
+                    // ✅ FinalTransformed 시작/종료 각도 및 최대 고도 (Train=0, ±270°)
+                    // 항상 final_transformed MST의 값 제공
+                    put("FinalTransformedStartAzimuth", final["StartAzimuth"])
+                    put("FinalTransformedEndAzimuth", final["EndAzimuth"])
+                    put("FinalTransformedStartElevation", final["StartElevation"])
+                    put("FinalTransformedEndElevation", final["EndElevation"])
+                    put("FinalTransformedMaxElevation", final["MaxElevation"])
+                    
+                    // ✅ KeyholeFinalTransformed 시작/종료 각도 및 최대 고도 (Train≠0, ±270°)
+                    // 항상 keyhole_final_transformed MST의 값 제공 (없으면 null)
+                    // 조건부 로직 없이 항상 제공 - 프론트엔드에서 선택
+                    put("KeyholeFinalTransformedStartAzimuth", keyhole?.get("StartAzimuth"))
+                    put("KeyholeFinalTransformedEndAzimuth", keyhole?.get("EndAzimuth"))
+                    put("KeyholeFinalTransformedStartElevation", keyhole?.get("StartElevation"))
+                    put("KeyholeFinalTransformedEndElevation", keyhole?.get("EndElevation"))
+                    put("KeyholeFinalTransformedMaxElevation", keyhole?.get("MaxElevation"))
+                    
                     // ✅ Keyhole 관련 정보
                     put("IsKeyhole", isKeyhole)
                     put("RecommendedTrainAngle", original?.get("RecommendedTrainAngle") ?: 0.0)

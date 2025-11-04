@@ -91,15 +91,48 @@
 
 ---
 
-## ✅ 계획서 → 완료 문서
+## ✅ 계획서 → 완료 문서 (자동 워크플로우)
 
-작업이 완료되면:
+### 완료 처리 프로세스
+
+작업이 완료되면 다음 명령어 중 하나를 사용하세요:
+
+**완료 판단 키워드**:
+- "이 계획은 완료되었어"
+- "계획을 완료처리해"
+- "이 플랜 완료해줘"
+- "{기능명} 플랜 완료"
+
+**자동 처리**:
 ```
-docs/plans/{기능}_Plan.md
-→ docs/completed/{기능}_Completed.md
+1. docs/plans/{기능명}_Plan.md 읽기
+2. docs/completed/{기능명}_Completed.md 생성
+   - 파일명 변환: {기능명}_Plan.md → {기능명}_Completed.md
+   - 완료일, 상태 메타데이터 추가
+   - 완료 문서 템플릿 적용
+3. 원본 플랜 파일 삭제 (docs/plans/에서 제거)
+4. README.md 업데이트
 ```
 
-계획서는 **삭제하지 않고 유지** (이력 관리)
+### 파일명 변환 규칙
+
+| 원본 파일명 | 완료 파일명 |
+|------------|------------|
+| `Train_Algorithm_Plan.md` | `Train_Algorithm_Completed.md` |
+| `Frontend_Display_Values_Validation_Plan.md` | `Frontend_Display_Values_Validation_Completed.md` |
+| `{기능명}_Plan.md` | `{기능명}_Completed.md` |
+
+### 사용 예시
+
+```
+사용자: "Frontend_Display_Values_Validation_Plan.md 계획을 완료처리해"
+
+AI 처리:
+1. docs/plans/Frontend_Display_Values_Validation_Plan.md 읽기
+2. docs/completed/Frontend_Display_Values_Validation_Completed.md 생성
+3. 원본 플랜 파일 삭제
+4. README 업데이트
+```
 
 ---
 
