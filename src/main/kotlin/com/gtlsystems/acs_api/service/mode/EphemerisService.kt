@@ -164,7 +164,7 @@ class EphemerisService(
             logger.info("🚀 정지궤도 위성 추적 시작 (3축 변환 적용)")
 
             // 3축 변환된 정지궤도 위치 계산
-            val geo3AxisPosition = getCurrentGeostationaryPositionWith3AxisTransform(tleLine1, tleLine2)
+            val geo3AxisPosition = getCurrentGeostationaryPositionWith3AxisTransform(tleLine1, tleLine2, tiltAngle = settingsService.tiltAngle, trainAngle = 0.0)
 
             // 원본 좌표 추출
             val originalAzimuth = geo3AxisPosition["originalAzimuth"] as? Double ?: 0.0

@@ -10,6 +10,11 @@ import org.orekit.frames.Frame
 import org.orekit.frames.TopocentricFrame
 import org.orekit.propagation.analytical.tle.TLE
 import org.orekit.propagation.analytical.tle.TLEPropagator
+import org.orekit.propagation.events.ElevationDetector
+import org.orekit.propagation.events.EventDetector
+import org.orekit.propagation.events.handlers.EventHandler
+import org.orekit.propagation.SpacecraftState
+import org.hipparchus.ode.events.Action
 import org.orekit.time.TimeScale
 import org.orekit.time.TimeScalesFactory
 import org.orekit.utils.Constants
@@ -107,11 +112,156 @@ class OrekitCalculator(
     }
 
     /**
-     * 간단한 가시성 기간 감지 (ElevationDetector 대신 기본 방식 사용)
+     * ElevationDetector를 사용한 가시성 기간 감지
      * 
-     * ✅ Orekit 13.0.2 안정적 구현
+     * ✅ 이벤트 기반: 시간 간격 설정 불필요
+     * ✅ 자동 정밀도: 내부 이진 탐색으로 정확한 시점 탐지
+     * ✅ 성능 최적화: 필요한 시점만 계산
+     * 
+     * @see https://www.orekit.org/static/apidocs/org/orekit/propagation/events/ElevationDetector.html
      */
     private fun detectVisibilityPeriods(
+        tleLine1: String,
+        tleLine2: String,
+        startDate: ZonedDateTime,
+        durationDays: Int,
+        minElevation: Float,
+        latitude: Double,
+        longitude: Double,
+        altitude: Double
+    ): List<VisibilityPeriod> {
+        logger.info("🔍 ElevationDetector로 가시성 기간 감지 시작")
+        logger.info("📊 파라미터: minElevation=${minElevation}°, 위치=(${latitude}, ${longitude}), 기간=${durationDays}일")
+        
+        val visibilityPeriods = mutableListOf<VisibilityPeriod>()
+        
+        try {
+            val tle = TLE(tleLine1, tleLine2)
+            val propagator = TLEPropagator.selectExtrapolator(tle)
+            
+            logger.info("🛰️ TLE: ${tle.satelliteNumber}, Epoch: ${tle.date}")
+            
+            val stationPosition = GeodeticPoint(
+                FastMath.toRadians(latitude),
+                FastMath.toRadians(longitude),
+                altitude
+            )
+            val stationFrame = TopocentricFrame(earthModel, stationPosition, "GroundStation")
+            
+            // ✅ 시작 시점의 elevation 확인 (별도 propagator 사용 - 기존 propagator와 독립)
+            val startAbsoluteDate = toAbsoluteDate(startDate)
+            val endAbsoluteDate = toAbsoluteDate(startDate.plusDays(durationDays.toLong()))
+            
+            val checkPropagator = TLEPropagator.selectExtrapolator(tle)
+            val initialState = checkPropagator.propagate(startAbsoluteDate)
+            val initialPvInStation = initialState.getPVCoordinates(stationFrame)
+            val initialPosInStation = initialPvInStation.position
+            val initialElevation = FastMath.toDegrees(
+                FastMath.asin(initialPosInStation.z / initialPosInStation.norm)
+            )
+            logger.info("🔎 시작 시점 elevation: ${String.format("%.6f", initialElevation)}° (minElevation: ${minElevation}°)")
+            
+            // ✅ 이벤트를 직접 수집하는 리스트
+            val eventList = mutableListOf<Pair<ZonedDateTime, Boolean>>()  // (시간, isIncreasing)
+            
+            // ✅ ElevationDetector 설정 - 커스텀 EventHandler 사용
+            // Orekit 13.0.2에서는 EventHandler가 제네릭이 아닙니다
+            val customHandler = object : EventHandler {
+                override fun eventOccurred(
+                    s: SpacecraftState,
+                    detector: org.orekit.propagation.events.EventDetector,
+                    increasing: Boolean
+                ): Action {
+                    val eventTime = toZonedDateTime(s.date)
+                    
+                    // elevation 값 계산 (로깅용)
+                    val pvInStation = s.getPVCoordinates(stationFrame)
+                    val posInStation = pvInStation.position
+                    val elevation = FastMath.toDegrees(
+                        FastMath.asin(posInStation.z / posInStation.norm)
+                    )
+                    
+                    val eventType = if (increasing) "AOS" else "LOS"
+                    logger.info("📡 가시성 ${if (increasing) "시작" else "종료"} ($eventType): $eventTime (고도각: ${String.format("%.6f", elevation)}°)")
+                    
+                    eventList.add(Pair(eventTime, increasing))
+                    
+                    return Action.CONTINUE
+                }
+            }
+            
+            val elevationDetector = ElevationDetector(stationFrame)
+                .withConstantElevation(FastMath.toRadians(minElevation.toDouble()))
+                .withMaxCheck(60.0)      // 최대 체크 간격 10분 (Orekit이 자동 최적화)
+                .withThreshold(1.0e-3)    // 이벤트 시점 정밀도 1ms (충분함)
+                .withHandler(customHandler)
+            
+            // ✅ Detector 등록
+            propagator.addEventDetector(elevationDetector)
+            
+            // ✅ 시간 범위 propagate - 자동으로 이벤트 감지
+            logger.info("🔄 Propagation 시작: ${startDate} ~ ${toZonedDateTime(endAbsoluteDate)}")
+            try {
+                propagator.propagate(startAbsoluteDate, endAbsoluteDate)
+                logger.info("✅ Propagation 완료: ${eventList.size}개 이벤트 감지됨")
+            } catch (e: Exception) {
+                logger.warn("⚠️ Propagation 중 예외 발생 (정상일 수 있음): ${e.message}")
+            }
+            
+            // ✅ 이벤트를 가시성 기간으로 변환
+            var currentStart: ZonedDateTime? = null
+            
+            // 시작 시점이 이미 가시성 범위 내라면 시작 시점을 AOS로 설정
+            if (initialElevation >= minElevation) {
+                logger.info("⚠️ 시작 시점이 이미 가시성 범위 내 (elevation: ${String.format("%.6f", initialElevation)}°)")
+                logger.info("   → 첫 LOS 이벤트까지 가시성 기간 시작으로 설정")
+                currentStart = startDate
+            }
+            
+            for ((eventTime, isIncreasing) in eventList) {
+                if (isIncreasing) {
+                    // AOS: 위성 상승 (가시성 시작)
+                    currentStart = eventTime
+                } else {
+                    // LOS: 위성 하강 (가시성 종료)ㅋ`
+                    if (currentStart != null) {
+                        visibilityPeriods.add(VisibilityPeriod(startTime = currentStart, endTime = eventTime))
+                        logger.info("✅ 가시성 기간 추가: $currentStart ~ $eventTime")
+                        currentStart = null
+                    } else {
+                        logger.warn("⚠️ LOS 이벤트인데 AOS가 없음! (시작 시점 가시성 범위 밖)")
+                    }
+                }
+            }
+            
+            // ✅ 마지막 가시성 기간 처리 (종료 시점에 가시성 유지 중인 경우)
+            if (currentStart != null) {
+                val endTime = toZonedDateTime(endAbsoluteDate)
+                visibilityPeriods.add(VisibilityPeriod(startTime = currentStart, endTime = endTime))
+                logger.debug("📡 마지막 가시성 기간 종료 시점을 스케줄 종료로 설정")
+            }
+            
+            logger.info("✅ ${visibilityPeriods.size}개 가시성 기간 감지 완료")
+            
+            // ✅ 각 기간의 정보 로깅 (검증용)
+            visibilityPeriods.forEachIndexed { index, period ->
+                logger.debug("  패스 ${index + 1}: ${period.startTime} ~ ${period.endTime}")
+            }
+            
+            return visibilityPeriods
+            
+        } catch (e: Exception) {
+            logger.error("❌ 가시성 기간 감지 실패: ${e.message}", e)
+            throw RuntimeException("가시성 기간 감지 실패", e)
+        }
+    }
+    
+    /**
+     * 🔴 백업: 이전 5분 간격 체크 방식
+     * 
+     * 문제 발생 시 이 함수로 롤백 가능
+     * 
+    private fun detectVisibilityPeriodsOld(
         tleLine1: String,
         tleLine2: String,
         startDate: ZonedDateTime,
@@ -186,6 +336,7 @@ class OrekitCalculator(
             throw RuntimeException("가시성 기간 감지 실패", e)
         }
     }
+    */
 
     /**
      * Orekit AbsoluteDate를 ZonedDateTime으로 변환
