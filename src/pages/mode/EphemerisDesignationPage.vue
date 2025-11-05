@@ -368,12 +368,28 @@ ISS (ZARYA)
             </q-td>
           </template>
 
-          <!-- ✅ 최대 고도 템플릿 (FinalTransformed) -->
-          <template v-slot:body-cell-MaxElevation="props">
+          <!-- ✅ 3축 최대 고도 템플릿 (Train=0, ±270°, 항상 고정) -->
+          <template v-slot:body-cell-Train0MaxElevation="props">
             <q-td :props="props">
               <div class="text-center">
                 <div class="text-weight-bold text-green-3">
                   {{ safeToFixed(props.value, 6) }}°
+                </div>
+              </div>
+            </q-td>
+          </template>
+
+          <!-- ✅ FinalTransformed 최대 고도 템플릿 (Keyhole에 따라 다른 값 표시) -->
+          <template v-slot:body-cell-MaxElevation="props">
+            <q-td :props="props">
+              <div class="text-center">
+                <div class="text-weight-bold" :class="props.row?.isKeyhole ? 'text-red' : 'text-green-3'">
+                  {{ safeToFixed(
+                    props.row?.isKeyhole
+                      ? (props.row?.KeyholeFinalTransformedMaxElevation ?? props.value ?? 0)
+                      : (props.value ?? 0),
+                    6
+                  ) }}°
                 </div>
               </div>
             </q-td>
@@ -685,11 +701,20 @@ const scheduleColumns: QTableColumn[] = [
     sortable: true,
     format: (val) => val?.toFixed(6) || '-',
   },
-  // ✅ 최대 고도 (FinalTransformed)
+  // ✅ 3축 최대 고도 (Train=0, ±270°, 항상 고정)
+  {
+    name: 'Train0MaxElevation',
+    label: '3축 최대 고도 (°)',
+    field: 'FinalTransformedMaxElevation',
+    align: 'center',
+    sortable: true,
+    format: (val) => val?.toFixed(6) || '0.000000',
+  },
+  // ✅ FinalTransformed 최대 고도 (Keyhole 여부에 따라 동적 표시)
   {
     name: 'MaxElevation',
     label: '최대 고도 (°)',
-    field: 'MaxElevation',
+    field: 'FinalTransformedMaxElevation',
     align: 'center',
     sortable: true,
     format: (val) => val?.toFixed(6) || '0.000000',
