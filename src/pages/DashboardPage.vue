@@ -1,4 +1,4 @@
-<template>
+``<template>
   <q-page class="dashboard-container q-pa-md">
     <!-- 상단 부분: 실시간 ICD 데이터 표시 (3축으로 구분) -->
     <!-- 기존의 q-card와 q-card-section 제거하고 axis-grid만 남기기 -->
@@ -25,7 +25,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.azimuthSpeed)
-                }}</q-item-label>
+              }}</q-item-label>
             </div>
           </div>
         </q-card-section>
@@ -53,7 +53,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.elevationSpeed)
-                }}</q-item-label>
+              }}</q-item-label>
             </div>
           </div>
         </q-card-section>
@@ -81,7 +81,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.trainSpeed)
-                }}</q-item-label>
+              }}</q-item-label>
             </div>
           </div>
         </q-card-section>
@@ -96,7 +96,7 @@
             <div class="emergency-content">
               <q-btn class="full-width" :color="acsEmergencyActive ? 'grey-8' : 'negative'"
                 :label="acsEmergencyActive ? 'Emergency Active' : 'Emergency Stop'" @click="handleEmergencyClick"
-                size="lg" />
+                size="md" />
             </div>
           </q-card-section>
         </q-card>
@@ -161,77 +161,81 @@
         <q-card-section>
           <div class="text-subtitle1 text-weight-bold">Status</div>
           <div class="status-content">
-            <!-- Emergency LED - TRUE면 빨간색, FALSE면 녹색 -->
-            <div class="status-item q-mb-sm">
-              <div class="status-led-container">
-                <div class="status-led" :class="{
-                  'led-error': errorEmergencyActive,
-                  'led-normal': !errorEmergencyActive,
-                }"></div>
-                <span class="status-label">Emergency</span>
-              </div>
-            </div>
-
-            <!-- Positioner LED - TRUE면 빨간색, FALSE면 녹색 -->
-            <div class="status-item q-mb-sm">
-              <div class="status-led-container">
-                <div class="status-led" :class="{
-                  'led-error': errorPositionerActive,
-                  'led-normal': !errorPositionerActive,
-                }"></div>
-                <span class="status-label">Positioner</span>
-              </div>
-            </div>
-
-            <!-- Feed LED - TRUE면 빨간색, FALSE면 녹색 -->
-            <div class="status-item q-mb-sm">
-              <div class="status-led-container">
-                <div class="status-led" :class="{ 'led-error': errorFeedActive, 'led-normal': !errorFeedActive }">
+            <!-- Status LED 그룹 - Control 카드의 control-buttons와 동일한 구조 -->
+            <div class="status-leds-group">
+              <!-- Emergency LED - TRUE면 빨간색, FALSE면 녹색 (고정 위치 - 맨 위) -->
+              <div class="status-item status-item-top">
+                <div class="status-led-container">
+                  <div class="status-led" :class="{
+                    'led-error': errorEmergencyActive,
+                    'led-normal': !errorEmergencyActive,
+                  }"></div>
+                  <span class="status-label">Emergency</span>
                 </div>
-                <span class="status-label">Feed</span>
               </div>
-            </div>
 
-            <!-- Protocol LED - TRUE면 빨간색, FALSE면 녹색 -->
-            <div class="status-item q-mb-sm">
-              <div class="status-led-container">
-                <div class="status-led" :class="{
-                  'led-error': errorProtocolActive,
-                  'led-normal': !errorProtocolActive,
-                }"></div>
-                <span class="status-label">Protocol</span>
-              </div>
-            </div>
-
-            <!-- Power LED - TRUE면 빨간색, FALSE면 녹색 -->
-            <div class="status-item q-mb-sm">
-              <div class="status-led-container">
-                <div class="status-led" :class="{ 'led-error': errorPowerActive, 'led-normal': !errorPowerActive }">
+              <!-- 중간 LED 그룹 - Emergency와 Stow Pin 사이의 LED들 (자동 간격 조절) -->
+              <div class="status-middle-group">
+                <!-- Positioner LED - TRUE면 빨간색, FALSE면 녹색 -->
+                <div class="status-item">
+                  <div class="status-led-container">
+                    <div class="status-led" :class="{
+                      'led-error': errorPositionerActive,
+                      'led-normal': !errorPositionerActive,
+                    }"></div>
+                    <span class="status-label">Positioner</span>
+                  </div>
                 </div>
-                <span class="status-label">Power</span>
-              </div>
-            </div>
 
-            <!-- ✅ Stow LED - TRUE면 녹색, FALSE면 회색 -->
-            <div class="status-item q-mb-sm">
-              <div class="status-led-container">
-                <div class="status-led" :class="{ 'led-stow-active': stowActive, 'led-inactive': !stowActive }">
+                <!-- Feed LED - TRUE면 빨간색, FALSE면 녹색 -->
+                <div class="status-item">
+                  <div class="status-led-container">
+                    <div class="status-led" :class="{ 'led-error': errorFeedActive, 'led-normal': !errorFeedActive }">
+                    </div>
+                    <span class="status-label">Feed</span>
+                  </div>
                 </div>
-                <span class="status-label">Stow</span>
-              </div>
-            </div>
 
-            <!-- ✅ Stow Pin LED - TRUE면 녹색, FALSE면 회색 -->
-            <div class="status-item q-mb-sm">
-              <div class="status-led-container">
-                <div class="status-led" :class="{ 'led-stow-active': stowPinActive, 'led-inactive': !stowPinActive }">
+                <!-- Protocol LED - TRUE면 빨간색, FALSE면 녹색 -->
+                <div class="status-item">
+                  <div class="status-led-container">
+                    <div class="status-led" :class="{
+                      'led-error': errorProtocolActive,
+                      'led-normal': !errorProtocolActive,
+                    }"></div>
+                    <span class="status-label">Protocol</span>
+                  </div>
                 </div>
-                <span class="status-label">Stow Pin</span>
-              </div>
-            </div>
 
-            <!-- All Status 버튼 -->
-            <div class="all-status-button q-mt-md">
+                <!-- Power LED - TRUE면 빨간색, FALSE면 녹색 -->
+                <div class="status-item">
+                  <div class="status-led-container">
+                    <div class="status-led" :class="{ 'led-error': errorPowerActive, 'led-normal': !errorPowerActive }">
+                    </div>
+                    <span class="status-label">Power</span>
+                  </div>
+                </div>
+
+                <!-- ✅ Stow LED - TRUE면 녹색, FALSE면 회색 -->
+                <div class="status-item">
+                  <div class="status-led-container">
+                    <div class="status-led" :class="{ 'led-stow-active': stowActive, 'led-inactive': !stowActive }">
+                    </div>
+                    <span class="status-label">Stow</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ✅ Stow Pin LED - TRUE면 녹색, FALSE면 회색 (Monitoring LED와 같은 높이 - 고정) -->
+              <div class="status-item status-item-bottom">
+                <div class="status-led-container">
+                  <div class="status-led" :class="{ 'led-stow-active': stowPinActive, 'led-inactive': !stowPinActive }">
+                  </div>
+                  <span class="status-label">Stow Pin</span>
+                </div>
+              </div>
+
+              <!-- All Status 버튼 (Control Request 버튼과 같은 높이) - control-buttons 안에 버튼이 있는 것과 동일한 구조 -->
               <q-btn color="primary" label="All Status" class="full-width" @click="handleAllStatus" />
             </div>
           </div>
@@ -1595,7 +1599,12 @@ const handleAllStatus = () => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 0.25rem 1rem 0.5rem 1rem;
+  padding-top: 0.15rem !important;
+  /* 상단 패딩 30% 감소: 0.25rem → 0.15rem */
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+  padding-bottom: 0 !important;
+  /* 하단 패딩 완전 제거: 0.05rem → 0 - CMD/Actual/Speed 하단 빈 공간 제거 */
 }
 
 /* 각 축 카드의 상단 테두리만 색상 유지, 나머지는 밝은 회색 */
@@ -1623,9 +1632,7 @@ const handleAllStatus = () => {
 }
 
 /* Azimuth 카드 전용 스타일 - 상단 테두리 색상 제거 */
-.q-card.azimuth-card .q-card-section {
-  padding: 0 !important;
-}
+/* 주석: .axis-card .q-card-section에서 이미 하단 패딩이 설정되므로 별도 설정 불필요 */
 
 .azimuth-card {
   background-color: var(--theme-card-background) !important;
@@ -1634,9 +1641,7 @@ const handleAllStatus = () => {
 }
 
 /* Elevation 카드 전용 스타일 */
-.q-card.elevation-card .q-card-section {
-  padding: 0 !important;
-}
+/* 주석: .axis-card .q-card-section에서 이미 하단 패딩이 설정되므로 별도 설정 불필요 */
 
 .elevation-card {
   background-color: var(--theme-card-background) !important;
@@ -1645,9 +1650,7 @@ const handleAllStatus = () => {
 }
 
 /* Tilt 카드 전용 스타일 */
-.q-card.tilt-card .q-card-section {
-  padding: 0 !important;
-}
+/* 주석: .axis-card .q-card-section에서 이미 하단 패딩이 설정되므로 별도 설정 불필요 */
 
 .tilt-card {
   background-color: var(--theme-card-background) !important;
@@ -1656,11 +1659,7 @@ const handleAllStatus = () => {
 }
 
 /* 모든 축 카드의 텍스트 높이 통일 */
-.q-card.azimuth-card .q-card-section,
-.q-card.elevation-card .q-card-section,
-.q-card.tilt-card .q-card-section {
-  padding: 0 !important;
-}
+/* 주석: .axis-card .q-card-section에서 이미 하단 패딩이 설정되므로 별도 설정 불필요 */
 
 .azimuth-card,
 .elevation-card,
@@ -1675,8 +1674,8 @@ const handleAllStatus = () => {
 .elevation-card .text-subtitle1,
 .tilt-card .text-subtitle1 {
   margin: 0 !important;
-  padding: 0.1rem 0 1rem 0 !important;
-  /* Azimuth의 정확한 위치로 통일 */
+  padding: 0.1rem 0 0.3rem 0 !important;
+  /* 제목 하단 패딩 30% 감소: 0.7rem → 0.3rem (약 4.8px) */
   text-align: center !important;
   color: var(--theme-text) !important;
   font-size: 1rem !important;
@@ -1692,7 +1691,8 @@ const handleAllStatus = () => {
   /* 동일한 높이 */
   min-height: 300px !important;
   width: 100%;
-  margin: 1rem 0 0.25rem 0 !important;
+  margin: 0.3rem 0 0.05rem 0 !important;
+  /* 상단 마진 30% 감소: 0.7rem → 0.3rem, 하단 마진 50% 감소: 0.1rem → 0.05rem */
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1706,7 +1706,8 @@ const handleAllStatus = () => {
   height: 240px !important;
   min-height: 240px !important;
   width: 100%;
-  margin: 1rem 0 0.25rem 0 !important;
+  margin: 0.3rem 0 0.05rem 0 !important;
+  /* 상단 마진 30% 감소: 0.7rem → 0.3rem, 하단 마진 50% 감소: 0.1rem → 0.05rem */
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1716,17 +1717,15 @@ const handleAllStatus = () => {
 }
 
 .axis-data-row {
-  margin-top: auto;
+  margin-top: 0.05rem !important;
+  /* 상단 마진 50% 감소: 0.1rem → 0.05rem (약 0.8px) - margin-top: auto 제거 */
   margin-bottom: 0;
   padding-bottom: 0;
+  display: flex;
+  justify-content: space-between;
 }
 
-.axis-card .text-subtitle1 {
-  margin-bottom: 0.15rem;
-  font-size: 1rem;
-  color: var(--theme-text);
-  font-weight: 600;
-}
+/* 주석: .azimuth-card .text-subtitle1 등에서 이미 스타일이 설정되어 있으므로 중복 제거 */
 
 /* Emergency와 Control 컨테이너 */
 .control-container {
@@ -1759,18 +1758,13 @@ const handleAllStatus = () => {
   /* Control과 Status와 동일한 패딩으로 통일 */
 }
 
-/* Emergency Stop 버튼 높이 확장 */
+/* Emergency Stop 버튼 높이 50% 감소 */
 .emergency-content .q-btn {
-  height: calc(100% + 0.5rem) !important;
-  /* 패딩 증가로 인한 보정 */
-  min-height: 80px !important;
-  /* 최소 높이 더 증가 */
-  font-size: 1.2rem !important;
-  /* 폰트 크기 더 증가 */
-  font-weight: 700 !important;
-  /* 폰트 두께 증가 */
-  padding: 1rem 0.5rem !important;
-  /* 내부 패딩 증가로 더 큰 버튼 */
+  height: 50% !important;
+  min-height: 40px !important;
+  font-size: 0.9rem !important;
+  font-weight: 600 !important;
+  padding: 0.5rem 0.5rem !important;
 }
 
 /* Control 카드 - 밝은 회색 테두리 */
@@ -1783,16 +1777,42 @@ const handleAllStatus = () => {
   box-shadow: 0 2px 4px var(--theme-shadow-light);
 }
 
+/* Control 카드 하단 패딩 줄이기 */
+.control-card .q-card-section {
+  padding-bottom: 0.25rem !important;
+  /* 하단 패딩 더 줄이기 - Control Request 버튼 아래 공간 최소화 */
+  padding-top: 1rem !important;
+  /* 상단 패딩 명시적으로 설정 - Status 카드와 동일하게 맞추기 */
+}
+
 .control-content {
   height: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.5rem 0;
+  flex-direction: column;
+  justify-content: space-between;
+  /* space-between으로 변경하여 버튼을 아래로 내리기 */
+  padding: 0.5rem 0 0.1rem 0;
+  /* 하단 패딩 더 줄이기: 0.25rem → 0.1rem - Control Request 버튼 아래 공간 최소화 */
+}
+
+/* Control Request 버튼 높이 50% 감소 */
+.control-content .q-btn {
+  height: auto !important;
+  min-height: 32px !important;
+  /* 버튼 높이 줄이기: 30px → 32px (최소 높이만 설정) */
+  font-size: 0.85rem !important;
+  padding: 0.35rem 0.5rem !important;
+  /* 패딩 30% 감소: 0.4rem → 0.35rem */
 }
 
 .control-buttons {
   width: 100%;
+}
+
+/* Control Request 버튼만 아래로 내리기 */
+.control-buttons .q-btn {
+  margin-top: 0.1rem;
+  /* Control Request 버튼 상단 마진 추가 - LED와 버튼 사이 간격 유지 */
 }
 
 /* Control LED 인디케이터 스타일 - Status LED와 동일한 스타일로 통일 */
@@ -1850,13 +1870,82 @@ const handleAllStatus = () => {
   box-shadow: 0 2px 4px var(--theme-shadow-light);
 }
 
+/* Status 카드 하단 패딩 줄이기 */
+.status-card .q-card-section {
+  padding-bottom: 0.25rem !important;
+  /* 하단 패딩 더 줄이기 - All Status 버튼 아래 공간 최소화 */
+  padding-top: 1rem !important;
+  /* 상단 패딩 명시적으로 설정 - Control 카드와 동일하게 맞추기 */
+}
+
 .status-content {
   height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding: 0.5rem 0;
-  /* Control과 동일한 패딩으로 간격 조정 */
+  justify-content: space-between;
+  /* Control 카드와 동일한 구조: LED 그룹은 위에, 버튼은 아래에 */
+  padding: 0.5rem 0 0.1rem 0;
+  /* 하단 패딩 더 줄이기: 0.25rem → 0.1rem - All Status 버튼 아래 공간 최소화 */
+}
+
+/* Status LED 그룹 - Control 카드의 control-buttons와 동일한 구조 */
+.status-leds-group {
+  width: 100%;
+  /* Control 카드의 control-buttons와 동일한 너비 */
+  display: flex;
+  flex-direction: column;
+  /* Control 카드의 control-buttons와 동일한 flex 방향 */
+  /* height: 100% 제거 - 자동 높이로 변경하여 버튼 위치 조정 가능하게 함 */
+}
+
+/* Status LED 항목들을 감싸는 영역 - flex-grow로 공간 차지 */
+.status-content>.status-item,
+.status-leds-group>.status-item {
+  flex-shrink: 0;
+  /* LED 항목들이 줄어들지 않도록 */
+}
+
+/* Status 카드의 모든 LED 항목 - 동일한 간격 적용 */
+.status-leds-group .status-item {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  margin: 0 0 0.4rem 0 !important;
+  /* 모든 LED 아래 동일한 간격 0.4rem */
+}
+
+/* 마지막 LED (Stow Pin) - 다른 LED와 동일한 간격 유지 */
+.status-item-bottom {
+  margin-bottom: 0.4rem !important;
+  /* 다른 LED와 동일한 간격 */
+}
+
+/* 중간 LED 그룹 - 간격 제어 없이 LED들만 포함 */
+.status-middle-group {
+  display: flex;
+  flex-direction: column;
+  margin: 0 !important;
+  /* 그룹 자체는 간격 제어하지 않음 */
+  gap: 0 !important;
+  /* gap 사용 안 함, LED 자체의 margin-bottom으로 제어 */
+}
+
+/* All Status 버튼 (Control Request 버튼과 같은 높이) */
+.status-leds-group .q-btn {
+  flex-shrink: 0;
+  /* 버튼은 줄어들지 않도록 */
+  margin-top: 0.1rem !important;
+  /* Control 카드의 버튼과 동일한 margin-top 적용 */
+}
+
+/* All Status 버튼 높이 50% 감소 */
+.all-status-button .q-btn {
+  height: auto !important;
+  min-height: 32px !important;
+  /* 버튼 높이 줄이기: 30px → 32px (최소 높이만 설정) */
+  font-size: 0.85rem !important;
+  padding: 0.35rem 0.5rem !important;
+  /* 패딩 30% 감소: 0.4rem → 0.35rem */
 }
 
 .status-messages {
@@ -1877,7 +1966,8 @@ const handleAllStatus = () => {
   height: 240px;
   min-height: 240px;
   width: 100%;
-  margin: 0.25rem 0 0.25rem 0;
+  margin: 0.3rem 0 0.05rem 0;
+  /* 상단 마진: 0.25rem → 0.3rem, 하단 마진 50% 감소: 0.1rem → 0.05rem */
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1895,14 +1985,22 @@ const handleAllStatus = () => {
 .axis-data-row {
   display: flex;
   justify-content: space-between;
-  margin-top: 0.25rem;
+  margin-top: 0.1rem;
   margin-bottom: 0;
+  padding-bottom: 0;
 }
 
 .axis-data-item {
   flex: 1;
   text-align: center;
-  padding: 0.25rem 0.5rem;
+  padding: 0.1rem 0.5rem;
+  margin-bottom: 0;
+}
+
+/* q-item-label 마진 제거 */
+.axis-data-item .q-item-label {
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 /* 모드 선택 섹션 - 밝은 회색 테두리 */
@@ -1934,10 +2032,15 @@ const handleAllStatus = () => {
 
 /* mode-selection-section 상단/하단 마진 추가 */
 .mode-selection-section {
-  margin-top: 1rem !important;
+  margin-top: 0.5rem !important;
   /* 상단 마진 추가 */
-  margin-bottom: 1rem !important;
+  margin-bottom: 0.5rem !important;
   /* 하단 마진 추가 */
+}
+
+/* mode-selection-section 패딩 50% 감소 */
+.mode-selection-section .q-card-section {
+  padding: 0.5rem 1rem !important;
 }
 
 /* 모든 모드 컴포넌트가 동일한 하단 공간을 가지도록 통일 */
@@ -2008,20 +2111,21 @@ const handleAllStatus = () => {
   color: var(--theme-text);
 }
 
-.all-status-button {
-  margin-top: 1rem;
-}
 
 /* Control Request와 All Status 버튼 높이 통일 */
 .control-content .q-btn,
 .all-status-button .q-btn {
-  font-size: 1rem;
-  padding: 12px 16px;
+  font-size: 0.85rem !important;
+  /* 폰트 크기 30% 감소: 1rem → 0.85rem */
+  padding: 0.35rem 0.5rem !important;
+  /* 패딩 30% 감소: 12px 16px → 0.35rem 0.5rem */
   background-color: var(--theme-button-primary);
   color: white;
   font-weight: 600;
-  min-height: 48px;
-  /* 동일한 최소 높이 */
+  min-height: 32px !important;
+  /* 최소 높이 30% 감소: 48px → 32px */
+  height: auto !important;
+  /* 높이 자동 설정 */
 }
 
 /* 반응형 디자인 유지 */
@@ -2136,7 +2240,8 @@ const handleAllStatus = () => {
   min-height: 200px !important;
   background-color: var(--theme-card-background) !important;
   border: none !important;
-  margin: 1rem 0 0.25rem 0 !important;
+  margin: 0.3rem 0 0.05rem 0 !important;
+  /* 상단 마진: 1rem → 0.3rem, 하단 마진 50% 감소: 0.1rem → 0.05rem */
 }
 
 /* 또는 더 구체적인 선택자 */
@@ -2147,6 +2252,7 @@ const handleAllStatus = () => {
   min-height: 200px !important;
   background-color: var(--theme-card-background) !important;
   border: none !important;
-  margin: 1rem 0 0.25rem 0 !important;
+  margin: 0.3rem 0 0.05rem 0 !important;
+  /* 상단 마진: 1rem → 0.3rem, 하단 마진 50% 감소: 0.1rem → 0.05rem */
 }
 </style>
