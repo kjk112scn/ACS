@@ -196,7 +196,7 @@
                       <span class="info-label">시작/종료 시간:</span>
                       <span class="info-value">{{
                         formatToLocalTime(selectedScheduleInfo.startTime)
-                        }} / {{
+                      }} / {{
                           formatToLocalTime(selectedScheduleInfo.endTime)
                         }}</span>
                     </div>
@@ -226,7 +226,7 @@
                         <span class="info-label">권장 Train 각도:</span>
                         <span class="info-value text-positive">{{
                           safeToFixed(selectedScheduleInfo.recommendedTrainAngle, 6)
-                        }}°</span>
+                          }}°</span>
                       </div>
                       <div class="info-row">
                         <span class="info-label">최대 Azimuth 속도:</span>
@@ -998,8 +998,11 @@ const downloadCSVWithTransformations = (data: RealtimeTrackingDataItem[]) => {
     // 축변환 데이터 (기울기 변환 적용)
     'AxisTransformedAzimuth(°)', 'AxisTransformedElevation(°)', 'AxisTransformedRange(km)', 'AxisTransformedAltitude(km)',
 
-    // 최종 변환 데이터 (±270도 제한 적용)
+    // 최종 변환 데이터 (±270도 제한 적용, Train=0)
     'FinalTransformedAzimuth(°)', 'FinalTransformedElevation(°)', 'FinalTransformedRange(km)', 'FinalTransformedAltitude(km)',
+
+    // Keyhole Final 변환 데이터 (±270도 제한 적용, Train≠0) [Keyhole 발생 시만]
+    'KeyholeFinalTransformedAzimuth(°)', 'KeyholeFinalTransformedElevation(°)', 'KeyholeFinalTransformedRange(km)', 'KeyholeFinalTransformedAltitude(km)',
 
     // 명령 및 실제 추적 데이터
     'CmdAzimuth(°)', 'CmdElevation(°)', 'ActualAzimuth(°)', 'ActualElevation(°)',
@@ -1045,11 +1048,17 @@ const downloadCSVWithTransformations = (data: RealtimeTrackingDataItem[]) => {
         safeToFixed(item.axisTransformedRange, 6),
         safeToFixed(item.axisTransformedAltitude, 6),
 
-        // 최종 변환 데이터 (±270도 제한 적용)
+        // 최종 변환 데이터 (±270도 제한 적용, Train=0)
         safeToFixed(item.finalTransformedAzimuth, 6),
         safeToFixed(item.finalTransformedElevation, 6),
         safeToFixed(item.finalTransformedRange, 6),
         safeToFixed(item.finalTransformedAltitude, 6),
+
+        // Keyhole Final 변환 데이터 (±270도 제한 적용, Train≠0) [Keyhole 발생 시만]
+        safeToFixed(item.keyholeFinalTransformedAzimuth ?? null, 6),
+        safeToFixed(item.keyholeFinalTransformedElevation ?? null, 6),
+        safeToFixed(item.keyholeFinalTransformedRange ?? null, 6),
+        safeToFixed(item.keyholeFinalTransformedAltitude ?? null, 6),
 
         // 명령 및 실제 추적 데이터
         safeToFixed(item.cmdAz, 6),

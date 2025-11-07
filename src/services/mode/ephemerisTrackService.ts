@@ -184,11 +184,17 @@ export interface RealtimeTrackingDataItem {
   axisTransformedRange?: number
   axisTransformedAltitude?: number
 
-  // 최종 변환 데이터 (±270도 제한 적용)
+  // 최종 변환 데이터 (±270도 제한 적용, Train=0)
   finalTransformedAzimuth?: number
   finalTransformedElevation?: number
   finalTransformedRange?: number
   finalTransformedAltitude?: number
+
+  // Keyhole Final 변환 데이터 (±270도 제한 적용, Train≠0) [Keyhole 발생 시만]
+  keyholeFinalTransformedAzimuth?: number
+  keyholeFinalTransformedElevation?: number
+  keyholeFinalTransformedRange?: number
+  keyholeFinalTransformedAltitude?: number
 
   // 명령 및 실제 추적 데이터
   cmdAz: number
@@ -227,6 +233,8 @@ export interface RealtimeTrackingDataItem {
   hasTransformation?: boolean
   interpolationMethod?: string
   interpolationAccuracy?: number
+  isKeyhole?: boolean
+  finalDataType?: string
 
   // 데이터 유효성 및 소스
   hasValidData?: boolean
@@ -831,6 +839,32 @@ class EphemerisTrackService {
     } catch (error) {
       console.error('❌ 설정값 조회 실패, 기본값 0.0 사용:', error)
       return 0.0
+    }
+  }
+
+  /**
+   * enableDisplayMinElevationFiltering 설정값 조회
+   *
+   * SettingsService에서 displayMinElevationAngle 필터링 활성화/비활성화 여부를 조회합니다.
+   *
+   * @returns enableDisplayMinElevationFiltering 값 (boolean)
+   */
+  async getEnableDisplayMinElevationFiltering(): Promise<boolean> {
+    try {
+      const response = await api.get('/settings')
+
+      const setting = response.data.find(
+        (s: SettingItem) => s.key === 'ephemeris.tracking.enableDisplayMinElevationFiltering',
+      )
+
+      const value = setting?.value ? setting.value === 'true' || setting.value === true : true // 기본값: true
+
+      console.log(`⚙️ enableDisplayMinElevationFiltering 설정값: ${value}`)
+
+      return value
+    } catch (error) {
+      console.error('❌ 설정값 조회 실패, 기본값 true 사용:', error)
+      return true // 기본값: 활성화
     }
   }
 
