@@ -1,203 +1,240 @@
 <template>
   <div class="pass-schedule-mode">
-    <div class="section-title text-h5 text-primary q-mb-xs">Pass Schedule Mode</div>
-
-    <!-- Control Section -->
-    <div class="row q-col-gutter-md q-mb-md">
-      <!-- Azimuth Control -->
-      <div class="col-6 col-sm-3">
+    <!-- 1행: Offset Controls - EphemerisDesignationPage와 동일한 구조 -->
+    <div class="row q-col-gutter-md q-mb-sm">
+      <div class="col-12">
         <q-card flat bordered class="control-card">
-          <q-card-section class="bg-blue-1">
-            <div class="text-subtitle2 text-weight-bold text-primary">Azimuth</div>
-          </q-card-section>
-          <q-card-section>
-            <div class="compact-control-row">
-              <q-input v-model="inputs[0]" @input="(val: string) => onInputChange(0, val)" dense outlined type="number"
-                step="0.01" class="control-input" label="Input" />
-              <div class="control-buttons">
-                <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
-                <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
+          <q-card-section class="compact-control purple-1">
+            <!-- 모든 간격이 동적으로 조정되는 반응형 레이아웃 -->
+            <div class="flexible-offset-layout">
+              <!-- Azimuth Offset -->
+              <div class="offset-group">
+                <div class="row q-gutter-xs align-center">
+                  <div class="col-auto position-offset-label">
+                    <div class="text-subtitle2 text-weight-bold text-primary text-center">
+                      Azimuth<br>Offset
+                    </div>
+                  </div>
+                  <div class="col-auto">
+                    <q-input v-model="inputs[0]" @input="(val: string) => onInputChange(0, val)" dense outlined
+                      type="number" step="0.01" label="Azimuth" class="offset-input" />
+                  </div>
+                  <div class="col-auto">
+                    <div class="vertical-button-group">
+                      <div class="vertical-buttons">
+                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
+                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
+                      </div>
+                      <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(0)" />
+                    </div>
+                  </div>
+                  <div class="col-auto">
+                    <q-input v-model="outputs[0]" dense outlined readonly label="Output"
+                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                  </div>
+                </div>
               </div>
-              <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(0)" class="reset-button" />
 
-              <q-input v-model="outputs[0]" dense outlined readonly class="output-input-small" label="Output" />
-            </div>
-          </q-card-section>
-        </q-card>
-      </div>
-      <!-- Elevation Control -->
-      <div class="col-6 col-sm-3">
-        <q-card flat bordered class="control-card">
-          <q-card-section class="bg-green-1">
-            <div class="text-subtitle2 text-weight-bold text-primary">Elevation</div>
-          </q-card-section>
-          <q-card-section>
-            <div class="compact-control-row">
-              <q-input v-model="inputs[1]" @input="(val: string) => onInputChange(1, val)" dense outlined type="number"
-                step="0.01" class="control-input" label="Input" />
-              <div class="control-buttons">
-                <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(1)" />
-                <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
+              <!-- Elevation Offset -->
+              <div class="offset-group">
+                <div class="row q-gutter-xs align-center">
+                  <div class="col-auto position-offset-label">
+                    <div class="text-subtitle2 text-weight-bold text-primary text-center">
+                      Elevation<br>Offset
+                    </div>
+                  </div>
+                  <div class="col-auto">
+                    <q-input v-model="inputs[1]" @input="(val: string) => onInputChange(1, val)" dense outlined
+                      type="number" step="0.01" label="Elevation"
+                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                  </div>
+                  <div class="col-auto">
+                    <div class="vertical-button-group">
+                      <div class="vertical-buttons">
+                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(1)" />
+                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
+                      </div>
+                      <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(1)" />
+                    </div>
+                  </div>
+                  <div class="col-auto">
+                    <q-input v-model="outputs[1]" dense outlined readonly label="Output"
+                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                  </div>
+                </div>
               </div>
-              <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(1)" class="reset-button" />
 
-              <q-input v-model="outputs[1]" dense outlined readonly class="output-input-small" label="Output" />
-            </div>
-          </q-card-section>
-        </q-card>
-      </div>
-      <!-- Tilt Control -->
-      <div class="col-6 col-sm-3">
-        <q-card flat bordered class="control-card">
-          <q-card-section class="bg-orange-1">
-            <div class="text-subtitle2 text-weight-bold text-primary">Tilt</div>
-          </q-card-section>
-          <q-card-section>
-            <div class="compact-control-row">
-              <q-input v-model="inputs[2]" @input="(val: string) => onInputChange(2, val)" dense outlined type="number"
-                step="0.01" class="control-input" label="Input" />
-              <div class="control-buttons">
-                <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(2)" />
-                <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
+              <!-- Tilt Offset -->
+              <div class="offset-group">
+                <div class="row q-gutter-xs align-center">
+                  <div class="col-auto position-offset-label">
+                    <div class="text-subtitle2 text-weight-bold text-primary text-center">
+                      Tilt<br>Offset
+                    </div>
+                  </div>
+                  <div class="col-auto">
+                    <q-input v-model="inputs[2]" @input="(val: string) => onInputChange(2, val)" dense outlined
+                      type="number" step="0.01" label="Tilt"
+                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                  </div>
+                  <div class="col-auto">
+                    <div class="vertical-button-group">
+                      <div class="vertical-buttons">
+                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(2)" />
+                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
+                      </div>
+                      <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(2)" />
+                    </div>
+                  </div>
+                  <div class="col-auto">
+                    <q-input v-model="outputs[2]" dense outlined readonly label="Output"
+                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                  </div>
+                </div>
               </div>
-              <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(2)" class="reset-button" />
 
-              <q-input v-model="outputs[2]" dense outlined readonly class="output-input-small" label="Output" />
-            </div>
-          </q-card-section>
-        </q-card>
-      </div>
-      <!-- Time Control -->
-      <div class="col-6 col-sm-3">
-        <q-card flat bordered class="control-card">
-          <q-card-section class="purple-1">
-            <div class="text-subtitle2 text-weight-bold text-primary">Time</div>
-          </q-card-section>
-          <q-card-section>
-            <div class="compact-control-row">
-              <q-input v-model="inputs[3]" @input="(val: string) => onInputChange(3, val)" dense outlined type="number"
-                step="1" class="control-input" label="Input" />
-              <div class="control-buttons">
-                <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(3)" />
-                <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
-              </div>
-              <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(3)" class="reset-button" />
-
-
-              <div class="time-output-section">
-                <q-input v-model="outputs[3]" dense outlined readonly class="output-input" label="Output" />
-                <q-input v-model="formattedCalTime" dense outlined readonly label="Cal Time" class="cal-time-input" />
+              <!-- Time Offset + Cal Time -->
+              <div class="offset-group">
+                <div class="row q-gutter-xs align-center">
+                  <div class="col-auto position-offset-label">
+                    <div class="text-subtitle2 text-weight-bold text-primary text-center">
+                      Time<br>Offset
+                    </div>
+                  </div>
+                  <div class="col-auto">
+                    <q-input v-model="inputs[3]" @input="(val: string) => onInputChange(3, val)" dense outlined
+                      type="number" step="0.01" label="Time"
+                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                  </div>
+                  <div class="col-auto">
+                    <div class="vertical-button-group">
+                      <div class="vertical-buttons">
+                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(3)" />
+                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
+                      </div>
+                      <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(3)" />
+                    </div>
+                  </div>
+                  <div class="col-auto">
+                    <q-input v-model="outputs[3]" dense outlined readonly label="Result"
+                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                  </div>
+                  <div class="col-auto cal-time-field">
+                    <q-input v-model="formattedCalTime" dense outlined readonly label="Cal Time"
+                      style="min-width: 190px !important; max-width: 220px !important;" />
+                  </div>
+                </div>
               </div>
             </div>
           </q-card-section>
         </q-card>
       </div>
     </div>
-    <!-- Main Content Section - 2행 구조로 변경 -->
-    <div class="schedule-container">
-      <div class="row q-col-gutter-sm">
+    <!-- 2행: Main Content -->
+    <div class="row q-col-gutter-md items-stretch">
+      <!-- 1번 영역: 차트가 들어갈 네모난 칸 - 반응형 크기 조정 -->
+      <div class="col-12 col-md-3 col-lg-3 col-xl-3">
+        <q-card class="control-section">
+          <q-card-section>
+            <div class="text-subtitle1 text-weight-bold text-primary">Position View</div>
+            <div class="chart-area" ref="chartRef"></div>
+          </q-card-section>
+        </q-card>
+      </div>
 
-        <!-- 1행: Position View - 기존 크기 유지 -->
-        <div class="col-12 col-md-4">
-          <q-card class="control-section">
-            <q-card-section>
-              <div class="text-subtitle1 text-weight-bold text-primary">Position View</div>
-              <div ref="chartRef" class="chart-area"></div>
-            </q-card-section>
-          </q-card>
-        </div>
-        <!-- 1행: Schedule Information - 30% 축소 -->
-        <div class="col-12 col-md-2">
-          <q-card class="control-section">
-            <q-card-section>
-              <div class="text-subtitle1 text-weight-bold text-primary">Schedule Information</div>
-              <div class="schedule-form">
-                <div class="form-row">
-                  <!-- 자동/수동 선택된 스케줄 정보 표시 -->
-                  <div v-if="displaySchedule" class="schedule-info q-mt-md">
-                    <div class="info-row">
-                      <span class="info-label">스케줄 ID / 상태:</span>
-                      <div class="info-value-with-badge">
-                        <span class="info-value">{{ displaySchedule.no }}</span>
-                        <q-badge v-if="currentScheduleStatus" :color="currentScheduleStatus.color"
-                          :label="currentScheduleStatus.label" class="q-ml-sm" />
-                      </div>
+      <!-- 2번 영역: Schedule Information -->
+      <div class="col-12 col-md-4">
+        <q-card class="control-section">
+          <q-card-section>
+            <div class="text-subtitle1 text-weight-bold text-primary q-mb-xs">Schedule Information</div>
+            <div class="schedule-form">
+              <div class="form-row">
+                <!-- 자동/수동 선택된 스케줄 정보 표시 -->
+                <div v-if="displaySchedule" class="schedule-info q-mt-xs">
+                  <div class="info-row">
+                    <span class="info-label">스케줄 ID / 상태:</span>
+                    <div class="info-value-with-badge">
+                      <span class="info-value">{{ displaySchedule.no }}</span>
+                      <q-badge v-if="currentScheduleStatus" :color="currentScheduleStatus.color"
+                        :label="currentScheduleStatus.label" class="q-ml-sm" />
                     </div>
-                    <!--     <div class="info-row">
+                  </div>
+                  <!--     <div class="info-row">
                       <span class="info-label">Index:</span>
                       <span class="info-value">{{ displaySchedule.index }}</span>
                     </div> -->
-                    <div class="info-row">
-                      <span class="info-label">위성 이름:</span>
-                      <span class="info-value">{{ displaySchedule.satelliteName }}</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">시작 시간:</span>
-                      <span class="info-value">{{ formatToLocalTime(displaySchedule.startTime) }}</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">종료 시간:</span>
-                      <span class="info-value">{{ formatToLocalTime(displaySchedule.endTime) }}</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">지속 시간:</span>
-                      <span class="info-value">{{ displaySchedule.duration }}</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">시작 방위각:</span>
-                      <span class="info-value">{{ displaySchedule.startAzimuthAngle.toFixed(2) }}°</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">최대 고도각:</span>
-                      <span class="info-value">{{ displaySchedule.maxElevation?.toFixed(2) }}°</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">남은 시간:</span>
-                      <span class="info-value" :class="{
-                        'text-negative': timeRemaining < 0,
-                        'text-positive': timeRemaining > 0,
-                        'text-grey': timeRemaining === 0,
-                      }">
-                        {{ formatTimeRemaining(timeRemaining) }}
-                      </span>
-                    </div>
-
+                  <div class="info-row">
+                    <span class="info-label">위성 이름:</span>
+                    <span class="info-value">{{ displaySchedule.satelliteName }}</span>
                   </div>
-                  <!-- 스케줄이 선택되지 않은 경우 -->
-                  <div v-else class="no-schedule-selected">
-                    <div class="text-grey-5">추적 중인 스케줄이 없습니다</div>
+                  <div class="info-row">
+                    <span class="info-label">시작 시간:</span>
+                    <span class="info-value">{{ formatToLocalTime(displaySchedule.startTime) }}</span>
                   </div>
-                </div>
-              </div>
-            </q-card-section>
-          </q-card>
-        </div>
-        <!-- Schedule Control - 30% 확대 -->
-        <div class="col-12 col-md-6">
-          <q-card class="control-section">
-            <q-card-section>
-              <!-- ✅ Schedule Control 헤더 -->
-              <div class="schedule-header">
-                <div class="text-subtitle1 text-weight-bold text-primary">Schedule Control</div>
-                <div class="schedule-header-right">
-                  <!-- 현재/다음 스케줄 상태 표시 -->
-                  <div v-if="currentDisplaySchedule" class="current-schedule-display">
-                    <q-icon :name="currentDisplaySchedule.type === 'current' ? 'play_arrow' : 'schedule'"
-                      :color="currentDisplaySchedule.type === 'current' ? 'positive' : 'primary'" size="sm" />
-                    <span class="text-body2 q-ml-xs">
-                      {{ currentDisplaySchedule.label }}: Index {{ currentDisplaySchedule.mstId }}
+                  <div class="info-row">
+                    <span class="info-label">종료 시간:</span>
+                    <span class="info-value">{{ formatToLocalTime(displaySchedule.endTime) }}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">지속 시간:</span>
+                    <span class="info-value">{{ displaySchedule.duration }}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">시작 방위각:</span>
+                    <span class="info-value">{{ displaySchedule.startAzimuthAngle.toFixed(2) }}°</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">최대 고도각:</span>
+                    <span class="info-value">{{ displaySchedule.maxElevation?.toFixed(2) }}°</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">남은 시간:</span>
+                    <span class="info-value" :class="{
+                      'text-negative': timeRemaining < 0,
+                      'text-positive': timeRemaining > 0,
+                      'text-grey': timeRemaining === 0,
+                    }">
+                      {{ formatTimeRemaining(timeRemaining) }}
                     </span>
-                    <q-badge :color="currentDisplaySchedule.type === 'current' ? 'positive' : 'primary'"
-                      :label="currentDisplaySchedule.type === 'current' ? '추적중' : '대기중'" class="q-ml-sm" />
                   </div>
-                  <!-- 등록된 스케줄 정보 -->
-                  <div class="registered-schedule-info">
-                    <span class="text-body2 text-primary">등록된 스케줄</span>
-                    <span class="text-caption text-grey-5 q-ml-xs">{{ scheduleData.length }}개</span>
-                  </div>
+
+                </div>
+                <!-- 스케줄이 선택되지 않은 경우 -->
+                <div v-else class="no-schedule-selected">
+                  <div class="text-grey-5">추적 중인 스케줄이 없습니다</div>
                 </div>
               </div>
-              <!--
+            </div>
+          </q-card-section>
+        </q-card>
+      </div>
+
+      <!-- 3번 영역: Schedule Control -->
+      <div class="col-12 col-md-5">
+        <q-card class="control-section">
+          <q-card-section>
+            <!-- ✅ Schedule Control 헤더 -->
+            <div class="schedule-header">
+              <div class="text-subtitle1 text-weight-bold text-primary schedule-header-title">Schedule Control</div>
+              <div class="schedule-header-right">
+                <!-- 현재/다음 스케줄 상태 표시 -->
+                <div v-if="currentDisplaySchedule" class="current-schedule-display">
+                  <q-icon :name="currentDisplaySchedule.type === 'current' ? 'play_arrow' : 'schedule'"
+                    :color="currentDisplaySchedule.type === 'current' ? 'positive' : 'primary'" size="sm" />
+                  <span class="text-body2 q-ml-xs">
+                    {{ currentDisplaySchedule.label }}: Index {{ currentDisplaySchedule.mstId }}
+                  </span>
+                  <q-badge :color="currentDisplaySchedule.type === 'current' ? 'positive' : 'primary'"
+                    :label="currentDisplaySchedule.type === 'current' ? '추적중' : '대기중'" class="q-ml-sm" />
+                </div>
+                <!-- 등록된 스케줄 정보 -->
+                <div class="registered-schedule-info">
+                  <span class="text-body2 text-primary">등록된 스케줄</span>
+                  <span class="text-caption text-grey-5 q-ml-xs">{{ scheduleData.length }}개</span>
+                </div>
+              </div>
+            </div>
+            <!--
               <div class="debug-panel q-mb-md" v-if="true">
                 <q-card flat bordered>
                   <q-card-section class="q-py-sm">
@@ -220,89 +257,88 @@
                 </q-card>
               </div>
  -->
-              <!-- ✅ 스케줄 테이블 - 체크박스 제거 -->
-              <q-table flat bordered :row-class="getRowClass" :row-style="getRowStyleDirect" :rows="sortedScheduleList"
-                :columns="scheduleColumns" row-key="no" :pagination="{ rowsPerPage: 0 }" hide-pagination
-                :loading="loading" @row-click="onRowClick" class="schedule-table q-mt-sm"
-                :style="scheduleData.length <= 20 ? 'height: auto; max-height: 400px' : 'height: 300px'"
-                :no-data-label="'등록된 스케줄이 없습니다'" :virtual-scroll="scheduleData.length > 20"
-                :virtual-scroll-sticky-size-start="48">
-                <template v-slot:loading>
-                  <q-inner-loading showing color="primary">
-                    <q-spinner size="50px" color="primary" />
-                  </q-inner-loading>
-                </template>
-                <!-- 삭제 버튼 컬럼 -->
-                <template v-slot:body-cell-actions="props">
-                  <q-td :props="props">
-                    <q-btn icon="delete" color="negative" size="sm" flat round>
-                      <q-tooltip>목록에서 제거</q-tooltip>
-                    </q-btn>
-                  </q-td>
-                </template>
-                <!-- 위성 정보 컬럼 템플릿 -->
-                <template v-slot:body-cell-satelliteInfo="props">
-                  <q-td :props="props" class="satellite-info-cell">
-                    <div class="satellite-container">
-                      <div class="satellite-id">{{ props.row.satelliteId || '-' }}</div>
-                      <div class="satellite-name">{{ props.row.satelliteName }}</div>
-                    </div>
-                  </q-td>
-                </template>
-
-                <!-- 시간 범위 컬럼 템플릿 - formatDateTime 함수 사용 -->
-                <template v-slot:body-cell-timeRange="props">
-                  <q-td :props="props" class="time-range-cell">
-                    <div class="time-container">
-
-
-                      <div class="start-time">{{ formatDateTime(props.row.startTime) }}</div>
-                      <div class="end-time">{{ formatDateTime(props.row.endTime) }}</div>
-                    </div>
-                  </q-td>
-                </template>
-
-                <!-- Azimuth 범위 컬럼 템플릿 -->
-                <template v-slot:body-cell-azimuthRange="props">
-                  <q-td :props="props" class="azimuth-range-cell">
-                    <div class="azimuth-container">
-                      <div class="start-az">{{ formatAngle(props.row.startAzimuthAngle) }}</div>
-                      <div class="end-az">{{ formatAngle(props.row.endAzimuthAngle) }}</div>
-                    </div>
-                  </q-td>
-                </template>
-
-                <!-- Elevation 정보 컬럼 템플릿 -->
-                <template v-slot:body-cell-elevationInfo="props">
-                  <q-td :props="props" class="elevation-info-cell">
-                    <div class="elevation-container">
-                      <div class="max-elevation">{{ formatAngle(props.row.maxElevation) }}</div>
-                      <div class="train">{{ formatAngle(0) }}</div>
-                    </div>
-                  </q-td>
-                </template>
-              </q-table>
-              <!-- 버튼 그룹 섹션 -->
-              <div class="button-group q-mt-md">
-                <div class="button-row q-mb-md">
-                  <q-btn color="info" label="TLE Upload" icon="upload_file" @click="handleTLEUpload"
-                    class="q-mr-sm upload-btn" size="md" />
-
-                  <q-btn color="primary" label="Select Schedule" icon="playlist_add_check" @click="selectScheduleData"
-                    class="upload-btn" size="md">
-                    <q-tooltip>스케줄 목록을 불러와서 선택할 수 있습니다</q-tooltip>
+            <!-- ✅ 스케줄 테이블 - 체크박스 제거 -->
+            <q-table flat bordered :row-class="getRowClass" :row-style="getRowStyleDirect" :rows="sortedScheduleList"
+              :columns="scheduleColumns" row-key="no" :pagination="{ rowsPerPage: 0 }" hide-pagination
+              :loading="loading" @row-click="onRowClick" class="schedule-table q-mt-sm"
+              :style="scheduleData.length <= 20 ? 'height: auto; max-height: 200px' : 'height: 200px'"
+              :no-data-label="'등록된 스케줄이 없습니다'" :virtual-scroll="scheduleData.length > 20"
+              :virtual-scroll-sticky-size-start="48">
+              <template v-slot:loading>
+                <q-inner-loading showing color="primary">
+                  <q-spinner size="50px" color="primary" />
+                </q-inner-loading>
+              </template>
+              <!-- 삭제 버튼 컬럼 -->
+              <template v-slot:body-cell-actions="props">
+                <q-td :props="props">
+                  <q-btn icon="delete" color="negative" size="sm" flat round>
+                    <q-tooltip>목록에서 제거</q-tooltip>
                   </q-btn>
-                </div>
+                </q-td>
+              </template>
+              <!-- 위성 정보 컬럼 템플릿 -->
+              <template v-slot:body-cell-satelliteInfo="props">
+                <q-td :props="props" class="satellite-info-cell">
+                  <div class="satellite-container">
+                    <div class="satellite-id">{{ props.row.satelliteId || '-' }}</div>
+                    <div class="satellite-name">{{ props.row.satelliteName }}</div>
+                  </div>
+                </q-td>
+              </template>
 
-                <div class="control-button-row">
-                  <q-btn color="positive" label="Start" @click="handleStartCommand" class="control-btn" size="md" />
-                  <q-btn color="warning" label="Stop" @click="handleStopCommand" class="control-btn" size="md" />
-                  <q-btn color="negative" label="Stow" @click="handleStowCommand" class="control-btn" size="md" />
-                </div>
+              <!-- 시간 범위 컬럼 템플릿 - formatDateTime 함수 사용 -->
+              <template v-slot:body-cell-timeRange="props">
+                <q-td :props="props" class="time-range-cell">
+                  <div class="time-container">
+
+
+                    <div class="start-time">{{ formatDateTime(props.row.startTime) }}</div>
+                    <div class="end-time">{{ formatDateTime(props.row.endTime) }}</div>
+                  </div>
+                </q-td>
+              </template>
+
+              <!-- Azimuth 범위 컬럼 템플릿 -->
+              <template v-slot:body-cell-azimuthRange="props">
+                <q-td :props="props" class="azimuth-range-cell">
+                  <div class="azimuth-container">
+                    <div class="start-az">{{ formatAngle(props.row.startAzimuthAngle) }}</div>
+                    <div class="end-az">{{ formatAngle(props.row.endAzimuthAngle) }}</div>
+                  </div>
+                </q-td>
+              </template>
+
+              <!-- Elevation 정보 컬럼 템플릿 -->
+              <template v-slot:body-cell-elevationInfo="props">
+                <q-td :props="props" class="elevation-info-cell">
+                  <div class="elevation-container">
+                    <div class="max-elevation">{{ formatAngle(props.row.maxElevation) }}</div>
+                    <div class="train">{{ formatAngle(0) }}</div>
+                  </div>
+                </q-td>
+              </template>
+            </q-table>
+            <!-- 버튼 그룹 섹션 -->
+            <div class="button-group q-mt-sm">
+              <div class="button-row q-mb-sm">
+                <q-btn color="info" label="TLE Upload" icon="upload_file" @click="handleTLEUpload"
+                  class="q-mr-sm upload-btn" size="sm" />
+
+                <q-btn color="primary" label="Select Schedule" icon="playlist_add_check" @click="selectScheduleData"
+                  class="upload-btn" size="sm">
+                  <q-tooltip>스케줄 목록을 불러와서 선택할 수 있습니다</q-tooltip>
+                </q-btn>
               </div>
-            </q-card-section>
-          </q-card>
-        </div>
+
+              <div class="control-button-row">
+                <q-btn color="positive" label="Start" @click="handleStartCommand" class="control-btn" size="sm" />
+                <q-btn color="warning" label="Stop" @click="handleStopCommand" class="control-btn" size="sm" />
+                <q-btn color="negative" label="Stow" @click="handleStowCommand" class="control-btn" size="sm" />
+              </div>
+            </div>
+          </q-card-section>
+        </q-card>
       </div>
     </div>
   </div>
@@ -1125,7 +1161,7 @@ const handleTLEUpload = async () => {
   }
 }
 
-// 🆕 PassSchedule 전용 차트 초기화
+// ✅ 차트 초기화 함수 수정 - 반응형 크기
 const initChart = () => {
   if (!chartRef.value) return
 
@@ -1134,18 +1170,36 @@ const initChart = () => {
     passChart.dispose()
   }
 
-  // 차트 인스턴스 생성
-  passChart = echarts.init(chartRef.value)
+  // 화면 크기에 따른 차트 크기 결정
+  const getChartSize = () => {
+    const width = window.innerWidth
+    if (width <= 1200) return 280
+    if (width <= 1600) return 320
+    if (width <= 1900) return 360
+    return 420
+  }
+
+  const chartSize = getChartSize()
+
+  // 차트 인스턴스 생성 (반응형 크기)
+  passChart = echarts.init(chartRef.value, null, {
+    width: chartSize,
+    height: chartSize
+  })
   console.log('PassSchedule 차트 인스턴스 생성됨')
 
-  // 차트 옵션 설정 (Ephemeris와 동일한 스타일)
+  // 차트 옵션 설정
   const option = {
     backgroundColor: 'transparent',
     grid: {
-      containLabel: true,
+      left: 10,
+      right: 10,
+      top: 10,
+      bottom: 10,
+      containLabel: false
     },
     polar: {
-      radius: ['0%', '80%'],
+      radius: ['0%', '50%'],
       center: ['50%', '50%'],
     },
     angleAxis: {
@@ -1154,7 +1208,7 @@ const initChart = () => {
       clockwise: true,
       min: 0,
       max: 360,
-      animation: false,
+      animation: false, // ✅ 애니메이션 완전 비활성화
       axisLine: {
         show: true,
         lineStyle: {
@@ -1163,13 +1217,14 @@ const initChart = () => {
       },
       axisTick: {
         show: true,
-        interval: 30,
+        interval: 60,
+        length: 3,
         lineStyle: {
           color: '#555',
         },
       },
       axisLabel: {
-        interval: 30,
+        interval: 60,
         formatter: function (value: number) {
           if (value === 0) return 'N (0°)'
           if (value === 90) return 'E (90°)'
@@ -1179,16 +1234,16 @@ const initChart = () => {
           if (value === 135) return 'SE (135°)'
           if (value === 225) return 'SW (225°)'
           if (value === 315) return 'NW (315°)'
-          if (value % 30 === 0) return value + '°'
+          if (value % 60 === 0) return value + '°'
           return ''
         },
         color: '#999',
-        fontSize: 10,
-        distance: 10,
+        fontSize: 8,
+        distance: -8,
       },
       splitLine: {
         show: true,
-        interval: 30,
+        interval: 60,
         lineStyle: {
           color: '#555',
           type: 'dashed',
@@ -1201,7 +1256,7 @@ const initChart = () => {
       min: 0,
       max: 90,
       inverse: true,
-      animation: false,
+      animation: false, // ✅ 애니메이션 완전 비활성화
       axisLine: {
         show: false,
       },
@@ -1211,6 +1266,7 @@ const initChart = () => {
       axisLabel: {
         formatter: '{value}°',
         color: '#999',
+        fontSize: 8,
       },
       splitLine: {
         show: true,
@@ -1227,7 +1283,7 @@ const initChart = () => {
         coordinateSystem: 'polar',
         symbol: 'circle',
         symbolSize: 15,
-        animation: false,
+        animation: false, // ✅ 애니메이션 완전 비활성화
         itemStyle: {
           color: '#ff5722',
         },
@@ -1242,7 +1298,10 @@ const initChart = () => {
         label: {
           show: true,
           formatter: function (params: EChartsScatterParam) {
-            return `Az: ${params.value[1].toFixed(2)}°\nEl: ${params.value[0].toFixed(2)}°`
+            // ✅ 원본 값 표시 (정규화된 값이 아닌)
+            const originalAz = currentPosition.value?.azimuth || params.value[1]
+            const originalEl = currentPosition.value?.elevation || params.value[0]
+            return `Az: ${originalAz.toFixed(2)}°\nEl: ${originalEl.toFixed(2)}°`
           },
           position: 'top',
           distance: 5,
@@ -1254,16 +1313,32 @@ const initChart = () => {
         },
         zlevel: 3,
       },
-
+      {
+        name: '위치 선',
+        type: 'line',
+        coordinateSystem: 'polar',
+        symbol: 'none',
+        animation: false, // ✅ 애니메이션 완전 비활성화
+        lineStyle: {
+          color: '#ff5722',
+          width: 2,
+          type: 'dashed',
+        },
+        data: [
+          [0, 0],
+          [0, 0],
+        ],
+        zlevel: 2,
+      },
       {
         name: '실시간 추적 경로',
         type: 'line',
         coordinateSystem: 'polar',
         symbol: 'none',
-        animation: false,
+        animation: false, // ✅ 애니메이션 완전 비활성화
         lineStyle: {
           color: '#ffffff',
-          width: 2,
+          width: 2, // ✅ 3 → 2로 줄여서 렌더링 부하 감소
           opacity: 0.8,
         },
         data: [],
@@ -1274,7 +1349,7 @@ const initChart = () => {
         type: 'line',
         coordinateSystem: 'polar',
         symbol: 'none',
-        animation: false,
+        animation: false, // ✅ 애니메이션 완전 비활성화
         lineStyle: {
           color: '#2196f3',
           width: 2,
@@ -1285,18 +1360,32 @@ const initChart = () => {
     ],
   }
 
-  // 차트 옵션 적용
-  passChart.setOption(option)
+  // 차트 옵션 적용 (반응형 크기)
+  passChart.setOption(option, true)
+  passChart.resize({
+    width: chartSize,
+    height: chartSize
+  })
   console.log('PassSchedule 차트 옵션 적용됨')
 
-  // 명시적으로 리사이즈 호출
+  // 차트 크기 조정
   setTimeout(() => {
-    passChart?.resize()
-  }, 0)
+    if (passChart && !passChart.isDisposed()) {
+      passChart.resize({
+        width: chartSize,
+        height: chartSize
+      })
+      console.log('PassSchedule 차트 리사이즈 완료')
+    }
+  }, 100)
 
-  // 윈도우 리사이즈 이벤트에 대응
+  // 윈도우 리사이즈 이벤트에 대응 (반응형)
   window.addEventListener('resize', () => {
-    passChart?.resize()
+    const newSize = getChartSize()
+    passChart?.resize({
+      width: newSize,
+      height: newSize
+    })
   })
 }
 
@@ -2034,6 +2123,89 @@ const formattedCalTime = computed(() => {
 </script>
 
 <style scoped>
+/* 모든 간격이 동적으로 조정되는 반응형 레이아웃 */
+.flexible-offset-layout {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  width: 100%;
+  gap: 40px;
+  row-gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 개별 Offset 그룹 - Elevation, Tilt, Time은 좌측 공간 축소 */
+.offset-group {
+  flex: none;
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.01);
+  display: flex;
+  align-items: center;
+}
+
+/* ✅ 간격 통일 - padding-left 제거하고 gap만으로 간격 관리 */
+
+/* 라벨 스타일 */
+.position-offset-label {
+  min-width: 80px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: rgba(25, 118, 210, 0.1);
+  border: 1px solid rgba(25, 118, 210, 0.3);
+}
+
+/* Cal Time 필드 스타일 - 확보된 공간 활용 */
+.cal-time-field {
+  flex-shrink: 0;
+  min-width: 190px;
+}
+
+/* 반응형 동작 - 1900px 기준으로 줄바꿈 */
+@media (max-width: 1900px) {
+  .flexible-offset-layout {
+    flex-wrap: wrap;
+    gap: 20px;
+    row-gap: 8px;
+    justify-content: center;
+  }
+
+  .offset-group {
+    flex: none;
+    min-width: 0;
+    padding: 8px;
+  }
+
+  .position-offset-label {
+    min-width: 70px;
+    font-size: 0.8rem;
+  }
+
+  .cal-time-field {
+    min-width: 180px;
+    max-width: 200px;
+  }
+}
+
+@media (min-width: 1901px) {
+  .flexible-offset-layout {
+    flex-wrap: nowrap;
+    gap: 40px;
+    justify-content: center;
+  }
+
+  .offset-group {
+    flex: none;
+    min-width: 0;
+  }
+
+  .position-offset-label {
+    min-width: 80px;
+    font-size: 0.875rem;
+  }
+}
+
 /* ===== 1. 기본 컨테이너 스타일 ===== */
 .pass-schedule-mode {
   height: 100%;
@@ -2042,11 +2214,12 @@ const formattedCalTime = computed(() => {
   margin: 0;
 }
 
-.schedule-container {
-  padding: 0.5rem 1rem 1rem 1rem;
+/* ✅ 외각 공간 제어 - 단순화 */
+.pass-schedule-mode .schedule-container {
+  padding: 0;
   width: 100%;
   height: 100%;
-  box-sizing: border-box;
+  margin: 0;
 }
 
 .section-title {
@@ -2057,34 +2230,77 @@ const formattedCalTime = computed(() => {
 
 /* ===== 2. 컨트롤 섹션 기본 스타일 ===== */
 .control-section {
-  height: 500px;
+  height: 100%;
+  max-height: 500px;
   width: 100%;
   background-color: var(--theme-card-background);
   border: 1px solid rgba(255, 255, 255, 0.12);
+  /* ✅ EphemerisDesignationPage.vue와 동일한 높이를 위해 flex 추가 - 내부 구성 변경 없음 */
   display: flex;
   flex-direction: column;
-  border-radius: 4px;
 }
 
 .control-section .q-card-section {
+  padding: 16px !important;
+  /* ✅ 남은 공간을 채우도록 flex 추가 - 내부 구성 변경 없음 */
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  padding: 1rem;
 }
 
-/* ===== 3. 차트 영역 스타일 ===== */
 .chart-area {
-  height: 400px;
+  height: 220px;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 0.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-  background-color: rgba(0, 0, 0, 0.2);
+  margin: 0 auto;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: visible;
+  text-align: center;
+  position: relative;
+}
+
+/* ✅ 차트 컨테이너 완전 가운데 정렬 - 이전 크기로 복원, 아래로 조정 */
+.chart-area>div {
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  transform: translate(-50%, -50%);
+  width: 420px;
+  height: 420px;
+  max-width: 420px;
+  max-height: 420px;
+  aspect-ratio: 1;
+}
+
+/* 반응형 차트 크기 조정 - 이전 크기로 복원, 아래로 조정 */
+@media (max-width: 1900px) {
+  .chart-area>div {
+    width: 360px;
+    height: 360px;
+    max-width: 360px;
+    max-height: 360px;
+  }
+}
+
+@media (max-width: 1600px) {
+  .chart-area>div {
+    width: 320px;
+    height: 320px;
+    max-width: 320px;
+    max-height: 320px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .chart-area>div {
+    width: 280px;
+    height: 280px;
+    max-width: 280px;
+    max-height: 280px;
+  }
 }
 
 /* ===== 4. 컨트롤 카드 스타일 ===== */
@@ -2094,8 +2310,237 @@ const formattedCalTime = computed(() => {
   overflow: hidden;
 }
 
-.control-card .q-card-section {
-  padding: 0.75rem;
+/* ✅ 컴팩트 컨트롤 스타일 - 정리 */
+.pass-schedule-mode .compact-control {
+  padding: 0 8px;
+  margin: 0;
+  min-height: auto;
+  height: auto;
+  line-height: 1;
+  vertical-align: top;
+}
+
+.pass-schedule-mode .compact-control .q-input {
+  margin-bottom: 0.25rem;
+}
+
+.pass-schedule-mode .compact-control .q-btn {
+  min-height: 2rem;
+  padding: 0.25rem;
+}
+
+/* ✅ 레이아웃 정렬 스타일 - 정리 */
+.pass-schedule-mode .align-center {
+  align-items: center;
+}
+
+.pass-schedule-mode .justify-end {
+  justify-content: flex-end;
+}
+
+.pass-schedule-mode .justify-center {
+  justify-content: center;
+}
+
+/* ✅ 컴팩트 컨트롤 레이아웃 */
+.pass-schedule-mode .compact-control .row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  width: 100%;
+}
+
+.pass-schedule-mode .compact-control .q-field {
+  margin-bottom: 0;
+}
+
+.pass-schedule-mode .compact-control .col-auto {
+  flex-shrink: 0;
+}
+
+/* ✅ 세부 레이아웃 스타일 - 정리 */
+.pass-schedule-mode .compact-control .row .row {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.pass-schedule-mode .compact-control .text-subtitle2 {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.pass-schedule-mode .compact-control .col-1 {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: fit-content;
+}
+
+/* ✅ 입력 필드 스타일 - 통일 */
+.pass-schedule-mode .offset-input {
+  width: 110px;
+  min-width: 110px;
+  max-width: 110px;
+}
+
+.pass-schedule-mode .cal-time-field {
+  min-width: 190px;
+  max-width: 220px;
+}
+
+/* ✅ 새로운 세로 버튼 레이아웃 */
+.vertical-button-group {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+.vertical-buttons {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+/* ✅ 방법 1: 왼쪽 세로 라벨 (카드 안) - 높이 최적화 */
+.position-offset-label {
+  background: linear-gradient(135deg, rgba(25, 118, 210, 0.15) 0%, rgba(25, 118, 210, 0.08) 100%);
+  padding: 4px 8px;
+  border-radius: 6px;
+  border-right: 3px solid var(--q-primary);
+  min-width: 50px;
+  margin-right: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.position-offset-label .text-subtitle2 {
+  font-size: 0.8rem !important;
+  line-height: 1.2 !important;
+}
+
+/* ✅ 카드 테두리 위아래 패딩 완전 제거 - 더 구체적인 셀렉터 */
+.q-card.control-card .q-card-section.compact-control {
+  padding: 0px 8px !important;
+}
+
+/* ✅ 추가적인 강제 적용 */
+.q-card-section.compact-control {
+  padding-top: 0px !important;
+  padding-bottom: 0px !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+/* ✅ 더 강력한 강제 적용 - 모든 가능한 셀렉터 */
+.q-card-section.compact-control.purple-1,
+.q-card.control-card .q-card-section.compact-control.purple-1,
+.q-card-section[class*="compact-control"],
+.q-card-section[class*="purple-1"] {
+  padding-top: 0px !important;
+  padding-bottom: 0px !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  margin-top: 0px !important;
+  margin-bottom: 0px !important;
+  min-height: auto !important;
+  height: auto !important;
+  line-height: 1 !important;
+  vertical-align: top !important;
+  display: flex !important;
+  align-items: flex-start !important;
+}
+
+/* ✅ Quasar 기본 스타일 덮어쓰기 - 1행 offset control 카드에만 적용 */
+.pass-schedule-mode .q-card.control-card .q-card-section {
+  padding-top: 0px !important;
+  padding-bottom: 0px !important;
+  line-height: 1 !important;
+  vertical-align: top !important;
+}
+
+/* ✅ 2행 control-section 카드는 기본 패딩 유지 */
+.pass-schedule-mode .control-section .q-card-section {
+  padding: 16px !important;
+}
+
+/* ✅ 카드 자체 마진도 제거 */
+.pass-schedule-mode .q-card.control-card {
+  margin-bottom: 0px !important;
+  min-height: auto !important;
+  height: auto !important;
+  line-height: 1 !important;
+  vertical-align: top !important;
+}
+
+.pass-schedule-mode .q-card.control-card .q-card__section {
+  padding-top: 0px !important;
+  padding-bottom: 0px !important;
+  min-height: auto !important;
+  height: auto !important;
+  line-height: 1 !important;
+  vertical-align: top !important;
+}
+
+/* ✅ 추가 높이 줄이기 - 모든 요소의 높이 최소화 */
+.pass-schedule-mode .q-input {
+  min-height: auto !important;
+}
+
+.pass-schedule-mode .q-field__control {
+  min-height: auto !important;
+}
+
+.pass-schedule-mode .q-field__native {
+  padding: auto !important;
+}
+
+.pass-schedule-mode .q-btn {
+  min-height: auto !important;
+}
+
+.pass-schedule-mode .q-btn--dense {
+  min-height: auto !important;
+}
+
+/* ✅ 라벨 테두리 높이만 줄이기 - 내부 구성은 유지 */
+.pass-schedule-mode .position-offset-label {
+  padding: 4px 8px !important;
+  min-width: 50px !important;
+  border-right: 1px solid var(--q-primary) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+}
+
+.pass-schedule-mode .position-offset-label .text-subtitle2 {
+  font-size: 0.8rem !important;
+  line-height: 1.2 !important;
+}
+
+/* ✅ 간격 제거로 더 타이트하게 */
+.pass-schedule-mode .compact-control .row.q-gutter-none {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.pass-schedule-mode .compact-control .row.q-gutter-none>div {
+  padding-left: 0.25rem !important;
+  padding-right: 0.25rem !important;
+}
+
+.pass-schedule-mode .compact-control .row.q-gutter-none>div:first-child {
+  padding-left: 0 !important;
+}
+
+.pass-schedule-mode .compact-control .row.q-gutter-none>div:last-child {
+  padding-right: 0 !important;
 }
 
 /* ===== 5. 컴팩트 컨트롤 행 스타일 ===== */
@@ -2218,8 +2663,6 @@ const formattedCalTime = computed(() => {
 .schedule-form {
   margin-top: 0.5rem;
   width: 100%;
-  flex: 1;
-  overflow-y: auto;
 }
 
 .form-row {
@@ -2227,16 +2670,13 @@ const formattedCalTime = computed(() => {
   flex-direction: column;
   gap: 0.5rem;
   width: 100%;
-  height: 100%;
 }
 
 .schedule-info {
-  padding: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
   background-color: rgba(255, 255, 255, 0.05);
-  flex: 1;
-  overflow-y: auto;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .no-schedule-selected {
@@ -2245,7 +2685,7 @@ const formattedCalTime = computed(() => {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 6px;
   background-color: rgba(255, 255, 255, 0.02);
-  flex: 1;
+  /* ✅ flex: 1 제거 - EphemerisDesignationPage.vue 기준으로 높이 맞추기 */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2255,23 +2695,25 @@ const formattedCalTime = computed(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.info-row:last-child {
+  border-bottom: none;
 }
 
 .info-label {
   font-weight: 500;
-  color: var(--theme-text-secondary);
-  font-size: 13px;
-  min-width: 80px;
+  color: #90caf9;
+  min-width: 120px;
 }
 
 .info-value {
-  font-weight: 600;
-  color: var(--theme-text);
-  font-size: 13px;
+  font-weight: 400;
+  color: #ffffff;
   text-align: right;
+  flex: 1;
 }
 
 .info-value-with-badge {
@@ -2285,22 +2727,29 @@ const formattedCalTime = computed(() => {
 .schedule-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.25rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.schedule-header-title {
+  line-height: 1.2;
+  margin: 0;
+  padding: 0;
 }
 
 .schedule-header-right {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
+  margin-top: 2px;
 }
 
 .current-schedule-display {
   display: flex;
   align-items: center;
-  padding: 4px 8px;
+  padding: 2px 6px;
   background-color: rgba(25, 118, 210, 0.1);
   border-radius: 4px;
   border: 1px solid rgba(25, 118, 210, 0.3);
@@ -2308,8 +2757,8 @@ const formattedCalTime = computed(() => {
 
 .registered-schedule-info {
   background-color: rgba(0, 0, 0, 0.8);
-  padding: 8px 12px;
-  border-radius: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -2320,23 +2769,25 @@ const formattedCalTime = computed(() => {
 }
 
 .registered-schedule-info .text-body2 {
-  margin-bottom: 2px;
+  margin-bottom: 0;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 11px;
   color: #2196f3;
+  line-height: 1.2;
 }
 
 .registered-schedule-info .text-caption {
-  font-size: 11px;
+  font-size: 10px;
   color: rgba(255, 255, 255, 0.8);
   font-weight: 500;
+  line-height: 1.2;
 }
 
 /* ===== 9. 테이블 기본 스타일 ===== */
 .schedule-table {
   background-color: var(--theme-card-background);
   color: white;
-  flex: 1;
+  /* ✅ flex: 1 제거 - EphemerisDesignationPage.vue 기준으로 높이 맞추기 */
   border-radius: 6px;
   overflow: hidden;
 }
@@ -2432,7 +2883,7 @@ const formattedCalTime = computed(() => {
 /* 테이블 셀 기본 스타일 */
 .schedule-table :deep(.q-table tbody td) {
   padding: 8px 6px;
-  font-size: 12px;
+  font-size: 14px;
   color: rgba(255, 255, 255, 0.9);
   border-right: 1px solid rgba(255, 255, 255, 0.04);
   vertical-align: middle;
@@ -2590,13 +3041,13 @@ const formattedCalTime = computed(() => {
 
 .satellite-id {
   font-weight: 600;
-  font-size: 11px;
+  font-size: 14px;
   color: #2196f3;
   line-height: 1.2;
 }
 
 .satellite-name {
-  font-size: 10px;
+  font-size: 14px;
   color: rgba(255, 255, 255, 0.8);
   font-weight: 400;
   line-height: 1.2;
@@ -2619,7 +3070,7 @@ const formattedCalTime = computed(() => {
 
 .start-time,
 .end-time {
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 500;
   line-height: 1.2;
   font-family: 'Courier New', monospace;
@@ -2743,7 +3194,7 @@ const formattedCalTime = computed(() => {
 
 .start-az,
 .end-az {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.2;
   font-family: 'Courier New', monospace;
@@ -2776,7 +3227,7 @@ const formattedCalTime = computed(() => {
 
 .max-elevation,
 .train {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.2;
   font-family: 'Courier New', monospace;
@@ -2792,23 +3243,23 @@ const formattedCalTime = computed(() => {
 
 /* ===== 14. 버튼 그룹 스타일 ===== */
 .button-group {
-  margin-top: 1rem;
+  margin-top: 0.5rem;
   width: 100%;
   flex-shrink: 0;
-  padding-top: 1rem;
+  padding-top: 0.5rem;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .button-row {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.5rem;
   width: 100%;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .control-button-row {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.5rem;
   width: 100%;
 }
 
@@ -2816,8 +3267,8 @@ const formattedCalTime = computed(() => {
 .upload-btn {
   flex: 1;
   min-width: 0;
-  height: 48px;
-  font-size: 14px;
+  height: 36px;
+  font-size: 13px;
   font-weight: 500;
   border-radius: 6px;
   transition: all 0.2s ease;
@@ -2832,8 +3283,8 @@ const formattedCalTime = computed(() => {
 .control-btn {
   flex: 1;
   min-width: 0;
-  height: 40px;
-  font-size: 14px;
+  height: 32px;
+  font-size: 13px;
   font-weight: 500;
   border-radius: 6px;
   transition: all 0.2s ease;
@@ -3057,20 +3508,17 @@ const formattedCalTime = computed(() => {
 
 /* ===== 17. 전역 스타일 (Quasar 오버라이드) ===== */
 
-/* 컬럼 비율 조정 */
+/* ✅ 컬럼 비율 조정 - padding 제거하여 q-col-gutter-md 간격만 사용 */
 .col-md-2 {
   width: 21.6667% !important;
-  padding: 4px;
 }
 
 .col-md-4 {
   width: 33.3333% !important;
-  padding: 4px;
 }
 
 .col-md-6 {
   width: 45% !important;
-  padding: 4px;
 }
 
 /* 오프셋 컨트롤 카드 비중 조정 */

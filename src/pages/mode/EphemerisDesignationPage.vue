@@ -2314,13 +2314,7 @@ onUnmounted(() => {
   align-items: center;
 }
 
-/* Elevation, Tilt, Time Offset 그룹 - Azimuth와 동일한 우측 정렬 */
-.offset-group:nth-child(2),
-.offset-group:nth-child(3),
-.offset-group:nth-child(4) {
-  padding-left: 12px;
-  margin-left: 0px;
-}
+/* ✅ 간격 통일 - padding-left 제거하고 gap만으로 간격 관리 */
 
 /* 라벨 스타일 */
 .position-offset-label {
@@ -2894,29 +2888,23 @@ onUnmounted(() => {
 </style>
 
 <style>
-/* ✅ 전역 스타일 제거하고 scoped로 변경 */
-.q-field__control {
+/* ✅ EphemerisDesignationPage 내부 스타일만 적용 - .ephemeris-mode로 스코프 제한 */
+/* ✅ q-field__control padding 제거 - PassSchedulePage.vue와 동일한 좌측 여백을 위해 Quasar 기본 패딩 사용 */
+/* .ephemeris-mode .q-field__control {
   padding: 0 8px;
-}
+} */
 
-.q-card__section {
+.ephemeris-mode .q-card__section {
   padding: 16px;
 }
 
-/* ✅ 전역 q-card 스타일 제거 - 이것이 문제의 원인 */
-/* .q-card {
-  background: var(--q-dark);
-  box-shadow: 0 1px 5px rgb(0 0 0 / 20%), 0 2px 2px rgb(0 0 0 / 14%), 0 3px 1px -2px rgb(0 0 0 / 12%);
-} */
-
-/* ✅ EphemerisDesignationPage 내부의 q-card만 스타일 적용 */
+/* ✅ EphemerisDesignationPage 내부의 q-card만 스타일 적용 - PassSchedulePage.vue와 동일하게 Quasar 기본 그림자 사용 */
 .ephemeris-mode .q-card {
   background: var(--theme-card-background);
-  box-shadow: 0 1px 5px rgb(0 0 0 / 20%), 0 2px 2px rgb(0 0 0 / 14%), 0 3px 1px -2px rgb(0 0 0 / 12%);
+  /* ✅ box-shadow 제거 - Quasar 기본 q-card 그림자 사용 (PassSchedulePage.vue와 동일) */
 }
 
-
-.q-btn {
+.ephemeris-mode .q-btn {
   flex: 1;
 }
 
@@ -2946,9 +2934,8 @@ onUnmounted(() => {
   font-size: 12px !important;
 }
 
-/* 나머지 스타일은 그대로 유지... */
-/* KEYHOLE 관련 스타일 */
-.keyhole-info {
+/* ✅ KEYHOLE 관련 스타일 - .ephemeris-mode로 스코프 제한 */
+.ephemeris-mode .keyhole-info {
   background-color: rgba(255, 0, 0, 0.1) !important;
   border-left: 3px solid #f44336 !important;
   border-radius: 4px;
@@ -2956,20 +2943,20 @@ onUnmounted(() => {
   margin-top: 8px !important;
 }
 
-.keyhole-info .text-weight-bold {
+.ephemeris-mode .keyhole-info .text-weight-bold {
   font-weight: 600 !important;
 }
 
-.keyhole-info .text-red {
+.ephemeris-mode .keyhole-info .text-red {
   color: #f44336 !important;
 }
 
-.keyhole-info .text-positive {
+.ephemeris-mode .keyhole-info .text-positive {
   color: #4caf50 !important;
 }
 
-/* KEYHOLE 배지 스타일 */
-.q-badge.keyhole-badge {
+/* ✅ KEYHOLE 배지 스타일 - .ephemeris-mode로 스코프 제한 */
+.ephemeris-mode .q-badge.keyhole-badge {
   background-color: #f44336 !important;
   color: white !important;
   font-weight: 600 !important;
@@ -2978,25 +2965,25 @@ onUnmounted(() => {
   border-radius: 3px !important;
 }
 
-/* KEYHOLE 테이블 행 하이라이트 */
-.q-table tbody tr.keyhole-row {
+/* ✅ KEYHOLE 테이블 행 하이라이트 - .ephemeris-mode로 스코프 제한 */
+.ephemeris-mode .q-table tbody tr.keyhole-row {
   background-color: rgba(255, 0, 0, 0.05) !important;
 }
 
-.q-table tbody tr.keyhole-row:hover {
+.ephemeris-mode .q-table tbody tr.keyhole-row:hover {
   background-color: rgba(255, 0, 0, 0.1) !important;
 }
 
-/* KEYHOLE 컬럼 스타일 */
-.keyhole-column {
+/* ✅ KEYHOLE 컬럼 스타일 - .ephemeris-mode로 스코프 제한 */
+.ephemeris-mode .keyhole-column {
   font-weight: 600 !important;
 }
 
-.keyhole-column.text-red {
+.ephemeris-mode .keyhole-column.text-red {
   color: #f44336 !important;
 }
 
-.keyhole-column.text-positive {
+.ephemeris-mode .keyhole-column.text-positive {
   color: #4caf50 !important;
 }
 </style>
