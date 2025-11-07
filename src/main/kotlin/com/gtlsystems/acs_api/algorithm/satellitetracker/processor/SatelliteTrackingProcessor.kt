@@ -84,30 +84,59 @@ class SatelliteTrackingProcessor(
         finalTransformedMst.forEachIndexed { index, mstData ->
             val mstId = mstData["No"] as UInt
 
-            // Train=0 기준 MaxAzRate로 Keyhole 판단
+            /**
+             * Keyhole 판단 및 Train≠0 재계산
+             * 
+             * finalTransformedMst의 IsKeyhole 값을 직접 참조함 (재판단하지 않음).
+             * applyAngleLimitTransformation()에서 이미 계산된 값임.
+             * 
+             * Keyhole 발생 시 finalTransformedMst의 RecommendedTrainAngle을 사용함.
+             * 이 값은 finalTransformedMst 기준으로 본인 데이터로 계산된 값임.
+             * 
+             * 중요: originalMst의 RecommendedTrainAngle을 사용하지 않음.
+             * - originalMst: 2축 기준으로 계산된 값
+             * - finalTransformedMst: 3축, Train=0, ±270도 제한 있음 기준으로 계산된 값 (시스템의 주요 판단 기준)
+             */
+            // ✅ finalTransformedMst의 IsKeyhole 값을 직접 참조 (재판단하지 않음)
+            val isKeyhole = mstData["IsKeyhole"] as? Boolean ?: false
             val train0MaxAzRate = mstData["MaxAzRate"] as? Double ?: 0.0
-            val threshold = settingsService.keyholeAzimuthVelocityThreshold
-            val isKeyhole = train0MaxAzRate >= threshold
 
             logger.info("패스 #$mstId: Train=0 MaxAzRate = ${String.format("%.6f", train0MaxAzRate)}°/s")
-            logger.info("   Keyhole 임계값: $threshold°/s")
-            logger.info("   판단 결과: ${if (isKeyhole) "✅ Keyhole 발생" else "✅ Keyhole 미발생"}")
+            logger.info("   Keyhole 판단 결과 (finalTransformedMst): ${if (isKeyhole) "✅ Keyhole 발생" else "✅ Keyhole 미발생"}")
 
             // Keyhole 발생 시 Train≠0 재계산
             if (isKeyhole) {
-                val recommendedTrainAngle = originalMst[index]["RecommendedTrainAngle"] as? Double ?: 0.0
-                val maxAzRateAzimuth = mstData["MaxAzRateAzimuth"] as? Double ?: 0.0
-
-                logger.info("   계산된 Train 각도: ${String.format("%.6f", recommendedTrainAngle)}°")
+                /**
+                 * finalTransformedMst의 RecommendedTrainAngle 사용
+                 * 
+                 * 이 값은 finalTransformedMst 기준으로 본인 데이터로 계산된 값임.
+                 * 안테나 서쪽(+7°) 방향을 위성 Azimuth로 회전시키는 Train 각도임.
+                 * 
+                 * @param mstData finalTransformedMst의 MST 데이터
+                 * @return RecommendedTrainAngle (Keyhole 발생 시 계산된 Train 각도)
+                 */
+                // ✅ finalTransformedMst의 RecommendedTrainAngle 사용
+                val recommendedTrainAngle = mstData["RecommendedTrainAngle"] as? Double ?: 0.0
+                
+                logger.info("   계산된 Train 각도 (finalTransformedMst): ${String.format("%.6f", recommendedTrainAngle)}°")
                 logger.info("🔄 Train=${String.format("%.6f", recommendedTrainAngle)}°로 재변환 시작...")
 
                 // 해당 패스의 Original DTL 추출
                 val passOriginalDtl = originalDtl.filter { it["MstId"] == mstId }
-                val mstIdValue = mstId
 
+                /**
+                 * Original MST를 Train≠0으로 업데이트
+                 * 
+                 * finalTransformedMst의 RecommendedTrainAngle을 사용하여 keyholeOriginalMst를 생성함.
+                 * 이 값은 이후 applyAxisTransformation()에서 trainAngleForTransformation으로 사용됨.
+                 * 
+                 * @param originalMst[index] Original MST 데이터
+                 * @param recommendedTrainAngle finalTransformedMst의 RecommendedTrainAngle
+                 * @return keyholeOriginalMst Train≠0으로 업데이트된 Original MST
+                 */
                 // Original MST를 Train≠0으로 업데이트
                 val keyholeOriginalMst = listOf(originalMst[index].toMutableMap().apply {
-                    put("RecommendedTrainAngle", recommendedTrainAngle)
+                    put("RecommendedTrainAngle", recommendedTrainAngle)  // ✅ finalTransformedMst의 값 사용
                     put("IsKeyhole", true)
                 })
 
@@ -224,50 +253,42 @@ class SatelliteTrackingProcessor(
             val threshold = settingsService.keyholeAzimuthVelocityThreshold
             val isKeyhole = maxAzRate >= threshold
             
-            // ============================================================
-            // Train 계산 방법 선택
-            // 방법 A: calculateTrainAngleMethodA(metrics)  - 2축 기준
-            // 방법 B: calculateTrainAngleMethodB(passDtl) - 최종 기준
-            // ============================================================
-            val currentMethod = "B"  // ← 여기만 변경 (A 또는 B)
-            
-            // Keyhole인 경우 최적 Train 각도 계산
+            /**
+             * RecommendedTrainAngle 계산 (MST 저장용)
+             * 
+             * 각 MST는 본인 기준에서 Keyhole 판단 및 RecommendedTrainAngle을 계산해야 함.
+             * Original MST는 2축 기준 데이터로 계산함.
+             * 
+             * 계산 방식:
+             * 1. 본인의 DTL 데이터로 calculateMetrics() 호출하여 MaxAzRateAzimuth 획득
+             * 2. calculateTrainAngle()을 직접 호출하여 안테나 서쪽(+7°) 방향을 위성 Azimuth로 회전시키는 Train 각도 계산
+             * 
+             * @param isKeyhole Keyhole 발생 여부
+             * @param metrics calculateMetrics()로 계산된 메타데이터 (MaxAzRateAzimuth 포함)
+             * @return RecommendedTrainAngle (Keyhole이면 계산된 Train 각도, 아니면 0.0)
+             */
             val recommendedTrainAngle = if (isKeyhole) {
-                val trainAngle = if (currentMethod == "A") {
-                    calculateTrainAngleMethodA(metrics)
-                } else {
-                    calculateTrainAngleMethodB(passDtl)
-                }
-                
-                // 상세 Train 각도 계산 로그
+                // 본인의 DTL 데이터로 calculateMetrics() 호출 → MaxAzRateAzimuth 얻기
+                // 이미 위에서 calculateMetrics(passDtl) 호출했으므로 metrics 사용
                 val maxAzRateAzimuth = metrics["MaxAzRateAzimuth"] as? Double ?: 0.0
                 val maxAzRateTime = metrics["MaxAzRateTime"] as? ZonedDateTime
                 
+                // calculateTrainAngle() 직접 호출 (래퍼 함수 사용하지 않음)
+                val trainAngle = calculateTrainAngle(maxAzRateAzimuth)
+                
+                // 상세 Train 각도 계산 로그
                 logger.info("=".repeat(60))
-                logger.info("🔍 패스 #${index + 1} ($satelliteName) Train 각도 계산 [방법 $currentMethod]")
+                logger.info("🔍 패스 #${index + 1} ($satelliteName) Train 각도 계산 (2축 기준)")
                 logger.info("-".repeat(60))
-                
-                if (currentMethod == "A") {
-                    logger.info("📊 입력 데이터:")
-                    logger.info("  - Original MaxAzRate: ${String.format("%.6f", maxAzRate)}°/s")
-                    logger.info("  - 2축 최대 각속도 시점: $maxAzRateTime")
-                    logger.info("  - 해당 시점 Azimuth: ${String.format("%.6f", maxAzRateAzimuth)}°")
-                    logger.info("")
-                    logger.info("📊 Train 각도 계산 (방법 A: 2축 각속도 시점 기준):")
-                    logger.info("  - 2축 최대 각속도 시점 Azimuth로 Train 각도 계산 (최단 거리)")
-                    logger.info("")
-                } else {
-                    logger.info("📊 입력 데이터:")
-                    logger.info("  - Original MaxAzRate: ${String.format("%.6f", maxAzRate)}°/s")
-                    logger.info("  - 2축 최대 각속도 시점: $maxAzRateTime")
-                    logger.info("  - 2축 해당 시점 Azimuth: ${String.format("%.6f", maxAzRateAzimuth)}°")
-                    logger.info("")
-                    logger.info("📊 Train 각도 계산 (방법 B: 최종 각속도 시점 기준):")
-                    logger.info("  - Train=0으로 최종 변환 후 최대 각속도 시점 Azimuth 추출")
-                    logger.info("  - 해당 Azimuth로 Train 각도 계산 (최단 거리)")
-                    logger.info("")
-                }
-                
+                logger.info("📊 입력 데이터:")
+                logger.info("  - Original MaxAzRate: ${String.format("%.6f", maxAzRate)}°/s")
+                logger.info("  - 2축 최대 각속도 시점: $maxAzRateTime")
+                logger.info("  - 해당 시점 Azimuth: ${String.format("%.6f", maxAzRateAzimuth)}°")
+                logger.info("")
+                logger.info("📊 Train 각도 계산:")
+                logger.info("  - 2축 최대 각속도 시점 Azimuth로 Train 각도 계산")
+                logger.info("  - 안테나 서쪽(+7°) 방향을 위성 Azimuth로 회전시키는 Train 각도")
+                logger.info("")
                 logger.info("✅ 선택된 Train 각도: ${String.format("%.6f", trainAngle)}°")
                 logger.info("   회전량: ${String.format("%.6f", Math.abs(trainAngle))}° (${if (trainAngle >= 0) "시계 방향" else "반시계 방향"})")
                 logger.info("=".repeat(60))
@@ -278,17 +299,16 @@ class SatelliteTrackingProcessor(
             }
 
             // ============================================================
-            // 새로 추가: 별도 분석 함수 호출 (기존 로직에 영향 없음)
+            // 별도 분석 함수 호출 (기존 로직에 영향 없음)
             // ============================================================
             if (isKeyhole) {
-                // currentMethod는 위에서 정의됨 (Line 137)
                 analyzeTrainOptimization(
                     satelliteName = satelliteName,
                     passIndex = index,
                     originalDtl = passDtl,
                     originalMetrics = metrics,
                     currentTrainAngle = recommendedTrainAngle,
-                    currentMethod = currentMethod
+                    currentMethod = "A"  // 이제는 직접 계산하므로 "A" 방식으로 표시
                 )
             }
 
@@ -341,9 +361,20 @@ class SatelliteTrackingProcessor(
 
         originalMst.forEach { mstData ->
             val mstId = mstData["No"] as UInt
-            val recommendedTrainAngle = forcedTrainAngle ?: (mstData["RecommendedTrainAngle"] as? Double ?: 0.0)
+            
+            /**
+             * 3축 변환용 Train 각도 (trainAngleForTransformation)
+             * 
+             * 이 값은 3축 변환에 사용되는 Train 각도임.
+             * - forcedTrainAngle=0.0: 항상 0.0 (axis_transformed, final_transformed 생성 시)
+             * - forcedTrainAngle=null: MST에서 읽은 RecommendedTrainAngle (keyhole_* 생성 시)
+             * 
+             * 주의: 이 값은 MST에 저장되는 RecommendedTrainAngle과는 별개임.
+             * MST 저장용 RecommendedTrainAngle은 본인 기준으로 별도 계산됨.
+             */
+            val trainAngleForTransformation = forcedTrainAngle ?: (mstData["RecommendedTrainAngle"] as? Double ?: 0.0)
 
-            logger.debug("패스 #$mstId 3축 변환 중 (Train: ${recommendedTrainAngle}°${if (forcedTrainAngle != null) " [강제 적용]" else " [MST에서 읽음]"})")
+            logger.debug("패스 #$mstId 3축 변환 중 (Train: ${trainAngleForTransformation}°${if (forcedTrainAngle != null) " [강제 적용]" else " [MST에서 읽음]"})")
 
             // 해당 패스의 상세 데이터 조회 (MstId로 필터링!)
             val passDtl = originalDtl.filter { it["MstId"] == mstId }
@@ -359,7 +390,7 @@ class SatelliteTrackingProcessor(
                     azimuth = originalAz,
                     elevation = originalEl,
                     tiltAngle = settingsService.tiltAngle,
-                    trainAngle = recommendedTrainAngle
+                    trainAngle = trainAngleForTransformation  // ✅ 3축 변환용 Train 사용
                 )
 
                 axisTransformedDtl.add(
@@ -369,7 +400,7 @@ class SatelliteTrackingProcessor(
                         "Time" to time,
                         "Azimuth" to transformedAz,
                         "Elevation" to transformedEl,
-                        "Train" to recommendedTrainAngle,
+                        "Train" to trainAngleForTransformation,  // ✅ 3축 변환용 Train 저장
                         "DataType" to "axis_transformed"
                     )
                 )
@@ -379,10 +410,36 @@ class SatelliteTrackingProcessor(
             val transformedPassDtl = axisTransformedDtl.filter { it["MstId"] == mstId }
             val metrics = calculateMetrics(transformedPassDtl)
 
-            // Keyhole 재분석
+            // Keyhole 재분석 (본인 기준)
             val maxAzRate = metrics["MaxAzRate"] as? Double ?: 0.0
             val threshold = settingsService.keyholeAzimuthVelocityThreshold
             val isKeyhole = maxAzRate >= threshold
+
+            /**
+             * RecommendedTrainAngle 계산 (MST 저장용)
+             * 
+             * 각 MST는 본인 기준에서 Keyhole 판단 및 RecommendedTrainAngle을 계산해야 함.
+             * AxisTransformed MST는 3축 변환 후 데이터(±270도 제한 없음, Train=0)로 계산함.
+             * 
+             * 계산 방식:
+             * 1. 변환 후 DTL 데이터로 calculateMetrics() 호출하여 MaxAzRateAzimuth 획득
+             * 2. calculateTrainAngle()을 직접 호출하여 안테나 서쪽(+7°) 방향을 위성 Azimuth로 회전시키는 Train 각도 계산
+             * 
+             * 중요: 이 값은 3축 변환용 trainAngleForTransformation과는 별개로 계산됨.
+             * - trainAngleForTransformation: 3축 변환에 사용 (forcedTrainAngle=0.0이면 0.0)
+             * - recommendedTrainAngleForMst: MST 저장용 (본인 기준으로 계산, Keyhole이면 계산된 값, 아니면 0.0)
+             * 
+             * @param isKeyhole Keyhole 발생 여부
+             * @param metrics calculateMetrics()로 계산된 메타데이터 (MaxAzRateAzimuth 포함)
+             * @return RecommendedTrainAngle (Keyhole이면 계산된 Train 각도, 아니면 0.0)
+             */
+            val recommendedTrainAngleForMst = if (isKeyhole) {
+                // 이미 calculateMetrics()로 MaxAzRateAzimuth를 계산했으므로, 이를 사용하여 Train 각도 계산
+                val maxAzRateAzimuth = metrics["MaxAzRateAzimuth"] as? Double ?: 0.0
+                calculateTrainAngle(maxAzRateAzimuth)  // ✅ 본인 기준으로 계산
+            } else {
+                0.0
+            }
 
             axisTransformedMst.add(
                 mapOf(
@@ -404,7 +461,7 @@ class SatelliteTrackingProcessor(
                     "MaxAzAccel" to metrics["MaxAzAccel"],
                     "MaxElAccel" to metrics["MaxElAccel"],
                     "IsKeyhole" to isKeyhole,
-                    "RecommendedTrainAngle" to recommendedTrainAngle,
+                    "RecommendedTrainAngle" to recommendedTrainAngleForMst,  // ✅ 본인 기준에서 계산된 값
                     "CreationDate" to mstData["CreationDate"],
                     "Creator" to mstData["Creator"],
                     "DataType" to "axis_transformed"
@@ -456,10 +513,35 @@ class SatelliteTrackingProcessor(
             val finalPassDtl = finalTransformedDtl.filter { it["MstId"] == mstId }
             val metrics = calculateMetrics(finalPassDtl)
 
-            // Keyhole 재분석
+            // Keyhole 재분석 (본인 기준)
             val maxAzRate = metrics["MaxAzRate"] as? Double ?: 0.0
             val threshold = settingsService.keyholeAzimuthVelocityThreshold
             val isKeyhole = maxAzRate >= threshold
+
+            /**
+             * RecommendedTrainAngle 계산 (MST 저장용)
+             * 
+             * 각 MST는 본인 기준에서 Keyhole 판단 및 RecommendedTrainAngle을 계산해야 함.
+             * FinalTransformed MST는 ±270도 제한 적용 후 데이터(3축, Train=0, ±270도 제한 있음)로 계산함.
+             * 
+             * 계산 방식:
+             * 1. ±270도 제한 적용 후 DTL 데이터로 calculateMetrics() 호출하여 MaxAzRateAzimuth 획득
+             * 2. calculateTrainAngle()을 직접 호출하여 안테나 서쪽(+7°) 방향을 위성 Azimuth로 회전시키는 Train 각도 계산
+             * 
+             * 중요: 이 값은 본인 기준으로 계산된 값임. AxisTransformed MST의 값과는 별개임.
+             * - FinalTransformed MST는 ±270도 제한이 적용된 상태에서 계산하므로 다른 값이 될 수 있음.
+             * 
+             * @param isKeyhole Keyhole 발생 여부
+             * @param metrics calculateMetrics()로 계산된 메타데이터 (MaxAzRateAzimuth 포함)
+             * @return RecommendedTrainAngle (Keyhole이면 계산된 Train 각도, 아니면 0.0)
+             */
+            val recommendedTrainAngle = if (isKeyhole) {
+                // 이미 calculateMetrics()로 MaxAzRateAzimuth를 계산했으므로, 이를 사용하여 Train 각도 계산
+                val maxAzRateAzimuth = metrics["MaxAzRateAzimuth"] as? Double ?: 0.0
+                calculateTrainAngle(maxAzRateAzimuth)  // ✅ 본인 기준으로 계산
+            } else {
+                0.0
+            }
 
             finalTransformedMst.add(
                 mapOf(
@@ -478,10 +560,12 @@ class SatelliteTrackingProcessor(
                     "EndElevation" to metrics["EndElevation"],
                     "MaxAzRate" to metrics["MaxAzRate"],
                     "MaxElRate" to metrics["MaxElRate"],
+                    "MaxAzRateAzimuth" to metrics["MaxAzRateAzimuth"],  // ✅ Train 각도 재계산용
+                    "MaxAzRateTime" to metrics["MaxAzRateTime"],  // ✅ 참고용
                     "MaxAzAccel" to metrics["MaxAzAccel"],
                     "MaxElAccel" to metrics["MaxElAccel"],
                     "IsKeyhole" to isKeyhole,
-                    "RecommendedTrainAngle" to mstData["RecommendedTrainAngle"],
+                    "RecommendedTrainAngle" to recommendedTrainAngle,  // ✅ 본인 기준에서 계산된 값
                     "CreationDate" to mstData["CreationDate"],
                     "Creator" to mstData["Creator"],
                     "DataType" to "final_transformed"

@@ -1123,7 +1123,24 @@ class EphemerisService(
     }
 
     /**
-     * ✅ 실시간 추적 데이터 생성 (개선된 버전 - 시간 기반 인덱스 매칭)
+     * ✅ 실시간 추적 데이터 생성 (개선된 버전 - Keyhole 대응 + 필터링 + keyhole_final_transformed 추가)
+     * 
+     * Keyhole 여부에 따라 적절한 DataType 사용:
+     * - Keyhole 발생: keyhole_final_transformed (Train≠0)
+     * - Keyhole 미발생: final_transformed (Train=0)
+     * 
+     * displayMinElevationAngle 기준으로 필터링:
+     * - 실제 추적 명령은 displayMinElevationAngle 이상만 사용
+     * 
+     * ✅ 예외 처리:
+     * - final_transformed MST 없음: 빈 Map 반환
+     * - 필터링 후 데이터 없음: 빈 Map 반환
+     * - Keyhole 발생 시 keyhole_final_transformed 데이터 없음: null 반환
+     * 
+     * @param passId 패스 ID (MST ID)
+     * @param currentTime 현재 시간
+     * @param startTime 추적 시작 시간
+     * @return 실시간 추적 데이터 Map
      */
     private fun createRealtimeTrackingData(
         passId: UInt,
@@ -1135,10 +1152,66 @@ class EphemerisService(
         // 1. 이론치 데이터 타입별로 분리해서 가져오기
         val originalPassDetails = getEphemerisTrackDtlByMstIdAndDataType(passId, "original")
         val axisTransformedPassDetails = getEphemerisTrackDtlByMstIdAndDataType(passId, "axis_transformed")
-        val finalTransformedPassDetails = getEphemerisTrackDtlByMstIdAndDataType(passId, "final_transformed")
 
         if (originalPassDetails.isEmpty()) {
             logger.debug("원본 이론치 데이터가 없어 실시간 데이터 저장을 건너뜁니다.")
+            return emptyMap()
+        }
+        
+        // ✅ Keyhole 여부 확인 (final_transformed MST에서)
+        val finalMst = ephemerisTrackMstStorage.find { 
+            it["No"] == passId && it["DataType"] == "final_transformed" 
+        }
+        
+        if (finalMst == null) {
+            logger.warn("⚠️ 패스 ID ${passId}에 해당하는 final_transformed MST 데이터를 찾을 수 없습니다.")
+            return emptyMap()
+        }
+        
+        val isKeyhole = finalMst["IsKeyhole"] as? Boolean ?: false
+        
+        // ✅ Keyhole 여부에 따라 DataType 선택
+        val finalDataType = if (isKeyhole) {
+            // ✅ Keyhole 발생 시 keyhole_final_transformed 데이터 존재 여부 확인
+            val keyholeDataExists = ephemerisTrackDtlStorage.any {
+                it["MstId"] == passId && it["DataType"] == "keyhole_final_transformed"
+            }
+            
+            if (!keyholeDataExists) {
+                logger.warn("⚠️ 패스 ID ${passId}: Keyhole로 판단되었으나 keyhole_final_transformed 데이터가 없습니다. final_transformed로 폴백합니다.")
+                "final_transformed"  // ✅ 폴백
+            } else {
+                logger.debug("🔑 실시간 추적: 패스 ID ${passId} Keyhole 발생 → keyhole_final_transformed 사용")
+                "keyhole_final_transformed"
+            }
+        } else {
+            logger.debug("✅ 실시간 추적: 패스 ID ${passId} Keyhole 미발생 → final_transformed 사용")
+            "final_transformed"
+        }
+        
+        // 선택된 DataType의 데이터 조회
+        val finalTransformedPassDetails = getEphemerisTrackDtlByMstIdAndDataType(passId, finalDataType)
+        
+        // ✅ displayMinElevationAngle 기준으로 필터링 (조건부)
+        val enableFiltering = settingsService.enableDisplayMinElevationFiltering
+        val displayMinElevation = settingsService.displayMinElevationAngle
+        
+        val filteredFinalTransformed = if (enableFiltering) {
+            finalTransformedPassDetails.filter {
+                (it["Elevation"] as? Double ?: 0.0) >= displayMinElevation
+            }
+        } else {
+            // 필터링 비활성화 시에도 하드웨어 제한 각도는 유지
+            val elevationMin = settingsService.angleElevationMin
+            finalTransformedPassDetails.filter {
+                (it["Elevation"] as? Double ?: 0.0) >= elevationMin
+            }
+        }
+        
+        // 필터링된 데이터가 비어있으면 로깅
+        if (filteredFinalTransformed.isEmpty()) {
+            val filterThreshold = if (enableFiltering) displayMinElevation else settingsService.angleElevationMin
+            logger.warn("⚠️ 패스 ID ${passId}: 필터링 결과 데이터가 없습니다. (기준: ${filterThreshold}°)")
             return emptyMap()
         }
 
@@ -1159,10 +1232,25 @@ class EphemerisService(
             axisTransformedPassDetails.last()
         }
 
-        val theoreticalFinalPoint = if (theoreticalIndex < finalTransformedPassDetails.size) {
-            finalTransformedPassDetails[theoreticalIndex]
+        // ✅ 필터링된 final_transformed 데이터에서 인덱스 찾기
+        val theoreticalFinalPoint = if (filteredFinalTransformed.isNotEmpty()) {
+            val targetTime = theoreticalPoint["Time"] as? ZonedDateTime
+            if (targetTime != null) {
+                filteredFinalTransformed.minByOrNull { point ->
+                    val pointTime = point["Time"] as? ZonedDateTime
+                    if (pointTime != null) {
+                        abs(Duration.between(targetTime, pointTime).toMillis())
         } else {
-            finalTransformedPassDetails.last()
+                        Long.MAX_VALUE
+                    }
+                } ?: filteredFinalTransformed.first()
+            } else {
+                val filteredIndex = (theoreticalIndex * filteredFinalTransformed.size / originalPassDetails.size)
+                    .coerceIn(0, filteredFinalTransformed.size - 1)
+                filteredFinalTransformed[filteredIndex]
+            }
+        } else {
+            emptyMap<String, Any?>()
         }
 
         // 4. ✅ 정확한 이론치 값 추출 (보간 없이 직접 매칭)
@@ -1176,12 +1264,83 @@ class EphemerisService(
         val axisTransformedRange = (theoreticalAxisPoint["Range"] as? Double)?.toFloat() ?: originalRange
         val axisTransformedAltitude = (theoreticalAxisPoint["Altitude"] as? Double)?.toFloat() ?: originalAltitude
 
+        // ✅ 필터링된 final_transformed 데이터에서 값 추출
         val finalTransformedAzimuth = (theoreticalFinalPoint["Azimuth"] as? Double)?.toFloat() ?: axisTransformedAzimuth
         val finalTransformedElevation =
             (theoreticalFinalPoint["Elevation"] as? Double)?.toFloat() ?: axisTransformedElevation
         val finalTransformedRange = (theoreticalFinalPoint["Range"] as? Double)?.toFloat() ?: axisTransformedRange
         val finalTransformedAltitude =
             (theoreticalFinalPoint["Altitude"] as? Double)?.toFloat() ?: axisTransformedAltitude
+
+        // ✅ 필터링 기준 확인 (조건부)
+        val filterThreshold = if (enableFiltering) {
+            displayMinElevation
+        } else {
+            settingsService.angleElevationMin
+        }
+        
+        if (finalTransformedElevation < filterThreshold) {
+            logger.warn("⚠️ 실시간 추적 데이터: Elevation(${finalTransformedElevation}°) < 필터 기준(${filterThreshold}°)")
+            return emptyMap()
+        }
+
+        // ✅ Keyhole Final 변환 데이터 추출 (Keyhole 발생 시만)
+        val keyholeFinalTransformedAzimuth = if (isKeyhole) {
+            val keyholeFinalPassDetails = getEphemerisTrackDtlByMstIdAndDataType(passId, "keyhole_final_transformed")
+            if (keyholeFinalPassDetails.isNotEmpty()) {
+                val keyholeFinalPoint = if (theoreticalIndex < keyholeFinalPassDetails.size) {
+                    keyholeFinalPassDetails[theoreticalIndex]
+                } else {
+                    keyholeFinalPassDetails.lastOrNull()
+                }
+                (keyholeFinalPoint?.get("Azimuth") as? Double)?.toFloat()
+            } else {
+                logger.warn("⚠️ 패스 ID ${passId}: Keyhole 발생 시 keyhole_final_transformed 데이터가 없습니다.")
+                null
+            }
+        } else null
+        
+        val keyholeFinalTransformedElevation = if (isKeyhole) {
+            val keyholeFinalPassDetails = getEphemerisTrackDtlByMstIdAndDataType(passId, "keyhole_final_transformed")
+            if (keyholeFinalPassDetails.isNotEmpty()) {
+                val keyholeFinalPoint = if (theoreticalIndex < keyholeFinalPassDetails.size) {
+                    keyholeFinalPassDetails[theoreticalIndex]
+                } else {
+                    keyholeFinalPassDetails.lastOrNull()
+                }
+                (keyholeFinalPoint?.get("Elevation") as? Double)?.toFloat()
+            } else {
+                null
+            }
+        } else null
+        
+        val keyholeFinalTransformedRange = if (isKeyhole) {
+            val keyholeFinalPassDetails = getEphemerisTrackDtlByMstIdAndDataType(passId, "keyhole_final_transformed")
+            if (keyholeFinalPassDetails.isNotEmpty()) {
+                val keyholeFinalPoint = if (theoreticalIndex < keyholeFinalPassDetails.size) {
+                    keyholeFinalPassDetails[theoreticalIndex]
+                } else {
+                    keyholeFinalPassDetails.lastOrNull()
+                }
+                (keyholeFinalPoint?.get("Range") as? Double)?.toFloat()
+            } else {
+                null
+            }
+        } else null
+        
+        val keyholeFinalTransformedAltitude = if (isKeyhole) {
+            val keyholeFinalPassDetails = getEphemerisTrackDtlByMstIdAndDataType(passId, "keyhole_final_transformed")
+            if (keyholeFinalPassDetails.isNotEmpty()) {
+                val keyholeFinalPoint = if (theoreticalIndex < keyholeFinalPassDetails.size) {
+                    keyholeFinalPassDetails[theoreticalIndex]
+                } else {
+                    keyholeFinalPassDetails.lastOrNull()
+                }
+                (keyholeFinalPoint?.get("Altitude") as? Double)?.toFloat()
+            } else {
+                null
+            }
+        } else null
 
         // 변환 정보 추출
         val tiltAngle = settingsService.tiltAngle
@@ -1231,13 +1390,19 @@ class EphemerisService(
             "axisTransformedRange" to axisTransformedRange,
             "axisTransformedAltitude" to axisTransformedAltitude,
 
-            // ✅ 최종 변환 데이터 (±270도 제한 적용)
+            // ✅ 최종 변환 데이터 (±270도 제한 적용, Train=0)
             "finalTransformedAzimuth" to finalTransformedAzimuth,
             "finalTransformedElevation" to finalTransformedElevation,
             "finalTransformedRange" to finalTransformedRange,
             "finalTransformedAltitude" to finalTransformedAltitude,
 
-            // ✅ 실제 추적 데이터
+            // ✅ Keyhole Final 변환 데이터 (±270도 제한 적용, Train≠0) [Keyhole 발생 시만]
+            "keyholeFinalTransformedAzimuth" to keyholeFinalTransformedAzimuth,
+            "keyholeFinalTransformedElevation" to keyholeFinalTransformedElevation,
+            "keyholeFinalTransformedRange" to keyholeFinalTransformedRange,
+            "keyholeFinalTransformedAltitude" to keyholeFinalTransformedAltitude,
+
+            // ✅ 실제 추적 명령 데이터
             "cmdAz" to finalTransformedAzimuth,  // 최종 변환 데이터를 명령으로 사용
             "cmdEl" to finalTransformedElevation,
             "actualAz" to currentData.azimuthAngle,
@@ -1279,6 +1444,8 @@ class EphemerisService(
             // ✅ 변환 정보
             "tiltAngle" to tiltAngle,
             "transformationType" to transformationType,
+            "isKeyhole" to isKeyhole,
+            "finalDataType" to finalDataType,
 
             // ✅ 변환 적용 여부
             "hasTransformation" to (transformationType != "none"),
@@ -1637,8 +1804,17 @@ class EphemerisService(
             logger.info("전체 데이터 길이: ${totalLength}개")
             logger.info("실제 데이터 개수: ${actualDataCount}개")
 
+            // ✅ 필터링 후 데이터가 없으면 추적 시작 중단
+            if (actualDataCount == 0) {
+                logger.error("❌ 패스 ID ${passId}: 필터링 후 데이터가 없어 추적을 시작할 수 없습니다.")
+                dataStoreService.setEphemerisTracking(false)
+                return
+            }
+
+            // ✅ 두 함수 모두 동일한 필터링 로직 사용하므로 항상 일치해야 함
             if (totalLength != actualDataCount) {
-                logger.warn("데이터 길이 불일치: 계산된 길이=${totalLength}, 실제 길이=${actualDataCount}")
+                logger.warn("⚠️ 데이터 길이 불일치: 계산된 길이=${totalLength}, 실제 길이=${actualDataCount}")
+                logger.warn("   이는 예상치 못한 상황입니다. 두 함수가 동일한 필터링 로직을 사용하므로 항상 일치해야 합니다.")
             }
 
             // 2.12.1 위성 추적 헤더 정보 송신 프로토콜 생성
@@ -1698,10 +1874,25 @@ class EphemerisService(
                 TimeRangeStatus.IN_RANGE -> {
                     logger.info("🎯 현재 시간이 추적 범위 내에 있습니다 - 실시간 추적 모드")
 
-                    // 정상 추적 로직
-                    // ✅ 실시간 추적: 현재 시간에 정확히 맞는 데이터 추출
+                    // ✅ 실시간 추적: 필터링된 데이터에서 현재 시간에 가장 가까운 데이터 찾기
                     val timeDifferenceMs = Duration.between(startTime, calTime).toMillis()
-                    val calculatedIndex = (timeDifferenceMs / 100).toInt()
+                    
+                    // 필터링된 데이터에서 시간 기준으로 가장 가까운 데이터 찾기
+                    val closestPoint = passDetails.minByOrNull { point ->
+                        val pointTime = point["Time"] as? ZonedDateTime
+                        if (pointTime != null) {
+                            abs(Duration.between(startTime, pointTime).toMillis())
+                        } else {
+                            Long.MAX_VALUE
+                        }
+                    }
+                    
+                    val calculatedIndex = if (closestPoint != null) {
+                        passDetails.indexOf(closestPoint)
+                    } else {
+                        // 시간 정보가 없으면 원본 방식 사용
+                        (timeDifferenceMs / 100).toInt()
+                    }
 
                     val totalSize = passDetails.size
                     val safeStartIndex = when {
@@ -2146,9 +2337,26 @@ class EphemerisService(
                     put("KeyholeFinalTransformedEndElevation", keyhole?.get("EndElevation"))
                     put("KeyholeFinalTransformedMaxElevation", keyhole?.get("MaxElevation"))
                     
+                    // ✅ displayMinElevationAngle 기준으로 필터링된 데이터의 MaxElevation 재계산
+                    // SelectSchedule 화면에서 필터링된 데이터 기준으로 표시하기 위함
+                    // 필터링된 데이터 조회 (getEphemerisTrackDtlByMstId는 이미 displayMinElevationAngle 기준으로 필터링된 데이터 반환)
+                    val filteredData = getEphemerisTrackDtlByMstId(mstId)
+                    
+                    // 필터링된 데이터 기준 MaxElevation 계산
+                    val filteredMaxElevation = if (filteredData.isNotEmpty()) {
+                        filteredData.maxOfOrNull { (it["Elevation"] as? Double) ?: Double.NEGATIVE_INFINITY }
+                    } else {
+                        null
+                    }
+                    
+                    // ✅ MaxElevation 설정 (SelectSchedule에서 사용하는 필드)
+                    // 필터링된 데이터 기준으로 계산된 값 사용
+                    put("MaxElevation", filteredMaxElevation)
+                    
                     // ✅ Keyhole 관련 정보
+                    // Keyhole 판단은 finalTransformedMst 기준으로 수행하므로, RecommendedTrainAngle도 finalTransformedMst에서 가져옴
                     put("IsKeyhole", isKeyhole)
-                    put("RecommendedTrainAngle", original?.get("RecommendedTrainAngle") ?: 0.0)
+                    put("RecommendedTrainAngle", final.get("RecommendedTrainAngle") as? Double ?: 0.0)
                     
                     // 중앙차분법 데이터는 주석으로 보관 (실시간 제어용)
                     put("CentralDiffMaxAzRate", original?.get("MaxAzRate"))
@@ -2156,8 +2364,32 @@ class EphemerisService(
                 }
             }
             
+            // ✅ Step 2: Select Schedule 목록에서 스케줄 필터링 (조건부)
+            val enableFiltering = settingsService.enableDisplayMinElevationFiltering
+            val displayMinElevation = settingsService.displayMinElevationAngle
+            
+            val filteredMergedData = if (enableFiltering) {
+                // 필터링 활성화 시: displayMinElevationAngle 기준으로 필터링
+                mergedData.filter { item ->
+                    val maxElevation = item["MaxElevation"] as? Double
+                    maxElevation != null && maxElevation >= displayMinElevation
+                }
+            } else {
+                // 필터링 비활성화 시: 모든 스케줄 반환 (하드웨어 제한 각도는 유지)
+                val elevationMin = settingsService.angleElevationMin
+                mergedData.filter { item ->
+                    val maxElevation = item["MaxElevation"] as? Double
+                    maxElevation != null && maxElevation >= elevationMin
+                }
+            }
+            
             logger.info("✅ 병합 완료: ${mergedData.size}개 MST 레코드 (KeyholeAxis + KeyholeFinal 데이터 포함)")
-            return mergedData
+            if (enableFiltering) {
+                logger.info("✅ 필터링 완료: ${mergedData.size}개 → ${filteredMergedData.size}개 (displayMinElevationAngle=${displayMinElevation}° 기준)")
+            } else {
+                logger.info("✅ 필터링 완료: ${mergedData.size}개 → ${filteredMergedData.size}개 (elevationMin=${settingsService.angleElevationMin}° 기준)")
+            }
+            return filteredMergedData
             
         } catch (error: Exception) {
             logger.error("❌ 데이터 병합 실패: ${error.message}", error)
@@ -2320,13 +2552,111 @@ class EphemerisService(
     }
 
     /**
-     * 특정 마스터 ID에 해당하는 세부 추적 데이터 조회 (최종 변환된 데이터만)
-     * 축변환 후 ±270도 제한이 적용된 최종 데이터를 조회합니다.
+     * 특정 마스터 ID에 해당하는 세부 추적 데이터 조회 (실제 추적 명령용)
+     * 
+     * ✅ Keyhole 여부에 따라 적절한 DataType 자동 선택:
+     *    - Keyhole 발생: keyhole_final_transformed (Train≠0, ±270°)
+     *    - Keyhole 미발생: final_transformed (Train=0, ±270°)
+     * 
+     * ✅ displayMinElevationAngle 기준으로 필터링:
+     *    - sourceMinElevationAngle = -20도로 넓게 추적했지만
+     *    - 실제 추적 명령은 displayMinElevationAngle = 0도 이상만 사용
+     *    - 백엔드와 프론트엔드 데이터 일치 보장
+     * 
+     * ✅ 예외 처리:
+     *    - final_transformed MST 없음: 빈 리스트 반환 + 경고 로그
+     *    - Keyhole 발생 시 keyhole_final_transformed 데이터 없음: final_transformed로 폴백 + 경고 로그
+     *    - 필터링 후 데이터 없음: 빈 리스트 반환 + 경고 로그
+     * 
+     * @param mstId 마스터 ID
+     * @return 필터링된 세부 추적 데이터 리스트 (실제 추적 명령에 사용)
      */
     fun getEphemerisTrackDtlByMstId(mstId: UInt): List<Map<String, Any?>> {
-        return ephemerisTrackDtlStorage.filter {
-            it["MstId"] == mstId && it["DataType"] == "final_transformed"
+        // 1. MST에서 Keyhole 여부 확인
+        // final_transformed MST에 IsKeyhole 정보가 저장되어 있음
+        val finalMst = ephemerisTrackMstStorage.find { 
+            it["No"] == mstId && it["DataType"] == "final_transformed" 
         }
+        
+        if (finalMst == null) {
+            logger.warn("⚠️ MST ID ${mstId}에 해당하는 final_transformed MST 데이터를 찾을 수 없습니다.")
+            return emptyList()
+        }
+        
+        // Keyhole 여부 확인 (final_transformed MST의 IsKeyhole 필드 사용)
+        val isKeyhole = finalMst["IsKeyhole"] as? Boolean ?: false
+        
+        // 2. Keyhole 여부에 따라 DataType 선택
+        // Keyhole 발생 시: keyhole_final_transformed (Train≠0으로 재계산된 데이터)
+        // Keyhole 미발생 시: final_transformed (Train=0 데이터)
+        val dataType = if (isKeyhole) {
+            // ✅ Keyhole 발생 시 keyhole_final_transformed 데이터 존재 여부 확인
+            val keyholeDataExists = ephemerisTrackDtlStorage.any {
+                it["MstId"] == mstId && it["DataType"] == "keyhole_final_transformed"
+            }
+            
+            if (!keyholeDataExists) {
+                logger.warn("⚠️ MST ID ${mstId}: Keyhole로 판단되었으나 keyhole_final_transformed 데이터가 없습니다. final_transformed로 폴백합니다.")
+                "final_transformed"  // ✅ 폴백
+            } else {
+                logger.debug("🔑 MST ID ${mstId}: Keyhole 발생 → keyhole_final_transformed 사용")
+                "keyhole_final_transformed"
+            }
+        } else {
+            logger.debug("✅ MST ID ${mstId}: Keyhole 미발생 → final_transformed 사용")
+            "final_transformed"
+        }
+        
+        // 3. displayMinElevationAngle 기준으로 필터링 (조건부)
+        // sourceMinElevationAngle = -20도로 넓게 추적했지만
+        // 실제 추적 명령은 displayMinElevationAngle = 0도 이상만 사용 (필터링 활성화 시)
+        val enableFiltering = settingsService.enableDisplayMinElevationFiltering
+        val displayMinElevation = settingsService.displayMinElevationAngle
+        
+        // 선택된 DataType의 데이터 조회
+        val allData = ephemerisTrackDtlStorage.filter {
+            it["MstId"] == mstId && it["DataType"] == dataType
+        }
+        
+        // 필터링 활성화 여부에 따라 조건부 필터링
+        val filteredData = if (enableFiltering) {
+            allData.filter {
+                (it["Elevation"] as? Double ?: 0.0) >= displayMinElevation
+            }
+        } else {
+            // 필터링 비활성화 시에도 하드웨어 제한 각도는 유지
+            val elevationMin = settingsService.angleElevationMin
+            allData.filter {
+                (it["Elevation"] as? Double ?: 0.0) >= elevationMin
+            }
+        }
+        
+        // 필터링 결과 로깅
+        val totalCount = allData.size
+        val filteredCount = filteredData.size
+        
+        logger.info("📊 MST ID ${mstId} 데이터 조회:")
+        logger.info("   - Keyhole 여부: ${if (isKeyhole) "YES" else "NO"}")
+        logger.info("   - 사용 DataType: ${dataType}")
+        logger.info("   - 필터링 활성화: ${if (enableFiltering) "YES" else "NO"}")
+        if (enableFiltering) {
+            logger.info("   - 필터 기준: displayMinElevationAngle = ${displayMinElevation}°")
+        } else {
+            logger.info("   - 필터 기준: elevationMin (하드웨어 제한) = ${settingsService.angleElevationMin}°")
+        }
+        logger.info("   - 전체 데이터: ${totalCount}개")
+        logger.info("   - 필터링 후: ${filteredCount}개")
+        
+        if (filteredCount == 0 && totalCount > 0) {
+            val filterThreshold = if (enableFiltering) displayMinElevation else settingsService.angleElevationMin
+            logger.warn("⚠️ 필터링 결과 데이터가 없습니다. 필터 기준(${filterThreshold}°)가 너무 높을 수 있습니다.")
+        }
+        
+        if (filteredCount == 0) {
+            logger.error("❌ MST ID ${mstId}: 필터링 후 데이터가 없어 추적을 시작할 수 없습니다.")
+        }
+        
+        return filteredData
     }
 
     /**
@@ -3003,88 +3333,171 @@ class EphemerisService(
             )
         }
     }
+    /**
+     * ✅ MST 데이터를 CSV 파일로 내보내기 (개선된 버전 - 필터링 + Keyhole 대응)
+     * 
+     * ✅ displayMinElevationAngle 기준으로 필터링:
+     *    - sourceMinElevationAngle = -20도로 넓게 추적했지만
+     *    - 이론치 다운로드 CSV에는 displayMinElevationAngle = 0도 이상만 포함
+     *    - 실제 추적 명령과 일치하는 데이터 제공
+     * 
+     * ✅ Keyhole 여부에 따라 적절한 DataType 사용:
+     *    - Keyhole 발생: keyhole_final_transformed (Train≠0, ±270°)
+     *    - Keyhole 미발생: final_transformed (Train=0, ±270°)
+     * 
+     * @param mstId 마스터 ID
+     * @param outputDirectory 출력 디렉토리
+     * @return CSV 파일 생성 결과
+     */
     fun exportMstDataToCsv(mstId: Int, outputDirectory: String = "csv_exports"): Map<String, Any?> {
         try {
-            logger.info("📊 MST ID $mstId CSV 파일 생성 시작")
-            val originalDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "original")
-            val axisTransformedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "axis_transformed")
-            val finalTransformedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "final_transformed")
+            logger.info("📊 MST ID ${mstId} CSV 파일 생성 시작")
             
-            // ✅ Keyhole 데이터 조회
-            val keyholeAxisDtl = try {
-                val data = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "keyhole_axis_transformed")
-                logger.info("📊 Keyhole Axis DTL 조회 성공: ${data.size}개")
-                data
-            } catch (e: Exception) {
-                logger.warn("⚠️ Keyhole Axis 데이터 조회 실패: ${e.message}")
-                emptyList()
-            }
-            
-            val keyholeFinalDtl = try {
-                val data = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "keyhole_final_transformed")
-                logger.info("📊 Keyhole Final DTL 조회 성공: ${data.size}개")
-                data
-            } catch (e: Exception) {
-                logger.warn("⚠️ Keyhole Final 데이터 조회 실패: ${e.message}")
-                emptyList()
-            }
-            
-            if (originalDtl.isEmpty()) {
-                logger.error("❌ MST ID $mstId 의 원본 데이터를 찾을 수 없습니다")
-                return mapOf<String, Any?>("success" to false, "error" to "원본 데이터를 찾을 수 없습니다")
-            }
-            val mstInfo = getAllEphemerisTrackMst().find { it["No"] == mstId.toUInt() }
-            val satelliteName = mstInfo?.get("SatelliteName") as? String ?: "Unknown"
-            val startTime = mstInfo?.get("StartTime") as? java.time.ZonedDateTime
-            val endTime = mstInfo?.get("EndTime") as? java.time.ZonedDateTime
-            
-            // ✅ MST 정보 조회
+            // ✅ MST 정보 조회 및 Keyhole 여부 확인
             val finalMst = getAllEphemerisTrackMst().find { 
                 it["No"] == mstId.toUInt() && it["DataType"] == "final_transformed" 
             }
             
-            // ✅ Keyhole 판단: final_transformed (Train=0)의 MaxAzRate로 판단
-            val train0MaxAzRate = finalMst?.get("MaxAzRate") as? Double ?: 0.0
-            val threshold = settingsService.keyholeAzimuthVelocityThreshold
-            val isKeyhole = train0MaxAzRate >= threshold
+            if (finalMst == null) {
+                logger.error("❌ MST ID ${mstId}에 해당하는 final_transformed MST 데이터를 찾을 수 없습니다.")
+                return mapOf<String, Any?>("success" to false, "error" to "MST 데이터를 찾을 수 없습니다")
+            }
             
-            logger.info("📊 Keyhole 판단: Train=0 MaxAzRate = ${"%.6f".format(train0MaxAzRate)}°/s, 임계값 = $threshold°/s")
-            logger.info("   결과: ${if (isKeyhole) "✅ Keyhole 발생" else "✅ Keyhole 미발생"}")
+            val isKeyhole = finalMst["IsKeyhole"] as? Boolean ?: false
             
-            // ✅ Train 각도 가져오기 및 포맷팅
-            val recommendedTrainAngle = mstInfo?.get("RecommendedTrainAngle") as? Double ?: 0.0
+            // ✅ Keyhole 여부에 따라 DataType 선택
+            val finalDataType = if (isKeyhole) {
+                val keyholeDataExists = ephemerisTrackDtlStorage.any {
+                    it["MstId"] == mstId.toUInt() && it["DataType"] == "keyhole_final_transformed"
+                }
+                if (!keyholeDataExists) {
+                    logger.warn("⚠️ MST ID ${mstId}: Keyhole로 판단되었으나 keyhole_final_transformed 데이터가 없습니다. final_transformed로 폴백합니다.")
+                    "final_transformed"
+                } else {
+                    logger.info("🔑 MST ID ${mstId}: Keyhole 발생 → keyhole_final_transformed 사용")
+                    "keyhole_final_transformed"
+                }
+            } else {
+                logger.info("✅ MST ID ${mstId}: Keyhole 미발생 → final_transformed 사용")
+                "final_transformed"
+            }
             
+            // ✅ displayMinElevationAngle 기준으로 필터링 (조건부)
+            val enableFiltering = settingsService.enableDisplayMinElevationFiltering
+            val displayMinElevation = settingsService.displayMinElevationAngle
+            
+            // 원본 데이터 조회 (필터링 없음 - 비교용)
+            val originalDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "original")
+            val axisTransformedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "axis_transformed")
+            
+            // ✅ 필터링된 final_transformed 데이터 조회 (조건부)
+            val finalTransformedDtlAll = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "final_transformed")
+            val finalTransformedDtl = if (enableFiltering) {
+                finalTransformedDtlAll.filter {
+                    (it["Elevation"] as? Double ?: 0.0) >= displayMinElevation
+                }
+            } else {
+                // 필터링 비활성화 시에도 하드웨어 제한 각도는 유지
+                val elevationMin = settingsService.angleElevationMin
+                finalTransformedDtlAll.filter {
+                    (it["Elevation"] as? Double ?: 0.0) >= elevationMin
+                }
+            }
+            
+            // ✅ 필터링된 keyhole_final_transformed 데이터 조회 (Keyhole 발생 시만, 조건부)
+            val keyholeFinalDtlAll = if (isKeyhole) {
+                getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "keyhole_final_transformed")
+            } else {
+                emptyList()
+            }
+            val keyholeFinalDtl = if (isKeyhole) {
+                if (enableFiltering) {
+                    keyholeFinalDtlAll.filter {
+                        (it["Elevation"] as? Double ?: 0.0) >= displayMinElevation
+                    }
+                } else {
+                    // 필터링 비활성화 시에도 하드웨어 제한 각도는 유지
+                    val elevationMin = settingsService.angleElevationMin
+                    keyholeFinalDtlAll.filter {
+                        (it["Elevation"] as? Double ?: 0.0) >= elevationMin
+                    }
+                }
+            } else {
+                emptyList()
+            }
+            
+            // ✅ Keyhole Axis 데이터 조회 (필터링 없음 - 중간 단계 데이터)
+            val keyholeAxisDtl = if (isKeyhole) {
+                try {
+                    getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "keyhole_axis_transformed")
+            } catch (e: Exception) {
+                    logger.warn("⚠️ Keyhole Axis 데이터 조회 실패: ${e.message}")
+                    emptyList()
+                }
+            } else {
+                emptyList()
+            }
+            
+            // 필터링 결과 로깅
+            logger.info("📊 MST ID ${mstId} CSV 생성:")
+            logger.info("   - Keyhole 여부: ${if (isKeyhole) "YES" else "NO"}")
+            logger.info("   - 사용 DataType: ${finalDataType}")
+            logger.info("   - 필터링 활성화: ${if (enableFiltering) "YES" else "NO"}")
+            if (enableFiltering) {
+                logger.info("   - 필터 기준: displayMinElevationAngle = ${displayMinElevation}°")
+            } else {
+                logger.info("   - 필터 기준: elevationMin (하드웨어 제한) = ${settingsService.angleElevationMin}°")
+            }
+            logger.info("   - Original 데이터: ${originalDtl.size}개")
+            logger.info("   - AxisTransformed 데이터: ${axisTransformedDtl.size}개")
+            logger.info("   - FinalTransformed 전체: ${finalTransformedDtlAll.size}개")
+            logger.info("   - FinalTransformed 필터링 후: ${finalTransformedDtl.size}개")
+            if (isKeyhole) {
+                logger.info("   - KeyholeFinal 전체: ${keyholeFinalDtlAll.size}개")
+                logger.info("   - KeyholeFinal 필터링 후: ${keyholeFinalDtl.size}개")
+            }
+            
+            if (originalDtl.isEmpty()) {
+                logger.error("❌ MST ID ${mstId} 의 원본 데이터를 찾을 수 없습니다")
+                return mapOf<String, Any?>("success" to false, "error" to "원본 데이터를 찾을 수 없습니다")
+            }
+            
+            // ✅ 필터링된 데이터가 없으면 경고
+            if (finalTransformedDtl.isEmpty()) {
+                val filterThreshold = if (enableFiltering) displayMinElevation else settingsService.angleElevationMin
+                logger.warn("⚠️ MST ID ${mstId}: 필터링 결과 데이터가 없습니다. (기준: ${filterThreshold}°)")
+                return mapOf<String, Any?>("success" to false, "error" to "필터링 후 데이터가 없습니다")
+            }
+            
+            // ✅ finalTransformedMst에서 정보 가져오기 (Keyhole 판단 기준)
+            val allMst = getAllEphemerisTrackMst()
+            val finalTransformedMstInfo = allMst.find { 
+                it["No"] == mstId.toUInt() && it["DataType"] == "final_transformed"
+            }
+            val originalMstInfo = allMst.find { 
+                it["No"] == mstId.toUInt() && it["DataType"] == "original"
+            }
+            
+            // ✅ finalTransformedMst에서 정보 가져오기 (없으면 original 사용)
+            val mstInfo = finalTransformedMstInfo ?: originalMstInfo
+            val satelliteName = mstInfo?.get("SatelliteName") as? String ?: "Unknown"
+            val startTime = mstInfo?.get("StartTime") as? java.time.ZonedDateTime
+            val endTime = mstInfo?.get("EndTime") as? java.time.ZonedDateTime
+            
+            // ✅ Train 각도 가져오기: finalTransformedMst의 RecommendedTrainAngle 사용 (Keyhole 판단 기준과 일치)
+            val recommendedTrainAngle = finalTransformedMstInfo?.get("RecommendedTrainAngle") as? Double ?: 0.0
             val trainAngleFormatted = if (recommendedTrainAngle == 0.0) {
                 "0"
             } else {
                 String.format("%.6f", recommendedTrainAngle)
             }
             
-            // ✅ 데이터 정합성 확인
-            val keyholeDataExists = keyholeFinalDtl.isNotEmpty()
-            if (isKeyhole && !keyholeDataExists) {
-                logger.warn("⚠️ Keyhole로 판단되었으나 keyhole_final_transformed 데이터가 없습니다!")
-            }
-            if (!isKeyhole && keyholeDataExists) {
-                logger.warn("⚠️ Keyhole이 아닌데 keyhole_final_transformed 데이터가 존재합니다!")
-            }
-            
-            logger.info("📊 Train 각도: $trainAngleFormatted°, Keyhole: $isKeyhole")
-            
-            // ✅ 파일명 개선: 타임스탬프 제거하고 날짜만 포함 (중복 실행 방지)
+            // ✅ 파일명 개선
             val dateOnly = startTime?.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")) ?: "unknown"
             val filename = "MST${mstId}_${satelliteName}_${dateOnly}.csv"
             val filePath = "$outputDirectory/$filename"
             
-            // ✅ 기존 파일 확인 및 덮어쓰기 로그
-            val file = java.io.File(filePath)
-            if (file.exists()) {
-                logger.info("🔄 기존 파일 덮어쓰기: $filename")
-            } else {
-                logger.info("📄 새 파일 생성: $filename")
-            }
-            
-            // ✅ Train=0 데이터는 finalTransformedDtl 그대로 사용 (이미 Train=0으로 변환됨)
+            // ✅ Train=0 데이터는 필터링된 finalTransformedDtl 사용
             val train0Dtl = finalTransformedDtl.map { point ->
                 val az = point["Azimuth"] as Double
                 val el = point["Elevation"] as Double
@@ -3096,7 +3509,53 @@ class EphemerisService(
                     "Elevation" to el
                 )
             }
-            logger.info("📊 Train=0 데이터 생성 완료: ${train0Dtl.size}개 (finalTransformedDtl 사용)")
+            logger.info("📊 Train=0 데이터 생성 완료: ${train0Dtl.size}개 (필터링된 finalTransformedDtl 사용)")
+            
+            // ✅ 필터링된 final_transformed 데이터 기준으로 original과 axis_transformed도 필터링
+            // 필터링된 final_transformed 데이터의 시간을 기준으로 매칭
+            val filteredFinalTransformedTimes = finalTransformedDtl.map { it["Time"] as? java.time.ZonedDateTime }.toSet()
+            
+            // ✅ 필터링된 final_transformed의 시간에 해당하는 original과 axis_transformed만 선택
+            val filteredOriginalDtl = originalDtl.filter { 
+                val time = it["Time"] as? java.time.ZonedDateTime
+                time != null && filteredFinalTransformedTimes.contains(time)
+            }
+            val filteredAxisTransformedDtl = axisTransformedDtl.filter { 
+                val time = it["Time"] as? java.time.ZonedDateTime
+                time != null && filteredFinalTransformedTimes.contains(time)
+            }
+            
+            // ✅ 필터링된 keyhole_final_transformed의 시간에 해당하는 keyhole_axis_transformed도 필터링
+            val filteredKeyholeFinalTransformedTimes = if (isKeyhole) {
+                keyholeFinalDtl.map { it["Time"] as? java.time.ZonedDateTime }.toSet()
+            } else {
+                emptySet()
+            }
+            val filteredKeyholeAxisDtl = if (isKeyhole) {
+                keyholeAxisDtl.filter { 
+                    val time = it["Time"] as? java.time.ZonedDateTime
+                    time != null && filteredKeyholeFinalTransformedTimes.contains(time)
+                }
+            } else {
+                emptyList()
+            }
+            
+            logger.info("📊 필터링된 데이터 매칭:")
+            logger.info("   - Original 필터링 후: ${filteredOriginalDtl.size}개")
+            logger.info("   - AxisTransformed 필터링 후: ${filteredAxisTransformedDtl.size}개")
+            logger.info("   - FinalTransformed 필터링 후: ${finalTransformedDtl.size}개")
+            if (isKeyhole) {
+                logger.info("   - KeyholeAxis 필터링 후: ${filteredKeyholeAxisDtl.size}개")
+                logger.info("   - KeyholeFinal 필터링 후: ${keyholeFinalDtl.size}개")
+            }
+            
+            // ✅ 필터링된 데이터 기준으로 최대 크기 계산
+            val maxSize = maxOf(
+                filteredOriginalDtl.size,
+                filteredAxisTransformedDtl.size,
+                finalTransformedDtl.size,
+                if (isKeyhole) keyholeFinalDtl.size else 0
+            )
             
             // ✅ 최대값 추적용 변수 (블록 밖에서 선언)
             var maxOriginalAzVelocity = 0.0
@@ -3126,9 +3585,8 @@ class EphemerisService(
                 
                 writer.write("Azimuth_Transformation_Error,Elevation_Transformation_Error\n")
                 
-                val maxSize = maxOf(originalDtl.size, axisTransformedDtl.size, finalTransformedDtl.size)
-                
-                // ✅ 각 변환 단계별 각속도 계산을 위한 이전 값 저장
+                // ✅ 필터링된 데이터 기준으로 CSV 데이터 생성
+                // 시간 기준으로 매칭하여 인덱스 불일치 방지
                 var prevOriginalAzimuth: Double? = null
                 var prevOriginalElevation: Double? = null
                 var prevAxisTransformedAzimuth: Double? = null
@@ -3138,9 +3596,35 @@ class EphemerisService(
                 var prevTime: java.time.ZonedDateTime? = null
                 
                 for (i in 0 until maxSize) {
-                    val originalPoint = if (i < originalDtl.size) originalDtl[i] else null
-                    val axisTransformedPoint = if (i < axisTransformedDtl.size) axisTransformedDtl[i] else null
+                    // ✅ 필터링된 final_transformed 데이터 기준으로 매칭
                     val finalTransformedPoint = if (i < finalTransformedDtl.size) finalTransformedDtl[i] else null
+                    val finalTransformedTime = finalTransformedPoint?.get("Time") as? java.time.ZonedDateTime
+                    
+                    // ✅ 시간 기준으로 original과 axis_transformed 매칭
+                    val originalPoint = if (finalTransformedTime != null) {
+                        filteredOriginalDtl.find { it["Time"] == finalTransformedTime }
+                    } else {
+                        if (i < filteredOriginalDtl.size) filteredOriginalDtl[i] else null
+                    }
+                    
+                    val axisTransformedPoint = if (finalTransformedTime != null) {
+                        filteredAxisTransformedDtl.find { it["Time"] == finalTransformedTime }
+                    } else {
+                        if (i < filteredAxisTransformedDtl.size) filteredAxisTransformedDtl[i] else null
+                    }
+                    
+                    // ✅ Keyhole 데이터 매칭 (Keyhole 발생 시만)
+                    val keyholeFinalPoint = if (isKeyhole && finalTransformedTime != null) {
+                        keyholeFinalDtl.find { it["Time"] == finalTransformedTime }
+                    } else {
+                        null
+                    }
+                    
+                    val keyholeAxisPoint = if (isKeyhole && finalTransformedTime != null) {
+                        filteredKeyholeAxisDtl.find { it["Time"] == finalTransformedTime }
+                    } else {
+                        null
+                    }
                     
                     val originalTime = originalPoint?.get("Time") as? java.time.ZonedDateTime
                     val originalAz = originalPoint?.get("Azimuth") as? Double ?: 0.0
@@ -3183,12 +3667,13 @@ class EphemerisService(
                         var currentKeyholeFinalElSum = 0.0
                         
                         // 10개 구간의 변화량을 모두 더함 (j-1이 유효하도록)
+                        // ✅ 필터링된 데이터 기준으로 계산
                         for (j in (i - 9)..i) { // j는 현재 인덱스 i까지, 이전 9개 포함 (총 10개)
-                            if (j > 0) { // j-1이 유효한 경우만 계산
-                                val prevOriginalPoint = originalDtl[j - 1]
-                                val currentOriginalPoint = originalDtl[j]
-                                val prevAxisTransformedPoint = axisTransformedDtl[j - 1]
-                                val currentAxisTransformedPoint = axisTransformedDtl[j]
+                            if (j > 0 && j < filteredOriginalDtl.size && (j - 1) < filteredOriginalDtl.size) { // j-1이 유효한 경우만 계산
+                                val prevOriginalPoint = filteredOriginalDtl[j - 1]
+                                val currentOriginalPoint = filteredOriginalDtl[j]
+                                val prevAxisTransformedPoint = filteredAxisTransformedDtl[j - 1]
+                                val currentAxisTransformedPoint = filteredAxisTransformedDtl[j]
                                 val prevTrain0Point = train0Dtl[j - 1]
                                 val currentTrain0Point = train0Dtl[j]
                                 
@@ -3226,9 +3711,9 @@ class EphemerisService(
                                 currentTrain0ElSum += kotlin.math.abs(currentTrain0El - prevTrain0El)
                                 
                                 // ✅ Keyhole Axis (Keyhole 발생 시만)
-                                if (isKeyhole && j < keyholeAxisDtl.size) {
-                                    val prevKeyholeAxisPoint = keyholeAxisDtl[j - 1]
-                                    val currentKeyholeAxisPoint = keyholeAxisDtl[j]
+                                if (isKeyhole && j < filteredKeyholeAxisDtl.size && (j - 1) < filteredKeyholeAxisDtl.size) {
+                                    val prevKeyholeAxisPoint = filteredKeyholeAxisDtl[j - 1]
+                                    val currentKeyholeAxisPoint = filteredKeyholeAxisDtl[j]
                                     val prevKeyholeAxisAz = prevKeyholeAxisPoint["Azimuth"] as Double
                                     val currentKeyholeAxisAz = currentKeyholeAxisPoint["Azimuth"] as Double
                                     val prevKeyholeAxisEl = prevKeyholeAxisPoint["Elevation"] as Double
@@ -3241,7 +3726,7 @@ class EphemerisService(
                                 }
                                 
                                 // ✅ Keyhole Final (Keyhole 발생 시만)
-                                if (isKeyhole && j < keyholeFinalDtl.size) {
+                                if (isKeyhole && j < keyholeFinalDtl.size && (j - 1) < keyholeFinalDtl.size) {
                                     val prevKeyholeFinalPoint = keyholeFinalDtl[j - 1]
                                     val currentKeyholeFinalPoint = keyholeFinalDtl[j]
                                     val prevKeyholeFinalAz = prevKeyholeFinalPoint["Azimuth"] as Double
@@ -3301,25 +3786,15 @@ class EphemerisService(
                     
                     // Keyhole 발생 시만 Keyhole 데이터 출력
                     if (isKeyhole) {
-                        // ✅ Keyhole Axis 데이터 (각도 제한 ❌)
-                        if (i < keyholeAxisDtl.size) {
-                            val keyholeAxisPoint = keyholeAxisDtl[i]
-                            val keyholeAxisAz = keyholeAxisPoint["Azimuth"] as? Double ?: 0.0
-                            val keyholeAxisEl = keyholeAxisPoint["Elevation"] as? Double ?: 0.0
+                        // ✅ Keyhole Axis 데이터 (각도 제한 ❌) - 필터링된 데이터 사용
+                        val keyholeAxisAz = keyholeAxisPoint?.get("Azimuth") as? Double ?: 0.0
+                        val keyholeAxisEl = keyholeAxisPoint?.get("Elevation") as? Double ?: 0.0
                             writer.write("${String.format("%.6f", keyholeAxisAz)},${String.format("%.6f", keyholeAxisEl)},${String.format("%.6f", keyholeAxisAzimuthVelocity)},${String.format("%.6f", keyholeAxisElevationVelocity)},")
-                        } else {
-                            writer.write("0.000000,0.000000,0.000000,0.000000,")
-                        }
                         
-                        // ✅ Keyhole Final 데이터 (각도 제한 ✅)
-                        if (i < keyholeFinalDtl.size) {
-                            val keyholeFinalPoint = keyholeFinalDtl[i]
-                            val keyholeFinalAz = keyholeFinalPoint["Azimuth"] as? Double ?: 0.0
-                            val keyholeFinalEl = keyholeFinalPoint["Elevation"] as? Double ?: 0.0
+                        // ✅ Keyhole Final 데이터 (각도 제한 ✅) - 필터링된 데이터 사용
+                        val keyholeFinalAz = keyholeFinalPoint?.get("Azimuth") as? Double ?: 0.0
+                        val keyholeFinalEl = keyholeFinalPoint?.get("Elevation") as? Double ?: 0.0
                             writer.write("${String.format("%.6f", keyholeFinalAz)},${String.format("%.6f", keyholeFinalEl)},${String.format("%.6f", keyholeFinalAzimuthVelocity)},${String.format("%.6f", keyholeFinalElevationVelocity)},")
-                        } else {
-                            writer.write("0.000000,0.000000,0.000000,0.000000,")
-                        }
                     }
                     
                     writer.write("${String.format("%.6f", azimuthTransformationError)},${String.format("%.6f", elevationTransformationError)}\n")

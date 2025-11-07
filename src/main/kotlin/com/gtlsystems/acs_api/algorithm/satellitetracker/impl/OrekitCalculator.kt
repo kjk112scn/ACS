@@ -192,7 +192,7 @@ class OrekitCalculator(
             
             val elevationDetector = ElevationDetector(stationFrame)
                 .withConstantElevation(FastMath.toRadians(minElevation.toDouble()))
-                .withMaxCheck(60.0)      // 최대 체크 간격 10분 (Orekit이 자동 최적화)
+                .withMaxCheck(60.0)      // 최대 체크 간격 1분 (Orekit이 자동 최적화)
                 .withThreshold(1.0e-3)    // 이벤트 시점 정밀도 1ms (충분함)
                 .withHandler(customHandler)
             
