@@ -788,17 +788,40 @@ class EphemerisService(
         return kotlin.math.abs(cmdTilt - currentTilt.toFloat()) <= 0.1f
     }
 
+    /**
+     * 위성 추적 시작
+     * 
+     * 위성 추적을 시작하고 상태머신을 초기화합니다.
+     * Keyhole 여부에 따라 적절한 MST를 currentTrackingPass에 설정합니다.
+     * 
+     * @param passId 추적할 패스 ID (MST ID)
+     * 
+     * @see getTrackingPassMst Keyhole 여부에 따라 적절한 MST 선택
+     * @see moveToStartPosition 시작 위치로 이동
+     * @see startModeTimer 모드 타이머 시작
+     */
     fun startEphemerisTracking(passId: UInt) {
         logger.info("🚀 위성 추적 시작: 패스 ID = {}", passId)
         stopModeTimer()
         executedActions.clear()
         logger.info("🔄 실행 플래그 초기화 완료")
         currentTrackingPassId = passId
-        currentTrackingPass = ephemerisTrackMstStorage.find { it["No"] == passId }
+        
+        // ✅ Keyhole 여부에 따라 적절한 MST 선택
+        // Keyhole 발생: keyhole_final_transformed MST
+        // Keyhole 미발생: final_transformed MST
+        currentTrackingPass = getTrackingPassMst(passId)
+        
         if (currentTrackingPass == null) {
             logger.error("패스 ID {}에 해당하는 데이터를 찾을 수 없습니다", passId)
             return
         }
+        
+        // Keyhole 정보 로깅
+        val isKeyhole = currentTrackingPass["IsKeyhole"] as? Boolean ?: false
+        val recommendedTrainAngle = currentTrackingPass["RecommendedTrainAngle"] as? Double ?: 0.0
+        logger.info("📊 추적 패스 정보: Keyhole=${if (isKeyhole) "YES" else "NO"}, RecommendedTrainAngle=${recommendedTrainAngle}°")
+        
         logger.info("✅ ephemeris 추적 준비 완료 (실제 추적 시작 전)")
         // 상태머신 진입
         moveToStartPosition(passId)
@@ -960,15 +983,41 @@ class EphemerisService(
                 TrackingState.MOVING_TRAIN_TO_ZERO -> {
                     // ✅ Tilt 시작 위치로 이동 상태 표시
                     trackingStatus.ephemerisTrackingState = "TRAIN_MOVING_TO_ZERO"
-                    var trainAngle = 0f
+                    
+                    // ✅ Keyhole 여부에 따라 Train 각도 설정
+                    // currentTrackingPass는 getTrackingPassMst()를 통해 설정되었으므로
+                    // Keyhole 여부에 따라 적절한 MST를 가리킴
+                    val recommendedTrainAngle = currentTrackingPass?.get("RecommendedTrainAngle") as? Double ?: 0.0
+                    val isKeyhole = currentTrackingPass?.get("IsKeyhole") as? Boolean ?: false
+                    
+                    // Keyhole 여부에 따라 Train 각도 설정
+                    // Keyhole 발생: RecommendedTrainAngle 사용 (Train≠0)
+                    // Keyhole 미발생: 0 사용 (Train=0)
+                    val trainAngle = if (isKeyhole) {
+                        recommendedTrainAngle.toFloat()
+                    } else {
+                        0f
+                    }
+                    
+                    // GlobalData에 Train 각도 설정
                     GlobalData.EphemerisTrakingAngle.trainAngle = trainAngle
+                    
+                    // Train 각도 이동 명령 전송
                     moveTrainToZero(trainAngle)
+                    
+                    // Train 각도 설정 정보 로깅
+                    logger.info("🔄 Train 각도 설정: Keyhole=${if (isKeyhole) "YES" else "NO"}, Train=${trainAngle}°")
+                    if (isKeyhole) {
+                        logger.info("   - RecommendedTrainAngle: ${recommendedTrainAngle}°")
+                    }
+                    
+                    // Train 각도 도달 확인
                     if (isTrainAtZero()) {
                         currentTrackingState = TrackingState.WAITING_FOR_TRAIN_STABILIZATION
                         stabilizationStartTime = System.currentTimeMillis()
-                        // ✅ Tilt 0도 이동 완료, 안정화 대기 상태로 업데이트
+                        // ✅ Tilt ${trainAngle}도 이동 완료, 안정화 대기 상태로 업데이트
                         trackingStatus.ephemerisTrackingState = "TRAIN_STABILIZING"
-                        logger.info("✅ Train가 0도에 도달, 안정화 대기 시작")
+                        logger.info("✅ Train가 ${trainAngle}도에 도달, 안정화 대기 시작")
                     }
                 }
 
@@ -1769,23 +1818,37 @@ class EphemerisService(
 
     /**
      * 위성 추적 시작 - 헤더 정보 전송
+     * 
      * 2.12.1 위성 추적 해더 정보 송신 프로토콜 사용
+     * Keyhole 여부에 따라 적절한 MST를 currentTrackingPass에 설정합니다.
+     * 
+     * @param passId 추적할 패스 ID (MST ID)
+     * 
+     * @see getTrackingPassMst Keyhole 여부에 따라 적절한 MST 선택
      */
     fun sendHeaderTrackingData(passId: UInt) {
         try {
             udpFwICDService.writeNTPCommand()
             currentTrackingPassId = passId
-            // 선택된 패스 ID에 해당하는 마스터 데이터 찾기
-            val selectedPass = ephemerisTrackMstStorage.find { it["No"] == passId }
-            // 시작 방위각과 고도각 가져오기
-
+            
+            // ✅ Keyhole 여부에 따라 적절한 MST 선택
+            // Keyhole 발생: keyhole_final_transformed MST
+            // Keyhole 미발생: final_transformed MST
+            val selectedPass = getTrackingPassMst(passId)
+            
             if (selectedPass == null) {
                 logger.error("선택된 패스 ID($passId)에 해당하는 데이터를 찾을 수 없습니다.")
                 return
             }
+            
             // 현재 추적 중인 패스 설정
             currentTrackingPass = selectedPass
-
+            
+            // Keyhole 정보 로깅
+            val isKeyhole = selectedPass["IsKeyhole"] as? Boolean ?: false
+            val recommendedTrainAngle = selectedPass["RecommendedTrainAngle"] as? Double ?: 0.0
+            logger.info("📊 헤더 전송 패스 정보: Keyhole=${if (isKeyhole) "YES" else "NO"}, RecommendedTrainAngle=${recommendedTrainAngle}°")
+            
             // 패스 시작 및 종료 시간 가져오기
             val startTime = (selectedPass["StartTime"] as ZonedDateTime).withZoneSameInstant(ZoneOffset.UTC)
             val endTime = (selectedPass["EndTime"] as ZonedDateTime).withZoneSameInstant(ZoneOffset.UTC)
@@ -2705,6 +2768,80 @@ class EphemerisService(
         return ephemerisTrackDtlStorage.filter {
             it["MstId"] == mstId && it["DataType"] == dataType
         }
+    }
+
+    /**
+     * Keyhole 여부에 따라 적절한 MST(Master) 데이터를 반환합니다.
+     * 
+     * 이 함수는 위성 추적 시작 시 currentTrackingPass를 설정하기 위해 사용됩니다.
+     * passId로 조회하며, Keyhole 여부에 따라 DataType을 **동적으로 선택**합니다:
+     * - Keyhole 발생: keyhole_final_transformed MST (Train≠0, ±270° 제한 적용)
+     * - Keyhole 미발생: final_transformed MST (Train=0, ±270° 제한 적용)
+     * 
+     * 선택된 MST에는 다음 정보가 포함됩니다:
+     * - IsKeyhole: Keyhole 여부 (Boolean)
+     * - RecommendedTrainAngle: 권장 Train 각도 (Double, Keyhole 발생 시만 0이 아님)
+     * - StartTime, EndTime: 추적 시작/종료 시간
+     * - 기타 추적 메타데이터
+     * 
+     * @param passId 패스 ID (MST ID)
+     * @return Keyhole 여부에 따라 선택된 MST 데이터, 없으면 null
+     * 
+     * @see getEphemerisTrackDtlByMstId 동일한 Keyhole 판단 로직 사용 (DTL 데이터 반환)
+     * @see getAllEphemerisTrackMstMerged Keyhole 판단 기준과 일치
+     * 
+     * @note 이 함수는 현재 존재하지 않으며, 새로 생성해야 합니다.
+     * @note DataType은 정해져 있지 않고, Keyhole 여부에 따라 동적으로 선택됩니다.
+     */
+    private fun getTrackingPassMst(passId: UInt): Map<String, Any?>? {
+        // 1. final_transformed MST에서 IsKeyhole 확인
+        // final_transformed MST에 IsKeyhole 정보가 저장되어 있음
+        val finalMst = ephemerisTrackMstStorage.find { 
+            it["No"] == passId && it["DataType"] == "final_transformed" 
+        }
+        
+        if (finalMst == null) {
+            logger.warn("⚠️ 패스 ID ${passId}에 해당하는 final_transformed MST 데이터를 찾을 수 없습니다.")
+            return null
+        }
+        
+        // Keyhole 여부 확인 (final_transformed MST의 IsKeyhole 필드 사용)
+        val isKeyhole = finalMst["IsKeyhole"] as? Boolean ?: false
+        
+        // 2. Keyhole 여부에 따라 MST 선택
+        // Keyhole 발생 시: keyhole_final_transformed MST (Train≠0으로 재계산된 데이터)
+        // Keyhole 미발생 시: final_transformed MST (Train=0 데이터)
+        val dataType = if (isKeyhole) {
+            // Keyhole 발생 시 keyhole_final_transformed MST 존재 여부 확인
+            val keyholeMstExists = ephemerisTrackMstStorage.any {
+                it["No"] == passId && it["DataType"] == "keyhole_final_transformed"
+            }
+            
+            if (!keyholeMstExists) {
+                logger.warn("⚠️ 패스 ID ${passId}: Keyhole로 판단되었으나 keyhole_final_transformed MST가 없습니다. final_transformed MST로 폴백합니다.")
+                "final_transformed"  // 폴백
+            } else {
+                logger.debug("🔑 패스 ID ${passId}: Keyhole 발생 → keyhole_final_transformed MST 사용")
+                "keyhole_final_transformed"
+            }
+        } else {
+            logger.debug("✅ 패스 ID ${passId}: Keyhole 미발생 → final_transformed MST 사용")
+            "final_transformed"
+        }
+        
+        // 3. 선택된 DataType의 MST 반환
+        val selectedMst = ephemerisTrackMstStorage.find {
+            it["No"] == passId && it["DataType"] == dataType
+        }
+        
+        if (selectedMst == null) {
+            logger.error("❌ 패스 ID ${passId}: 선택된 DataType($dataType)의 MST를 찾을 수 없습니다.")
+            return null
+        }
+        
+        logger.info("📊 패스 ID ${passId} MST 선택: Keyhole=${if (isKeyhole) "YES" else "NO"}, DataType=${dataType}")
+        
+        return selectedMst
     }
 
     /**
