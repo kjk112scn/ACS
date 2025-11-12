@@ -33,6 +33,39 @@ export interface ScheduleItem {
   originalEndAzimuth?: number
   maxElevation?: number
   maxElevationTime?: string
+
+  // ✅ Keyhole 정보 추가
+  isKeyhole?: boolean
+  IsKeyhole?: boolean // 백엔드 응답 호환성
+  recommendedTrainAngle?: number
+  RecommendedTrainAngle?: number // 백엔드 응답 호환성
+
+  // ✅ Original (2축) 메타데이터 추가
+  OriginalMaxElevation?: number
+  OriginalMaxAzRate?: number
+  OriginalMaxElRate?: number
+
+  // ✅ FinalTransformed (3축, Train=0, ±270°) 메타데이터 추가
+  FinalTransformedMaxAzRate?: number
+  FinalTransformedMaxElRate?: number
+  FinalTransformedStartAzimuth?: number
+  FinalTransformedEndAzimuth?: number
+  FinalTransformedStartElevation?: number
+  FinalTransformedEndElevation?: number
+  FinalTransformedMaxElevation?: number
+
+  // ✅ KeyholeAxisTransformed (3축, Train≠0) 메타데이터 추가
+  KeyholeAxisTransformedMaxAzRate?: number
+  KeyholeAxisTransformedMaxElRate?: number
+
+  // ✅ KeyholeFinalTransformed (3축, Train≠0, ±270°) 메타데이터 추가
+  KeyholeFinalTransformedMaxAzRate?: number
+  KeyholeFinalTransformedMaxElRate?: number
+  KeyholeFinalTransformedStartAzimuth?: number
+  KeyholeFinalTransformedEndAzimuth?: number
+  KeyholeFinalTransformedStartElevation?: number
+  KeyholeFinalTransformedEndElevation?: number
+  KeyholeFinalTransformedMaxElevation?: number
 }
 
 // 🔧 타입들을 export하여 다른 파일에서 사용 가능하게 함
@@ -956,7 +989,7 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
                 endAzimuthAngle: pass.EndAzimuth || 0,
                 startElevationAngle: pass.StartElevation || 0,
                 endElevationAngle: pass.EndElevation || 0,
-                train: 0,
+                train: pass.RecommendedTrainAngle || 0, // ✅ Keyhole Train 각도 사용
                 maxElevation: pass.MaxElevation || 0,
                 maxElevationTime: pass.MaxElevationTime || '',
                 maxAzimuthRate: pass.MaxAzRate || 0,
@@ -965,11 +998,44 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
                 maxElevationAccel: pass.MaxElAccel || 0,
                 originalStartAzimuth: pass.OriginalStartAzimuth || 0,
                 originalEndAzimuth: pass.OriginalEndAzimuth || 0,
+
+                // ✅ Keyhole 정보 매핑
+                isKeyhole: pass.IsKeyhole || false,
+                IsKeyhole: pass.IsKeyhole || false,
+                recommendedTrainAngle: pass.RecommendedTrainAngle || 0,
+                RecommendedTrainAngle: pass.RecommendedTrainAngle || 0,
+
+                // ✅ Original (2축) 메타데이터 매핑
+                OriginalMaxElevation: pass.OriginalMaxElevation,
+                OriginalMaxAzRate: pass.OriginalMaxAzRate,
+                OriginalMaxElRate: pass.OriginalMaxElRate,
+
+                // ✅ FinalTransformed (3축, Train=0, ±270°) 메타데이터 매핑
+                FinalTransformedMaxAzRate: pass.FinalTransformedMaxAzRate,
+                FinalTransformedMaxElRate: pass.FinalTransformedMaxElRate,
+                FinalTransformedStartAzimuth: pass.FinalTransformedStartAzimuth,
+                FinalTransformedEndAzimuth: pass.FinalTransformedEndAzimuth,
+                FinalTransformedStartElevation: pass.FinalTransformedStartElevation,
+                FinalTransformedEndElevation: pass.FinalTransformedEndElevation,
+                FinalTransformedMaxElevation: pass.FinalTransformedMaxElevation,
+
+                // ✅ KeyholeAxisTransformed (3축, Train≠0) 메타데이터 매핑
+                KeyholeAxisTransformedMaxAzRate: pass.KeyholeAxisTransformedMaxAzRate,
+                KeyholeAxisTransformedMaxElRate: pass.KeyholeAxisTransformedMaxElRate,
+
+                // ✅ KeyholeFinalTransformed (3축, Train≠0, ±270°) 메타데이터 매핑
+                KeyholeFinalTransformedMaxAzRate: pass.KeyholeFinalTransformedMaxAzRate,
+                KeyholeFinalTransformedMaxElRate: pass.KeyholeFinalTransformedMaxElRate,
+                KeyholeFinalTransformedStartAzimuth: pass.KeyholeFinalTransformedStartAzimuth,
+                KeyholeFinalTransformedEndAzimuth: pass.KeyholeFinalTransformedEndAzimuth,
+                KeyholeFinalTransformedStartElevation: pass.KeyholeFinalTransformedStartElevation,
+                KeyholeFinalTransformedEndElevation: pass.KeyholeFinalTransformedEndElevation,
+                KeyholeFinalTransformedMaxElevation: pass.KeyholeFinalTransformedMaxElevation,
               }
 
               allSchedules.push(scheduleItem)
               console.log(
-                `✅ 스케줄 생성: ${scheduleItem.satelliteName} - ${scheduleItem.startTime}`,
+                `✅ 스케줄 생성: ${scheduleItem.satelliteName} - ${scheduleItem.startTime} (Keyhole: ${scheduleItem.IsKeyhole ? 'YES' : 'NO'})`,
               )
             } catch (itemError) {
               console.error(`❌ 스케줄 아이템 생성 실패:`, itemError)

@@ -1,7 +1,7 @@
 <template>
   <div class="pass-schedule-mode">
     <!-- 1행: Offset Controls - EphemerisDesignationPage와 동일한 구조 -->
-    <div class="row q-col-gutter-md q-mb-sm">
+    <div class="row q-col-gutter-md q-mb-sm offset-control-row">
       <div class="col-12">
         <q-card flat bordered class="control-card">
           <q-card-section class="compact-control purple-1">
@@ -22,9 +22,9 @@
                   <div class="col-auto">
                     <div class="vertical-button-group">
                       <div class="vertical-buttons">
-                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
-                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
-                      </div>
+                <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
+                <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
+              </div>
                       <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(0)" />
                     </div>
                   </div>
@@ -41,8 +41,8 @@
                   <div class="col-auto position-offset-label">
                     <div class="text-subtitle2 text-weight-bold text-primary text-center">
                       Elevation<br>Offset
-                    </div>
-                  </div>
+            </div>
+      </div>
                   <div class="col-auto">
                     <q-input v-model="inputs[1]" @input="(val: string) => onInputChange(1, val)" dense outlined
                       type="number" step="0.01" label="Elevation"
@@ -51,9 +51,9 @@
                   <div class="col-auto">
                     <div class="vertical-button-group">
                       <div class="vertical-buttons">
-                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(1)" />
-                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
-                      </div>
+                <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(1)" />
+                <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
+              </div>
                       <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(1)" />
                     </div>
                   </div>
@@ -70,8 +70,8 @@
                   <div class="col-auto position-offset-label">
                     <div class="text-subtitle2 text-weight-bold text-primary text-center">
                       Tilt<br>Offset
-                    </div>
-                  </div>
+            </div>
+      </div>
                   <div class="col-auto">
                     <q-input v-model="inputs[2]" @input="(val: string) => onInputChange(2, val)" dense outlined
                       type="number" step="0.01" label="Tilt"
@@ -80,9 +80,9 @@
                   <div class="col-auto">
                     <div class="vertical-button-group">
                       <div class="vertical-buttons">
-                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(2)" />
-                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
-                      </div>
+                <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(2)" />
+                <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
+              </div>
                       <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(2)" />
                     </div>
                   </div>
@@ -99,8 +99,8 @@
                   <div class="col-auto position-offset-label">
                     <div class="text-subtitle2 text-weight-bold text-primary text-center">
                       Time<br>Offset
-                    </div>
-                  </div>
+            </div>
+      </div>
                   <div class="col-auto">
                     <q-input v-model="inputs[3]" @input="(val: string) => onInputChange(3, val)" dense outlined
                       type="number" step="0.01" label="Time"
@@ -109,9 +109,9 @@
                   <div class="col-auto">
                     <div class="vertical-button-group">
                       <div class="vertical-buttons">
-                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(3)" />
-                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
-                      </div>
+                <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(3)" />
+                <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
+              </div>
                       <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(3)" />
                     </div>
                   </div>
@@ -131,110 +131,110 @@
       </div>
     </div>
     <!-- 2행: Main Content -->
-    <div class="row q-col-gutter-md items-stretch">
+    <div class="row q-col-gutter-md main-content-row" style="display: flex; flex-wrap: nowrap; align-items: stretch; margin-bottom: 0 !important; padding-bottom: 0 !important;">
       <!-- 1번 영역: 차트가 들어갈 네모난 칸 - 반응형 크기 조정 -->
-      <div class="col-12 col-md-3 col-lg-3 col-xl-3">
-        <q-card class="control-section">
-          <q-card-section>
-            <div class="text-subtitle1 text-weight-bold text-primary">Position View</div>
-            <div class="chart-area" ref="chartRef"></div>
-          </q-card-section>
-        </q-card>
-      </div>
+      <div class="col-12 col-md-3 position-view-col">
+        <q-card class="control-section position-view-card" style="min-height: 360px !important; height: 100% !important; display: flex !important; flex-direction: column !important;">
+          <q-card-section class="position-view-section" style="min-height: 360px !important; height: 100% !important; flex: 1 !important; display: flex !important; flex-direction: column !important; padding-top: 16px !important; padding-bottom: 0px !important;">
+            <div class="text-subtitle1 text-weight-bold text-primary position-view-title">Position View</div>
+            <div class="chart-area" ref="chartRef" style="min-height: 340px !important; height: 100% !important; flex: 1 !important; padding-top: 0 !important; padding-bottom: 0 !important; margin-bottom: 0 !important;"></div>
+            </q-card-section>
+          </q-card>
+        </div>
 
       <!-- 2번 영역: Schedule Information -->
-      <div class="col-12 col-md-4">
-        <q-card class="control-section">
-          <q-card-section>
+      <div class="col-12 col-md-3">
+          <q-card class="control-section">
+            <q-card-section>
             <div class="text-subtitle1 text-weight-bold text-primary q-mb-xs">Schedule Information</div>
-            <div class="schedule-form">
-              <div class="form-row">
-                <!-- 자동/수동 선택된 스케줄 정보 표시 -->
+              <div class="schedule-form">
+                <div class="form-row">
+                  <!-- 자동/수동 선택된 스케줄 정보 표시 -->
                 <div v-if="displaySchedule" class="schedule-info q-mt-xs">
-                  <div class="info-row">
-                    <span class="info-label">스케줄 ID / 상태:</span>
-                    <div class="info-value-with-badge">
-                      <span class="info-value">{{ displaySchedule.no }}</span>
-                      <q-badge v-if="currentScheduleStatus" :color="currentScheduleStatus.color"
-                        :label="currentScheduleStatus.label" class="q-ml-sm" />
+                    <div class="info-row">
+                      <span class="info-label">스케줄 ID / 상태:</span>
+                      <div class="info-value-with-badge">
+                        <span class="info-value">{{ displaySchedule.no }}</span>
+                        <q-badge v-if="currentScheduleStatus" :color="currentScheduleStatus.color"
+                          :label="currentScheduleStatus.label" class="q-ml-sm" />
+                      </div>
                     </div>
-                  </div>
-                  <!--     <div class="info-row">
+                    <!--     <div class="info-row">
                       <span class="info-label">Index:</span>
                       <span class="info-value">{{ displaySchedule.index }}</span>
                     </div> -->
-                  <div class="info-row">
-                    <span class="info-label">위성 이름:</span>
-                    <span class="info-value">{{ displaySchedule.satelliteName }}</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="info-label">시작 시간:</span>
-                    <span class="info-value">{{ formatToLocalTime(displaySchedule.startTime) }}</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="info-label">종료 시간:</span>
-                    <span class="info-value">{{ formatToLocalTime(displaySchedule.endTime) }}</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="info-label">지속 시간:</span>
-                    <span class="info-value">{{ displaySchedule.duration }}</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="info-label">시작 방위각:</span>
-                    <span class="info-value">{{ displaySchedule.startAzimuthAngle.toFixed(2) }}°</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="info-label">최대 고도각:</span>
-                    <span class="info-value">{{ displaySchedule.maxElevation?.toFixed(2) }}°</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="info-label">남은 시간:</span>
-                    <span class="info-value" :class="{
-                      'text-negative': timeRemaining < 0,
-                      'text-positive': timeRemaining > 0,
-                      'text-grey': timeRemaining === 0,
-                    }">
-                      {{ formatTimeRemaining(timeRemaining) }}
-                    </span>
-                  </div>
+                    <div class="info-row">
+                      <span class="info-label">위성 이름:</span>
+                      <span class="info-value">{{ displaySchedule.satelliteName }}</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">시작 시간:</span>
+                      <span class="info-value">{{ formatToLocalTime(displaySchedule.startTime) }}</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">종료 시간:</span>
+                      <span class="info-value">{{ formatToLocalTime(displaySchedule.endTime) }}</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">지속 시간:</span>
+                    <span class="info-value">{{ formatDuration(displaySchedule.duration) }}</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">시작 방위각:</span>
+                      <span class="info-value">{{ displaySchedule.startAzimuthAngle.toFixed(2) }}°</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">최대 고도각:</span>
+                      <span class="info-value">{{ displaySchedule.maxElevation?.toFixed(2) }}°</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">남은 시간:</span>
+                      <span class="info-value" :class="{
+                        'text-negative': timeRemaining < 0,
+                        'text-positive': timeRemaining > 0,
+                        'text-grey': timeRemaining === 0,
+                      }">
+                        {{ formatTimeRemaining(timeRemaining) }}
+                      </span>
+                    </div>
 
-                </div>
-                <!-- 스케줄이 선택되지 않은 경우 -->
-                <div v-else class="no-schedule-selected">
-                  <div class="text-grey-5">추적 중인 스케줄이 없습니다</div>
+                  </div>
+                  <!-- 스케줄이 선택되지 않은 경우 -->
+                  <div v-else class="no-schedule-selected">
+                    <div class="text-grey-5">추적 중인 스케줄이 없습니다</div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </q-card-section>
-        </q-card>
-      </div>
+            </q-card-section>
+          </q-card>
+        </div>
 
       <!-- 3번 영역: Schedule Control -->
-      <div class="col-12 col-md-5">
-        <q-card class="control-section">
-          <q-card-section>
-            <!-- ✅ Schedule Control 헤더 -->
-            <div class="schedule-header">
+      <div class="col-12 col-md-6 schedule-control-col">
+          <q-card class="control-section">
+            <q-card-section class="schedule-control-section">
+              <!-- ✅ Schedule Control 헤더 -->
+              <div class="schedule-header">
               <div class="text-subtitle1 text-weight-bold text-primary schedule-header-title">Schedule Control</div>
-              <div class="schedule-header-right">
-                <!-- 현재/다음 스케줄 상태 표시 -->
-                <div v-if="currentDisplaySchedule" class="current-schedule-display">
-                  <q-icon :name="currentDisplaySchedule.type === 'current' ? 'play_arrow' : 'schedule'"
-                    :color="currentDisplaySchedule.type === 'current' ? 'positive' : 'primary'" size="sm" />
-                  <span class="text-body2 q-ml-xs">
-                    {{ currentDisplaySchedule.label }}: Index {{ currentDisplaySchedule.mstId }}
-                  </span>
-                  <q-badge :color="currentDisplaySchedule.type === 'current' ? 'positive' : 'primary'"
-                    :label="currentDisplaySchedule.type === 'current' ? '추적중' : '대기중'" class="q-ml-sm" />
-                </div>
-                <!-- 등록된 스케줄 정보 -->
-                <div class="registered-schedule-info">
-                  <span class="text-body2 text-primary">등록된 스케줄</span>
-                  <span class="text-caption text-grey-5 q-ml-xs">{{ scheduleData.length }}개</span>
+                <div class="schedule-header-right">
+                  <!-- 현재/다음 스케줄 상태 표시 -->
+                  <div v-if="currentDisplaySchedule" class="current-schedule-display">
+                    <q-icon :name="currentDisplaySchedule.type === 'current' ? 'play_arrow' : 'schedule'"
+                      :color="currentDisplaySchedule.type === 'current' ? 'positive' : 'primary'" size="sm" />
+                    <span class="text-body2 q-ml-xs">
+                      {{ currentDisplaySchedule.label }}: Index {{ currentDisplaySchedule.mstId }}
+                    </span>
+                    <q-badge :color="currentDisplaySchedule.type === 'current' ? 'positive' : 'primary'"
+                      :label="currentDisplaySchedule.type === 'current' ? '추적중' : '대기중'" class="q-ml-sm" />
+                  </div>
+                  <!-- 등록된 스케줄 정보 -->
+                  <div class="registered-schedule-info">
+                    <span class="text-body2 text-primary">등록된 스케줄</span>
+                    <span class="text-caption text-grey-5 q-ml-xs">{{ scheduleData.length }}개</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <!--
+              <!--
               <div class="debug-panel q-mb-md" v-if="true">
                 <q-card flat bordered>
                   <q-card-section class="q-py-sm">
@@ -257,95 +257,95 @@
                 </q-card>
               </div>
  -->
-            <!-- ✅ 스케줄 테이블 - 체크박스 제거 -->
-            <q-table flat bordered :row-class="getRowClass" :row-style="getRowStyleDirect" :rows="sortedScheduleList"
-              :columns="scheduleColumns" row-key="no" :pagination="{ rowsPerPage: 0 }" hide-pagination
-              :loading="loading" @row-click="onRowClick" class="schedule-table q-mt-sm"
-              :style="scheduleData.length <= 20 ? 'height: auto; max-height: 200px' : 'height: 200px'"
-              :no-data-label="'등록된 스케줄이 없습니다'" :virtual-scroll="scheduleData.length > 20"
-              :virtual-scroll-sticky-size-start="48">
-              <template v-slot:loading>
-                <q-inner-loading showing color="primary">
-                  <q-spinner size="50px" color="primary" />
-                </q-inner-loading>
-              </template>
-              <!-- 삭제 버튼 컬럼 -->
-              <template v-slot:body-cell-actions="props">
-                <q-td :props="props">
-                  <q-btn icon="delete" color="negative" size="sm" flat round>
-                    <q-tooltip>목록에서 제거</q-tooltip>
-                  </q-btn>
-                </q-td>
-              </template>
-              <!-- 위성 정보 컬럼 템플릿 -->
-              <template v-slot:body-cell-satelliteInfo="props">
-                <q-td :props="props" class="satellite-info-cell">
-                  <div class="satellite-container">
-                    <div class="satellite-id">{{ props.row.satelliteId || '-' }}</div>
-                    <div class="satellite-name">{{ props.row.satelliteName }}</div>
-                  </div>
-                </q-td>
-              </template>
+            <!-- ✅ 스케줄 테이블 - 체크박스 제거, 높이 고정 (모든 데이터 표시, 화면에는 정확히 3개 행만 보이도록) -->
+              <q-table flat bordered :row-class="getRowClass" :row-style="getRowStyleDirect" :rows="sortedScheduleList"
+                :columns="scheduleColumns" row-key="no" :pagination="{ rowsPerPage: 0 }" hide-pagination
+              :loading="loading && sortedScheduleList.length === 0" @row-click="onRowClick" class="schedule-table q-mt-sm"
+              style="height: 210px; max-height: 210px;"
+              :no-data-label="'등록된 스케줄이 없습니다'"
+              :virtual-scroll="false">
+                <template v-slot:loading>
+                  <q-inner-loading showing color="primary">
+                    <q-spinner size="50px" color="primary" />
+                  </q-inner-loading>
+                </template>
+                <!-- 삭제 버튼 컬럼 -->
+                <template v-slot:body-cell-actions="props">
+                  <q-td :props="props">
+                    <q-btn icon="delete" color="negative" size="sm" flat round>
+                      <q-tooltip>목록에서 제거</q-tooltip>
+                    </q-btn>
+                  </q-td>
+                </template>
+                <!-- 위성 정보 컬럼 템플릿 -->
+                <template v-slot:body-cell-satelliteInfo="props">
+                  <q-td :props="props" class="satellite-info-cell">
+                    <div class="satellite-container">
+                      <div class="satellite-id">{{ props.row.satelliteId || '-' }}</div>
+                      <div class="satellite-name">{{ props.row.satelliteName }}</div>
+                    </div>
+                  </q-td>
+                </template>
 
-              <!-- 시간 범위 컬럼 템플릿 - formatDateTime 함수 사용 -->
-              <template v-slot:body-cell-timeRange="props">
-                <q-td :props="props" class="time-range-cell">
-                  <div class="time-container">
+                <!-- 시간 범위 컬럼 템플릿 - formatDateTime 함수 사용 -->
+                <template v-slot:body-cell-timeRange="props">
+                  <q-td :props="props" class="time-range-cell">
+                    <div class="time-container">
 
 
-                    <div class="start-time">{{ formatDateTime(props.row.startTime) }}</div>
-                    <div class="end-time">{{ formatDateTime(props.row.endTime) }}</div>
-                  </div>
-                </q-td>
-              </template>
+                      <div class="start-time">{{ formatDateTime(props.row.startTime) }}</div>
+                      <div class="end-time">{{ formatDateTime(props.row.endTime) }}</div>
+                    </div>
+                  </q-td>
+                </template>
 
-              <!-- Azimuth 범위 컬럼 템플릿 -->
-              <template v-slot:body-cell-azimuthRange="props">
-                <q-td :props="props" class="azimuth-range-cell">
-                  <div class="azimuth-container">
-                    <div class="start-az">{{ formatAngle(props.row.startAzimuthAngle) }}</div>
-                    <div class="end-az">{{ formatAngle(props.row.endAzimuthAngle) }}</div>
-                  </div>
-                </q-td>
-              </template>
+                <!-- Azimuth 범위 컬럼 템플릿 -->
+                <template v-slot:body-cell-azimuthRange="props">
+                  <q-td :props="props" class="azimuth-range-cell">
+                    <div class="azimuth-container">
+                      <div class="start-az">{{ formatAngle(props.row.startAzimuthAngle) }}</div>
+                      <div class="end-az">{{ formatAngle(props.row.endAzimuthAngle) }}</div>
+                    </div>
+                  </q-td>
+                </template>
 
-              <!-- Elevation 정보 컬럼 템플릿 -->
-              <template v-slot:body-cell-elevationInfo="props">
-                <q-td :props="props" class="elevation-info-cell">
-                  <div class="elevation-container">
-                    <div class="max-elevation">{{ formatAngle(props.row.maxElevation) }}</div>
-                    <div class="train">{{ formatAngle(0) }}</div>
-                  </div>
-                </q-td>
-              </template>
-            </q-table>
-            <!-- 버튼 그룹 섹션 -->
-            <div class="button-group q-mt-sm">
-              <div class="button-row q-mb-sm">
-                <q-btn color="info" label="TLE Upload" icon="upload_file" @click="handleTLEUpload"
+                <!-- Elevation 정보 컬럼 템플릿 -->
+                <template v-slot:body-cell-elevationInfo="props">
+                  <q-td :props="props" class="elevation-info-cell">
+                    <div class="elevation-container">
+                      <div class="max-elevation">{{ formatAngle(props.row.maxElevation) }}</div>
+                      <div class="train">{{ formatAngle(0) }}</div>
+                    </div>
+                  </q-td>
+                </template>
+              </q-table>
+              <!-- 버튼 그룹 섹션 -->
+            <div class="button-group">
+              <div class="button-row">
+                  <q-btn color="info" label="TLE Upload" icon="upload_file" @click="handleTLEUpload"
                   class="q-mr-sm upload-btn" size="sm" />
 
-                <q-btn color="primary" label="Select Schedule" icon="playlist_add_check" @click="selectScheduleData"
+                  <q-btn color="primary" label="Select Schedule" icon="playlist_add_check" @click="selectScheduleData"
                   class="upload-btn" size="sm">
-                  <q-tooltip>스케줄 목록을 불러와서 선택할 수 있습니다</q-tooltip>
-                </q-btn>
-              </div>
+                    <q-tooltip>스케줄 목록을 불러와서 선택할 수 있습니다</q-tooltip>
+                  </q-btn>
+                </div>
 
-              <div class="control-button-row">
+                <div class="control-button-row">
                 <q-btn color="positive" label="Start" @click="handleStartCommand" class="control-btn" size="sm" />
                 <q-btn color="warning" label="Stop" @click="handleStopCommand" class="control-btn" size="sm" />
                 <q-btn color="negative" label="Stow" @click="handleStowCommand" class="control-btn" size="sm" />
+                </div>
               </div>
-            </div>
-          </q-card-section>
-        </q-card>
+            </q-card-section>
+          </q-card>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch, onActivated, onDeactivated } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, onActivated, onDeactivated, nextTick } from 'vue'
 import { useQuasar } from 'quasar'
 import { usePassScheduleModeStore, type ScheduleItem } from '@/stores'
 import { useICDStore } from '../../stores/icd/icdStore'
@@ -1090,6 +1090,7 @@ const scheduleColumns: QTableColumn[] = [
     field: 'duration',
     align: 'center' as const,
     sortable: true,
+    format: (val) => formatDuration(val),
     style: 'width: 80px'
   },
   {
@@ -1127,6 +1128,26 @@ const formatAngle = (angle: number | undefined | null): string => {
   return `${angle.toFixed(1)}°`
 }
 
+// ✅ Duration 포맷 함수 추가 (ISO 8601 Duration 형식 파싱)
+const formatDuration = (duration: string): string => {
+  if (!duration) return '0분 0초'
+
+  // ISO 8601 Duration 형식 (PT13M43.6S) 파싱
+  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/)
+  if (!match) return duration // 파싱 실패 시 원본 반환
+
+  const hours = parseInt(match[1] || '0', 10)
+  const minutes = parseInt(match[2] || '0', 10)
+  const seconds = parseFloat(match[3] || '0')
+
+  const parts: string[] = []
+  if (hours > 0) parts.push(`${hours}시간`)
+  if (minutes > 0) parts.push(`${minutes}분`)
+  if (seconds > 0) parts.push(`${Math.round(seconds)}초`)
+
+  return parts.length > 0 ? parts.join(' ') : '0분 0초'
+}
+
 // TLE 업로드 핸들러
 const handleTLEUpload = async () => {
   try {
@@ -1161,7 +1182,7 @@ const handleTLEUpload = async () => {
   }
 }
 
-// ✅ 차트 초기화 함수 수정 - 반응형 크기
+// ✅ 차트 초기화 함수 수정 - 컨테이너 크기에 맞춘 크기
 const initChart = () => {
   if (!chartRef.value) return
 
@@ -1170,32 +1191,24 @@ const initChart = () => {
     passChart.dispose()
   }
 
-  // 화면 크기에 따른 차트 크기 결정
-  const getChartSize = () => {
-    const width = window.innerWidth
-    if (width <= 1200) return 280
-    if (width <= 1600) return 320
-    if (width <= 1900) return 360
-    return 420
-  }
+  // ✅ 차트 크기 설정 (차트를 더 크게, Position View 구역 크기와 독립적)
+  const initialSize = 500
 
-  const chartSize = getChartSize()
-
-  // 차트 인스턴스 생성 (반응형 크기)
+  // 차트 인스턴스 생성
   passChart = echarts.init(chartRef.value, null, {
-    width: chartSize,
-    height: chartSize
+    width: initialSize,
+    height: initialSize
   })
-  console.log('PassSchedule 차트 인스턴스 생성됨')
+  console.log('PassSchedule 차트 인스턴스 생성됨, 크기:', initialSize)
 
   // 차트 옵션 설정
   const option = {
     backgroundColor: 'transparent',
     grid: {
-      left: 10,
-      right: 10,
-      top: 10,
-      bottom: 10,
+      left: '10%', /* ✅ 균등한 여백 확보 */
+      right: '10%',
+      top: '10%',
+      bottom: '10%',
       containLabel: false
     },
     polar: {
@@ -1360,34 +1373,80 @@ const initChart = () => {
     ],
   }
 
-  // 차트 옵션 적용 (반응형 크기)
+  // 차트 옵션 적용 (초기 크기)
   passChart.setOption(option, true)
   passChart.resize({
-    width: chartSize,
-    height: chartSize
+    width: initialSize,
+    height: initialSize
   })
   console.log('PassSchedule 차트 옵션 적용됨')
 
-  // 차트 크기 조정
-  setTimeout(() => {
-    if (passChart && !passChart.isDisposed()) {
+  // ✅ 차트 크기 조정 (차트를 더 크게, Position View 구역 크기와 독립적)
+  const adjustChartSize = async () => {
+    await nextTick() // ✅ Vue의 DOM 업데이트 완료 대기
+
+    if (!passChart || passChart.isDisposed() || !chartRef.value) return
+
+    // ✅ 차트를 더 크게 설정 (Position View 구역 크기와 독립적)
+    const chartSize = 500
+
+    console.log('차트 크기 설정:', chartSize)
+
+    // 리사이즈 수행
+    passChart.resize({
+      width: chartSize,
+      height: chartSize
+    })
+
+    // ✅ ECharts가 생성한 실제 DOM 요소에 크기 설정
+    await nextTick()
+    const chartElement = chartRef.value.querySelector('div') as HTMLElement | null
+    if (chartElement) {
+      // ✅ 차트를 더 크게 설정
+      chartElement.style.width = `${chartSize}px`
+      chartElement.style.height = `${chartSize}px`
+      chartElement.style.maxWidth = `${chartSize}px`
+      chartElement.style.maxHeight = `${chartSize}px`
+      chartElement.style.minWidth = `${chartSize}px`
+      chartElement.style.minHeight = `${chartSize}px`
+      // ✅ 중앙 정렬
+      chartElement.style.top = '50%'
+      chartElement.style.position = 'absolute'
+      chartElement.style.left = '50%'
+      chartElement.style.transform = 'translate(-50%, -50%)'
+
+      // 다시 리사이즈하여 적용 확인
       passChart.resize({
         width: chartSize,
         height: chartSize
       })
-      console.log('PassSchedule 차트 리사이즈 완료')
     }
+
+    console.log('차트 리사이즈 완료:', chartSize)
+  }
+
+  // ✅ Vue의 nextTick을 사용하여 안전하게 차트 조정
+  setTimeout(() => {
+    adjustChartSize().catch(console.error)
+    // 추가 리사이즈 (레이아웃 완료 대기)
+    setTimeout(() => {
+      adjustChartSize().catch(console.error)
+    }, 200)
   }, 100)
 
-  // 윈도우 리사이즈 이벤트에 대응 (반응형)
-  window.addEventListener('resize', () => {
-    const newSize = getChartSize()
-    passChart?.resize({
-      width: newSize,
-      height: newSize
-    })
-  })
+  // ✅ 윈도우 리사이즈 이벤트에 대응 (반응형) - 컨테이너 크기 기반
+  const handleResize = () => {
+    if (!passChart || passChart.isDisposed()) return
+
+    nextTick().then(() => {
+      // ✅ 리사이즈 시에도 컨테이너 크기에 맞춰 조정
+      adjustChartSize().catch(console.error)
+    }).catch(console.error)
+  }
+
+  window.addEventListener('resize', handleResize)
 }
+
 
 // 🆕 선택된 스케줄의 추적 경로 로드
 const loadSelectedScheduleTrackingPath = async () => {
@@ -2206,12 +2265,117 @@ const formattedCalTime = computed(() => {
   }
 }
 
-/* ===== 1. 기본 컨테이너 스타일 ===== */
-.pass-schedule-mode {
-  height: 100%;
+/* ✅ 오프셋 컨트롤 행 하단 여백 줄이기 */
+.pass-schedule-mode .offset-control-row {
+  margin-bottom: 0.5rem !important; /* ✅ 기본 q-mb-sm (0.5rem) 유지하되 명시적으로 설정 */
+}
+
+/* ✅ 메인 콘텐츠 행 하단 여백을 EphemerisDesignationPage.vue와 동일하게 설정 (하단 마진 없음) */
+.pass-schedule-mode .main-content-row {
+  margin-bottom: 0 !important; /* ✅ EphemerisDesignationPage.vue와 동일하게 하단 마진 없음 */
+  padding-bottom: 0 !important; /* ✅ 하단 패딩 제거 */
+}
+
+/* ✅ Quasar q-col-gutter-md가 행에 추가하는 하단 마진을 EphemerisDesignationPage.vue와 동일하게 설정 (하단 마진 없음) */
+.pass-schedule-mode .main-content-row.q-col-gutter-md,
+.pass-schedule-mode .row.q-col-gutter-md.main-content-row {
+  margin-bottom: 0 !important; /* ✅ EphemerisDesignationPage.vue와 동일하게 하단 마진 없음 */
+  padding-bottom: 0 !important;
+}
+
+/* ✅ Quasar row 기본 스타일 오버라이드 (더 강력한 선택자) - EphemerisDesignationPage.vue와 동일하게 설정 (하단 마진 없음) */
+.pass-schedule-mode .main-content-row.row,
+.pass-schedule-mode .row.main-content-row {
+  margin-bottom: 0 !important; /* ✅ EphemerisDesignationPage.vue와 동일하게 하단 마진 없음 */
+  padding-bottom: 0 !important;
+}
+
+/* ✅ 1단계: pass-schedule-mode와 부모 요소의 하단 여백 완전 제거 */
+/* router-view, q-page-container 내부의 pass-schedule-mode 하단 여백 제거 */
+router-view .pass-schedule-mode,
+q-page-container .pass-schedule-mode,
+q-page .pass-schedule-mode,
+.pass-schedule-mode,
+[class*="pass-schedule-mode"],
+div.pass-schedule-mode {
+  height: auto !important; /* ✅ height: 100% 제거하여 내용에 맞게 조정 */
   width: 100%;
-  padding: 0;
-  margin: 0;
+  padding: 0 !important; /* ✅ EphemerisDesignationPage.vue와 동일하게 상단 패딩 제거 */
+  margin: 0 !important;
+  margin-bottom: 0 !important; /* ✅ 하단 마진 제거 */
+  padding-bottom: 0 !important; /* ✅ 하단 패딩 제거 */
+  min-height: auto !important; /* ✅ 최소 높이 제거 */
+  max-height: none !important; /* ✅ 최대 높이 제거 */
+  display: flex !important; /* ✅ flexbox로 변경 */
+  flex-direction: column !important; /* ✅ 세로 방향 */
+  gap: 0 !important; /* ✅ flex gap 제거 */
+  row-gap: 0 !important; /* ✅ flex row-gap 제거 */
+  column-gap: 0 !important; /* ✅ flex column-gap 제거 */
+}
+
+/* router-view, q-page-container의 하단 패딩/마진 제거 */
+router-view,
+q-page-container,
+router-view > *,
+q-page-container > * {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* router-view 내부의 모든 요소 하단 여백 제거 */
+router-view .pass-schedule-mode,
+q-page-container .pass-schedule-mode {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ pass-schedule-mode 내부의 마지막 요소 하단 여백을 EphemerisDesignationPage.vue와 동일하게 설정 (하단 마진 없음) */
+.pass-schedule-mode > *:last-child {
+  margin-bottom: 0 !important; /* ✅ EphemerisDesignationPage.vue와 동일하게 하단 마진 없음 */
+  padding-bottom: 0 !important;
+}
+
+/* ✅ pass-schedule-mode 내부의 모든 직접 자식 요소 하단 여백 제거 */
+.pass-schedule-mode > * {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row가 pass-schedule-mode의 마지막 자식일 때 하단 여백 완전 제거 */
+.pass-schedule-mode > .main-content-row:last-child,
+.pass-schedule-mode > .row.main-content-row:last-child,
+.pass-schedule-mode > div.main-content-row:last-child,
+.pass-schedule-mode > .main-content-row,
+.pass-schedule-mode > .row.main-content-row,
+.pass-schedule-mode > div.main-content-row {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+/* ✅ pass-schedule-mode의 마지막 div 요소 하단 여백 완전 제거 (더 강력한 선택자) */
+.pass-schedule-mode > div:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ pass-schedule-mode의 마지막 row 요소 하단 여백 완전 제거 */
+.pass-schedule-mode > .row:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ pass-schedule-mode의 모든 직접 자식 row 요소 하단 여백 제거 */
+.pass-schedule-mode > .row {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ pass-schedule-mode의 모든 직접 자식 div 요소 하단 여백 제거 */
+.pass-schedule-mode > div {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 /* ✅ 외각 공간 제어 - 단순화 */
@@ -2238,68 +2402,226 @@ const formattedCalTime = computed(() => {
   /* ✅ EphemerisDesignationPage.vue와 동일한 높이를 위해 flex 추가 - 내부 구성 변경 없음 */
   display: flex;
   flex-direction: column;
+  margin-bottom: 0 !important; /* ✅ 하단 마진 제거 */
+}
+
+/* ✅ main-content-row 내부의 모든 컬럼 하단 여백 완전 제거 */
+.pass-schedule-mode .main-content-row > [class*="col-"] {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 마지막 컬럼 하단 여백 완전 제거 (더 구체적인 선택자) */
+.pass-schedule-mode .main-content-row > [class*="col-"]:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 모든 컬럼 내부의 q-card 하단 여백 제거 */
+.pass-schedule-mode .main-content-row > [class*="col-"] .q-card {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 마지막 컬럼 내부의 q-card 하단 여백 제거 (더 구체적인 선택자) */
+.pass-schedule-mode .main-content-row > [class*="col-"]:last-child .q-card {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 모든 컬럼 내부의 q-card-section 하단 여백 제거 */
+.pass-schedule-mode .main-content-row > [class*="col-"] .q-card-section {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 마지막 컬럼 내부의 q-card-section 하단 여백 제거 (더 구체적인 선택자) */
+.pass-schedule-mode .main-content-row > [class*="col-"]:last-child .q-card-section {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 Quasar q-card 하단 마진/패딩 완전 제거 */
+.pass-schedule-mode .main-content-row .q-card {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 모든 control-section 하단 여백 제거 */
+.pass-schedule-mode .main-content-row .control-section {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ Position View 카드 높이 제한 */
+.pass-schedule-mode .control-section.position-view-card,
+.pass-schedule-mode .control-section.position-view-card.q-card {
+  min-height: 360px !important; /* ✅ 최소 높이 보장 */
+  height: 100% !important; /* ✅ 부모 높이에 맞춤 (다른 패널과 동일하게) */
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* ✅ Position View 카드 섹션 높이 조정 */
+.pass-schedule-mode .control-section.position-view-card .q-card-section.position-view-section {
+  min-height: 360px !important; /* ✅ 차트 영역 최소 높이 보장 */
+  height: 100% !important; /* ✅ 부모 높이에 맞춤 (다른 패널과 동일하게) */
+  flex: 1 !important; /* ✅ 남은 공간 채우기 */
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 .control-section .q-card-section {
   padding: 16px !important;
+  padding-bottom: 0 !important; /* ✅ 하단 패딩 제거 (상단 공간과 동일하게) */
   /* ✅ 남은 공간을 채우도록 flex 추가 - 내부 구성 변경 없음 */
   flex: 1;
   display: flex;
   flex-direction: column;
+  position: relative; /* ✅ 제목 absolute positioning을 위한 기준점 */
+}
+
+/* ✅ Schedule Information 카드 높이를 Position View와 동일하게 설정 (360px) */
+.pass-schedule-mode .main-content-row > [class*="col-"]:nth-child(2) .control-section,
+.pass-schedule-mode .main-content-row > [class*="col-"]:nth-child(2) .control-section.q-card {
+  min-height: 360px !important; /* ✅ 최소 높이 보장 */
+  height: 100% !important; /* ✅ 부모 높이에 맞춤 */
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* ✅ Schedule Information 카드 섹션 높이 조정 */
+.pass-schedule-mode .main-content-row > [class*="col-"]:nth-child(2) .control-section .q-card-section {
+  min-height: 360px !important; /* ✅ 최소 높이 보장 */
+  flex: 1 !important; /* ✅ 남은 공간 채우기 */
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* ✅ Schedule Control 카드 높이를 Position View와 동일하게 설정 (360px) */
+.pass-schedule-mode .main-content-row .schedule-control-col .control-section,
+.pass-schedule-mode .main-content-row .schedule-control-col .control-section.q-card {
+  min-height: 360px !important; /* ✅ 최소 높이 보장 */
+  height: 100% !important; /* ✅ 부모 높이에 맞춤 */
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* ✅ Schedule Control 카드 섹션 높이 조정 */
+.pass-schedule-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section {
+  min-height: 360px !important; /* ✅ 최소 높이 보장 */
+  flex: 1 1 auto !important; /* ✅ 남은 공간 채우기 (flex-grow: 1, flex-shrink: 1, flex-basis: auto) */
+  display: flex !important;
+  flex-direction: column !important;
+  padding-bottom: 0 !important; /* ✅ 하단 패딩 완전 제거 (상단 공간과 동일하게) */
+  margin-bottom: 0 !important; /* ✅ 하단 마진 제거 */
+  overflow: hidden !important; /* ✅ 하단 여백 방지 */
+  justify-content: flex-start !important; /* ✅ 상단 정렬로 하단 여백 제거 */
+}
+
+/* ✅ 3단계: schedule-control-section 내부의 button-group 하단 여백 완전 제거 (더 구체적인 선택자) */
+.pass-schedule-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .button-group {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+  flex-shrink: 0 !important; /* ✅ 버튼 그룹이 축소되지 않도록 */
+}
+
+/* ✅ schedule-control-section 내부의 마지막 요소 하단 여백 완전 제거 */
+.pass-schedule-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section > *:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ schedule-control-section 내부의 모든 직접 자식 요소 하단 여백 제거 */
+.pass-schedule-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section > * {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.position-view-section {
+  padding: 16px 16px 0px 16px !important; /* ✅ 상단 패딩을 다른 패널과 동일하게 16px로 맞춤, 하단 패딩 제거 */
+}
+
+.position-view-title {
+  position: absolute; /* ✅ 제목을 absolute로 배치하여 차트 영역이 전체 공간 사용 */
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  margin: 0;
+  padding: 0;
 }
 
 .chart-area {
-  height: 220px;
+  min-height: 340px !important; /* ✅ 최소 높이 보장 */
+  height: 100% !important; /* ✅ 부모 높이에 맞춤 */
+  flex: 1 !important; /* ✅ 남은 공간 채우기 */
   width: 100%;
   display: flex;
-  align-items: center;
+  align-items: center; /* ✅ 중앙 정렬 */
   justify-content: center;
   margin: 0 auto;
-  padding: 0;
+  margin-bottom: 0 !important; /* ✅ 하단 마진 제거 */
+  padding: 0 !important;
+  padding-bottom: 0 !important; /* ✅ 하단 패딩 제거 */
   box-sizing: border-box;
-  overflow: visible;
+  overflow: visible !important; /* ✅ 차트가 넘쳐도 보이도록 변경 */
   text-align: center;
   position: relative;
 }
 
-/* ✅ 차트 컨테이너 완전 가운데 정렬 - 이전 크기로 복원, 아래로 조정 */
+/* ✅ 차트 컨테이너 - 차트를 더 크게 (Position View 구역 크기와 독립적) */
 .chart-area>div {
-  position: absolute;
-  left: 50%;
-  top: 55%;
-  transform: translate(-50%, -50%);
-  width: 420px;
-  height: 420px;
-  max-width: 420px;
-  max-height: 420px;
-  aspect-ratio: 1;
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important; /* ✅ 중앙 정렬 */
+  transform: translate(-50%, -50%) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  /* ✅ 차트를 더 크게 설정 (Position View 구역 크기와 독립적) */
+  width: 500px !important;
+  height: 500px !important;
+  max-width: 500px !important;
+  max-height: 500px !important;
+  min-width: 500px !important;
+  min-height: 500px !important;
+  aspect-ratio: 1 !important; /* ✅ 정사각형 유지 */
 }
 
-/* 반응형 차트 크기 조정 - 이전 크기로 복원, 아래로 조정 */
+/* 반응형 차트 크기 조정 - 차트를 더 크게 (Position View 구역 크기와 독립적) */
 @media (max-width: 1900px) {
   .chart-area>div {
-    width: 360px;
-    height: 360px;
-    max-width: 360px;
-    max-height: 360px;
+    width: 500px !important;
+    height: 500px !important;
+    max-width: 500px !important;
+    max-height: 500px !important;
+    min-width: 500px !important;
+    min-height: 500px !important;
+    top: 50% !important; /* ✅ 중앙 정렬 */
   }
 }
 
 @media (max-width: 1600px) {
   .chart-area>div {
-    width: 320px;
-    height: 320px;
-    max-width: 320px;
-    max-height: 320px;
+    width: 470px !important;
+    height: 470px !important;
+    max-width: 470px !important;
+    max-height: 470px !important;
+    min-width: 470px !important;
+    min-height: 470px !important;
+    top: 50% !important; /* ✅ 중앙 정렬 */
   }
 }
 
 @media (max-width: 1200px) {
   .chart-area>div {
-    width: 280px;
-    height: 280px;
-    max-width: 280px;
-    max-height: 280px;
+    width: 420px !important;
+    height: 420px !important;
+    max-width: 420px !important;
+    max-height: 420px !important;
+    min-width: 420px !important;
+    min-height: 420px !important;
+    top: 50% !important; /* ✅ 중앙 정렬 */
   }
 }
 
@@ -2663,20 +2985,30 @@ const formattedCalTime = computed(() => {
 .schedule-form {
   margin-top: 0.5rem;
   width: 100%;
+  margin-bottom: 0; /* ✅ 하단 마진 제거 */
+  flex: 1; /* ✅ 남은 공간을 채워서 하단 정렬 */
+  display: flex;
+  flex-direction: column;
 }
 
 .form-row {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.25rem; /* ✅ gap 줄임 (0.5rem → 0.25rem) */
   width: 100%;
+  flex: 1; /* ✅ 남은 공간을 채워서 하단 정렬 */
+  justify-content: flex-start; /* ✅ 상단부터 시작 */
 }
 
 .schedule-info {
   background-color: rgba(255, 255, 255, 0.05);
   border-radius: 8px;
-  padding: 16px;
+  padding: 12px 16px 8px 16px; /* ✅ 하단 패딩 줄임 (16px → 8px) */
   border: 1px solid rgba(255, 255, 255, 0.1);
+  flex: 1; /* ✅ 남은 공간을 채워서 하단 정렬 */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start; /* ✅ 상단부터 시작 */
 }
 
 .no-schedule-selected {
@@ -2695,12 +3027,13 @@ const formattedCalTime = computed(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
+  padding: 6px 0; /* ✅ 패딩 줄임 (8px → 6px) */
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .info-row:last-child {
   border-bottom: none;
+  margin-bottom: auto; /* ✅ 마지막 행 아래에 자동 여백 추가하여 하단 정렬 */
 }
 
 .info-label {
@@ -2790,12 +3123,27 @@ const formattedCalTime = computed(() => {
   /* ✅ flex: 1 제거 - EphemerisDesignationPage.vue 기준으로 높이 맞추기 */
   border-radius: 6px;
   overflow: hidden;
+  height: 210px !important; /* ✅ 높이 고정 (정확히 3개 행만 보이도록) */
+  max-height: 210px !important; /* ✅ 최대 높이 고정 */
 }
 
 /* Quasar 테이블 기본 설정 초기화 */
 .schedule-table :deep(.q-table__container) {
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.12);
+  height: 210px !important; /* ✅ 높이 고정 (정확히 3개 행만 보이도록) */
+  max-height: 210px !important; /* ✅ 최대 높이 고정 */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* ✅ 컨테이너는 스크롤 없음 */
+}
+
+/* ✅ 테이블 바디 영역만 스크롤 가능하도록 설정 */
+.schedule-table :deep(.q-table__middle) {
+  flex: 1;
+  overflow-y: auto; /* ✅ 세로 스크롤 가능 */
+  overflow-x: auto; /* ✅ 가로 스크롤도 가능 */
+  min-height: 0;
 }
 
 .schedule-table :deep(.q-table__top) {
@@ -2811,9 +3159,17 @@ const formattedCalTime = computed(() => {
   display: none !important;
 }
 
+/* ✅ 테이블 헤더 고정 (Sticky Header) */
+.schedule-table :deep(.q-table thead) {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: var(--theme-card-background);
+}
+
 /* 테이블 헤더 스타일 */
 .schedule-table :deep(.q-table thead th) {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: rgba(255, 255, 255, 0.05) !important;
   color: rgba(255, 255, 255, 0.9);
   font-weight: 600;
   font-size: 12px;
@@ -2824,7 +3180,9 @@ const formattedCalTime = computed(() => {
   white-space: pre-line;
   line-height: 1.2;
   height: 50px !important;
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 /* 헤더 정렬 요소를 flexbox로 분리 배치 */
@@ -3243,24 +3601,39 @@ const formattedCalTime = computed(() => {
 
 /* ===== 14. 버튼 그룹 스타일 ===== */
 .button-group {
-  margin-top: 0.5rem;
+  margin-top: 0.25rem; /* ✅ 상단 마진 줄임 (0.5rem → 0.25rem) */
+  margin-bottom: 0 !important; /* ✅ 하단 마진 완전 제거 */
   width: 100%;
   flex-shrink: 0;
-  padding-top: 0.5rem;
+  padding-top: 0.25rem; /* ✅ 상단 패딩 줄임 (0.5rem → 0.25rem) */
+  padding-bottom: 0 !important; /* ✅ 하단 패딩 완전 제거 */
   border-top: 1px solid rgba(255, 255, 255, 0.1);
+  box-sizing: border-box !important;
+  display: flex !important; /* ✅ flex 컨테이너로 명시 */
+  flex-direction: column !important; /* ✅ 세로 방향 */
+  gap: 0.5rem !important; /* ✅ 버튼 행 사이 간격 명시 (겹침 방지) */
 }
 
 .button-row {
   display: flex;
   gap: 0.5rem;
   width: 100%;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0 !important; /* ✅ 하단 마진 완전 제거 (상단 공간과 동일하게) */
+  flex-shrink: 0 !important; /* ✅ 버튼 행이 축소되지 않도록 */
+}
+
+/* ✅ Quasar q-mb-sm 클래스 오버라이드 (button-row에 적용된 경우) */
+.button-row.q-mb-sm,
+.schedule-control-section .button-row.q-mb-sm {
+  margin-bottom: 0 !important; /* ✅ 하단 마진 완전 제거 */
 }
 
 .control-button-row {
   display: flex;
   gap: 0.5rem;
   width: 100%;
+  flex-shrink: 0 !important; /* ✅ 버튼 행이 축소되지 않도록 */
+  margin-bottom: 0 !important; /* ✅ 하단 마진 제거 */
 }
 
 /* 업로드 버튼 스타일 */
@@ -3404,7 +3777,8 @@ const formattedCalTime = computed(() => {
 /* 모바일 크기 (768px 이하) */
 @media (max-width: 767px) {
   .pass-schedule-mode {
-    padding: 0.25rem;
+    padding: 0.25rem !important; /* ✅ 모바일에서만 패딩 적용 */
+    padding-bottom: 0 !important; /* ✅ 하단 패딩은 여전히 제거 */
   }
 
   .schedule-container {
@@ -3509,16 +3883,24 @@ const formattedCalTime = computed(() => {
 /* ===== 17. 전역 스타일 (Quasar 오버라이드) ===== */
 
 /* ✅ 컬럼 비율 조정 - padding 제거하여 q-col-gutter-md 간격만 사용 */
-.col-md-2 {
-  width: 21.6667% !important;
-}
+/* .col-md-2 오버라이드 제거 - Quasar 기본값 사용 */
 
 .col-md-4 {
   width: 33.3333% !important;
 }
 
 .col-md-6 {
-  width: 45% !important;
+  width: 50% !important; /* ✅ 정확한 50%로 수정 */
+}
+
+/* ✅ Schedule Control이 남은 공간을 차지하도록 설정 */
+.schedule-control-col {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.col-md-7 {
+  width: 58.3333% !important;
 }
 
 /* 오프셋 컨트롤 카드 비중 조정 */

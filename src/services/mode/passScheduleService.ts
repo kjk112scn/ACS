@@ -92,6 +92,12 @@ export interface TleAndTrackingResponse {
 }
 
 // 🆕 패스 스케줄 관련 타입들 추가
+/**
+ * PassSchedule 마스터 데이터 인터페이스
+ *
+ * EphemerisService의 ScheduleItem과 동일한 수준의 정보를 포함합니다.
+ * Keyhole 정보 및 축 변환 정보를 포함합니다.
+ */
 export interface PassScheduleMasterData {
   No: number
   SatelliteID: string
@@ -113,6 +119,37 @@ export interface PassScheduleMasterData {
   Creator: string
   OriginalStartAzimuth: number
   OriginalEndAzimuth: number
+
+  // ✅ Keyhole 정보 추가
+  IsKeyhole: boolean
+  RecommendedTrainAngle: number
+
+  // ✅ Original (2축) 메타데이터 추가
+  OriginalMaxElevation?: number
+  OriginalMaxAzRate?: number
+  OriginalMaxElRate?: number
+
+  // ✅ FinalTransformed (3축, Train=0, ±270°) 메타데이터 추가
+  FinalTransformedMaxAzRate?: number
+  FinalTransformedMaxElRate?: number
+  FinalTransformedStartAzimuth?: number
+  FinalTransformedEndAzimuth?: number
+  FinalTransformedStartElevation?: number
+  FinalTransformedEndElevation?: number
+  FinalTransformedMaxElevation?: number
+
+  // ✅ KeyholeAxisTransformed (3축, Train≠0) 메타데이터 추가
+  KeyholeAxisTransformedMaxAzRate?: number
+  KeyholeAxisTransformedMaxElRate?: number
+
+  // ✅ KeyholeFinalTransformed (3축, Train≠0, ±270°) 메타데이터 추가
+  KeyholeFinalTransformedMaxAzRate?: number
+  KeyholeFinalTransformedMaxElRate?: number
+  KeyholeFinalTransformedStartAzimuth?: number
+  KeyholeFinalTransformedEndAzimuth?: number
+  KeyholeFinalTransformedStartElevation?: number
+  KeyholeFinalTransformedEndElevation?: number
+  KeyholeFinalTransformedMaxElevation?: number
 }
 export interface TrackingTarget {
   no: number

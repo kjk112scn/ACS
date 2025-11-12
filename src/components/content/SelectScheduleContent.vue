@@ -19,8 +19,9 @@
       <!-- 스케줄 테이블 -->
       <q-table flat bordered dark :rows="scheduleData" :columns="scheduleColumns" row-key="no" :loading="loading"
         selection="multiple" v-model:selected="selectedRows" @row-click="onRowClick" class="schedule-table"
-        style="height: 400px; background-color: var(--theme-card-background);" virtual-scroll
-        :virtual-scroll-sticky-size-start="48" hide-pagination :rows-per-page-options="[0]" :row-class="getRowClass">
+        style="height: 500px; background-color: var(--theme-card-background);" virtual-scroll
+        :virtual-scroll-sticky-size-start="48" hide-pagination :rows-per-page-options="[0]" :row-class="getRowClass"
+        :grid="false" dense>
 
         <template v-slot:loading>
           <q-inner-loading showing color="primary">
@@ -83,17 +84,27 @@
           </q-td>
         </template>
 
-        <!-- ✅ Azimuth 각도 컬럼 템플릿 -->
+        <!-- ✅ 위성 이름 컬럼 템플릿 (KEYHOLE 배지 포함) -->
+        <template v-slot:body-cell-satelliteName="props">
+          <q-td :props="props" class="text-center satellite-name-cell">
+            <div class="satellite-name-container">
+              <div class="satellite-name-text">{{ props.value || props.row?.satelliteId || '이름 없음' }}</div>
+              <q-badge v-if="props.row?.IsKeyhole || props.row?.isKeyhole" color="red" class="keyhole-badge" label="KEYHOLE" />
+            </div>
+          </q-td>
+        </template>
+
+        <!-- ✅ Azimuth 각도 컬럼 템플릿 (Keyhole 여부에 따라 동적 값 표시) -->
         <template v-slot:body-cell-azimuthAngles="props">
           <q-td :props="props" class="angle-cell">
             <div class="angle-container">
               <div class="angle-line start-angle">
                 <span class="angle-label">시작:</span>
-                <span class="angle-value">{{ formatAngle(props.row.startAzimuthAngle) }}</span>
+                <span class="angle-value">{{ formatAngle(props.value?.start) }}</span>
               </div>
               <div class="angle-line end-angle">
                 <span class="angle-label">종료:</span>
-                <span class="angle-value">{{ formatAngle(props.row.endAzimuthAngle) }}</span>
+                <span class="angle-value">{{ formatAngle(props.value?.end) }}</span>
               </div>
             </div>
           </q-td>
@@ -103,6 +114,159 @@
         <template v-slot:body-cell-index="props">
           <q-td :props="props" class="index-cell">
             <span class="index-value">{{ props.value }}</span>
+          </q-td>
+        </template>
+
+        <!-- ✅ Elevation 각도 컬럼 템플릿 (Keyhole 여부에 따라 동적 값 표시) -->
+        <template v-slot:body-cell-elevationAngles="props">
+          <q-td :props="props" class="angle-cell">
+            <div class="angle-container">
+              <div class="angle-line start-angle">
+                <span class="angle-label">시작:</span>
+                <span class="angle-value">{{ formatAngle(props.value?.start) }}</span>
+              </div>
+              <div class="angle-line end-angle">
+                <span class="angle-label">종료:</span>
+                <span class="angle-value">{{ formatAngle(props.value?.end) }}</span>
+              </div>
+            </div>
+          </q-td>
+        </template>
+
+        <!-- ✅ Keyhole 정보 컬럼 템플릿 -->
+        <template v-slot:body-cell-isKeyhole="props">
+          <q-td :props="props" class="keyhole-cell">
+            <q-badge
+              v-if="props.value"
+              color="red"
+              label="KEYHOLE"
+              class="keyhole-badge"
+            />
+            <span v-else class="text-grey-5">-</span>
+          </q-td>
+        </template>
+
+        <!-- ✅ RecommendedTrainAngle 컬럼 템플릿 -->
+        <template v-slot:body-cell-recommendedTrainAngle="props">
+          <q-td :props="props" class="train-angle-cell">
+            <span v-if="props.row.IsKeyhole && props.value" class="text-positive text-weight-bold">
+              {{ safeToFixed(props.value, 6) }}°
+            </span>
+            <span v-else class="text-grey-5">-</span>
+          </q-td>
+        </template>
+
+        <!-- ✅ 2축 최대 고도 템플릿 (Original) -->
+        <template v-slot:body-cell-OriginalMaxElevation="props">
+          <q-td :props="props">
+            <div class="text-center">
+              <div class="text-weight-bold text-blue-3">
+                {{ safeToFixed(props.value, 6) }}°
+              </div>
+            </div>
+          </q-td>
+        </template>
+
+        <!-- ✅ 3축 최대 고도 템플릿 (Train=0, ±270°, 항상 고정) -->
+        <template v-slot:body-cell-Train0MaxElevation="props">
+          <q-td :props="props">
+            <div class="text-center">
+              <div class="text-weight-bold text-green-3">
+                {{ safeToFixed(props.value, 6) }}°
+              </div>
+            </div>
+          </q-td>
+        </template>
+
+        <!-- ✅ FinalTransformed 최대 고도 템플릿 (Keyhole에 따라 다른 값 표시) -->
+        <template v-slot:body-cell-MaxElevation="props">
+          <q-td :props="props">
+            <div class="text-center">
+              <div class="text-weight-bold" :class="props.row?.IsKeyhole ? 'text-red' : 'text-green-3'">
+                {{ safeToFixed(
+                  props.row?.IsKeyhole
+                    ? (props.row?.KeyholeFinalTransformedMaxElevation ?? props.value ?? 0)
+                    : (props.value ?? 0),
+                  6
+                ) }}°
+              </div>
+            </div>
+          </q-td>
+        </template>
+
+        <!-- ✅ 2축 최대 Az 속도 템플릿 -->
+        <template v-slot:body-cell-OriginalMaxAzRate="props">
+          <q-td :props="props">
+            <div class="text-center">
+              <div class="text-weight-bold text-blue-3">
+                {{ safeToFixed(props.value, 6) }}°/s
+              </div>
+            </div>
+          </q-td>
+        </template>
+
+        <!-- ✅ 3축 최대 Az 속도 템플릿 (Train=0, ±270°, 항상 고정) -->
+        <template v-slot:body-cell-Train0MaxAzRate="props">
+          <q-td :props="props">
+            <div class="text-center">
+              <div class="text-weight-bold text-green-3">
+                {{ safeToFixed(props.value, 6) }}°/s
+              </div>
+            </div>
+          </q-td>
+        </template>
+
+        <!-- ✅ FinalTransformed 최대 Az 속도 템플릿 (Keyhole에 따라 다른 값 표시) -->
+        <template v-slot:body-cell-FinalTransformedMaxAzRate="props">
+          <q-td :props="props">
+            <div class="text-center">
+              <div class="text-weight-bold" :class="props.row?.IsKeyhole ? 'text-red' : 'text-green-3'">
+                {{ safeToFixed(
+                  props.row?.IsKeyhole
+                    ? (props.row?.KeyholeFinalTransformedMaxAzRate ?? props.value ?? 0)
+                    : (props.value ?? 0),
+                  6
+                ) }}°/s
+              </div>
+            </div>
+          </q-td>
+        </template>
+
+        <!-- ✅ 2축 최대 El 속도 템플릿 -->
+        <template v-slot:body-cell-OriginalMaxElRate="props">
+          <q-td :props="props">
+            <div class="text-center">
+              <div class="text-weight-bold text-blue-3">
+                {{ safeToFixed(props.value, 6) }}°/s
+              </div>
+            </div>
+          </q-td>
+        </template>
+
+        <!-- ✅ 3축 최대 El 속도 템플릿 (Train=0, ±270°, 항상 고정) -->
+        <template v-slot:body-cell-Train0MaxElRate="props">
+          <q-td :props="props">
+            <div class="text-center">
+              <div class="text-weight-bold text-green-3">
+                {{ safeToFixed(props.value, 6) }}°/s
+              </div>
+            </div>
+          </q-td>
+        </template>
+
+        <!-- ✅ FinalTransformed 최대 El 속도 템플릿 (Keyhole에 따라 다른 값 표시) -->
+        <template v-slot:body-cell-FinalTransformedMaxElRate="props">
+          <q-td :props="props">
+            <div class="text-center">
+              <div class="text-weight-bold" :class="props.row?.IsKeyhole ? 'text-red' : 'text-green-3'">
+                {{ safeToFixed(
+                  props.row?.IsKeyhole
+                    ? (props.row?.KeyholeFinalTransformedMaxElRate ?? props.value ?? 0)
+                    : (props.value ?? 0),
+                  6
+                ) }}°/s
+              </div>
+            </div>
           </q-td>
         </template>
       </q-table>
@@ -446,10 +610,10 @@ const onRowClick = (evt: Event, row: ScheduleItem) => {
 type QTableColumn = NonNullable<QTableProps['columns']>[0]
 
 const scheduleColumns: QTableColumn[] = [
-  { name: 'index', label: 'Index', field: 'index', align: 'left' as const, sortable: true, style: 'width: 70px' },
-  { name: 'no', label: 'No', field: 'no', align: 'left' as const, sortable: true, style: 'width: 60px' },
-  { name: 'satelliteId', label: '위성 ID', field: 'satelliteId', align: 'center' as const, sortable: true, style: 'width: 100px' },
-  { name: 'satelliteName', label: '위성명', field: 'satelliteName', align: 'left' as const, sortable: true },
+  { name: 'index', label: 'Index', field: 'index', align: 'left' as const, sortable: true, style: 'width: 80px' },
+  { name: 'no', label: 'No', field: 'no', align: 'left' as const, sortable: true, style: 'width: 70px' },
+  { name: 'satelliteId', label: '위성 ID', field: 'satelliteId', align: 'center' as const, sortable: true, style: 'width: 120px' },
+  { name: 'satelliteName', label: '위성명', field: 'satelliteName', align: 'center' as const, sortable: true, style: 'min-width: 150px' },
   {
     name: 'startTime',
     label: '시작 시간',
@@ -472,23 +636,154 @@ const scheduleColumns: QTableColumn[] = [
     field: 'duration',
     align: 'center' as const,
     sortable: true,
-    style: 'width: 80px'
+    format: (val) => formatDuration(val),
+    style: 'width: 100px'
   },
+  // ✅ 2축 최대 고도 (Original)
   {
-    name: 'maxElevation',
-    label: '최대 고도',
-    field: 'maxElevation',
+    name: 'OriginalMaxElevation',
+    label: '2축 최대 고도 (°)',
+    field: 'OriginalMaxElevation',
     align: 'center' as const,
     sortable: true,
-    style: 'width: 80px'
+    style: 'width: 130px'
   },
+  // ✅ 3축 최대 고도 (Train=0, ±270°, 항상 고정)
+  {
+    name: 'Train0MaxElevation',
+    label: '3축 최대 고도 (°)',
+    field: 'FinalTransformedMaxElevation',
+    align: 'center' as const,
+    sortable: true,
+    style: 'width: 130px'
+  },
+  // ✅ FinalTransformed 최대 고도 (Keyhole 여부에 따라 동적 표시)
+  {
+    name: 'MaxElevation',
+    label: '최대 고도 (°)',
+    field: 'FinalTransformedMaxElevation',
+    align: 'center' as const,
+    sortable: true,
+    style: 'width: 120px'
+  },
+  // ✅ 2축 최대 Az 속도
+  {
+    name: 'OriginalMaxAzRate',
+    label: '2축 최대 Az 속도 (°/s)',
+    field: 'OriginalMaxAzRate',
+    align: 'center' as const,
+    sortable: true,
+    style: 'width: 150px'
+  },
+  // ✅ 3축 최대 Az 속도 (Train=0, ±270°, 항상 고정)
+  {
+    name: 'Train0MaxAzRate',
+    label: '3축 최대 Az 속도 (°/s)',
+    field: 'FinalTransformedMaxAzRate',
+    align: 'center' as const,
+    sortable: true,
+    style: 'width: 150px'
+  },
+  // ✅ FinalTransformed 최대 Az 속도 (Keyhole 여부에 따라 동적 표시)
+  {
+    name: 'FinalTransformedMaxAzRate',
+    label: '최대 Az 속도 (°/s)',
+    field: 'FinalTransformedMaxAzRate',
+    align: 'center' as const,
+    sortable: true,
+    style: 'width: 140px'
+  },
+  // ✅ 2축 최대 El 속도
+  {
+    name: 'OriginalMaxElRate',
+    label: '2축 최대 El 속도 (°/s)',
+    field: 'OriginalMaxElRate',
+    align: 'center' as const,
+    sortable: true,
+    style: 'width: 150px'
+  },
+  // ✅ 3축 최대 El 속도 (Train=0, ±270°, 항상 고정)
+  {
+    name: 'Train0MaxElRate',
+    label: '3축 최대 El 속도 (°/s)',
+    field: 'FinalTransformedMaxElRate',
+    align: 'center' as const,
+    sortable: true,
+    style: 'width: 150px'
+  },
+  // ✅ FinalTransformed 최대 El 속도 (Keyhole 여부에 따라 동적 표시)
+  {
+    name: 'FinalTransformedMaxElRate',
+    label: '최대 El 속도 (°/s)',
+    field: 'FinalTransformedMaxElRate',
+    align: 'center' as const,
+    sortable: true,
+    style: 'width: 140px'
+  },
+  // ✅ Azimuth 각도 컬럼 (Keyhole 여부에 따라 동적 값 표시)
   {
     name: 'azimuthAngles',
     label: 'Azimuth 각도',
-    field: (row: ScheduleItem) => ({ start: row.startAzimuthAngle, end: row.endAzimuthAngle }),
+    field: (row: ScheduleItem) => {
+      // Keyhole일 경우: KeyholeFinalTransformed 값 사용
+      // Keyhole 아닐 경우: FinalTransformed 값 사용
+      const isKeyhole = row.IsKeyhole || row.isKeyhole || false
+      if (isKeyhole) {
+        return {
+          start: row.KeyholeFinalTransformedStartAzimuth ?? row.FinalTransformedStartAzimuth ?? row.startAzimuthAngle ?? 0,
+          end: row.KeyholeFinalTransformedEndAzimuth ?? row.FinalTransformedEndAzimuth ?? row.endAzimuthAngle ?? 0
+        }
+      } else {
+        return {
+          start: row.FinalTransformedStartAzimuth ?? row.startAzimuthAngle ?? 0,
+          end: row.FinalTransformedEndAzimuth ?? row.endAzimuthAngle ?? 0
+        }
+      }
+    },
     align: 'center' as const,
     sortable: false,
-    style: 'width: 120px'
+    style: 'width: 140px'
+  },
+  // ✅ Elevation 각도 컬럼 추가 (Keyhole 여부에 따라 동적 값 표시)
+  {
+    name: 'elevationAngles',
+    label: 'Elevation 각도',
+    field: (row: ScheduleItem) => {
+      // Keyhole일 경우: KeyholeFinalTransformed 값 사용
+      // Keyhole 아닐 경우: FinalTransformed 값 사용
+      const isKeyhole = row.IsKeyhole || row.isKeyhole || false
+      if (isKeyhole) {
+        return {
+          start: row.KeyholeFinalTransformedStartElevation ?? row.FinalTransformedStartElevation ?? row.startElevationAngle ?? 0,
+          end: row.KeyholeFinalTransformedEndElevation ?? row.FinalTransformedEndElevation ?? row.endElevationAngle ?? 0
+        }
+      } else {
+        return {
+          start: row.FinalTransformedStartElevation ?? row.startElevationAngle ?? 0,
+          end: row.FinalTransformedEndElevation ?? row.endElevationAngle ?? 0
+        }
+      }
+    },
+    align: 'center' as const,
+    sortable: false,
+    style: 'width: 140px'
+  },
+  // ✅ Keyhole 정보 컬럼 추가
+  {
+    name: 'isKeyhole',
+    label: 'KEYHOLE',
+    field: 'IsKeyhole',
+    align: 'center' as const,
+    sortable: true,
+    style: 'width: 100px'
+  },
+  {
+    name: 'recommendedTrainAngle',
+    label: 'Train 각도 (°)',
+    field: 'RecommendedTrainAngle',
+    align: 'center' as const,
+    sortable: true,
+    style: 'width: 110px'
   },
 ]
 
@@ -500,6 +795,43 @@ const formatDateTime = (dateString: string): string => {
     console.error('시간 포맷팅 오류:', error)
     return dateString
   }
+}
+
+// ✅ 안전한 숫자 포맷팅 헬퍼 함수 (EphemerisDesignationPage.vue 참고)
+const safeToFixed = (value: unknown, decimals: number = 6): string => {
+  if (typeof value === 'number' && !isNaN(value)) {
+    return value.toFixed(decimals)
+  }
+
+  // 문자열이나 숫자 문자열만 파싱 시도
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = parseFloat(String(value))
+    if (!isNaN(parsed)) {
+      return parsed.toFixed(decimals)
+    }
+  }
+
+  return '-'
+}
+
+// ✅ Duration 포맷 함수 추가 (ISO 8601 Duration 형식 파싱)
+const formatDuration = (duration: string): string => {
+  if (!duration) return '0분 0초'
+
+  // ISO 8601 Duration 형식 (PT13M43.6S) 파싱
+  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/)
+  if (!match) return duration // 파싱 실패 시 원본 반환
+
+  const hours = parseInt(match[1] || '0')
+  const minutes = parseInt(match[2] || '0')
+  const seconds = parseFloat(match[3] || '0')
+
+  const parts: string[] = []
+  if (hours > 0) parts.push(`${hours}시간`)
+  if (minutes > 0) parts.push(`${minutes}분`)
+  if (seconds > 0) parts.push(`${Math.round(seconds)}초`)
+
+  return parts.length > 0 ? parts.join(' ') : '0분 0초'
 }
 
 const formatAngle = (angle: number | undefined | null): string => {
@@ -520,9 +852,14 @@ const getRowClass = (row: ScheduleItem): string => {
   }
 
   if (!canSelectSchedule(row)) {
-
     classes.push('disabled-row')
   }
+
+  // ✅ Keyhole 위성 행 스타일 추가
+  if (row.IsKeyhole || row.isKeyhole) {
+    classes.push('keyhole-row')
+  }
+
   return classes.join(' ')
 }
 
@@ -818,7 +1155,7 @@ onUnmounted(async () => {
 
 .content-body {
   flex: 1;
-  overflow: hidden;
+  overflow: hidden; /* ✅ 자식 요소에서 스크롤 처리 */
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -896,6 +1233,9 @@ onUnmounted(async () => {
   border: 1px solid var(--theme-border);
   border-radius: 6px;
   max-height: 100%;
+  overflow: hidden; /* ✅ 컨테이너는 스크롤 없음, 하위 요소에서 처리 */
+  display: flex;
+  flex-direction: column;
 
   /* ✅ 내부 테두리 강화 */
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -917,8 +1257,9 @@ onUnmounted(async () => {
   position: sticky;
   top: 0;
   z-index: 10;
-  font-weight: 600;
-  padding: 12px 8px;
+  font-weight: 600 !important; /* ✅ 헤더 폰트 굵기 증가 */
+  padding: 12px 8px !important; /* ✅ 헤더 패딩 증가 */
+  font-size: 13px !important; /* ✅ 헤더 폰트 크기 증가 */
 }
 
 /* ✅ 헤더 호버 효과 */
@@ -972,11 +1313,64 @@ onUnmounted(async () => {
   cursor: not-allowed;
 }
 
+/* ✅ Keyhole 위성 행 스타일 (빨간색 강조) */
+.schedule-table :deep(.q-table tbody tr.keyhole-row) {
+  background-color: rgba(244, 67, 54, 0.1) !important;
+  border-left: 3px solid #f44336 !important;
+}
+
+.schedule-table :deep(.q-table tbody tr.keyhole-row:hover) {
+  background-color: rgba(244, 67, 54, 0.2) !important;
+}
+
+.schedule-table :deep(.q-table tbody tr.keyhole-row.selected) {
+  background-color: rgba(244, 67, 54, 0.25) !important;
+  border-left: 3px solid #f44336 !important;
+}
+
+/* ✅ 위성 이름 셀 스타일 */
+.schedule-table :deep(.satellite-name-cell) {
+  padding: 8px 10px !important;
+  vertical-align: middle;
+}
+
+/* ✅ 위성 이름 컨테이너 스타일 (세로 배치) */
+.schedule-table :deep(.satellite-name-container) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 50px;
+}
+
+/* ✅ 위성 이름 텍스트 스타일 */
+.schedule-table :deep(.satellite-name-text) {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: white;
+}
+
+/* ✅ Keyhole 배지 스타일 */
+.schedule-table :deep(.keyhole-badge) {
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  padding: 4px 8px !important;
+  letter-spacing: 0.5px !important;
+  margin-top: 2px;
+}
+
+/* ✅ Train 각도 셀 스타일 */
+.schedule-table :deep(.train-angle-cell) {
+  font-weight: 600 !important;
+}
+
 .schedule-table :deep(.q-table tbody td) {
   background-color: transparent !important;
   color: white !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-  padding: 8px;
+  padding: 10px 8px; /* ✅ 상하 패딩 증가로 가독성 향상 */
+  font-size: 13px; /* ✅ 폰트 크기 증가 */
 }
 
 /* ✅ 시간 관련 셀 내용 폰트 크기 증가 */
@@ -1241,8 +1635,18 @@ onUnmounted(async () => {
 
 /* ✅ 테이블 전체 스크롤 영역 스타일 */
 .schedule-table :deep(.q-table__middle) {
-  overflow-y: auto;
+  overflow-x: auto; /* ✅ 가로 스크롤바 추가 */
+  overflow-y: auto; /* ✅ 세로 스크롤바 유지 */
   max-height: 100%;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ✅ 테이블 자체에 최소 너비 설정 (컬럼 총 너비보다 크게) */
+.schedule-table :deep(.q-table) {
+  min-width: 2000px; /* ✅ 컬럼들의 총 너비보다 큰 값 설정 */
+  table-layout: auto; /* ✅ 컬럼 너비 자동 조정 */
+  width: 100%;
 }
 
 .status-badge {
@@ -1440,3 +1844,4 @@ onUnmounted(async () => {
   }
 }
 </style>
+

@@ -133,21 +133,21 @@
       </div>
 
       <!-- 2행: Main Content -->
-      <div class="row q-col-gutter-md">
+      <div class="row q-col-gutter-md main-content-row" style="display: flex; flex-wrap: nowrap; align-items: stretch;">
         <!-- 1번 영역: 차트가 들어갈 네모난 칸 - 반응형 크기 조정 -->
         <div class="col-12 col-md-3 col-lg-3 col-xl-3">
-          <q-card class="control-section">
-            <q-card-section>
-              <div class="text-subtitle1 text-weight-bold text-primary">Position View</div>
-              <div class="chart-area" ref="chartRef"></div>
+          <q-card class="control-section position-view-card" style="min-height: 360px !important; height: 100% !important; display: flex !important; flex-direction: column !important;">
+            <q-card-section class="position-view-section" style="min-height: 360px !important; height: 100% !important; flex: 1 !important; display: flex !important; flex-direction: column !important; padding-top: 16px !important; padding-bottom: 0px !important;">
+              <div class="text-subtitle1 text-weight-bold text-primary position-view-title">Position View</div>
+              <div class="chart-area" ref="chartRef" style="min-height: 340px !important; height: 100% !important; flex: 1 !important; padding-top: 0 !important; padding-bottom: 0 !important; margin-bottom: 0 !important;"></div>
             </q-card-section>
           </q-card>
         </div>
 
         <!-- 2번 영역: 계산 정보 표시 영역 수정 -->
         <div class="col-12 col-md-4">
-          <q-card class="control-section">
-            <q-card-section>
+          <q-card class="control-section" style="min-height: 360px !important; height: 100% !important; display: flex !important; flex-direction: column !important;">
+            <q-card-section style="min-height: 360px !important; height: 100% !important; flex: 1 !important; display: flex !important; flex-direction: column !important;">
               <div class="row justify-between items-center q-mb-xs">
                 <div class="text-subtitle1 text-weight-bold text-primary">위성 추적 정보</div>
                 <div class="row items-center q-gutter-sm">
@@ -274,8 +274,8 @@
 
         <!-- 3번 영역: TLE Data -->
         <div class="col-12 col-md-5">
-          <q-card class="control-section tle-data-card">
-            <q-card-section>
+          <q-card class="control-section tle-data-card" style="min-height: 360px !important; height: 100% !important; display: flex !important; flex-direction: column !important;">
+            <q-card-section style="min-height: 360px !important; height: 100% !important; flex: 1 !important; display: flex !important; flex-direction: column !important;">
               <div class="text-subtitle1 text-weight-bold text-primary">TLE Data</div>
               <q-editor v-model="tleData.displayText" readonly flat dense class="tle-display q-mt-xs" :toolbar="[]"
                 :definitions="{
@@ -356,6 +356,38 @@ ISS (ZARYA)
         <q-table :rows="ephemerisStore.masterData" :columns="scheduleColumns" row-key="No"
           :loading="isLoadingComparison" :pagination="{ rowsPerPage: 10 }" selection="single"
           v-model:selected="selectedSchedule" class="bg-grey-9 text-white" dark flat bordered>
+
+          <!-- ✅ Azimuth 각도 컬럼 템플릿 (Keyhole 여부에 따라 동적 값 표시) -->
+          <template v-slot:body-cell-azimuthAngles="props">
+            <q-td :props="props" class="angle-cell">
+              <div class="angle-container">
+                <div class="angle-line start-angle">
+                  <span class="angle-label">시작:</span>
+                  <span class="angle-value">{{ formatAngle(props.value?.start) }}</span>
+                </div>
+                <div class="angle-line end-angle">
+                  <span class="angle-label">종료:</span>
+                  <span class="angle-value">{{ formatAngle(props.value?.end) }}</span>
+                </div>
+              </div>
+            </q-td>
+          </template>
+
+          <!-- ✅ Elevation 각도 컬럼 템플릿 (Keyhole 여부에 따라 동적 값 표시) -->
+          <template v-slot:body-cell-elevationAngles="props">
+            <q-td :props="props" class="angle-cell">
+              <div class="angle-container">
+                <div class="angle-line start-angle">
+                  <span class="angle-label">시작:</span>
+                  <span class="angle-value">{{ formatAngle(props.value?.start) }}</span>
+                </div>
+                <div class="angle-line end-angle">
+                  <span class="angle-label">종료:</span>
+                  <span class="angle-value">{{ formatAngle(props.value?.end) }}</span>
+                </div>
+              </div>
+            </q-td>
+          </template>
 
           <!-- ✅ 2축 최대 고도 템플릿 (Original) -->
           <template v-slot:body-cell-OriginalMaxElevation="props">
@@ -502,10 +534,10 @@ ISS (ZARYA)
 
           <!-- KEYHOLE 배지 템플릿 -->
           <template v-slot:body-cell-SatelliteName="props">
-            <q-td :props="props">
-              <div class="flex items-center">
-                <span>{{ props.value || props.row?.SatelliteID || '이름 없음' }}</span>
-                <q-badge v-if="props.row?.isKeyhole" color="red" class="q-ml-sm" label="KEYHOLE" />
+            <q-td :props="props" class="text-center satellite-name-cell">
+              <div class="satellite-name-container">
+                <div class="satellite-name-text">{{ props.value || props.row?.SatelliteID || '이름 없음' }}</div>
+                <q-badge v-if="props.row?.isKeyhole" color="red" class="keyhole-badge" label="KEYHOLE" />
               </div>
             </q-td>
           </template>
@@ -661,7 +693,7 @@ const scheduleColumns: QTableColumn[] = [
     name: 'SatelliteName',
     label: '위성 이름',
     field: 'SatelliteName',
-    align: 'left',
+    align: 'center',
     sortable: true,
     format: (val, row) => {
       const name = val || row.SatelliteID || '이름 없음'
@@ -691,6 +723,52 @@ const scheduleColumns: QTableColumn[] = [
     align: 'left',
     sortable: true,
     format: (val) => formatDuration(val)
+  },
+  // ✅ Azimuth 각도 컬럼 (Keyhole 여부에 따라 동적 값 표시)
+  {
+    name: 'azimuthAngles',
+    label: 'Azimuth 각도',
+    field: (row) => {
+      // Keyhole일 경우: KeyholeFinalTransformed 값 사용
+      // Keyhole 아닐 경우: FinalTransformed 값 사용
+      const isKeyhole = row.isKeyhole || row.IsKeyhole || false
+      if (isKeyhole) {
+        return {
+          start: row.KeyholeFinalTransformedStartAzimuth ?? row.FinalTransformedStartAzimuth ?? row.StartAzimuth ?? 0,
+          end: row.KeyholeFinalTransformedEndAzimuth ?? row.FinalTransformedEndAzimuth ?? row.EndAzimuth ?? 0
+        }
+      } else {
+        return {
+          start: row.FinalTransformedStartAzimuth ?? row.StartAzimuth ?? 0,
+          end: row.FinalTransformedEndAzimuth ?? row.EndAzimuth ?? 0
+        }
+      }
+    },
+    align: 'center',
+    sortable: false,
+  },
+  // ✅ Elevation 각도 컬럼 (Keyhole 여부에 따라 동적 값 표시)
+  {
+    name: 'elevationAngles',
+    label: 'Elevation 각도',
+    field: (row) => {
+      // Keyhole일 경우: KeyholeFinalTransformed 값 사용
+      // Keyhole 아닐 경우: FinalTransformed 값 사용
+      const isKeyhole = row.isKeyhole || row.IsKeyhole || false
+      if (isKeyhole) {
+        return {
+          start: row.KeyholeFinalTransformedStartElevation ?? row.FinalTransformedStartElevation ?? row.StartElevation ?? 0,
+          end: row.KeyholeFinalTransformedEndElevation ?? row.FinalTransformedEndElevation ?? row.EndElevation ?? 0
+        }
+      } else {
+        return {
+          start: row.FinalTransformedStartElevation ?? row.StartElevation ?? 0,
+          end: row.FinalTransformedEndElevation ?? row.EndElevation ?? 0
+        }
+      }
+    },
+    align: 'center',
+    sortable: false,
   },
   // ✅ 2축 최대 고도 (Original)
   {
@@ -1339,13 +1417,13 @@ const initChart = () => {
     chart.dispose()
   }
 
-  // 화면 크기에 따른 차트 크기 결정
+  // 화면 크기에 따른 차트 크기 결정 (PassSchedulePage.vue와 동일)
   const getChartSize = () => {
     const width = window.innerWidth
-    if (width <= 1200) return 280
-    if (width <= 1600) return 320
-    if (width <= 1900) return 360
-    return 420
+    if (width <= 1200) return 350
+    if (width <= 1600) return 400
+    if (width <= 1900) return 450
+    return 500
   }
 
   const chartSize = getChartSize()
@@ -1990,6 +2068,12 @@ const safeToFixed = (value: unknown, decimals: number = 6): string => {
   return '0.00'
 }
 
+// ✅ 각도 포맷팅 헬퍼 함수 (Azimuth/Elevation 각도 컬럼용)
+const formatAngle = (angle: number | undefined | null): string => {
+  if (angle === undefined || angle === null) return '-'
+  return `${Number(angle).toFixed(1)}°`
+}
+
 // 스케줄 모달 관련
 const openScheduleModal = async () => {
   console.log('🚨🚨🚨 Select Schedule 버튼 클릭됨 - 함수 시작!')
@@ -2395,19 +2479,67 @@ onUnmounted(() => {
 
 
 .control-section {
-  height: 100%;
-  max-height: 500px;
+  min-height: 360px !important; /* ✅ 최소 높이 보장 */
+  height: 100% !important; /* ✅ 부모 높이에 맞춤 */
   width: 100%;
   background-color: var(--theme-card-background);
   border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 .control-section .q-card-section {
   padding: 16px !important;
+  padding-bottom: 0 !important; /* ✅ 하단 패딩 제거 */
+  flex: 1 !important; /* ✅ 남은 공간 채우기 */
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative; /* ✅ 제목 absolute positioning을 위한 기준점 */
+}
+
+/* ✅ Position View 카드 섹션에만 overflow: visible 적용 */
+.control-section.position-view-card .q-card-section {
+  overflow: visible !important; /* ✅ 차트가 넘쳐도 보이도록 */
+}
+
+/* ✅ Position View 카드 높이 설정 (PassSchedulePage.vue와 동일) */
+.control-section.position-view-card,
+.control-section.position-view-card.q-card {
+  min-height: 360px !important; /* ✅ 최소 높이 보장 */
+  height: 100% !important; /* ✅ 부모 높이에 맞춤 */
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: visible !important; /* ✅ 차트가 넘쳐도 보이도록 */
+}
+
+/* ✅ Position View 카드 섹션 높이 조정 */
+.control-section.position-view-card .q-card-section.position-view-section {
+  min-height: 360px !important; /* ✅ 차트 영역 최소 높이 보장 */
+  height: 100% !important; /* ✅ 부모 높이에 맞춤 */
+  flex: 1 !important; /* ✅ 남은 공간 채우기 */
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: visible !important; /* ✅ 차트가 넘쳐도 보이도록 */
+}
+
+.position-view-section {
+  padding: 16px 16px 0px 16px !important; /* ✅ 상단 패딩을 다른 패널과 동일하게 16px로 맞춤, 하단 패딩 제거 */
+  overflow: visible !important; /* ✅ 차트가 넘쳐도 보이도록 */
+}
+
+.position-view-title {
+  position: absolute; /* ✅ 제목을 absolute로 배치하여 차트 영역이 전체 공간 사용 */
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  margin: 0;
+  padding: 0;
 }
 
 .chart-area {
-  height: 220px;
+  min-height: 340px !important; /* ✅ 최소 높이 보장 */
+  height: 100% !important; /* ✅ 부모 높이에 맞춤 */
+  flex: 1 !important; /* ✅ 남은 공간 채우기 */
   width: 100%;
   display: flex;
   align-items: center;
@@ -2415,55 +2547,82 @@ onUnmounted(() => {
   margin: 0 auto;
   padding: 0;
   box-sizing: border-box;
-  overflow: visible;
+  overflow: visible !important; /* ✅ 차트가 컨테이너를 넘어설 수 있도록 */
   text-align: center;
   position: relative;
 }
 
-/* ✅ 차트 컨테이너 완전 가운데 정렬 - 이전 크기로 복원, 아래로 조정 */
+/* ✅ 차트 컨테이너 완전 가운데 정렬 (PassSchedulePage.vue와 동일) */
 .chart-area>div {
   position: absolute;
   left: 50%;
-  top: 55%;
+  top: 50% !important;
   transform: translate(-50%, -50%);
-  width: 420px;
-  height: 420px;
-  max-width: 420px;
-  max-height: 420px;
+  width: 500px !important;
+  height: 500px !important;
+  max-width: 500px !important;
+  max-height: 500px !important;
+  min-width: 500px !important;
+  min-height: 500px !important;
   aspect-ratio: 1;
 }
 
-/* 반응형 차트 크기 조정 - 이전 크기로 복원, 아래로 조정 */
+/* 반응형 차트 크기 조정 (PassSchedulePage.vue와 동일) */
 @media (max-width: 1900px) {
   .chart-area>div {
-    width: 360px;
-    height: 360px;
-    max-width: 360px;
-    max-height: 360px;
+    width: 450px !important;
+    height: 450px !important;
+    max-width: 450px !important;
+    max-height: 450px !important;
+    min-width: 450px !important;
+    min-height: 450px !important;
   }
 }
 
 @media (max-width: 1600px) {
   .chart-area>div {
-    width: 320px;
-    height: 320px;
-    max-width: 320px;
-    max-height: 320px;
+    width: 400px !important;
+    height: 400px !important;
+    max-width: 400px !important;
+    max-height: 400px !important;
+    min-width: 400px !important;
+    min-height: 400px !important;
   }
 }
 
 @media (max-width: 1200px) {
   .chart-area>div {
-    width: 280px;
-    height: 280px;
-    max-width: 280px;
-    max-height: 280px;
+    width: 350px !important;
+    height: 350px !important;
+    max-width: 350px !important;
+    max-height: 350px !important;
+    min-width: 350px !important;
+    min-height: 350px !important;
   }
+}
+
+/* ✅ 2번 영역(위성 추적 정보) 카드 섹션 높이 조정 */
+.ephemeris-mode .main-content-row > [class*="col-"]:nth-child(2) .control-section .q-card-section {
+  min-height: 360px !important; /* ✅ 최소 높이 보장 */
+  flex: 1 !important; /* ✅ 남은 공간 채우기 */
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* ✅ 3번 영역(TLE Data) 카드 섹션 높이 조정 */
+.ephemeris-mode .main-content-row > [class*="col-"]:nth-child(3) .control-section .q-card-section {
+  min-height: 360px !important; /* ✅ 최소 높이 보장 */
+  flex: 1 !important; /* ✅ 남은 공간 채우기 */
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 .ephemeris-form {
   margin-top: 0.5rem;
   width: 100%;
+  flex: 1 !important; /* ✅ 남은 공간 채우기 */
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 .form-row {
@@ -2904,6 +3063,12 @@ onUnmounted(() => {
   /* ✅ box-shadow 제거 - Quasar 기본 q-card 그림자 사용 (PassSchedulePage.vue와 동일) */
 }
 
+/* ✅ Position View 카드에만 overflow: visible 적용 */
+.ephemeris-mode .q-card.position-view-card,
+.ephemeris-mode .control-section.position-view-card.q-card {
+  overflow: visible !important; /* ✅ 차트가 넘쳐도 보이도록 */
+}
+
 .ephemeris-mode .q-btn {
   flex: 1;
 }
@@ -2985,5 +3150,85 @@ onUnmounted(() => {
 
 .ephemeris-mode .keyhole-column.text-positive {
   color: #4caf50 !important;
+}
+
+/* ✅ 각도 컬럼 스타일 (Azimuth/Elevation 각도) */
+.ephemeris-mode .angle-cell {
+  padding: 6px 10px !important;
+  vertical-align: middle;
+}
+
+.ephemeris-mode .angle-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 50px;
+  justify-content: center;
+}
+
+.ephemeris-mode .angle-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px !important;
+  line-height: 1.3;
+}
+
+.ephemeris-mode .angle-label {
+  color: var(--theme-text-secondary);
+  font-weight: 600 !important;
+  min-width: 35px;
+  font-size: 13px !important;
+}
+
+.ephemeris-mode .angle-value {
+  color: white;
+  font-weight: 700 !important;
+  text-align: right;
+  font-size: 14px !important;
+}
+
+.ephemeris-mode .start-angle .angle-value {
+  color: #4caf50;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+}
+
+.ephemeris-mode .end-angle .angle-value {
+  color: #ff9800;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+}
+
+/* ✅ 위성 이름 셀 스타일 */
+.ephemeris-mode .satellite-name-cell {
+  padding: 8px 10px !important;
+  vertical-align: middle;
+}
+
+/* ✅ 위성 이름 컨테이너 스타일 (세로 배치) */
+.ephemeris-mode .satellite-name-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 50px;
+}
+
+/* ✅ 위성 이름 텍스트 스타일 */
+.ephemeris-mode .satellite-name-text {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: white;
+}
+
+/* ✅ Keyhole 배지 스타일 */
+.ephemeris-mode .keyhole-badge {
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  padding: 4px 8px !important;
+  letter-spacing: 0.5px !important;
+  margin-top: 2px;
 }
 </style>
