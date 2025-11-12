@@ -17,25 +17,51 @@
 
 ---
 
-### 📝 [plans/](plans/)
-**계획 단계 문서**
-- 협의 중인 작업 계획
-- Step by Step 형태
-- 코드 예시 및 수정 위치
-- 사용자와 협의하며 업데이트
+### 📝 [features/](features/)
+**기능별 통합 문서 관리** ⭐ **권장**
+- 모든 기능의 계획 및 완료 문서
+- 기능별 폴더로 통합 관리
+- 계획 → 완료 워크플로우 명확화
 
-**용도**: 새 기능 구현 전 계획 수립
+**구조**:
+```
+features/
+  active/                      # 진행 중인 기능
+    {기능명}/
+      {기능명}_plan.md
+      README.md
+      (completed/ 폴더 없음)
+  
+  completed/                   # 완료된 기능
+    {기능명}/
+      {기능명}_plan.md
+      README.md
+      completed/
+        {기능명}_Final_Result.md
+        {기능명}_Summary.md
+```
+
+**용도**: 기능별 문서 일괄 관리 및 히스토리 추적
+
+👉 **새로운 기능은 `features/` 구조를 사용하세요**
 
 ---
 
-### ✅ [completed/](completed/)
-**완료 단계 문서**
-- 작업 완료 후 정리본
-- 구현 완료 상태 명시
-- 테스트 결과 포함
-- 다이어그램/표 중심
+### 📝 [plans/](plans/) (Deprecated)
+**계획 단계 문서 (구버전)**
 
-**용도**: 작업 완료 상태 확인 및 이력 관리
+> ⚠️ **참고**: 새로운 계획은 `features/{기능명}/{기능명}_plan.md`로 작성하세요.
+
+기존 plans/ 폴더는 유지하되, 새로운 계획은 features/ 구조를 사용합니다.
+
+---
+
+### ✅ [completed/](completed/) (Deprecated)
+**완료 단계 문서 (구버전)**
+
+> ⚠️ **참고**: 모든 문서가 `features/` 구조로 마이그레이션되었습니다.
+
+기존 completed/ 폴더는 유지하되, 새로운 완료 문서는 features/ 구조를 사용합니다.
 
 ---
 
@@ -61,14 +87,17 @@
 
 ```
 1. 계획 작성
-   docs/plans/{기능}_Plan.md
+   docs/features/active/{기능명}/{기능명}_plan.md
    → 사용자와 협의, 계속 업데이트
 
 2. 작업 진행
    → 코드 구현 및 테스트
+   → active/{기능명}/ 폴더에서 작업
 
 3. 완료 문서 생성
-   docs/completed/{기능}_Completed.md
+   active/{기능명}/ → completed/{기능명}/ 이동
+   docs/features/completed/{기능명}/completed/{기능명}_Final_Result.md
+   docs/features/completed/{기능명}/completed/{기능명}_Summary.md
    → 구현 완료 상태 정리
 
 4. 개발 가이드 통합
@@ -82,11 +111,11 @@
 ## 📋 문서 찾기
 
 ### 새로운 기능 시작
-1. `plans/` 확인 - 진행 중인 계획이 있는지
-2. 없으면 새 계획 작성 요청
+1. `features/active/` 확인 - 진행 중인 계획이 있는지
+2. 없으면 새 계획 작성 요청 (`features/active/{기능명}/{기능명}_plan.md`)
 
 ### 완료된 기능 확인
-1. `completed/` 확인 - 완료 문서
+1. `features/completed/` 확인 - 기능별 완료 문서
 2. `Development_Guide.md` 확인 - 전체 개요
 
 ### 상세 기술 문서
@@ -116,17 +145,13 @@ MAJOR.MINOR.PATCH
 
 ## 📝 문서 작성 가이드
 
-### plans/ (계획서)
-- Step 1, Step 2... 형태
-- 코드 예시 포함
-- 수정할 파일/라인 명시
-- Markdown 형식
-
-### completed/ (완료 문서)
-- 구현 완료 상태 명시
-- 다이어그램/표 중심
-- 테스트 결과
-- 코드 참조 (라인 번호)
+### features/ (기능별 문서)
+- **active/{기능명}/**: 진행 중인 기능
+  - `{기능명}_plan.md`: Step 1, Step 2... 형태, 코드 예시 포함, 수정할 파일/라인 명시
+- **completed/{기능명}/**: 완료된 기능
+  - `{기능명}_plan.md`: 원본 계획 보존
+  - `completed/{기능명}_Final_Result.md`: 구현 완료 상태 명시, 다이어그램/표 중심, 테스트 결과, 코드 참조
+  - `completed/{기능명}_Summary.md`: 요약 문서, 빠른 참조용
 
 ### references/ (참조 문서)
 - 설계 문서 형태
@@ -136,7 +161,7 @@ MAJOR.MINOR.PATCH
 
 ---
 
-**문서 버전**: 1.0.0  
-**최종 업데이트**: 2024-12  
+**문서 버전**: 2.0.0  
+**최종 업데이트**: 2025-01  
 **유지 관리자**: GTL Systems
 

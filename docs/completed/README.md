@@ -8,66 +8,139 @@
 
 `plans/`의 계획서대로 작업을 완료한 후, 최종 구현 상태를 정리하는 문서
 
-**워크플로우**: `docs/plans/{기능명}_Plan.md` → `docs/completed/{기능명}_Completed.md`
-
-### 특징
-- **구현 완료 상태**: 최종 구현 내용
-- **다이어그램 중심**: 시각적 설명
-- **테스트 결과 포함**: 검증 완료
-- **참조용**: 향후 유지보수 시 참고
+**새로운 워크플로우**: `docs/plans/{기능명}_Plan.md` → `docs/completed/{기능명}/` (3개 문서)
 
 ---
 
-## 📁 파일 명명 규칙
+## 📁 새로운 문서 구조
 
-### 파일명 변환 규칙
+### 폴더 구조
 
-플랜 문서에서 완료 문서로 변환될 때 파일명이 자동으로 변경됩니다:
-
-```
-{기능명}_Plan.md → {기능명}_Completed.md
-```
-
-**예시**:
-- `Train_Algorithm_Plan.md` → `Train_Algorithm_Completed.md`
-- `Frontend_Display_Values_Validation_Plan.md` → `Frontend_Display_Values_Validation_Completed.md`
-- `Settings_Management_Plan.md` → `Settings_Management_Completed.md`
-
-### 워크플로우 프로세스
+완료된 작업은 기능명 폴더로 묶여서 관리됩니다:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ 1. 플랜 작성 단계                                           │
-│    docs/plans/{기능명}_Plan.md 생성                         │
-│    사용자와 협의하며 계획 수정                              │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│ 2. 작업 수행 단계                                           │
-│    플랜에 따라 코드 구현                                    │
-│    테스트 및 검증                                            │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│ 3. 완료 처리 단계                                           │
-│    사용자: "이 계획은 완료되었어" 또는 "계획을 완료처리해"  │
-│                                                              │
-│    AI 자동 처리:                                            │
-│    a. docs/plans/{기능명}_Plan.md 읽기                      │
-│    b. docs/completed/{기능명}_Completed.md 생성             │
-│    c. 원본 플랜 파일 삭제 (docs/plans/에서 제거)           │
-│    d. 완료일, 상태 메타데이터 추가                          │
-│    e. README.md 업데이트                                    │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│ 4. 완료 문서 관리                                           │
-│    docs/completed/{기능명}_Completed.md 유지                │
-│    향후 참조 및 유지보수용                                   │
-└─────────────────────────────────────────────────────────────┘
+completed/
+  {기능명}/
+    {기능명}_Original_Plan.md      # 원본 계획 문서 (수정 없음)
+    {기능명}_Final_Result.md        # 계획 전체 + 수정 사항 + 최종 적용 내용
+    {기능명}_Summary.md             # 최종 요약 문서
 ```
 
-### 완료 판단 키워드
+### 예시
+
+```
+completed/
+  PassScheduleService_Improvement_And_PushDataService_Integration/
+    PassScheduleService_Improvement_And_PushDataService_Integration_Original_Plan.md
+    PassScheduleService_Improvement_And_PushDataService_Integration_Final_Result.md
+    PassScheduleService_Improvement_And_PushDataService_Integration_Summary.md
+  
+  Train_Algorithm/
+    Train_Algorithm_Original_Plan.md
+    Train_Algorithm_Final_Result.md
+    Train_Algorithm_Summary.md
+```
+
+---
+
+## 📋 문서 내용 규칙
+
+### 1. Original_Plan.md
+
+- `plans/` 폴더의 원본 계획 문서 그대로 보존
+- 수정 없이 원본 상태 유지
+- 향후 계획과 실제 구현의 차이를 비교할 때 참조
+
+### 2. Final_Result.md
+
+원본 계획 전체 내용 + 수정 사항 + 최종 적용 내용을 포함합니다.
+
+**구조**:
+```markdown
+# {기능명} 최종 결과
+
+## 원본 계획
+[원본 계획 전체 내용]
+
+## 수정 사항
+[계획과 다른 부분, 문제 발생 및 해결]
+
+## 최종 적용 내용
+[실제 구현된 내용, 최종 코드]
+```
+
+### 3. Summary.md
+
+최종 요약 문서로, 빠른 참조용입니다.
+
+**구조**:
+```markdown
+# {기능명} 요약
+
+## 목표
+[달성한 목표]
+
+## 주요 변경 사항
+[핵심 변경 내용]
+
+## 최종 상태
+[최종 구현 상태]
+
+## 참조
+- 원본 계획: [Original_Plan.md](./{기능명}_Original_Plan.md)
+- 최종 결과: [Final_Result.md](./{기능명}_Final_Result.md)
+```
+
+---
+
+## 🔄 워크플로우
+
+### 완료 처리 프로세스
+
+1. **사용자 요청**: "이 계획은 완료되었어" 또는 "계획을 완료처리해"
+2. **AI 자동 처리**:
+   - `docs/plans/{기능명}_Plan.md` 읽기
+   - `docs/completed/{기능명}/` 폴더 생성
+   - `{기능명}_Original_Plan.md` 생성 (원본 그대로)
+   - `{기능명}_Final_Result.md` 생성 (계획 + 수정 사항 + 최종 적용)
+   - `{기능명}_Summary.md` 생성 (요약)
+   - `docs/plans/{기능명}_Plan.md` 삭제
+   - `docs/completed/README.md` 업데이트
+
+### 기존 completed/ 문서 재구성
+
+기존 `*_Completed.md` 파일들은 새 구조로 재구성됩니다:
+
+1. **기존 문서 확인**: `docs/completed/` 폴더의 모든 `*_Completed.md` 파일
+2. **기능명 추출**: 파일명에서 기능명 추출 (예: `Train_Algorithm_Completed.md` → `Train_Algorithm`)
+3. **새 구조 생성**:
+   - `docs/completed/{기능명}/` 폴더 생성
+   - `{기능명}_Original_Plan.md` 생성 (plans/에서 원본 찾거나, Completed 문서에서 계획 부분 추출)
+   - `{기능명}_Final_Result.md` 생성 (기존 Completed 문서 내용 활용)
+   - `{기능명}_Summary.md` 생성 (기존 Completed 문서에서 요약 추출)
+4. **기존 파일 삭제**: `docs/completed/{기능명}_Completed.md` 삭제
+
+---
+
+## 📁 파일명 규칙
+
+### 기능명 추출 규칙
+
+| 원본 파일명 | 기능명 | 폴더명 |
+|------------|--------|--------|
+| `PassScheduleService_Improvement_And_PushDataService_Integration_Plan.md` | `PassScheduleService_Improvement_And_PushDataService_Integration` | `PassScheduleService_Improvement_And_PushDataService_Integration/` |
+| `Train_Algorithm_Plan.md` | `Train_Algorithm` | `Train_Algorithm/` |
+| `Keyhole_And_Train_Angle_Recalculation_Plan.md` | `Keyhole_And_Train_Angle_Recalculation` | `Keyhole_And_Train_Angle_Recalculation/` |
+
+### 파일명 생성 규칙
+
+- `{기능명}_Original_Plan.md`
+- `{기능명}_Final_Result.md`
+- `{기능명}_Summary.md`
+
+---
+
+## ✅ 완료 판단 키워드
 
 다음 키워드 중 하나를 사용하면 자동으로 완료 처리됩니다:
 - "이 계획은 완료되었어"
@@ -77,96 +150,19 @@
 
 ---
 
-## 📋 완료 문서 템플릿
+## 📊 완료 작업 목록
 
-```markdown
-# {기능명} 구현 완료
+| 폴더명 | 기능 | 완료일 | 버전 | 통합 여부 |
+|--------|------|--------|------|----------|
+| Train_Algorithm/ | Train 각도 최적화 알고리즘 | 2024-12 | 1.0 | - |
+| PassScheduleService_Improvement/ | PassScheduleService 개선 및 PushDataService 통합 | 2024-12 | 1.0 | ✅ (2개 통합) |
+| Keyhole_Train_Angle_Management/ | Keyhole Train 각도 관리 | 2024-12 | 1.0 | ✅ (2개 통합) |
+| Elevation_Filtering_Management/ | Elevation 필터링 관리 | 2024-12 | 1.0 | ✅ (3개 통합) |
+| Frontend_Display_Values_Validation/ | 프론트엔드 표시 값 검증 | 2025-01 | 1.0 | - |
 
 ---
-**완료일**: 2024-12-15
-**작성자**: GTL Systems
-**상태**: ✅ 구현 완료
-**테스트**: ✅ 통과
----
-
-## 📌 개요
-
-{이 기능이 무엇인지 간단 설명}
-
-## 🎯 구현 목표
-
-{달성하고자 했던 목표}
-
-## 📊 구현 내용
-
-### 주요 기능
-1. {기능 1}
-2. {기능 2}
-3. {기능 3}
-
-### 데이터 흐름
-
-```
-[다이어그램]
-입력 → 처리 → 출력
-```
-
-### 핵심 알고리즘
-
-{핵심 로직 설명}
-
-## 📁 수정된 파일
-
-| 파일 | 수정 내용 | 라인 |
-|------|----------|------|
-| `파일1.kt` | {설명} | 100-200 |
-| `파일2.kt` | {설명} | 50-80 |
-
-## 🧪 테스트 결과
-
-### 단위 테스트
-- ✅ {테스트 케이스 1}
-- ✅ {테스트 케이스 2}
-
-### 통합 테스트
-- ✅ {시나리오 1}
-- ✅ {시나리오 2}
-
-### 성능 테스트
-- 처리 시간: {결과}
-- 메모리 사용: {결과}
-
-## 📈 Before/After
-
-| 항목 | Before | After |
-|------|--------|-------|
-| {항목1} | {이전} | {이후} |
-| {항목2} | {이전} | {이후} |
-
-## 🔍 주요 이슈 및 해결
-
-### 이슈 1: {문제}
-**원인**: {원인 분석}
-**해결**: {해결 방법}
-
-## 📚 참조 문서
-
-- 계획서: [plans/{기능}_Plan.md](../plans/{기능}_Plan.md)
-- 상세 설계: [references/{카테고리}/{기능}_Design.md](../references/{카테고리}/{기능}_Design.md)
 
 ## 🔜 다음 단계
-
-{향후 개선 계획 또는 후속 작업}
-
----
-
-**문서 버전**: 1.0.0  
-**최종 업데이트**: 2024-12-15
-```
-
----
-
-## 🔄 완료 문서 이후
 
 완료 문서 작성 후:
 1. `Development_Guide.md`에 해당 기능 섹션 추가
@@ -175,14 +171,5 @@
 
 ---
 
-## 📊 완료 작업 목록
-
-| 파일명 | 기능 | 완료일 | 버전 |
-|--------|------|--------|------|
-| Train_Algorithm_Completed.md | Train 각도 최적화 알고리즘 | 2024-12 | 1.0 |
-
----
-
-**문서 버전**: 1.0.0  
+**문서 버전**: 2.0.0  
 **최종 업데이트**: 2024-12
-
