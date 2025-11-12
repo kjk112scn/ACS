@@ -157,6 +157,7 @@
                         <span class="info-value">{{ displaySchedule.no }}</span>
                         <q-badge v-if="currentScheduleStatus" :color="currentScheduleStatus.color"
                           :label="currentScheduleStatus.label" class="q-ml-sm" />
+                        <q-badge v-if="displaySchedule.isKeyhole || displaySchedule.IsKeyhole" color="red" label="KEYHOLE" class="q-ml-sm" />
                       </div>
                     </div>
                     <!--     <div class="info-row">
@@ -269,12 +270,10 @@
                     <q-spinner size="50px" color="primary" />
                   </q-inner-loading>
                 </template>
-                <!-- 삭제 버튼 컬럼 -->
-                <template v-slot:body-cell-actions="props">
+                <!-- Keyhole 배지 컬럼 -->
+                <template v-slot:body-cell-keyhole="props">
                   <q-td :props="props">
-                    <q-btn icon="delete" color="negative" size="sm" flat round>
-                      <q-tooltip>목록에서 제거</q-tooltip>
-                    </q-btn>
+                    <q-badge v-if="props.row.isKeyhole || props.row.IsKeyhole" color="red" label="KEYHOLE" />
                   </q-td>
                 </template>
                 <!-- 위성 정보 컬럼 템플릿 -->
@@ -417,19 +416,27 @@ class PassChartUpdatePool {
   }
 
   updateTrackingPath(newPath: [number, number][]) {
-    // 안전한 배열 업데이트
+    // ✅ 안전한 배열 업데이트 - 이전 데이터 완전 제거
     this.trackingData.length = 0
-    if (Array.isArray(newPath)) {
+    if (Array.isArray(newPath) && newPath.length > 0) {
       this.trackingData.push(...newPath)
+    }
+    // ✅ 시리즈 데이터 참조 업데이트 (series[1]에 설정)
+    if (this.updateOption.series[1]) {
+      this.updateOption.series[1].data = this.trackingData
     }
     return this.updateOption
   }
 
   updatePredictedPath(newPath: [number, number][]) {
-    // 안전한 배열 업데이트
+    // ✅ 안전한 배열 업데이트 - 이전 데이터 완전 제거
     this.predictedData.length = 0
-    if (Array.isArray(newPath)) {
+    if (Array.isArray(newPath) && newPath.length > 0) {
       this.predictedData.push(...newPath)
+    }
+    // ✅ 시리즈 데이터 참조 업데이트 (series[2]에 설정)
+    if (this.updateOption.series[2]) {
+      this.updateOption.series[2].data = this.predictedData
     }
     return this.updateOption
   }
@@ -473,9 +480,26 @@ const sortedScheduleList = computed(() => {
 const reactivityTrigger = ref(0)
 
 // 🆕 Store 값 변경 감지
-watch(() => icdStore.currentTrackingMstId, (newVal, oldVal) => {
-  console.log(`🔄 currentTrackingMstId 변경 감지: ${oldVal} → ${newVal}`)
+// ✅ 스케줄 전환 시 경로 초기화 로직
+watch(() => icdStore.currentTrackingMstId, (newMstId, oldMstId) => {
+  console.log(`🔄 currentTrackingMstId 변경 감지: ${oldMstId} → ${newMstId}`)
   reactivityTrigger.value++
+
+  // 스케줄이 변경된 경우 (이전 스케줄 완료, 다음 스케줄 시작)
+  if (oldMstId !== null && newMstId !== null && oldMstId !== newMstId) {
+    console.log(`🔄 스케줄 전환 감지: ${oldMstId} → ${newMstId}`)
+    // 이전 스케줄의 실시간 추적 경로만 초기화 (predictedTrackingPath는 새 스케줄 로드 시 자동 교체)
+    passScheduleStore.actualTrackingPath = []
+    console.log('✅ 이전 스케줄의 실시간 추적 경로 초기화 완료')
+  } else if (oldMstId === null && newMstId !== null) {
+    // 추적 시작 시 빈 경로에서 시작
+    console.log('🚀 추적 시작 - 실시간 추적 경로 초기화 (빈 경로에서 시작)')
+    passScheduleStore.actualTrackingPath = []
+  } else if (oldMstId !== null && newMstId === null) {
+    // 추적 완료 시 경로 초기화
+    console.log('🛑 추적 완료 - 실시간 추적 경로 초기화')
+    passScheduleStore.actualTrackingPath = []
+  }
 }, { immediate: true })
 
 watch(() => icdStore.nextTrackingMstId, (newVal, oldVal) => {
@@ -1111,7 +1135,7 @@ const scheduleColumns: QTableColumn[] = [
     style: 'width: 80px',
     headerStyle: 'white-space: pre-line; line-height: 1.3; text-align: center; vertical-align: middle;'
   },
-  { name: 'actions', label: '작업', field: 'actions', align: 'center' as const, sortable: false, style: 'width: 60px' },
+  { name: 'keyhole', label: 'keyhole', field: 'keyhole', align: 'center' as const, sortable: false, style: 'width: 80px' },
 ]
 
 const formatDateTime = (dateString: string): string => {
@@ -1326,23 +1350,7 @@ const initChart = () => {
         },
         zlevel: 3,
       },
-      {
-        name: '위치 선',
-        type: 'line',
-        coordinateSystem: 'polar',
-        symbol: 'none',
-        animation: false, // ✅ 애니메이션 완전 비활성화
-        lineStyle: {
-          color: '#ff5722',
-          width: 2,
-          type: 'dashed',
-        },
-        data: [
-          [0, 0],
-          [0, 0],
-        ],
-        zlevel: 2,
-      },
+      // ✅ 위치 선 제거 - 현재 위치 점이 이동하면서 실시간 경로를 그리므로 불필요
       {
         name: '실시간 추적 경로',
         type: 'line',
@@ -1350,8 +1358,8 @@ const initChart = () => {
         symbol: 'none',
         animation: false, // ✅ 애니메이션 완전 비활성화
         lineStyle: {
-          color: '#ffffff',
-          width: 2, // ✅ 3 → 2로 줄여서 렌더링 부하 감소
+          color: '#ffffff', // 흰색
+          width: 2,
           opacity: 0.8,
         },
         data: [],
@@ -1364,7 +1372,7 @@ const initChart = () => {
         symbol: 'none',
         animation: false, // ✅ 애니메이션 완전 비활성화
         lineStyle: {
-          color: '#2196f3',
+          color: '#2196f3', // 파란색
           width: 2,
         },
         data: [],
@@ -1449,16 +1457,36 @@ const initChart = () => {
 
 
 // 🆕 선택된 스케줄의 추적 경로 로드
+// ✅ 현재 추적 중인 스케줄이 있으면 해당 스케줄의 경로만 로드
 const loadSelectedScheduleTrackingPath = async () => {
   try {
-    const schedule = displaySchedule.value
-    if (!schedule) {
+    // ✅ 현재 추적 중인 스케줄 우선 확인
+    const currentTrackingMstId = icdStore.currentTrackingMstId
+    let scheduleToLoad: ScheduleItem | null = null
+
+    if (currentTrackingMstId !== null) {
+      // 현재 추적 중인 스케줄이 있으면 해당 스케줄 사용
+      const currentSchedule = sortedScheduleList.value.find(s => Number(s.index) === Number(currentTrackingMstId))
+      if (currentSchedule) {
+        scheduleToLoad = currentSchedule
+        console.log('🎯 현재 추적 중인 스케줄의 경로 로드:', currentSchedule.satelliteName)
+      }
+    } else {
+      // 현재 추적 중인 스케줄이 없으면 선택된 스케줄 사용
+      scheduleToLoad = displaySchedule.value
+      if (scheduleToLoad) {
+        console.log('📌 선택된 스케줄의 경로 로드:', scheduleToLoad.satelliteName)
+      }
+    }
+
+    if (!scheduleToLoad) {
       console.log('⚠️ 로드할 스케줄이 없음')
       return
     }
 
-    const satelliteId = schedule.satelliteId || schedule.satelliteName
-    const passId = schedule.index || schedule.no
+    const satelliteId = scheduleToLoad.satelliteId || scheduleToLoad.satelliteName
+    // ✅ index만 사용 (no는 재생성된 값이므로 사용하지 않음)
+    const passId = scheduleToLoad.index
 
     if (!satelliteId || !passId) {
       console.log('⚠️ 위성 ID 또는 패스 ID가 없음')
@@ -1466,7 +1494,7 @@ const loadSelectedScheduleTrackingPath = async () => {
     }
 
     console.log('🚀 스케줄 추적 경로 로드 시작:', {
-      satelliteName: schedule.satelliteName,
+      satelliteName: scheduleToLoad.satelliteName,
       satelliteId,
       passId
     })
@@ -1598,7 +1626,53 @@ const updateChartWithPerformanceMonitoring = () => {
     }
 
     // 🆕 적응형 해상도 조정
-    const predictedPath = passScheduleStore.predictedTrackingPath
+    // ✅ 차트 경로 표시 우선순위: 현재 추적 중인 스케줄 우선, 없으면 선택된 스케줄만 표시
+    const currentTrackingMstId = icdStore.currentTrackingMstId
+    const selectedSchedule = displaySchedule.value
+    const shouldShowPredictedPath = currentTrackingMstId !== null || selectedSchedule !== null
+
+    // 현재 추적 중인 스케줄이 있으면 해당 스케줄의 경로만, 없으면 선택된 스케줄의 경로만 표시
+    let predictedPathToShow: [number, number][] = []
+
+    if (shouldShowPredictedPath) {
+      // 현재 추적 중인 스케줄이 있으면 해당 스케줄의 경로 사용
+      if (currentTrackingMstId !== null) {
+        const currentSchedule = sortedScheduleList.value.find(s => Number(s.index) === Number(currentTrackingMstId))
+        if (currentSchedule) {
+          // ✅ 현재 스케줄의 satelliteId와 passId 확인하여 일치하는 경로만 사용
+          const currentPath = passScheduleStore.predictedTrackingPath
+          const pathInfo = passScheduleStore.currentTrackingPathInfo
+          const scheduleSatelliteId = currentSchedule.satelliteId || currentSchedule.satelliteName
+          // ✅ index만 사용 (no는 재생성된 값이므로 사용하지 않음)
+          const schedulePassId = currentSchedule.index
+
+          if (currentPath && currentPath.length > 0 &&
+              pathInfo.satelliteId === scheduleSatelliteId &&
+              pathInfo.passId === schedulePassId) {
+            predictedPathToShow = currentPath.map((point: readonly [number, number]) => [...point])
+          } else {
+            // ✅ 경로가 일치하지 않으면 빈 배열로 초기화
+            predictedPathToShow = []
+          }
+        }
+      } else if (selectedSchedule) {
+        // ✅ 선택된 스케줄의 satelliteId와 passId 확인하여 일치하는 경로만 사용
+        const selectedPath = passScheduleStore.predictedTrackingPath
+        const pathInfo = passScheduleStore.currentTrackingPathInfo
+        const scheduleSatelliteId = selectedSchedule.satelliteId || selectedSchedule.satelliteName
+        // ✅ index만 사용 (no는 재생성된 값이므로 사용하지 않음)
+        const schedulePassId = selectedSchedule.index
+
+        if (selectedPath && selectedPath.length > 0 &&
+            pathInfo.satelliteId === scheduleSatelliteId &&
+            pathInfo.passId === schedulePassId) {
+          predictedPathToShow = selectedPath.map((point: readonly [number, number]) => [...point])
+        } else {
+          // ✅ 경로가 일치하지 않으면 빈 배열로 초기화
+          predictedPathToShow = []
+        }
+      }
+    }
 
     const shouldShowTrackingPath = icdStore.passScheduleStatusInfo?.isActive === true &&
       actualPath && actualPath.length > 0
@@ -1614,7 +1688,8 @@ const updateChartWithPerformanceMonitoring = () => {
     // 🆕 PassChartUpdatePool을 사용한 차트 업데이트
     const updateOption = passChartPool.updatePosition(normalizedEl, normalizedAz)
     passChartPool.updateTrackingPath(displayPath)
-    passChartPool.updatePredictedPath((predictedPath || []).map((point: readonly [number, number]) => [...point]))
+    // ✅ 현재 추적 중인 스케줄 또는 선택된 스케줄의 경로만 표시
+    passChartPool.updatePredictedPath(predictedPathToShow)
 
     if (passChart && !passChart.isDisposed()) {
       passChart.setOption(updateOption, false, true)
