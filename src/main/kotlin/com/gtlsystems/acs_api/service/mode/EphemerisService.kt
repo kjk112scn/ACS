@@ -446,6 +446,20 @@ class EphemerisService(
             ephemerisTrackDtlStorage.addAll(processedData.keyholeFinalTransformedDtl)
             logger.debug("Keyhole Final 저장: ${processedData.keyholeFinalTransformedMst.size} Mst, ${processedData.keyholeFinalTransformedDtl.size} Dtl")
 
+            // ✅ Keyhole Optimized Axis 변환 데이터 저장 (Train≠0 최적화, 각도 제한 ❌)
+            ephemerisTrackMstStorage.addAll(processedData.keyholeOptimizedAxisTransformedMst)
+            ephemerisTrackDtlStorage.addAll(processedData.keyholeOptimizedAxisTransformedDtl)
+            logger.debug("Keyhole Optimized Axis 저장: ${processedData.keyholeOptimizedAxisTransformedMst.size} Mst, ${processedData.keyholeOptimizedAxisTransformedDtl.size} Dtl")
+
+            // ✅ Keyhole Optimized Final 변환 데이터 저장 (Train≠0 최적화, 각도 제한 ✅)
+            ephemerisTrackMstStorage.addAll(processedData.keyholeOptimizedFinalTransformedMst)
+            ephemerisTrackDtlStorage.addAll(processedData.keyholeOptimizedFinalTransformedDtl)
+            logger.info("✅ Keyhole Optimized Final 저장: ${processedData.keyholeOptimizedFinalTransformedMst.size} Mst, ${processedData.keyholeOptimizedFinalTransformedDtl.size} Dtl")
+            // 🔍 디버깅: 저장된 MST 데이터 상세 정보
+            processedData.keyholeOptimizedFinalTransformedMst.forEach { mst ->
+                logger.info("   저장된 MST - No: ${mst["No"]}, RecommendedTrainAngle: ${mst["RecommendedTrainAngle"]}, MaxAzRate: ${mst["MaxAzRate"]}, DataType: ${mst["DataType"]}")
+            }
+
             logger.info("✅ 저장 완료: 총 ${ephemerisTrackMstStorage.size}개 Mst, ${ephemerisTrackDtlStorage.size}개 Dtl")
             logger.info("🎉 위성 궤도 추적 완료")
 
@@ -2318,12 +2332,15 @@ class EphemerisService(
      */
     fun getAllEphemerisTrackMstMerged(): List<Map<String, Any?>> {
         try {
-            logger.info("📊 Original, FinalTransformed, KeyholeAxisTransformed, KeyholeFinalTransformed 데이터 병합 시작")
+            // ✅ 요청 ID (디버깅용) - 함수 전체에서 재사용
+            val requestId = System.currentTimeMillis() % 10000
+            logger.info("📊 [요청 #$requestId] Original, FinalTransformed, KeyholeAxisTransformed, KeyholeFinalTransformed, KeyholeOptimized 데이터 병합 시작")
             
             val originalMst = ephemerisTrackMstStorage.filter { it["DataType"] == "original" }
             val finalMst = ephemerisTrackMstStorage.filter { it["DataType"] == "final_transformed" }
             val keyholeAxisMst = ephemerisTrackMstStorage.filter { it["DataType"] == "keyhole_axis_transformed" }  // ✅ 추가
             val keyholeMst = ephemerisTrackMstStorage.filter { it["DataType"] == "keyhole_final_transformed" }
+            val keyholeOptimizedMst = ephemerisTrackMstStorage.filter { it["DataType"] == "keyhole_optimized_final_transformed" }  // ✅ 추가: 방법 2 (최적화)
             
             if (finalMst.isEmpty()) {
                 logger.warn("⚠️ FinalTransformed 데이터가 없습니다")
@@ -2334,12 +2351,34 @@ class EphemerisService(
                 val mstId = final["No"] as UInt
                 val original = originalMst.find { it["No"] == mstId }
                 val keyholeAxis = keyholeAxisMst.find { it["No"] == mstId }  // ✅ 추가
-                val keyhole = keyholeMst.find { it["No"] == mstId }  // ✅ Keyhole 데이터 조회
+                val keyhole = keyholeMst.find { it["No"] == mstId }  // ✅ Keyhole 데이터 조회 (방법 1)
+                val keyholeOptimized = keyholeOptimizedMst.find { it["No"] == mstId }  // ✅ Keyhole Optimized 데이터 조회 (방법 2)
                 
                 // ✅ Keyhole 판단: final_transformed (Train=0) 기준으로 판단
                 val train0MaxAzRate = final["MaxAzRate"] as? Double ?: 0.0
                 val threshold = settingsService.keyholeAzimuthVelocityThreshold
                 val isKeyhole = train0MaxAzRate >= threshold
+                
+                // 🔍 디버깅: Keyhole Optimized 데이터 확인
+                if (isKeyhole) {
+                    logger.info("🔍 [요청 #$requestId] MST #$mstId Keyhole Optimized 디버깅:")
+                    logger.info("   [요청 #$requestId] keyholeOptimizedMst 전체 크기: ${keyholeOptimizedMst.size}")
+                    logger.info("   [요청 #$requestId] keyholeOptimizedMst의 No 필드들: ${keyholeOptimizedMst.map { it["No"] }}")
+                    logger.info("   [요청 #$requestId] 찾는 mstId: $mstId (타입: ${mstId::class.simpleName})")
+                    logger.info("   [요청 #$requestId] keyholeOptimized 찾음: ${keyholeOptimized != null}")
+                    logger.info("   [요청 #$requestId] isKeyhole: $isKeyhole")
+                    if (keyholeOptimized != null) {
+                        logger.info("   [요청 #$requestId] keyholeOptimized의 RecommendedTrainAngle: ${keyholeOptimized["RecommendedTrainAngle"]}")
+                        logger.info("   [요청 #$requestId] keyholeOptimized의 MaxAzRate: ${keyholeOptimized["MaxAzRate"]}")
+                    } else {
+                        logger.warn("⚠️ [요청 #$requestId] MST #$mstId: Keyhole 발생했으나 keyholeOptimized 데이터를 찾을 수 없습니다.")
+                        // 🔍 추가 디버깅: 타입 불일치 확인
+                        keyholeOptimizedMst.forEach { mst ->
+                            val mstNo = mst["No"]
+                            logger.info("   [요청 #$requestId] keyholeOptimizedMst 항목 - No: $mstNo (타입: ${mstNo?.let { it::class.simpleName }}), 일치 여부: ${mstNo == mstId}")
+                        }
+                    }
+                }
                 
                 // 백업: Original MST의 IsKeyhole도 확인 (데이터 정합성)
                 val isKeyholeFromOriginal = original?.get("IsKeyhole") as? Boolean ?: false
@@ -2377,8 +2416,14 @@ class EphemerisService(
                     }
                     
                     // ✅ Keyhole 발생 시 KeyholeFinalTransformed 데이터로 속도 계산 (각도 제한 ✅, Train≠0)
-                    if (keyhole != null && isKeyhole) {
-                        val keyholeRates = calculateFinalTransformedSumMethodRates(mstId, "keyhole_final_transformed")
+                    // keyholeRates를 블록 밖에서 선언하여 재사용 가능하도록 함
+                    val keyholeRates = if (keyhole != null && isKeyhole) {
+                        calculateFinalTransformedSumMethodRates(mstId, "keyhole_final_transformed")
+                    } else {
+                        null
+                    }
+                    
+                    if (keyholeRates != null) {
                         put("KeyholeFinalTransformedMaxAzRate", keyholeRates["maxAzRate"])  // ✅ Keyhole Final 데이터
                         put("KeyholeFinalTransformedMaxElRate", keyholeRates["maxElRate"])  // ✅ Keyhole Final 데이터
                     } else {
@@ -2419,6 +2464,84 @@ class EphemerisService(
                     // 필터링된 데이터 기준으로 계산된 값 사용
                     put("MaxElevation", filteredMaxElevation)
                     
+                    // ✅ 방법 2 (신규): Keyhole Optimized 데이터 추가
+                    logger.info("🔍 [요청 #$requestId] MST #$mstId: Keyhole Optimized 조건 확인:")
+                    logger.info("   - keyholeOptimized != null: ${keyholeOptimized != null}")
+                    logger.info("   - isKeyhole: $isKeyhole")
+                    logger.info("   - 조건 결과 (keyholeOptimized != null && isKeyhole): ${keyholeOptimized != null && isKeyhole}")
+                    
+                    if (keyholeOptimized != null && isKeyhole) {
+                        logger.info("✅ [요청 #$requestId] MST #$mstId: Keyhole Optimized 데이터 처리 시작")
+                        // 🔍 데이터 존재 여부 확인
+                        val keyholeOptimizedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "keyhole_optimized_final_transformed")
+                        logger.info("   [요청 #$requestId] keyhole_optimized_final_transformed DTL 데이터 크기: ${keyholeOptimizedDtl.size}개")
+                        if (keyholeOptimizedDtl.isEmpty()) {
+                            logger.warn("⚠️ [요청 #$requestId] MST #$mstId: keyhole_optimized_final_transformed DTL 데이터가 없습니다!")
+                        }
+                        
+                        val keyholeOptimizedRates = calculateFinalTransformedSumMethodRates(
+                            mstId, 
+                            "keyhole_optimized_final_transformed"
+                        )
+                        logger.info("   [요청 #$requestId] 계산된 Rates: maxAzRate=${keyholeOptimizedRates["maxAzRate"]}, maxElRate=${keyholeOptimizedRates["maxElRate"]}")
+                        logger.info("   [요청 #$requestId] RecommendedTrainAngle: ${keyholeOptimized["RecommendedTrainAngle"]}")
+                        logger.info("   [요청 #$requestId] API 응답에 설정되는 값들:")
+                        logger.info("      - KeyholeOptimizedRecommendedTrainAngle: ${keyholeOptimized["RecommendedTrainAngle"]}")
+                        logger.info("      - KeyholeOptimizedFinalTransformedMaxAzRate: ${keyholeOptimizedRates["maxAzRate"]}")
+                        logger.info("      - KeyholeOptimizedFinalTransformedMaxElRate: ${keyholeOptimizedRates["maxElRate"]}")
+                        val recommendedTrainAngleValue = keyholeOptimized["RecommendedTrainAngle"] as? Double ?: 0.0
+                        val maxAzRateValue = keyholeOptimizedRates["maxAzRate"] as? Double ?: 0.0
+                        val maxElRateValue = keyholeOptimizedRates["maxElRate"] as? Double ?: 0.0
+                        
+                        logger.info("   [요청 #$requestId] 실제 API 응답에 설정되는 값들:")
+                        logger.info("      - KeyholeOptimizedRecommendedTrainAngle: $recommendedTrainAngleValue")
+                        logger.info("      - KeyholeOptimizedFinalTransformedMaxAzRate: $maxAzRateValue")
+                        logger.info("      - KeyholeOptimizedFinalTransformedMaxElRate: $maxElRateValue")
+                        
+                        put("KeyholeOptimizedFinalTransformedMaxAzRate", maxAzRateValue)
+                        put("KeyholeOptimizedFinalTransformedMaxElRate", maxElRateValue)
+                        put("KeyholeOptimizedRecommendedTrainAngle", recommendedTrainAngleValue)
+                        
+                        // ✅ 비교 결과 계산 (방법 1의 keyholeRates 재사용 - 이미 위에서 계산됨)
+                        val method1MaxAzRate = keyholeRates?.get("maxAzRate") as? Double ?: 0.0
+                        val method2MaxAzRate = keyholeOptimizedRates["maxAzRate"] as? Double ?: 0.0
+                        val improvement = method1MaxAzRate - method2MaxAzRate
+                        val improvementRate = if (method1MaxAzRate > 0) {
+                            (improvement / method1MaxAzRate) * 100.0
+                        } else {
+                            0.0
+                        }
+                        
+                        logger.info("   [요청 #$requestId] 비교 결과:")
+                        logger.info("      - OptimizationImprovement: $improvement")
+                        logger.info("      - OptimizationImprovementRate: $improvementRate")
+                        
+                        put("OptimizationImprovement", improvement)
+                        put("OptimizationImprovementRate", improvementRate)
+                        
+                        // 🔍 최종 확인: 실제로 put된 값들
+                        logger.info("   [요청 #$requestId] 최종 확인 - put된 값들:")
+                        logger.info("      - KeyholeOptimizedRecommendedTrainAngle: ${get("KeyholeOptimizedRecommendedTrainAngle")}")
+                        logger.info("      - KeyholeOptimizedFinalTransformedMaxAzRate: ${get("KeyholeOptimizedFinalTransformedMaxAzRate")}")
+                        logger.info("      - KeyholeOptimizedFinalTransformedMaxElRate: ${get("KeyholeOptimizedFinalTransformedMaxElRate")}")
+                        logger.info("      - OptimizationImprovement: ${get("OptimizationImprovement")}")
+                        logger.info("      - OptimizationImprovementRate: ${get("OptimizationImprovementRate")}")
+                    } else {
+                        // Keyhole 미발생 시 기본값 설정
+                        if (isKeyhole && keyholeOptimized == null) {
+                            logger.warn("⚠️ [요청 #$requestId] MST #$mstId: Keyhole 발생했으나 keyholeOptimized가 null입니다. 기본값(0)으로 설정합니다.")
+                        } else if (!isKeyhole) {
+                            logger.info("   [요청 #$requestId] MST #$mstId: Keyhole 미발생 (isKeyhole=false). 기본값(0)으로 설정합니다.")
+                        } else {
+                            logger.warn("⚠️ [요청 #$requestId] MST #$mstId: 예상치 못한 조건 (keyholeOptimized=${keyholeOptimized != null}, isKeyhole=$isKeyhole)")
+                        }
+                        put("KeyholeOptimizedFinalTransformedMaxAzRate", finalRates["maxAzRate"])
+                        put("KeyholeOptimizedFinalTransformedMaxElRate", finalRates["maxElRate"])
+                        put("KeyholeOptimizedRecommendedTrainAngle", 0.0)
+                        put("OptimizationImprovement", 0.0)
+                        put("OptimizationImprovementRate", 0.0)
+                    }
+                    
                     // ✅ Keyhole 관련 정보
                     // Keyhole 판단은 finalTransformedMst 기준으로 수행하므로, RecommendedTrainAngle도 finalTransformedMst에서 가져옴
                     put("IsKeyhole", isKeyhole)
@@ -2449,11 +2572,11 @@ class EphemerisService(
                 }
             }
             
-            logger.info("✅ 병합 완료: ${mergedData.size}개 MST 레코드 (KeyholeAxis + KeyholeFinal 데이터 포함)")
+            logger.info("✅ [요청 #$requestId] 병합 완료: ${mergedData.size}개 MST 레코드 (KeyholeAxis + KeyholeFinal 데이터 포함)")
             if (enableFiltering) {
-                logger.info("✅ 필터링 완료: ${mergedData.size}개 → ${filteredMergedData.size}개 (displayMinElevationAngle=${displayMinElevation}° 기준)")
+                logger.info("✅ [요청 #$requestId] 필터링 완료: ${mergedData.size}개 → ${filteredMergedData.size}개 (displayMinElevationAngle=${displayMinElevation}° 기준)")
             } else {
-                logger.info("✅ 필터링 완료: ${mergedData.size}개 → ${filteredMergedData.size}개 (elevationMin=${settingsService.angleElevationMin}° 기준)")
+                logger.info("✅ [요청 #$requestId] 필터링 완료: ${mergedData.size}개 → ${filteredMergedData.size}개 (elevationMin=${settingsService.angleElevationMin}° 기준)")
             }
             return filteredMergedData
             
@@ -3566,6 +3689,28 @@ class EphemerisService(
                 emptyList()
             }
             
+            // ✅ 필터링된 keyhole_optimized_final_transformed 데이터 조회 (Keyhole 발생 시만, 조건부)
+            val keyholeOptimizedFinalDtlAll = if (isKeyhole) {
+                getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "keyhole_optimized_final_transformed")
+            } else {
+                emptyList()
+            }
+            val keyholeOptimizedFinalDtl = if (isKeyhole) {
+                if (enableFiltering) {
+                    keyholeOptimizedFinalDtlAll.filter {
+                        (it["Elevation"] as? Double ?: 0.0) >= displayMinElevation
+                    }
+                } else {
+                    // 필터링 비활성화 시에도 하드웨어 제한 각도는 유지
+                    val elevationMin = settingsService.angleElevationMin
+                    keyholeOptimizedFinalDtlAll.filter {
+                        (it["Elevation"] as? Double ?: 0.0) >= elevationMin
+                    }
+                }
+            } else {
+                emptyList()
+            }
+            
             // ✅ Keyhole Axis 데이터 조회 (필터링 없음 - 중간 단계 데이터)
             val keyholeAxisDtl = if (isKeyhole) {
                 try {
@@ -3595,6 +3740,8 @@ class EphemerisService(
             if (isKeyhole) {
                 logger.info("   - KeyholeFinal 전체: ${keyholeFinalDtlAll.size}개")
                 logger.info("   - KeyholeFinal 필터링 후: ${keyholeFinalDtl.size}개")
+                logger.info("   - KeyholeOptimizedFinal 전체: ${keyholeOptimizedFinalDtlAll.size}개")
+                logger.info("   - KeyholeOptimizedFinal 필터링 후: ${keyholeOptimizedFinalDtl.size}개")
             }
             
             if (originalDtl.isEmpty()) {
@@ -3617,6 +3764,13 @@ class EphemerisService(
             val originalMstInfo = allMst.find { 
                 it["No"] == mstId.toUInt() && it["DataType"] == "original"
             }
+            val keyholeOptimizedMstInfo = if (isKeyhole) {
+                allMst.find { 
+                    it["No"] == mstId.toUInt() && it["DataType"] == "keyhole_optimized_final_transformed"
+                }
+            } else {
+                null
+            }
             
             // ✅ finalTransformedMst에서 정보 가져오기 (없으면 original 사용)
             val mstInfo = finalTransformedMstInfo ?: originalMstInfo
@@ -3630,6 +3784,18 @@ class EphemerisService(
                 "0"
             } else {
                 String.format("%.6f", recommendedTrainAngle)
+            }
+            
+            // ✅ Keyhole Optimized Train 각도 가져오기 (방법 2)
+            val keyholeOptimizedRecommendedTrainAngle = if (isKeyhole) {
+                keyholeOptimizedMstInfo?.get("RecommendedTrainAngle") as? Double ?: 0.0
+            } else {
+                0.0
+            }
+            val keyholeOptimizedTrainAngleFormatted = if (keyholeOptimizedRecommendedTrainAngle == 0.0) {
+                "0"
+            } else {
+                String.format("%.6f", keyholeOptimizedRecommendedTrainAngle)
             }
             
             // ✅ 파일명 개선
@@ -3680,6 +3846,13 @@ class EphemerisService(
                 emptyList()
             }
             
+            // ✅ 필터링된 keyhole_optimized_final_transformed의 시간에 해당하는 데이터도 필터링
+            val filteredKeyholeOptimizedFinalTransformedTimes = if (isKeyhole) {
+                keyholeOptimizedFinalDtl.map { it["Time"] as? java.time.ZonedDateTime }.toSet()
+            } else {
+                emptySet()
+            }
+            
             logger.info("📊 필터링된 데이터 매칭:")
             logger.info("   - Original 필터링 후: ${filteredOriginalDtl.size}개")
             logger.info("   - AxisTransformed 필터링 후: ${filteredAxisTransformedDtl.size}개")
@@ -3694,7 +3867,8 @@ class EphemerisService(
                 filteredOriginalDtl.size,
                 filteredAxisTransformedDtl.size,
                 finalTransformedDtl.size,
-                if (isKeyhole) keyholeFinalDtl.size else 0
+                if (isKeyhole) keyholeFinalDtl.size else 0,
+                if (isKeyhole) keyholeOptimizedFinalDtl.size else 0
             )
             
             // ✅ 최대값 추적용 변수 (블록 밖에서 선언)
@@ -3708,6 +3882,8 @@ class EphemerisService(
             var maxKeyholeAxisElVelocity = 0.0
             var maxKeyholeFinalAzVelocity = 0.0
             var maxKeyholeFinalElVelocity = 0.0
+            var maxKeyholeOptimizedFinalAzVelocity = 0.0
+            var maxKeyholeOptimizedFinalElVelocity = 0.0
             
             java.io.FileWriter(filePath).use { writer ->
                 // ✅ 사용자 요구사항에 맞는 CSV 헤더: 각 변환 단계별 각속도 포함
@@ -3721,9 +3897,18 @@ class EphemerisService(
                 if (isKeyhole) {
                     writer.write("KeyholeAxisTransformed_train${trainAngleFormatted}_Azimuth,KeyholeAxisTransformed_train${trainAngleFormatted}_Elevation,KeyholeAxisTransformed_train${trainAngleFormatted}_Azimuth_Velocity,KeyholeAxisTransformed_train${trainAngleFormatted}_Elevation_Velocity,")
                     writer.write("KeyholeFinalTransformed_train${trainAngleFormatted}_Azimuth,KeyholeFinalTransformed_train${trainAngleFormatted}_Elevation,KeyholeFinalTransformed_train${trainAngleFormatted}_Azimuth_Velocity,KeyholeFinalTransformed_train${trainAngleFormatted}_Elevation_Velocity,")
+                    // ✅ 방법 2 (신규): Keyhole Optimized 컬럼 추가
+                    writer.write("KeyholeOptimizedFinalTransformed_train${keyholeOptimizedTrainAngleFormatted}_Azimuth,KeyholeOptimizedFinalTransformed_train${keyholeOptimizedTrainAngleFormatted}_Elevation,KeyholeOptimizedFinalTransformed_train${keyholeOptimizedTrainAngleFormatted}_Azimuth_Velocity,KeyholeOptimizedFinalTransformed_train${keyholeOptimizedTrainAngleFormatted}_Elevation_Velocity,")
                 }
                 
-                writer.write("Azimuth_Transformation_Error,Elevation_Transformation_Error\n")
+                writer.write("Azimuth_Transformation_Error,Elevation_Transformation_Error")
+                
+                // ✅ 비교 결과 컬럼 추가 (Keyhole 발생 시만)
+                if (isKeyhole) {
+                    writer.write(",OptimizationImprovement,OptimizationImprovementRate\n")
+                } else {
+                    writer.write("\n")
+                }
                 
                 // ✅ 필터링된 데이터 기준으로 CSV 데이터 생성
                 // 시간 기준으로 매칭하여 인덱스 불일치 방지
@@ -3766,6 +3951,13 @@ class EphemerisService(
                         null
                     }
                     
+                    // ✅ Keyhole Optimized 데이터 매칭 (Keyhole 발생 시만, 방법 2)
+                    val keyholeOptimizedFinalPoint = if (isKeyhole && finalTransformedTime != null) {
+                        keyholeOptimizedFinalDtl.find { it["Time"] == finalTransformedTime }
+                    } else {
+                        null
+                    }
+                    
                     val originalTime = originalPoint?.get("Time") as? java.time.ZonedDateTime
                     val originalAz = originalPoint?.get("Azimuth") as? Double ?: 0.0
                     val originalEl = originalPoint?.get("Elevation") as? Double ?: 0.0
@@ -3789,6 +3981,8 @@ class EphemerisService(
                     var keyholeAxisElevationVelocity = 0.0
                     var keyholeFinalAzimuthVelocity = 0.0
                     var keyholeFinalElevationVelocity = 0.0
+                    var keyholeOptimizedFinalAzimuthVelocity = 0.0
+                    var keyholeOptimizedFinalElevationVelocity = 0.0
                     
                     // Train=0 데이터 포인트 가져오기
                     val train0Point = if (i < train0Dtl.size) train0Dtl[i] else null
@@ -3805,6 +3999,8 @@ class EphemerisService(
                         var currentKeyholeAxisElSum = 0.0
                         var currentKeyholeFinalAzSum = 0.0
                         var currentKeyholeFinalElSum = 0.0
+                        var currentKeyholeOptimizedFinalAzSum = 0.0
+                        var currentKeyholeOptimizedFinalElSum = 0.0
                         
                         // 10개 구간의 변화량을 모두 더함 (j-1이 유효하도록)
                         // ✅ 필터링된 데이터 기준으로 계산
@@ -3879,6 +4075,21 @@ class EphemerisService(
                                     currentKeyholeFinalAzSum += kotlin.math.abs(azDiffKeyholeFinal)
                                     currentKeyholeFinalElSum += kotlin.math.abs(currentKeyholeFinalEl - prevKeyholeFinalEl)
                                 }
+                                
+                                // ✅ Keyhole Optimized Final (Keyhole 발생 시만, 방법 2)
+                                if (isKeyhole && j < keyholeOptimizedFinalDtl.size && (j - 1) < keyholeOptimizedFinalDtl.size) {
+                                    val prevKeyholeOptimizedFinalPoint = keyholeOptimizedFinalDtl[j - 1]
+                                    val currentKeyholeOptimizedFinalPoint = keyholeOptimizedFinalDtl[j]
+                                    val prevKeyholeOptimizedFinalAz = prevKeyholeOptimizedFinalPoint["Azimuth"] as Double
+                                    val currentKeyholeOptimizedFinalAz = currentKeyholeOptimizedFinalPoint["Azimuth"] as Double
+                                    val prevKeyholeOptimizedFinalEl = prevKeyholeOptimizedFinalPoint["Elevation"] as Double
+                                    val currentKeyholeOptimizedFinalEl = currentKeyholeOptimizedFinalPoint["Elevation"] as Double
+                                    var azDiffKeyholeOptimizedFinal = currentKeyholeOptimizedFinalAz - prevKeyholeOptimizedFinalAz
+                                    if (azDiffKeyholeOptimizedFinal > 180) azDiffKeyholeOptimizedFinal -= 360
+                                    if (azDiffKeyholeOptimizedFinal < -180) azDiffKeyholeOptimizedFinal += 360
+                                    currentKeyholeOptimizedFinalAzSum += kotlin.math.abs(azDiffKeyholeOptimizedFinal)
+                                    currentKeyholeOptimizedFinalElSum += kotlin.math.abs(currentKeyholeOptimizedFinalEl - prevKeyholeOptimizedFinalEl)
+                                }
                             }
                         }
                         
@@ -3892,6 +4103,8 @@ class EphemerisService(
                         keyholeAxisElevationVelocity = currentKeyholeAxisElSum
                         keyholeFinalAzimuthVelocity = currentKeyholeFinalAzSum
                         keyholeFinalElevationVelocity = currentKeyholeFinalElSum
+                        keyholeOptimizedFinalAzimuthVelocity = currentKeyholeOptimizedFinalAzSum
+                        keyholeOptimizedFinalElevationVelocity = currentKeyholeOptimizedFinalElSum
                         
                         // 최대값 업데이트
                         maxOriginalAzVelocity = maxOf(maxOriginalAzVelocity, originalAzimuthVelocity)
@@ -3904,6 +4117,8 @@ class EphemerisService(
                         maxKeyholeAxisElVelocity = maxOf(maxKeyholeAxisElVelocity, keyholeAxisElevationVelocity)
                         maxKeyholeFinalAzVelocity = maxOf(maxKeyholeFinalAzVelocity, keyholeFinalAzimuthVelocity)
                         maxKeyholeFinalElVelocity = maxOf(maxKeyholeFinalElVelocity, keyholeFinalElevationVelocity)
+                        maxKeyholeOptimizedFinalAzVelocity = maxOf(maxKeyholeOptimizedFinalAzVelocity, keyholeOptimizedFinalAzimuthVelocity)
+                        maxKeyholeOptimizedFinalElVelocity = maxOf(maxKeyholeOptimizedFinalElVelocity, keyholeOptimizedFinalElevationVelocity)
                     }
                     
                     val azimuthTransformationError = axisTransformedAz - originalAz
@@ -3935,9 +4150,27 @@ class EphemerisService(
                         val keyholeFinalAz = keyholeFinalPoint?.get("Azimuth") as? Double ?: 0.0
                         val keyholeFinalEl = keyholeFinalPoint?.get("Elevation") as? Double ?: 0.0
                             writer.write("${String.format("%.6f", keyholeFinalAz)},${String.format("%.6f", keyholeFinalEl)},${String.format("%.6f", keyholeFinalAzimuthVelocity)},${String.format("%.6f", keyholeFinalElevationVelocity)},")
+                        
+                        // ✅ 방법 2 (신규): Keyhole Optimized Final 데이터 (각도 제한 ✅) - 필터링된 데이터 사용
+                        val keyholeOptimizedFinalAz = keyholeOptimizedFinalPoint?.get("Azimuth") as? Double ?: 0.0
+                        val keyholeOptimizedFinalEl = keyholeOptimizedFinalPoint?.get("Elevation") as? Double ?: 0.0
+                            writer.write("${String.format("%.6f", keyholeOptimizedFinalAz)},${String.format("%.6f", keyholeOptimizedFinalEl)},${String.format("%.6f", keyholeOptimizedFinalAzimuthVelocity)},${String.format("%.6f", keyholeOptimizedFinalElevationVelocity)},")
                     }
                     
-                    writer.write("${String.format("%.6f", azimuthTransformationError)},${String.format("%.6f", elevationTransformationError)}\n")
+                    writer.write("${String.format("%.6f", azimuthTransformationError)},${String.format("%.6f", elevationTransformationError)}")
+                    
+                    // ✅ 비교 결과 출력 (Keyhole 발생 시만)
+                    if (isKeyhole) {
+                        val improvement = keyholeFinalAzimuthVelocity - keyholeOptimizedFinalAzimuthVelocity
+                        val improvementRate = if (keyholeFinalAzimuthVelocity > 0) {
+                            (improvement / keyholeFinalAzimuthVelocity) * 100.0
+                        } else {
+                            0.0
+                        }
+                        writer.write(",${String.format("%.6f", improvement)},${String.format("%.2f", improvementRate)}\n")
+                    } else {
+                        writer.write("\n")
+                    }
                     
                     // ✅ 다음 반복을 위한 값 저장
                     prevOriginalAzimuth = originalAz
@@ -3963,6 +4196,21 @@ class EphemerisService(
                 logger.info("  - KeyholeAxis_train${trainAngleFormatted}_Elevation_Velocity: ${String.format("%.6f", maxKeyholeAxisElVelocity)}°/s")
                 logger.info("  - KeyholeFinal_train${trainAngleFormatted}_Azimuth_Velocity: ${String.format("%.6f", maxKeyholeFinalAzVelocity)}°/s")
                 logger.info("  - KeyholeFinal_train${trainAngleFormatted}_Elevation_Velocity: ${String.format("%.6f", maxKeyholeFinalElVelocity)}°/s")
+                logger.info("  - KeyholeOptimizedFinal_train${keyholeOptimizedTrainAngleFormatted}_Azimuth_Velocity: ${String.format("%.6f", maxKeyholeOptimizedFinalAzVelocity)}°/s")
+                logger.info("  - KeyholeOptimizedFinal_train${keyholeOptimizedTrainAngleFormatted}_Elevation_Velocity: ${String.format("%.6f", maxKeyholeOptimizedFinalElVelocity)}°/s")
+                
+                // ✅ 비교 결과 로깅
+                val improvement = maxKeyholeFinalAzVelocity - maxKeyholeOptimizedFinalAzVelocity
+                val improvementRate = if (maxKeyholeFinalAzVelocity > 0) {
+                    (improvement / maxKeyholeFinalAzVelocity) * 100.0
+                } else {
+                    0.0
+                }
+                logger.info("📊 비교 결과 (최대값 기준):")
+                logger.info("  - 방법 1 (기존): ${String.format("%.6f", maxKeyholeFinalAzVelocity)}°/s")
+                logger.info("  - 방법 2 (신규): ${String.format("%.6f", maxKeyholeOptimizedFinalAzVelocity)}°/s")
+                logger.info("  - 개선량: ${String.format("%.6f", improvement)}°/s")
+                logger.info("  - 개선율: ${String.format("%.2f", improvementRate)}%")
             }
             return mapOf<String, Any?>(
                 "success" to true,

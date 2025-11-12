@@ -69,10 +69,10 @@ PassSchedulePage의 Position View 차트를 최적화하여 성능을 개선하�
    - 이전 경로가 제대로 초기화되지 않아 누적 표시
    - 스케줄 변경 시 경로 일치 확인 로직 부족
 
-3. **비효율적인 차트 업데이트**
+3. **비효율적인 차트 업데이트 및 타이머 불일치**
    - 매번 `setOption`으로 전체 경로를 다시 그리므로 성능 저하
    - ECharts의 `appendData` API 미사용으로 증분 업데이트 불가
-   - 타이머 100ms인데 스로틀링 200ms로 불일치
+   - **타이머 불일치**: 백엔드는 100ms 주기로 데이터 전송하지만, 프론트엔드는 200ms 주기로 업데이트하여 데이터 누적 문제 발생
 
 4. **메모리 누적 문제 재정의**
    - **정상 동작**: 스케줄 추적 중에는 실시간 추적 경로(`actualTrackingPath`)가 계속 누적되어야 함 (요구사항)
@@ -80,9 +80,11 @@ PassSchedulePage의 Position View 차트를 최적화하여 성능을 개선하�
    - **해결 방안**: `currentTrackingMstId` 변경 감지하여 스케줄 전환 시 이전 스케줄의 `actualTrackingPath`만 초기화
    - **메모리 보호**: 50,000개 포인트 초과 시 `cleanupOldPoints`로 오래된 포인트 정리 (이미 구현됨, 유지)
 
-5. **경로 데이터 변환**
-   - `convertToChartData`가 단순히 `Azimuth`, `Elevation`만 사용
-   - 백엔드가 이미 적절한 데이터를 반환하므로 추가 변환 불필요
+5. **경로 데이터 변환 및 시간 정렬 문제**
+   - `convertToChartData`가 단순히 `Azimuth`, `Elevation`만 사용하고 시간 정렬 없음
+   - 백엔드에서 ±270° 범위로 제한된 값을 전달하지만, 프론트엔드에서 단순히 +360을 하여 경로가 왜곡됨
+   - 시간 순서 정렬 누락으로 경로가 왔다갔다 하는 문제 발생
+   - 백엔드가 이미 회전 방향성을 보장했으므로, 프론트엔드에서 연속성을 유지하면서 0~360°로 변환 필요
 
 ---
 
@@ -149,13 +151,16 @@ PassSchedulePage의 Position View 차트를 최적화하여 성능을 개선하�
 3. **차트 업데이트 시 이전 경로 명시적 초기화**
    - `setOption` 호출 시 모든 시리즈를 명시적으로 초기화하여 이전 경로 제거
 
-### Phase 3: 프론트엔드 데이터 변환 개선
+### Phase 3: 프론트엔드 데이터 변환 개선 (우선순위: 높음)
 
 **파일**: `ACS/src/services/mode/passScheduleService.ts`
 
 1. **convertToChartData 함수 개선**
-   - 백엔드가 이미 적절한 DataType의 데이터를 반환하므로, 단순히 `Azimuth`, `Elevation` 사용
-   - keyhole 여부는 스케줄 정보에서 확인하여 경로 정보에 저장
+   - ✅ 시간 순서 정렬 추가: `Time` 필드 기준으로 정렬하여 경로 순서 보장
+   - ✅ 연속성 유지 변환: 백엔드가 이미 ±270° 범위로 제한했으므로, 이전 값과의 차이(delta)를 계산하여 연속성을 유지하면서 0~360°로 변환
+   - ✅ 첫 번째 포인트: 음수면 +360, 양수면 그대로
+   - ✅ 이후 포인트: 이전 변환된 값에 delta를 더하여 연속성 유지
+   - ✅ 샘플링 시 마지막 포인트 항상 포함
 
 ### Phase 4: 차트 업데이트 최적화
 
@@ -166,9 +171,10 @@ PassSchedulePage의 Position View 차트를 최적화하여 성능을 개선하�
    - 예정 위성 궤적은 스케줄 변경 시에만 전체 업데이트
    - 현재 위치는 기존 방식 유지 (단일 포인트)
 
-2. **타이머 및 스로틀링 일치**
-   - 타이머를 200ms로 변경하거나 스로틀링을 100ms로 변경하여 일치
-   - 또는 `requestAnimationFrame` 사용 고려
+2. **타이머 및 스로틀링 일치 (우선순위: 높음)**
+   - ✅ 타이머를 100ms로 변경하여 백엔드 모니터링 주기(100ms)와 일치
+   - ✅ `updateThrottle`을 100ms로 변경
+   - 백엔드가 100ms마다 데이터를 전송하므로 프론트엔드도 100ms마다 업데이트하여 데이터 누적 방지
 
 3. **차트 업데이트 진행도 표시**
    - 차트 업데이트 중 로딩 인디케이터 표시
@@ -261,58 +267,109 @@ series: [
 ]
 ```
 
-#### PassChartUpdatePool 구조 수정
+#### convertToChartData 함수 개선 (시간 정렬 및 연속성 유지)
 
 ```typescript
-class PassChartUpdatePool {
-  private positionData: [number, number][] = [[0, 0]]
-  private trackingData: [number, number][] = []
-  private predictedData: [number, number][] = []
-  private updateOption: {
-    series: Array<{ data?: [number, number][] }>
-  }
+convertToChartData(trackingPoints: TrackingDetailItem[]): [number, number][] {
+  try {
+    if (!Array.isArray(trackingPoints) || trackingPoints.length === 0) {
+      console.warn('⚠️ 변환할 추적 포인트가 없음')
+      return []
+    }
 
-  constructor() {
-    this.updateOption = {
-      series: [
-        { data: this.positionData },      // 시리즈 0: 현재 위치 (scatter)
-        { data: this.trackingData },      // 시리즈 1: 실시간 추적 경로 (line) - 흰색
-        { data: this.predictedData },     // 시리즈 2: 예정 위성 궤적 (line) - 파란색
-      ],
-    }
-  }
+    // ✅ 1. 시간 순서대로 정렬 (Time 필드 기준)
+    const sortedPoints = [...trackingPoints].sort((a, b) => {
+      const timeA = new Date(a.Time || 0).getTime()
+      const timeB = new Date(b.Time || 0).getTime()
+      return timeA - timeB
+    })
 
-  updatePosition(elevation: number, azimuth: number) {
-    // ... 기존 로직 ...
-    return this.updateOption
-  }
+    // ✅ 2. 백엔드가 이미 ±270° 범위로 제한했으므로, 연속성을 유지하면서 0~360°로 변환
+    let previousAzimuth: number | null = null
+    const chartData: [number, number][] = sortedPoints
+      .filter((point) => {
+        // 유효한 데이터만 필터링
+        return (
+          point.Azimuth !== null &&
+          point.Azimuth !== undefined &&
+          point.Elevation !== null &&
+          point.Elevation !== undefined &&
+          !isNaN(Number(point.Azimuth)) &&
+          !isNaN(Number(point.Elevation))
+        )
+      })
+      .map((point) => {
+        const elevation = Math.max(0, Math.min(90, Number(point.Elevation)))
+        let azimuth = Number(point.Azimuth) // 백엔드에서 이미 ±270° 범위로 제한됨
+        
+        // ✅ 백엔드가 이미 회전 방향성을 보장했으므로, 연속성을 유지하면서 0~360°로 변환
+        if (previousAzimuth !== null) {
+          // 이전 값과의 차이 계산 (360°/0° 경계 고려)
+          let delta = azimuth - previousAzimuth
+          
+          // 180도 이상 차이나면 반대 방향으로 보정
+          if (delta > 180) {
+            delta -= 360
+          } else if (delta < -180) {
+            delta += 360
+          }
+          
+          // 이전 변환된 값에 delta를 더함 (연속성 유지)
+          const previousConverted = chartData[chartData.length - 1][1]
+          azimuth = previousConverted + delta
+          
+          // 0~360° 범위로 정규화
+          while (azimuth < 0) azimuth += 360
+          while (azimuth >= 360) azimuth -= 360
+        } else {
+          // 첫 번째 포인트: 음수면 +360, 양수면 그대로
+          if (azimuth < 0) {
+            azimuth = azimuth + 360
+          }
+        }
+        
+        previousAzimuth = Number(point.Azimuth) // 원본 값 저장 (다음 포인트와 비교용)
+        
+        return [elevation, azimuth] as [number, number]
+      })
 
-  updateTrackingPath(newPath: [number, number][]) {
-    // ✅ 안전한 배열 업데이트 - 이전 데이터 완전 제거
-    this.trackingData.length = 0
-    if (Array.isArray(newPath) && newPath.length > 0) {
-      this.trackingData.push(...newPath)
-    }
-    // ✅ 시리즈 데이터 참조 업데이트 (series[1]에 설정)
-    if (this.updateOption.series[1]) {
-      this.updateOption.series[1].data = this.trackingData
-    }
-    return this.updateOption
-  }
+    console.log(`✅ 차트 데이터 변환 완료: ${chartData.length}개 포인트 (시간 순 정렬, 연속성 유지)`)
 
-  updatePredictedPath(newPath: [number, number][]) {
-    // ✅ 안전한 배열 업데이트 - 이전 데이터 완전 제거
-    this.predictedData.length = 0
-    if (Array.isArray(newPath) && newPath.length > 0) {
-      this.predictedData.push(...newPath)
+    // ✅ 3. 샘플링 (정렬된 데이터에서 샘플링)
+    if (chartData.length > 200) {
+      const step = Math.ceil(chartData.length / 200)
+      const sampledData = chartData.filter((_, index) => index % step === 0)
+      // ✅ 마지막 포인트는 항상 포함
+      if (sampledData.length > 0 && 
+          sampledData[sampledData.length - 1] !== chartData[chartData.length - 1]) {
+        sampledData.push(chartData[chartData.length - 1])
+      }
+      console.log(`📊 데이터 샘플링: ${chartData.length} → ${sampledData.length}개 포인트`)
+      return sampledData
     }
-    // ✅ 시리즈 데이터 참조 업데이트 (series[2]에 설정)
-    if (this.updateOption.series[2]) {
-      this.updateOption.series[2].data = this.predictedData
-    }
-    return this.updateOption
+
+    return chartData
+  } catch (error) {
+    console.error('❌ 차트 데이터 변환 실패:', error)
+    return []
   }
 }
+```
+
+#### 타이머 및 스로틀링 일치
+
+```typescript
+// ✅ 타이머를 100ms로 변경하여 백엔드 모니터링 주기(100ms)와 일치
+const updateThrottle = 100 // 200ms → 100ms로 변경
+
+// 타이머도 100ms로 변경
+updateTimer = window.setInterval(() => {
+  try {
+    updateChart()
+  } catch (timerError) {
+    console.error('차트 업데이트 타이머 오류:', timerError)
+  }
+}, 100) // 200 → 100으로 변경
 ```
 
 ### Phase 2: 경로 일치 확인 로직 추가 및 Index/No 혼용 문제 해결
@@ -458,14 +515,21 @@ watch(() => icdStore.currentTrackingMstId, (newMstId, oldMstId) => {
 8. 스케줄 변경 시 이전 경로가 제거되고 새 경로만 표시되는지 확인
 9. 차트에 하나의 경로만 표시되는지 확인 (중복 경로 없음)
 
-### Phase 3-6 테스트 (기존 계획)
-7. keyhole 위성 스케줄 선택 시 keyhole 경로 표시 확인
-8. 일반 위성 스케줄 선택 시 3축 최종 변환 경로 표시 확인
-9. **스케줄 추적 중 실시간 경로가 계속 누적되어 표시되는지 확인** (요구사항)
-10. **스케줄 전환 시 이전 스케줄의 경로가 초기화되고 새 스케줄의 경로만 표시되는지 확인**
-11. 실시간 추적 경로가 증분 업데이트되는지 확인 (appendData 활용)
-12. **메모리 보호**: 50,000개 포인트 초과 시 오래된 포인트가 자동으로 정리되는지 확인
-13. 차트 업데이트 성능 개선 확인 (appendData vs setOption 비교)
+### Phase 3 테스트 (데이터 변환 및 타이머 개선)
+10. **시간 순서 정렬**: 경로가 시간 순서대로 그려지는지 확인
+11. **연속성 유지**: 백엔드 ±270° 범위 값이 연속성을 유지하면서 0~360°로 변환되는지 확인
+12. **경로 왜곡 해결**: 경로가 왔다갔다 하지 않고 한 선으로 그려지는지 확인
+13. **타이머 일치**: 백엔드 100ms 주기와 프론트엔드 100ms 업데이트가 일치하는지 확인
+14. **데이터 누적 방지**: 100ms마다 업데이트하여 데이터가 누적되지 않는지 확인
+
+### Phase 4-6 테스트 (기존 계획)
+15. keyhole 위성 스케줄 선택 시 keyhole 경로 표시 확인
+16. 일반 위성 스케줄 선택 시 3축 최종 변환 경로 표시 확인
+17. **스케줄 추적 중 실시간 경로가 계속 누적되어 표시되는지 확인** (요구사항)
+18. **스케줄 전환 시 이전 스케줄의 경로가 초기화되고 새 스케줄의 경로만 표시되는지 확인**
+19. 실시간 추적 경로가 증분 업데이트되는지 확인 (appendData 활용)
+20. **메모리 보호**: 50,000개 포인트 초과 시 오래된 포인트가 자동으로 정리되는지 확인
+21. 차트 업데이트 성능 개선 확인 (appendData vs setOption 비교)
 
 ---
 
@@ -484,5 +548,10 @@ watch(() => icdStore.currentTrackingMstId, (newMstId, oldMstId) => {
 - **메모리 관리**: 스케줄 추적 중에는 경로를 계속 누적하되, 스케줄 전환 시에만 이전 경로 초기화
 - **자동 스케줄 전환**: 백엔드 상태 머신이 자동으로 처리하므로 프론트엔드에서는 `currentTrackingMstId` 변경 감지만 필요
 - **백엔드 데이터**: 백엔드가 이미 keyhole 여부에 따라 적절한 DataType의 데이터를 반환하므로 추가 변환 불필요
+- **백엔드 ±270° 제한**: 백엔드 `LimitAngleCalculator`가 0~360° 범위를 ±270° 범위로 제한하여 포지셔너 물리적 제한 준수
+  - 회전 방향성을 보장하면서 ±270° 범위로 변환
+  - 프론트엔드 ECharts는 0~360° 범위만 지원하므로 연속성을 유지하면서 변환 필요
+- **타이머 일치**: 백엔드 모니터링 주기(100ms)와 프론트엔드 업데이트 주기(100ms)를 일치시켜 데이터 누적 방지
+- **시간 정렬**: 백엔드에서 시간 순서 정렬 없이 전달할 수 있으므로 프론트엔드에서 `Time` 필드 기준 정렬 필요
 - **차트 성능**: ECharts의 `appendData` API 활용으로 증분 업데이트 구현
 

@@ -2042,6 +2042,52 @@ class PassScheduleService(
         return filteredDtl
     }
 
+    /**
+     * ✅ API용: 특정 위성의 특정 패스에 대한 DTL 데이터 조회
+     * 프론트엔드에서 DataType을 명시적으로 지정할 수 있음
+     * 
+     * @param satelliteId 위성 ID
+     * @param passId 패스 ID (MST ID)
+     * @param dataType DataType (optional) - null이면 기존 로직 사용 (하위 호환성)
+     * @return 필터링된 DTL 데이터 리스트
+     */
+    fun getPassScheduleTrackDtlByMstId(
+        satelliteId: String,
+        passId: UInt,
+        dataType: String? = null  // ✅ DataType 파라미터 추가
+    ): List<Map<String, Any?>> {
+        // 1. DTL 데이터 조회
+        val allDtlData = passScheduleTrackDtlStorage[satelliteId] ?: return emptyList()
+        
+        // 2. DataType 결정
+        val targetDataType = if (dataType != null) {
+            // ✅ 프론트엔드에서 명시적으로 DataType을 전달한 경우
+            dataType
+        } else {
+            // ✅ 기존 로직: determineKeyholeDataType() 사용 (하위 호환성)
+            // selectedTrackMstStorage에서 먼저 확인
+            val selectedMst = selectedTrackMstStorage.values.flatten().find {
+                it["No"] == passId
+            }
+            
+            if (selectedMst != null) {
+                determineKeyholeDataType(passId, selectedTrackMstStorage) ?: return emptyList()
+            } else {
+                // selectedTrackMstStorage에 없으면 전체 저장소에서 확인
+                determineKeyholeDataType(passId, passScheduleTrackMstStorage) ?: return emptyList()
+            }
+        }
+        
+        // 3. 선택된 DataType의 DTL 데이터 필터링
+        val filteredDtl = allDtlData.filter {
+            it["MstId"] == passId && it["DataType"] == targetDataType
+        }
+        
+        logger.info("📊 위성 $satelliteId 패스 $passId DTL 조회: DataType=${targetDataType}, ${filteredDtl.size}개 포인트")
+        
+        return filteredDtl
+    }
+
     fun getSelectedTrackingSchedule(): List<Map<String, Any?>> {
         val allSelectedPasses = mutableListOf<Map<String, Any?>>()
 

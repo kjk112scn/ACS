@@ -80,8 +80,14 @@ class SatelliteTrackingProcessor(
         val keyholeAxisTransformedDtl = mutableListOf<Map<String, Any?>>()
         val keyholeFinalTransformedMst = mutableListOf<Map<String, Any?>>()
         val keyholeFinalTransformedDtl = mutableListOf<Map<String, Any?>>()
+        
+        // ✅ Keyhole 최적화 데이터 (방법 2: 하이브리드 3단계 그리드 서치)
+        val keyholeOptimizedAxisTransformedMst = mutableListOf<Map<String, Any?>>()
+        val keyholeOptimizedAxisTransformedDtl = mutableListOf<Map<String, Any?>>()
+        val keyholeOptimizedFinalTransformedMst = mutableListOf<Map<String, Any?>>()
+        val keyholeOptimizedFinalTransformedDtl = mutableListOf<Map<String, Any?>>()
 
-        finalTransformedMst.forEachIndexed { index, mstData ->
+        finalTransformedMst.forEachIndexed { _, mstData ->
             val mstId = mstData["No"] as UInt
 
             /**
@@ -135,7 +141,14 @@ class SatelliteTrackingProcessor(
                  * @return keyholeOriginalMst Train≠0으로 업데이트된 Original MST
                  */
                 // Original MST를 Train≠0으로 업데이트
-                val keyholeOriginalMst = listOf(originalMst[index].toMutableMap().apply {
+                // ✅ mstId로 originalMst에서 찾기 (index 대신 사용하여 데이터 불일치 방지)
+                val originalMstData = originalMst.find { it["No"] == mstId }
+                if (originalMstData == null) {
+                    logger.error("❌ Original MST를 찾을 수 없습니다: mstId=$mstId (방법 1)")
+                    return@forEachIndexed  // 이 패스는 건너뛰기
+                }
+                
+                val keyholeOriginalMst = listOf(originalMstData.toMutableMap().apply {
                     put("RecommendedTrainAngle", recommendedTrainAngle)  // ✅ finalTransformedMst의 값 사용
                     put("IsKeyhole", true)
                 })
@@ -182,6 +195,126 @@ class SatelliteTrackingProcessor(
                 }
 
                 logger.info("✅ Keyhole 데이터 저장 완료: Axis=${keyholeAxisDtl.size}개, Final=${keyholeFinalDtl.size}개")
+                
+                // ============================================================
+                // 🔄 방법 1 (기존): final_transformed의 RecommendedTrainAngle 사용
+                // ============================================================
+                val method1RecommendedTrainAngle = recommendedTrainAngle
+                val method1MaxAzRate = keyholeFinalMst.firstOrNull()?.get("MaxAzRate") as? Double ?: 0.0
+                
+                logger.info("📊 방법 1 (기존): RecommendedTrainAngle=${String.format("%.6f", method1RecommendedTrainAngle)}°")
+                logger.info("   방법 1 결과: MaxAzRate=${String.format("%.6f", method1MaxAzRate)}°/s")
+                
+                // ============================================================
+                // 🔄 방법 2 (신규): 하이브리드 3단계 그리드 서치 알고리즘
+                // ============================================================
+                val threshold = settingsService.keyholeAzimuthVelocityThreshold
+                val (optimalTrainAngle, optimalMaxAzRate) = findOptimalTrainAngle(
+                    passOriginalDtl,
+                    mstData,
+                    threshold
+                )
+                
+                logger.info("📊 방법 2 (신규): 최적 Train=${String.format("%.6f", optimalTrainAngle)}°")
+                logger.info("   방법 2 결과: MaxAzRate=${String.format("%.6f", optimalMaxAzRate)}°/s")
+                
+                // 방법 2: Keyhole Optimized 데이터 생성
+                // ✅ mstId로 originalMst에서 찾기 (index 대신 사용하여 데이터 불일치 방지)
+                val originalMstDataForOptimized = originalMst.find { it["No"] == mstId }
+                if (originalMstDataForOptimized == null) {
+                    logger.error("❌ Original MST를 찾을 수 없습니다: mstId=$mstId (방법 2)")
+                    return@forEachIndexed  // 이 패스는 건너뛰기
+                }
+                
+                val keyholeOptimizedOriginalMst = listOf(originalMstDataForOptimized.toMutableMap().apply {
+                    put("RecommendedTrainAngle", optimalTrainAngle)
+                    put("IsKeyhole", true)
+                })
+                
+                val (keyholeOptimizedAxisMst, keyholeOptimizedAxisDtl) = applyAxisTransformation(
+                    keyholeOptimizedOriginalMst,
+                    passOriginalDtl
+                )
+                logger.info("   📊 Keyhole Optimized Axis 변환 완료: MST=${keyholeOptimizedAxisMst.size}개, DTL=${keyholeOptimizedAxisDtl.size}개")
+                
+                // ✅ Keyhole Optimized Axis 데이터 저장
+                keyholeOptimizedAxisDtl.forEach { dtl ->
+                    keyholeOptimizedAxisTransformedDtl.add(dtl.toMutableMap().apply {
+                        put("DataType", "keyhole_optimized_axis_transformed")
+                    })
+                }
+                
+                // ✅ keyholeOptimizedAxisMst에 최적화된 Train 각도를 본인의 정보로 명시적으로 설정
+                // applyAxisTransformation에서 재계산되면 0.0이 될 수 있으므로, optimalTrainAngle을 보존
+                val keyholeOptimizedAxisMstWithTrainAngle = keyholeOptimizedAxisMst.map { mst ->
+                    mst.toMutableMap().apply {
+                        put("RecommendedTrainAngle", optimalTrainAngle)
+                    }
+                }
+                
+                keyholeOptimizedAxisMstWithTrainAngle.forEach { mst ->
+                    keyholeOptimizedAxisTransformedMst.add(mst.toMutableMap().apply {
+                        put("DataType", "keyhole_optimized_axis_transformed")
+                    })
+                }
+                
+                // ✅ keyholeOptimizedAxisMstWithTrainAngle는 이미 findOptimalTrainAngle()로 계산한 optimalTrainAngle을 본인의 정보로 가지고 있음
+                // 이 값은 다른 DataType을 참고해서 계산한 결과이므로, 이를 보존해야 함
+                val (keyholeOptimizedFinalMst, keyholeOptimizedFinalDtl) = applyAngleLimitTransformation(
+                    keyholeOptimizedAxisMstWithTrainAngle,  // ✅ 이미 계산된 optimalTrainAngle을 본인의 정보로 가지고 있음
+                    keyholeOptimizedAxisDtl,
+                    preserveRecommendedTrainAngle = true,  // ✅ 최적화 로직: 이미 계산된 결과를 본인의 정보로 보존
+                    targetDataType = "keyhole_optimized_final_transformed"  // ✅ 최적화 로직: DataType 명시
+                )
+                logger.info("   📊 Keyhole Optimized Final 변환 완료: MST=${keyholeOptimizedFinalMst.size}개, DTL=${keyholeOptimizedFinalDtl.size}개")
+                
+                // ✅ Keyhole Optimized Final 데이터 저장
+                keyholeOptimizedFinalDtl.forEach { dtl ->
+                    keyholeOptimizedFinalTransformedDtl.add(dtl.toMutableMap().apply {
+                        put("DataType", "keyhole_optimized_final_transformed")
+                    })
+                }
+                
+                keyholeOptimizedFinalMst.forEach { mst ->
+                    // 🔍 디버깅: 저장 직전 값 확인
+                    val mstId = mst["No"] as? UInt
+                    logger.info("🔍 [저장 직전] MST #$mstId - applyAngleLimitTransformation 반환값:")
+                    logger.info("   RecommendedTrainAngle: ${mst["RecommendedTrainAngle"]}")
+                    logger.info("   MaxAzRate: ${mst["MaxAzRate"]}")
+                    logger.info("   optimalTrainAngle: $optimalTrainAngle")
+                    logger.info("   optimalMaxAzRate: $optimalMaxAzRate")
+                    
+                    keyholeOptimizedFinalTransformedMst.add(mst.toMutableMap().apply {
+                        put("DataType", "keyhole_optimized_final_transformed")
+                        // ✅ 이미 계산된 결과를 본인의 정보로 명시적으로 설정
+                        // optimalTrainAngle은 findOptimalTrainAngle()로 계산한 결과이므로, 이를 본인의 정보로 저장
+                        put("RecommendedTrainAngle", optimalTrainAngle)  // ✅ 계산된 결과를 본인의 정보로 저장
+                        put("MaxAzRate", optimalMaxAzRate)  // ✅ 계산된 결과를 본인의 정보로 저장
+                        
+                        // 🔍 디버깅: 저장 직후 값 확인
+                        logger.info("🔍 [저장 직후] MST #$mstId - 저장된 값:")
+                        logger.info("   RecommendedTrainAngle: ${get("RecommendedTrainAngle")}")
+                        logger.info("   MaxAzRate: ${get("MaxAzRate")}")
+                        logger.info("   DataType: ${get("DataType")}")
+                    })
+                }
+                
+                // ============================================================
+                // 📊 비교 결과 로깅
+                // ============================================================
+                val improvement = method1MaxAzRate - optimalMaxAzRate
+                val improvementRate = if (method1MaxAzRate > 0) {
+                    (improvement / method1MaxAzRate) * 100.0
+                } else {
+                    0.0
+                }
+                
+                logger.info("📊 비교 결과:")
+                logger.info("   방법 1 (기존): MaxAzRate=${String.format("%.6f", method1MaxAzRate)}°/s")
+                logger.info("   방법 2 (신규): MaxAzRate=${String.format("%.6f", optimalMaxAzRate)}°/s")
+                logger.info("   개선량: ${String.format("%.6f", improvement)}°/s")
+                logger.info("   개선율: ${String.format("%.2f", improvementRate)}%")
+                logger.info("✅ Keyhole Optimized 데이터 저장 완료: Axis=${keyholeOptimizedAxisDtl.size}개, Final=${keyholeOptimizedFinalDtl.size}개")
             }
 
             logger.info("")
@@ -194,6 +327,8 @@ class SatelliteTrackingProcessor(
         logger.info("   Final Transformed (Train=0): ${finalTransformedDtl.size}개")
         logger.info("   Keyhole Axis (Train≠0): ${keyholeAxisTransformedDtl.size}개")
         logger.info("   Keyhole Final (Train≠0): ${keyholeFinalTransformedDtl.size}개")
+        logger.info("   Keyhole Optimized Axis (Train≠0 최적화): ${keyholeOptimizedAxisTransformedDtl.size}개")
+        logger.info("   Keyhole Optimized Final (Train≠0 최적화): ${keyholeOptimizedFinalTransformedDtl.size}개")
         logger.info("=".repeat(60))
 
         return ProcessedTrackingData(
@@ -206,7 +341,11 @@ class SatelliteTrackingProcessor(
             keyholeAxisTransformedMst = keyholeAxisTransformedMst,           // ✅ 추가
             keyholeAxisTransformedDtl = keyholeAxisTransformedDtl,           // ✅ 추가
             keyholeFinalTransformedMst = keyholeFinalTransformedMst,
-            keyholeFinalTransformedDtl = keyholeFinalTransformedDtl
+            keyholeFinalTransformedDtl = keyholeFinalTransformedDtl,
+            keyholeOptimizedAxisTransformedMst = keyholeOptimizedAxisTransformedMst,  // ✅ 추가: 방법 2 (최적화)
+            keyholeOptimizedAxisTransformedDtl = keyholeOptimizedAxisTransformedDtl,  // ✅ 추가: 방법 2 (최적화)
+            keyholeOptimizedFinalTransformedMst = keyholeOptimizedFinalTransformedMst,  // ✅ 추가: 방법 2 (최적화)
+            keyholeOptimizedFinalTransformedDtl = keyholeOptimizedFinalTransformedDtl   // ✅ 추가: 방법 2 (최적화)
         )
     }
 
@@ -360,7 +499,12 @@ class SatelliteTrackingProcessor(
         val axisTransformedDtl = mutableListOf<Map<String, Any?>>()
 
         originalMst.forEach { mstData ->
-            val mstId = mstData["No"] as UInt
+            // ✅ null 안전성 체크 추가
+            val mstId = mstData["No"] as? UInt
+            if (mstId == null) {
+                logger.error("❌ MST 데이터에 No 필드가 없거나 null입니다: $mstData")
+                return@forEach  // 이 MST는 건너뛰기
+            }
             
             /**
              * 3축 변환용 Train 각도 (trainAngleForTransformation)
@@ -477,17 +621,32 @@ class SatelliteTrackingProcessor(
      *
      * ✅ MstId 기반 연결 유지
      * ✅ 변환 후 메타데이터 재계산
+     * ✅ 각 DataType은 독립적으로 관리되며, 다른 DataType을 참고해서 계산한 결과를 본인의 정보로 저장합니다.
+     * 
+     * @param axisTransformedMst 축 변환된 MST 데이터
+     * @param axisTransformedDtl 축 변환된 DTL 데이터
+     * @param preserveRecommendedTrainAngle RecommendedTrainAngle을 보존할지 여부
+     *   - true: 입력 MST의 RecommendedTrainAngle을 보존 (이미 계산된 결과를 본인의 정보로 유지)
+     *   - false: 본인 기준으로 RecommendedTrainAngle을 계산 (다른 DataType을 참고해서 계산한 결과)
+     * @param targetDataType 변환 후 DataType (기본값: "final_transformed")
      */
     private fun applyAngleLimitTransformation(
         axisTransformedMst: List<Map<String, Any?>>,
-        axisTransformedDtl: List<Map<String, Any?>>
+        axisTransformedDtl: List<Map<String, Any?>>,
+        preserveRecommendedTrainAngle: Boolean = false,
+        targetDataType: String = "final_transformed"
     ): Pair<List<Map<String, Any?>>, List<Map<String, Any?>>> {
 
         val finalTransformedMst = mutableListOf<Map<String, Any?>>()
         val finalTransformedDtl = mutableListOf<Map<String, Any?>>()
 
         axisTransformedMst.forEach { mstData ->
-            val mstId = mstData["No"] as UInt
+            // ✅ null 안전성 체크 추가
+            val mstId = mstData["No"] as? UInt
+            if (mstId == null) {
+                logger.error("❌ MST 데이터에 No 필드가 없거나 null입니다: $mstData")
+                return@forEach  // 이 MST는 건너뛰기
+            }
 
             logger.debug("패스 #$mstId 각도제한 변환 중")
 
@@ -500,11 +659,11 @@ class SatelliteTrackingProcessor(
                 passDtl
             )
 
-            // DataType을 final_transformed로 변경
+            // DataType을 targetDataType로 변경
             convertedDtl.forEach { dtl ->
                 finalTransformedDtl.add(
                     dtl.toMutableMap().apply {
-                        put("DataType", "final_transformed")
+                        put("DataType", targetDataType)
                     }
                 )
             }
@@ -521,24 +680,28 @@ class SatelliteTrackingProcessor(
             /**
              * RecommendedTrainAngle 계산 (MST 저장용)
              * 
-             * 각 MST는 본인 기준에서 Keyhole 판단 및 RecommendedTrainAngle을 계산해야 함.
-             * FinalTransformed MST는 ±270도 제한 적용 후 데이터(3축, Train=0, ±270도 제한 있음)로 계산함.
+             * ✅ preserveRecommendedTrainAngle이 true인 경우: 이미 계산된 결과를 본인의 정보로 보존
+             * 이는 keyhole_optimized_* DataType의 경우 이미 최적화된 Train 각도를 사용했으므로,
+             * 다른 DataType의 계산 로직에 의해 덮어쓰지 않고 본인의 정보를 유지해야 하기 때문입니다.
              * 
-             * 계산 방식:
-             * 1. ±270도 제한 적용 후 DTL 데이터로 calculateMetrics() 호출하여 MaxAzRateAzimuth 획득
-             * 2. calculateTrainAngle()을 직접 호출하여 안테나 서쪽(+7°) 방향을 위성 Azimuth로 회전시키는 Train 각도 계산
+             * ✅ preserveRecommendedTrainAngle이 false인 경우: 본인의 데이터를 참고해서 계산한 결과를 본인의 정보로 저장
              * 
-             * 중요: 이 값은 본인 기준으로 계산된 값임. AxisTransformed MST의 값과는 별개임.
-             * - FinalTransformed MST는 ±270도 제한이 적용된 상태에서 계산하므로 다른 값이 될 수 있음.
-             * 
+             * @param preserveRecommendedTrainAngle RecommendedTrainAngle 보존 여부
              * @param isKeyhole Keyhole 발생 여부
              * @param metrics calculateMetrics()로 계산된 메타데이터 (MaxAzRateAzimuth 포함)
-             * @return RecommendedTrainAngle (Keyhole이면 계산된 Train 각도, 아니면 0.0)
+             * @return RecommendedTrainAngle (보존 또는 계산된 값)
              */
-            val recommendedTrainAngle = if (isKeyhole) {
-                // 이미 calculateMetrics()로 MaxAzRateAzimuth를 계산했으므로, 이를 사용하여 Train 각도 계산
+            val recommendedTrainAngle = if (preserveRecommendedTrainAngle) {
+                // ✅ 최적화 로직: 이미 계산된 결과를 본인의 정보로 보존 (다른 DataType을 참고해서 계산한 결과)
+                val preservedAngle = mstData["RecommendedTrainAngle"] as? Double ?: 0.0
+                logger.debug("✅ RecommendedTrainAngle 보존: $preservedAngle° (MST #$mstId, 최적화 로직)")
+                preservedAngle
+            } else if (isKeyhole) {
+                // ✅ 기존 로직: 본인의 데이터를 참고해서 계산한 결과를 본인의 정보로 저장
                 val maxAzRateAzimuth = metrics["MaxAzRateAzimuth"] as? Double ?: 0.0
-                calculateTrainAngle(maxAzRateAzimuth)  // ✅ 본인 기준으로 계산
+                val calculatedAngle = calculateTrainAngle(maxAzRateAzimuth)  // ✅ 본인의 데이터로 계산
+                logger.debug("✅ RecommendedTrainAngle 계산: $calculatedAngle° (MST #$mstId, 본인의 데이터로 계산한 결과)")
+                calculatedAngle
             } else {
                 0.0
             }
@@ -565,10 +728,10 @@ class SatelliteTrackingProcessor(
                     "MaxAzAccel" to metrics["MaxAzAccel"],
                     "MaxElAccel" to metrics["MaxElAccel"],
                     "IsKeyhole" to isKeyhole,
-                    "RecommendedTrainAngle" to recommendedTrainAngle,  // ✅ 본인 기준에서 계산된 값
+                    "RecommendedTrainAngle" to recommendedTrainAngle,  // ✅ 본인의 정보 (보존 또는 계산)
                     "CreationDate" to mstData["CreationDate"],
                     "Creator" to mstData["Creator"],
-                    "DataType" to "final_transformed"
+                    "DataType" to targetDataType
                 )
             )
         }
@@ -776,6 +939,177 @@ class SatelliteTrackingProcessor(
             "MaxAzAccel" to maxAzAccel,
             "MaxElAccel" to maxElAccel
         )
+    }
+
+    /**
+     * 특정 Train 각도에 대한 MaxAzRate 계산 (헬퍼 함수)
+     * 
+     * 주어진 Train 각도를 적용하여 3축 변환 및 각도 제한을 수행한 후,
+     * 최대 Azimuth 각속도를 계산합니다.
+     * 
+     * 이 함수는 하이브리드 3단계 그리드 서치 알고리즘에서
+     * 각 Train 각도 후보에 대한 MaxAzRate를 계산하기 위해 사용됩니다.
+     * 
+     * @param originalDtl Original DTL 데이터 (2축 원본 데이터)
+     * @param trainAngle 적용할 Train 각도 (°)
+     * @return 계산된 MaxAzRate (°/s)
+     * 
+     * @see findOptimalTrainAngle 하이브리드 3단계 그리드 서치 알고리즘
+     * @see CoordinateTransformer.transformCoordinatesWithTrain 3축 좌표 변환
+     * @see LimitAngleCalculator.convertTrackingData 각도 제한 (±270°)
+     * @see calculateMetrics 메타데이터 계산
+     */
+    private fun calculateMaxAzRateForTrainAngle(
+        originalDtl: List<Map<String, Any?>>,
+        trainAngle: Double
+    ): Double {
+        // 1. Train 각도 적용하여 3축 변환
+        val transformedDtl = originalDtl.map { dtl ->
+            val originalAz = dtl["Azimuth"] as? Double ?: 0.0
+            val originalEl = dtl["Elevation"] as? Double ?: 0.0
+            
+            val (transformedAz, transformedEl) = CoordinateTransformer.transformCoordinatesWithTrain(
+                azimuth = originalAz,
+                elevation = originalEl,
+                tiltAngle = settingsService.tiltAngle,
+                trainAngle = trainAngle
+            )
+            
+            dtl.toMutableMap().apply {
+                put("Azimuth", transformedAz)
+                put("Elevation", transformedEl)
+            }
+        }
+        
+        // 2. ±270도 제한 적용
+        // ✅ LimitAngleCalculator 요구사항: MstId, No, Time, Azimuth, Elevation 필수
+        val (_, limitedDtl) = limitAngleCalculator.convertTrackingData(
+            emptyList(),  // MST는 필요 없음
+            transformedDtl.map { dtl ->
+                mapOf(
+                    "MstId" to dtl["MstId"],      // ✅ 그룹화용 (convertDetailData Line 66)
+                    "No" to dtl["No"],            // ✅ 정렬용 (convertAzimuthPath Line 87)
+                    "Time" to dtl["Time"],        // ✅ 시간 정보
+                    "Azimuth" to dtl["Azimuth"],  // ✅ 변환 대상 (convertAzimuthPath Line 88)
+                    "Elevation" to dtl["Elevation"] // ✅ 고도 정보
+                )
+            }
+        )
+        
+        // 3. MaxAzRate 계산
+        val metrics = calculateMetrics(limitedDtl)
+        return metrics["MaxAzRate"] as? Double ?: Double.MAX_VALUE
+    }
+
+    /**
+     * 최적 Train 각도 탐색 (하이브리드 3단계 그리드 서치 알고리즘)
+     * 
+     * 현재 방식(최고속도 위치의 Azimuth를 Train으로 회전)의 한계를 해결하고,
+     * MaxAzRate가 가장 낮은 Train 각도를 탐색합니다.
+     * 
+     * 알고리즘:
+     * 1. **1단계 (초기값 계산)**: 현재 방식으로 초기값 계산
+     *    - finalTransformedMst의 MaxAzRateAzimuth를 사용하여 Train 각도 계산
+     *    - 이 값은 기존 방식과 동일한 계산 방법
+     * 
+     * 2. **2단계 (대략적 탐색)**: 초기값 ±90도 범위에서 10도 간격으로 탐색
+     *    - 탐색 범위: 초기값 -90도 ~ 초기값 +90도 (단, ±270도 범위 내)
+     *    - 탐색 간격: 10도
+     *    - 예상 계산 횟수: 약 19회
+     * 
+     * 3. **3단계 (정밀 탐색)**: 2단계에서 찾은 최적값 ±5도 범위에서 0.5도 간격으로 탐색
+     *    - 탐색 범위: 최적값 -5도 ~ 최적값 +5도 (단, ±270도 범위 내)
+     *    - 탐색 간격: 0.5도
+     *    - 예상 계산 횟수: 약 21회
+     * 
+     * 총 계산 횟수: 약 41회 (1 + 19 + 21)
+     * 정밀도: 0.5도
+     * 
+     * @param originalDtl Original DTL 데이터 (2축 원본 데이터)
+     * @param finalTransformedMst FinalTransformed MST (초기값 계산용)
+     * @param threshold Keyhole 임계값 (°/s)
+     * @return Pair<최적 Train 각도, 최적 MaxAzRate> (°, °/s)
+     * 
+     * @see calculateMaxAzRateForTrainAngle 특정 Train 각도에 대한 MaxAzRate 계산
+     * @see calculateTrainAngle Train 각도 계산 (최단 거리, ±270° 범위)
+     * 
+     * @note Train 각도는 ±270도 범위 내에서만 유효합니다.
+     * @note 계산 시간이 오래 걸릴 수 있으므로, 대용량 데이터의 경우 성능 고려가 필요합니다.
+     */
+    private fun findOptimalTrainAngle(
+        originalDtl: List<Map<String, Any?>>,
+        finalTransformedMst: Map<String, Any?>,
+        threshold: Double
+    ): Pair<Double, Double> {
+        // 1단계: 현재 방식으로 초기값 계산
+        logger.info("🔍 1단계: 초기값 계산 (현재 방식)")
+        val initialMaxAzRateAzimuth = finalTransformedMst["MaxAzRateAzimuth"] as? Double ?: 0.0
+        val initialTrainAngle = calculateTrainAngle(initialMaxAzRateAzimuth)
+        logger.info("   초기 Train 각도: ${String.format("%.2f", initialTrainAngle)}°")
+        
+        // 초기값의 MaxAzRate 계산
+        val initialMaxAzRate = calculateMaxAzRateForTrainAngle(originalDtl, initialTrainAngle)
+        logger.info("   초기 MaxAzRate: ${String.format("%.6f", initialMaxAzRate)}°/s")
+        
+        var bestTrainAngle = initialTrainAngle
+        var bestMaxAzRate = initialMaxAzRate
+        
+        // 2단계: 대략적 탐색 (초기값 ±90도, 10도 간격)
+        logger.info("🔍 2단계: 대략적 탐색 (초기값 ±90도, 10도 간격)")
+        val coarseSearchRange = 90.0
+        val coarseSearchInterval = 10.0
+        val searchStart = (initialTrainAngle - coarseSearchRange).coerceAtLeast(-270.0)
+        val searchEnd = (initialTrainAngle + coarseSearchRange).coerceAtMost(270.0)
+        
+        var coarseSearchCount = 0
+        for (trainAngle in (searchStart / coarseSearchInterval).toInt()..(searchEnd / coarseSearchInterval).toInt()) {
+            val trainAngleDouble = trainAngle * coarseSearchInterval
+            if (trainAngleDouble < -270.0 || trainAngleDouble > 270.0) continue
+            
+            val maxAzRate = calculateMaxAzRateForTrainAngle(originalDtl, trainAngleDouble)
+            coarseSearchCount++
+            
+            if (maxAzRate < bestMaxAzRate) {
+                bestMaxAzRate = maxAzRate
+                bestTrainAngle = trainAngleDouble
+            }
+        }
+        logger.info("   2단계 완료: ${coarseSearchCount}개 계산, 최적 Train=${String.format("%.2f", bestTrainAngle)}°, MaxAzRate=${String.format("%.6f", bestMaxAzRate)}°/s")
+        
+        // 3단계: 정밀 탐색 (최적 구간 ±5도, 0.5도 간격)
+        logger.info("🔍 3단계: 정밀 탐색 (최적 구간 ±5도, 0.5도 간격)")
+        val fineSearchRange = 5.0
+        val fineSearchInterval = 0.5
+        val fineSearchStart = (bestTrainAngle - fineSearchRange).coerceAtLeast(-270.0)
+        val fineSearchEnd = (bestTrainAngle + fineSearchRange).coerceAtMost(270.0)
+        
+        var fineSearchCount = 0
+        for (trainAngle in (fineSearchStart / fineSearchInterval).toInt()..(fineSearchEnd / fineSearchInterval).toInt()) {
+            val trainAngleDouble = trainAngle * fineSearchInterval
+            if (trainAngleDouble < -270.0 || trainAngleDouble > 270.0) continue
+            
+            val maxAzRate = calculateMaxAzRateForTrainAngle(originalDtl, trainAngleDouble)
+            fineSearchCount++
+            
+            if (maxAzRate < bestMaxAzRate) {
+                bestMaxAzRate = maxAzRate
+                bestTrainAngle = trainAngleDouble
+            }
+        }
+        logger.info("   3단계 완료: ${fineSearchCount}개 계산, 최적 Train=${String.format("%.2f", bestTrainAngle)}°")
+        
+        val improvement = initialMaxAzRate - bestMaxAzRate
+        val improvementRate = if (initialMaxAzRate > 0) {
+            (improvement / initialMaxAzRate) * 100.0
+        } else {
+            0.0
+        }
+        
+        logger.info("✅ 최종 최적 Train 각도: ${String.format("%.2f", bestTrainAngle)}°, MaxAzRate=${String.format("%.6f", bestMaxAzRate)}°/s")
+        logger.info("   개선량: ${String.format("%.6f", improvement)}°/s")
+        logger.info("   개선율: ${String.format("%.2f", improvementRate)}%")
+        
+        return Pair(bestTrainAngle, bestMaxAzRate)
     }
 
     /**

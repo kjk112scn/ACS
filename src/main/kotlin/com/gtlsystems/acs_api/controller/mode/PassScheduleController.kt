@@ -673,13 +673,15 @@ class PassScheduleController(
     )
     fun getTrackingDetailDataByPass(
         @PathVariable satelliteId: String,
-        @PathVariable passId: UInt
+        @PathVariable passId: UInt,
+        @RequestParam(required = false) dataType: String? = null  // ✅ DataType 파라미터 추가
     ): ResponseEntity<Map<String, Any>> {
         return try {
-            val dtlData = passScheduleService.getPassScheduleTrackDtlByMstId(satelliteId, passId)
+            // ✅ DataType 파라미터를 서비스에 전달
+            val dtlData = passScheduleService.getPassScheduleTrackDtlByMstId(satelliteId, passId, dataType)
 
             if (dtlData.isNotEmpty()) {
-                logger.info("위성 $satelliteId 패스 $passId 세부 데이터 조회 성공: ${dtlData.size}개 추적 포인트")
+                logger.info("위성 $satelliteId 패스 $passId 세부 데이터 조회 성공: ${dtlData.size}개 추적 포인트 (DataType: ${dataType ?: "auto"})")
 
                 ResponseEntity.ok(
                     mapOf(
@@ -689,13 +691,14 @@ class PassScheduleController(
                             "satelliteId" to satelliteId,
                             "passId" to passId,
                             "trackingPointCount" to dtlData.size,
-                            "trackingPoints" to dtlData
+                            "trackingPoints" to dtlData,
+                            "dataType" to (dataType ?: "auto")  // ✅ 반환된 DataType 정보 추가
                         ),
                         "timestamp" to System.currentTimeMillis()
                     )
                 )
             } else {
-                logger.warn("위성 $satelliteId 패스 $passId 세부 데이터 없음")
+                logger.warn("위성 $satelliteId 패스 $passId 세부 데이터 없음 (DataType: ${dataType ?: "auto"})")
                 ResponseEntity.status(404).body(
                     mapOf(
                         "success" to false,

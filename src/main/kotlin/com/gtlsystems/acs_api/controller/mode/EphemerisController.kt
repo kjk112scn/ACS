@@ -943,6 +943,22 @@ class EphemerisController(
         return Mono.fromCallable {
             try {
                 val mergedData = ephemerisService.getAllEphemerisTrackMstMerged()
+                
+                // 🔍 디버깅: Keyhole이 있는 항목의 최적화 데이터 확인
+                mergedData.forEach { item ->
+                    val isKeyhole = item["IsKeyhole"] as? Boolean ?: false
+                    if (isKeyhole) {
+                        val mstId = item["No"] as? UInt
+                        logger.info("🔍 [API 응답] MST #$mstId 최적화 데이터:")
+                        logger.info("   - IsKeyhole: $isKeyhole")
+                        logger.info("   - KeyholeOptimizedRecommendedTrainAngle: ${item["KeyholeOptimizedRecommendedTrainAngle"]}")
+                        logger.info("   - KeyholeOptimizedFinalTransformedMaxAzRate: ${item["KeyholeOptimizedFinalTransformedMaxAzRate"]}")
+                        logger.info("   - KeyholeOptimizedFinalTransformedMaxElRate: ${item["KeyholeOptimizedFinalTransformedMaxElRate"]}")
+                        logger.info("   - OptimizationImprovement: ${item["OptimizationImprovement"]}")
+                        logger.info("   - OptimizationImprovementRate: ${item["OptimizationImprovementRate"]}")
+                    }
+                }
+                
                 mapOf(
                     "status" to "success",
                     "data" to mergedData,
@@ -950,6 +966,7 @@ class EphemerisController(
                     "message" to "병합 데이터 조회 완료"
                 )
             } catch (e: Exception) {
+                logger.error("❌ API 응답 생성 실패: ${e.message}", e)
                 mapOf(
                     "status" to "error",
                     "message" to "병합 데이터 조회 실패: ${e.message}",
