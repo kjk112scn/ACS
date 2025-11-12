@@ -919,11 +919,16 @@ class PassScheduleService {
 
   /**
    * 특정 위성의 특정 패스에 대한 세부 추적 데이터 조회
-   * 백엔드 API: GET /tracking/detail/{satelliteId}/pass/{passId}
+   * 백엔드 API: GET /tracking/detail/{satelliteId}/pass/{passId}?dataType={dataType}
+   *
+   * @param satelliteId 위성 ID
+   * @param passId 패스 ID (MST ID)
+   * @param dataType DataType (optional) - 'final_transformed' 또는 'keyhole_final_transformed'
    */
   async getTrackingDetailByPass(
     satelliteId: string,
     passId: number,
+    dataType?: string, // ✅ DataType 파라미터 추가
   ): Promise<{
     success: boolean
     message: string
@@ -932,17 +937,26 @@ class PassScheduleService {
       passId: number
       trackingPointCount: number
       trackingPoints: TrackingDetailItem[]
+      dataType?: string // ✅ 반환된 DataType 정보
     }
     timestamp?: number
   }> {
     try {
-      console.log(`📡 추적 세부 데이터 조회 요청: satelliteId=${satelliteId}, passId=${passId}`)
+      // ✅ DataType 파라미터가 있으면 쿼리 파라미터로 추가
+      const url = dataType
+        ? `/pass-schedule/tracking/detail/${satelliteId}/pass/${passId}?dataType=${dataType}`
+        : `/pass-schedule/tracking/detail/${satelliteId}/pass/${passId}`
 
-      const response = await api.get(`/pass-schedule/tracking/detail/${satelliteId}/pass/${passId}`)
+      console.log(
+        `📡 추적 세부 데이터 조회 요청: satelliteId=${satelliteId}, passId=${passId}, dataType=${dataType || 'auto'}`,
+      )
+
+      const response = await api.get(url)
 
       console.log('✅ 추적 세부 데이터 응답:', {
         success: response.data.success,
         pointCount: response.data.data?.trackingPointCount,
+        dataType: response.data.data?.dataType || dataType || 'auto',
         message: response.data.message,
       })
 
@@ -955,6 +969,9 @@ class PassScheduleService {
 
   /**
    * 추적 경로 데이터를 Position View 차트용 좌표로 변환
+   *
+   * 백엔드에서 이미 ±270° 범위로 제한된 값을 받으므로,
+   * 연속성을 유지하면서 0~360° 범위로 변환합니다.
    */
   convertToChartData(trackingPoints: TrackingDetailItem[]): [number, number][] {
     try {
@@ -963,7 +980,17 @@ class PassScheduleService {
         return []
       }
 
-      const chartData: [number, number][] = trackingPoints
+      // ✅ 1. 시간 순서대로 정렬 (Time 필드 기준)
+      const sortedPoints = [...trackingPoints].sort((a, b) => {
+        const timeA = new Date(a.Time || 0).getTime()
+        const timeB = new Date(b.Time || 0).getTime()
+        return timeA - timeB
+      })
+
+      // ✅ 2. 백엔드가 이미 ±270° 범위로 제한했으므로, 연속성을 유지하면서 0~360°로 변환
+      // ✅ reduce를 사용하여 이전 변환된 값을 참조할 수 있도록 수정
+      let previousAzimuth: number | null = null
+      const chartData: [number, number][] = sortedPoints
         .filter((point) => {
           // 유효한 데이터만 필터링
           return (
@@ -975,20 +1002,57 @@ class PassScheduleService {
             !isNaN(Number(point.Elevation))
           )
         })
-        .map((point) => {
-          // [elevation, azimuth] 순서로 변환 (polar 차트 좌표계)
+        .reduce<[number, number][]>((acc, point) => {
           const elevation = Math.max(0, Math.min(90, Number(point.Elevation)))
-          const azimuth =
-            Number(point.Azimuth) < 0 ? Number(point.Azimuth) + 360 : Number(point.Azimuth)
-          return [elevation, azimuth] as [number, number]
-        })
+          let azimuth = Number(point.Azimuth) // 백엔드에서 이미 ±270° 범위로 제한됨
 
-      console.log(`✅ 차트 데이터 변환 완료: ${chartData.length}개 포인트`)
+          // ✅ 백엔드가 이미 회전 방향성을 보장했으므로, 연속성을 유지하면서 0~360°로 변환
+          if (previousAzimuth !== null && acc.length > 0) {
+            // 이전 값과의 차이 계산 (360°/0° 경계 고려)
+            let delta = azimuth - previousAzimuth
 
-      // 샘플링 (성능 최적화)
+            // 180도 이상 차이나면 반대 방향으로 보정
+            if (delta > 180) {
+              delta -= 360
+            } else if (delta < -180) {
+              delta += 360
+            }
+
+            // 이전 변환된 값에 delta를 더함 (연속성 유지)
+            const previousConverted = acc[acc.length - 1][1]
+            azimuth = previousConverted + delta
+
+            // 0~360° 범위로 정규화
+            while (azimuth < 0) azimuth += 360
+            while (azimuth >= 360) azimuth -= 360
+          } else {
+            // 첫 번째 포인트: 음수면 +360, 양수면 그대로
+            if (azimuth < 0) {
+              azimuth = azimuth + 360
+            }
+          }
+
+          previousAzimuth = Number(point.Azimuth) // 원본 값 저장 (다음 포인트와 비교용)
+
+          acc.push([elevation, azimuth])
+          return acc
+        }, [])
+
+      console.log(
+        `✅ 차트 데이터 변환 완료: ${chartData.length}개 포인트 (시간 순 정렬, 연속성 유지)`,
+      )
+
+      // ✅ 3. 샘플링 (정렬된 데이터에서 샘플링)
       if (chartData.length > 200) {
         const step = Math.ceil(chartData.length / 200)
         const sampledData = chartData.filter((_, index) => index % step === 0)
+        // ✅ 마지막 포인트는 항상 포함
+        if (
+          sampledData.length > 0 &&
+          sampledData[sampledData.length - 1] !== chartData[chartData.length - 1]
+        ) {
+          sampledData.push(chartData[chartData.length - 1])
+        }
         console.log(`📊 데이터 샘플링: ${chartData.length} → ${sampledData.length}개 포인트`)
         return sampledData
       }

@@ -144,6 +144,33 @@ export interface ScheduleItem {
    */
   CentralDiffMaxElRate?: number
 
+  /**
+   * ✅ 방법 2 (신규): 하이브리드 3단계 그리드 서치로 계산된 Train 각도
+   */
+  KeyholeOptimizedRecommendedTrainAngle?: number
+
+  /**
+   * ✅ 방법 2 (신규): 최적화된 최대 Azimuth 각속도 (도/초)
+   */
+  KeyholeOptimizedFinalTransformedMaxAzRate?: number
+
+  /**
+   * ✅ 방법 2 (신규): 최적화된 최대 Elevation 각속도 (도/초)
+   */
+  KeyholeOptimizedFinalTransformedMaxElRate?: number
+
+  /**
+   * ✅ 비교 결과: 개선량 (도/초)
+   * 방법 1 - 방법 2
+   */
+  OptimizationImprovement?: number
+
+  /**
+   * ✅ 비교 결과: 개선율 (%)
+   * (개선량 / 방법 1) * 100
+   */
+  OptimizationImprovementRate?: number
+
   [key: string]: string | number | boolean | null | undefined
 }
 
@@ -413,13 +440,22 @@ class EphemerisTrackService {
 
   async fetchEphemerisMasterData(): Promise<ScheduleItem[]> {
     try {
-      console.log('🔍 API 호출 시작: /ephemeris/master')
-      const response = await api.get('/ephemeris/master')
-      console.log('✅ API 응답 받음:', response.status, response.data?.length || 0, '개')
+      // ✅ 최적화 데이터를 포함한 병합 API 사용
+      console.log('🔍 API 호출 시작: /ephemeris/tracking/mst/merged')
+      const response = await api.get('/ephemeris/tracking/mst/merged')
+      console.log('✅ API 응답 받음:', response.status, response.data?.data?.length || 0, '개')
+
+      // ✅ 병합 API 응답 구조: { status: 'success', data: [...] }
+      const mergedData =
+        response.data?.status === 'success'
+          ? (response.data.data as Record<string, unknown>[])
+          : Array.isArray(response.data)
+            ? response.data
+            : []
 
       // 백엔드가 병합 데이터를 반환하므로 매핑 처리
-      if (Array.isArray(response.data)) {
-        const mappedData = response.data.map((item: Record<string, unknown>) => ({
+      if (Array.isArray(mergedData) && mergedData.length > 0) {
+        const mappedData = mergedData.map((item: Record<string, unknown>) => ({
           No: item.No as number,
           SatelliteID: item.SatelliteID as string,
           SatelliteName: item.SatelliteName as string,
@@ -493,6 +529,17 @@ class EphemerisTrackService {
           KeyholeFinalTransformedMaxElRate: item.KeyholeFinalTransformedMaxElRate as
             | number
             | undefined,
+
+          // ✅ 방법 2 (신규): 최적화 데이터 추가
+          KeyholeOptimizedRecommendedTrainAngle: item.KeyholeOptimizedRecommendedTrainAngle as
+            | number
+            | undefined,
+          KeyholeOptimizedFinalTransformedMaxAzRate:
+            item.KeyholeOptimizedFinalTransformedMaxAzRate as number | undefined,
+          KeyholeOptimizedFinalTransformedMaxElRate:
+            item.KeyholeOptimizedFinalTransformedMaxElRate as number | undefined,
+          OptimizationImprovement: item.OptimizationImprovement as number | undefined,
+          OptimizationImprovementRate: item.OptimizationImprovementRate as number | undefined,
         }))
 
         console.log(
@@ -501,6 +548,30 @@ class EphemerisTrackService {
           '개, Original 데이터 포함:',
           mappedData[0]?.OriginalMaxElevation !== undefined,
         )
+
+        // 🔍 디버깅: Keyhole이 있는 항목의 최적화 데이터 확인
+        mappedData.forEach((item, index) => {
+          if (item.isKeyhole) {
+            console.log(
+              `🔍 [프론트엔드] fetchEphemerisMasterData - Schedule #${index + 1} (MST ID: ${item.No}):`,
+            )
+            console.log(`   - isKeyhole: ${item.isKeyhole}`)
+            console.log(
+              `   - KeyholeOptimizedRecommendedTrainAngle:`,
+              item.KeyholeOptimizedRecommendedTrainAngle,
+            )
+            console.log(
+              `   - KeyholeOptimizedFinalTransformedMaxAzRate:`,
+              item.KeyholeOptimizedFinalTransformedMaxAzRate,
+            )
+            console.log(
+              `   - KeyholeOptimizedFinalTransformedMaxElRate:`,
+              item.KeyholeOptimizedFinalTransformedMaxElRate,
+            )
+            console.log(`   - OptimizationImprovement:`, item.OptimizationImprovement)
+            console.log(`   - OptimizationImprovementRate:`, item.OptimizationImprovementRate)
+          }
+        })
 
         // 첫 번째 데이터의 속도 값 확인
         if (mappedData.length > 0) {
@@ -527,11 +598,11 @@ class EphemerisTrackService {
         return mappedData
       }
 
-      console.log('⚠️ 응답 데이터가 배열이 아님:', typeof response.data)
-      return response.data || []
+      console.log('⚠️ 응답 데이터가 배열이 아님:', typeof mergedData)
+      return mergedData || []
     } catch (error) {
       console.error('❌ API 호출 실패:', error)
-      console.error('❌ 요청 URL:', '/ephemeris/master')
+      console.error('❌ 요청 URL:', '/ephemeris/tracking/mst/merged')
       console.error('❌ 에러 상세:', error.response?.status, error.response?.statusText)
       return this.handleApiError(error, '마스터 데이터 조회에 실패했습니다') as Promise<
         ScheduleItem[]
@@ -1004,6 +1075,47 @@ class EphemerisTrackService {
       if (response.data.status === 'success') {
         const mergedData = response.data.data as Record<string, unknown>[]
 
+        // 🔍 디버깅: 원본 API 응답 확인
+        console.log('🔍 [프론트엔드] 원본 API 응답:', response.data)
+        console.log('🔍 [프론트엔드] mergedData 크기:', mergedData.length)
+
+        // Keyhole이 있는 항목 찾기
+        mergedData.forEach((item, index) => {
+          const isKeyhole = item.IsKeyhole as boolean
+          if (isKeyhole) {
+            const no = item.No as number | undefined
+            const keyholeOptimizedRecommendedTrainAngle =
+              item.KeyholeOptimizedRecommendedTrainAngle as number | undefined
+            const keyholeOptimizedFinalTransformedMaxAzRate =
+              item.KeyholeOptimizedFinalTransformedMaxAzRate as number | undefined
+            const keyholeOptimizedFinalTransformedMaxElRate =
+              item.KeyholeOptimizedFinalTransformedMaxElRate as number | undefined
+            const optimizationImprovement = item.OptimizationImprovement as number | undefined
+            const optimizationImprovementRate = item.OptimizationImprovementRate as
+              | number
+              | undefined
+
+            console.log(`🔍 [프론트엔드] 원본 API 응답 - Item #${index + 1}:`)
+            console.log(`   - No:`, no)
+            console.log(`   - IsKeyhole:`, isKeyhole)
+            console.log(
+              `   - KeyholeOptimizedRecommendedTrainAngle:`,
+              keyholeOptimizedRecommendedTrainAngle,
+            )
+            console.log(
+              `   - KeyholeOptimizedFinalTransformedMaxAzRate:`,
+              keyholeOptimizedFinalTransformedMaxAzRate,
+            )
+            console.log(
+              `   - KeyholeOptimizedFinalTransformedMaxElRate:`,
+              keyholeOptimizedFinalTransformedMaxElRate,
+            )
+            console.log(`   - OptimizationImprovement:`, optimizationImprovement)
+            console.log(`   - OptimizationImprovementRate:`, optimizationImprovementRate)
+            console.log(`   - 전체 item:`, item)
+          }
+        })
+
         const scheduleItems: ScheduleItem[] = mergedData.map((item) => ({
           No: item.No as number,
           SatelliteID: item.SatelliteID as string,
@@ -1022,19 +1134,51 @@ class EphemerisTrackService {
           FinalTransformedMaxAzRate: item.FinalTransformedMaxAzRate as number,
           FinalTransformedMaxElRate: item.FinalTransformedMaxElRate as number,
 
-          // ✅ TrainOK (KeyholeFinalTransformed) 속도
+          // ✅ TrainOK (KeyholeFinalTransformed) 속도 (방법 1: 기존)
           KeyholeFinalTransformedMaxAzRate: item.KeyholeFinalTransformedMaxAzRate as number,
           KeyholeFinalTransformedMaxElRate: item.KeyholeFinalTransformedMaxElRate as number,
 
-          // Keyhole 관련
+          // Keyhole 관련 (방법 1: 기존)
           isKeyhole: item.IsKeyhole as boolean,
           recommendedTrainAngle: item.RecommendedTrainAngle as number,
+
+          // ✅ 방법 2 (신규): 최적화 데이터 추가
+          KeyholeOptimizedRecommendedTrainAngle: item.KeyholeOptimizedRecommendedTrainAngle as
+            | number
+            | undefined,
+          KeyholeOptimizedFinalTransformedMaxAzRate:
+            item.KeyholeOptimizedFinalTransformedMaxAzRate as number | undefined,
+          KeyholeOptimizedFinalTransformedMaxElRate:
+            item.KeyholeOptimizedFinalTransformedMaxElRate as number | undefined,
+          OptimizationImprovement: item.OptimizationImprovement as number | undefined,
+          OptimizationImprovementRate: item.OptimizationImprovementRate as number | undefined,
 
           CreationDate: item.CreationDate as string,
           Creator: item.Creator as string,
         }))
 
         console.log(`✅ 병합 데이터 조회 완료: ${scheduleItems.length}개 패스`)
+
+        // 🔍 디버깅: Keyhole이 있는 항목의 최적화 데이터 확인
+        scheduleItems.forEach((item, index) => {
+          if (item.isKeyhole) {
+            console.log(`🔍 [프론트엔드] Schedule #${index + 1} (MST ID: ${item.id}):`)
+            console.log(`   - isKeyhole: ${item.isKeyhole}`)
+            console.log(
+              `   - KeyholeOptimizedRecommendedTrainAngle: ${item.KeyholeOptimizedRecommendedTrainAngle}`,
+            )
+            console.log(
+              `   - KeyholeOptimizedFinalTransformedMaxAzRate: ${item.KeyholeOptimizedFinalTransformedMaxAzRate}`,
+            )
+            console.log(
+              `   - KeyholeOptimizedFinalTransformedMaxElRate: ${item.KeyholeOptimizedFinalTransformedMaxElRate}`,
+            )
+            console.log(`   - OptimizationImprovement: ${item.OptimizationImprovement}`)
+            console.log(`   - OptimizationImprovementRate: ${item.OptimizationImprovementRate}`)
+            console.log(`   - 원본 API 응답 데이터:`, response.data.data?.[index])
+          }
+        })
+
         return scheduleItems
       } else {
         console.warn('⚠️ 병합 데이터 조회 실패:', response.data)

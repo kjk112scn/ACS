@@ -136,18 +136,24 @@
       <div class="row q-col-gutter-md main-content-row" style="display: flex; flex-wrap: nowrap; align-items: stretch;">
         <!-- 1번 영역: 차트가 들어갈 네모난 칸 - 반응형 크기 조정 -->
         <div class="col-12 col-md-3 col-lg-3 col-xl-3">
-          <q-card class="control-section position-view-card" style="min-height: 360px !important; height: 100% !important; display: flex !important; flex-direction: column !important;">
-            <q-card-section class="position-view-section" style="min-height: 360px !important; height: 100% !important; flex: 1 !important; display: flex !important; flex-direction: column !important; padding-top: 16px !important; padding-bottom: 0px !important;">
+          <q-card class="control-section position-view-card"
+            style="min-height: 360px !important; height: 100% !important; display: flex !important; flex-direction: column !important;">
+            <q-card-section class="position-view-section"
+              style="min-height: 360px !important; height: 100% !important; flex: 1 !important; display: flex !important; flex-direction: column !important; padding-top: 16px !important; padding-bottom: 0px !important;">
               <div class="text-subtitle1 text-weight-bold text-primary position-view-title">Position View</div>
-              <div class="chart-area" ref="chartRef" style="min-height: 340px !important; height: 100% !important; flex: 1 !important; padding-top: 0 !important; padding-bottom: 0 !important; margin-bottom: 0 !important;"></div>
+              <div class="chart-area" ref="chartRef"
+                style="min-height: 340px !important; height: 100% !important; flex: 1 !important; padding-top: 0 !important; padding-bottom: 0 !important; margin-bottom: 0 !important;">
+              </div>
             </q-card-section>
           </q-card>
         </div>
 
         <!-- 2번 영역: 계산 정보 표시 영역 수정 -->
         <div class="col-12 col-md-4">
-          <q-card class="control-section" style="min-height: 360px !important; height: 100% !important; display: flex !important; flex-direction: column !important;">
-            <q-card-section style="min-height: 360px !important; height: 100% !important; flex: 1 !important; display: flex !important; flex-direction: column !important;">
+          <q-card class="control-section"
+            style="min-height: 360px !important; height: 100% !important; display: flex !important; flex-direction: column !important;">
+            <q-card-section
+              style="min-height: 360px !important; height: 100% !important; flex: 1 !important; display: flex !important; flex-direction: column !important;">
               <div class="row justify-between items-center q-mb-xs">
                 <div class="text-subtitle1 text-weight-bold text-primary">위성 추적 정보</div>
                 <div class="row items-center q-gutter-sm">
@@ -274,8 +280,10 @@
 
         <!-- 3번 영역: TLE Data -->
         <div class="col-12 col-md-5">
-          <q-card class="control-section tle-data-card" style="min-height: 360px !important; height: 100% !important; display: flex !important; flex-direction: column !important;">
-            <q-card-section style="min-height: 360px !important; height: 100% !important; flex: 1 !important; display: flex !important; flex-direction: column !important;">
+          <q-card class="control-section tle-data-card"
+            style="min-height: 360px !important; height: 100% !important; display: flex !important; flex-direction: column !important;">
+            <q-card-section
+              style="min-height: 360px !important; height: 100% !important; flex: 1 !important; display: flex !important; flex-direction: column !important;">
               <div class="text-subtitle1 text-weight-bold text-primary">TLE Data</div>
               <q-editor v-model="tleData.displayText" readonly flat dense class="tle-display q-mt-xs" :toolbar="[]"
                 :definitions="{
@@ -549,6 +557,82 @@ ISS (ZARYA)
                 {{ safeToFixed(props.value) }}°
               </span>
               <span v-else class="text-grey">-</span>
+            </q-td>
+          </template>
+
+          <!-- ✅ 방법 2 (신규): 최적화 Train 각도 템플릿 -->
+          <template v-slot:body-cell-KeyholeOptimizedRecommendedTrainAngle="props">
+            <q-td :props="props">
+              <span v-if="props.row?.isKeyhole" class="text-info">
+                {{ safeToFixed(props.value ?? 0) }}°
+              </span>
+              <span v-else class="text-grey">-</span>
+            </q-td>
+          </template>
+
+          <!-- ✅ 방법 2 (신규): 최적화된 최대 Az 속도 템플릿 -->
+          <template v-slot:body-cell-KeyholeOptimizedFinalTransformedMaxAzRate="props">
+            <q-td :props="props">
+              <div class="text-center">
+                <div class="text-weight-bold" :class="props.row?.isKeyhole ? 'text-info' : 'text-grey'">
+                  {{ safeToFixed(
+                    props.row?.isKeyhole
+                      ? (props.value ?? 0)
+                      : 0,
+                    6
+                  ) }}°/s
+                </div>
+              </div>
+            </q-td>
+          </template>
+
+          <!-- ✅ 방법 2 (신규): 최적화된 최대 El 속도 템플릿 -->
+          <template v-slot:body-cell-KeyholeOptimizedFinalTransformedMaxElRate="props">
+            <q-td :props="props">
+              <div class="text-center">
+                <div class="text-weight-bold" :class="props.row?.isKeyhole ? 'text-info' : 'text-grey'">
+                  {{ safeToFixed(
+                    props.row?.isKeyhole
+                      ? (props.value ?? 0)
+                      : 0,
+                    6
+                  ) }}°/s
+                </div>
+              </div>
+            </q-td>
+          </template>
+
+          <!-- ✅ 비교 결과: 개선량 템플릿 -->
+          <template v-slot:body-cell-OptimizationImprovement="props">
+            <q-td :props="props">
+              <div class="text-center">
+                <div class="text-weight-bold"
+                  :class="props.row?.isKeyhole && (props.value ?? 0) > 0 ? 'text-positive' : 'text-grey'">
+                  {{ safeToFixed(
+                    props.row?.isKeyhole
+                      ? (props.value ?? 0)
+                      : 0,
+                    6
+                  ) }}°/s
+                </div>
+              </div>
+            </q-td>
+          </template>
+
+          <!-- ✅ 비교 결과: 개선율 템플릿 -->
+          <template v-slot:body-cell-OptimizationImprovementRate="props">
+            <q-td :props="props">
+              <div class="text-center">
+                <div class="text-weight-bold"
+                  :class="props.row?.isKeyhole && (props.value ?? 0) > 0 ? 'text-positive' : 'text-grey'">
+                  {{ safeToFixed(
+                    props.row?.isKeyhole
+                      ? (props.value ?? 0)
+                      : 0,
+                    2
+                  ) }}%
+                </div>
+              </div>
             </q-td>
           </template>
 
@@ -886,6 +970,51 @@ const scheduleColumns: QTableColumn[] = [
     sortable: true,
     format: (val, row) => row.isKeyhole ? val?.toFixed(6) : '-',
   },
+  // ✅ 방법 2 (신규): 하이브리드 3단계 그리드 서치로 계산된 Train 각도
+  {
+    name: 'keyholeOptimizedRecommendedTrainAngle',
+    label: '최적화 Train 각도 (°)',
+    field: 'KeyholeOptimizedRecommendedTrainAngle',
+    align: 'center',
+    sortable: true,
+    format: (val, row) => row.isKeyhole ? (val?.toFixed(6) || '-') : '-',
+  },
+  // ✅ 방법 2 (신규): 최적화된 최대 Az 속도
+  {
+    name: 'KeyholeOptimizedFinalTransformedMaxAzRate',
+    label: '최적화 최대 Az 속도 (°/s)',
+    field: 'KeyholeOptimizedFinalTransformedMaxAzRate',
+    align: 'center',
+    sortable: true,
+    format: (val, row) => row.isKeyhole ? (val?.toFixed(6) || '0.000000') : '-',
+  },
+  // ✅ 방법 2 (신규): 최적화된 최대 El 속도
+  {
+    name: 'KeyholeOptimizedFinalTransformedMaxElRate',
+    label: '최적화 최대 El 속도 (°/s)',
+    field: 'KeyholeOptimizedFinalTransformedMaxElRate',
+    align: 'center',
+    sortable: true,
+    format: (val, row) => row.isKeyhole ? (val?.toFixed(6) || '0.000000') : '-',
+  },
+  // ✅ 비교 결과: 개선량
+  {
+    name: 'OptimizationImprovement',
+    label: '개선량 (°/s)',
+    field: 'OptimizationImprovement',
+    align: 'center',
+    sortable: true,
+    format: (val, row) => row.isKeyhole ? (val?.toFixed(6) || '0.000000') : '-',
+  },
+  // ✅ 비교 결과: 개선율
+  {
+    name: 'OptimizationImprovementRate',
+    label: '개선율 (%)',
+    field: 'OptimizationImprovementRate',
+    align: 'center',
+    sortable: true,
+    format: (val, row) => row.isKeyhole ? (val?.toFixed(2) || '0.00') + '%' : '-',
+  },
 ]
 
 // ✅ 새로운 코드로 교체:
@@ -962,6 +1091,12 @@ const selectedScheduleInfo = computed(() => {
       KeyholeAxisTransformedMaxElRate: undefined,
       KeyholeFinalTransformedMaxAzRate: undefined,
       KeyholeFinalTransformedMaxElRate: undefined,
+      // ✅ 방법 2 (신규): 최적화 데이터 기본값
+      KeyholeOptimizedRecommendedTrainAngle: 0,
+      KeyholeOptimizedFinalTransformedMaxAzRate: 0,
+      KeyholeOptimizedFinalTransformedMaxElRate: 0,
+      OptimizationImprovement: 0,
+      OptimizationImprovementRate: 0,
     }
   }
 
@@ -1002,6 +1137,12 @@ const selectedScheduleInfo = computed(() => {
       KeyholeAxisTransformedMaxElRate: selected.KeyholeAxisTransformedMaxElRate,
       KeyholeFinalTransformedMaxAzRate: selected.KeyholeFinalTransformedMaxAzRate,
       KeyholeFinalTransformedMaxElRate: selected.KeyholeFinalTransformedMaxElRate,
+      // ✅ 방법 2 (신규): 최적화 데이터 추가
+      KeyholeOptimizedRecommendedTrainAngle: selected.KeyholeOptimizedRecommendedTrainAngle || 0,
+      KeyholeOptimizedFinalTransformedMaxAzRate: selected.KeyholeOptimizedFinalTransformedMaxAzRate || 0,
+      KeyholeOptimizedFinalTransformedMaxElRate: selected.KeyholeOptimizedFinalTransformedMaxElRate || 0,
+      OptimizationImprovement: selected.OptimizationImprovement || 0,
+      OptimizationImprovementRate: selected.OptimizationImprovementRate || 0,
     }
   }
 
@@ -1029,6 +1170,12 @@ const selectedScheduleInfo = computed(() => {
     KeyholeAxisTransformedMaxElRate: undefined,
     KeyholeFinalTransformedMaxAzRate: undefined,
     KeyholeFinalTransformedMaxElRate: undefined,
+    // ✅ 방법 2 (신규): 최적화 데이터 기본값
+    KeyholeOptimizedRecommendedTrainAngle: 0,
+    KeyholeOptimizedFinalTransformedMaxAzRate: 0,
+    KeyholeOptimizedFinalTransformedMaxElRate: 0,
+    OptimizationImprovement: 0,
+    OptimizationImprovementRate: 0,
   }
 })
 
@@ -2479,8 +2626,10 @@ onUnmounted(() => {
 
 
 .control-section {
-  min-height: 360px !important; /* ✅ 최소 높이 보장 */
-  height: 100% !important; /* ✅ 부모 높이에 맞춤 */
+  min-height: 360px !important;
+  /* ✅ 최소 높이 보장 */
+  height: 100% !important;
+  /* ✅ 부모 높이에 맞춤 */
   width: 100%;
   background-color: var(--theme-card-background);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -2490,45 +2639,59 @@ onUnmounted(() => {
 
 .control-section .q-card-section {
   padding: 16px !important;
-  padding-bottom: 0 !important; /* ✅ 하단 패딩 제거 */
-  flex: 1 !important; /* ✅ 남은 공간 채우기 */
+  padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 제거 */
+  flex: 1 !important;
+  /* ✅ 남은 공간 채우기 */
   display: flex !important;
   flex-direction: column !important;
-  position: relative; /* ✅ 제목 absolute positioning을 위한 기준점 */
+  position: relative;
+  /* ✅ 제목 absolute positioning을 위한 기준점 */
 }
 
 /* ✅ Position View 카드 섹션에만 overflow: visible 적용 */
 .control-section.position-view-card .q-card-section {
-  overflow: visible !important; /* ✅ 차트가 넘쳐도 보이도록 */
+  overflow: visible !important;
+  /* ✅ 차트가 넘쳐도 보이도록 */
 }
 
 /* ✅ Position View 카드 높이 설정 (PassSchedulePage.vue와 동일) */
 .control-section.position-view-card,
 .control-section.position-view-card.q-card {
-  min-height: 360px !important; /* ✅ 최소 높이 보장 */
-  height: 100% !important; /* ✅ 부모 높이에 맞춤 */
+  min-height: 360px !important;
+  /* ✅ 최소 높이 보장 */
+  height: 100% !important;
+  /* ✅ 부모 높이에 맞춤 */
   display: flex !important;
   flex-direction: column !important;
-  overflow: visible !important; /* ✅ 차트가 넘쳐도 보이도록 */
+  overflow: visible !important;
+  /* ✅ 차트가 넘쳐도 보이도록 */
 }
 
 /* ✅ Position View 카드 섹션 높이 조정 */
 .control-section.position-view-card .q-card-section.position-view-section {
-  min-height: 360px !important; /* ✅ 차트 영역 최소 높이 보장 */
-  height: 100% !important; /* ✅ 부모 높이에 맞춤 */
-  flex: 1 !important; /* ✅ 남은 공간 채우기 */
+  min-height: 360px !important;
+  /* ✅ 차트 영역 최소 높이 보장 */
+  height: 100% !important;
+  /* ✅ 부모 높이에 맞춤 */
+  flex: 1 !important;
+  /* ✅ 남은 공간 채우기 */
   display: flex !important;
   flex-direction: column !important;
-  overflow: visible !important; /* ✅ 차트가 넘쳐도 보이도록 */
+  overflow: visible !important;
+  /* ✅ 차트가 넘쳐도 보이도록 */
 }
 
 .position-view-section {
-  padding: 16px 16px 0px 16px !important; /* ✅ 상단 패딩을 다른 패널과 동일하게 16px로 맞춤, 하단 패딩 제거 */
-  overflow: visible !important; /* ✅ 차트가 넘쳐도 보이도록 */
+  padding: 16px 16px 0px 16px !important;
+  /* ✅ 상단 패딩을 다른 패널과 동일하게 16px로 맞춤, 하단 패딩 제거 */
+  overflow: visible !important;
+  /* ✅ 차트가 넘쳐도 보이도록 */
 }
 
 .position-view-title {
-  position: absolute; /* ✅ 제목을 absolute로 배치하여 차트 영역이 전체 공간 사용 */
+  position: absolute;
+  /* ✅ 제목을 absolute로 배치하여 차트 영역이 전체 공간 사용 */
   top: 16px;
   left: 16px;
   z-index: 10;
@@ -2537,9 +2700,12 @@ onUnmounted(() => {
 }
 
 .chart-area {
-  min-height: 340px !important; /* ✅ 최소 높이 보장 */
-  height: 100% !important; /* ✅ 부모 높이에 맞춤 */
-  flex: 1 !important; /* ✅ 남은 공간 채우기 */
+  min-height: 340px !important;
+  /* ✅ 최소 높이 보장 */
+  height: 100% !important;
+  /* ✅ 부모 높이에 맞춤 */
+  flex: 1 !important;
+  /* ✅ 남은 공간 채우기 */
   width: 100%;
   display: flex;
   align-items: center;
@@ -2547,7 +2713,8 @@ onUnmounted(() => {
   margin: 0 auto;
   padding: 0;
   box-sizing: border-box;
-  overflow: visible !important; /* ✅ 차트가 컨테이너를 넘어설 수 있도록 */
+  overflow: visible !important;
+  /* ✅ 차트가 컨테이너를 넘어설 수 있도록 */
   text-align: center;
   position: relative;
 }
@@ -2602,17 +2769,21 @@ onUnmounted(() => {
 }
 
 /* ✅ 2번 영역(위성 추적 정보) 카드 섹션 높이 조정 */
-.ephemeris-mode .main-content-row > [class*="col-"]:nth-child(2) .control-section .q-card-section {
-  min-height: 360px !important; /* ✅ 최소 높이 보장 */
-  flex: 1 !important; /* ✅ 남은 공간 채우기 */
+.ephemeris-mode .main-content-row>[class*="col-"]:nth-child(2) .control-section .q-card-section {
+  min-height: 360px !important;
+  /* ✅ 최소 높이 보장 */
+  flex: 1 !important;
+  /* ✅ 남은 공간 채우기 */
   display: flex !important;
   flex-direction: column !important;
 }
 
 /* ✅ 3번 영역(TLE Data) 카드 섹션 높이 조정 */
-.ephemeris-mode .main-content-row > [class*="col-"]:nth-child(3) .control-section .q-card-section {
-  min-height: 360px !important; /* ✅ 최소 높이 보장 */
-  flex: 1 !important; /* ✅ 남은 공간 채우기 */
+.ephemeris-mode .main-content-row>[class*="col-"]:nth-child(3) .control-section .q-card-section {
+  min-height: 360px !important;
+  /* ✅ 최소 높이 보장 */
+  flex: 1 !important;
+  /* ✅ 남은 공간 채우기 */
   display: flex !important;
   flex-direction: column !important;
 }
@@ -2620,7 +2791,8 @@ onUnmounted(() => {
 .ephemeris-form {
   margin-top: 0.5rem;
   width: 100%;
-  flex: 1 !important; /* ✅ 남은 공간 채우기 */
+  flex: 1 !important;
+  /* ✅ 남은 공간 채우기 */
   display: flex !important;
   flex-direction: column !important;
 }
@@ -3066,7 +3238,8 @@ onUnmounted(() => {
 /* ✅ Position View 카드에만 overflow: visible 적용 */
 .ephemeris-mode .q-card.position-view-card,
 .ephemeris-mode .control-section.position-view-card.q-card {
-  overflow: visible !important; /* ✅ 차트가 넘쳐도 보이도록 */
+  overflow: visible !important;
+  /* ✅ 차트가 넘쳐도 보이도록 */
 }
 
 .ephemeris-mode .q-btn {

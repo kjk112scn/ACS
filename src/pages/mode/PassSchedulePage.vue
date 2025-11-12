@@ -22,9 +22,9 @@
                   <div class="col-auto">
                     <div class="vertical-button-group">
                       <div class="vertical-buttons">
-                <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
-                <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
-              </div>
+                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
+                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
+                      </div>
                       <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(0)" />
                     </div>
                   </div>
@@ -41,8 +41,8 @@
                   <div class="col-auto position-offset-label">
                     <div class="text-subtitle2 text-weight-bold text-primary text-center">
                       Elevation<br>Offset
-            </div>
-      </div>
+                    </div>
+                  </div>
                   <div class="col-auto">
                     <q-input v-model="inputs[1]" @input="(val: string) => onInputChange(1, val)" dense outlined
                       type="number" step="0.01" label="Elevation"
@@ -51,9 +51,9 @@
                   <div class="col-auto">
                     <div class="vertical-button-group">
                       <div class="vertical-buttons">
-                <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(1)" />
-                <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
-              </div>
+                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(1)" />
+                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
+                      </div>
                       <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(1)" />
                     </div>
                   </div>
@@ -70,8 +70,8 @@
                   <div class="col-auto position-offset-label">
                     <div class="text-subtitle2 text-weight-bold text-primary text-center">
                       Tilt<br>Offset
-            </div>
-      </div>
+                    </div>
+                  </div>
                   <div class="col-auto">
                     <q-input v-model="inputs[2]" @input="(val: string) => onInputChange(2, val)" dense outlined
                       type="number" step="0.01" label="Tilt"
@@ -80,9 +80,9 @@
                   <div class="col-auto">
                     <div class="vertical-button-group">
                       <div class="vertical-buttons">
-                <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(2)" />
-                <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
-              </div>
+                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(2)" />
+                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
+                      </div>
                       <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(2)" />
                     </div>
                   </div>
@@ -99,8 +99,8 @@
                   <div class="col-auto position-offset-label">
                     <div class="text-subtitle2 text-weight-bold text-primary text-center">
                       Time<br>Offset
-            </div>
-      </div>
+                    </div>
+                  </div>
                   <div class="col-auto">
                     <q-input v-model="inputs[3]" @input="(val: string) => onInputChange(3, val)" dense outlined
                       type="number" step="0.01" label="Time"
@@ -109,9 +109,9 @@
                   <div class="col-auto">
                     <div class="vertical-button-group">
                       <div class="vertical-buttons">
-                <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(3)" />
-                <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
-              </div>
+                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(3)" />
+                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
+                      </div>
                       <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(3)" />
                     </div>
                   </div>
@@ -131,111 +131,117 @@
       </div>
     </div>
     <!-- 2행: Main Content -->
-    <div class="row q-col-gutter-md main-content-row" style="display: flex; flex-wrap: nowrap; align-items: stretch; margin-bottom: 0 !important; padding-bottom: 0 !important;">
+    <div class="row q-col-gutter-md main-content-row"
+      style="display: flex; flex-wrap: nowrap; align-items: stretch; margin-bottom: 0 !important; padding-bottom: 0 !important;">
       <!-- 1번 영역: 차트가 들어갈 네모난 칸 - 반응형 크기 조정 -->
       <div class="col-12 col-md-3 position-view-col">
-        <q-card class="control-section position-view-card" style="min-height: 360px !important; height: 100% !important; display: flex !important; flex-direction: column !important;">
-          <q-card-section class="position-view-section" style="min-height: 360px !important; height: 100% !important; flex: 1 !important; display: flex !important; flex-direction: column !important; padding-top: 16px !important; padding-bottom: 0px !important;">
+        <q-card class="control-section position-view-card"
+          style="min-height: 360px !important; height: 100% !important; display: flex !important; flex-direction: column !important;">
+          <q-card-section class="position-view-section"
+            style="min-height: 360px !important; height: 100% !important; flex: 1 !important; display: flex !important; flex-direction: column !important; padding-top: 16px !important; padding-bottom: 0px !important;">
             <div class="text-subtitle1 text-weight-bold text-primary position-view-title">Position View</div>
-            <div class="chart-area" ref="chartRef" style="min-height: 340px !important; height: 100% !important; flex: 1 !important; padding-top: 0 !important; padding-bottom: 0 !important; margin-bottom: 0 !important;"></div>
-            </q-card-section>
-          </q-card>
-        </div>
+            <div class="chart-area" ref="chartRef"
+              style="min-height: 340px !important; height: 100% !important; flex: 1 !important; padding-top: 0 !important; padding-bottom: 0 !important; margin-bottom: 0 !important;">
+            </div>
+          </q-card-section>
+        </q-card>
+      </div>
 
       <!-- 2번 영역: Schedule Information -->
       <div class="col-12 col-md-3">
-          <q-card class="control-section">
-            <q-card-section>
+        <q-card class="control-section">
+          <q-card-section>
             <div class="text-subtitle1 text-weight-bold text-primary q-mb-xs">Schedule Information</div>
-              <div class="schedule-form">
-                <div class="form-row">
-                  <!-- 자동/수동 선택된 스케줄 정보 표시 -->
+            <div class="schedule-form">
+              <div class="form-row">
+                <!-- 자동/수동 선택된 스케줄 정보 표시 -->
                 <div v-if="displaySchedule" class="schedule-info q-mt-xs">
-                    <div class="info-row">
-                      <span class="info-label">스케줄 ID / 상태:</span>
-                      <div class="info-value-with-badge">
-                        <span class="info-value">{{ displaySchedule.no }}</span>
-                        <q-badge v-if="currentScheduleStatus" :color="currentScheduleStatus.color"
-                          :label="currentScheduleStatus.label" class="q-ml-sm" />
-                        <q-badge v-if="displaySchedule.isKeyhole || displaySchedule.IsKeyhole" color="red" label="KEYHOLE" class="q-ml-sm" />
-                      </div>
+                  <div class="info-row">
+                    <span class="info-label">스케줄 ID / 상태:</span>
+                    <div class="info-value-with-badge">
+                      <span class="info-value">{{ displaySchedule.no }}</span>
+                      <q-badge v-if="currentScheduleStatus" :color="currentScheduleStatus.color"
+                        :label="currentScheduleStatus.label" class="q-ml-sm" />
+                      <q-badge v-if="displaySchedule.isKeyhole || displaySchedule.IsKeyhole" color="red" label="KEYHOLE"
+                        class="q-ml-sm" />
                     </div>
-                    <!--     <div class="info-row">
+                  </div>
+                  <!--     <div class="info-row">
                       <span class="info-label">Index:</span>
                       <span class="info-value">{{ displaySchedule.index }}</span>
                     </div> -->
-                    <div class="info-row">
-                      <span class="info-label">위성 이름:</span>
-                      <span class="info-value">{{ displaySchedule.satelliteName }}</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">시작 시간:</span>
-                      <span class="info-value">{{ formatToLocalTime(displaySchedule.startTime) }}</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">종료 시간:</span>
-                      <span class="info-value">{{ formatToLocalTime(displaySchedule.endTime) }}</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">지속 시간:</span>
+                  <div class="info-row">
+                    <span class="info-label">위성 이름:</span>
+                    <span class="info-value">{{ displaySchedule.satelliteName }}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">시작 시간:</span>
+                    <span class="info-value">{{ formatToLocalTime(displaySchedule.startTime) }}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">종료 시간:</span>
+                    <span class="info-value">{{ formatToLocalTime(displaySchedule.endTime) }}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">지속 시간:</span>
                     <span class="info-value">{{ formatDuration(displaySchedule.duration) }}</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">시작 방위각:</span>
-                      <span class="info-value">{{ displaySchedule.startAzimuthAngle.toFixed(2) }}°</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">최대 고도각:</span>
-                      <span class="info-value">{{ displaySchedule.maxElevation?.toFixed(2) }}°</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">남은 시간:</span>
-                      <span class="info-value" :class="{
-                        'text-negative': timeRemaining < 0,
-                        'text-positive': timeRemaining > 0,
-                        'text-grey': timeRemaining === 0,
-                      }">
-                        {{ formatTimeRemaining(timeRemaining) }}
-                      </span>
-                    </div>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">시작 방위각:</span>
+                    <span class="info-value">{{ displaySchedule.startAzimuthAngle.toFixed(2) }}°</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">최대 고도각:</span>
+                    <span class="info-value">{{ displaySchedule.maxElevation?.toFixed(2) }}°</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">남은 시간:</span>
+                    <span class="info-value" :class="{
+                      'text-negative': timeRemaining < 0,
+                      'text-positive': timeRemaining > 0,
+                      'text-grey': timeRemaining === 0,
+                    }">
+                      {{ formatTimeRemaining(timeRemaining) }}
+                    </span>
+                  </div>
 
-                  </div>
-                  <!-- 스케줄이 선택되지 않은 경우 -->
-                  <div v-else class="no-schedule-selected">
-                    <div class="text-grey-5">추적 중인 스케줄이 없습니다</div>
-                  </div>
+                </div>
+                <!-- 스케줄이 선택되지 않은 경우 -->
+                <div v-else class="no-schedule-selected">
+                  <div class="text-grey-5">추적 중인 스케줄이 없습니다</div>
                 </div>
               </div>
-            </q-card-section>
-          </q-card>
-        </div>
+            </div>
+          </q-card-section>
+        </q-card>
+      </div>
 
       <!-- 3번 영역: Schedule Control -->
       <div class="col-12 col-md-6 schedule-control-col">
-          <q-card class="control-section">
-            <q-card-section class="schedule-control-section">
-              <!-- ✅ Schedule Control 헤더 -->
-              <div class="schedule-header">
+        <q-card class="control-section">
+          <q-card-section class="schedule-control-section">
+            <!-- ✅ Schedule Control 헤더 -->
+            <div class="schedule-header">
               <div class="text-subtitle1 text-weight-bold text-primary schedule-header-title">Schedule Control</div>
-                <div class="schedule-header-right">
-                  <!-- 현재/다음 스케줄 상태 표시 -->
-                  <div v-if="currentDisplaySchedule" class="current-schedule-display">
-                    <q-icon :name="currentDisplaySchedule.type === 'current' ? 'play_arrow' : 'schedule'"
-                      :color="currentDisplaySchedule.type === 'current' ? 'positive' : 'primary'" size="sm" />
-                    <span class="text-body2 q-ml-xs">
-                      {{ currentDisplaySchedule.label }}: Index {{ currentDisplaySchedule.mstId }}
-                    </span>
-                    <q-badge :color="currentDisplaySchedule.type === 'current' ? 'positive' : 'primary'"
-                      :label="currentDisplaySchedule.type === 'current' ? '추적중' : '대기중'" class="q-ml-sm" />
-                  </div>
-                  <!-- 등록된 스케줄 정보 -->
-                  <div class="registered-schedule-info">
-                    <span class="text-body2 text-primary">등록된 스케줄</span>
-                    <span class="text-caption text-grey-5 q-ml-xs">{{ scheduleData.length }}개</span>
-                  </div>
+              <div class="schedule-header-right">
+                <!-- 현재/다음 스케줄 상태 표시 -->
+                <div v-if="currentDisplaySchedule" class="current-schedule-display">
+                  <q-icon :name="currentDisplaySchedule.type === 'current' ? 'play_arrow' : 'schedule'"
+                    :color="currentDisplaySchedule.type === 'current' ? 'positive' : 'primary'" size="sm" />
+                  <span class="text-body2 q-ml-xs">
+                    {{ currentDisplaySchedule.label }}: Index {{ currentDisplaySchedule.mstId }}
+                  </span>
+                  <q-badge :color="currentDisplaySchedule.type === 'current' ? 'positive' : 'primary'"
+                    :label="currentDisplaySchedule.type === 'current' ? '추적중' : '대기중'" class="q-ml-sm" />
+                </div>
+                <!-- 등록된 스케줄 정보 -->
+                <div class="registered-schedule-info">
+                  <span class="text-body2 text-primary">등록된 스케줄</span>
+                  <span class="text-caption text-grey-5 q-ml-xs">{{ scheduleData.length }}개</span>
                 </div>
               </div>
-              <!--
+            </div>
+            <!--
               <div class="debug-panel q-mb-md" v-if="true">
                 <q-card flat bordered>
                   <q-card-section class="q-py-sm">
@@ -259,85 +265,84 @@
               </div>
  -->
             <!-- ✅ 스케줄 테이블 - 체크박스 제거, 높이 고정 (모든 데이터 표시, 화면에는 정확히 3개 행만 보이도록) -->
-              <q-table flat bordered :row-class="getRowClass" :row-style="getRowStyleDirect" :rows="sortedScheduleList"
-                :columns="scheduleColumns" row-key="no" :pagination="{ rowsPerPage: 0 }" hide-pagination
-              :loading="loading && sortedScheduleList.length === 0" @row-click="onRowClick" class="schedule-table q-mt-sm"
-              style="height: 210px; max-height: 210px;"
-              :no-data-label="'등록된 스케줄이 없습니다'"
+            <q-table flat bordered :row-class="getRowClass" :row-style="getRowStyleDirect" :rows="sortedScheduleList"
+              :columns="scheduleColumns" row-key="no" :pagination="{ rowsPerPage: 0 }" hide-pagination
+              :loading="loading && sortedScheduleList.length === 0" @row-click="onRowClick"
+              class="schedule-table q-mt-sm" style="height: 210px; max-height: 210px;" :no-data-label="'등록된 스케줄이 없습니다'"
               :virtual-scroll="false">
-                <template v-slot:loading>
-                  <q-inner-loading showing color="primary">
-                    <q-spinner size="50px" color="primary" />
-                  </q-inner-loading>
-                </template>
-                <!-- Keyhole 배지 컬럼 -->
-                <template v-slot:body-cell-keyhole="props">
-                  <q-td :props="props">
-                    <q-badge v-if="props.row.isKeyhole || props.row.IsKeyhole" color="red" label="KEYHOLE" />
-                  </q-td>
-                </template>
-                <!-- 위성 정보 컬럼 템플릿 -->
-                <template v-slot:body-cell-satelliteInfo="props">
-                  <q-td :props="props" class="satellite-info-cell">
-                    <div class="satellite-container">
-                      <div class="satellite-id">{{ props.row.satelliteId || '-' }}</div>
-                      <div class="satellite-name">{{ props.row.satelliteName }}</div>
-                    </div>
-                  </q-td>
-                </template>
+              <template v-slot:loading>
+                <q-inner-loading showing color="primary">
+                  <q-spinner size="50px" color="primary" />
+                </q-inner-loading>
+              </template>
+              <!-- Keyhole 배지 컬럼 -->
+              <template v-slot:body-cell-keyhole="props">
+                <q-td :props="props">
+                  <q-badge v-if="props.row.isKeyhole || props.row.IsKeyhole" color="red" label="KEYHOLE" />
+                </q-td>
+              </template>
+              <!-- 위성 정보 컬럼 템플릿 -->
+              <template v-slot:body-cell-satelliteInfo="props">
+                <q-td :props="props" class="satellite-info-cell">
+                  <div class="satellite-container">
+                    <div class="satellite-id">{{ props.row.satelliteId || '-' }}</div>
+                    <div class="satellite-name">{{ props.row.satelliteName }}</div>
+                  </div>
+                </q-td>
+              </template>
 
-                <!-- 시간 범위 컬럼 템플릿 - formatDateTime 함수 사용 -->
-                <template v-slot:body-cell-timeRange="props">
-                  <q-td :props="props" class="time-range-cell">
-                    <div class="time-container">
+              <!-- 시간 범위 컬럼 템플릿 - formatDateTime 함수 사용 -->
+              <template v-slot:body-cell-timeRange="props">
+                <q-td :props="props" class="time-range-cell">
+                  <div class="time-container">
 
 
-                      <div class="start-time">{{ formatDateTime(props.row.startTime) }}</div>
-                      <div class="end-time">{{ formatDateTime(props.row.endTime) }}</div>
-                    </div>
-                  </q-td>
-                </template>
+                    <div class="start-time">{{ formatDateTime(props.row.startTime) }}</div>
+                    <div class="end-time">{{ formatDateTime(props.row.endTime) }}</div>
+                  </div>
+                </q-td>
+              </template>
 
-                <!-- Azimuth 범위 컬럼 템플릿 -->
-                <template v-slot:body-cell-azimuthRange="props">
-                  <q-td :props="props" class="azimuth-range-cell">
-                    <div class="azimuth-container">
-                      <div class="start-az">{{ formatAngle(props.row.startAzimuthAngle) }}</div>
-                      <div class="end-az">{{ formatAngle(props.row.endAzimuthAngle) }}</div>
-                    </div>
-                  </q-td>
-                </template>
+              <!-- Azimuth 범위 컬럼 템플릿 -->
+              <template v-slot:body-cell-azimuthRange="props">
+                <q-td :props="props" class="azimuth-range-cell">
+                  <div class="azimuth-container">
+                    <div class="start-az">{{ formatAngle(props.row.startAzimuthAngle) }}</div>
+                    <div class="end-az">{{ formatAngle(props.row.endAzimuthAngle) }}</div>
+                  </div>
+                </q-td>
+              </template>
 
-                <!-- Elevation 정보 컬럼 템플릿 -->
-                <template v-slot:body-cell-elevationInfo="props">
-                  <q-td :props="props" class="elevation-info-cell">
-                    <div class="elevation-container">
-                      <div class="max-elevation">{{ formatAngle(props.row.maxElevation) }}</div>
-                      <div class="train">{{ formatAngle(0) }}</div>
-                    </div>
-                  </q-td>
-                </template>
-              </q-table>
-              <!-- 버튼 그룹 섹션 -->
+              <!-- Elevation 정보 컬럼 템플릿 -->
+              <template v-slot:body-cell-elevationInfo="props">
+                <q-td :props="props" class="elevation-info-cell">
+                  <div class="elevation-container">
+                    <div class="max-elevation">{{ formatAngle(props.row.maxElevation) }}</div>
+                    <div class="train">{{ formatAngle(0) }}</div>
+                  </div>
+                </q-td>
+              </template>
+            </q-table>
+            <!-- 버튼 그룹 섹션 -->
             <div class="button-group">
               <div class="button-row">
-                  <q-btn color="info" label="TLE Upload" icon="upload_file" @click="handleTLEUpload"
+                <q-btn color="info" label="TLE Upload" icon="upload_file" @click="handleTLEUpload"
                   class="q-mr-sm upload-btn" size="sm" />
 
-                  <q-btn color="primary" label="Select Schedule" icon="playlist_add_check" @click="selectScheduleData"
+                <q-btn color="primary" label="Select Schedule" icon="playlist_add_check" @click="selectScheduleData"
                   class="upload-btn" size="sm">
-                    <q-tooltip>스케줄 목록을 불러와서 선택할 수 있습니다</q-tooltip>
-                  </q-btn>
-                </div>
+                  <q-tooltip>스케줄 목록을 불러와서 선택할 수 있습니다</q-tooltip>
+                </q-btn>
+              </div>
 
-                <div class="control-button-row">
+              <div class="control-button-row">
                 <q-btn color="positive" label="Start" @click="handleStartCommand" class="control-btn" size="sm" />
                 <q-btn color="warning" label="Stop" @click="handleStopCommand" class="control-btn" size="sm" />
                 <q-btn color="negative" label="Stow" @click="handleStowCommand" class="control-btn" size="sm" />
-                </div>
               </div>
-            </q-card-section>
-          </q-card>
+            </div>
+          </q-card-section>
+        </q-card>
       </div>
     </div>
   </div>
@@ -398,6 +403,11 @@ class PassChartUpdatePool {
         { data: this.predictedData }, // 예측 경로
       ],
     }
+  }
+
+  // ✅ updateOption에 대한 public getter 메서드 추가
+  getUpdateOption() {
+    return this.updateOption
   }
 
   updatePosition(elevation: number, azimuth: number) {
@@ -479,6 +489,10 @@ const sortedScheduleList = computed(() => {
 // 🔧 반응성 트리거
 const reactivityTrigger = ref(0)
 
+// ✅ appendData를 위한 이전 경로 길이 추적 (watch보다 먼저 선언)
+const lastTrackingPathLength = ref(0)
+const lastPredictedPathLength = ref(0)
+
 // 🆕 Store 값 변경 감지
 // ✅ 스케줄 전환 시 경로 초기화 로직
 watch(() => icdStore.currentTrackingMstId, (newMstId, oldMstId) => {
@@ -489,16 +503,22 @@ watch(() => icdStore.currentTrackingMstId, (newMstId, oldMstId) => {
   if (oldMstId !== null && newMstId !== null && oldMstId !== newMstId) {
     console.log(`🔄 스케줄 전환 감지: ${oldMstId} → ${newMstId}`)
     // 이전 스케줄의 실시간 추적 경로만 초기화 (predictedTrackingPath는 새 스케줄 로드 시 자동 교체)
-    passScheduleStore.actualTrackingPath = []
+    passScheduleStore.clearActualTrackingPath()
+    // ✅ appendData를 위한 경로 길이도 초기화
+    lastTrackingPathLength.value = 0
     console.log('✅ 이전 스케줄의 실시간 추적 경로 초기화 완료')
   } else if (oldMstId === null && newMstId !== null) {
     // 추적 시작 시 빈 경로에서 시작
     console.log('🚀 추적 시작 - 실시간 추적 경로 초기화 (빈 경로에서 시작)')
-    passScheduleStore.actualTrackingPath = []
+    passScheduleStore.clearActualTrackingPath()
+    // ✅ appendData를 위한 경로 길이도 초기화
+    lastTrackingPathLength.value = 0
   } else if (oldMstId !== null && newMstId === null) {
     // 추적 완료 시 경로 초기화
     console.log('🛑 추적 완료 - 실시간 추적 경로 초기화')
-    passScheduleStore.actualTrackingPath = []
+    passScheduleStore.clearActualTrackingPath()
+    // ✅ appendData를 위한 경로 길이도 초기화
+    lastTrackingPathLength.value = 0
   }
 }, { immediate: true })
 
@@ -924,10 +944,11 @@ const handleActivated = () => {
 
   // 🆕 타이머 재시작
   if (!updateTimer) {
+    // ✅ 타이머를 100ms로 변경하여 백엔드 모니터링 주기(100ms)와 일치
     updateTimer = window.setInterval(() => {
       updateChart()
     }, 100)
-    console.log('✅ 차트 업데이트 타이머 재시작')
+    console.log('✅ 차트 업데이트 타이머 재시작 (100ms)')
   }
 
   // 🆕 DOM 하이라이트 강제 적용
@@ -1208,251 +1229,263 @@ const handleTLEUpload = async () => {
 
 // ✅ 차트 초기화 함수 수정 - 컨테이너 크기에 맞춘 크기
 const initChart = () => {
-  if (!chartRef.value) return
+  try {
+    if (!chartRef.value) {
+      console.warn('⚠️ 차트 컨테이너가 아직 준비되지 않음')
+      return
+    }
 
-  // 기존 차트 인스턴스가 있으면 제거
-  if (passChart) {
-    passChart.dispose()
-  }
+    // 기존 차트 인스턴스가 있으면 제거
+    if (passChart) {
+      try {
+        passChart.dispose()
+      } catch (disposeError) {
+        console.warn('차트 dispose 오류 (무시):', disposeError)
+      }
+    }
 
-  // ✅ 차트 크기 설정 (차트를 더 크게, Position View 구역 크기와 독립적)
-  const initialSize = 500
+    // ✅ 차트 크기 설정 (차트를 더 크게, Position View 구역 크기와 독립적)
+    const initialSize = 500
 
-  // 차트 인스턴스 생성
-  passChart = echarts.init(chartRef.value, null, {
-    width: initialSize,
-    height: initialSize
-  })
-  console.log('PassSchedule 차트 인스턴스 생성됨, 크기:', initialSize)
-
-  // 차트 옵션 설정
-  const option = {
-    backgroundColor: 'transparent',
-    grid: {
-      left: '10%', /* ✅ 균등한 여백 확보 */
-      right: '10%',
-      top: '10%',
-      bottom: '10%',
-      containLabel: false
-    },
-    polar: {
-      radius: ['0%', '50%'],
-      center: ['50%', '50%'],
-    },
-    angleAxis: {
-      type: 'value',
-      startAngle: 90,
-      clockwise: true,
-      min: 0,
-      max: 360,
-      animation: false, // ✅ 애니메이션 완전 비활성화
-      axisLine: {
-        show: true,
-        lineStyle: {
-          color: '#555',
-        },
-      },
-      axisTick: {
-        show: true,
-        interval: 60,
-        length: 3,
-        lineStyle: {
-          color: '#555',
-        },
-      },
-      axisLabel: {
-        interval: 60,
-        formatter: function (value: number) {
-          if (value === 0) return 'N (0°)'
-          if (value === 90) return 'E (90°)'
-          if (value === 180) return 'S (180°)'
-          if (value === 270) return 'W (270°)'
-          if (value === 45) return 'NE (45°)'
-          if (value === 135) return 'SE (135°)'
-          if (value === 225) return 'SW (225°)'
-          if (value === 315) return 'NW (315°)'
-          if (value % 60 === 0) return value + '°'
-          return ''
-        },
-        color: '#999',
-        fontSize: 8,
-        distance: -8,
-      },
-      splitLine: {
-        show: true,
-        interval: 60,
-        lineStyle: {
-          color: '#555',
-          type: 'dashed',
-          width: 1,
-        },
-      },
-    },
-    radiusAxis: {
-      type: 'value',
-      min: 0,
-      max: 90,
-      inverse: true,
-      animation: false, // ✅ 애니메이션 완전 비활성화
-      axisLine: {
-        show: false,
-      },
-      axisTick: {
-        show: false,
-      },
-      axisLabel: {
-        formatter: '{value}°',
-        color: '#999',
-        fontSize: 8,
-      },
-      splitLine: {
-        show: true,
-        lineStyle: {
-          color: '#555',
-          type: 'dashed',
-        },
-      },
-    },
-    series: [
-      {
-        name: '실시간 추적 위치',
-        type: 'scatter',
-        coordinateSystem: 'polar',
-        symbol: 'circle',
-        symbolSize: 15,
-        animation: false, // ✅ 애니메이션 완전 비활성화
-        itemStyle: {
-          color: '#ff5722',
-        },
-        data: [[0, 0]],
-        emphasis: {
-          itemStyle: {
-            color: '#ff9800',
-            borderColor: '#fff',
-            borderWidth: 2,
-          },
-        },
-        label: {
-          show: true,
-          formatter: function (params: EChartsScatterParam) {
-            // ✅ 원본 값 표시 (정규화된 값이 아닌)
-            const originalAz = currentPosition.value?.azimuth || params.value[1]
-            const originalEl = currentPosition.value?.elevation || params.value[0]
-            return `Az: ${originalAz.toFixed(2)}°\nEl: ${originalEl.toFixed(2)}°`
-          },
-          position: 'top',
-          distance: 5,
-          color: '#fff',
-          backgroundColor: 'rgba(0,0,0,0.7)',
-          padding: [4, 8],
-          borderRadius: 4,
-          fontSize: 10,
-        },
-        zlevel: 3,
-      },
-      // ✅ 위치 선 제거 - 현재 위치 점이 이동하면서 실시간 경로를 그리므로 불필요
-      {
-        name: '실시간 추적 경로',
-        type: 'line',
-        coordinateSystem: 'polar',
-        symbol: 'none',
-        animation: false, // ✅ 애니메이션 완전 비활성화
-        lineStyle: {
-          color: '#ffffff', // 흰색
-          width: 2,
-          opacity: 0.8,
-        },
-        data: [],
-        zlevel: 2,
-      },
-      {
-        name: '예정 위성 궤적',
-        type: 'line',
-        coordinateSystem: 'polar',
-        symbol: 'none',
-        animation: false, // ✅ 애니메이션 완전 비활성화
-        lineStyle: {
-          color: '#2196f3', // 파란색
-          width: 2,
-        },
-        data: [],
-        zlevel: 1,
-      },
-    ],
-  }
-
-  // 차트 옵션 적용 (초기 크기)
-  passChart.setOption(option, true)
-  passChart.resize({
-    width: initialSize,
-    height: initialSize
-  })
-  console.log('PassSchedule 차트 옵션 적용됨')
-
-  // ✅ 차트 크기 조정 (차트를 더 크게, Position View 구역 크기와 독립적)
-  const adjustChartSize = async () => {
-    await nextTick() // ✅ Vue의 DOM 업데이트 완료 대기
-
-    if (!passChart || passChart.isDisposed() || !chartRef.value) return
-
-    // ✅ 차트를 더 크게 설정 (Position View 구역 크기와 독립적)
-    const chartSize = 500
-
-    console.log('차트 크기 설정:', chartSize)
-
-    // 리사이즈 수행
-    passChart.resize({
-      width: chartSize,
-      height: chartSize
+    // 차트 인스턴스 생성
+    passChart = echarts.init(chartRef.value, null, {
+      width: initialSize,
+      height: initialSize
     })
+    console.log('PassSchedule 차트 인스턴스 생성됨, 크기:', initialSize)
 
-    // ✅ ECharts가 생성한 실제 DOM 요소에 크기 설정
-    await nextTick()
-    const chartElement = chartRef.value.querySelector('div') as HTMLElement | null
-    if (chartElement) {
-      // ✅ 차트를 더 크게 설정
-      chartElement.style.width = `${chartSize}px`
-      chartElement.style.height = `${chartSize}px`
-      chartElement.style.maxWidth = `${chartSize}px`
-      chartElement.style.maxHeight = `${chartSize}px`
-      chartElement.style.minWidth = `${chartSize}px`
-      chartElement.style.minHeight = `${chartSize}px`
-      // ✅ 중앙 정렬
-      chartElement.style.top = '50%'
-      chartElement.style.position = 'absolute'
-      chartElement.style.left = '50%'
-      chartElement.style.transform = 'translate(-50%, -50%)'
+    // 차트 옵션 설정
+    const option = {
+      backgroundColor: 'transparent',
+      grid: {
+        left: '10%', /* ✅ 균등한 여백 확보 */
+        right: '10%',
+        top: '10%',
+        bottom: '10%',
+        containLabel: false
+      },
+      polar: {
+        radius: ['0%', '50%'],
+        center: ['50%', '50%'],
+      },
+      angleAxis: {
+        type: 'value',
+        startAngle: 90,
+        clockwise: true,
+        min: 0,
+        max: 360,
+        animation: false, // ✅ 애니메이션 완전 비활성화
+        axisLine: {
+          show: true,
+          lineStyle: {
+            color: '#555',
+          },
+        },
+        axisTick: {
+          show: true,
+          interval: 60,
+          length: 3,
+          lineStyle: {
+            color: '#555',
+          },
+        },
+        axisLabel: {
+          interval: 60,
+          formatter: function (value: number) {
+            if (value === 0) return 'N (0°)'
+            if (value === 90) return 'E (90°)'
+            if (value === 180) return 'S (180°)'
+            if (value === 270) return 'W (270°)'
+            if (value === 45) return 'NE (45°)'
+            if (value === 135) return 'SE (135°)'
+            if (value === 225) return 'SW (225°)'
+            if (value === 315) return 'NW (315°)'
+            if (value % 60 === 0) return value + '°'
+            return ''
+          },
+          color: '#999',
+          fontSize: 8,
+          distance: -8,
+        },
+        splitLine: {
+          show: true,
+          interval: 60,
+          lineStyle: {
+            color: '#555',
+            type: 'dashed',
+            width: 1,
+          },
+        },
+      },
+      radiusAxis: {
+        type: 'value',
+        min: 0,
+        max: 90,
+        inverse: true,
+        animation: false, // ✅ 애니메이션 완전 비활성화
+        axisLine: {
+          show: false,
+        },
+        axisTick: {
+          show: false,
+        },
+        axisLabel: {
+          formatter: '{value}°',
+          color: '#999',
+          fontSize: 8,
+        },
+        splitLine: {
+          show: true,
+          lineStyle: {
+            color: '#555',
+            type: 'dashed',
+          },
+        },
+      },
+      series: [
+        {
+          name: '실시간 추적 위치',
+          type: 'scatter',
+          coordinateSystem: 'polar',
+          symbol: 'circle',
+          symbolSize: 15,
+          animation: false, // ✅ 애니메이션 완전 비활성화
+          itemStyle: {
+            color: '#ff5722',
+          },
+          data: [[0, 0]],
+          emphasis: {
+            itemStyle: {
+              color: '#ff9800',
+              borderColor: '#fff',
+              borderWidth: 2,
+            },
+          },
+          label: {
+            show: true,
+            formatter: function (params: EChartsScatterParam) {
+              // ✅ 원본 값 표시 (정규화된 값이 아닌)
+              const originalAz = currentPosition.value?.azimuth || params.value[1]
+              const originalEl = currentPosition.value?.elevation || params.value[0]
+              return `Az: ${originalAz.toFixed(2)}°\nEl: ${originalEl.toFixed(2)}°`
+            },
+            position: 'top',
+            distance: 5,
+            color: '#fff',
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            padding: [4, 8],
+            borderRadius: 4,
+            fontSize: 10,
+          },
+          zlevel: 3,
+        },
+        // ✅ 위치 선 제거 - 현재 위치 점이 이동하면서 실시간 경로를 그리므로 불필요
+        {
+          name: '실시간 추적 경로',
+          type: 'line',
+          coordinateSystem: 'polar',
+          symbol: 'none',
+          animation: false, // ✅ 애니메이션 완전 비활성화
+          lineStyle: {
+            color: '#ffffff', // 흰색
+            width: 2,
+            opacity: 0.8,
+          },
+          data: [],
+          zlevel: 2,
+        },
+        {
+          name: '예정 위성 궤적',
+          type: 'line',
+          coordinateSystem: 'polar',
+          symbol: 'none',
+          animation: false, // ✅ 애니메이션 완전 비활성화
+          lineStyle: {
+            color: '#2196f3', // 파란색
+            width: 2,
+          },
+          data: [],
+          zlevel: 1,
+        },
+      ],
+    }
 
-      // 다시 리사이즈하여 적용 확인
+    // 차트 옵션 적용 (초기 크기)
+    passChart.setOption(option, true)
+    passChart.resize({
+      width: initialSize,
+      height: initialSize
+    })
+    console.log('PassSchedule 차트 옵션 적용됨')
+
+    // ✅ 차트 크기 조정 (차트를 더 크게, Position View 구역 크기와 독립적)
+    const adjustChartSize = async () => {
+      await nextTick() // ✅ Vue의 DOM 업데이트 완료 대기
+
+      if (!passChart || passChart.isDisposed() || !chartRef.value) return
+
+      // ✅ 차트를 더 크게 설정 (Position View 구역 크기와 독립적)
+      const chartSize = 500
+
+      console.log('차트 크기 설정:', chartSize)
+
+      // 리사이즈 수행
       passChart.resize({
         width: chartSize,
         height: chartSize
       })
+
+      // ✅ ECharts가 생성한 실제 DOM 요소에 크기 설정
+      await nextTick()
+      const chartElement = chartRef.value.querySelector('div') as HTMLElement | null
+      if (chartElement) {
+        // ✅ 차트를 더 크게 설정
+        chartElement.style.width = `${chartSize}px`
+        chartElement.style.height = `${chartSize}px`
+        chartElement.style.maxWidth = `${chartSize}px`
+        chartElement.style.maxHeight = `${chartSize}px`
+        chartElement.style.minWidth = `${chartSize}px`
+        chartElement.style.minHeight = `${chartSize}px`
+        // ✅ 중앙 정렬
+        chartElement.style.top = '50%'
+        chartElement.style.position = 'absolute'
+        chartElement.style.left = '50%'
+        chartElement.style.transform = 'translate(-50%, -50%)'
+
+        // 다시 리사이즈하여 적용 확인
+        passChart.resize({
+          width: chartSize,
+          height: chartSize
+        })
+      }
+
+      console.log('차트 리사이즈 완료:', chartSize)
     }
 
-    console.log('차트 리사이즈 완료:', chartSize)
-  }
-
-  // ✅ Vue의 nextTick을 사용하여 안전하게 차트 조정
-  setTimeout(() => {
-    adjustChartSize().catch(console.error)
-    // 추가 리사이즈 (레이아웃 완료 대기)
+    // ✅ Vue의 nextTick을 사용하여 안전하게 차트 조정
     setTimeout(() => {
       adjustChartSize().catch(console.error)
-    }, 200)
-  }, 100)
+      // 추가 리사이즈 (레이아웃 완료 대기)
+      setTimeout(() => {
+        adjustChartSize().catch(console.error)
+      }, 200)
+    }, 100)
 
-  // ✅ 윈도우 리사이즈 이벤트에 대응 (반응형) - 컨테이너 크기 기반
-  const handleResize = () => {
-    if (!passChart || passChart.isDisposed()) return
+    // ✅ 윈도우 리사이즈 이벤트에 대응 (반응형) - 컨테이너 크기 기반
+    const handleResize = () => {
+      if (!passChart || passChart.isDisposed()) return
 
-    nextTick().then(() => {
-      // ✅ 리사이즈 시에도 컨테이너 크기에 맞춰 조정
-      adjustChartSize().catch(console.error)
-    }).catch(console.error)
+      nextTick().then(() => {
+        // ✅ 리사이즈 시에도 컨테이너 크기에 맞춰 조정
+        adjustChartSize().catch(console.error)
+      }).catch(console.error)
+    }
+
+    window.addEventListener('resize', handleResize)
+  } catch (error) {
+    console.error('차트 초기화 중 오류:', error)
+    // 차트 초기화 실패해도 컴포넌트는 계속 렌더링되도록 함
   }
-
-  window.addEventListener('resize', handleResize)
 }
 
 
@@ -1493,19 +1526,29 @@ const loadSelectedScheduleTrackingPath = async () => {
       return
     }
 
+    // ✅ 스케줄의 keyhole 여부에 따라 DataType 결정
+    const isKeyhole = scheduleToLoad.isKeyhole || scheduleToLoad.IsKeyhole || false
+    const dataType = isKeyhole ? 'keyhole_final_transformed' : 'final_transformed'
+
     console.log('🚀 스케줄 추적 경로 로드 시작:', {
       satelliteName: scheduleToLoad.satelliteName,
       satelliteId,
-      passId
+      passId,
+      isKeyhole,
+      dataType,
     })
 
+    // ✅ DataType을 Store에 전달
     const success = await passScheduleStore.loadTrackingDetailData(
       satelliteId,
-      passId
+      passId,
+      dataType  // ✅ DataType 전달
     )
 
     if (success) {
       console.log('✅ 추적 경로 로드 완료, 차트 업데이트')
+      // ✅ 예정 경로 길이 초기화 (새 경로 로드)
+      lastPredictedPathLength.value = 0
       // 차트가 초기화되어 있다면 즉시 업데이트
       if (passChart) {
         updateChart()
@@ -1520,9 +1563,10 @@ const loadSelectedScheduleTrackingPath = async () => {
 
 // 🆕 성능 최적화를 위한 변수들
 const lastUpdateTime = ref(0)
-const updateThrottle = 200 // 200ms로 업데이트 간격 증가
+const updateThrottle = 100 // ✅ 100ms로 변경하여 백엔드 모니터링 주기(100ms)와 일치
 const lastPathLength = ref(0)
 const pathUpdateThreshold = 5 // 경로 포인트가 5개 이상 변경될 때만 업데이트
+// ✅ appendData를 위한 이전 경로 길이 추적 (이미 위에서 선언됨)
 
 // 🆕 성능 모니터링 및 적응형 해상도 조정
 const performanceMonitor = {
@@ -1587,11 +1631,12 @@ const optimizePathAdaptive = (path: [number, number][], resolution: number): [nu
 
 // 🆕 성능 모니터링이 포함된 차트 업데이트
 const updateChartWithPerformanceMonitoring = () => {
-  if (!passChart) return
-
-  const startTime = performance.now()
-
   try {
+    if (!passChart || passChart.isDisposed()) {
+      return
+    }
+
+    const startTime = performance.now()
     const now = Date.now()
 
     // 스로틀링
@@ -1647,8 +1692,8 @@ const updateChartWithPerformanceMonitoring = () => {
           const schedulePassId = currentSchedule.index
 
           if (currentPath && currentPath.length > 0 &&
-              pathInfo.satelliteId === scheduleSatelliteId &&
-              pathInfo.passId === schedulePassId) {
+            pathInfo.satelliteId === scheduleSatelliteId &&
+            pathInfo.passId === schedulePassId) {
             predictedPathToShow = currentPath.map((point: readonly [number, number]) => [...point])
           } else {
             // ✅ 경로가 일치하지 않으면 빈 배열로 초기화
@@ -1664,8 +1709,8 @@ const updateChartWithPerformanceMonitoring = () => {
         const schedulePassId = selectedSchedule.index
 
         if (selectedPath && selectedPath.length > 0 &&
-            pathInfo.satelliteId === scheduleSatelliteId &&
-            pathInfo.passId === schedulePassId) {
+          pathInfo.satelliteId === scheduleSatelliteId &&
+          pathInfo.passId === schedulePassId) {
           predictedPathToShow = selectedPath.map((point: readonly [number, number]) => [...point])
         } else {
           // ✅ 경로가 일치하지 않으면 빈 배열로 초기화
@@ -1678,36 +1723,54 @@ const updateChartWithPerformanceMonitoring = () => {
       actualPath && actualPath.length > 0
 
     // 성능 모니터링 및 해상도 조정
-    const frameTime = performance.now() - startTime
-    const resolution = adjustDisplayResolution(actualPath?.length || 0, frameTime)
+    const currentFrameTime = performance.now() - startTime
+    const resolution = adjustDisplayResolution(actualPath?.length || 0, currentFrameTime)
 
     // 적응형 경로 최적화
     const displayPath = shouldShowTrackingPath ?
       optimizePathAdaptive(actualPath as [number, number][], resolution) : []
 
-    // 🆕 PassChartUpdatePool을 사용한 차트 업데이트
-    const updateOption = passChartPool.updatePosition(normalizedEl, normalizedAz)
-    passChartPool.updateTrackingPath(displayPath)
-    // ✅ 현재 추적 중인 스케줄 또는 선택된 스케줄의 경로만 표시
-    passChartPool.updatePredictedPath(predictedPathToShow)
+    // ✅ PassChartUpdatePool을 사용한 차트 업데이트 (기존 방식으로 복원)
+    try {
+      passChartPool.updatePosition(normalizedEl, normalizedAz)
+      passChartPool.updateTrackingPath(displayPath)
+      // ✅ 현재 추적 중인 스케줄 또는 선택된 스케줄의 경로만 표시
+      passChartPool.updatePredictedPath(predictedPathToShow)
 
-    if (passChart && !passChart.isDisposed()) {
-      passChart.setOption(updateOption, false, true)
-      lastUpdateTime.value = now
+      // ✅ 전체 업데이트 (appendData 대신 setOption 사용)
+      const finalOption = passChartPool.getUpdateOption()
 
-      // 성능 통계 업데이트
-      performanceMonitor.frameCount++
-      performanceMonitor.averageFrameTime =
-        (performanceMonitor.averageFrameTime * (performanceMonitor.frameCount - 1) + frameTime) /
-        performanceMonitor.frameCount
+      if (passChart && !passChart.isDisposed()) {
+        passChart.setOption(finalOption, false, true)
 
-      // 성능 로그 (10프레임마다)
-      if (performanceMonitor.frameCount % 10 === 0) {
-        console.log(`📊 성능 통계: 평균 ${performanceMonitor.averageFrameTime.toFixed(2)}ms, 해상도: 1/${resolution}, 포인트: ${displayPath.length}/${actualPath?.length || 0}`)
+        // ✅ 경로 길이 추적 업데이트
+        if (shouldShowTrackingPath) {
+          lastTrackingPathLength.value = displayPath.length
+        } else {
+          lastTrackingPathLength.value = 0
+        }
+        lastPredictedPathLength.value = predictedPathToShow.length
+
+        lastUpdateTime.value = now
+
+        // 성능 통계 업데이트
+        performanceMonitor.frameCount++
+        performanceMonitor.averageFrameTime =
+          (performanceMonitor.averageFrameTime * (performanceMonitor.frameCount - 1) + currentFrameTime) /
+          performanceMonitor.frameCount
+
+        // 성능 로그 (10프레임마다)
+        if (performanceMonitor.frameCount % 10 === 0) {
+          console.log(`📊 성능 통계: 평균 ${performanceMonitor.averageFrameTime.toFixed(2)}ms, 해상도: 1/${resolution}, 포인트: ${displayPath.length}/${actualPath?.length || 0}`)
+        }
       }
+    } catch (chartError) {
+      console.error('차트 업데이트 중 오류:', chartError)
+      // 차트 업데이트 실패해도 컴포넌트는 계속 동작하도록 함
     }
   } catch (error) {
     console.error('PassSchedule 차트 업데이트 오류:', error)
+    // 에러가 발생해도 컴포넌트는 계속 동작하도록 함
   }
 }
 
@@ -1776,10 +1839,14 @@ const updateScheduleChart = async () => {
     const passId = selectedSchedule.value.index || selectedSchedule.value.no
 
     if (satelliteId && passId) {
-      console.log(`🛰️ 스케줄 선택 - 추적 경로 조회: ${satelliteId}, 패스: ${passId}`)
+      // ✅ 스케줄의 keyhole 여부에 따라 DataType 결정
+      const isKeyhole = selectedSchedule.value.isKeyhole || selectedSchedule.value.IsKeyhole || false
+      const dataType = isKeyhole ? 'keyhole_final_transformed' : 'final_transformed'
 
-      // Store를 통해 추적 경로 세부 데이터 조회
-      const success = await passScheduleStore.loadTrackingDetailData(satelliteId, passId)
+      console.log(`🛰️ 스케줄 선택 - 추적 경로 조회: ${satelliteId}, 패스: ${passId}, DataType: ${dataType}`)
+
+      // ✅ DataType을 Store에 전달
+      const success = await passScheduleStore.loadTrackingDetailData(satelliteId, passId, dataType)
 
       if (success) {
         console.log('✅ 추적 경로 데이터 로드 성공')
@@ -2152,47 +2219,65 @@ const handleReset = async () => {
 // }
 // 컴포넌트 마운트
 onMounted(async () => {
-  console.log('PassSchedulePage 컴포넌트 마운트됨')
+  try {
+    console.log('PassSchedulePage 컴포넌트 마운트됨')
 
-  // 🆕 기존 데이터 복원 확인
-  const hasExistingData = passScheduleStore.selectedScheduleList.length > 0
-  console.log('기존 데이터 확인:', {
-    hasExistingData,
-    scheduleCount: passScheduleStore.selectedScheduleList.length,
-    currentTrackingMstId: icdStore.currentTrackingMstId,
-    nextTrackingMstId: icdStore.nextTrackingMstId
-  })
+    // 🆕 기존 데이터 복원 확인
+    const hasExistingData = passScheduleStore.selectedScheduleList.length > 0
+    console.log('기존 데이터 확인:', {
+      hasExistingData,
+      scheduleCount: passScheduleStore.selectedScheduleList.length,
+      currentTrackingMstId: icdStore.currentTrackingMstId,
+      nextTrackingMstId: icdStore.nextTrackingMstId
+    })
 
-  // 🆕 Store 초기화 (기존 데이터가 있으면 건너뛰기)
-  if (!hasExistingData) {
-    try {
-      await passScheduleStore.init()
-      console.log('✅ 스케줄 데이터 로드 완료:', passScheduleStore.scheduleData.length, '개')
-    } catch (error) {
-      console.error('스케줄 데이터 로드 실패:', error)
-      $q.notify({
-        type: 'negative',
-        message: '스케줄 데이터를 불러오는데 실패했습니다',
-      })
+    // 🆕 Store 초기화 (기존 데이터가 있으면 건너뛰기)
+    if (!hasExistingData) {
+      try {
+        await passScheduleStore.init()
+        console.log('✅ 스케줄 데이터 로드 완료:', passScheduleStore.scheduleData.length, '개')
+      } catch (error) {
+        console.error('스케줄 데이터 로드 실패:', error)
+        // 에러가 발생해도 컴포넌트는 계속 렌더링되도록 함
+        $q.notify({
+          type: 'warning',
+          message: '스케줄 데이터를 불러오는데 실패했습니다',
+          caption: '기존 데이터를 사용합니다'
+        })
+      }
+    } else {
+      console.log('✅ 기존 스케줄 데이터 사용:', passScheduleStore.selectedScheduleList.length, '개')
     }
-  } else {
-    console.log('✅ 기존 스케줄 데이터 사용:', passScheduleStore.selectedScheduleList.length, '개')
+
+    // 🆕 PassSchedule 차트 초기화 (지연 시간 증가, 에러 처리 강화)
+    setTimeout(() => {
+      try {
+        initChart()
+
+        // 🆕 차트 업데이트 타이머 시작 (기존 타이머 정리 후 시작)
+        if (updateTimer) {
+          clearInterval(updateTimer)
+        }
+        // ✅ 타이머를 100ms로 변경하여 백엔드 모니터링 주기(100ms)와 일치
+        updateTimer = window.setInterval(() => {
+          try {
+            updateChart()
+          } catch (timerError) {
+            console.error('차트 업데이트 타이머 오류:', timerError)
+            // 타이머 오류가 발생해도 컴포넌트는 계속 동작하도록 함
+          }
+        }, 100)
+
+        console.log('✅ PassSchedule 차트 및 타이머 초기화 완료 (100ms)')
+      } catch (chartError) {
+        console.error('차트 초기화 오류:', chartError)
+        // 차트 초기화 실패해도 컴포넌트는 계속 렌더링되도록 함
+      }
+    }, 200) // 지연 시간을 200ms로 증가
+  } catch (error) {
+    console.error('PassSchedulePage 마운트 중 오류:', error)
+    // 마운트 오류가 발생해도 컴포넌트는 렌더링되도록 함
   }
-
-  // 🆕 PassSchedule 차트 초기화 (지연 시간 증가)
-  setTimeout(() => {
-    initChart()
-
-    // 🆕 차트 업데이트 타이머 시작 (기존 타이머 정리 후 시작)
-    if (updateTimer) {
-      clearInterval(updateTimer)
-    }
-    updateTimer = window.setInterval(() => {
-      updateChart()
-    }, 100)
-
-    console.log('✅ PassSchedule 차트 및 타이머 초기화 완료')
-  }, 200) // 지연 시간을 200ms로 증가
 })
 
 // 컴포넌트 언마운트
@@ -2342,26 +2427,31 @@ const formattedCalTime = computed(() => {
 
 /* ✅ 오프셋 컨트롤 행 하단 여백 줄이기 */
 .pass-schedule-mode .offset-control-row {
-  margin-bottom: 0.5rem !important; /* ✅ 기본 q-mb-sm (0.5rem) 유지하되 명시적으로 설정 */
+  margin-bottom: 0.5rem !important;
+  /* ✅ 기본 q-mb-sm (0.5rem) 유지하되 명시적으로 설정 */
 }
 
 /* ✅ 메인 콘텐츠 행 하단 여백을 EphemerisDesignationPage.vue와 동일하게 설정 (하단 마진 없음) */
 .pass-schedule-mode .main-content-row {
-  margin-bottom: 0 !important; /* ✅ EphemerisDesignationPage.vue와 동일하게 하단 마진 없음 */
-  padding-bottom: 0 !important; /* ✅ 하단 패딩 제거 */
+  margin-bottom: 0 !important;
+  /* ✅ EphemerisDesignationPage.vue와 동일하게 하단 마진 없음 */
+  padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 제거 */
 }
 
 /* ✅ Quasar q-col-gutter-md가 행에 추가하는 하단 마진을 EphemerisDesignationPage.vue와 동일하게 설정 (하단 마진 없음) */
 .pass-schedule-mode .main-content-row.q-col-gutter-md,
 .pass-schedule-mode .row.q-col-gutter-md.main-content-row {
-  margin-bottom: 0 !important; /* ✅ EphemerisDesignationPage.vue와 동일하게 하단 마진 없음 */
+  margin-bottom: 0 !important;
+  /* ✅ EphemerisDesignationPage.vue와 동일하게 하단 마진 없음 */
   padding-bottom: 0 !important;
 }
 
 /* ✅ Quasar row 기본 스타일 오버라이드 (더 강력한 선택자) - EphemerisDesignationPage.vue와 동일하게 설정 (하단 마진 없음) */
 .pass-schedule-mode .main-content-row.row,
 .pass-schedule-mode .row.main-content-row {
-  margin-bottom: 0 !important; /* ✅ EphemerisDesignationPage.vue와 동일하게 하단 마진 없음 */
+  margin-bottom: 0 !important;
+  /* ✅ EphemerisDesignationPage.vue와 동일하게 하단 마진 없음 */
   padding-bottom: 0 !important;
 }
 
@@ -2373,26 +2463,37 @@ q-page .pass-schedule-mode,
 .pass-schedule-mode,
 [class*="pass-schedule-mode"],
 div.pass-schedule-mode {
-  height: auto !important; /* ✅ height: 100% 제거하여 내용에 맞게 조정 */
+  height: auto !important;
+  /* ✅ height: 100% 제거하여 내용에 맞게 조정 */
   width: 100%;
-  padding: 0 !important; /* ✅ EphemerisDesignationPage.vue와 동일하게 상단 패딩 제거 */
+  padding: 0 !important;
+  /* ✅ EphemerisDesignationPage.vue와 동일하게 상단 패딩 제거 */
   margin: 0 !important;
-  margin-bottom: 0 !important; /* ✅ 하단 마진 제거 */
-  padding-bottom: 0 !important; /* ✅ 하단 패딩 제거 */
-  min-height: auto !important; /* ✅ 최소 높이 제거 */
-  max-height: none !important; /* ✅ 최대 높이 제거 */
-  display: flex !important; /* ✅ flexbox로 변경 */
-  flex-direction: column !important; /* ✅ 세로 방향 */
-  gap: 0 !important; /* ✅ flex gap 제거 */
-  row-gap: 0 !important; /* ✅ flex row-gap 제거 */
-  column-gap: 0 !important; /* ✅ flex column-gap 제거 */
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 제거 */
+  padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 제거 */
+  min-height: auto !important;
+  /* ✅ 최소 높이 제거 */
+  max-height: none !important;
+  /* ✅ 최대 높이 제거 */
+  display: flex !important;
+  /* ✅ flexbox로 변경 */
+  flex-direction: column !important;
+  /* ✅ 세로 방향 */
+  gap: 0 !important;
+  /* ✅ flex gap 제거 */
+  row-gap: 0 !important;
+  /* ✅ flex row-gap 제거 */
+  column-gap: 0 !important;
+  /* ✅ flex column-gap 제거 */
 }
 
 /* router-view, q-page-container의 하단 패딩/마진 제거 */
 router-view,
 q-page-container,
-router-view > *,
-q-page-container > * {
+router-view>*,
+q-page-container>* {
   padding-bottom: 0 !important;
   margin-bottom: 0 !important;
 }
@@ -2405,24 +2506,25 @@ q-page-container .pass-schedule-mode {
 }
 
 /* ✅ pass-schedule-mode 내부의 마지막 요소 하단 여백을 EphemerisDesignationPage.vue와 동일하게 설정 (하단 마진 없음) */
-.pass-schedule-mode > *:last-child {
-  margin-bottom: 0 !important; /* ✅ EphemerisDesignationPage.vue와 동일하게 하단 마진 없음 */
+.pass-schedule-mode>*:last-child {
+  margin-bottom: 0 !important;
+  /* ✅ EphemerisDesignationPage.vue와 동일하게 하단 마진 없음 */
   padding-bottom: 0 !important;
 }
 
 /* ✅ pass-schedule-mode 내부의 모든 직접 자식 요소 하단 여백 제거 */
-.pass-schedule-mode > * {
+.pass-schedule-mode>* {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
 
 /* ✅ main-content-row가 pass-schedule-mode의 마지막 자식일 때 하단 여백 완전 제거 */
-.pass-schedule-mode > .main-content-row:last-child,
-.pass-schedule-mode > .row.main-content-row:last-child,
-.pass-schedule-mode > div.main-content-row:last-child,
-.pass-schedule-mode > .main-content-row,
-.pass-schedule-mode > .row.main-content-row,
-.pass-schedule-mode > div.main-content-row {
+.pass-schedule-mode>.main-content-row:last-child,
+.pass-schedule-mode>.row.main-content-row:last-child,
+.pass-schedule-mode>div.main-content-row:last-child,
+.pass-schedule-mode>.main-content-row,
+.pass-schedule-mode>.row.main-content-row,
+.pass-schedule-mode>div.main-content-row {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
   margin-top: 0 !important;
@@ -2430,25 +2532,25 @@ q-page-container .pass-schedule-mode {
 }
 
 /* ✅ pass-schedule-mode의 마지막 div 요소 하단 여백 완전 제거 (더 강력한 선택자) */
-.pass-schedule-mode > div:last-child {
+.pass-schedule-mode>div:last-child {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
 
 /* ✅ pass-schedule-mode의 마지막 row 요소 하단 여백 완전 제거 */
-.pass-schedule-mode > .row:last-child {
+.pass-schedule-mode>.row:last-child {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
 
 /* ✅ pass-schedule-mode의 모든 직접 자식 row 요소 하단 여백 제거 */
-.pass-schedule-mode > .row {
+.pass-schedule-mode>.row {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
 
 /* ✅ pass-schedule-mode의 모든 직접 자식 div 요소 하단 여백 제거 */
-.pass-schedule-mode > div {
+.pass-schedule-mode>div {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
@@ -2477,41 +2579,42 @@ q-page-container .pass-schedule-mode {
   /* ✅ EphemerisDesignationPage.vue와 동일한 높이를 위해 flex 추가 - 내부 구성 변경 없음 */
   display: flex;
   flex-direction: column;
-  margin-bottom: 0 !important; /* ✅ 하단 마진 제거 */
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 제거 */
 }
 
 /* ✅ main-content-row 내부의 모든 컬럼 하단 여백 완전 제거 */
-.pass-schedule-mode .main-content-row > [class*="col-"] {
+.pass-schedule-mode .main-content-row>[class*="col-"] {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
 
 /* ✅ main-content-row 내부의 마지막 컬럼 하단 여백 완전 제거 (더 구체적인 선택자) */
-.pass-schedule-mode .main-content-row > [class*="col-"]:last-child {
+.pass-schedule-mode .main-content-row>[class*="col-"]:last-child {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
 
 /* ✅ main-content-row 내부의 모든 컬럼 내부의 q-card 하단 여백 제거 */
-.pass-schedule-mode .main-content-row > [class*="col-"] .q-card {
+.pass-schedule-mode .main-content-row>[class*="col-"] .q-card {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
 
 /* ✅ main-content-row 내부의 마지막 컬럼 내부의 q-card 하단 여백 제거 (더 구체적인 선택자) */
-.pass-schedule-mode .main-content-row > [class*="col-"]:last-child .q-card {
+.pass-schedule-mode .main-content-row>[class*="col-"]:last-child .q-card {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
 
 /* ✅ main-content-row 내부의 모든 컬럼 내부의 q-card-section 하단 여백 제거 */
-.pass-schedule-mode .main-content-row > [class*="col-"] .q-card-section {
+.pass-schedule-mode .main-content-row>[class*="col-"] .q-card-section {
   padding-bottom: 0 !important;
   margin-bottom: 0 !important;
 }
 
 /* ✅ main-content-row 내부의 마지막 컬럼 내부의 q-card-section 하단 여백 제거 (더 구체적인 선택자) */
-.pass-schedule-mode .main-content-row > [class*="col-"]:last-child .q-card-section {
+.pass-schedule-mode .main-content-row>[class*="col-"]:last-child .q-card-section {
   padding-bottom: 0 !important;
   margin-bottom: 0 !important;
 }
@@ -2531,44 +2634,55 @@ q-page-container .pass-schedule-mode {
 /* ✅ Position View 카드 높이 제한 */
 .pass-schedule-mode .control-section.position-view-card,
 .pass-schedule-mode .control-section.position-view-card.q-card {
-  min-height: 360px !important; /* ✅ 최소 높이 보장 */
-  height: 100% !important; /* ✅ 부모 높이에 맞춤 (다른 패널과 동일하게) */
+  min-height: 360px !important;
+  /* ✅ 최소 높이 보장 */
+  height: 100% !important;
+  /* ✅ 부모 높이에 맞춤 (다른 패널과 동일하게) */
   display: flex !important;
   flex-direction: column !important;
 }
 
 /* ✅ Position View 카드 섹션 높이 조정 */
 .pass-schedule-mode .control-section.position-view-card .q-card-section.position-view-section {
-  min-height: 360px !important; /* ✅ 차트 영역 최소 높이 보장 */
-  height: 100% !important; /* ✅ 부모 높이에 맞춤 (다른 패널과 동일하게) */
-  flex: 1 !important; /* ✅ 남은 공간 채우기 */
+  min-height: 360px !important;
+  /* ✅ 차트 영역 최소 높이 보장 */
+  height: 100% !important;
+  /* ✅ 부모 높이에 맞춤 (다른 패널과 동일하게) */
+  flex: 1 !important;
+  /* ✅ 남은 공간 채우기 */
   display: flex !important;
   flex-direction: column !important;
 }
 
 .control-section .q-card-section {
   padding: 16px !important;
-  padding-bottom: 0 !important; /* ✅ 하단 패딩 제거 (상단 공간과 동일하게) */
+  padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 제거 (상단 공간과 동일하게) */
   /* ✅ 남은 공간을 채우도록 flex 추가 - 내부 구성 변경 없음 */
   flex: 1;
   display: flex;
   flex-direction: column;
-  position: relative; /* ✅ 제목 absolute positioning을 위한 기준점 */
+  position: relative;
+  /* ✅ 제목 absolute positioning을 위한 기준점 */
 }
 
 /* ✅ Schedule Information 카드 높이를 Position View와 동일하게 설정 (360px) */
-.pass-schedule-mode .main-content-row > [class*="col-"]:nth-child(2) .control-section,
-.pass-schedule-mode .main-content-row > [class*="col-"]:nth-child(2) .control-section.q-card {
-  min-height: 360px !important; /* ✅ 최소 높이 보장 */
-  height: 100% !important; /* ✅ 부모 높이에 맞춤 */
+.pass-schedule-mode .main-content-row>[class*="col-"]:nth-child(2) .control-section,
+.pass-schedule-mode .main-content-row>[class*="col-"]:nth-child(2) .control-section.q-card {
+  min-height: 360px !important;
+  /* ✅ 최소 높이 보장 */
+  height: 100% !important;
+  /* ✅ 부모 높이에 맞춤 */
   display: flex !important;
   flex-direction: column !important;
 }
 
 /* ✅ Schedule Information 카드 섹션 높이 조정 */
-.pass-schedule-mode .main-content-row > [class*="col-"]:nth-child(2) .control-section .q-card-section {
-  min-height: 360px !important; /* ✅ 최소 높이 보장 */
-  flex: 1 !important; /* ✅ 남은 공간 채우기 */
+.pass-schedule-mode .main-content-row>[class*="col-"]:nth-child(2) .control-section .q-card-section {
+  min-height: 360px !important;
+  /* ✅ 최소 높이 보장 */
+  flex: 1 !important;
+  /* ✅ 남은 공간 채우기 */
   display: flex !important;
   flex-direction: column !important;
 }
@@ -2576,49 +2690,60 @@ q-page-container .pass-schedule-mode {
 /* ✅ Schedule Control 카드 높이를 Position View와 동일하게 설정 (360px) */
 .pass-schedule-mode .main-content-row .schedule-control-col .control-section,
 .pass-schedule-mode .main-content-row .schedule-control-col .control-section.q-card {
-  min-height: 360px !important; /* ✅ 최소 높이 보장 */
-  height: 100% !important; /* ✅ 부모 높이에 맞춤 */
+  min-height: 360px !important;
+  /* ✅ 최소 높이 보장 */
+  height: 100% !important;
+  /* ✅ 부모 높이에 맞춤 */
   display: flex !important;
   flex-direction: column !important;
 }
 
 /* ✅ Schedule Control 카드 섹션 높이 조정 */
 .pass-schedule-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section {
-  min-height: 360px !important; /* ✅ 최소 높이 보장 */
-  flex: 1 1 auto !important; /* ✅ 남은 공간 채우기 (flex-grow: 1, flex-shrink: 1, flex-basis: auto) */
+  min-height: 360px !important;
+  /* ✅ 최소 높이 보장 */
+  flex: 1 1 auto !important;
+  /* ✅ 남은 공간 채우기 (flex-grow: 1, flex-shrink: 1, flex-basis: auto) */
   display: flex !important;
   flex-direction: column !important;
-  padding-bottom: 0 !important; /* ✅ 하단 패딩 완전 제거 (상단 공간과 동일하게) */
-  margin-bottom: 0 !important; /* ✅ 하단 마진 제거 */
-  overflow: hidden !important; /* ✅ 하단 여백 방지 */
-  justify-content: flex-start !important; /* ✅ 상단 정렬로 하단 여백 제거 */
+  padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 완전 제거 (상단 공간과 동일하게) */
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 제거 */
+  overflow: hidden !important;
+  /* ✅ 하단 여백 방지 */
+  justify-content: flex-start !important;
+  /* ✅ 상단 정렬로 하단 여백 제거 */
 }
 
 /* ✅ 3단계: schedule-control-section 내부의 button-group 하단 여백 완전 제거 (더 구체적인 선택자) */
 .pass-schedule-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .button-group {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
-  flex-shrink: 0 !important; /* ✅ 버튼 그룹이 축소되지 않도록 */
+  flex-shrink: 0 !important;
+  /* ✅ 버튼 그룹이 축소되지 않도록 */
 }
 
 /* ✅ schedule-control-section 내부의 마지막 요소 하단 여백 완전 제거 */
-.pass-schedule-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section > *:last-child {
+.pass-schedule-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section>*:last-child {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
 
 /* ✅ schedule-control-section 내부의 모든 직접 자식 요소 하단 여백 제거 */
-.pass-schedule-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section > * {
+.pass-schedule-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section>* {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
 
 .position-view-section {
-  padding: 16px 16px 0px 16px !important; /* ✅ 상단 패딩을 다른 패널과 동일하게 16px로 맞춤, 하단 패딩 제거 */
+  padding: 16px 16px 0px 16px !important;
+  /* ✅ 상단 패딩을 다른 패널과 동일하게 16px로 맞춤, 하단 패딩 제거 */
 }
 
 .position-view-title {
-  position: absolute; /* ✅ 제목을 absolute로 배치하여 차트 영역이 전체 공간 사용 */
+  position: absolute;
+  /* ✅ 제목을 absolute로 배치하여 차트 영역이 전체 공간 사용 */
   top: 16px;
   left: 16px;
   z-index: 10;
@@ -2627,19 +2752,26 @@ q-page-container .pass-schedule-mode {
 }
 
 .chart-area {
-  min-height: 340px !important; /* ✅ 최소 높이 보장 */
-  height: 100% !important; /* ✅ 부모 높이에 맞춤 */
-  flex: 1 !important; /* ✅ 남은 공간 채우기 */
+  min-height: 340px !important;
+  /* ✅ 최소 높이 보장 */
+  height: 100% !important;
+  /* ✅ 부모 높이에 맞춤 */
+  flex: 1 !important;
+  /* ✅ 남은 공간 채우기 */
   width: 100%;
   display: flex;
-  align-items: center; /* ✅ 중앙 정렬 */
+  align-items: center;
+  /* ✅ 중앙 정렬 */
   justify-content: center;
   margin: 0 auto;
-  margin-bottom: 0 !important; /* ✅ 하단 마진 제거 */
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 제거 */
   padding: 0 !important;
-  padding-bottom: 0 !important; /* ✅ 하단 패딩 제거 */
+  padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 제거 */
   box-sizing: border-box;
-  overflow: visible !important; /* ✅ 차트가 넘쳐도 보이도록 변경 */
+  overflow: visible !important;
+  /* ✅ 차트가 넘쳐도 보이도록 변경 */
   text-align: center;
   position: relative;
 }
@@ -2648,7 +2780,8 @@ q-page-container .pass-schedule-mode {
 .chart-area>div {
   position: absolute !important;
   left: 50% !important;
-  top: 50% !important; /* ✅ 중앙 정렬 */
+  top: 50% !important;
+  /* ✅ 중앙 정렬 */
   transform: translate(-50%, -50%) !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -2660,7 +2793,8 @@ q-page-container .pass-schedule-mode {
   max-height: 500px !important;
   min-width: 500px !important;
   min-height: 500px !important;
-  aspect-ratio: 1 !important; /* ✅ 정사각형 유지 */
+  aspect-ratio: 1 !important;
+  /* ✅ 정사각형 유지 */
 }
 
 /* 반응형 차트 크기 조정 - 차트를 더 크게 (Position View 구역 크기와 독립적) */
@@ -2672,7 +2806,8 @@ q-page-container .pass-schedule-mode {
     max-height: 500px !important;
     min-width: 500px !important;
     min-height: 500px !important;
-    top: 50% !important; /* ✅ 중앙 정렬 */
+    top: 50% !important;
+    /* ✅ 중앙 정렬 */
   }
 }
 
@@ -2684,7 +2819,8 @@ q-page-container .pass-schedule-mode {
     max-height: 470px !important;
     min-width: 470px !important;
     min-height: 470px !important;
-    top: 50% !important; /* ✅ 중앙 정렬 */
+    top: 50% !important;
+    /* ✅ 중앙 정렬 */
   }
 }
 
@@ -2696,7 +2832,8 @@ q-page-container .pass-schedule-mode {
     max-height: 420px !important;
     min-width: 420px !important;
     min-height: 420px !important;
-    top: 50% !important; /* ✅ 중앙 정렬 */
+    top: 50% !important;
+    /* ✅ 중앙 정렬 */
   }
 }
 
@@ -3060,8 +3197,10 @@ q-page-container .pass-schedule-mode {
 .schedule-form {
   margin-top: 0.5rem;
   width: 100%;
-  margin-bottom: 0; /* ✅ 하단 마진 제거 */
-  flex: 1; /* ✅ 남은 공간을 채워서 하단 정렬 */
+  margin-bottom: 0;
+  /* ✅ 하단 마진 제거 */
+  flex: 1;
+  /* ✅ 남은 공간을 채워서 하단 정렬 */
   display: flex;
   flex-direction: column;
 }
@@ -3069,21 +3208,27 @@ q-page-container .pass-schedule-mode {
 .form-row {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem; /* ✅ gap 줄임 (0.5rem → 0.25rem) */
+  gap: 0.25rem;
+  /* ✅ gap 줄임 (0.5rem → 0.25rem) */
   width: 100%;
-  flex: 1; /* ✅ 남은 공간을 채워서 하단 정렬 */
-  justify-content: flex-start; /* ✅ 상단부터 시작 */
+  flex: 1;
+  /* ✅ 남은 공간을 채워서 하단 정렬 */
+  justify-content: flex-start;
+  /* ✅ 상단부터 시작 */
 }
 
 .schedule-info {
   background-color: rgba(255, 255, 255, 0.05);
   border-radius: 8px;
-  padding: 12px 16px 8px 16px; /* ✅ 하단 패딩 줄임 (16px → 8px) */
+  padding: 12px 16px 8px 16px;
+  /* ✅ 하단 패딩 줄임 (16px → 8px) */
   border: 1px solid rgba(255, 255, 255, 0.1);
-  flex: 1; /* ✅ 남은 공간을 채워서 하단 정렬 */
+  flex: 1;
+  /* ✅ 남은 공간을 채워서 하단 정렬 */
   display: flex;
   flex-direction: column;
-  justify-content: flex-start; /* ✅ 상단부터 시작 */
+  justify-content: flex-start;
+  /* ✅ 상단부터 시작 */
 }
 
 .no-schedule-selected {
@@ -3102,13 +3247,15 @@ q-page-container .pass-schedule-mode {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 0; /* ✅ 패딩 줄임 (8px → 6px) */
+  padding: 6px 0;
+  /* ✅ 패딩 줄임 (8px → 6px) */
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .info-row:last-child {
   border-bottom: none;
-  margin-bottom: auto; /* ✅ 마지막 행 아래에 자동 여백 추가하여 하단 정렬 */
+  margin-bottom: auto;
+  /* ✅ 마지막 행 아래에 자동 여백 추가하여 하단 정렬 */
 }
 
 .info-label {
@@ -3198,26 +3345,33 @@ q-page-container .pass-schedule-mode {
   /* ✅ flex: 1 제거 - EphemerisDesignationPage.vue 기준으로 높이 맞추기 */
   border-radius: 6px;
   overflow: hidden;
-  height: 210px !important; /* ✅ 높이 고정 (정확히 3개 행만 보이도록) */
-  max-height: 210px !important; /* ✅ 최대 높이 고정 */
+  height: 210px !important;
+  /* ✅ 높이 고정 (정확히 3개 행만 보이도록) */
+  max-height: 210px !important;
+  /* ✅ 최대 높이 고정 */
 }
 
 /* Quasar 테이블 기본 설정 초기화 */
 .schedule-table :deep(.q-table__container) {
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  height: 210px !important; /* ✅ 높이 고정 (정확히 3개 행만 보이도록) */
-  max-height: 210px !important; /* ✅ 최대 높이 고정 */
+  height: 210px !important;
+  /* ✅ 높이 고정 (정확히 3개 행만 보이도록) */
+  max-height: 210px !important;
+  /* ✅ 최대 높이 고정 */
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* ✅ 컨테이너는 스크롤 없음 */
+  overflow: hidden;
+  /* ✅ 컨테이너는 스크롤 없음 */
 }
 
 /* ✅ 테이블 바디 영역만 스크롤 가능하도록 설정 */
 .schedule-table :deep(.q-table__middle) {
   flex: 1;
-  overflow-y: auto; /* ✅ 세로 스크롤 가능 */
-  overflow-x: auto; /* ✅ 가로 스크롤도 가능 */
+  overflow-y: auto;
+  /* ✅ 세로 스크롤 가능 */
+  overflow-x: auto;
+  /* ✅ 가로 스크롤도 가능 */
   min-height: 0;
 }
 
@@ -3676,39 +3830,51 @@ q-page-container .pass-schedule-mode {
 
 /* ===== 14. 버튼 그룹 스타일 ===== */
 .button-group {
-  margin-top: 0.25rem; /* ✅ 상단 마진 줄임 (0.5rem → 0.25rem) */
-  margin-bottom: 0 !important; /* ✅ 하단 마진 완전 제거 */
+  margin-top: 0.25rem;
+  /* ✅ 상단 마진 줄임 (0.5rem → 0.25rem) */
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 완전 제거 */
   width: 100%;
   flex-shrink: 0;
-  padding-top: 0.25rem; /* ✅ 상단 패딩 줄임 (0.5rem → 0.25rem) */
-  padding-bottom: 0 !important; /* ✅ 하단 패딩 완전 제거 */
+  padding-top: 0.25rem;
+  /* ✅ 상단 패딩 줄임 (0.5rem → 0.25rem) */
+  padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 완전 제거 */
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   box-sizing: border-box !important;
-  display: flex !important; /* ✅ flex 컨테이너로 명시 */
-  flex-direction: column !important; /* ✅ 세로 방향 */
-  gap: 0.5rem !important; /* ✅ 버튼 행 사이 간격 명시 (겹침 방지) */
+  display: flex !important;
+  /* ✅ flex 컨테이너로 명시 */
+  flex-direction: column !important;
+  /* ✅ 세로 방향 */
+  gap: 0.5rem !important;
+  /* ✅ 버튼 행 사이 간격 명시 (겹침 방지) */
 }
 
 .button-row {
   display: flex;
   gap: 0.5rem;
   width: 100%;
-  margin-bottom: 0 !important; /* ✅ 하단 마진 완전 제거 (상단 공간과 동일하게) */
-  flex-shrink: 0 !important; /* ✅ 버튼 행이 축소되지 않도록 */
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 완전 제거 (상단 공간과 동일하게) */
+  flex-shrink: 0 !important;
+  /* ✅ 버튼 행이 축소되지 않도록 */
 }
 
 /* ✅ Quasar q-mb-sm 클래스 오버라이드 (button-row에 적용된 경우) */
 .button-row.q-mb-sm,
 .schedule-control-section .button-row.q-mb-sm {
-  margin-bottom: 0 !important; /* ✅ 하단 마진 완전 제거 */
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 완전 제거 */
 }
 
 .control-button-row {
   display: flex;
   gap: 0.5rem;
   width: 100%;
-  flex-shrink: 0 !important; /* ✅ 버튼 행이 축소되지 않도록 */
-  margin-bottom: 0 !important; /* ✅ 하단 마진 제거 */
+  flex-shrink: 0 !important;
+  /* ✅ 버튼 행이 축소되지 않도록 */
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 제거 */
 }
 
 /* 업로드 버튼 스타일 */
@@ -3852,8 +4018,10 @@ q-page-container .pass-schedule-mode {
 /* 모바일 크기 (768px 이하) */
 @media (max-width: 767px) {
   .pass-schedule-mode {
-    padding: 0.25rem !important; /* ✅ 모바일에서만 패딩 적용 */
-    padding-bottom: 0 !important; /* ✅ 하단 패딩은 여전히 제거 */
+    padding: 0.25rem !important;
+    /* ✅ 모바일에서만 패딩 적용 */
+    padding-bottom: 0 !important;
+    /* ✅ 하단 패딩은 여전히 제거 */
   }
 
   .schedule-container {
@@ -3965,7 +4133,8 @@ q-page-container .pass-schedule-mode {
 }
 
 .col-md-6 {
-  width: 50% !important; /* ✅ 정확한 50%로 수정 */
+  width: 50% !important;
+  /* ✅ 정확한 50%로 수정 */
 }
 
 /* ✅ Schedule Control이 남은 공간을 차지하도록 설정 */

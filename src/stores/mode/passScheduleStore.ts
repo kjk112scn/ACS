@@ -154,6 +154,7 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
     passId: number | null
     pointCount: number
     lastUpdated: number | null
+    dataType?: string // ✅ DataType 정보 추가
   }>({
     satelliteId: null,
     passId: null,
@@ -1249,7 +1250,11 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
   }
 
   // 🆕 추적 경로 세부 데이터 조회 (개선된 버전)
-  async function loadTrackingDetailData(satelliteId: string, passId: number): Promise<boolean> {
+  async function loadTrackingDetailData(
+    satelliteId: string,
+    passId: number,
+    dataType?: string, // ✅ DataType 파라미터 추가
+  ): Promise<boolean> {
     try {
       // 이미 같은 데이터가 로드되어 있는지 확인
       if (
@@ -1262,14 +1267,21 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
       }
 
       trackingPathLoading.value = true
-      console.log(`📡 Store: 추적 경로 세부 데이터 조회 - 위성: ${satelliteId}, 패스: ${passId}`)
+      console.log(
+        `📡 Store: 추적 경로 세부 데이터 조회 - 위성: ${satelliteId}, 패스: ${passId}, DataType: ${dataType || 'auto'}`,
+      )
 
-      // 🔧 새로운 API 사용
-      const response = await passScheduleService.getTrackingDetailByPass(satelliteId, passId)
+      // ✅ DataType을 서비스에 전달
+      const response = await passScheduleService.getTrackingDetailByPass(
+        satelliteId,
+        passId,
+        dataType,
+      )
 
       if (response.success && response.data?.trackingPoints) {
         const trackingPoints = response.data.trackingPoints
 
+        // ✅ 프론트엔드 필터링 로직 제거 (백엔드에서 이미 필터링됨)
         // 원본 상세 데이터 저장
         trackingDetailData.value = trackingPoints
 
@@ -1283,6 +1295,7 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
           passId,
           pointCount: trackingPoints.length,
           lastUpdated: Date.now(),
+          dataType: response.data.dataType || dataType, // ✅ DataType 정보 저장
         }
 
         console.log(`✅ Store: 추적 경로 데이터 로드 완료:`, {
@@ -1290,12 +1303,13 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
           chartPointCount: chartData.length,
           satelliteId,
           passId,
+          dataType: response.data.dataType || dataType,
         })
 
         $q.notify({
           type: 'positive',
           message: '추적 경로를 로드했습니다',
-          caption: `${trackingPoints.length}개 포인트`,
+          caption: `${trackingPoints.length}개 포인트 (${response.data.dataType || dataType || 'auto'})`,
         })
 
         return true
@@ -1348,8 +1362,15 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
       passId: null,
       pointCount: 0,
       lastUpdated: null,
+      dataType: undefined, // ✅ DataType 초기화
     }
     console.log('✅ PassSchedule 추적 경로 데이터 정리 완료')
+  }
+
+  // ✅ 실시간 추적 경로만 초기화 (스케줄 전환 시 사용)
+  const clearActualTrackingPath = () => {
+    actualTrackingPath.value = []
+    console.log('✅ 실시간 추적 경로만 초기화 완료')
   }
 
   // 🆕 현재 위치 업데이트
@@ -1782,6 +1803,7 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
     setPredictedTrackingPath,
     updateActualTrackingPath,
     clearTrackingPaths,
+    clearActualTrackingPath, // ✅ 실시간 추적 경로만 초기화
     updateCurrentPosition,
     updateOffsetValues,
 
