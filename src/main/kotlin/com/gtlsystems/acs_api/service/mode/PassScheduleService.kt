@@ -2,10 +2,12 @@ package com.gtlsystems.acs_api.service.mode
 
 import com.gtlsystems.acs_api.algorithm.axislimitangle.LimitAngleCalculator
 import com.gtlsystems.acs_api.algorithm.satellitetracker.impl.OrekitCalculator
+import com.gtlsystems.acs_api.algorithm.satellitetracker.processor.SatelliteTrackingProcessor
 import com.gtlsystems.acs_api.event.ACSEvent
 import com.gtlsystems.acs_api.event.ACSEventBus
 import com.gtlsystems.acs_api.event.subscribeToType
 import com.gtlsystems.acs_api.model.GlobalData
+import com.gtlsystems.acs_api.model.PushData
 import com.gtlsystems.acs_api.service.datastore.DataStoreService
 import com.gtlsystems.acs_api.service.icd.ICDService
 import com.gtlsystems.acs_api.service.udp.UdpFwICDService
@@ -48,6 +50,7 @@ import java.util.concurrent.atomic.AtomicLong
 @Service
 class PassScheduleService(
     private val orekitCalculator: OrekitCalculator,
+    private val satelliteTrackingProcessor: SatelliteTrackingProcessor, // ✅ 추가
     private val acsEventBus: ACSEventBus,
     private val udpFwICDService: UdpFwICDService,
     private val dataStoreService: DataStoreService,
@@ -81,10 +84,59 @@ class PassScheduleService(
     }
 
     /**
+     * PREPARING 상태 내에서의 진행 단계를 정의하는 열거형
+     * 
+     * PREPARING 상태 내에서 Train 회전 → 안정화 대기 → Az/El 이동을 순차적으로 처리하기 위한 내부 플래그
+     */
+    private enum class PreparingStep {
+        /** 초기화 */
+        INIT,
+        
+        /** Train 회전 중 */
+        MOVING_TRAIN,
+        
+        /** Train 안정화 대기 */
+        WAITING_TRAIN,
+        
+        /** Az/El 이동 중 */
+        MOVING_AZ_EL
+    }
+
+    /**
      * 현재 추적 상태
      * 상태 변경 시에만 실제 액션을 실행하여 중복 실행을 방지합니다.
      */
     private var currentTrackingState = TrackingState.IDLE
+
+    /**
+     * PREPARING 상태 내에서의 진행 단계
+     */
+    private var currentPreparingStep = PreparingStep.INIT
+
+    /**
+     * PREPARING 상태에서 처리 중인 패스 ID
+     */
+    private var preparingPassId: UInt? = null
+
+    /**
+     * 목표 Azimuth 각도
+     */
+    private var targetAzimuth: Float = 0f
+
+    /**
+     * 목표 Elevation 각도
+     */
+    private var targetElevation: Float = 0f
+
+    /**
+     * Train 안정화 대기 시작 시간
+     */
+    private var trainStabilizationStartTime: Long = 0
+
+    /**
+     * Train 안정화 대기 시간 (밀리초)
+     */
+    private val TRAIN_STABILIZATION_TIMEOUT = 3000L // 3초
     
     /**
      * 마지막 상태 변경 시간 (밀리초)
@@ -391,13 +443,60 @@ class PassScheduleService(
             }
             
             TrackingState.PREPARING -> {
-                // ✅ 준비 상태 - 시작 위치로 이동 (2분 이내)
+                // ✅ PREPARING 상태 내에서 단계별 처리
                 val nextMstId = nextSchedule?.get("No") as? UInt
-                if (nextMstId != null) {
-                    logger.info(" [ACTION] PREPARING 상태 - 시작 위치로 이동 (2분 이내)")
-                    moveToStartPosition(nextMstId)
-                } else {
-                    logger.warn("[ACTION] PREPARING 상태에서 다음 스케줄 ID를 찾을 수 없음")
+                
+                when (currentPreparingStep) {
+                    PreparingStep.INIT -> {
+                        // 초기화: moveToStartPosition() 호출
+                        if (nextMstId != null) {
+                            logger.info("[ACTION] PREPARING 상태 - 시작 위치로 이동 (2분 이내)")
+                            moveToStartPosition(nextMstId)
+                        } else {
+                            logger.warn("[ACTION] PREPARING 상태에서 다음 스케줄 ID를 찾을 수 없음")
+                        }
+                    }
+                    
+                    PreparingStep.MOVING_TRAIN -> {
+                        // Train 회전 중
+                        if (preparingPassId != null) {
+                            val selectedPass = getTrackingPassMst(preparingPassId!!)
+                            val isKeyhole = selectedPass?.get("IsKeyhole") as? Boolean ?: false
+                            val recommendedTrainAngle = selectedPass?.get("RecommendedTrainAngle") as? Double ?: 0.0
+                            
+                            val trainAngle = if (isKeyhole) {
+                                recommendedTrainAngle.toFloat()
+                            } else {
+                                0f
+                            }
+                            
+                            // Train 각도 이동 명령 전송 (한 번만)
+                            moveTrainToZero(trainAngle)
+                            
+                            // Train 각도 도달 확인
+                            if (isTrainAtZero()) {
+                                currentPreparingStep = PreparingStep.WAITING_TRAIN
+                                trainStabilizationStartTime = System.currentTimeMillis()
+                                logger.info("✅ Train가 ${trainAngle}도에 도달, 안정화 대기 시작")
+                            }
+                        }
+                    }
+                    
+                    PreparingStep.WAITING_TRAIN -> {
+                        // Train 안정화 대기
+                        if (System.currentTimeMillis() - trainStabilizationStartTime >= TRAIN_STABILIZATION_TIMEOUT && isTrainStabilized()) {
+                            moveToTargetAzEl()
+                            currentPreparingStep = PreparingStep.MOVING_AZ_EL
+                            logger.info("✅ Train 안정화 완료, 목표 Az/El로 이동 시작")
+                        }
+                    }
+                    
+                    PreparingStep.MOVING_AZ_EL -> {
+                        // Az/El 이동 완료 (목표 위치 도달 체크는 생략, 즉시 완료)
+                        currentPreparingStep = PreparingStep.INIT
+                        preparingPassId = null
+                        logger.info("✅ 목표 위치 이동 완료")
+                    }
                 }
             }
             
@@ -639,16 +738,93 @@ class PassScheduleService(
         }
     }
 
+    /**
+     * Train 축만 활성화하여 목표 각도로 회전합니다.
+     *
+     * 이 함수는 PREPARING 상태에서 Train을 먼저 회전하기 위해 사용됩니다.
+     * Train 축만 활성화하여 다른 축(Az, El)에는 영향을 주지 않습니다.
+     *
+     * @param trainAngle 목표 Train 각도 (도 단위, Float)
+     *
+     * @see moveToTargetAzEl Train 회전 후 Az/El 이동
+     * @see isTrainAtZero Train 각도 도달 확인
+     */
+    private fun moveTrainToZero(trainAngle: Float) {
+        val multiAxis = BitSet()
+        multiAxis.set(2)  // Train 축만 활성화
+        udpFwICDService.singleManualCommand(
+            multiAxis, trainAngle, 5f
+        )
+        logger.info("🔄 Train 각도 이동 시작: ${trainAngle}°")
+    }
+
+    /**
+     * Azimuth와 Elevation 축만 활성화하여 목표 위치로 이동합니다.
+     *
+     * 이 함수는 Train 회전 및 안정화 완료 후 Az/El을 이동하기 위해 사용됩니다.
+     * Az와 El 축만 활성화하여 Train 축에는 영향을 주지 않습니다.
+     *
+     * @see moveTrainToZero Train 회전 먼저 수행
+     * @see isTrainStabilized Train 안정화 확인
+     */
+    private fun moveToTargetAzEl() {
+        val multiAxis = BitSet()
+        multiAxis.set(0)  // Azimuth
+        multiAxis.set(1)  // Elevation
+        udpFwICDService.multiManualCommand(
+            multiAxis, targetAzimuth, 5f, targetElevation, 5f, 0f, 0f
+        )
+        logger.info("🔄 목표 Az/El로 이동: Az=${targetAzimuth}°, El=${targetElevation}°")
+    }
+
+    /**
+     * Train 각도가 목표 각도에 도달했는지 확인합니다.
+     *
+     * @return Train 각도가 목표 각도에 도달했으면 true, 아니면 false
+     *
+     * @see moveTrainToZero Train 회전 명령 후 확인
+     */
+    private fun isTrainAtZero(): Boolean {
+        val cmdTrain = PushData.CMD.cmdTrainAngle ?: 0f
+        val currentTrain = dataStoreService.getLatestData().trainAngle ?: 0.0
+        return kotlin.math.abs(cmdTrain - currentTrain.toFloat()) <= 0.1f
+    }
+
+    /**
+     * Train 각도가 안정화되었는지 확인합니다.
+     *
+     * @return Train 각도가 안정화되었으면 true, 아니면 false
+     *
+     * @see isTrainAtZero Train 각도 도달 확인 후 안정화 확인
+     */
+    private fun isTrainStabilized(): Boolean {
+        val cmdTrain = PushData.CMD.cmdTrainAngle ?: 0f
+        val currentTrain = dataStoreService.getLatestData().trainAngle ?: 0.0
+        return kotlin.math.abs(cmdTrain - currentTrain.toFloat()) <= 0.1f
+    }
+
     // ✅ 기존 메서드들 유지 (변경 없음)
     private fun moveToStartPosition(passId: UInt) {
+        // ✅ Keyhole 여부에 따라 적절한 MST 선택
+        val selectedPass = getTrackingPassMst(passId)
+        
+        if (selectedPass == null) {
+            logger.error("패스 ID ${passId}에 해당하는 데이터를 찾을 수 없습니다.")
+            return
+        }
+        
+        // DTL 데이터 조회 (Keyhole 여부에 따라 적절한 DataType)
         val passDetails = getSelectedTrackDtlByMstId(passId)
-
+        
         if (passDetails.isNotEmpty()) {
             val startPoint = passDetails.first()
-            val startAzimuth = (startPoint["Azimuth"] as Double).toFloat()
-            val startElevation = (startPoint["Elevation"] as Double).toFloat()
-            moveStartAnglePosition(startAzimuth, 5f, startElevation, 5f, 0f, 0f)
-            logger.info("📍 시작 위치 이동 완료: Az=${startAzimuth}°, El=${startElevation}°")
+            targetAzimuth = (startPoint["Azimuth"] as Double).toFloat()
+            targetElevation = (startPoint["Elevation"] as Double).toFloat()
+            
+            // ✅ PREPARING 상태 내에서 Train 회전 시작
+            preparingPassId = passId
+            currentPreparingStep = PreparingStep.MOVING_TRAIN
+            logger.info("📍 시작 위치 이동 준비: Az=${targetAzimuth}°, El=${targetElevation}°")
         }
     }
 
@@ -715,11 +891,19 @@ class PassScheduleService(
     fun sendHeaderTrackingData(passId: UInt) {
         try {
             udpFwICDService.writeNTPCommand()
-            val selectedPass = getSelectedTrackMstByMstId(passId)
+            
+            // ✅ Keyhole 여부에 따라 적절한 MST 선택
+            val selectedPass = getTrackingPassMst(passId)
+            
             if (selectedPass == null) {
                 logger.error("선택된 패스 ID($passId)에 해당하는 데이터를 찾을 수 없습니다.")
                 return
             }
+
+            // Keyhole 정보 로깅
+            val isKeyhole = selectedPass["IsKeyhole"] as? Boolean ?: false
+            val recommendedTrainAngle = selectedPass["RecommendedTrainAngle"] as? Double ?: 0.0
+            logger.info("📊 헤더 전송 패스 정보: Keyhole=${if (isKeyhole) "YES" else "NO"}, RecommendedTrainAngle=${recommendedTrainAngle}°")
 
             val startTime = (selectedPass["StartTime"] as ZonedDateTime).withZoneSameInstant(ZoneOffset.UTC)
             val endTime = (selectedPass["EndTime"] as ZonedDateTime).withZoneSameInstant(ZoneOffset.UTC)
@@ -760,11 +944,17 @@ class PassScheduleService(
     //12.2
     fun sendInitialTrackingData(passId: UInt) {
         try {
-            val selectedPass = getSelectedTrackMstByMstId(passId)
+            // ✅ Keyhole 여부에 따라 적절한 MST 선택
+            val selectedPass = getTrackingPassMst(passId)
+            
             if (selectedPass == null) {
                 logger.error("선택된 패스 ID($passId)에 해당하는 데이터를 찾을 수 없습니다.")
                 return
             }
+
+            // Keyhole 정보 확인
+            val isKeyhole = selectedPass["IsKeyhole"] as? Boolean ?: false
+            logger.info("📊 초기 추적 데이터 전송 패스 정보: Keyhole=${if (isKeyhole) "YES" else "NO"}")
 
             val startTime = (selectedPass["StartTime"] as ZonedDateTime).withZoneSameInstant(ZoneOffset.UTC)
             val endTime = (selectedPass["EndTime"] as ZonedDateTime).withZoneSameInstant(ZoneOffset.UTC)
@@ -773,7 +963,8 @@ class PassScheduleService(
             logger.info("위성 추적 시작: ${selectedPass["SatelliteName"]} (패스 ID: $passId)")
             logger.info("시작 시간: $startTime, 종료 시간: $endTime, 현재 시간: $calTime")
 
-            val passDetails = getSelectedTrackDtlByMstId(passId)
+            // ✅ Keyhole 여부에 따라 적절한 DataType의 DTL 조회
+            val passDetails = getSelectedTrackDtlByMstId(passId) // 내부에서 Keyhole 여부에 따라 적절한 DataType 반환
             var initialTrackingData: List<Triple<UInt, Float, Float>> = emptyList()
 
             when {
@@ -867,36 +1058,66 @@ class PassScheduleService(
     // ✅ 기존 메서드 시그니처 유지하면서 내부 최적화
     fun handleTrackingDataRequest(passId: UInt, timeAcc: UInt, requestDataLength: UShort) {
         val startIndex = timeAcc.toInt()
-        sendAdditionalTrackingDataOptimized(passId, startIndex, requestDataLength.toInt())
+        sendAdditionalTrackingData(passId, startIndex, requestDataLength.toInt())
     }
 
-    // ✅ 최적화된 추가 데이터 전송 (기존 메서드 대체)
-    private fun sendAdditionalTrackingDataOptimized(passId: UInt, startIndex: Int, requestDataLength: Int = 25) {
-        // ✅ 즉시 비동기 처리로 UDP 스레드 블로킹 방지
-        CompletableFuture.runAsync({
+    /**
+     * 추가 추적 데이터를 전송합니다.
+     *
+     * 이 함수는 캐시 여부에 따라 동기/비동기 처리를 선택합니다:
+     * - 캐시 있으면: 동기 처리 (빠름, 즉시 전송)
+     * - 캐시 없으면: 비동기 처리 (메모리 저장소 조회는 느릴 수 있으므로 블로킹 방지)
+     *
+     * @param passId 패스 ID
+     * @param startIndex 시작 인덱스
+     * @param requestDataLength 요청 데이터 길이
+     */
+    private fun sendAdditionalTrackingData(passId: UInt, startIndex: Int, requestDataLength: Int = 25) {
+        val cache = trackingDataCache[passId]
+        
+        if (cache != null && !cache.isExpired()) {
+            // ✅ 캐시 있으면 동기 처리 (빠름, 즉시 전송)
+            val processingStart = System.nanoTime()
             try {
-                val processingStart = System.nanoTime()
-
-                // ✅ 캐시 우선 조회 (고속)
-                val cache = trackingDataCache[passId]
-                if (cache != null && !cache.isExpired()) {
-                    sendFromCache(cache, startIndex, requestDataLength, processingStart)
-                } else {
-                    // ✅ 캐시 없으면 기존 방식으로 폴백 (안전성 보장)
-                    sendFromDatabase(passId, startIndex, requestDataLength, processingStart)
-                }
-
+                sendAdditionalTrackingDataFromCache(cache, startIndex, requestDataLength, processingStart)
             } catch (e: Exception) {
-                logger.error("최적화된 추적 데이터 전송 실패: passId=$passId, ${e.message}", e)
-                // ✅ 실패 시 기존 방식으로 재시도
-                sendAdditionalTrackingDataLegacy(passId, startIndex, requestDataLength)
+                logger.error("캐시에서 추적 데이터 전송 실패: passId=$passId, ${e.message}", e)
+                // 폴백: 메모리 저장소에서 동기 처리로 재시도
+                try {
+                    sendAdditionalTrackingDataFromDatabase(passId, startIndex, requestDataLength, processingStart)
+                } catch (fallbackError: Exception) {
+                    logger.error("폴백 전송도 실패: passId=$passId, ${fallbackError.message}", fallbackError)
+                }
             }
-        }, batchExecutor)
+        } else {
+            // ✅ 캐시 없으면 비동기 처리 (메모리 저장소 조회는 느릴 수 있으므로 블로킹 방지)
+            CompletableFuture.runAsync({
+                try {
+                    val processingStart = System.nanoTime()
+                    sendAdditionalTrackingDataFromDatabase(passId, startIndex, requestDataLength, processingStart)
+                } catch (e: Exception) {
+                    logger.error("추적 데이터 전송 실패: passId=$passId, ${e.message}", e)
+                    // 폴백: 동기 처리로 재시도
+                    try {
+                        val processingStart = System.nanoTime()
+                        sendAdditionalTrackingDataFromDatabase(passId, startIndex, requestDataLength, processingStart)
+                    } catch (fallbackError: Exception) {
+                        logger.error("폴백 전송도 실패: passId=$passId, ${fallbackError.message}", fallbackError)
+                    }
+                }
+            }, batchExecutor)
+        }
     }
-    
 
-    // ✅ 캐시에서 고속 전송
-    private fun sendFromCache(
+    /**
+     * 캐시에서 추가 추적 데이터를 전송합니다.
+     *
+     * @param cache TrackingDataCache 객체
+     * @param startIndex 시작 인덱스
+     * @param requestDataLength 요청 데이터 길이
+     * @param processingStart 처리 시작 시간 (성능 측정용)
+     */
+    private fun sendAdditionalTrackingDataFromCache(
         cache: TrackingDataCache,
         startIndex: Int,
         requestDataLength: Int,
@@ -949,8 +1170,26 @@ class PassScheduleService(
         }
     }
 
-    // ✅ DB에서 전송 (폴백)
-    private fun sendFromDatabase(passId: UInt, startIndex: Int, requestDataLength: Int, processingStart: Long) {
+    /**
+     * 메모리 저장소에서 추가 추적 데이터를 전송합니다.
+     *
+     * 현재는 메모리 저장소(passScheduleTrackDtlStorage)에서 조회하지만,
+     * 추후 getSelectedTrackDtlByMstId() 내부를 DB 조회로 변경하면 자동으로 DB 연계됩니다.
+     *
+     * @param passId 패스 ID
+     * @param startIndex 시작 인덱스
+     * @param requestDataLength 요청 데이터 길이
+     * @param processingStart 처리 시작 시간 (성능 측정용)
+     */
+    private fun sendAdditionalTrackingDataFromDatabase(
+        passId: UInt,
+        startIndex: Int,
+        requestDataLength: Int,
+        processingStart: Long
+    ) {
+        // ✅ Keyhole-aware 데이터 사용
+        // 현재: getSelectedTrackDtlByMstId()는 메모리 저장소(passScheduleTrackDtlStorage)에서 조회
+        // 추후: getSelectedTrackDtlByMstId() 내부를 DB 조회로 변경하면 자동으로 DB 연계됨
         val passDetails = getSelectedTrackDtlByMstId(passId)
         if (passDetails.isEmpty()) {
             logger.error("선택된 패스 ID($passId)에 해당하는 세부 데이터를 찾을 수 없습니다.")
@@ -1001,44 +1240,7 @@ class PassScheduleService(
 
         // ✅ 성능 경고
         if (processingTime > 20) {
-            logger.warn("⚠️ DB 처리 지연: ${processingTime}ms")
-        }
-    }
-
-    // ✅ 기존 방식 보존 (안전성을 위한 폴백)
-    private fun sendAdditionalTrackingDataLegacy(passId: UInt, startIndex: Int, requestDataLength: Int = 25) {
-        try {
-            val passDetails = getSelectedTrackDtlByMstId(passId)
-            if (passDetails.isEmpty()) {
-                logger.error("선택된 패스 ID($passId)에 해당하는 세부 데이터를 찾을 수 없습니다.")
-                return
-            }
-
-            val indexMs = startIndex / 100
-            val additionalTrackingData = passDetails.drop(indexMs).take(requestDataLength).mapIndexed { index, point ->
-                Triple(
-                    startIndex + index * 100,
-                    (point["Elevation"] as Double).toFloat(),
-                    (point["Azimuth"] as Double).toFloat()
-                )
-            }
-
-            if (additionalTrackingData.isEmpty()) {
-                logger.info("더 이상 전송할 추적 데이터가 없습니다.")
-                return
-            }
-
-            val additionalDataFrame = ICDService.SatelliteTrackThree.SetDataFrame(
-                cmdOne = 'T', cmdTwo = 'R',
-                dataLength = additionalTrackingData.size.toUShort(),
-                satelliteTrackData = additionalTrackingData
-            )
-
-            udpFwICDService.sendSatelliteTrackAdditionalData(additionalDataFrame)
-            logger.info("🔄 [폴백] 위성 추적 추가 데이터 전송 완료 (${additionalTrackingData.size}개 데이터 포인트, 시작 인덱스: $startIndex)")
-
-        } catch (e: Exception) {
-            logger.error("폴백 추적 데이터 전송 중 오류 발생: ${e.message}", e)
+            logger.warn("⚠️ 메모리 저장소 처리 지연: ${processingTime}ms")
         }
     }
 
@@ -1325,15 +1527,16 @@ class PassScheduleService(
             logger.info("$actualSatelliteName 위성의 패스 스케줄 추적 시작")
 
             val today = ZonedDateTime.now().truncatedTo(ChronoUnit.DAYS)
-            val passScheduleTrackMst = mutableListOf<Map<String, Any?>>()
-            val passScheduleTrackDtl = mutableListOf<Map<String, Any?>>()
 
+            // ✅ 1. OrekitCalculator로 2축 데이터 생성 (유지)
+            // ✅ EphemerisService와 동일한 설정 사용 (sourceMinElevationAngle)
+            val sourceMinEl = settingsService.sourceMinElevationAngle.toFloat()
             val schedule = orekitCalculator.generateSatelliteTrackingSchedule(
                 tleLine1 = tleLine1,
                 tleLine2 = tleLine2,
                 startDate = today.withZoneSameInstant(ZoneOffset.UTC),
                 durationDays = 2,
-                minElevation = settingsService.minElevationAngle,
+                minElevation = sourceMinEl,
                 latitude = locationData.latitude,
                 longitude = locationData.longitude,
                 altitude = locationData.altitude,
@@ -1341,162 +1544,42 @@ class PassScheduleService(
 
             logger.info("위성 $satelliteId 추적 스케줄 생성 완료: ${schedule.trackingPasses.size}개 패스")
 
-            val creationDate = ZonedDateTime.now()
-            val creator = "PassScheduleService"
-
-            schedule.trackingPasses.forEachIndexed { index, pass ->
-                globalMstId++
-
-                val startTimeWithMs = pass.startTime.withZoneSameInstant(ZoneOffset.UTC)
-                val endTimeWithMs = pass.endTime.withZoneSameInstant(ZoneOffset.UTC)
-
-                logger.debug("패스 #$globalMstId: 시작=$startTimeWithMs, 종료=$endTimeWithMs")
-
-                // ✅ 메타데이터 필드 에러 해결: trackingData에서 직접 계산
-                val maxElevationData = pass.trackingData.maxByOrNull { it.elevation }
-                val startData = pass.trackingData.firstOrNull()
-                val endData = pass.trackingData.lastOrNull()
-                
-                // 속도/가속도 계산 (간단한 방식)
-                var maxAzRate = 0.0
-                var maxElRate = 0.0
-                var maxAzAccel = 0.0
-                var maxElAccel = 0.0
-                
-                if (pass.trackingData.size >= 2) {
-                    var prevAz: Double? = null
-                    var prevEl: Double? = null
-                    var prevTime: java.time.ZonedDateTime? = null
-                    var prevAzRate: Double? = null
-                    var prevElRate: Double? = null
-                    
-                    pass.trackingData.forEach { data ->
-                        if (prevAz != null && prevEl != null && prevTime != null) {
-                            val timeDiff = java.time.Duration.between(prevTime, data.timestamp).toMillis() / 1000.0
-                            if (timeDiff > 0.001) {
-                                val azRate = (data.azimuth - prevAz!!) / timeDiff
-                                val elRate = (data.elevation - prevEl!!) / timeDiff
-                                
-                                maxAzRate = maxOf(maxAzRate, kotlin.math.abs(azRate))
-                                maxElRate = maxOf(maxElRate, kotlin.math.abs(elRate))
-                                
-                                if (prevAzRate != null && prevElRate != null) {
-                                    val azAccel = (azRate - prevAzRate!!) / timeDiff
-                                    val elAccel = (elRate - prevElRate!!) / timeDiff
-                                    
-                                    maxAzAccel = maxOf(maxAzAccel, kotlin.math.abs(azAccel))
-                                    maxElAccel = maxOf(maxElAccel, kotlin.math.abs(elAccel))
-                                }
-                                
-                                prevAzRate = azRate
-                                prevElRate = elRate
-                            }
-                        }
-                        prevAz = data.azimuth
-                        prevEl = data.elevation
-                        prevTime = data.timestamp
-                    }
-                }
-
-                passScheduleTrackMst.add(
-                    mapOf(
-                        "No" to globalMstId.toUInt(),
-                        "SatelliteID" to satelliteId,
-                        "SatelliteName" to actualSatelliteName,
-                        "StartTime" to startTimeWithMs,
-                        "EndTime" to endTimeWithMs,
-                        "Duration" to pass.getDurationString(),
-                        "MaxElevation" to (maxElevationData?.elevation ?: 0.0),
-                        "MaxElevationTime" to (maxElevationData?.timestamp ?: startTimeWithMs),
-                        "StartAzimuth" to (startData?.azimuth ?: 0.0),
-                        "StartElevation" to (startData?.elevation ?: 0.0),
-                        "EndAzimuth" to (endData?.azimuth ?: 0.0),
-                        "EndElevation" to (endData?.elevation ?: 0.0),
-                        "MaxAzRate" to maxAzRate,
-                        "MaxElRate" to maxElRate,
-                        "MaxAzAccel" to maxAzAccel,
-                        "MaxElAccel" to maxElAccel,
-                        "CreationDate" to creationDate,
-                        "Creator" to creator
-                    )
+            // ✅ 2. SatelliteTrackingProcessor로 모든 변환 수행
+            logger.info("🔄 SatelliteTrackingProcessor로 데이터 변환 시작...")
+            val processedData = try {
+                satelliteTrackingProcessor.processFullTransformation(
+                    schedule,
+                    actualSatelliteName
                 )
-
-                pass.trackingData.forEachIndexed { dtlIndex, data ->
-                    passScheduleTrackDtl.add(
-                        mapOf(
-                            "No" to (dtlIndex + 1).toUInt(),
-                            "MstId" to globalMstId.toUInt(),
-                            "SatelliteID" to satelliteId,
-                            "Time" to data.timestamp,
-                            "Azimuth" to data.azimuth,
-                            "Elevation" to data.elevation,
-                            "Range" to data.range,
-                            "Altitude" to data.altitude
-                        )
-                    )
-                }
+            } catch (e: Exception) {
+                logger.error("❌ 위성 추적 데이터 처리 실패: ${e.message}", e)
+                throw e
             }
+            logger.info("✅ SatelliteTrackingProcessor 데이터 변환 완료")
 
-            logger.info("위성 $satelliteId 추적 데이터 생성 완료: ${passScheduleTrackMst.size}개 스케줄 항목과 ${passScheduleTrackDtl.size}개 좌표 포인트")
+            // ✅ 3. 5가지 DataType 모두 저장
+            val allMstData = mutableListOf<Map<String, Any?>>()
+            allMstData.addAll(processedData.originalMst)
+            allMstData.addAll(processedData.axisTransformedMst)
+            allMstData.addAll(processedData.finalTransformedMst)
+            allMstData.addAll(processedData.keyholeAxisTransformedMst)
+            allMstData.addAll(processedData.keyholeFinalTransformedMst)
 
-            // 방위각 변환 시작
-            logger.info("방위각 변환 시작 (0~360도 -> ±270도)")
-            val (convertedMst, convertedDtl) = limitAngleCalculator.convertTrackingData(
-                passScheduleTrackMst, passScheduleTrackDtl
-            )
-            logger.info("방위각 변환 완료")
-
-            // 검증
-            val validationResult = limitAngleCalculator.validateConversion(
-                passScheduleTrackMst, passScheduleTrackDtl, convertedMst, convertedDtl
-            )
-            logger.info(validationResult.getSummary())
-
-            // 통계
-            val statistics = limitAngleCalculator.getConversionStatistics(passScheduleTrackDtl, convertedDtl)
-            logger.info(statistics.getSummary())
-
-            if (validationResult.isValid) {
-                logger.info("✅ 방위각 변환 검증 성공")
-            } else {
-                logger.warn("⚠️ 방위각 변환 검증 이슈:")
-                validationResult.issues.forEach { issue ->
-                    logger.warn("  - $issue")
-                }
-            }
+            val allDtlData = mutableListOf<Map<String, Any?>>()
+            allDtlData.addAll(processedData.originalDtl)
+            allDtlData.addAll(processedData.axisTransformedDtl)
+            allDtlData.addAll(processedData.finalTransformedDtl)
+            allDtlData.addAll(processedData.keyholeAxisTransformedDtl)
+            allDtlData.addAll(processedData.keyholeFinalTransformedDtl)
 
             // 저장소에 데이터 저장
-            passScheduleTrackMstStorage[satelliteId] = convertedMst
-            passScheduleTrackDtlStorage[satelliteId] = convertedDtl
+            passScheduleTrackMstStorage[satelliteId] = allMstData
+            passScheduleTrackDtlStorage[satelliteId] = allDtlData
 
-            // 변환 결과 로깅
-            convertedMst.forEach { mst ->
-                val mstId = mst["No"] as UInt
-                val originalStartAz = mst["OriginalStartAzimuth"] as? Double
-                val originalEndAz = mst["OriginalEndAzimuth"] as? Double
-                val convertedStartAz = mst["StartAzimuth"] as Double
-                val convertedEndAz = mst["EndAzimuth"] as Double
+            logger.info("✅ 위성 $satelliteId 추적 데이터 저장 완료: ${allMstData.size}개 MST 레코드 (5가지 DataType 포함), ${allDtlData.size}개 DTL 레코드")
 
-                logger.debug("패스 #$mstId 변환 결과:")
-                if (originalStartAz != null && originalEndAz != null) {
-                    logger.debug(
-                        "  원본: ${String.format("%.2f", originalStartAz)}° ~ ${
-                            String.format(
-                                "%.2f", originalEndAz
-                            )
-                        }°"
-                    )
-                }
-                logger.debug(
-                    "  변환: ${String.format("%.2f", convertedStartAz)}° ~ ${
-                        String.format(
-                            "%.2f", convertedEndAz
-                        )
-                    }°"
-                )
-            }
-
-            Pair(convertedMst, convertedDtl)
+            // 하위 호환성을 위해 final_transformed 데이터 반환
+            Pair(processedData.finalTransformedMst, processedData.finalTransformedDtl)
         }.subscribeOn(Schedulers.boundedElastic()).doOnSubscribe {
             logger.info("위성 패스 스케줄 추적 데이터 생성 시작 (비동기): $satelliteId")
         }.doOnSuccess {
@@ -1528,6 +1611,154 @@ class PassScheduleService(
 
     fun getAllPassScheduleTrackMst(): Map<String, List<Map<String, Any?>>> {
         return passScheduleTrackMstStorage.toMap()
+    }
+
+    /**
+     * 모든 PassSchedule MST 데이터를 병합하여 반환합니다.
+     *
+     * 이 함수는 5가지 DataType(original, axis_transformed, final_transformed,
+     * keyhole_axis_transformed, keyhole_final_transformed)의 MST 데이터를 병합하여
+     * Keyhole 정보를 포함한 단일 리스트로 반환합니다.
+     *
+     * 병합된 데이터에는 다음 정보가 포함됩니다:
+     * - Original (2축) 메타데이터: OriginalMaxElevation, OriginalMaxAzRate, OriginalMaxElRate 등
+     * - FinalTransformed (3축, Train=0, ±270°) 메타데이터: FinalTransformedMaxAzRate, FinalTransformedMaxElRate 등
+     * - KeyholeAxisTransformed (3축, Train≠0) 메타데이터: KeyholeAxisTransformedMaxAzRate 등
+     * - KeyholeFinalTransformed (3축, Train≠0, ±270°) 메타데이터: KeyholeFinalTransformedMaxAzRate 등
+     * - Keyhole 정보: IsKeyhole, RecommendedTrainAngle
+     * - 필터링된 MaxElevation: displayMinElevationAngle 기준으로 필터링된 데이터의 MaxElevation
+     *
+     * @return 병합된 MST 데이터 리스트 (Keyhole 정보 포함)
+     *
+     * @see getAllEphemerisTrackMstMerged EphemerisService의 동일한 로직 참고
+     * @see getTrackingPassMst Keyhole 판단 기준과 일치
+     */
+    fun getAllPassScheduleTrackMstMerged(): List<Map<String, Any?>> {
+        try {
+            logger.info("📊 Original, FinalTransformed, KeyholeAxisTransformed, KeyholeFinalTransformed 데이터 병합 시작")
+            
+            // 5가지 DataType 모두 조회 (위성별 그룹화된 구조에서 flatten)
+            val allMstData = passScheduleTrackMstStorage.values.flatten()
+            val originalMst = allMstData.filter { it["DataType"] == "original" }
+            val finalMst = allMstData.filter { it["DataType"] == "final_transformed" }
+            val keyholeAxisMst = allMstData.filter { it["DataType"] == "keyhole_axis_transformed" }
+            val keyholeMst = allMstData.filter { it["DataType"] == "keyhole_final_transformed" }
+            
+            if (finalMst.isEmpty()) {
+                logger.warn("⚠️ FinalTransformed 데이터가 없습니다")
+                return emptyList()
+            }
+            
+            // final_transformed MST 기준으로 병합
+            val mergedData = finalMst.map { final ->
+                val mstId = final["No"] as UInt
+                val original = originalMst.find { it["No"] == mstId }
+                val keyholeAxis = keyholeAxisMst.find { it["No"] == mstId }
+                val keyhole = keyholeMst.find { it["No"] == mstId }
+                
+                // Keyhole 판단: final_transformed (Train=0) 기준으로 판단
+                val train0MaxAzRate = final["MaxAzRate"] as? Double ?: 0.0
+                val threshold = settingsService.keyholeAzimuthVelocityThreshold
+                val isKeyhole = train0MaxAzRate >= threshold
+                
+                // 병합된 데이터 생성 (EphemerisService와 동일한 구조)
+                final.toMutableMap().apply {
+                    // Original (2축) 메타데이터 추가
+                    put("OriginalMaxElevation", original?.get("MaxElevation"))
+                    put("OriginalMaxAzRate", original?.get("MaxAzRate"))
+                    put("OriginalMaxElRate", original?.get("MaxElRate"))
+                    
+                    // FinalTransformed 속도 (Train=0, ±270°)
+                    put("FinalTransformedMaxAzRate", final["MaxAzRate"])
+                    put("FinalTransformedMaxElRate", final["MaxElRate"])
+                    
+                    // Keyhole Axis Transformed 데이터 추가 (각도 제한 ❌, Train≠0)
+                    if (keyholeAxis != null && isKeyhole) {
+                        put("KeyholeAxisTransformedMaxAzRate", keyholeAxis["MaxAzRate"])
+                        put("KeyholeAxisTransformedMaxElRate", keyholeAxis["MaxElRate"])
+                    }
+                    
+                    // Keyhole Final Transformed 데이터 추가 (각도 제한 ✅, Train≠0)
+                    if (keyhole != null && isKeyhole) {
+                        put("KeyholeFinalTransformedMaxAzRate", keyhole["MaxAzRate"])
+                        put("KeyholeFinalTransformedMaxElRate", keyhole["MaxElRate"])
+                    }
+                    
+                    // FinalTransformed 시작/종료 각도 및 최대 고도 (Train=0, ±270°)
+                    put("FinalTransformedStartAzimuth", final["StartAzimuth"])
+                    put("FinalTransformedEndAzimuth", final["EndAzimuth"])
+                    put("FinalTransformedStartElevation", final["StartElevation"])
+                    put("FinalTransformedEndElevation", final["EndElevation"])
+                    put("FinalTransformedMaxElevation", final["MaxElevation"])
+                    
+                    // KeyholeFinalTransformed 시작/종료 각도 및 최대 고도 (Train≠0, ±270°)
+                    put("KeyholeFinalTransformedStartAzimuth", keyhole?.get("StartAzimuth"))
+                    put("KeyholeFinalTransformedEndAzimuth", keyhole?.get("EndAzimuth"))
+                    put("KeyholeFinalTransformedStartElevation", keyhole?.get("StartElevation"))
+                    put("KeyholeFinalTransformedEndElevation", keyhole?.get("EndElevation"))
+                    put("KeyholeFinalTransformedMaxElevation", keyhole?.get("MaxElevation"))
+                    
+                    // ✅ displayMinElevationAngle 기준으로 필터링된 데이터의 MaxElevation 재계산
+                    // 전체 저장소에서 해당 MST ID의 DTL 데이터 조회 (Keyhole-aware)
+                    val satelliteId = final["SatelliteID"] as? String
+                    val allDtlData = if (satelliteId != null) {
+                        passScheduleTrackDtlStorage[satelliteId] ?: emptyList()
+                    } else {
+                        emptyList()
+                    }
+                    
+                    // Keyhole 여부에 따라 적절한 DataType의 DTL 필터링
+                    val dataType = determineKeyholeDataType(mstId, passScheduleTrackMstStorage)
+                    val filteredDtl = if (dataType != null) {
+                        allDtlData.filter {
+                            it["MstId"] == mstId && it["DataType"] == dataType
+                        }
+                    } else {
+                        emptyList()
+                    }
+                    
+                    val filteredMaxElevation = if (filteredDtl.isNotEmpty()) {
+                        filteredDtl.maxOfOrNull { (it["Elevation"] as? Double) ?: Double.NEGATIVE_INFINITY }
+                    } else {
+                        null
+                    }
+                    put("MaxElevation", filteredMaxElevation)
+                    
+                    // Keyhole 정보
+                    put("IsKeyhole", isKeyhole)
+                    put("RecommendedTrainAngle", final.get("RecommendedTrainAngle") as? Double ?: 0.0)
+                }
+            }
+            
+            // ✅ 필터링 (displayMinElevationAngle 기준)
+            val enableFiltering = settingsService.enableDisplayMinElevationFiltering
+            val displayMinElevation = settingsService.displayMinElevationAngle
+            
+            val filteredMergedData = if (enableFiltering) {
+                mergedData.filter { item ->
+                    val maxElevation = item["MaxElevation"] as? Double
+                    maxElevation != null && maxElevation >= displayMinElevation
+                }
+            } else {
+                val elevationMin = settingsService.angleElevationMin
+                mergedData.filter { item ->
+                    val maxElevation = item["MaxElevation"] as? Double
+                    maxElevation != null && maxElevation >= elevationMin
+                }
+            }
+            
+            logger.info("✅ 병합 완료: ${mergedData.size}개 MST 레코드 (KeyholeAxis + KeyholeFinal 데이터 포함)")
+            if (enableFiltering) {
+                logger.info("✅ 필터링 완료: ${mergedData.size}개 → ${filteredMergedData.size}개 (displayMinElevationAngle=${displayMinElevation}° 기준)")
+            } else {
+                logger.info("✅ 필터링 완료: ${mergedData.size}개 → ${filteredMergedData.size}개 (elevationMin=${settingsService.angleElevationMin}° 기준)")
+            }
+            return filteredMergedData
+            
+        } catch (error: Exception) {
+            logger.error("❌ 데이터 병합 실패: ${error.message}", error)
+            return emptyList()
+        }
     }
 
     fun getAllPassScheduleTrackDtl(): Map<String, List<Map<String, Any?>>> {
@@ -1615,6 +1846,15 @@ class PassScheduleService(
         logger.info("위성 추적 스케줄 대상 목록이 초기화되었습니다. ${size}개 항목 삭제")
     }
 
+    /**
+     * 선택된 추적 데이터를 생성합니다.
+     *
+     * 이 함수는 사용자가 선택한 패스만 필터링하여 selectedTrackMstStorage에 저장합니다.
+     * trackingTargetList에 있는 MST ID만 필터링하며, 5가지 DataType 모두 처리합니다.
+     *
+     * @note 이 함수는 passScheduleTrackMstStorage에서 5가지 DataType 모두 필터링합니다.
+     * @note selectedTrackMstStorage를 사용하는 모든 함수가 Keyhole 정보를 포함하도록 개선됩니다.
+     */
     fun generateSelectedTrackingData() {
         synchronized(trackingTargetList) {
             if (trackingTargetList.isEmpty()) {
@@ -1628,20 +1868,36 @@ class PassScheduleService(
             selectedTrackMstStorage.clear()
             val targetMstIds = trackingTargetList.map { it.mstId }.toSet()
 
+            // ✅ 5가지 DataType 모두 필터링
+            val dataTypes = listOf(
+                "original",
+                "axis_transformed",
+                "final_transformed",
+                "keyhole_axis_transformed",
+                "keyhole_final_transformed"
+            )
+
             passScheduleTrackMstStorage.forEach { (satelliteId, allMstData) ->
-                val selectedMstData = allMstData.filter { mstRecord ->
-                    val mstId = mstRecord["No"] as? UInt
-                    mstId != null && targetMstIds.contains(mstId)
+                val selectedMstData = mutableListOf<Map<String, Any?>>()
+                
+                // 각 DataType별로 필터링
+                dataTypes.forEach { dataType ->
+                    val filteredByDataType = allMstData.filter { mstRecord ->
+                        val mstId = mstRecord["No"] as? UInt
+                        val recordDataType = mstRecord["DataType"] as? String
+                        mstId != null && targetMstIds.contains(mstId) && recordDataType == dataType
+                    }
+                    selectedMstData.addAll(filteredByDataType)
                 }
 
                 if (selectedMstData.isNotEmpty()) {
                     selectedTrackMstStorage[satelliteId] = selectedMstData
-                    logger.info("위성 $satelliteId 선별된 패스: ${selectedMstData.size}개")
+                    logger.info("위성 $satelliteId 선별된 패스: ${selectedMstData.size}개 (5가지 DataType 포함)")
                 }
             }
 
             val totalSelectedPasses = selectedTrackMstStorage.values.sumOf { it.size }
-            logger.info("선별된 추적 데이터 생성 완료: ${selectedTrackMstStorage.size}개 위성, ${totalSelectedPasses}개 패스")
+            logger.info("선별된 추적 데이터 생성 완료: ${selectedTrackMstStorage.size}개 위성, ${totalSelectedPasses}개 패스 (5가지 DataType 포함)")
         }
     }
 
@@ -1653,6 +1909,95 @@ class PassScheduleService(
         return selectedTrackMstStorage.toMap()
     }
 
+    /**
+     * Keyhole 여부를 확인하고 적절한 DataType을 반환합니다.
+     *
+     * 이 함수는 final_transformed MST에서 IsKeyhole 정보를 확인하여,
+     * Keyhole 발생 시 keyhole_final_transformed, 미발생 시 final_transformed를 반환합니다.
+     *
+     * @param passId 패스 ID (MST ID)
+     * @param storage 조회할 저장소 (passScheduleTrackMstStorage 또는 selectedTrackMstStorage)
+     * @return Keyhole 여부에 따라 선택된 DataType ("keyhole_final_transformed" 또는 "final_transformed"), 없으면 null
+     *
+     * @see getTrackingPassMst 이 함수에서 사용하여 MST 선택
+     * @see getSelectedTrackDtlByMstId 이 함수에서 사용하여 DTL 선택
+     *
+     * @note final_transformed MST에 IsKeyhole 정보가 저장되어 있어야 함
+     * @note keyhole_final_transformed 데이터가 없으면 final_transformed로 폴백
+     */
+    private fun determineKeyholeDataType(
+        passId: UInt,
+        storage: Map<String, List<Map<String, Any?>>>
+    ): String? {
+        // final_transformed MST에서 IsKeyhole 확인
+        val allMstData = storage.values.flatten()
+        val finalMst = allMstData.find {
+            it["No"] == passId && it["DataType"] == "final_transformed"
+        } ?: return null
+        
+        val isKeyhole = finalMst["IsKeyhole"] as? Boolean ?: false
+        
+        return if (isKeyhole) {
+            // Keyhole 발생 시 keyhole_final_transformed 데이터 존재 여부 확인
+            val keyholeDataExists = allMstData.any {
+                it["No"] == passId && it["DataType"] == "keyhole_final_transformed"
+            }
+            
+            if (!keyholeDataExists) {
+                logger.warn("⚠️ 패스 ID ${passId}: Keyhole로 판단되었으나 keyhole_final_transformed 데이터가 없습니다. final_transformed로 폴백합니다.")
+                "final_transformed"  // 폴백
+            } else {
+                "keyhole_final_transformed"
+            }
+        } else {
+            "final_transformed"
+        }
+    }
+
+    /**
+     * Keyhole 여부에 따라 적절한 MST(Master) 데이터를 반환합니다.
+     *
+     * 이 함수는 위성 추적 시작 시 currentTrackingPass를 설정하기 위해 사용됩니다.
+     * passId로 조회하며, Keyhole 여부에 따라 DataType을 **동적으로 선택**합니다:
+     * - Keyhole 발생: keyhole_final_transformed MST (Train≠0, ±270° 제한 적용)
+     * - Keyhole 미발생: final_transformed MST (Train=0, ±270° 제한 적용)
+     *
+     * 선택된 MST에는 다음 정보가 포함됩니다:
+     * - IsKeyhole: Keyhole 여부 (Boolean)
+     * - RecommendedTrainAngle: 권장 Train 각도 (Double, Keyhole 발생 시만 0이 아님)
+     * - StartTime, EndTime: 추적 시작/종료 시간
+     * - 기타 추적 메타데이터
+     *
+     * @param passId 패스 ID (MST ID)
+     * @return Keyhole 여부에 따라 선택된 MST 데이터, 없으면 null
+     *
+     * @see getSelectedTrackDtlByMstId 동일한 Keyhole 판단 로직 사용 (DTL 데이터 반환)
+     * @see getAllPassScheduleTrackMstMerged Keyhole 판단 기준과 일치
+     *
+     * @note 이 함수는 passScheduleTrackMstStorage에서 직접 조회합니다.
+     * @note selectedTrackMstStorage를 사용하는 함수들과 달리, 전체 저장소에서 조회합니다.
+     * @note DataType은 정해져 있지 않고, Keyhole 여부에 따라 동적으로 선택됩니다.
+     */
+    private fun getTrackingPassMst(passId: UInt): Map<String, Any?>? {
+        // determineKeyholeDataType()을 사용하여 적절한 DataType 결정
+        val dataType = determineKeyholeDataType(passId, passScheduleTrackMstStorage) ?: return null
+        
+        // 선택된 DataType의 MST 반환
+        val selectedMst = passScheduleTrackMstStorage.values.flatten().find {
+            it["No"] == passId && it["DataType"] == dataType
+        }
+        
+        if (selectedMst == null) {
+            logger.error("❌ 패스 ID ${passId}: 선택된 DataType($dataType)의 MST를 찾을 수 없습니다.")
+            return null
+        }
+        
+        val isKeyhole = selectedMst["IsKeyhole"] as? Boolean ?: false
+        logger.info("📊 패스 ID ${passId} MST 선택: Keyhole=${if (isKeyhole) "YES" else "NO"}, DataType=${dataType}")
+        
+        return selectedMst
+    }
+
     fun getSelectedTrackMstByMstId(mstId: UInt): Map<String, Any?>? {
         selectedTrackMstStorage.values.forEach { mstDataList ->
             val found = mstDataList.find { it["No"] == mstId }
@@ -1661,12 +2006,40 @@ class PassScheduleService(
         return null
     }
 
+    /**
+     * 선택된 패스의 DTL 데이터를 조회합니다.
+     *
+     * 이 함수는 Keyhole 여부에 따라 적절한 DataType의 DTL 데이터를 반환합니다.
+     * selectedTrackMstStorage에서 MST를 조회한 후, Keyhole 여부를 확인하여 적절한 DataType의 DTL을 반환합니다.
+     *
+     * @param mstId MST ID (패스 ID)
+     * @return Keyhole 여부에 따라 선택된 DataType의 DTL 데이터 리스트
+     *
+     * @see getTrackingPassMst 동일한 Keyhole 판단 로직 사용 (MST 데이터 반환)
+     * @see getEphemerisTrackDtlByMstId EphemerisService의 동일한 로직 참고
+     */
     fun getSelectedTrackDtlByMstId(mstId: UInt): List<Map<String, Any?>> {
+        // 1. selectedTrackMstStorage에서 MST 조회
         val selectedMst = getSelectedTrackMstByMstId(mstId) ?: return emptyList()
         val satelliteId = selectedMst["SatelliteID"] as? String ?: return emptyList()
-
+        
+        // 2. determineKeyholeDataType()을 사용하여 적절한 DataType 결정
+        val dataType = determineKeyholeDataType(mstId, selectedTrackMstStorage) ?: return emptyList()
+        
+        // 3. 선택된 DataType의 DTL 데이터 조회
         val allDtlData = passScheduleTrackDtlStorage[satelliteId] ?: return emptyList()
-        return allDtlData.filter { it["MstId"] == mstId }
+        
+        val filteredDtl = allDtlData.filter {
+            it["MstId"] == mstId && it["DataType"] == dataType
+        }
+        
+        val isKeyhole = selectedTrackMstStorage.values.flatten().find {
+            it["No"] == mstId && it["DataType"] == "final_transformed"
+        }?.get("IsKeyhole") as? Boolean ?: false
+        
+        logger.info("📊 MST ID ${mstId} DTL 조회: Keyhole=${if (isKeyhole) "YES" else "NO"}, DataType=${dataType}, ${filteredDtl.size}개 포인트")
+        
+        return filteredDtl
     }
 
     fun getSelectedTrackingSchedule(): List<Map<String, Any?>> {

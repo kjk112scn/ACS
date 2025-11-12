@@ -724,22 +724,37 @@ class PassScheduleController(
         operationId = "getallpassschedulemasterdata",
         tags = ["Mode - Pass Schedule"]
     )
+    /**
+     * 전체 PassSchedule 마스터 데이터를 조회합니다.
+     *
+     * 이 함수는 5가지 DataType의 MST 데이터를 병합하여 Keyhole 정보를 포함한 데이터를 반환합니다.
+     * EphemerisController의 `/ephemeris/master` API와 동일한 수준의 정보를 제공합니다.
+     *
+     * @return ResponseEntity<Map<String, Any>> 위성별로 그룹화된 MST 데이터 (Keyhole 정보 포함)
+     *
+     * @see EphemerisController.getAllEphemerisTrackMst EphemerisService의 동일한 로직 참고
+     * @see PassScheduleService.getAllPassScheduleTrackMstMerged 병합된 데이터 제공
+     */
     fun getAllTrackingMasterData(): ResponseEntity<Map<String, Any>> {
         return try {
-            val allMstData = passScheduleService.getAllPassScheduleTrackMst()
+            // ✅ getAllPassScheduleTrackMstMerged() 사용 (Keyhole 정보 포함)
+            val allMstData = passScheduleService.getAllPassScheduleTrackMstMerged()
 
             if (allMstData.isNotEmpty()) {
-                val totalPasses = allMstData.values.sumOf { it.size }
-                logger.info("전체 마스터 데이터 조회 성공: ${allMstData.size}개 위성, ${totalPasses}개 패스")
+                // 위성별로 그룹화 (기존 구조 유지, 하위 호환성)
+                val satellites = allMstData.groupBy { it["SatelliteID"] as String }
+                val totalPasses = allMstData.size
+
+                logger.info("전체 마스터 데이터 조회 성공: ${satellites.size}개 위성, ${totalPasses}개 패스 (Keyhole 정보 포함)")
 
                 ResponseEntity.ok(
                     mapOf(
                         "success" to true,
                         "message" to "전체 마스터 데이터 조회 성공",
                         "data" to mapOf(
-                            "satelliteCount" to allMstData.size,
+                            "satelliteCount" to satellites.size,
                             "totalPassCount" to totalPasses,
-                            "satellites" to allMstData
+                            "satellites" to satellites
                         ),
                         "timestamp" to System.currentTimeMillis()
                     )

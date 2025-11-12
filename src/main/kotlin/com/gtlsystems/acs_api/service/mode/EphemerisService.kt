@@ -810,16 +810,19 @@ class EphemerisService(
         // ✅ Keyhole 여부에 따라 적절한 MST 선택
         // Keyhole 발생: keyhole_final_transformed MST
         // Keyhole 미발생: final_transformed MST
-        currentTrackingPass = getTrackingPassMst(passId)
+        val selectedPass = getTrackingPassMst(passId)
         
-        if (currentTrackingPass == null) {
+        if (selectedPass == null) {
             logger.error("패스 ID {}에 해당하는 데이터를 찾을 수 없습니다", passId)
             return
         }
         
+        // ✅ 로컬 변수에 할당하여 smart cast 문제 해결
+        currentTrackingPass = selectedPass
+        
         // Keyhole 정보 로깅
-        val isKeyhole = currentTrackingPass["IsKeyhole"] as? Boolean ?: false
-        val recommendedTrainAngle = currentTrackingPass["RecommendedTrainAngle"] as? Double ?: 0.0
+        val isKeyhole = selectedPass["IsKeyhole"] as? Boolean ?: false
+        val recommendedTrainAngle = selectedPass["RecommendedTrainAngle"] as? Double ?: 0.0
         logger.info("📊 추적 패스 정보: Keyhole=${if (isKeyhole) "YES" else "NO"}, RecommendedTrainAngle=${recommendedTrainAngle}°")
         
         logger.info("✅ ephemeris 추적 준비 완료 (실제 추적 시작 전)")

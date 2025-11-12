@@ -590,14 +590,41 @@ fun sendInitialTrackingData(passId: UInt) {
 }
 ```
 
-#### 1.7 sendAdditionalTrackingDataOptimized() 개선
+#### 1.7 sendAdditionalTrackingData() 개선 (함수 이름 개선 및 비동기/동기 처리 최적화)
 
 **현재 (874-895줄)**:
+- `sendAdditionalTrackingDataOptimized()`: 비동기 처리, 캐시 우선
+- `sendFromCache()`: 캐시에서 전송 (최적화된 배열 구조)
+- `sendFromDatabase()`: 메모리 저장소에서 전송 (현재는 DB 사용 안 함, 추후 DB 연계 예정)
+- `sendAdditionalTrackingDataLegacy()`: 폴백용 (중복)
 - `getSelectedTrackDtlByMstId()` 사용 (954줄) - Keyhole 정보 없음
 
+**참고**: `sendFromCache()`와 `sendFromDatabase()`의 차이
+- `sendFromCache()`: 최적화된 캐시 구조(`TrackingDataCache`의 `Array<TrackingPoint>`)에서 빠르게 접근
+- `sendFromDatabase()`: 일반 메모리 저장소(`ConcurrentHashMap`)에서 가져옴 (현재는 DB 사용 안 함)
+- 둘 다 메모리에서 가져오지만, 데이터 구조와 성능이 다름
+- 추후 DB 연계 시: `getSelectedTrackDtlByMstId()`만 수정하면 `sendAdditionalTrackingDataFromDatabase()`가 자동으로 DB 연계됨
+
+**문제점**:
+1. 함수 이름이 불명확함 (`Optimized`, `FromCache`, `FromDatabase`, `Legacy`)
+2. 비동기 처리가 느려서 동기 처리가 필요했음
+3. `sendAdditionalTrackingDataLegacy()`와 `sendFromDatabase()`가 중복
+
 **개선 후**:
-- Keyhole 여부에 따라 적절한 DataType 반환
-- `EphemerisService.kt`의 `sendAdditionalTrackingData()` (2055-2102줄) 참고
+1. **함수 이름 개선**:
+   - `sendAdditionalTrackingDataOptimized()` → `sendAdditionalTrackingData()` (메인 함수)
+   - `sendFromCache()` → `sendAdditionalTrackingDataFromCache()` (명확하게)
+   - `sendFromDatabase()` → `sendAdditionalTrackingDataFromDatabase()` (명확하게)
+   - `sendAdditionalTrackingDataLegacy()` → **제거** (중복이므로)
+
+2. **비동기/동기 처리 최적화**:
+   - 캐시 있으면: 동기 처리 (빠름, 즉시 전송)
+   - 캐시 없으면: 비동기 처리 (DB 조회는 느릴 수 있으므로 블로킹 방지)
+   - 예외 발생 시: 동기 처리로 폴백
+
+3. **Keyhole-aware 데이터 사용**:
+   - `getSelectedTrackDtlByMstId()` 사용 (이미 Keyhole-aware로 개선됨)
+   - `EphemerisService.kt`의 `sendAdditionalTrackingData()` (2055-2102줄) 참고
 
 ### Phase 2: Controller API 개선 (PushDataService 의존성 추가하지 않음)
 
@@ -1345,40 +1372,700 @@ SatelliteTrackingProcessor.processFullTransformation()
 3. **테스트**: Keyhole 계산 로직 검증 필수
 4. **상태머신**: Train 각도 설정 시점 확인 필요 (질문 1 참고)
 
-## 구현 순서
+## 구현 순서 (컴파일 확인 포함)
 
-1. ✅ 현재 상태 분석 (완료)
-2. ⏳ PassScheduleService에 SatelliteTrackingProcessor 주입 및 processFullTransformation() 통합
-3. ⏳ PassScheduleService 저장소 구조 개선: 5가지 DataType 저장 및 Keyhole 정보 포함
-4. ⏳ PassScheduleService 조회 메서드 개선: Keyhole 여부에 따라 적절한 DataType 반환, getTrackingPassMst() 헬퍼 함수 추가
-   - getTrackingPassMst() 헬퍼 함수 추가 (passScheduleTrackMstStorage에서 직접 조회)
-   - getSelectedTrackMstByMstId() 개선 (selectedTrackMstStorage 사용, generateSelectedTrackingData() 개선 필요)
-   - getSelectedTrackDtlByMstId() 개선 (Keyhole 여부에 따라 적절한 DataType 반환)
-   - generateSelectedTrackingData() 개선 (5가지 DataType 모두 필터링하여 selectedTrackMstStorage에 저장)
-5. ⏳ PassScheduleService PREPARING 상태 개선: Train 회전 로직 추가 (별도 상태 추가 없이)
-   - 내부 플래그(PreparingStep enum)로 진행 단계 관리
-   - moveToStartPosition() 개선: targetAzimuth, targetElevation 설정 후 PreparingStep.MOVING_TRAIN으로 전환
-   - executeStateAction()의 PREPARING 상태에서 단계별 처리 (Train 회전 → 안정화 대기 → Az/El 이동)
-   - moveTrainToZero(), moveToTargetAzEl(), isTrainAtZero(), isTrainStabilized() 함수 추가
-   - checkTrackingScheduleWithStateMachine()이 100ms 주기로 호출되므로, PREPARING 상태에서 단계별 체크 가능
-7. ⏳ PassScheduleService ICD 프로토콜 함수 개선: sendHeaderTrackingData(), sendInitialTrackingData(), sendAdditionalTrackingDataOptimized()
-   - sendHeaderTrackingData(): getTrackingPassMst() 사용 (Keyhole 정보 포함)
-   - sendInitialTrackingData(): getSelectedTrackDtlByMstId() 사용 (Keyhole 여부에 따라 적절한 DataType 반환)
-   - sendAdditionalTrackingDataOptimized(): getSelectedTrackDtlByMstId() 사용 (Keyhole 여부에 따라 적절한 DataType 반환)
-   - sendFromDatabase(): getSelectedTrackDtlByMstId() 사용 (Keyhole 여부에 따라 적절한 DataType 반환)
-   - sendAdditionalTrackingDataLegacy(): getSelectedTrackDtlByMstId() 사용 (Keyhole 여부에 따라 적절한 DataType 반환)
-8. ⏳ PassScheduleService Controller API 개선: getAllPassScheduleTrackMstMerged() 함수 추가 및 Keyhole 정보 포함
-   - Service: getAllPassScheduleTrackMstMerged() 함수 추가 (EphemerisService의 getAllEphemerisTrackMstMerged() 참고)
-   - Controller: /pass-schedule/tracking/master API에서 getAllPassScheduleTrackMstMerged() 사용
-   - Keyhole 정보 포함: IsKeyhole, RecommendedTrainAngle 필드 추가
-   - 프론트엔드 타입 개선: PassScheduleMasterData 인터페이스에 Keyhole 정보 필드 추가
-   - 프론트엔드 타입 개선: ScheduleItem 인터페이스에 Keyhole 정보 필드 추가
-   - 프론트엔드 매핑 개선: fetchScheduleDataFromServer()에서 Keyhole 정보 매핑 추가
-   - 프론트엔드 UI 개선: SelectScheduleContent.vue에 Keyhole 정보 컬럼 추가 (EphemerisDesignationPage 참고)
-9. ⏳ PassScheduleService 캐시 관련 함수 개선: preloadTrackingDataCache(), calculateDataLength()
-   - preloadTrackingDataCache(): getSelectedTrackDtlByMstId() 사용 (Keyhole 여부에 따라 적절한 DataType 반환)
-   - calculateDataLength(): getSelectedTrackDtlByMstId() 사용 (Keyhole 여부에 따라 적절한 DataType 반환)
-10. ⏳ 테스트 및 검증
+### 수행 가이드
+
+**전체 프로세스**:
+1. 각 Phase를 순서대로 진행 (Phase 1 → Phase 8)
+2. 각 Step을 순서대로 진행 (의존성 확인 필수)
+3. 각 Step 완료 후 반드시 컴파일 확인
+4. 컴파일 성공 후 다음 Step 진행
+5. 모든 함수에 KDOC 주석 작성 (각 Step의 예시 참고)
+
+**컴파일 확인 방법**:
+- 백엔드: `./gradlew compileKotlin` (각 Step마다 수행)
+- 프론트엔드: `npm run build` (Phase 8만 수행)
+- 전체 빌드: 최종 확인 시 `./gradlew build` 및 `npm run build`
+
+**KDOC 주석 작성 규칙**:
+- 모든 새로 추가되는 함수에는 반드시 KDOC 주석 작성
+- 각 Step의 "KDOC 주석 예시" 섹션 참고
+- 필수 항목:
+  - 함수 역할 설명 (한 줄 요약 + 상세 설명)
+  - `@param`: 모든 파라미터 설명
+  - `@return`: 반환값 설명
+  - `@see`: 관련 함수 참조
+  - `@note`: 주의사항 또는 특이사항
+
+**문제 발생 시**:
+- 컴파일 오류: 해당 Step의 구현을 다시 검토
+- 런타임 오류: 로그 확인 및 디버깅
+- 의존성 문제: 앞 단계 완료 여부 확인
+
+### Phase 1: 기본 인프라 구축 (컴파일 확인 필수)
+
+#### Step 1.1: SatelliteTrackingProcessor 주입
+**파일**: `PassScheduleService.kt` (49-56줄)
+
+**작업 내용**:
+- 생성자에 `satelliteTrackingProcessor: SatelliteTrackingProcessor` 추가
+- `LimitAngleCalculator`는 유지 (SatelliteTrackingProcessor가 ±270도 변환도 포함하지만, 기존 코드와의 호환성을 위해 유지)
+
+**컴파일 확인**:
+```bash
+# Gradle 빌드 실행
+./gradlew compileKotlin
+```
+**예상 결과**: 컴파일 성공 (SatelliteTrackingProcessor는 이미 Spring Bean으로 등록되어 있음)
+
+**의존성**: 없음 (가장 먼저 수행)
+
+---
+
+#### Step 1.2: determineKeyholeDataType() 헬퍼 함수 추가
+**파일**: `PassScheduleService.kt` (새로 추가, getTrackingPassMst() 앞에 배치)
+
+**작업 내용**:
+- Keyhole 판단 로직을 공통 헬퍼 함수로 추출
+- `passScheduleTrackMstStorage`와 `selectedTrackMstStorage` 모두에서 사용 가능하도록 구현
+
+**KDOC 주석 예시**:
+```kotlin
+/**
+ * Keyhole 여부를 확인하고 적절한 DataType을 반환합니다.
+ *
+ * 이 함수는 final_transformed MST에서 IsKeyhole 정보를 확인하여,
+ * Keyhole 발생 시 keyhole_final_transformed, 미발생 시 final_transformed를 반환합니다.
+ *
+ * @param passId 패스 ID (MST ID)
+ * @param storage 조회할 저장소 (passScheduleTrackMstStorage 또는 selectedTrackMstStorage)
+ * @return Keyhole 여부에 따라 선택된 DataType ("keyhole_final_transformed" 또는 "final_transformed"), 없으면 null
+ *
+ * @see getTrackingPassMst 이 함수에서 사용하여 MST 선택
+ * @see getSelectedTrackDtlByMstId 이 함수에서 사용하여 DTL 선택
+ *
+ * @note final_transformed MST에 IsKeyhole 정보가 저장되어 있어야 함
+ * @note keyhole_final_transformed 데이터가 없으면 final_transformed로 폴백
+ */
+private fun determineKeyholeDataType(
+    passId: UInt,
+    storage: Map<String, List<Map<String, Any?>>>
+): String? {
+    // 구현 내용...
+}
+```
+
+**컴파일 확인**:
+```bash
+./gradlew compileKotlin
+```
+**예상 결과**: 컴파일 성공 (독립적인 함수이므로 다른 코드에 영향 없음)
+
+**의존성**: Step 1.1 완료 필요
+
+---
+
+### Phase 2: 데이터 생성 및 저장 개선 (컴파일 확인 필수)
+
+#### Step 2.1: generatePassScheduleTrackingDataAsync() 개선
+**파일**: `PassScheduleService.kt` (1319-1513줄)
+
+**작업 내용**:
+- `OrekitCalculator`로 2축 데이터 생성 (유지)
+- `SatelliteTrackingProcessor.processFullTransformation()` 호출
+- `LimitAngleCalculator` 제거 (SatelliteTrackingProcessor가 ±270도 변환 포함)
+- 5가지 DataType 모두 저장 (저장소 구조 변경)
+
+**저장소 구조 변경**:
+```kotlin
+// 현재 (1469-1470줄)
+passScheduleTrackMstStorage[satelliteId] = convertedMst  // 단일 DataType
+
+// 개선 후
+val allMstData = mutableListOf<Map<String, Any?>>()
+allMstData.addAll(processedData.originalMst)
+allMstData.addAll(processedData.axisTransformedMst)
+allMstData.addAll(processedData.finalTransformedMst)
+allMstData.addAll(processedData.keyholeAxisTransformedMst)
+allMstData.addAll(processedData.keyholeFinalTransformedMst)
+passScheduleTrackMstStorage[satelliteId] = allMstData  // 5가지 DataType 모두 저장
+
+// DTL도 동일하게 저장
+val allDtlData = mutableListOf<Map<String, Any?>>()
+allDtlData.addAll(processedData.originalDtl)
+allDtlData.addAll(processedData.axisTransformedDtl)
+allDtlData.addAll(processedData.finalTransformedDtl)
+allDtlData.addAll(processedData.keyholeAxisTransformedDtl)
+allDtlData.addAll(processedData.keyholeFinalTransformedDtl)
+passScheduleTrackDtlStorage[satelliteId] = allDtlData
+```
+
+**컴파일 확인**:
+```bash
+./gradlew compileKotlin
+```
+**예상 결과**: 컴파일 성공 (저장소 타입은 `List<Map<String, Any?>>`이므로 변경 없음)
+
+**의존성**: Step 1.1, Step 1.2 완료 필요
+
+**주의사항**: 
+- `LimitAngleCalculator` 사용하는 다른 부분이 있는지 확인 필요
+- 현재는 `generatePassScheduleTrackingDataAsync()`에서만 사용하므로 제거 가능
+
+---
+
+### Phase 3: 조회 메서드 개선 (컴파일 확인 필수)
+
+#### Step 3.1: getTrackingPassMst() 헬퍼 함수 추가
+**파일**: `PassScheduleService.kt` (새로 추가, getSelectedTrackMstByMstId() 앞에 배치)
+
+**작업 내용**:
+- `EphemerisService.kt`의 `getTrackingPassMst()` (2796-2845줄) 참고
+- `passScheduleTrackMstStorage`에서 직접 조회 (위성별 리스트 구조 고려)
+- `determineKeyholeDataType()` 사용
+
+**KDOC 주석**: 
+- 계획 파일의 1.3 섹션 (166-239줄)에 상세한 KDOC 주석 예시가 포함되어 있음
+- 반드시 해당 예시를 참고하여 작성할 것
+
+**컴파일 확인**:
+```bash
+./gradlew compileKotlin
+```
+**예상 결과**: 컴파일 성공 (독립적인 함수이므로 다른 코드에 영향 없음)
+
+**의존성**: Step 1.2, Step 2.1 완료 필요
+
+---
+
+#### Step 3.2: generateSelectedTrackingData() 개선
+**파일**: `PassScheduleService.kt` (1618-1646줄)
+
+**작업 내용**:
+- 5가지 DataType 모두 필터링하여 `selectedTrackMstStorage`에 저장
+- DataType 필드 확인 추가
+
+**컴파일 확인**:
+```bash
+./gradlew compileKotlin
+```
+**예상 결과**: 컴파일 성공 (저장소 타입 변경 없음)
+
+**의존성**: Step 2.1 완료 필요
+
+**주의사항**: 
+- `selectedTrackMstStorage`를 사용하는 모든 함수에 영향
+- `getCurrentSelectedTrackingPassWithTime()`에서 DataType 필터링 필요할 수 있음
+
+---
+
+#### Step 3.3: getSelectedTrackDtlByMstId() 개선
+**파일**: `PassScheduleService.kt` (1664-1670줄)
+
+**작업 내용**:
+- `determineKeyholeDataType()` 사용하여 Keyhole 여부 확인
+- Keyhole 여부에 따라 적절한 DataType 반환
+- `EphemerisService.kt`의 `getEphemerisTrackDtlByMstId()` (2637-2723줄) 참고
+
+**컴파일 확인**:
+```bash
+./gradlew compileKotlin
+```
+**예상 결과**: 컴파일 성공 (반환 타입 변경 없음)
+
+**의존성**: Step 1.2, Step 3.2 완료 필요
+
+**주의사항**: 
+- 이 함수를 사용하는 모든 곳에서 Keyhole-aware 데이터를 받게 됨
+- `sendInitialTrackingData()`, `sendAdditionalTrackingDataOptimized()` 등에 영향
+
+---
+
+### Phase 4: 상태머신 개선 (컴파일 확인 필수)
+
+#### Step 4.1: PreparingStep enum 추가
+**파일**: `PassScheduleService.kt` (새로 추가, TrackingState enum 근처)
+
+**작업 내용**:
+- `PreparingStep` enum 추가: `INIT`, `MOVING_TRAIN`, `WAITING_TRAIN`, `MOVING_AZ_EL`
+- 내부 변수 추가: `private var currentPreparingStep: PreparingStep = PreparingStep.INIT`
+
+**컴파일 확인**:
+```bash
+./gradlew compileKotlin
+```
+**예상 결과**: 컴파일 성공 (독립적인 enum이므로 다른 코드에 영향 없음)
+
+**의존성**: 없음
+
+---
+
+#### Step 4.2: Train 회전 관련 헬퍼 함수 추가
+**파일**: `PassScheduleService.kt` (새로 추가, moveToStartPosition() 근처)
+
+**작업 내용**:
+- `moveTrainToZero(trainAngle: Float)`: Train 축만 활성화하여 회전
+- `moveToTargetAzEl()`: Azimuth, Elevation 축만 활성화하여 이동
+- `isTrainAtZero()`: Train 각도 도달 확인
+- `isTrainStabilized()`: Train 각도 안정화 확인
+- `EphemerisService.kt`의 동일한 함수들 참고
+
+**KDOC 주석 예시**:
+```kotlin
+/**
+ * Train 축만 활성화하여 목표 각도로 회전합니다.
+ *
+ * 이 함수는 PREPARING 상태에서 Train을 먼저 회전하기 위해 사용됩니다.
+ * Train 축만 활성화하여 다른 축(Az, El)에는 영향을 주지 않습니다.
+ *
+ * @param trainAngle 목표 Train 각도 (도 단위, Float)
+ *
+ * @see moveToTargetAzEl Train 회전 후 Az/El 이동
+ * @see isTrainAtZero Train 각도 도달 확인
+ */
+private fun moveTrainToZero(trainAngle: Float) {
+    // 구현 내용...
+}
+
+/**
+ * Azimuth와 Elevation 축만 활성화하여 목표 위치로 이동합니다.
+ *
+ * 이 함수는 Train 회전 및 안정화 완료 후 Az/El을 이동하기 위해 사용됩니다.
+ * Az와 El 축만 활성화하여 Train 축에는 영향을 주지 않습니다.
+ *
+ * @see moveTrainToZero Train 회전 먼저 수행
+ * @see isTrainStabilized Train 안정화 확인
+ */
+private fun moveToTargetAzEl() {
+    // 구현 내용...
+}
+
+/**
+ * Train 각도가 목표 각도에 도달했는지 확인합니다.
+ *
+ * @return Train 각도가 목표 각도에 도달했으면 true, 아니면 false
+ *
+ * @see moveTrainToZero Train 회전 명령 후 확인
+ */
+private fun isTrainAtZero(): Boolean {
+    // 구현 내용...
+}
+
+/**
+ * Train 각도가 안정화되었는지 확인합니다.
+ *
+ * @return Train 각도가 안정화되었으면 true, 아니면 false
+ *
+ * @see isTrainAtZero Train 각도 도달 확인 후 안정화 확인
+ */
+private fun isTrainStabilized(): Boolean {
+    // 구현 내용...
+}
+```
+
+**컴파일 확인**:
+```bash
+./gradlew compileKotlin
+```
+**예상 결과**: 컴파일 성공 (독립적인 함수이므로 다른 코드에 영향 없음)
+
+**의존성**: Step 3.1 완료 필요 (getTrackingPassMst()로 Keyhole 정보 확인)
+
+---
+
+#### Step 4.3: moveToStartPosition() 개선
+**파일**: `PassScheduleService.kt` (643-652줄)
+
+**작업 내용**:
+- `getSelectedTrackDtlByMstId()` 사용 (이미 Keyhole-aware)
+- `getTrackingPassMst()`로 Keyhole 정보 확인
+- `targetAzimuth`, `targetElevation` 설정
+- `currentPreparingStep = PreparingStep.MOVING_TRAIN` 설정
+- Train 각도 동적 설정 (Keyhole 여부에 따라)
+
+**컴파일 확인**:
+```bash
+./gradlew compileKotlin
+```
+**예상 결과**: 컴파일 성공 (함수 시그니처 변경 없음)
+
+**의존성**: Step 3.1, Step 3.3, Step 4.1, Step 4.2 완료 필요
+
+---
+
+#### Step 4.4: executeStateAction() PREPARING 상태 개선
+**파일**: `PassScheduleService.kt` (393-402줄)
+
+**작업 내용**:
+- PREPARING 상태에서 `currentPreparingStep`에 따라 단계별 처리
+- `MOVING_TRAIN`: Train 회전 명령 전송
+- `WAITING_TRAIN`: Train 안정화 대기
+- `MOVING_AZ_EL`: Az/El 이동 명령 전송
+
+**컴파일 확인**:
+```bash
+./gradlew compileKotlin
+```
+**예상 결과**: 컴파일 성공 (when 문 확장)
+
+**의존성**: Step 4.1, Step 4.2, Step 4.3 완료 필요
+
+---
+
+### Phase 5: ICD 프로토콜 함수 개선 (컴파일 확인 필수)
+
+**참고**: `sendAdditionalTrackingData()` 함수 이름 개선 및 비동기/동기 처리 최적화 포함
+
+#### Step 5.1: sendHeaderTrackingData() 개선
+**파일**: `PassScheduleService.kt` (715-759줄)
+
+**작업 내용**:
+- `getSelectedTrackMstByMstId()` → `getTrackingPassMst()` 변경
+- Keyhole 정보 로깅 추가
+
+**컴파일 확인**:
+```bash
+./gradlew compileKotlin
+```
+**예상 결과**: 컴파일 성공 (반환 타입 동일)
+
+**의존성**: Step 3.1 완료 필요
+
+---
+
+#### Step 5.2: sendInitialTrackingData() 개선
+**파일**: `PassScheduleService.kt` (761-864줄)
+
+**작업 내용**:
+- `getSelectedTrackDtlByMstId()` 사용 (이미 Keyhole-aware로 개선됨)
+- Keyhole 정보 로깅 추가
+
+**컴파일 확인**:
+```bash
+./gradlew compileKotlin
+```
+**예상 결과**: 컴파일 성공 (함수 시그니처 변경 없음)
+
+**의존성**: Step 3.3 완료 필요
+
+---
+
+#### Step 5.3: sendAdditionalTrackingData() 함수 이름 개선 및 비동기/동기 처리 최적화
+**파일**: `PassScheduleService.kt` (874-1006줄)
+
+**작업 내용**:
+1. **함수 이름 개선**:
+   - `sendAdditionalTrackingDataOptimized()` → `sendAdditionalTrackingData()` (메인 함수이므로 간단하게)
+   - `sendFromCache()` → `sendAdditionalTrackingDataFromCache()` (명확하게)
+   - `sendFromDatabase()` → `sendAdditionalTrackingDataFromDatabase()` (명확하게)
+   - `sendAdditionalTrackingDataLegacy()` → **제거** (중복이므로)
+
+2. **비동기/동기 처리 최적화**:
+   - **문제**: 비동기 처리(`CompletableFuture.runAsync`)가 느려서 동기 처리가 필요했음
+   - **원인**: `batchExecutor`는 LOW 우선순위 스레드 풀이므로 작업 대기 시간 발생
+   - **해결**: 조건부 비동기 처리
+     - 캐시 있으면: 동기 처리 (빠름, 즉시 전송)
+     - 캐시 없으면: 비동기 처리 (DB 조회는 느릴 수 있으므로 블로킹 방지)
+   - **예외 처리**: `sendAdditionalTrackingDataFromDatabase()`를 try-catch로 감싸서 직접 호출 (Legacy 제거)
+
+3. **Keyhole-aware 데이터 사용**:
+   - `getSelectedTrackDtlByMstId()` 사용 (이미 Keyhole-aware로 개선됨)
+   - `sendAdditionalTrackingDataFromDatabase()` 내부에서도 `getSelectedTrackDtlByMstId()` 사용 확인
+
+**구현 예시**:
+```kotlin
+// 메인 함수 이름 변경
+fun handleTrackingDataRequest(passId: UInt, timeAcc: UInt, requestDataLength: UShort) {
+    val startIndex = timeAcc.toInt()
+    sendAdditionalTrackingData(passId, startIndex, requestDataLength.toInt())  // Optimized 제거
+}
+
+// 메인 함수 (조건부 비동기 처리)
+private fun sendAdditionalTrackingData(passId: UInt, startIndex: Int, requestDataLength: Int = 25) {
+    val cache = trackingDataCache[passId]
+    
+    if (cache != null && !cache.isExpired()) {
+        // ✅ 캐시 있으면 동기 처리 (빠름, 즉시 전송)
+        val processingStart = System.nanoTime()
+        try {
+            sendAdditionalTrackingDataFromCache(cache, startIndex, requestDataLength, processingStart)
+        } catch (e: Exception) {
+            logger.error("캐시에서 추적 데이터 전송 실패: passId=$passId, ${e.message}", e)
+            // 폴백: DB에서 동기 처리로 재시도
+            try {
+                sendAdditionalTrackingDataFromDatabase(passId, startIndex, requestDataLength, processingStart)
+            } catch (fallbackError: Exception) {
+                logger.error("폴백 전송도 실패: passId=$passId, ${fallbackError.message}", fallbackError)
+            }
+        }
+    } else {
+        // ✅ 캐시 없으면 비동기 처리 (DB 조회는 느릴 수 있으므로 블로킹 방지)
+        CompletableFuture.runAsync({
+            try {
+                val processingStart = System.nanoTime()
+                sendAdditionalTrackingDataFromDatabase(passId, startIndex, requestDataLength, processingStart)
+            } catch (e: Exception) {
+                logger.error("추적 데이터 전송 실패: passId=$passId, ${e.message}", e)
+                // 폴백: 동기 처리로 재시도
+                try {
+                    val processingStart = System.nanoTime()
+                    sendAdditionalTrackingDataFromDatabase(passId, startIndex, requestDataLength, processingStart)
+                } catch (fallbackError: Exception) {
+                    logger.error("폴백 전송도 실패: passId=$passId, ${fallbackError.message}", fallbackError)
+                }
+            }
+        }, batchExecutor)
+    }
+}
+
+// 헬퍼 함수 1: 캐시에서 전송 (이름 변경)
+private fun sendAdditionalTrackingDataFromCache(
+    cache: TrackingDataCache,
+    startIndex: Int,
+    requestDataLength: Int,
+    processingStart: Long
+) {
+    // 기존 sendFromCache() 로직 유지
+    // ...
+}
+
+// 헬퍼 함수 2: 메모리 저장소에서 전송 (이름 변경, 추후 DB 연계 예정)
+private fun sendAdditionalTrackingDataFromDatabase(
+    passId: UInt,
+    startIndex: Int,
+    requestDataLength: Int,
+    processingStart: Long
+) {
+    // ✅ Keyhole-aware 데이터 사용
+    // 현재: getSelectedTrackDtlByMstId()는 메모리 저장소(passScheduleTrackDtlStorage)에서 조회
+    // 추후: getSelectedTrackDtlByMstId() 내부를 DB 조회로 변경하면 자동으로 DB 연계됨
+    val passDetails = getSelectedTrackDtlByMstId(passId)
+    // 기존 sendFromDatabase() 로직 유지
+    // ...
+}
+
+// Legacy 함수 제거
+// sendAdditionalTrackingDataLegacy() 삭제
+```
+
+**컴파일 확인**:
+```bash
+./gradlew compileKotlin
+```
+**예상 결과**: 컴파일 성공 (함수 시그니처 변경 없음, 이름만 변경)
+
+**의존성**: Step 3.3 완료 필요
+
+**주의사항**:
+- `sendAdditionalTrackingDataLegacy()` 호출하는 곳이 있는지 확인 필요 (892줄에서만 호출됨)
+- 함수 이름 변경 시 모든 호출부 업데이트 필요
+- 비동기/동기 처리 최적화로 성능 개선 예상
+- **중요**: `sendAdditionalTrackingDataFromDatabase()`는 현재 메모리 저장소(`passScheduleTrackDtlStorage`)를 사용하지만, 함수 이름은 "FromDatabase"로 명명 (추후 DB 연계 예정)
+  - 현재: `getSelectedTrackDtlByMstId()`가 메모리 저장소에서 조회
+  - 추후: `getSelectedTrackDtlByMstId()` 내부를 DB 조회로 변경하면 자동으로 DB 연계됨
+  - **결론**: `sendAdditionalTrackingDataFromDatabase()` 함수는 수정 불필요, `getSelectedTrackDtlByMstId()`만 수정하면 됨
+
+---
+
+### Phase 6: Controller API 개선 (컴파일 확인 필수)
+
+#### Step 6.1: getAllPassScheduleTrackMstMerged() 함수 추가
+**파일**: `PassScheduleService.kt` (새로 추가, getAllPassScheduleTrackMst() 근처)
+
+**작업 내용**:
+- `EphemerisService.kt`의 `getAllEphemerisTrackMstMerged()` (2316-2461줄) 참고
+- 5가지 DataType 병합하여 Keyhole 정보 포함
+
+**컴파일 확인**:
+```bash
+./gradlew compileKotlin
+```
+**예상 결과**: 컴파일 성공 (새로운 함수 추가)
+
+**의존성**: Step 2.1 완료 필요
+
+---
+
+#### Step 6.2: PassScheduleController.kt 개선
+**파일**: `PassScheduleController.kt` (727-772줄)
+
+**작업 내용**:
+- `getAllPassScheduleTrackMst()` → `getAllPassScheduleTrackMstMerged()` 변경
+- 응답 구조 변경 (위성별 그룹화 유지, Keyhole 정보 포함)
+
+**컴파일 확인**:
+```bash
+./gradlew compileKotlin
+```
+**예상 결과**: 컴파일 성공 (반환 타입 변경 없음, 내부 구조만 변경)
+
+**의존성**: Step 6.1 완료 필요
+
+---
+
+### Phase 7: 캐시 관련 함수 개선 (컴파일 확인 필수)
+
+#### Step 7.1: preloadTrackingDataCache() 개선
+**파일**: `PassScheduleService.kt` (1820-1890줄)
+
+**작업 내용**:
+- `getSelectedTrackDtlByMstId()` 사용 (이미 Keyhole-aware로 개선됨)
+
+**컴파일 확인**:
+```bash
+./gradlew compileKotlin
+```
+**예상 결과**: 컴파일 성공 (함수 시그니처 변경 없음)
+
+**의존성**: Step 3.3 완료 필요
+
+---
+
+#### Step 7.2: calculateDataLength() 개선
+**파일**: `PassScheduleService.kt` (1774-1778줄)
+
+**작업 내용**:
+- `getSelectedTrackDtlByMstId()` 사용 (이미 Keyhole-aware로 개선됨)
+
+**컴파일 확인**:
+```bash
+./gradlew compileKotlin
+```
+**예상 결과**: 컴파일 성공 (함수 시그니처 변경 없음)
+
+**의존성**: Step 3.3 완료 필요
+
+---
+
+### Phase 8: 프론트엔드 개선 (컴파일 확인 필수)
+
+#### Step 8.1: 프론트엔드 타입 개선
+**파일**: 
+- `ACS/src/services/mode/passScheduleService.ts` (PassScheduleMasterData 인터페이스)
+- `ACS/src/stores/mode/passScheduleStore.ts` (ScheduleItem 인터페이스)
+
+**작업 내용**:
+- Keyhole 정보 필드 추가: `IsKeyhole`, `RecommendedTrainAngle`
+- 축 변환 정보 필드 추가: `OriginalMaxElevation`, `FinalTransformedMaxAzRate`, `KeyholeFinalTransformedMaxAzRate` 등
+
+**컴파일 확인**:
+```bash
+# 프론트엔드 빌드
+npm run build
+# 또는
+npm run type-check
+```
+**예상 결과**: 컴파일 성공 (타입 추가만 하므로 기존 코드에 영향 없음)
+
+**의존성**: Step 6.2 완료 필요
+
+---
+
+#### Step 8.2: 프론트엔드 매핑 개선
+**파일**: `ACS/src/stores/mode/passScheduleStore.ts` (fetchScheduleDataFromServer())
+
+**작업 내용**:
+- Keyhole 정보 매핑 추가
+- 축 변환 정보 매핑 추가
+
+**컴파일 확인**:
+```bash
+npm run build
+```
+**예상 결과**: 컴파일 성공 (매핑 로직 추가만 하므로 기존 코드에 영향 없음)
+
+**의존성**: Step 8.1 완료 필요
+
+---
+
+#### Step 8.3: 프론트엔드 UI 개선
+**파일**: `ACS/src/components/content/SelectScheduleContent.vue`
+
+**작업 내용**:
+- Keyhole 정보 컬럼 추가
+- Train 각도 컬럼 추가
+- **2축/3축/최종 데이터 컬럼 추가** (EphemerisDesignationPage.vue 수준):
+  - 2축 최대 고도 (OriginalMaxElevation)
+  - 3축 최대 고도 (Train0MaxElevation)
+  - 최종 최대 고도 (MaxElevation - Keyhole에 따라 동적)
+  - 2축 최대 Az 속도 (OriginalMaxAzRate)
+  - 3축 최대 Az 속도 (Train0MaxAzRate)
+  - 최종 최대 Az 속도 (FinalTransformedMaxAzRate - Keyhole에 따라 동적)
+  - 2축 최대 El 속도 (OriginalMaxElRate)
+  - 3축 최대 El 속도 (Train0MaxElRate)
+  - 최종 최대 El 속도 (FinalTransformedMaxElRate - Keyhole에 따라 동적)
+- **가독성 개선**:
+  - 테이블 높이 증가 (400px → 500px)
+  - 컬럼 너비 증가
+  - 폰트 크기 증가 (13px)
+  - 패딩 증가
+- `safeToFixed` 함수 추가 (안전한 숫자 포맷팅)
+- `EphemerisDesignationPage.vue` 참고
+
+**컴파일 확인**:
+```bash
+npm run build
+```
+**예상 결과**: 컴파일 성공 (컬럼 추가만 하므로 기존 코드에 영향 없음)
+
+**의존성**: Step 8.2 완료 필요
+
+**참고**: 문제 2 (SelectScheduleContent.vue UI 개선 요청) 섹션 참고
+
+---
+
+## 컴파일 확인 체크리스트
+
+각 Phase 완료 후 다음을 확인:
+
+1. **백엔드 컴파일**:
+   ```bash
+   ./gradlew compileKotlin
+   ```
+
+2. **프론트엔드 컴파일** (Phase 8만):
+   ```bash
+   npm run build
+   ```
+
+3. **전체 빌드** (최종 확인):
+   ```bash
+   # 백엔드
+   ./gradlew build
+   
+   # 프론트엔드
+   npm run build
+   ```
+
+## 적용 순서 요약
+
+1. **Phase 1**: 기본 인프라 구축 (Step 1.1 → Step 1.2)
+2. **Phase 2**: 데이터 생성 및 저장 개선 (Step 2.1)
+3. **Phase 3**: 조회 메서드 개선 (Step 3.1 → Step 3.2 → Step 3.3)
+4. **Phase 4**: 상태머신 개선 (Step 4.1 → Step 4.2 → Step 4.3 → Step 4.4)
+5. **Phase 5**: ICD 프로토콜 함수 개선 (Step 5.1 → Step 5.2 → Step 5.3)
+6. **Phase 6**: Controller API 개선 (Step 6.1 → Step 6.2)
+7. **Phase 7**: 캐시 관련 함수 개선 (Step 7.1 → Step 7.2)
+8. **Phase 8**: 프론트엔드 개선 (Step 8.1 → Step 8.2 → Step 8.3)
+
+## 주의사항
+
+1. **각 Phase 완료 후 반드시 컴파일 확인**
+   - 각 Step마다 컴파일 확인 섹션이 있으므로 반드시 수행할 것
+   - 컴파일 오류 발생 시 해당 Step의 구현을 다시 검토할 것
+2. **의존성 순서 준수** (앞 단계 완료 후 다음 단계 진행)
+   - 각 Step의 "의존성" 섹션을 확인하여 순서대로 진행할 것
+3. **저장소 구조 변경 시 영향 범위 확인** (Step 2.1)
+   - 저장소 구조 변경은 다른 함수들에 영향을 줄 수 있으므로 주의할 것
+4. **조회 함수 변경 시 사용처 확인** (Step 3.3)
+   - `getSelectedTrackDtlByMstId()` 변경 시 모든 사용처를 확인할 것
+5. **상태머신 변경 시 동작 확인** (Phase 4)
+   - 상태머신 로직 변경은 추적 동작에 직접적인 영향을 주므로 신중하게 구현할 것
+6. **KDOC 주석 작성 필수**
+   - 모든 새로 추가되는 함수에는 반드시 KDOC 주석을 작성할 것
+   - 각 Step의 "KDOC 주석 예시" 섹션을 참고하여 작성할 것
+   - 함수 역할, 파라미터, 반환값, 참고 함수를 명확히 작성할 것
 
 ## 사용자 협의 사항
 
@@ -1455,7 +2142,9 @@ SatelliteTrackingProcessor.processFullTransformation()
 - `sendHeaderTrackingData()`: `getSelectedTrackMstByMstId()` 사용 (Keyhole 정보 없음)
 - `sendInitialTrackingData()`: `getSelectedTrackDtlByMstId()` 사용 (Keyhole 정보 없음)
 - `sendAdditionalTrackingDataOptimized()`: `getSelectedTrackDtlByMstId()` 사용 (Keyhole 정보 없음)
+- `sendAdditionalTrackingDataLegacy()`: 폴백용 (중복, 제거 예정)
 - **개선 필요**: 모든 ICD 프로토콜 함수에서 Keyhole 정보 활용
+- **추가 개선**: 함수 이름 개선 및 비동기/동기 처리 최적화
 
 ### 6. Controller API 개선 (Keyhole 정보 포함)
 
@@ -1701,4 +2390,304 @@ SatelliteTrackingProcessor.processFullTransformation()
 - ✅ 최적화: 저장소 조회 최적화 및 캐시 활용 필요
 - ✅ 모든 함수 KDOC 주석: 완료
 - ✅ 모든 함수 테스트: 구현 후 테스트 필요
+
+---
+
+## 구현 중 발생한 문제 및 해결
+
+### 문제 1: Smart Cast 에러 (EphemerisService.kt)
+
+**발생 위치**: `EphemerisService.kt:821:25`
+
+**에러 메시지**:
+```
+Smart cast to 'Map<String, Any?>' is impossible, because 'currentTrackingPass' is a mutable property that could have been changed by this time
+```
+
+**원인**:
+- Kotlin의 smart cast는 mutable property에 대해 작동하지 않음
+- `currentTrackingPass`가 `var`로 선언된 mutable property이므로, null 체크 후에도 다른 스레드에서 변경될 수 있다고 가정
+- 따라서 `currentTrackingPass == null` 체크 후에도 smart cast가 불가능
+
+**해결 방법**:
+1. `getTrackingPassMst()` 결과를 로컬 변수(`selectedPass`)에 먼저 할당
+2. 로컬 변수에 대해 null 체크 수행
+3. null 체크 통과 후 `currentTrackingPass`에 할당
+4. 이후 로컬 변수(`selectedPass`)를 사용하여 데이터 접근
+
+**수정 전**:
+```kotlin
+currentTrackingPass = getTrackingPassMst(passId)
+
+if (currentTrackingPass == null) {
+    logger.error("패스 ID {}에 해당하는 데이터를 찾을 수 없습니다", passId)
+    return
+}
+
+// ❌ 에러: Smart cast 불가능
+val isKeyhole = currentTrackingPass["IsKeyhole"] as? Boolean ?: false
+```
+
+**수정 후**:
+```kotlin
+val selectedPass = getTrackingPassMst(passId)
+
+if (selectedPass == null) {
+    logger.error("패스 ID {}에 해당하는 데이터를 찾을 수 없습니다", passId)
+    return
+}
+
+// ✅ 로컬 변수에 할당하여 smart cast 문제 해결
+currentTrackingPass = selectedPass
+
+// ✅ 로컬 변수 사용 (smart cast 가능)
+val isKeyhole = selectedPass["IsKeyhole"] as? Boolean ?: false
+val recommendedTrainAngle = selectedPass["RecommendedTrainAngle"] as? Double ?: 0.0
+```
+
+**적용 파일**: `EphemerisService.kt` (813-826줄)
+
+**참고**: 
+- 이 문제는 `PassScheduleService.kt`에는 발생하지 않음
+- `PassScheduleService.kt`에서는 이미 로컬 변수 패턴을 사용하고 있음 (809-829줄)
+
+**검증**: 컴파일 성공 확인
+
+---
+
+### 문제 2: SelectScheduleContent.vue UI 개선 요청
+
+**발생 위치**: `SelectScheduleContent.vue` (스케줄 선택 화면)
+
+**요구사항**:
+1. 항목들이 너무 작아서 가독성이 떨어짐
+2. `EphemerisDesignationPage.vue`의 Select Schedule 화면처럼 상세한 정보 표시 필요:
+   - 2축 최대 고도 (OriginalMaxElevation)
+   - 3축 최대 고도 (Train0MaxElevation / FinalTransformedMaxElevation)
+   - 최종 최대 고도 (MaxElevation - Keyhole에 따라 동적)
+   - 2축 최대 Az 속도 (OriginalMaxAzRate)
+   - 3축 최대 Az 속도 (Train0MaxAzRate / FinalTransformedMaxAzRate)
+   - 최종 최대 Az 속도 (FinalTransformedMaxAzRate - Keyhole에 따라 동적)
+   - 2축 최대 El 속도 (OriginalMaxElRate)
+   - 3축 최대 El 속도 (Train0MaxElRate / FinalTransformedMaxElRate)
+   - 최종 최대 El 속도 (FinalTransformedMaxElRate - Keyhole에 따라 동적)
+
+**해결 방법**:
+1. **컬럼 추가**: `EphemerisDesignationPage.vue`의 `scheduleColumns` 참고하여 상세 컬럼 추가
+2. **템플릿 추가**: 각 컬럼에 대한 템플릿 추가 (색상 구분: 2축=파란색, 3축=초록색, Keyhole=빨간색)
+3. **가독성 개선**: 
+   - 테이블 높이 증가 (400px → 500px)
+   - 컬럼 너비 증가
+   - 폰트 크기 증가 (13px)
+   - 패딩 증가 (10px 8px)
+4. **safeToFixed 함수 추가**: 안전한 숫자 포맷팅을 위한 헬퍼 함수 추가
+
+**수정 내용**:
+
+**컬럼 추가** (586-606줄):
+```typescript
+// ✅ 2축 최대 고도 (Original)
+{
+  name: 'OriginalMaxElevation',
+  label: '2축 최대 고도 (°)',
+  field: 'OriginalMaxElevation',
+  align: 'center' as const,
+  sortable: true,
+  style: 'width: 130px'
+},
+// ✅ 3축 최대 고도 (Train=0, ±270°, 항상 고정)
+{
+  name: 'Train0MaxElevation',
+  label: '3축 최대 고도 (°)',
+  field: 'FinalTransformedMaxElevation',
+  align: 'center' as const,
+  sortable: true,
+  style: 'width: 130px'
+},
+// ✅ FinalTransformed 최대 고도 (Keyhole 여부에 따라 동적 표시)
+{
+  name: 'MaxElevation',
+  label: '최대 고도 (°)',
+  field: 'FinalTransformedMaxElevation',
+  align: 'center' as const,
+  sortable: true,
+  style: 'width: 120px'
+},
+// ✅ 2축 최대 Az 속도
+{
+  name: 'OriginalMaxAzRate',
+  label: '2축 최대 Az 속도 (°/s)',
+  field: 'OriginalMaxAzRate',
+  align: 'center' as const,
+  sortable: true,
+  style: 'width: 150px'
+},
+// ✅ 3축 최대 Az 속도 (Train=0, ±270°, 항상 고정)
+{
+  name: 'Train0MaxAzRate',
+  label: '3축 최대 Az 속도 (°/s)',
+  field: 'FinalTransformedMaxAzRate',
+  align: 'center' as const,
+  sortable: true,
+  style: 'width: 150px'
+},
+// ✅ FinalTransformed 최대 Az 속도 (Keyhole 여부에 따라 동적 표시)
+{
+  name: 'FinalTransformedMaxAzRate',
+  label: '최대 Az 속도 (°/s)',
+  field: 'FinalTransformedMaxAzRate',
+  align: 'center' as const,
+  sortable: true,
+  style: 'width: 140px'
+},
+// ✅ 2축 최대 El 속도
+{
+  name: 'OriginalMaxElRate',
+  label: '2축 최대 El 속도 (°/s)',
+  field: 'OriginalMaxElRate',
+  align: 'center' as const,
+  sortable: true,
+  style: 'width: 150px'
+},
+// ✅ 3축 최대 El 속도 (Train=0, ±270°, 항상 고정)
+{
+  name: 'Train0MaxElRate',
+  label: '3축 최대 El 속도 (°/s)',
+  field: 'FinalTransformedMaxElRate',
+  align: 'center' as const,
+  sortable: true,
+  style: 'width: 150px'
+},
+// ✅ FinalTransformed 최대 El 속도 (Keyhole 여부에 따라 동적 표시)
+{
+  name: 'FinalTransformedMaxElRate',
+  label: '최대 El 속도 (°/s)',
+  field: 'FinalTransformedMaxElRate',
+  align: 'center' as const,
+  sortable: true,
+  style: 'width: 140px'
+},
+```
+
+**템플릿 추가** (132-244줄):
+- 2축 최대 고도 템플릿 (파란색)
+- 3축 최대 고도 템플릿 (초록색)
+- FinalTransformed 최대 고도 템플릿 (Keyhole에 따라 빨간색/초록색)
+- 2축/3축/최종 Az 속도 템플릿 (동일한 색상 구분)
+- 2축/3축/최종 El 속도 템플릿 (동일한 색상 구분)
+
+**가독성 개선**:
+- 테이블 높이: 400px → 500px (22줄)
+- 컬럼 너비: 기본 컬럼들 증가 (index: 70px → 80px, no: 60px → 70px, satelliteId: 100px → 120px)
+- 폰트 크기: 13px (1048줄, 1060줄)
+- 패딩: 8px → 10px 8px (1048줄)
+
+**적용 파일**: `SelectScheduleContent.vue`
+
+**참고**: 
+- `EphemerisDesignationPage.vue`의 `scheduleColumns` (658-811줄) 및 템플릿 (360-472줄) 참고
+- `safeToFixed` 함수는 `EphemerisDesignationPage.vue` (1977-1991줄) 참고
+
+**검증**: 컴파일 성공 확인
+
+---
+
+### 문제 3: SelectScheduleContent.vue에 Elevation 각도 컬럼 추가 요청
+
+**발생 위치**: `SelectScheduleContent.vue` (스케줄 선택 화면)
+
+**요구사항**:
+1. Azimuth 각도 옆에 Elevation 각도 컬럼 추가
+2. Elevation 각도는 시작/종료 각도 표시
+3. Keyhole이 아닐 경우: 3축 최종 변환 값 (FinalTransformedStartElevation/EndElevation)
+4. Keyhole일 경우: Keyhole 최종 변환 값 (KeyholeFinalTransformedStartElevation/EndElevation)
+5. EphemerisDesignationPage.vue와 동일한 로직 적용
+
+**검토 결과**:
+- ✅ `EphemerisService.kt`의 `getAllEphemerisTrackMstMerged()` (2393-2404줄):
+  - `FinalTransformedStartElevation`, `FinalTransformedEndElevation` 제공
+  - `KeyholeFinalTransformedStartElevation`, `KeyholeFinalTransformedEndElevation` 제공
+- ✅ `EphemerisDesignationPage.vue` (911-916줄):
+  - Keyhole일 경우: `KeyholeFinalTransformedStartElevation/EndElevation` 사용
+  - Keyhole 아닐 경우: `FinalTransformedStartElevation/EndElevation` 사용
+- ✅ `PassScheduleService.kt`의 `getAllPassScheduleTrackMstMerged()` (1688-1697줄):
+  - 동일한 필드 제공 확인
+
+**해결 방법**:
+1. **Elevation 각도 컬럼 추가**: `azimuthAngles` 컬럼 옆에 `elevationAngles` 컬럼 추가
+2. **Keyhole-aware 로직**: Keyhole 여부에 따라 적절한 필드 사용
+3. **Azimuth 각도도 동일하게 수정**: Keyhole 여부에 따라 동적 값 표시하도록 개선
+
+**수정 내용**:
+
+**Azimuth 각도 컬럼 개선** (724-747줄):
+```typescript
+// ✅ Azimuth 각도 컬럼 (Keyhole 여부에 따라 동적 값 표시)
+{
+  name: 'azimuthAngles',
+  label: 'Azimuth 각도',
+  field: (row: ScheduleItem) => {
+    // Keyhole일 경우: KeyholeFinalTransformed 값 사용
+    // Keyhole 아닐 경우: FinalTransformed 값 사용
+    const isKeyhole = row.IsKeyhole || row.isKeyhole || false
+    if (isKeyhole) {
+      return {
+        start: row.KeyholeFinalTransformedStartAzimuth ?? row.FinalTransformedStartAzimuth ?? row.startAzimuthAngle ?? 0,
+        end: row.KeyholeFinalTransformedEndAzimuth ?? row.FinalTransformedEndAzimuth ?? row.endAzimuthAngle ?? 0
+      }
+    } else {
+      return {
+        start: row.FinalTransformedStartAzimuth ?? row.startAzimuthAngle ?? 0,
+        end: row.FinalTransformedEndAzimuth ?? row.endAzimuthAngle ?? 0
+      }
+    }
+  },
+  align: 'center' as const,
+  sortable: false,
+  style: 'width: 140px'
+},
+```
+
+**Elevation 각도 컬럼 추가** (748-771줄):
+```typescript
+// ✅ Elevation 각도 컬럼 추가 (Keyhole 여부에 따라 동적 값 표시)
+{
+  name: 'elevationAngles',
+  label: 'Elevation 각도',
+  field: (row: ScheduleItem) => {
+    // Keyhole일 경우: KeyholeFinalTransformed 값 사용
+    // Keyhole 아닐 경우: FinalTransformed 값 사용
+    const isKeyhole = row.IsKeyhole || row.isKeyhole || false
+    if (isKeyhole) {
+      return {
+        start: row.KeyholeFinalTransformedStartElevation ?? row.FinalTransformedStartElevation ?? row.startElevationAngle ?? 0,
+        end: row.KeyholeFinalTransformedEndElevation ?? row.FinalTransformedEndElevation ?? row.endElevationAngle ?? 0
+      }
+    } else {
+      return {
+        start: row.FinalTransformedStartElevation ?? row.startElevationAngle ?? 0,
+        end: row.FinalTransformedEndElevation ?? row.endElevationAngle ?? 0
+      }
+    }
+  },
+  align: 'center' as const,
+  sortable: false,
+  style: 'width: 140px'
+},
+```
+
+**템플릿 수정** (87-101줄):
+- Azimuth 각도 템플릿: `props.value?.start`, `props.value?.end` 사용 (field 함수의 반환값 사용)
+
+**템플릿 추가** (110-124줄):
+- Elevation 각도 템플릿 추가 (Azimuth 각도와 동일한 형식)
+
+**적용 파일**: `SelectScheduleContent.vue`
+
+**참고**: 
+- `EphemerisDesignationPage.vue`의 `selectedScheduleInfo` (905-916줄) 참고
+- `EphemerisService.kt`의 `getAllEphemerisTrackMstMerged()` (2393-2404줄) 참고
+- `PassScheduleService.kt`의 `getAllPassScheduleTrackMstMerged()` (1688-1697줄) 참고
+
+**검증**: 컴파일 성공 확인
 
