@@ -2,7 +2,7 @@
   <div class="ephemeris-mode">
     <div class="ephemeris-container">
       <!-- 1행: Offset Controls - 원본 형태로 복원하고 반응형 적용 -->
-      <div class="row q-col-gutter-md q-mb-sm">
+      <div class="row q-col-gutter-md q-mb-sm offset-control-row">
         <div class="col-12">
           <q-card flat bordered class="control-card">
             <q-card-section class="compact-control purple-1">
@@ -133,9 +133,10 @@
       </div>
 
       <!-- 2행: Main Content -->
-      <div class="row q-col-gutter-md main-content-row" style="display: flex; flex-wrap: nowrap; align-items: stretch;">
+      <div class="row q-col-gutter-md main-content-row"
+        style="display: flex; flex-wrap: nowrap; align-items: stretch; margin-bottom: 0 !important; padding-bottom: 0 !important;">
         <!-- 1번 영역: 차트가 들어갈 네모난 칸 - 반응형 크기 조정 -->
-        <div class="col-12 col-md-3 col-lg-3 col-xl-3">
+        <div class="col-12 col-md-3 position-view-col">
           <q-card class="control-section position-view-card"
             style="min-height: 360px !important; height: 100% !important; display: flex !important; flex-direction: column !important;">
             <q-card-section class="position-view-section"
@@ -149,11 +150,9 @@
         </div>
 
         <!-- 2번 영역: 계산 정보 표시 영역 수정 -->
-        <div class="col-12 col-md-4">
-          <q-card class="control-section"
-            style="min-height: 360px !important; height: 100% !important; display: flex !important; flex-direction: column !important;">
-            <q-card-section
-              style="min-height: 360px !important; height: 100% !important; flex: 1 !important; display: flex !important; flex-direction: column !important;">
+        <div class="col-12 col-md-3">
+          <q-card class="control-section">
+            <q-card-section>
               <div class="row justify-between items-center q-mb-xs">
                 <div class="text-subtitle1 text-weight-bold text-primary">위성 추적 정보</div>
                 <div class="row items-center q-gutter-sm">
@@ -279,11 +278,9 @@
         </div>
 
         <!-- 3번 영역: TLE Data -->
-        <div class="col-12 col-md-5">
-          <q-card class="control-section tle-data-card"
-            style="min-height: 360px !important; height: 100% !important; display: flex !important; flex-direction: column !important;">
-            <q-card-section
-              style="min-height: 360px !important; height: 100% !important; flex: 1 !important; display: flex !important; flex-direction: column !important;">
+        <div class="col-12 col-md-6 schedule-control-col">
+          <q-card class="control-section tle-data-card">
+            <q-card-section class="schedule-control-section">
               <div class="text-subtitle1 text-weight-bold text-primary">TLE Data</div>
               <q-editor v-model="tleData.displayText" readonly flat dense class="tle-display q-mt-xs" :toolbar="[]"
                 :definitions="{
@@ -652,7 +649,7 @@ ISS (ZARYA)
   </q-dialog>
 </template>
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { date } from 'quasar'
 
 import type { QTableProps } from 'quasar'
@@ -727,6 +724,7 @@ interface TrajectoryPoint {
 const chartRef = ref<HTMLElement | null>(null)
 let chart: ECharts | null = null
 let updateTimer: number | null = null
+let chartResizeHandler: (() => void) | null = null
 
 // TLE Data 스토어에서 상태 가져오기
 const tleData = computed(() => ephemerisStore.tleDisplayData)
@@ -1564,32 +1562,24 @@ const initChart = () => {
     chart.dispose()
   }
 
-  // 화면 크기에 따른 차트 크기 결정 (PassSchedulePage.vue와 동일)
-  const getChartSize = () => {
-    const width = window.innerWidth
-    if (width <= 1200) return 350
-    if (width <= 1600) return 400
-    if (width <= 1900) return 450
-    return 500
-  }
+  // ✅ 차트 크기 설정 (차트를 더 크게, Position View 구역 크기와 독립적) - PassSchedulePage와 동일
+  const initialSize = 500
 
-  const chartSize = getChartSize()
-
-  // 차트 인스턴스 생성 (반응형 크기)
+  // 차트 인스턴스 생성
   chart = echarts.init(chartRef.value, null, {
-    width: chartSize,
-    height: chartSize
+    width: initialSize,
+    height: initialSize
   })
-  console.log('차트 인스턴스 생성됨')
+  console.log('EphemerisDesignation 차트 인스턴스 생성됨, 크기:', initialSize)
 
   // 차트 옵션 설정
   const option = {
     backgroundColor: 'transparent',
     grid: {
-      left: 10,
-      right: 10,
-      top: 10,
-      bottom: 10,
+      left: '10%', /* ✅ 균등한 여백 확보 (PassSchedulePage와 동일) */
+      right: '10%',
+      top: '10%',
+      bottom: '10%',
       containLabel: false
     },
     polar: {
@@ -1754,33 +1744,78 @@ const initChart = () => {
     ],
   }
 
-  // 차트 옵션 적용 (반응형 크기)
+  // 차트 옵션 적용 (초기 크기)
   chart.setOption(option, true)
   chart.resize({
-    width: chartSize,
-    height: chartSize
+    width: initialSize,
+    height: initialSize
   })
-  console.log('차트 옵션 적용됨')
+  console.log('EphemerisDesignation 차트 옵션 적용됨')
 
-  // 차트 크기 조정
-  setTimeout(() => {
-    if (chart && !chart.isDisposed()) {
+  // ✅ 차트 크기 조정 (차트를 더 크게, Position View 구역 크기와 독립적) - PassSchedulePage와 동일
+  const adjustChartSize = async () => {
+    await nextTick() // ✅ Vue의 DOM 업데이트 완료 대기
+
+    if (!chart || chart.isDisposed() || !chartRef.value) return
+
+    // ✅ 차트를 더 크게 설정 (Position View 구역 크기와 독립적)
+    const chartSize = 500
+
+    console.log('차트 크기 설정:', chartSize)
+
+    // 리사이즈 수행
+    chart.resize({
+      width: chartSize,
+      height: chartSize
+    })
+
+    // ✅ ECharts가 생성한 실제 DOM 요소에 크기 설정
+    await nextTick()
+    const chartElement = chartRef.value.querySelector('div') as HTMLElement | null
+    if (chartElement) {
+      // ✅ 차트를 더 크게 설정
+      chartElement.style.width = `${chartSize}px`
+      chartElement.style.height = `${chartSize}px`
+      chartElement.style.maxWidth = `${chartSize}px`
+      chartElement.style.maxHeight = `${chartSize}px`
+      chartElement.style.minWidth = `${chartSize}px`
+      chartElement.style.minHeight = `${chartSize}px`
+      // ✅ 중앙 정렬
+      chartElement.style.top = '50%'
+      chartElement.style.position = 'absolute'
+      chartElement.style.left = '50%'
+      chartElement.style.transform = 'translate(-50%, -50%)'
+
+      // 다시 리사이즈하여 적용 확인
       chart.resize({
         width: chartSize,
         height: chartSize
       })
-      console.log('차트 리사이즈 완료')
     }
+
+    console.log('차트 리사이즈 완료:', chartSize)
+  }
+
+  // ✅ Vue의 nextTick을 사용하여 안전하게 차트 조정
+  setTimeout(() => {
+    adjustChartSize().catch(console.error)
+    // 추가 리사이즈 (레이아웃 완료 대기)
+    setTimeout(() => {
+      adjustChartSize().catch(console.error)
+    }, 200)
   }, 100)
 
-  // 윈도우 리사이즈 이벤트에 대응 (반응형)
-  window.addEventListener('resize', () => {
-    const newSize = getChartSize()
-    chart?.resize({
-      width: newSize,
-      height: newSize
-    })
-  })
+  // ✅ 윈도우 리사이즈 이벤트에 대응 (반응형) - 컨테이너 크기 기반
+  chartResizeHandler = () => {
+    if (!chart || chart.isDisposed()) return
+
+    nextTick().then(() => {
+      // ✅ 리사이즈 시에도 컨테이너 크기에 맞춰 조정
+      adjustChartSize().catch(console.error)
+    }).catch(console.error)
+  }
+
+  window.addEventListener('resize', chartResizeHandler)
 }
 
 // ✅ 최적화된 차트 업데이트 함수 (완전 교체)
@@ -2518,7 +2553,11 @@ onUnmounted(() => {
   // ✅ TypeScript Worker 정리
   ephemerisStore.cleanupWorker()
   // 윈도우 이벤트 리스너 정리
-  window.removeEventListener('resize', () => { })
+  // ✅ 차트 리사이즈 이벤트 리스너 제거
+  if (chartResizeHandler) {
+    window.removeEventListener('resize', chartResizeHandler)
+    chartResizeHandler = null
+  }
 })
 </script>
 
@@ -2606,17 +2645,106 @@ onUnmounted(() => {
   }
 }
 
-.ephemeris-mode {
-  height: 100%;
+/* ✅ 1단계: ephemeris-mode와 부모 요소의 하단 여백 완전 제거 (PassSchedulePage와 동일) */
+/* router-view, q-page-container 내부의 ephemeris-mode 하단 여백 제거 */
+router-view .ephemeris-mode,
+q-page-container .ephemeris-mode,
+q-page .ephemeris-mode,
+.ephemeris-mode,
+[class*="ephemeris-mode"],
+div.ephemeris-mode {
+  height: auto !important;
+  /* ✅ height: 100% 제거하여 내용에 맞게 조정 */
   width: 100%;
+  padding: 0 !important;
+  margin: 0 !important;
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 제거 */
+  padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 제거 */
+  min-height: auto !important;
+  /* ✅ 최소 높이 제거 */
+  max-height: none !important;
+  /* ✅ 최대 높이 제거 */
+  display: flex !important;
+  /* ✅ flexbox로 변경 */
+  flex-direction: column !important;
+  /* ✅ 세로 방향 */
+  gap: 0 !important;
+  /* ✅ flex gap 제거 */
+  row-gap: 0 !important;
+  /* ✅ flex row-gap 제거 */
+  column-gap: 0 !important;
+  /* ✅ flex column-gap 제거 */
+}
+
+/* router-view, q-page-container의 하단 패딩/마진 제거 */
+router-view .ephemeris-mode,
+q-page-container .ephemeris-mode {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ ephemeris-mode 내부의 마지막 요소 하단 여백 완전 제거 */
+.ephemeris-mode>*:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ ephemeris-mode 내부의 모든 직접 자식 요소 하단 여백 제거 */
+.ephemeris-mode>* {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row가 ephemeris-mode의 마지막 자식일 때 하단 여백 완전 제거 */
+.ephemeris-mode>.main-content-row:last-child,
+.ephemeris-mode>.row.main-content-row:last-child,
+.ephemeris-mode>div.main-content-row:last-child,
+.ephemeris-mode>.main-content-row,
+.ephemeris-mode>.row.main-content-row,
+.ephemeris-mode>div.main-content-row {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+/* ✅ ephemeris-mode의 마지막 div 요소 하단 여백 완전 제거 */
+.ephemeris-mode>div:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ ephemeris-mode의 마지막 row 요소 하단 여백 완전 제거 */
+.ephemeris-mode>.row:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ ephemeris-mode의 모든 직접 자식 row 요소 하단 여백 제거 */
+.ephemeris-mode>.row {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ ephemeris-mode의 모든 직접 자식 div 요소 하단 여백 제거 */
+.ephemeris-mode>div {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 /* ✅ 외각 공간 제어 - 단순화 */
 .ephemeris-mode .ephemeris-container {
   padding: 0;
   width: 100%;
-  height: 100%;
+  height: auto;
+  /* ✅ height: 100% → auto로 변경하여 내용에 맞게 조정 */
   margin: 0;
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 제거 */
+  padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 제거 */
 }
 
 .section-title {
@@ -2624,17 +2752,75 @@ onUnmounted(() => {
   padding-left: 0.5rem;
 }
 
+/* ✅ 오프셋 컨트롤 행 하단 여백 (PassSchedulePage와 동일) */
+.ephemeris-mode .offset-control-row {
+  margin-bottom: 0.5rem !important;
+  /* ✅ 기본 q-mb-sm (0.5rem) 유지하되 명시적으로 설정 (PassSchedulePage와 동일) */
+}
+
+/* ✅ ephemeris-container 내부의 offset-control-row와 main-content-row 사이 간격 보장 */
+.ephemeris-mode .ephemeris-container .offset-control-row {
+  margin-bottom: 0.5rem !important;
+  /* ✅ PassSchedulePage와 동일한 간격 */
+}
+
+.ephemeris-mode .ephemeris-container .main-content-row {
+  margin-top: 0 !important;
+  /* ✅ 상단 마진 제거 (offset-control-row의 margin-bottom만 사용) */
+  padding-top: 0 !important;
+  /* ✅ 상단 패딩 제거 */
+}
+
+/* ✅ 메인 콘텐츠 행 하단 여백 제거 (PassSchedulePage와 동일) */
+.ephemeris-mode .main-content-row {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ Quasar q-col-gutter-md가 행에 추가하는 하단 마진 제거 */
+.ephemeris-mode .main-content-row.q-col-gutter-md,
+.ephemeris-mode .row.q-col-gutter-md.main-content-row {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ Quasar row 기본 스타일 오버라이드 */
+.ephemeris-mode .main-content-row.row,
+.ephemeris-mode .row.main-content-row {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 모든 컬럼 하단 여백 제거 */
+.ephemeris-mode .main-content-row>[class*="col-"] {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 모든 컬럼 내부의 q-card 하단 여백 제거 */
+.ephemeris-mode .main-content-row>[class*="col-"] .q-card {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 모든 컬럼 내부의 control-section 하단 여백 제거 */
+.ephemeris-mode .main-content-row .control-section {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
 
 .control-section {
-  min-height: 360px !important;
-  /* ✅ 최소 높이 보장 */
-  height: 100% !important;
-  /* ✅ 부모 높이에 맞춤 */
+  height: 100%;
+  max-height: 500px;
+  /* ✅ PassSchedulePage와 동일한 최대 높이 설정 */
   width: 100%;
   background-color: var(--theme-card-background);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  display: flex !important;
-  flex-direction: column !important;
+  /* ✅ PassSchedulePage와 동일한 flex 설정 */
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 제거 */
 }
 
 .control-section .q-card-section {
@@ -2687,6 +2873,12 @@ onUnmounted(() => {
   /* ✅ 상단 패딩을 다른 패널과 동일하게 16px로 맞춤, 하단 패딩 제거 */
   overflow: visible !important;
   /* ✅ 차트가 넘쳐도 보이도록 */
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  /* ✅ 중앙 정렬 */
+  justify-content: center !important;
+  /* ✅ 중앙 정렬 */
 }
 
 .position-view-title {
@@ -2709,66 +2901,77 @@ onUnmounted(() => {
   width: 100%;
   display: flex;
   align-items: center;
+  /* ✅ 중앙 정렬 */
   justify-content: center;
   margin: 0 auto;
-  padding: 0;
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 제거 */
+  padding: 0 !important;
+  padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 제거 */
   box-sizing: border-box;
   overflow: visible !important;
-  /* ✅ 차트가 컨테이너를 넘어설 수 있도록 */
+  /* ✅ 차트가 넘쳐도 보이도록 변경 */
   text-align: center;
   position: relative;
 }
 
-/* ✅ 차트 컨테이너 완전 가운데 정렬 (PassSchedulePage.vue와 동일) */
+/* ✅ 차트 컨테이너 - PassSchedulePage와 동일한 크기 및 정렬 */
 .chart-area>div {
-  position: absolute;
-  left: 50%;
+  position: absolute !important;
+  left: 50% !important;
   top: 50% !important;
-  transform: translate(-50%, -50%);
+  /* ✅ 중앙 정렬 */
+  transform: translate(-50%, -50%) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  /* ✅ 차트를 더 크게 설정 (Position View 구역 크기와 독립적) */
   width: 500px !important;
   height: 500px !important;
   max-width: 500px !important;
   max-height: 500px !important;
   min-width: 500px !important;
   min-height: 500px !important;
-  aspect-ratio: 1;
+  aspect-ratio: 1 !important;
+  /* ✅ 정사각형 유지 */
 }
 
-/* 반응형 차트 크기 조정 (PassSchedulePage.vue와 동일) */
-@media (max-width: 1900px) {
-  .chart-area>div {
-    width: 450px !important;
-    height: 450px !important;
-    max-width: 450px !important;
-    max-height: 450px !important;
-    min-width: 450px !important;
-    min-height: 450px !important;
-  }
-}
-
+/* 반응형 차트 크기 조정 - PassSchedulePage와 동일 */
 @media (max-width: 1600px) {
   .chart-area>div {
-    width: 400px !important;
-    height: 400px !important;
-    max-width: 400px !important;
-    max-height: 400px !important;
-    min-width: 400px !important;
-    min-height: 400px !important;
+    width: 470px !important;
+    height: 470px !important;
+    max-width: 470px !important;
+    max-height: 470px !important;
+    min-width: 470px !important;
+    min-height: 470px !important;
   }
 }
 
 @media (max-width: 1200px) {
   .chart-area>div {
-    width: 350px !important;
-    height: 350px !important;
-    max-width: 350px !important;
-    max-height: 350px !important;
-    min-width: 350px !important;
-    min-height: 350px !important;
+    width: 420px !important;
+    height: 420px !important;
+    max-width: 420px !important;
+    max-height: 420px !important;
+    min-width: 420px !important;
+    min-height: 420px !important;
   }
 }
 
-/* ✅ 2번 영역(위성 추적 정보) 카드 섹션 높이 조정 */
+/* ✅ 2번 영역(위성 추적 정보) 카드 높이를 Position View와 동일하게 설정 (360px) - PassSchedulePage와 동일 */
+.ephemeris-mode .main-content-row>[class*="col-"]:nth-child(2) .control-section,
+.ephemeris-mode .main-content-row>[class*="col-"]:nth-child(2) .control-section.q-card {
+  min-height: 360px !important;
+  /* ✅ 최소 높이 보장 */
+  height: 100% !important;
+  /* ✅ 부모 높이에 맞춤 */
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* ✅ 2번 영역(위성 추적 정보) 카드 섹션 높이 조정 - PassSchedulePage와 동일 */
 .ephemeris-mode .main-content-row>[class*="col-"]:nth-child(2) .control-section .q-card-section {
   min-height: 360px !important;
   /* ✅ 최소 높이 보장 */
@@ -2778,30 +2981,56 @@ onUnmounted(() => {
   flex-direction: column !important;
 }
 
-/* ✅ 3번 영역(TLE Data) 카드 섹션 높이 조정 */
-.ephemeris-mode .main-content-row>[class*="col-"]:nth-child(3) .control-section .q-card-section {
+/* ✅ 3번 영역(TLE Data) 카드 높이를 Position View와 동일하게 설정 (360px) - PassSchedulePage와 동일 */
+.ephemeris-mode .main-content-row>[class*="col-"]:nth-child(3) .control-section,
+.ephemeris-mode .main-content-row>[class*="col-"]:nth-child(3) .control-section.q-card {
   min-height: 360px !important;
   /* ✅ 최소 높이 보장 */
-  flex: 1 !important;
-  /* ✅ 남은 공간 채우기 */
+  height: 100% !important;
+  /* ✅ 부모 높이에 맞춤 */
   display: flex !important;
   flex-direction: column !important;
+}
+
+/* ✅ 3번 영역(TLE Data) 카드 섹션 높이 조정 (PassSchedulePage의 schedule-control-section과 동일) */
+.ephemeris-mode .main-content-row>[class*="col-"]:nth-child(3) .control-section .q-card-section.schedule-control-section {
+  min-height: 360px !important;
+  /* ✅ 최소 높이 보장 */
+  flex: 1 1 auto !important;
+  /* ✅ 남은 공간 채우기 (flex-grow: 1, flex-shrink: 1, flex-basis: auto) */
+  display: flex !important;
+  flex-direction: column !important;
+  padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 완전 제거 (상단 공간과 동일하게) */
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 제거 */
+  overflow: hidden !important;
+  /* ✅ 하단 여백 방지 */
+  justify-content: flex-start !important;
+  /* ✅ 상단 정렬로 하단 여백 제거 */
 }
 
 .ephemeris-form {
   margin-top: 0.5rem;
   width: 100%;
-  flex: 1 !important;
-  /* ✅ 남은 공간 채우기 */
-  display: flex !important;
-  flex-direction: column !important;
+  margin-bottom: 0;
+  /* ✅ 하단 마진 제거 */
+  flex: 1;
+  /* ✅ 남은 공간을 채워서 하단 정렬 */
+  display: flex;
+  flex-direction: column;
 }
 
 .form-row {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.25rem;
+  /* ✅ PassSchedulePage와 동일 (0.5rem → 0.25rem) */
   width: 100%;
+  flex: 1;
+  /* ✅ 남은 공간을 채워서 하단 정렬 */
+  justify-content: flex-start;
+  /* ✅ 상단부터 시작 */
 }
 
 .button-group {
@@ -2841,24 +3070,34 @@ onUnmounted(() => {
   color: white;
 }
 
-/* ✅ 스케줄 정보 표시 스타일 */
+/* ✅ 스케줄 정보 표시 스타일 (PassSchedulePage와 동일) */
 .schedule-info {
   background-color: rgba(255, 255, 255, 0.05);
   border-radius: 8px;
-  padding: 16px;
+  padding: 12px 16px 8px 16px;
+  /* ✅ PassSchedulePage와 동일 */
   border: 1px solid rgba(255, 255, 255, 0.1);
+  flex: 1;
+  /* ✅ 남은 공간을 채워서 하단 정렬 */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  /* ✅ 상단부터 시작 */
 }
 
 .info-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
+  padding: 6px 0;
+  /* ✅ PassSchedulePage와 동일 (8px → 6px) */
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .info-row:last-child {
   border-bottom: none;
+  margin-bottom: auto;
+  /* ✅ 마지막 행 아래에 자동 여백 추가하여 하단 정렬 */
 }
 
 .info-label {
@@ -3403,5 +3642,11 @@ onUnmounted(() => {
   padding: 4px 8px !important;
   letter-spacing: 0.5px !important;
   margin-top: 2px;
+}
+
+/* ✅ Schedule Control이 남은 공간을 차지하도록 설정 (PassSchedulePage와 동일) */
+.schedule-control-col {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 </style>
