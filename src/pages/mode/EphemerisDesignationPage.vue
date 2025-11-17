@@ -1,317 +1,316 @@
 <template>
   <div class="ephemeris-mode">
-    <div class="ephemeris-container">
-      <!-- 1행: Offset Controls - 원본 형태로 복원하고 반응형 적용 -->
-      <div class="row q-col-gutter-md q-mb-sm offset-control-row">
-        <div class="col-12">
-          <q-card flat bordered class="control-card">
-            <q-card-section class="compact-control purple-1">
-              <!-- 모든 간격이 동적으로 조정되는 반응형 레이아웃 -->
-              <div class="flexible-offset-layout">
-                <!-- Azimuth Offset -->
-                <div class="offset-group">
-                  <div class="row q-gutter-xs align-center">
-                    <div class="col-auto position-offset-label">
-                      <div class="text-subtitle2 text-weight-bold text-primary text-center">
-                        Azimuth<br>Offset
-                      </div>
-                    </div>
-                    <div class="col-auto">
-                      <q-input v-model="inputs[0]" @input="(val: string) => onInputChange(0, val)" dense outlined
-                        type="number" step="0.01" label="Azimuth" class="offset-input" />
-                    </div>
-                    <div class="col-auto">
-                      <div class="vertical-button-group">
-                        <div class="vertical-buttons">
-                          <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
-                          <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
-                        </div>
-                        <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(0)" />
-                      </div>
-                    </div>
-                    <div class="col-auto">
-                      <q-input v-model="outputs[0]" dense outlined readonly label="Output"
-                        style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+    <!-- 1행: Offset Controls - 원본 형태로 복원하고 반응형 적용 -->
+    <div class="row q-col-gutter-md q-mb-sm offset-control-row">
+      <div class="col-12">
+        <q-card flat bordered class="control-card">
+          <q-card-section class="compact-control purple-1">
+            <!-- 모든 간격이 동적으로 조정되는 반응형 레이아웃 -->
+            <div class="flexible-offset-layout">
+              <!-- Azimuth Offset -->
+              <div class="offset-group">
+                <div class="row q-gutter-xs align-center">
+                  <div class="col-auto position-offset-label">
+                    <div class="text-subtitle2 text-weight-bold text-primary text-center">
+                      Azimuth<br>Offset
                     </div>
                   </div>
-                </div>
-
-                <!-- Elevation Offset -->
-                <div class="offset-group">
-                  <div class="row q-gutter-xs align-center">
-                    <div class="col-auto position-offset-label">
-                      <div class="text-subtitle2 text-weight-bold text-primary text-center">
-                        Elevation<br>Offset
+                  <div class="col-auto">
+                    <q-input v-model="inputs[0]" @input="(val: string) => onInputChange(0, val)" dense outlined
+                      type="number" step="0.01" label="Azimuth" class="offset-input" />
+                  </div>
+                  <div class="col-auto">
+                    <div class="vertical-button-group">
+                      <div class="vertical-buttons">
+                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
+                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
                       </div>
-                    </div>
-                    <div class="col-auto">
-                      <q-input v-model="inputs[1]" @input="(val: string) => onInputChange(1, val)" dense outlined
-                        type="number" step="0.01" label="Elevation"
-                        style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
-                    </div>
-                    <div class="col-auto">
-                      <div class="vertical-button-group">
-                        <div class="vertical-buttons">
-                          <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(1)" />
-                          <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
-                        </div>
-                        <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(1)" />
-                      </div>
-                    </div>
-                    <div class="col-auto">
-                      <q-input v-model="outputs[1]" dense outlined readonly label="Output"
-                        style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                      <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(0)" />
                     </div>
                   </div>
-                </div>
-
-                <!-- Tilt Offset -->
-                <div class="offset-group">
-                  <div class="row q-gutter-xs align-center">
-                    <div class="col-auto position-offset-label">
-                      <div class="text-subtitle2 text-weight-bold text-primary text-center">
-                        Tilt<br>Offset
-                      </div>
-                    </div>
-                    <div class="col-auto">
-                      <q-input v-model="inputs[2]" @input="(val: string) => onInputChange(2, val)" dense outlined
-                        type="number" step="0.01" label="Tilt"
-                        style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
-                    </div>
-                    <div class="col-auto">
-                      <div class="vertical-button-group">
-                        <div class="vertical-buttons">
-                          <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(2)" />
-                          <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
-                        </div>
-                        <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(2)" />
-                      </div>
-                    </div>
-                    <div class="col-auto">
-                      <q-input v-model="outputs[2]" dense outlined readonly label="Output"
-                        style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Time Offset + Cal Time -->
-                <div class="offset-group">
-                  <div class="row q-gutter-xs align-center">
-                    <div class="col-auto position-offset-label">
-                      <div class="text-subtitle2 text-weight-bold text-primary text-center">
-                        Time<br>Offset
-                      </div>
-                    </div>
-                    <div class="col-auto">
-                      <q-input v-model="inputs[3]" @input="(val: string) => onInputChange(3, val)" dense outlined
-                        type="number" step="0.01" label="Time"
-                        style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
-                    </div>
-                    <div class="col-auto">
-                      <div class="vertical-button-group">
-                        <div class="vertical-buttons">
-                          <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(3)" />
-                          <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
-                        </div>
-                        <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(3)" />
-                      </div>
-                    </div>
-                    <div class="col-auto">
-                      <q-input v-model="outputs[3]" dense outlined readonly label="Result"
-                        style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
-                    </div>
-                    <div class="col-auto cal-time-field">
-                      <q-input v-model="formattedCalTime" dense outlined readonly label="Cal Time"
-                        style="min-width: 190px !important; max-width: 220px !important;" />
-                    </div>
+                  <div class="col-auto">
+                    <q-input v-model="outputs[0]" dense outlined readonly label="Output"
+                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
                   </div>
                 </div>
               </div>
-            </q-card-section>
-          </q-card>
-        </div>
+
+              <!-- Elevation Offset -->
+              <div class="offset-group">
+                <div class="row q-gutter-xs align-center">
+                  <div class="col-auto position-offset-label">
+                    <div class="text-subtitle2 text-weight-bold text-primary text-center">
+                      Elevation<br>Offset
+                    </div>
+                  </div>
+                  <div class="col-auto">
+                    <q-input v-model="inputs[1]" @input="(val: string) => onInputChange(1, val)" dense outlined
+                      type="number" step="0.01" label="Elevation"
+                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                  </div>
+                  <div class="col-auto">
+                    <div class="vertical-button-group">
+                      <div class="vertical-buttons">
+                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(1)" />
+                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
+                      </div>
+                      <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(1)" />
+                    </div>
+                  </div>
+                  <div class="col-auto">
+                    <q-input v-model="outputs[1]" dense outlined readonly label="Output"
+                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tilt Offset -->
+              <div class="offset-group">
+                <div class="row q-gutter-xs align-center">
+                  <div class="col-auto position-offset-label">
+                    <div class="text-subtitle2 text-weight-bold text-primary text-center">
+                      Tilt<br>Offset
+                    </div>
+                  </div>
+                  <div class="col-auto">
+                    <q-input v-model="inputs[2]" @input="(val: string) => onInputChange(2, val)" dense outlined
+                      type="number" step="0.01" label="Tilt"
+                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                  </div>
+                  <div class="col-auto">
+                    <div class="vertical-button-group">
+                      <div class="vertical-buttons">
+                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(2)" />
+                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
+                      </div>
+                      <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(2)" />
+                    </div>
+                  </div>
+                  <div class="col-auto">
+                    <q-input v-model="outputs[2]" dense outlined readonly label="Output"
+                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Time Offset + Cal Time -->
+              <div class="offset-group">
+                <div class="row q-gutter-xs align-center">
+                  <div class="col-auto position-offset-label">
+                    <div class="text-subtitle2 text-weight-bold text-primary text-center">
+                      Time<br>Offset
+                    </div>
+                  </div>
+                  <div class="col-auto">
+                    <q-input v-model="inputs[3]" @input="(val: string) => onInputChange(3, val)" dense outlined
+                      type="number" step="0.01" label="Time"
+                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                  </div>
+                  <div class="col-auto">
+                    <div class="vertical-button-group">
+                      <div class="vertical-buttons">
+                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(3)" />
+                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
+                      </div>
+                      <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(3)" />
+                    </div>
+                  </div>
+                  <div class="col-auto">
+                    <q-input v-model="outputs[3]" dense outlined readonly label="Result"
+                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
+                  </div>
+                  <div class="col-auto cal-time-field">
+                    <q-input v-model="formattedCalTime" dense outlined readonly label="Cal Time"
+                      style="min-width: 190px !important; max-width: 220px !important;" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </q-card-section>
+        </q-card>
+      </div>
+    </div>
+
+    <!-- 2행: Main Content -->
+    <div class="row q-col-gutter-md main-content-row"
+      style="display: flex; flex-wrap: nowrap; align-items: stretch; margin-bottom: 0 !important; padding-bottom: 0 !important;">
+      <!-- 1번 영역: 차트가 들어갈 네모난 칸 - 반응형 크기 조정 -->
+      <div class="col-12 col-md-3 position-view-col">
+        <q-card class="control-section position-view-card"
+          style="min-height: 360px !important; height: 100% !important; display: flex !important; flex-direction: column !important;">
+          <q-card-section class="position-view-section"
+            style="min-height: 360px !important; height: 100% !important; flex: 1 !important; display: flex !important; flex-direction: column !important; padding-top: 16px !important; padding-bottom: 0px !important;">
+            <div class="text-subtitle1 text-weight-bold text-primary position-view-title">Position View</div>
+            <div class="chart-area" ref="chartRef"
+              style="min-height: 340px !important; height: 100% !important; flex: 1 !important; padding-top: 0 !important; padding-bottom: 0 !important; margin-bottom: 0 !important;">
+            </div>
+          </q-card-section>
+        </q-card>
       </div>
 
-      <!-- 2행: Main Content -->
-      <div class="row q-col-gutter-md main-content-row"
-        style="display: flex; flex-wrap: nowrap; align-items: stretch; margin-bottom: 0 !important; padding-bottom: 0 !important;">
-        <!-- 1번 영역: 차트가 들어갈 네모난 칸 - 반응형 크기 조정 -->
-        <div class="col-12 col-md-3 position-view-col">
-          <q-card class="control-section position-view-card"
-            style="min-height: 360px !important; height: 100% !important; display: flex !important; flex-direction: column !important;">
-            <q-card-section class="position-view-section"
-              style="min-height: 360px !important; height: 100% !important; flex: 1 !important; display: flex !important; flex-direction: column !important; padding-top: 16px !important; padding-bottom: 0px !important;">
-              <div class="text-subtitle1 text-weight-bold text-primary position-view-title">Position View</div>
-              <div class="chart-area" ref="chartRef"
-                style="min-height: 340px !important; height: 100% !important; flex: 1 !important; padding-top: 0 !important; padding-bottom: 0 !important; margin-bottom: 0 !important;">
+      <!-- 2번 영역: 계산 정보 표시 영역 수정 -->
+      <div class="col-12 col-md-3">
+        <q-card class="control-section">
+          <q-card-section>
+            <div class="row justify-between items-center q-mb-xs">
+              <div class="text-subtitle1 text-weight-bold text-primary">위성 추적 정보</div>
+              <div class="row items-center q-gutter-sm">
+                <span class="info-label">추적 상태:</span>
+                <q-chip :color="icdStore.ephemerisTrackingStateInfo.displayColor" text-color="white"
+                  :label="icdStore.ephemerisTrackingStateInfo.displayLabel" size="sm" class="tracking-status-chip" />
               </div>
-            </q-card-section>
-          </q-card>
-        </div>
+            </div>
 
-        <!-- 2번 영역: 계산 정보 표시 영역 수정 -->
-        <div class="col-12 col-md-3">
-          <q-card class="control-section">
-            <q-card-section>
-              <div class="row justify-between items-center q-mb-xs">
-                <div class="text-subtitle1 text-weight-bold text-primary">위성 추적 정보</div>
-                <div class="row items-center q-gutter-sm">
-                  <span class="info-label">추적 상태:</span>
-                  <q-chip :color="icdStore.ephemerisTrackingStateInfo.displayColor" text-color="white"
-                    :label="icdStore.ephemerisTrackingStateInfo.displayLabel" size="sm" class="tracking-status-chip" />
-                </div>
-              </div>
-
-              <div class="ephemeris-form">
-                <div class="form-row">
-                  <!-- ✅ 정지궤도 정보 표시 -->
-                  <div v-if="selectedScheduleInfo.isGeostationary" class="schedule-info q-mt-xs">
-                    <div class="text-subtitle2 text-weight-bold text-primary q-mb-xs">
-                      정지궤도 위성 정보
-                    </div>
-
-                    <div class="info-row">
-                      <span class="info-label">위성 이름/ID:</span>
-                      <span class="info-value">{{ selectedScheduleInfo.satelliteName }}</span>
-                    </div>
-
-                    <div class="info-row">
-                      <span class="info-label">방위각:</span>
-                      <span class="info-value">{{ selectedScheduleInfo.startAzimuth.toFixed(2) }}°</span>
-                    </div>
-
-                    <div class="info-row">
-                      <span class="info-label">고도:</span>
-                      <span class="info-value">{{ selectedScheduleInfo.startElevation.toFixed(2) }}°</span>
-                    </div>
+            <div class="ephemeris-form">
+              <div class="form-row">
+                <!-- ✅ 정지궤도 정보 표시 -->
+                <div v-if="selectedScheduleInfo.isGeostationary" class="schedule-info q-mt-xs">
+                  <div class="text-subtitle2 text-weight-bold text-primary q-mb-xs">
+                    정지궤도 위성 정보
                   </div>
 
-                  <!-- ✅ 기존 스케줄 정보 표시 (정지궤도가 아닌 경우) -->
-                  <div v-else-if="selectedScheduleInfo.satelliteName" class="schedule-info q-mt-xs">
-                    <div class="info-row">
-                      <span class="info-label">위성 이름/ID:</span>
-                      <span class="info-value">
-                        {{ selectedScheduleInfo.satelliteName }} / {{ selectedScheduleInfo.satelliteId }}
-                        <!-- KEYHOLE 배지 -->
-                        <q-badge v-if="selectedScheduleInfo.isKeyhole" color="red" class="q-ml-sm" label="KEYHOLE" />
-                      </span>
-                    </div>
+                  <div class="info-row">
+                    <span class="info-label">위성 이름/ID:</span>
+                    <span class="info-value">{{ selectedScheduleInfo.satelliteName }}</span>
+                  </div>
 
-                    <div class="info-row">
-                      <span class="info-label">시작/종료 시간:</span>
-                      <span class="info-value">{{
-                        formatToLocalTime(selectedScheduleInfo.startTime)
+                  <div class="info-row">
+                    <span class="info-label">방위각:</span>
+                    <span class="info-value">{{ selectedScheduleInfo.startAzimuth.toFixed(2) }}°</span>
+                  </div>
+
+                  <div class="info-row">
+                    <span class="info-label">고도:</span>
+                    <span class="info-value">{{ selectedScheduleInfo.startElevation.toFixed(2) }}°</span>
+                  </div>
+                </div>
+
+                <!-- ✅ 기존 스케줄 정보 표시 (정지궤도가 아닌 경우) -->
+                <div v-else-if="selectedScheduleInfo.satelliteName" class="schedule-info q-mt-xs">
+                  <div class="info-row">
+                    <span class="info-label">위성 이름/ID:</span>
+                    <span class="info-value">
+                      {{ selectedScheduleInfo.satelliteName }} / {{ selectedScheduleInfo.satelliteId }}
+                      <!-- KEYHOLE 배지 -->
+                      <q-badge v-if="selectedScheduleInfo.isKeyhole" color="red" class="q-ml-sm" label="KEYHOLE" />
+                    </span>
+                  </div>
+
+                  <div class="info-row">
+                    <span class="info-label">시작/종료 시간:</span>
+                    <span class="info-value">{{
+                      formatToLocalTime(selectedScheduleInfo.startTime)
                       }} / {{
-                          formatToLocalTime(selectedScheduleInfo.endTime)
-                        }}</span>
-                    </div>
+                        formatToLocalTime(selectedScheduleInfo.endTime)
+                      }}</span>
+                  </div>
 
+                  <div class="info-row">
+                    <span class="info-label">지속 시간:</span>
+                    <span class="info-value">{{ formatDuration(selectedScheduleInfo.duration) }}</span>
+                  </div>
+
+                  <div class="info-row">
+                    <span class="info-label">시작/종료 방위각/고도:</span>
+                    <span class="info-value">{{ selectedScheduleInfo.startAzimuth.toFixed(6) }}° / {{
+                      selectedScheduleInfo.endAzimuth.toFixed(6) }}° / {{
+                        selectedScheduleInfo.startElevation.toFixed(6) }}°</span>
+                  </div>
+
+                  <div class="info-row">
+                    <span class="info-label">최대 고도:</span>
+                    <span class="info-value">{{ selectedScheduleInfo.maxElevation.toFixed(6) }}°</span>
+                  </div>
+
+                  <!-- KEYHOLE 정보 표시 -->
+                  <div v-if="selectedScheduleInfo.isKeyhole" class="keyhole-info q-mt-sm q-pa-sm"
+                    style="background-color: rgba(255, 0, 0, 0.1); border-left: 3px solid #f44336;">
+                    <div class="text-weight-bold text-red q-mb-xs">🚀 KEYHOLE 위성 정보</div>
                     <div class="info-row">
-                      <span class="info-label">지속 시간:</span>
-                      <span class="info-value">{{ formatDuration(selectedScheduleInfo.duration) }}</span>
+                      <span class="info-label">권장 Train 각도:</span>
+                      <span class="info-value text-positive">{{
+                        safeToFixed(selectedScheduleInfo.recommendedTrainAngle, 6)
+                        }}°</span>
                     </div>
-
                     <div class="info-row">
-                      <span class="info-label">시작/종료 방위각/고도:</span>
-                      <span class="info-value">{{ selectedScheduleInfo.startAzimuth.toFixed(6) }}° / {{
-                        selectedScheduleInfo.endAzimuth.toFixed(6) }}° / {{
-                          selectedScheduleInfo.startElevation.toFixed(6) }}°</span>
+                      <span class="info-label">최대 Azimuth 속도:</span>
+                      <span class="info-value text-red">
+                        {{ safeToFixed(
+                          selectedScheduleInfo.isKeyhole
+                            ? (selectedScheduleInfo.KeyholeFinalTransformedMaxAzRate ??
+                              selectedScheduleInfo.FinalTransformedMaxAzRate ?? 0)
+                            : (selectedScheduleInfo.FinalTransformedMaxAzRate ?? 0),
+                          6
+                        ) }}°/s
+                      </span>
                     </div>
-
                     <div class="info-row">
-                      <span class="info-label">최대 고도:</span>
-                      <span class="info-value">{{ selectedScheduleInfo.maxElevation.toFixed(6) }}°</span>
-                    </div>
-
-                    <!-- KEYHOLE 정보 표시 -->
-                    <div v-if="selectedScheduleInfo.isKeyhole" class="keyhole-info q-mt-sm q-pa-sm"
-                      style="background-color: rgba(255, 0, 0, 0.1); border-left: 3px solid #f44336;">
-                      <div class="text-weight-bold text-red q-mb-xs">🚀 KEYHOLE 위성 정보</div>
-                      <div class="info-row">
-                        <span class="info-label">권장 Train 각도:</span>
-                        <span class="info-value text-positive">{{
-                          safeToFixed(selectedScheduleInfo.recommendedTrainAngle, 6)
-                          }}°</span>
-                      </div>
-                      <div class="info-row">
-                        <span class="info-label">최대 Azimuth 속도:</span>
-                        <span class="info-value text-red">
-                          {{ safeToFixed(
-                            selectedScheduleInfo.isKeyhole
-                              ? (selectedScheduleInfo.KeyholeFinalTransformedMaxAzRate ??
-                                selectedScheduleInfo.FinalTransformedMaxAzRate ?? 0)
-                              : (selectedScheduleInfo.FinalTransformedMaxAzRate ?? 0),
-                            6
-                          ) }}°/s
-                        </span>
-                      </div>
-                      <div class="info-row">
-                        <span class="info-label">최대 Elevation 속도:</span>
-                        <span class="info-value text-red">
-                          {{ safeToFixed(
-                            selectedScheduleInfo.isKeyhole
-                              ? (selectedScheduleInfo.KeyholeFinalTransformedMaxElRate ??
-                                selectedScheduleInfo.FinalTransformedMaxElRate ?? 0)
-                              : (selectedScheduleInfo.FinalTransformedMaxElRate ?? 0),
-                            6
-                          ) }}°/s
-                        </span>
-                      </div>
-                    </div>
-
-                    <div class="info-row">
-                      <span class="info-label">남은 시간:</span>
-                      <span class="info-value" :class="{
-                        'text-negative': timeRemaining < 0,
-                        'text-positive': timeRemaining > 0,
-                        'text-grey': timeRemaining === 0,
-                      }">
-                        {{ timeRemaining < 0 ? '지연됨' : timeRemaining > 0 ? `${Math.floor(timeRemaining / 60000)}분
-                          ${Math.floor((timeRemaining % 60000) / 1000)}초` : '완료' }}
+                      <span class="info-label">최대 Elevation 속도:</span>
+                      <span class="info-value text-red">
+                        {{ safeToFixed(
+                          selectedScheduleInfo.isKeyhole
+                            ? (selectedScheduleInfo.KeyholeFinalTransformedMaxElRate ??
+                              selectedScheduleInfo.FinalTransformedMaxElRate ?? 0)
+                            : (selectedScheduleInfo.FinalTransformedMaxElRate ?? 0),
+                          6
+                        ) }}°/s
                       </span>
                     </div>
                   </div>
+
+                  <div class="info-row">
+                    <span class="info-label">남은 시간:</span>
+                    <span class="info-value" :class="{
+                      'text-negative': timeRemaining < 0,
+                      'text-positive': timeRemaining > 0,
+                      'text-grey': timeRemaining === 0,
+                    }">
+                      {{ timeRemaining < 0 ? '지연됨' : timeRemaining > 0 ? `${Math.floor(timeRemaining / 60000)}분
+                        ${Math.floor((timeRemaining % 60000) / 1000)}초` : '완료' }}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </q-card-section>
-          </q-card>
-        </div>
+            </div>
+          </q-card-section>
+        </q-card>
+      </div>
 
-        <!-- 3번 영역: TLE Data -->
-        <div class="col-12 col-md-6 schedule-control-col">
-          <q-card class="control-section tle-data-card">
-            <q-card-section class="schedule-control-section">
-              <div class="text-subtitle1 text-weight-bold text-primary">TLE Data</div>
-              <q-editor v-model="tleData.displayText" readonly flat dense class="tle-display q-mt-xs" :toolbar="[]"
-                :definitions="{
-                  bold: undefined,
-                  italic: undefined,
-                  strike: undefined,
-                  underline: undefined,
-                }" content-class="tle-content" />
-              <div class="button-group q-mt-sm">
-                <q-btn color="primary" label="Text" @click="openTLEModal" class="q-mr-sm" />
-                <q-btn color="primary" label="Select Schedule" @click="openScheduleModal" class="q-mr-sm" />
-                <!-- ✅ 다운로드 버튼 추가 -->
+      <!-- 3번 영역: TLE Data -->
+      <div class="col-12 col-md-6 schedule-control-col">
+        <q-card class="control-section">
+          <q-card-section class="schedule-control-section">
+            <div class="text-subtitle1 text-weight-bold text-primary">TLE Data</div>
+            <q-editor v-model="tleData.displayText" readonly flat dense class="tle-display q-mt-sm" :toolbar="[]"
+              style="min-height: 80px; max-height: 130px;" :definitions="{
+                bold: undefined,
+                italic: undefined,
+                strike: undefined,
+                underline: undefined,
+              }" content-class="tle-content" />
+            <!-- ✅ 버튼 그룹을 하나로 통합 - PassSchedulePage.vue와 동일한 구조 -->
+            <div class="button-group">
+              <div class="button-row">
+                <q-btn color="primary" label="Text" @click="openTLEModal" class="q-mr-sm upload-btn" size="sm" />
+                <q-btn color="primary" label="Select Schedule" @click="openScheduleModal" class="upload-btn"
+                  size="sm" />
                 <q-btn color="secondary" label="Download" icon="download" @click="downloadRealtimeData"
-                  class="q-mr-sm" />
+                  class="upload-btn" size="sm" />
               </div>
-              <!-- 버튼 그룹 추가 -->
-              <div class="button-group q-mt-md">
-                <q-btn color="positive" label="Go" @click="handleEphemerisCommand" class="q-mr-sm" />
-                <q-btn color="warning" label="Stop" @click="handleStopCommand" class="q-mr-sm" />
-                <q-btn color="negative" label="Stow" @click="handleStowCommand" class="q-mr-sm" />
+              <div class="control-button-row">
+                <q-btn color="positive" label="Go" @click="handleEphemerisCommand" class="control-btn" size="sm" />
+                <q-btn color="warning" label="Stop" @click="handleStopCommand" class="control-btn" size="sm" />
+                <q-btn color="negative" label="Stow" @click="handleStowCommand" class="control-btn" size="sm" />
               </div>
-              <!-- 새로운 버튼 그룹 추가 -->
-              <div class="button-group q-mt-md">
+              <div class="button-row">
                 <q-btn color="info" label="Axis Calculator" icon="calculate" @click="openAxisTransformCalculator"
-                  class="q-mr-sm" />
+                  class="upload-btn" size="sm" />
                 <q-btn color="secondary" label="이론치 다운로드" icon="download" @click="exportAllMstDataToCsv"
-                  :loading="isExportingCsv" />
+                  :loading="isExportingCsv" class="upload-btn" size="sm" />
               </div>
-            </q-card-section>
-          </q-card>
-        </div>
+            </div>
+          </q-card-section>
+        </q-card>
       </div>
     </div>
   </div>
@@ -2685,19 +2684,48 @@ q-page-container .ephemeris-mode {
   padding-bottom: 0 !important;
 }
 
-/* ✅ ephemeris-mode 내부의 마지막 요소 하단 여백 완전 제거 */
-.ephemeris-mode>*:last-child {
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
+.section-title {
+  font-weight: 500;
+  padding-left: 0.5rem;
 }
 
-/* ✅ ephemeris-mode 내부의 모든 직접 자식 요소 하단 여백 제거 */
+/* ✅ 오프셋 컨트롤 행 하단 여백 줄이기 - PassSchedulePage.vue와 동일한 순서로 배치 */
+.ephemeris-mode .offset-control-row {
+  margin-bottom: 0.5rem !important;
+  /* ✅ 기본 q-mb-sm (0.5rem) 유지하되 명시적으로 설정 */
+}
+
+/* ✅ ephemeris-mode 내부의 모든 직접 자식 요소 하단 여백 제거 - PassSchedulePage.vue와 동일한 순서 */
 .ephemeris-mode>* {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
 
-/* ✅ main-content-row가 ephemeris-mode의 마지막 자식일 때 하단 여백 완전 제거 */
+/* ✅ ephemeris-mode의 마지막 div 요소 하단 여백 완전 제거 (더 강력한 선택자) - PassSchedulePage.vue와 동일 */
+.ephemeris-mode>div:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ ephemeris-mode의 마지막 row 요소 하단 여백 완전 제거 - PassSchedulePage.vue와 동일 */
+.ephemeris-mode>.row:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ ephemeris-mode의 모든 직접 자식 row 요소 하단 여백 제거 - PassSchedulePage.vue와 동일 */
+.ephemeris-mode>.row {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ ephemeris-mode의 모든 직접 자식 div 요소 하단 여백 제거 - PassSchedulePage.vue와 동일 */
+.ephemeris-mode>div {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row가 ephemeris-mode의 마지막 자식일 때 하단 여백 완전 제거 - PassSchedulePage.vue와 동일 */
 .ephemeris-mode>.main-content-row:last-child,
 .ephemeris-mode>.row.main-content-row:last-child,
 .ephemeris-mode>div.main-content-row:last-child,
@@ -2710,175 +2738,170 @@ q-page-container .ephemeris-mode {
   padding-top: 0 !important;
 }
 
-/* ✅ ephemeris-mode의 마지막 div 요소 하단 여백 완전 제거 */
-.ephemeris-mode>div:last-child {
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
 
-/* ✅ ephemeris-mode의 마지막 row 요소 하단 여백 완전 제거 */
-.ephemeris-mode>.row:last-child {
+/* ✅ 메인 콘텐츠 행 하단 여백을 EphemerisDesignationPage.vue와 동일하게 설정 (하단 마진 없음) */
+.ephemeris-mode .main-content-row {
   margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
-/* ✅ ephemeris-mode의 모든 직접 자식 row 요소 하단 여백 제거 */
-.ephemeris-mode>.row {
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
-/* ✅ ephemeris-mode의 모든 직접 자식 div 요소 하단 여백 제거 */
-.ephemeris-mode>div {
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
-/* ✅ 외각 공간 제어 - 단순화 */
-.ephemeris-mode .ephemeris-container {
-  padding: 0;
-  width: 100%;
-  height: auto;
-  /* ✅ height: 100% → auto로 변경하여 내용에 맞게 조정 */
-  margin: 0;
-  margin-bottom: 0 !important;
-  /* ✅ 하단 마진 제거 */
+  /* ✅ EphemerisDesignationPage.vue와 동일하게 하단 마진 없음 */
   padding-bottom: 0 !important;
   /* ✅ 하단 패딩 제거 */
 }
 
-.section-title {
-  font-weight: 500;
-  padding-left: 0.5rem;
-}
-
-/* ✅ 오프셋 컨트롤 행 하단 여백 (PassSchedulePage와 동일) */
-.ephemeris-mode .offset-control-row {
-  margin-bottom: 0.5rem !important;
-  /* ✅ 기본 q-mb-sm (0.5rem) 유지하되 명시적으로 설정 (PassSchedulePage와 동일) */
-}
-
-/* ✅ ephemeris-container 내부의 offset-control-row와 main-content-row 사이 간격 보장 */
-.ephemeris-mode .ephemeris-container .offset-control-row {
-  margin-bottom: 0.5rem !important;
-  /* ✅ PassSchedulePage와 동일한 간격 */
-}
-
-.ephemeris-mode .ephemeris-container .main-content-row {
-  margin-top: 0 !important;
-  /* ✅ 상단 마진 제거 (offset-control-row의 margin-bottom만 사용) */
-  padding-top: 0 !important;
-  /* ✅ 상단 패딩 제거 */
-}
-
-/* ✅ 메인 콘텐츠 행 하단 여백 제거 (PassSchedulePage와 동일) */
-.ephemeris-mode .main-content-row {
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
-/* ✅ Quasar q-col-gutter-md가 행에 추가하는 하단 마진 제거 */
+/* ✅ Quasar q-col-gutter-md가 행에 추가하는 하단 마진을 EphemerisDesignationPage.vue와 동일하게 설정 (하단 마진 없음) */
 .ephemeris-mode .main-content-row.q-col-gutter-md,
 .ephemeris-mode .row.q-col-gutter-md.main-content-row {
   margin-bottom: 0 !important;
+  /* ✅ EphemerisDesignationPage.vue와 동일하게 하단 마진 없음 */
   padding-bottom: 0 !important;
 }
 
-/* ✅ Quasar row 기본 스타일 오버라이드 */
+/* ✅ Quasar row 기본 스타일 오버라이드 (더 강력한 선택자) - EphemerisDesignationPage.vue와 동일하게 설정 (하단 마진 없음) */
 .ephemeris-mode .main-content-row.row,
 .ephemeris-mode .row.main-content-row {
   margin-bottom: 0 !important;
+  /* ✅ EphemerisDesignationPage.vue와 동일하게 하단 마진 없음 */
   padding-bottom: 0 !important;
 }
 
-/* ✅ main-content-row 내부의 모든 컬럼 하단 여백 제거 */
-.ephemeris-mode .main-content-row>[class*="col-"] {
+/* ✅ main-content-row 내부의 모든 컬럼 하단 여백 완전 제거 - PassSchedulePage.vue와 동일 (중복 제거됨) */
+
+/* ✅ main-content-row 내부의 마지막 컬럼 하단 여백 완전 제거 (더 구체적인 선택자) - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .main-content-row>[class*="col-"]:last-child {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
 
-/* ✅ main-content-row 내부의 모든 컬럼 내부의 q-card 하단 여백 제거 */
+/* ✅ main-content-row 내부의 모든 컬럼 내부의 q-card 하단 여백 제거 - PassSchedulePage.vue와 동일 */
 .ephemeris-mode .main-content-row>[class*="col-"] .q-card {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
 
-/* ✅ main-content-row 내부의 모든 컬럼 내부의 control-section 하단 여백 제거 */
-.ephemeris-mode .main-content-row .control-section {
+/* ✅ main-content-row 내부의 마지막 컬럼 내부의 q-card 하단 여백 제거 (더 구체적인 선택자) - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .main-content-row>[class*="col-"]:last-child .q-card {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
 
+/* ✅ main-content-row 내부의 모든 컬럼 내부의 q-card-section 하단 여백 제거 - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .main-content-row>[class*="col-"] .q-card-section {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 마지막 컬럼 내부의 q-card-section 하단 여백 제거 (더 구체적인 선택자) - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .main-content-row>[class*="col-"]:last-child .q-card-section {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 Quasar q-card 하단 마진/패딩 완전 제거 - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .main-content-row .q-card {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ===== 2. 컨트롤 섹션 기본 스타일 ===== */
 .control-section {
   height: 100%;
   max-height: 500px;
-  /* ✅ PassSchedulePage와 동일한 최대 높이 설정 */
+  /* ✅ PassSchedulePage.vue와 동일하게 설정 */
   width: 100%;
   background-color: var(--theme-card-background);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  /* ✅ PassSchedulePage와 동일한 flex 설정 */
+  /* ✅ EphemerisDesignationPage.vue와 동일한 높이를 위해 flex 추가 - 내부 구성 변경 없음 */
   display: flex;
   flex-direction: column;
   margin-bottom: 0 !important;
   /* ✅ 하단 마진 제거 */
 }
 
-.control-section .q-card-section {
-  padding: 16px !important;
+/* ✅ main-content-row 내부의 모든 컬럼 하단 여백 완전 제거 - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .main-content-row>[class*="col-"] {
+  margin-bottom: 0 !important;
   padding-bottom: 0 !important;
-  /* ✅ 하단 패딩 제거 */
-  flex: 1 !important;
-  /* ✅ 남은 공간 채우기 */
-  display: flex !important;
-  flex-direction: column !important;
-  position: relative;
-  /* ✅ 제목 absolute positioning을 위한 기준점 */
 }
 
-/* ✅ Position View 카드 섹션에만 overflow: visible 적용 */
-.control-section.position-view-card .q-card-section {
-  overflow: visible !important;
-  /* ✅ 차트가 넘쳐도 보이도록 */
+/* ✅ main-content-row 내부의 마지막 컬럼 하단 여백 완전 제거 (더 구체적인 선택자) - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .main-content-row>[class*="col-"]:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
 }
 
-/* ✅ Position View 카드 높이 설정 (PassSchedulePage.vue와 동일) */
-.control-section.position-view-card,
-.control-section.position-view-card.q-card {
+/* ✅ main-content-row 내부의 모든 컬럼 내부의 q-card 하단 여백 제거 - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .main-content-row>[class*="col-"] .q-card {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 마지막 컬럼 내부의 q-card 하단 여백 제거 (더 구체적인 선택자) - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .main-content-row>[class*="col-"]:last-child .q-card {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 모든 컬럼 내부의 q-card-section 하단 여백 제거 - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .main-content-row>[class*="col-"] .q-card-section {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 마지막 컬럼 내부의 q-card-section 하단 여백 제거 (더 구체적인 선택자) - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .main-content-row>[class*="col-"]:last-child .q-card-section {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 Quasar q-card 하단 마진/패딩 완전 제거 - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .main-content-row .q-card {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 모든 control-section 하단 여백 제거 - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .main-content-row .control-section {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ Position View 카드 높이 제한 - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .control-section.position-view-card,
+.ephemeris-mode .control-section.position-view-card.q-card {
   min-height: 360px !important;
   /* ✅ 최소 높이 보장 */
   height: 100% !important;
-  /* ✅ 부모 높이에 맞춤 */
+  /* ✅ 부모 높이에 맞춤 (다른 패널과 동일하게) */
   display: flex !important;
   flex-direction: column !important;
-  overflow: visible !important;
-  /* ✅ 차트가 넘쳐도 보이도록 */
 }
 
 /* ✅ Position View 카드 섹션 높이 조정 */
-.control-section.position-view-card .q-card-section.position-view-section {
+.ephemeris-mode .control-section.position-view-card .q-card-section.position-view-section {
   min-height: 360px !important;
   /* ✅ 차트 영역 최소 높이 보장 */
   height: 100% !important;
-  /* ✅ 부모 높이에 맞춤 */
+  /* ✅ 부모 높이에 맞춤 (다른 패널과 동일하게) */
   flex: 1 !important;
   /* ✅ 남은 공간 채우기 */
   display: flex !important;
   flex-direction: column !important;
-  overflow: visible !important;
-  /* ✅ 차트가 넘쳐도 보이도록 */
+}
+
+.control-section .q-card-section {
+  padding: 16px !important;
+  padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 제거 (상단 공간과 동일하게) */
+  /* ✅ 남은 공간을 채우도록 flex 추가 - 내부 구성 변경 없음 */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  /* ✅ 제목 absolute positioning을 위한 기준점 */
 }
 
 .position-view-section {
   padding: 16px 16px 0px 16px !important;
   /* ✅ 상단 패딩을 다른 패널과 동일하게 16px로 맞춤, 하단 패딩 제거 */
-  overflow: visible !important;
-  /* ✅ 차트가 넘쳐도 보이도록 */
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  /* ✅ 중앙 정렬 */
-  justify-content: center !important;
-  /* ✅ 중앙 정렬 */
 }
 
 .position-view-title {
@@ -2937,7 +2960,20 @@ q-page-container .ephemeris-mode {
   /* ✅ 정사각형 유지 */
 }
 
-/* 반응형 차트 크기 조정 - PassSchedulePage와 동일 */
+/* 반응형 차트 크기 조정 - 차트를 더 크게 (Position View 구역 크기와 독립적) - PassSchedulePage.vue와 동일 */
+@media (max-width: 1900px) {
+  .chart-area>div {
+    width: 500px !important;
+    height: 500px !important;
+    max-width: 500px !important;
+    max-height: 500px !important;
+    min-width: 500px !important;
+    min-height: 500px !important;
+    top: 50% !important;
+    /* ✅ 중앙 정렬 */
+  }
+}
+
 @media (max-width: 1600px) {
   .chart-area>div {
     width: 470px !important;
@@ -2946,6 +2982,8 @@ q-page-container .ephemeris-mode {
     max-height: 470px !important;
     min-width: 470px !important;
     min-height: 470px !important;
+    top: 50% !important;
+    /* ✅ 중앙 정렬 */
   }
 }
 
@@ -2957,6 +2995,8 @@ q-page-container .ephemeris-mode {
     max-height: 420px !important;
     min-width: 420px !important;
     min-height: 420px !important;
+    top: 50% !important;
+    /* ✅ 중앙 정렬 */
   }
 }
 
@@ -2981,11 +3021,16 @@ q-page-container .ephemeris-mode {
   flex-direction: column !important;
 }
 
+/* ✅ 2행 control-section 카드는 기본 패딩 유지 - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .control-section .q-card-section {
+  padding: 16px !important;
+}
+
 /* ✅ 3번 영역(TLE Data) 카드 높이를 Position View와 동일하게 설정 (360px) - PassSchedulePage와 동일 */
-.ephemeris-mode .main-content-row>[class*="col-"]:nth-child(3) .control-section,
-.ephemeris-mode .main-content-row>[class*="col-"]:nth-child(3) .control-section.q-card {
-  min-height: 360px !important;
-  /* ✅ 최소 높이 보장 */
+.ephemeris-mode .main-content-row .schedule-control-col .control-section,
+.ephemeris-mode .main-content-row .schedule-control-col .control-section.q-card {
+  min-height: 367px !important;
+  /* ✅ 최소 높이 증가 (365px → 367px) */
   height: 100% !important;
   /* ✅ 부모 높이에 맞춤 */
   display: flex !important;
@@ -2993,9 +3038,9 @@ q-page-container .ephemeris-mode {
 }
 
 /* ✅ 3번 영역(TLE Data) 카드 섹션 높이 조정 (PassSchedulePage의 schedule-control-section과 동일) */
-.ephemeris-mode .main-content-row>[class*="col-"]:nth-child(3) .control-section .q-card-section.schedule-control-section {
-  min-height: 360px !important;
-  /* ✅ 최소 높이 보장 */
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section {
+  min-height: 367px !important;
+  /* ✅ 최소 높이 증가 (365px → 367px) */
   flex: 1 1 auto !important;
   /* ✅ 남은 공간 채우기 (flex-grow: 1, flex-shrink: 1, flex-basis: auto) */
   display: flex !important;
@@ -3008,6 +3053,26 @@ q-page-container .ephemeris-mode {
   /* ✅ 하단 여백 방지 */
   justify-content: flex-start !important;
   /* ✅ 상단 정렬로 하단 여백 제거 */
+}
+
+/* ✅ 3단계: schedule-control-section 내부의 button-group 하단 여백 완전 제거 (더 구체적인 선택자) - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .button-group {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+  flex-shrink: 0 !important;
+  /* ✅ 버튼 그룹이 축소되지 않도록 */
+}
+
+/* ✅ schedule-control-section 내부의 마지막 요소 하단 여백 완전 제거 - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section>*:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ schedule-control-section 내부의 모든 직접 자식 요소 하단 여백 제거 - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section>* {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 .ephemeris-form {
@@ -3033,12 +3098,88 @@ q-page-container .ephemeris-mode {
   /* ✅ 상단부터 시작 */
 }
 
+/* ✅ button-group 스타일 - PassSchedulePage.vue와 동일 */
 .button-group {
-  display: flex;
-  gap: 0.25rem;
-  margin-top: 0.5rem;
+  margin-top: 0.25rem;
+  /* ✅ 상단 마진 줄임 (0.5rem → 0.25rem) - PassSchedulePage.vue와 동일 */
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 완전 제거 */
   width: 100%;
-  justify-content: space-between;
+  flex-shrink: 0;
+  padding-top: 0.25rem;
+  /* ✅ 상단 패딩 줄임 (0.5rem → 0.25rem) - PassSchedulePage.vue와 동일 */
+  padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 완전 제거 */
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  /* ✅ 상단 테두리 추가 - PassSchedulePage.vue와 동일 */
+  box-sizing: border-box !important;
+  display: flex !important;
+  /* ✅ flex 컨테이너로 명시 */
+  flex-direction: column !important;
+  /* ✅ 세로 방향 - PassSchedulePage.vue와 동일 */
+  gap: 0.5rem !important;
+  /* ✅ 버튼 행 사이 간격 명시 (겹침 방지) - PassSchedulePage.vue와 동일 */
+}
+
+/* ✅ button-row 스타일 - PassSchedulePage.vue와 동일 */
+.button-row {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 완전 제거 (상단 공간과 동일하게) */
+  flex-shrink: 0 !important;
+  /* ✅ 버튼 행이 축소되지 않도록 */
+}
+
+/* ✅ Quasar q-mb-sm 클래스 오버라이드 (button-row에 적용된 경우) */
+.button-row.q-mb-sm,
+.schedule-control-section .button-row.q-mb-sm {
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 완전 제거 */
+}
+
+/* ✅ control-button-row 스타일 - PassSchedulePage.vue와 동일 */
+.control-button-row {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+  flex-shrink: 0 !important;
+  /* ✅ 버튼 행이 축소되지 않도록 */
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 제거 */
+}
+
+/* ✅ 업로드 버튼 스타일 - PassSchedulePage.vue와 동일 */
+.upload-btn {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.upload-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* ✅ 컨트롤 버튼 스타일 - PassSchedulePage.vue와 동일 */
+.control-btn {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.control-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
 }
 
 .full-width {
@@ -3056,13 +3197,10 @@ q-page-container .ephemeris-mode {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 4px;
   min-height: 80px;
-  max-height: 120px;
+  max-height: 130px;
+  /* ✅ 높이 증가 (122px → 130px) */
 }
 
-/* TLE Data 카드 패딩 축소 */
-.tle-data-card .q-card-section {
-  padding: 16px !important;
-}
 
 /* 스케줄 테이블 스타일 */
 .schedule-table {
@@ -3280,7 +3418,6 @@ q-page-container .ephemeris-mode {
 /* ✅ 카드 테두리 위아래 패딩 완전 제거 - 더 구체적인 셀렉터 */
 .q-card.control-card .q-card-section.compact-control {
   padding: 0px 8px !important;
-  /* 상하 패딩을 완전히 제거 */
 }
 
 /* ✅ 추가적인 강제 적용 */
@@ -3310,16 +3447,17 @@ q-page-container .ephemeris-mode {
   align-items: flex-start !important;
 }
 
-/* ✅ Quasar 기본 스타일 덮어쓰기 */
-.q-card-section {
+/* ✅ Quasar 기본 스타일 덮어쓰기 - 1행 offset control 카드에만 적용 */
+.ephemeris-mode .q-card.control-card .q-card-section {
   padding-top: 0px !important;
   padding-bottom: 0px !important;
   line-height: 1 !important;
   vertical-align: top !important;
 }
 
+
 /* ✅ 카드 자체 마진도 제거 */
-.q-card.control-card {
+.ephemeris-mode .q-card.control-card {
   margin-bottom: 0px !important;
   min-height: auto !important;
   height: auto !important;
@@ -3328,7 +3466,7 @@ q-page-container .ephemeris-mode {
 }
 
 
-.q-card.control-card .q-card__section {
+.ephemeris-mode .q-card.control-card .q-card__section {
   padding-top: 0px !important;
   padding-bottom: 0px !important;
   min-height: auto !important;
@@ -3338,121 +3476,55 @@ q-page-container .ephemeris-mode {
 }
 
 /* ✅ 추가 높이 줄이기 - 모든 요소의 높이 최소화 */
-.q-input {
+.ephemeris-mode .q-input {
   min-height: auto !important;
-  /* 입력 필드 높이 원래대로 */
 }
 
-.q-field__control {
+.ephemeris-mode .q-field__control {
   min-height: auto !important;
-  /* 필드 컨트롤 높이 원래대로 */
 }
 
-.q-field__native {
+.ephemeris-mode .q-field__native {
   padding: auto !important;
-  /* 필드 내부 패딩 원래대로 */
 }
 
-.q-btn {
+.ephemeris-mode .q-btn {
   min-height: auto !important;
-  /* 버튼 높이 원래대로 */
 }
 
-.q-btn--dense {
+.ephemeris-mode .q-btn--dense {
   min-height: auto !important;
-  /* 조밀한 버튼 높이 원래대로 */
 }
 
 /* ✅ 라벨 테두리 높이만 줄이기 - 내부 구성은 유지 */
-.position-offset-label {
+.ephemeris-mode .position-offset-label {
   padding: 4px 8px !important;
-  /* 내부 패딩 원래대로 유지 */
   min-width: 50px !important;
-  /* 라벨 너비 원래대로 */
   border-right: 1px solid var(--q-primary) !important;
-  /* 테두리 두께만 줄임: 3px → 1px */
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
-  /* 그림자도 줄임 */
 }
 
-.position-offset-label .text-subtitle2 {
+.ephemeris-mode .position-offset-label .text-subtitle2 {
   font-size: 0.8rem !important;
-  /* 텍스트 크기 원래대로 */
   line-height: 1.2 !important;
-  /* 줄 간격 원래대로 */
-}
-
-/* ✅ 모든 개별 테두리 스타일 - 통합 테두리와 동일하게 */
-.azimuth-control-card,
-.elevation-control-card,
-.tilt-control-card,
-.time-control-card {
-  margin-bottom: 0px !important;
-  min-height: auto !important;
-  height: auto !important;
-}
-
-.azimuth-control-section,
-.elevation-control-section,
-.tilt-control-section,
-.time-control-section {
-  padding: 0px 8px !important;
-  padding-top: 0px !important;
-  padding-bottom: 0px !important;
-  margin: 0px !important;
-  min-height: auto !important;
-  height: auto !important;
-  line-height: 1 !important;
-  vertical-align: top !important;
-}
-
-.azimuth-control-section .row,
-.elevation-control-section .row,
-.tilt-control-section .row,
-.time-control-section .row {
-  margin: 0px !important;
-  padding: 0px !important;
-  min-height: auto !important;
-  height: auto !important;
-}
-
-.azimuth-control-section .row>div,
-.elevation-control-section .row>div,
-.tilt-control-section .row>div,
-.time-control-section .row>div {
-  margin: 0px !important;
-  padding: 0px !important;
-  min-height: auto !important;
-  height: auto !important;
-}
-
-/* ✅ Quasar 기본 스타일 완전 덮어쓰기 */
-.q-row {
-  margin: 0px !important;
-  padding: 0px !important;
-}
-
-.q-col {
-  margin: 0px !important;
-  padding: 0px !important;
 }
 
 /* 간격 제거로 더 타이트하게 */
-.compact-control .row.q-gutter-none {
+.ephemeris-mode .compact-control .row.q-gutter-none {
   margin: 0 !important;
   padding: 0 !important;
 }
 
-.compact-control .row.q-gutter-none>div {
+.ephemeris-mode .compact-control .row.q-gutter-none>div {
   padding-left: 0.25rem !important;
   padding-right: 0.25rem !important;
 }
 
-.compact-control .row.q-gutter-none>div:first-child {
+.ephemeris-mode .compact-control .row.q-gutter-none>div:first-child {
   padding-left: 0 !important;
 }
 
-.compact-control .row.q-gutter-none>div:last-child {
+.ephemeris-mode .compact-control .row.q-gutter-none>div:last-child {
   padding-right: 0 !important;
 }
 </style>

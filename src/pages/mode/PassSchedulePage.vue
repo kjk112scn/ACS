@@ -2687,11 +2687,11 @@ q-page-container .pass-schedule-mode {
   flex-direction: column !important;
 }
 
-/* ✅ Schedule Control 카드 높이를 Position View와 동일하게 설정 (360px) */
+/* ✅ Schedule Control 카드 높이를 Position View와 동일하게 설정 (367px) */
 .pass-schedule-mode .main-content-row .schedule-control-col .control-section,
 .pass-schedule-mode .main-content-row .schedule-control-col .control-section.q-card {
-  min-height: 360px !important;
-  /* ✅ 최소 높이 보장 */
+  min-height: 367px !important;
+  /* ✅ 최소 높이 보장 - EphemerisDesignationPage.vue와 동일 (367px) */
   height: 100% !important;
   /* ✅ 부모 높이에 맞춤 */
   display: flex !important;
@@ -2700,8 +2700,8 @@ q-page-container .pass-schedule-mode {
 
 /* ✅ Schedule Control 카드 섹션 높이 조정 */
 .pass-schedule-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section {
-  min-height: 360px !important;
-  /* ✅ 최소 높이 보장 */
+  min-height: 367px !important;
+  /* ✅ 최소 높이 보장 - EphemerisDesignationPage.vue와 동일 (367px) */
   flex: 1 1 auto !important;
   /* ✅ 남은 공간 채우기 (flex-grow: 1, flex-shrink: 1, flex-basis: auto) */
   display: flex !important;
