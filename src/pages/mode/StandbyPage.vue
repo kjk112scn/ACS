@@ -15,7 +15,7 @@
           <div class="button-group q-mt-lg q-gutter-x-lg">
             <q-btn color="primary" label="Standby" @click="handleStandby" size="lg" />
             <q-btn color="secondary" label="All Standby" @click="handleAllStandby" size="lg" />
-            <q-btn color="negative" label="Stow" @click="handleStow" size="lg" />
+            <q-btn color="warning" label="Stow" @click="handleStow" size="lg" />
           </div>
         </q-card-section>
       </q-card>

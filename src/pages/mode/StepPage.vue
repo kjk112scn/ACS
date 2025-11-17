@@ -90,7 +90,7 @@
           <q-btn label="Go" color="positive" icon="play_arrow" size="lg" :disable="!stepStore.isAnyAxisSelected()"
             @click="handleGo" />
           <q-btn label="Stop" color="negative" icon="stop" size="lg" @click="handleStop" />
-          <q-btn label="Stow" color="primary" icon="home" size="lg" @click="handleStow" />
+          <q-btn label="Stow" color="warning" icon="home" size="lg" @click="handleStow" />
         </div>
       </div>
     </div>

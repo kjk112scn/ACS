@@ -94,7 +94,7 @@
             @click="handleGoCommand" :loading="isGoLoading" />
           <q-btn label="Stop" color="negative" icon="stop" size="lg" :disable="!pedestalStore.isAnyAxisSelected()"
             @click="handleStopCommand" :loading="isStopLoading" />
-          <q-btn label="Stow" color="primary" icon="home" size="lg" @click="handleStowCommand"
+          <q-btn label="Stow" color="warning" icon="home" size="lg" @click="handleStowCommand"
             :loading="isStowLoading" />
         </div>
       </div>

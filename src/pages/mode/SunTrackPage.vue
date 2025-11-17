@@ -157,7 +157,7 @@
                 :loading="isStopLoading" />
             </div>
             <div class="col-auto">
-              <q-btn label="Stow" color="primary" icon="home" size="lg" @click="handleStowCommand"
+              <q-btn label="Stow" color="warning" icon="home" size="lg" @click="handleStowCommand"
                 :loading="isStowLoading" />
             </div>
           </div>

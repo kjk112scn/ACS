@@ -336,9 +336,12 @@
               </div>
 
               <div class="control-button-row">
-                <q-btn color="positive" label="Start" @click="handleStartCommand" class="control-btn" size="sm" />
-                <q-btn color="warning" label="Stop" @click="handleStopCommand" class="control-btn" size="sm" />
-                <q-btn color="negative" label="Stow" @click="handleStowCommand" class="control-btn" size="sm" />
+                <q-btn color="positive" icon="play_arrow" label="Start" @click="handleStartCommand" class="control-btn"
+                  size="sm" />
+                <q-btn color="negative" icon="stop" label="Stop" @click="handleStopCommand" class="control-btn"
+                  size="sm" />
+                <q-btn color="warning" icon="home" label="Stow" @click="handleStowCommand" class="control-btn"
+                  size="sm" />
               </div>
             </div>
           </q-card-section>
@@ -3877,7 +3880,7 @@ q-page-container .pass-schedule-mode {
   /* ✅ 하단 마진 제거 */
 }
 
-/* 업로드 버튼 스타일 */
+/* 업로드 버튼 스타일 - 크기는 유지하고 폰트만 확대 */
 .upload-btn {
   flex: 1;
   min-width: 0;
@@ -3888,12 +3891,22 @@ q-page-container .pass-schedule-mode {
   transition: all 0.2s ease;
 }
 
+.pass-schedule-mode .button-group :deep(.upload-btn .q-btn__content) {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.pass-schedule-mode :deep(.control-btn .q-btn__content) {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
 .upload-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-/* 컨트롤 버튼 스타일 */
+/* 컨트롤 버튼 스타일 - 크기는 유지하고 폰트만 확대 */
 .control-btn {
   flex: 1;
   min-width: 0;

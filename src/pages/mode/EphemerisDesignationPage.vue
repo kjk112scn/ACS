@@ -200,7 +200,7 @@
                     <span class="info-label">시작/종료 시간:</span>
                     <span class="info-value">{{
                       formatToLocalTime(selectedScheduleInfo.startTime)
-                    }} / {{
+                      }} / {{
                         formatToLocalTime(selectedScheduleInfo.endTime)
                       }}</span>
                   </div>
@@ -230,7 +230,7 @@
                       <span class="info-label">권장 Train 각도:</span>
                       <span class="info-value text-positive">{{
                         safeToFixed(selectedScheduleInfo.recommendedTrainAngle, 6)
-                      }}°</span>
+                        }}°</span>
                     </div>
                     <div class="info-row">
                       <span class="info-label">최대 Azimuth 속도:</span>
@@ -282,7 +282,7 @@
           <q-card-section class="schedule-control-section">
             <div class="text-subtitle1 text-weight-bold text-primary">TLE Data</div>
             <q-editor v-model="tleData.displayText" readonly flat dense class="tle-display q-mt-sm" :toolbar="[]"
-              style="min-height: 80px; max-height: 130px;" :definitions="{
+              style="height: calc(50% - 20px)" :definitions="{
                 bold: undefined,
                 italic: undefined,
                 strike: undefined,
@@ -291,22 +291,26 @@
             <!-- ✅ 버튼 그룹을 하나로 통합 - PassSchedulePage.vue와 동일한 구조 -->
             <div class="button-group">
               <div class="button-row">
-                <q-btn color="primary" label="Text" @click="openTLEModal" class="q-mr-sm upload-btn" size="sm" />
-                <q-btn color="primary" label="Select Schedule" @click="openScheduleModal" class="upload-btn"
+                <q-btn color="primary" label="Text" icon="description" @click="openTLEModal" class="q-mr-sm upload-btn"
                   size="sm" />
-                <q-btn color="secondary" label="Download" icon="download" @click="downloadRealtimeData"
+                <q-btn color="primary" label="Select Schedule" icon="playlist_add_check" @click="openScheduleModal"
                   class="upload-btn" size="sm" />
               </div>
               <div class="control-button-row">
-                <q-btn color="positive" label="Go" @click="handleEphemerisCommand" class="control-btn" size="sm" />
-                <q-btn color="warning" label="Stop" @click="handleStopCommand" class="control-btn" size="sm" />
-                <q-btn color="negative" label="Stow" @click="handleStowCommand" class="control-btn" size="sm" />
+                <q-btn color="positive" icon="play_arrow" label="Go" @click="handleEphemerisCommand" class="control-btn"
+                  size="sm" />
+                <q-btn color="negative" icon="stop" label="Stop" @click="handleStopCommand" class="control-btn"
+                  size="sm" />
+                <q-btn color="warning" icon="home" label="Stow" @click="handleStowCommand" class="control-btn"
+                  size="sm" />
               </div>
               <div class="button-row">
                 <q-btn color="info" label="Axis Calculator" icon="calculate" @click="openAxisTransformCalculator"
                   class="upload-btn" size="sm" />
                 <q-btn color="secondary" label="이론치 다운로드" icon="download" @click="exportAllMstDataToCsv"
                   :loading="isExportingCsv" class="upload-btn" size="sm" />
+                <q-btn color="secondary" label="Download" icon="download" @click="downloadRealtimeData"
+                  class="upload-btn" size="sm" />
               </div>
             </div>
           </q-card-section>
@@ -3037,7 +3041,7 @@ q-page-container .ephemeris-mode {
   flex-direction: column !important;
 }
 
-/* ✅ 3번 영역(TLE Data) 카드 섹션 높이 조정 (PassSchedulePage의 schedule-control-section과 동일) */
+/* ✅ 3번 영역(TLE Data) 카드 섹션 높이 조정 - 버튼을 아래로 내리기 위해 space-between 사용 */
 .ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section {
   min-height: 367px !important;
   /* ✅ 최소 높이 증가 (365px → 367px) */
@@ -3045,14 +3049,15 @@ q-page-container .ephemeris-mode {
   /* ✅ 남은 공간 채우기 (flex-grow: 1, flex-shrink: 1, flex-basis: auto) */
   display: flex !important;
   flex-direction: column !important;
+  justify-content: space-between !important;
+  /* ✅ 위아래 공간을 균등 분배하여 버튼을 아래로 내림 */
+  align-items: stretch !important;
   padding-bottom: 0 !important;
   /* ✅ 하단 패딩 완전 제거 (상단 공간과 동일하게) */
   margin-bottom: 0 !important;
   /* ✅ 하단 마진 제거 */
   overflow: hidden !important;
   /* ✅ 하단 여백 방지 */
-  justify-content: flex-start !important;
-  /* ✅ 상단 정렬로 하단 여백 제거 */
 }
 
 /* ✅ 3단계: schedule-control-section 내부의 button-group 하단 여백 완전 제거 (더 구체적인 선택자) - PassSchedulePage.vue와 동일 */
@@ -3098,16 +3103,17 @@ q-page-container .ephemeris-mode {
   /* ✅ 상단부터 시작 */
 }
 
-/* ✅ button-group 스타일 - PassSchedulePage.vue와 동일 */
+/* ✅ button-group 스타일 - 버튼을 카드 하단에 배치 */
 .button-group {
-  margin-top: 0.25rem;
-  /* ✅ 상단 마진 줄임 (0.5rem → 0.25rem) - PassSchedulePage.vue와 동일 */
+  margin-top: auto !important;
+  /* ✅ 남는 공간을 위로 밀어서 버튼을 카드 하단으로 이동 */
   margin-bottom: 0 !important;
   /* ✅ 하단 마진 완전 제거 */
   width: 100%;
-  flex-shrink: 0;
-  padding-top: 0.25rem;
-  /* ✅ 상단 패딩 줄임 (0.5rem → 0.25rem) - PassSchedulePage.vue와 동일 */
+  flex-shrink: 0 !important;
+  /* ✅ 버튼 그룹이 축소되지 않도록 */
+  padding-top: 10px;
+  /* ✅ 간격을 절반으로 줄임 (20px → 10px) */
   padding-bottom: 0 !important;
   /* ✅ 하단 패딩 완전 제거 */
   border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -3121,6 +3127,33 @@ q-page-container .ephemeris-mode {
   /* ✅ 버튼 행 사이 간격 명시 (겹침 방지) - PassSchedulePage.vue와 동일 */
 }
 
+/* ✅ 첫 번째 버튼 행 위쪽 여백 추가 (Text / Select Schedule) - 간격 절반으로 줄임 */
+.button-group .button-row:first-child {
+  margin-top: 4px !important;
+  /* ✅ 간격을 절반으로 줄임 (8px → 4px) */
+}
+
+/* ✅ TLE 에디터가 남는 공간을 차지하도록 설정 - 더 구체적인 선택자로 강제 적용 */
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .tle-display {
+  flex: 0 0 auto !important;
+  /* ✅ 필요한 높이만 차지 */
+  min-height: calc(50% - 20px) !important;
+  margin-bottom: 0.25rem !important;
+  /* ✅ 간격을 줄임 */
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .tle-display :deep(.q-editor),
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .tle-display :deep(.q-editor__content) {
+  flex: 0 0 auto !important;
+  min-height: calc(50% - 20px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  font-size: 1rem !important;
+  line-height: 1.4 !important;
+}
+
 /* ✅ button-row 스타일 - PassSchedulePage.vue와 동일 */
 .button-row {
   display: flex;
@@ -3130,6 +3163,7 @@ q-page-container .ephemeris-mode {
   /* ✅ 하단 마진 완전 제거 (상단 공간과 동일하게) */
   flex-shrink: 0 !important;
   /* ✅ 버튼 행이 축소되지 않도록 */
+  justify-content: flex-start;
 }
 
 /* ✅ Quasar q-mb-sm 클래스 오버라이드 (button-row에 적용된 경우) */
@@ -3150,7 +3184,7 @@ q-page-container .ephemeris-mode {
   /* ✅ 하단 마진 제거 */
 }
 
-/* ✅ 업로드 버튼 스타일 - PassSchedulePage.vue와 동일 */
+/* ✅ 업로드 버튼 스타일 - 크기는 유지하고 폰트만 확대 */
 .upload-btn {
   flex: 1;
   min-width: 0;
@@ -3161,12 +3195,22 @@ q-page-container .ephemeris-mode {
   transition: all 0.2s ease;
 }
 
+.ephemeris-mode .button-group :deep(.upload-btn .q-btn__content) {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.ephemeris-mode :deep(.control-btn .q-btn__content) {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
 .upload-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-/* ✅ 컨트롤 버튼 스타일 - PassSchedulePage.vue와 동일 */
+/* ✅ 컨트롤 버튼 스타일 - upload-btn과 동일한 높이로 통일 */
 .control-btn {
   flex: 1;
   min-width: 0;
@@ -3197,8 +3241,7 @@ q-page-container .ephemeris-mode {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 4px;
   min-height: 80px;
-  max-height: 130px;
-  /* ✅ 높이 증가 (122px → 130px) */
+  /* ✅ max-height 제거하여 공간을 차지하도록 */
 }
 
 
