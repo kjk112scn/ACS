@@ -200,7 +200,7 @@
                     <span class="info-label">시작/종료 시간:</span>
                     <span class="info-value">{{
                       formatToLocalTime(selectedScheduleInfo.startTime)
-                      }} / {{
+                    }} / {{
                         formatToLocalTime(selectedScheduleInfo.endTime)
                       }}</span>
                   </div>
@@ -230,7 +230,7 @@
                       <span class="info-label">권장 Train 각도:</span>
                       <span class="info-value text-positive">{{
                         safeToFixed(selectedScheduleInfo.recommendedTrainAngle, 6)
-                        }}°</span>
+                      }}°</span>
                     </div>
                     <div class="info-row">
                       <span class="info-label">최대 Azimuth 속도:</span>
@@ -656,7 +656,7 @@ ISS (ZARYA)
 </template>
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, onActivated, onDeactivated, computed, watch, nextTick } from 'vue'
-import { date } from 'quasar'
+import { date, useQuasar } from 'quasar'
 
 import type { QTableProps } from 'quasar'
 import { useICDStore } from '../../stores/icd/icdStore'
@@ -672,6 +672,9 @@ import {
 } from '../../services/mode/ephemerisTrackService'
 import { openPopup } from '../../utils/windowUtils'
 import { useNotification } from '../../composables/useNotification'
+
+// ✅ Quasar 인스턴스
+const $q = useQuasar()
 
 // ✅ 알림 시스템 사용
 const { success, error, warning, info } = useNotification()
@@ -731,6 +734,9 @@ const chartRef = ref<HTMLElement | null>(null)
 let chart: ECharts | null = null
 let updateTimer: number | null = null
 let chartResizeHandler: (() => void) | null = null
+
+// ✅ 차트 초기화 플래그 (리사이즈 방지용)
+const isChartInitialized = ref(false)
 
 // ✅ 차트 크기 상수 통일
 const CHART_SIZE = 500
@@ -1600,9 +1606,16 @@ const adjustChartSize = async () => {
 const initChart = () => {
   if (!chartRef.value) return
 
+  // ✅ 이미 초기화되었으면 재초기화하지 않음 (PassSchedulePage와 동일)
+  if (isChartInitialized.value && chart && !chart.isDisposed()) {
+    console.log('✅ 차트가 이미 초기화되어 있음 - 재초기화 건너뜀')
+    return
+  }
+
   // 기존 차트 인스턴스가 있으면 제거
   if (chart) {
     chart.dispose()
+    isChartInitialized.value = false // ✅ 플래그 리셋
   }
 
   // ✅ 차트 크기 설정 (차트를 더 크게, Position View 구역 크기와 독립적) - PassSchedulePage와 동일
@@ -1772,45 +1785,19 @@ const initChart = () => {
   chart.setOption(option, true)
   console.log('EphemerisDesignation 차트 옵션 적용됨')
 
-  // ✅ DOM 스타일을 먼저 설정 (리사이즈 전에!)
-  void nextTick(() => {
-    const chartElement = chartRef.value?.querySelector('div') as HTMLElement | null
-    if (chartElement) {
-      // ✅ 스타일을 먼저 설정하여 차트가 올바른 위치에서 렌더링되도록 함
-      chartElement.style.width = `${CHART_SIZE}px`
-      chartElement.style.height = `${CHART_SIZE}px`
-      chartElement.style.maxWidth = `${CHART_SIZE}px`
-      chartElement.style.maxHeight = `${CHART_SIZE}px`
-      chartElement.style.minWidth = `${CHART_SIZE}px`
-      chartElement.style.minHeight = `${CHART_SIZE}px`
-      chartElement.style.position = 'absolute'
-      chartElement.style.top = '50%'
-      chartElement.style.left = '50%'
-      chartElement.style.transform = 'translate(-50%, -50%)'
-    }
-
-    // ✅ 스타일 적용 후 리사이즈
-    void nextTick(() => {
-      if (chart && !chart.isDisposed()) {
-        chart.resize({
-          width: CHART_SIZE,
-          height: CHART_SIZE
-        })
-      }
-    })
-  })
-
-  // ✅ 윈도우 리사이즈 이벤트에 대응 (반응형) - 컨테이너 크기 기반
-  chartResizeHandler = () => {
-    if (!chart || chart.isDisposed()) return
-
-    nextTick().then(() => {
-      // ✅ 리사이즈 시에도 컨테이너 크기에 맞춰 조정
-      adjustChartSize().catch(console.error)
-    }).catch(console.error)
+  // ✅ 초기화 시에만 차트 크기 조정 (DOM 스타일 설정 및 리사이즈)
+  // 이미 초기화된 차트는 리사이즈하지 않음
+  if (!isChartInitialized.value) {
+    void adjustChartSize()
+    isChartInitialized.value = true
+    console.log('✅ 차트 초기화 및 리사이즈 완료')
+  } else {
+    console.log('⏸️ 차트가 이미 초기화됨 - 리사이즈 스킵')
   }
 
-  window.addEventListener('resize', chartResizeHandler)
+  // ✅ 윈도우 리사이즈 핸들러 제거 (고정 크기 차트이므로 불필요)
+  // 차트가 고정 크기(500px)이고 CSS로도 고정되어 있으므로 윈도우 리사이즈 시 리사이즈 불필요
+  // chartResizeHandler = null (등록하지 않음)
 }
 
 // ✅ 최적화된 차트 업데이트 함수 (완전 교체)
@@ -1927,6 +1914,9 @@ const updateChartWithTrajectory = (data: TrajectoryPoint[]) => {
 }
 
 // ✅ 차트 데이터 복원 함수 (이론 경로 + 실시간 경로 한 번에)
+// ⚠️ 현재 사용하지 않음 - 화면 복귀 시 불필요한 리렌더링 방지를 위해 제거
+// updateChart()가 100ms마다 업데이트하므로 별도 복원이 필요 없음
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const restoreChartData = () => {
   if (!chart || chart.isDisposed()) return
 
@@ -1949,7 +1939,7 @@ const restoreChartData = () => {
     })
   }
 
-  // ✅ 두 데이터를 한 번에 복원
+  // ✅ 두 데이터를 한 번에 복원 (리사이즈 없이)
   const updateOption: Parameters<typeof chart.setOption>[0] = {
     series: [
       {}, // series[0]: 실시간 위치 (updateChart에서 관리)
@@ -1962,6 +1952,8 @@ const restoreChartData = () => {
     ],
   }
 
+  // ✅ setOption 호출 시 리사이즈 방지 (notMerge: false, lazyUpdate: true)
+  // lazyUpdate: true는 다음 프레임에 업데이트하므로 리사이즈가 발생하지 않음
   chart.setOption(updateOption, false, true)
 
   if (hasTrackingPath) {
@@ -2482,27 +2474,27 @@ const handleActivated = () => {
   console.log('🔄 EphemerisDesignationPage 활성화됨')
 
   // ✅ 차트가 이미 존재하고 유효하면 재초기화하지 않음
-  if (!chart || chart.isDisposed()) {
+  // 차트 컨테이너와 차트 인스턴스가 모두 존재하면 그대로 유지
+  if (!chart || !chartRef.value) {
+    isChartInitialized.value = false // ✅ 플래그 리셋 (재초기화 필요)
     setTimeout(() => {
       initChart()
       console.log('✅ 차트 재초기화 완료')
     }, 100)
   } else {
-    // ✅ 차트가 이미 있으면 정상 상태로 복원 (adjustChartSize 사용)
-    console.log('✅ 차트가 이미 존재함 - 정상 상태로 복원')
-
-    // ✅ 정상적으로 표시된 차트 상태를 그대로 복원
-    setTimeout(() => {
-      adjustChartSize().then(() => {
-        console.log('✅ 차트 정상 상태 복원 완료')
-      }).catch(console.error)
-    }, 50) // 짧은 지연으로 DOM 준비 대기
+    // ✅ 차트가 이미 존재하면 그대로 유지 (추가 리사이즈/스타일 변경 없음)
+    //    초기 마운트 시 initChart + adjustChartSize에서 한 번만 리사이즈함
+    console.log('✅ 차트가 이미 존재함 - 그대로 유지 (리사이즈/스타일 변경 없음)')
   }
 
-  // ✅ 차트 데이터 복원 (이론 경로 + 실시간 경로 한 번에)
-  void nextTick(() => {
-    restoreChartData()
-  })
+  // ✅ 차트 데이터 복원 제거 - 화면 복귀 시 불필요한 리렌더링 방지
+  // 차트는 이미 데이터를 가지고 있고, updateChart()가 100ms마다 업데이트하므로
+  // 화면 복귀 시 별도 복원이 필요 없음 (불필요한 setOption 호출로 인한 깜빡임 방지)
+  // void nextTick(() => {
+  //   if (chart && !chart.isDisposed()) {
+  //     restoreChartData()
+  //   }
+  // })
 
   // ✅ 타이머 재시작
   if (!updateTimer) {
@@ -2529,68 +2521,97 @@ const handleDeactivated = () => {
 onActivated(handleActivated)
 onDeactivated(handleDeactivated)
 
-onMounted(async () => {
-  console.log('EphemerisDesignation 컴포넌트 마운트됨')
-  // ✅ 메인 스레드 모니터링 시작
-  startMainThreadMonitoring()
-  // 차트 초기화
-  setTimeout(() => {
-    initChart()
-  }, 100)
-  // ✅ 스토어에서 오프셋 값 복원
-  inputs.value = [
-    ephemerisStore.offsetValues.azimuth,
-    ephemerisStore.offsetValues.elevation,
-    ephemerisStore.offsetValues.train,
-    ephemerisStore.offsetValues.time,
-  ]
+onMounted(() => {
+  try {
+    console.log('EphemerisDesignation 컴포넌트 마운트됨')
+    // ✅ 메인 스레드 모니터링 시작
+    startMainThreadMonitoring()
 
-  // ✅ 스케줄 데이터 로드 (중복 제거)
-  await loadScheduleData()
+    // ✅ 스토어에서 오프셋 값 복원
+    inputs.value = [
+      ephemerisStore.offsetValues.azimuth,
+      ephemerisStore.offsetValues.elevation,
+      ephemerisStore.offsetValues.train,
+      ephemerisStore.offsetValues.time,
+    ]
 
-  // ✅ 차트 데이터 복원 (이론 경로 + 실시간 경로 한 번에)
-  setTimeout(() => {
-    if (chart) {
-      restoreChartData()
-    }
-  }, 200) // 차트 초기화 완료 대기
-  // 차트 업데이트 타이머 시작
-  updateTimer = window.setInterval(() => {
-    const currentTime = performance.now()
+    // ✅ 차트는 즉시 초기화 (서버 연결과 무관) - PassSchedulePage와 동일
+    void nextTick(() => {
+      try {
+        initChart()
+        console.log('✅ 차트 즉시 초기화 완료')
 
-    if (lastTimerExecution > 0) {
-      const interval = currentTime - lastTimerExecution
-      timerIntervalStats.totalExecutions++
-      timerIntervalStats.totalInterval += interval
-      timerIntervalStats.maxInterval = Math.max(timerIntervalStats.maxInterval, interval)
-      timerIntervalStats.minInterval = Math.min(timerIntervalStats.minInterval, interval)
+        // 차트 업데이트 타이머 시작
+        if (updateTimer) {
+          clearInterval(updateTimer)
+        }
+        updateTimer = window.setInterval(() => {
+          try {
+            const currentTime = performance.now()
 
-      // ✅ 타이머 간격이 150ms 이상이면 경고
-      if (interval > 150) {
-        console.warn(`⏰ 타이머 지연 감지: ${interval.toFixed(2)}ms (목표: 100ms)`)
+            if (lastTimerExecution > 0) {
+              const interval = currentTime - lastTimerExecution
+              timerIntervalStats.totalExecutions++
+              timerIntervalStats.totalInterval += interval
+              timerIntervalStats.maxInterval = Math.max(timerIntervalStats.maxInterval, interval)
+              timerIntervalStats.minInterval = Math.min(timerIntervalStats.minInterval, interval)
+
+              // ✅ 타이머 간격이 150ms 이상이면 경고
+              if (interval > 150) {
+                console.warn(`⏰ 타이머 지연 감지: ${interval.toFixed(2)}ms (목표: 100ms)`)
+              }
+
+              // ✅ 100번마다 타이머 통계 출력
+              if (timerIntervalStats.totalExecutions % 100 === 0) {
+                const avgInterval = timerIntervalStats.totalInterval / timerIntervalStats.totalExecutions
+                console.log(`⏰ 타이머 통계:`, {
+                  평균간격: avgInterval.toFixed(2) + 'ms',
+                  최대간격: timerIntervalStats.maxInterval.toFixed(2) + 'ms',
+                  최소간격: timerIntervalStats.minInterval.toFixed(2) + 'ms',
+                  목표간격: '100ms',
+                })
+              }
+            }
+
+            lastTimerExecution = currentTime
+            void updateChart()
+            updateTimeRemaining()
+          } catch (timerError) {
+            console.error('차트 업데이트 타이머 오류:', timerError)
+          }
+        }, 100)
+
+        // 시간 업데이트 타이머 시작
+        if (timeUpdateTimer) {
+          clearInterval(timeUpdateTimer)
+        }
+        timeUpdateTimer = window.setInterval(() => {
+          try {
+            updateTimeRemaining()
+          } catch (timeError) {
+            console.error('시간 업데이트 타이머 오류:', timeError)
+          }
+        }, 1000)
+      } catch (chartError) {
+        console.error('차트 초기화 오류:', chartError)
       }
+    })
 
-      // ✅ 100번마다 타이머 통계 출력
-      if (timerIntervalStats.totalExecutions % 100 === 0) {
-        const avgInterval = timerIntervalStats.totalInterval / timerIntervalStats.totalExecutions
-        console.log(`⏰ 타이머 통계:`, {
-          평균간격: avgInterval.toFixed(2) + 'ms',
-          최대간격: timerIntervalStats.maxInterval.toFixed(2) + 'ms',
-          최소간격: timerIntervalStats.minInterval.toFixed(2) + 'ms',
-          목표간격: '100ms',
-        })
-      }
-    }
+    // ✅ 서버 데이터 로딩은 비동기로 처리 (차트와 분리) - PassSchedulePage와 동일
+    void loadScheduleData().then(() => {
+      console.log('✅ 스케줄 데이터 로드 완료')
+    }).catch((error) => {
+      console.error('스케줄 데이터 로드 실패:', error)
+      $q.notify({
+        type: 'warning',
+        message: '스케줄 데이터를 불러오는데 실패했습니다',
+        caption: '차트는 정상적으로 표시됩니다'
+      })
+    })
+  } catch (error) {
+    console.error('EphemerisDesignationPage 마운트 중 오류:', error)
+  }
 
-    lastTimerExecution = currentTime
-    void updateChart()
-    updateTimeRemaining()
-  }, 100)
-
-  // 시간 업데이트 타이머 시작
-  timeUpdateTimer = window.setInterval(() => {
-    updateTimeRemaining()
-  }, 1000)
 })
 
 onUnmounted(() => {
@@ -3017,7 +3038,7 @@ q-page-container .ephemeris-mode {
   position: absolute !important;
   left: 50% !important;
   top: 50% !important;
-  /* ✅ 중앙 정렬 */
+  /* ✅ 중앙 정렬 - PassSchedulePage와 동일한 위치 */
   transform: translate(-50%, -50%) !important;
   margin: 0 !important;
   padding: 0 !important;

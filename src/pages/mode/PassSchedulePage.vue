@@ -1623,14 +1623,33 @@ const initChart = () => {
     })
     console.log('PassSchedule 차트 옵션 적용됨')
 
-    // ✅ Vue의 nextTick을 사용하여 안전하게 차트 조정
-    setTimeout(() => {
-      adjustChartSize().catch(console.error)
-      // 추가 리사이즈 (레이아웃 완료 대기)
-      setTimeout(() => {
-        adjustChartSize().catch(console.error)
-      }, 200)
-    }, 100)
+    // ✅ DOM 스타일을 먼저 설정 (리사이즈 전에!) - EphemerisDesignationPage.vue와 동일
+    void nextTick(() => {
+      const chartElement = chartRef.value?.querySelector('div') as HTMLElement | null
+      if (chartElement) {
+        // ✅ 스타일을 먼저 설정하여 차트가 올바른 위치에서 렌더링되도록 함
+        chartElement.style.width = `${initialSize}px`
+        chartElement.style.height = `${initialSize}px`
+        chartElement.style.maxWidth = `${initialSize}px`
+        chartElement.style.maxHeight = `${initialSize}px`
+        chartElement.style.minWidth = `${initialSize}px`
+        chartElement.style.minHeight = `${initialSize}px`
+        chartElement.style.position = 'absolute'
+        chartElement.style.top = '50%'
+        chartElement.style.left = '50%'
+        chartElement.style.transform = 'translate(-50%, -50%)'
+      }
+
+      // ✅ 스타일 적용 후 리사이즈
+      void nextTick(() => {
+        if (passChart && !passChart.isDisposed()) {
+          passChart.resize({
+            width: initialSize,
+            height: initialSize
+          })
+        }
+      })
+    })
 
     // ✅ 윈도우 리사이즈 이벤트에 대응 (반응형) - 컨테이너 크기 기반
     // ✅ 기존 리사이즈 리스너 제거 (중복 방지)
