@@ -1238,21 +1238,11 @@ class EphemerisService(
         
         // ✅ Keyhole 여부에 따라 DataType 선택
         val finalDataType = if (isKeyhole) {
-            // ✅ Keyhole 발생 시 keyhole_final_transformed 데이터 존재 여부 확인
-            val keyholeDataExists = ephemerisTrackDtlStorage.any {
-                it["MstId"] == passId && it["DataType"] == "keyhole_final_transformed"
-            }
-            
-            if (!keyholeDataExists) {
-                logger.warn("⚠️ 패스 ID ${passId}: Keyhole로 판단되었으나 keyhole_final_transformed 데이터가 없습니다. final_transformed로 폴백합니다.")
-                "final_transformed"  // ✅ 폴백
-            } else {
-                logger.debug("🔑 실시간 추적: 패스 ID ${passId} Keyhole 발생 → keyhole_final_transformed 사용")
-                "keyhole_final_transformed"
-            }
+            logger.debug("🔑 실시간 추적: 패스 ID ${passId} Keyhole 발생 → keyhole_optimized_final_transformed 사용")
+            "keyhole_optimized_final_transformed"  // Keyhole이면 최적화 데이터 사용
         } else {
             logger.debug("✅ 실시간 추적: 패스 ID ${passId} Keyhole 미발생 → final_transformed 사용")
-            "final_transformed"
+            "final_transformed"  // Keyhole 아니면 기본 데이터 사용
         }
         
         // 선택된 DataType의 데이터 조회
@@ -2776,24 +2766,14 @@ class EphemerisService(
         val isKeyhole = finalMst["IsKeyhole"] as? Boolean ?: false
         
         // 2. Keyhole 여부에 따라 DataType 선택
-        // Keyhole 발생 시: keyhole_final_transformed (Train≠0으로 재계산된 데이터)
+        // Keyhole 발생 시: keyhole_optimized_final_transformed (최적화된 Train≠0 데이터)
         // Keyhole 미발생 시: final_transformed (Train=0 데이터)
         val dataType = if (isKeyhole) {
-            // ✅ Keyhole 발생 시 keyhole_final_transformed 데이터 존재 여부 확인
-            val keyholeDataExists = ephemerisTrackDtlStorage.any {
-                it["MstId"] == mstId && it["DataType"] == "keyhole_final_transformed"
-            }
-            
-            if (!keyholeDataExists) {
-                logger.warn("⚠️ MST ID ${mstId}: Keyhole로 판단되었으나 keyhole_final_transformed 데이터가 없습니다. final_transformed로 폴백합니다.")
-                "final_transformed"  // ✅ 폴백
-            } else {
-                logger.debug("🔑 MST ID ${mstId}: Keyhole 발생 → keyhole_final_transformed 사용")
-                "keyhole_final_transformed"
-            }
+            logger.debug("🔑 MST ID ${mstId}: Keyhole 발생 → keyhole_optimized_final_transformed 사용")
+            "keyhole_optimized_final_transformed"  // Keyhole이면 최적화 데이터 사용
         } else {
             logger.debug("✅ MST ID ${mstId}: Keyhole 미발생 → final_transformed 사용")
-            "final_transformed"
+            "final_transformed"  // Keyhole 아니면 기본 데이터 사용
         }
         
         // 3. displayMinElevationAngle 기준으로 필터링 (조건부)
@@ -2935,24 +2915,14 @@ class EphemerisService(
         val isKeyhole = finalMst["IsKeyhole"] as? Boolean ?: false
         
         // 2. Keyhole 여부에 따라 MST 선택
-        // Keyhole 발생 시: keyhole_final_transformed MST (Train≠0으로 재계산된 데이터)
+        // Keyhole 발생 시: keyhole_optimized_final_transformed MST (최적화된 Train≠0 데이터)
         // Keyhole 미발생 시: final_transformed MST (Train=0 데이터)
         val dataType = if (isKeyhole) {
-            // Keyhole 발생 시 keyhole_final_transformed MST 존재 여부 확인
-            val keyholeMstExists = ephemerisTrackMstStorage.any {
-                it["No"] == passId && it["DataType"] == "keyhole_final_transformed"
-            }
-            
-            if (!keyholeMstExists) {
-                logger.warn("⚠️ 패스 ID ${passId}: Keyhole로 판단되었으나 keyhole_final_transformed MST가 없습니다. final_transformed MST로 폴백합니다.")
-                "final_transformed"  // 폴백
-            } else {
-                logger.debug("🔑 패스 ID ${passId}: Keyhole 발생 → keyhole_final_transformed MST 사용")
-                "keyhole_final_transformed"
-            }
+            logger.debug("🔑 패스 ID ${passId}: Keyhole 발생 → keyhole_optimized_final_transformed MST 사용")
+            "keyhole_optimized_final_transformed"  // Keyhole이면 최적화 MST 사용
         } else {
             logger.debug("✅ 패스 ID ${passId}: Keyhole 미발생 → final_transformed MST 사용")
-            "final_transformed"
+            "final_transformed"  // Keyhole 아니면 기본 MST 사용
         }
         
         // 3. 선택된 DataType의 MST 반환
