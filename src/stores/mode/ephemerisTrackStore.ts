@@ -8,6 +8,7 @@ import {
   type GeostationaryTrackingRequest,
   type GeostationaryTrackingResponse,
 } from '../../services/mode/ephemerisTrackService'
+import { useICDStore } from '../icd/icdStore'
 
 // ✅ 기본값 상수 정의 (파일 상단에 추가)
 const DEFAULT_WORKER_STATS = {
@@ -106,6 +107,9 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
   const trackingStartTime = ref<number | null>(null)
   const isInitialDelayActive = ref(false)
   const INITIAL_DELAY_MS = 10000 // 5초 지연
+
+  // ✅ Store 레벨 추적 경로 업데이트 타이머 (컴포넌트와 무관하게 계속 업데이트)
+  let storeTrackingTimer: number | null = null
 
   // ✅ Worker 통계 상태에 currentPathPoints 추가
   const workerStats = ref({
@@ -699,6 +703,53 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
   }
 
   /**
+   * ✅ Store 레벨 추적 경로 업데이트 시작 (컴포넌트와 무관하게 계속 업데이트)
+   */
+  const startStoreTrackingUpdate = () => {
+    // 이미 실행 중이면 중복 실행 방지
+    if (storeTrackingTimer !== null) {
+      return
+    }
+
+    console.log('🔄 Ephemeris Store 레벨 추적 경로 업데이트 시작')
+
+    storeTrackingTimer = window.setInterval(() => {
+      try {
+        const icdStore = useICDStore()
+
+        // 추적 중인지 확인
+        const isTrackingActive = icdStore.ephemerisTrackingState === 'TRACKING'
+
+        if (!isTrackingActive) {
+          return // 추적 중이 아니면 업데이트하지 않음
+        }
+
+        // 현재 위치 가져오기
+        const azimuth =
+          parseFloat(icdStore.trackingActualAzimuthAngle || icdStore.azimuthAngle) || 0
+        const elevation =
+          parseFloat(icdStore.trackingActualElevationAngle || icdStore.elevationAngle) || 0
+
+        // Store의 추적 경로 업데이트 (차트와 무관하게 계속 업데이트)
+        void updateTrackingPath(azimuth, elevation)
+      } catch (error) {
+        console.error('❌ Ephemeris Store 레벨 추적 경로 업데이트 오류:', error)
+      }
+    }, 100) // 100ms 주기로 업데이트
+  }
+
+  /**
+   * ✅ Store 레벨 추적 경로 업데이트 중지
+   */
+  const stopStoreTrackingUpdate = () => {
+    if (storeTrackingTimer !== null) {
+      clearInterval(storeTrackingTimer)
+      storeTrackingTimer = null
+      console.log('🛑 Ephemeris Store 레벨 추적 경로 업데이트 중지')
+    }
+  }
+
+  /**
    * 추적 시작
    */
   const startTracking = async () => {
@@ -711,6 +762,9 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
       trackingStatus.value = 'active'
       trackingStartTime.value = Date.now() // 추적 시작 시간 기록
       isInitialDelayActive.value = true // 지연 시작 활성화
+
+      // ✅ Store 레벨 추적 경로 업데이트 시작
+      startStoreTrackingUpdate()
     } catch (err) {
       trackingStatus.value = 'error'
       error.value = 'Failed to start tracking'
@@ -726,6 +780,9 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
       await ephemerisTrackService.stopEphemerisTracking()
       trackingStatus.value = 'idle'
       //currentTrackingPassId.value = null
+
+      // ✅ Store 레벨 추적 경로 업데이트 중지
+      stopStoreTrackingUpdate()
     } catch (err) {
       error.value = 'Failed to stop tracking'
       throw err

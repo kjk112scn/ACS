@@ -937,13 +937,45 @@ watch(
 const handleActivated = () => {
   console.log('🔄 PassSchedulePage 활성화됨')
 
-  // 🆕 차트가 없으면 재초기화
+  // ✅ 차트가 이미 존재하고 유효하면 재초기화하지 않음
   if (!passChart || passChart.isDisposed()) {
     setTimeout(() => {
       initChart()
       console.log('✅ 차트 재초기화 완료')
     }, 100)
+  } else {
+    // ✅ 차트가 이미 있으면 리사이즈만 수행
+    console.log('✅ 차트가 이미 존재함 - 리사이즈만 수행')
+    void nextTick(() => {
+      if (passChart && !passChart.isDisposed() && chartRef.value) {
+        passChart.resize()
+      }
+    })
   }
+
+  // ✅ 추적 경로 데이터 복원 (Store에 데이터가 있으면 차트에 복원)
+  void nextTick(() => {
+    if (passChart && !passChart.isDisposed()) {
+      // 실시간 추적 경로 복원
+      const actualPath = passScheduleStore.actualTrackingPath
+      if (actualPath && actualPath.length > 0) {
+        passChartPool.updateTrackingPath(actualPath as [number, number][])
+        console.log('✅ 실시간 추적 경로 복원:', actualPath.length, '개 포인트')
+      }
+
+      // 예측 경로 복원
+      const predictedPath = passScheduleStore.predictedTrackingPath
+      if (predictedPath && predictedPath.length > 0) {
+        passChartPool.updatePredictedPath(predictedPath as [number, number][])
+        console.log('✅ 예측 경로 복원:', predictedPath.length, '개 포인트')
+      }
+
+      // 차트 업데이트
+      const updateOption = passChartPool.getUpdateOption()
+      passChart.setOption(updateOption, false, true)
+      console.log('✅ 차트 데이터 복원 완료')
+    }
+  })
 
   // 🆕 타이머 재시작
   if (!updateTimer) {
@@ -2294,12 +2326,14 @@ onUnmounted(() => {
     console.log('✅ 차트 업데이트 타이머 정리됨')
   }
 
-  // 🆕 PassSchedule 차트 인스턴스 정리 (기존 인스턴스가 있을 때만)
-  if (passChart && !passChart.isDisposed()) {
-    passChart.dispose()
-    passChart = null
-    console.log('✅ PassSchedule 차트 인스턴스 정리됨')
-  }
+  // ✅ 차트는 유지 (dispose하지 않음) - keep-alive나 재마운트 시 재사용
+  // 차트는 onDeactivated에서도 유지되므로 여기서도 유지
+  // 실제로 컴포넌트가 완전히 제거될 때만 dispose (일반적으로 발생하지 않음)
+  // if (passChart && !passChart.isDisposed()) {
+  //   passChart.dispose()
+  //   passChart = null
+  //   console.log('✅ PassSchedule 차트 인스턴스 정리됨')
+  // }
 
   // 🆕 시간 업데이트 타이머 정리
   stopTimeTimer()
@@ -2310,7 +2344,7 @@ onUnmounted(() => {
   // 🆕 이벤트 리스너 정리
   window.removeEventListener('resize', () => { })
 
-  console.log('✅ PassSchedulePage 정리 완료')
+  console.log('✅ PassSchedulePage 정리 완료 (차트는 유지)')
 })
 
 // 서버 시간 포맷팅을 위한 계산된 속성 추가

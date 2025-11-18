@@ -176,6 +176,9 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
     isProcessing: false,
   })
 
+  // ✅ Store 레벨 추적 경로 업데이트 타이머 (컴포넌트와 무관하게 계속 업데이트)
+  let storeTrackingTimer: number | null = null
+
   // 🆕 추적 경로 통계
   const trackingPath = computed(() => ({
     sampledPath: actualTrackingPath.value,
@@ -1560,6 +1563,59 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
   }
 
   /**
+   * ✅ Store 레벨 추적 경로 업데이트 시작 (컴포넌트와 무관하게 계속 업데이트)
+   */
+  const startStoreTrackingUpdate = () => {
+    // 이미 실행 중이면 중복 실행 방지
+    if (storeTrackingTimer !== null) {
+      return
+    }
+
+    console.log('🔄 PassSchedule Store 레벨 추적 경로 업데이트 시작')
+
+    storeTrackingTimer = window.setInterval(() => {
+      try {
+        const icdStore = useICDStore()
+
+        // 추적 중인지 확인
+        const isTrackingActive =
+          icdStore.passScheduleStatusInfo?.isActive === true ||
+          icdStore.currentTrackingMstId !== null ||
+          icdStore.nextTrackingMstId !== null
+
+        if (!isTrackingActive) {
+          return // 추적 중이 아니면 업데이트하지 않음
+        }
+
+        // 현재 위치 가져오기
+        const azimuth =
+          parseFloat(icdStore.trackingActualAzimuthAngle || icdStore.azimuthAngle) || 0
+        const elevation =
+          parseFloat(icdStore.trackingActualElevationAngle || icdStore.elevationAngle) || 0
+
+        const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
+        const normalizedEl = Math.max(0, Math.min(90, elevation))
+
+        // Store의 추적 경로 업데이트 (차트와 무관하게 계속 업데이트)
+        void updateActualTrackingPath(normalizedAz, normalizedEl)
+      } catch (error) {
+        console.error('❌ PassSchedule Store 레벨 추적 경로 업데이트 오류:', error)
+      }
+    }, 100) // 100ms 주기로 업데이트
+  }
+
+  /**
+   * ✅ Store 레벨 추적 경로 업데이트 중지
+   */
+  const stopStoreTrackingUpdate = () => {
+    if (storeTrackingTimer !== null) {
+      clearInterval(storeTrackingTimer)
+      storeTrackingTimer = null
+      console.log('🛑 PassSchedule Store 레벨 추적 경로 업데이트 중지')
+    }
+  }
+
+  /**
    * 🆕 추적 모니터링 시작
    */
   const startTrackingMonitor = async (): Promise<boolean> => {
@@ -1578,6 +1634,9 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
         startedAt: Date.now(),
         uptime: 0,
       }
+
+      // ✅ Store 레벨 추적 경로 업데이트 시작
+      startStoreTrackingUpdate()
 
       // Worker 초기화
       await new Promise((resolve) => setTimeout(resolve, 10)) // 임시 대기
@@ -1617,6 +1676,9 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
         startedAt: undefined,
         uptime: 0,
       }
+
+      // ✅ Store 레벨 추적 경로 업데이트 중지
+      stopStoreTrackingUpdate()
 
       // Worker 정리
       await new Promise((resolve) => setTimeout(resolve, 10)) // 임시 대기

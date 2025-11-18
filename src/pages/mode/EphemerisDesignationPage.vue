@@ -200,7 +200,7 @@
                     <span class="info-label">시작/종료 시간:</span>
                     <span class="info-value">{{
                       formatToLocalTime(selectedScheduleInfo.startTime)
-                      }} / {{
+                    }} / {{
                         formatToLocalTime(selectedScheduleInfo.endTime)
                       }}</span>
                   </div>
@@ -230,7 +230,7 @@
                       <span class="info-label">권장 Train 각도:</span>
                       <span class="info-value text-positive">{{
                         safeToFixed(selectedScheduleInfo.recommendedTrainAngle, 6)
-                        }}°</span>
+                      }}°</span>
                     </div>
                     <div class="info-row">
                       <span class="info-label">최대 Azimuth 속도:</span>
@@ -655,7 +655,7 @@ ISS (ZARYA)
   </q-dialog>
 </template>
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, onActivated, onDeactivated, computed, watch, nextTick } from 'vue'
 import { date } from 'quasar'
 
 import type { QTableProps } from 'quasar'
@@ -731,6 +731,9 @@ const chartRef = ref<HTMLElement | null>(null)
 let chart: ECharts | null = null
 let updateTimer: number | null = null
 let chartResizeHandler: (() => void) | null = null
+
+// ✅ 차트 크기 상수 통일
+const CHART_SIZE = 500
 
 // TLE Data 스토어에서 상태 가져오기
 const tleData = computed(() => ephemerisStore.tleDisplayData)
@@ -1477,7 +1480,7 @@ class ChartUpdatePool {
 
   constructor() {
     this.updateOption = {
-      series: [{ data: this.positionData }, {}, { data: this.trackingData }, {}],
+      series: [{ data: this.positionData }, { data: this.trackingData }, {}],
     }
   }
 
@@ -1559,6 +1562,40 @@ const updateChart = () => {
     }
   })
 }
+
+// ✅ 차트 크기 조정 함수 (외부에서도 호출 가능) - DOM 스타일을 먼저 설정하여 깜빡임 방지
+const adjustChartSize = async () => {
+  await nextTick() // ✅ Vue의 DOM 업데이트 완료 대기
+
+  if (!chart || chart.isDisposed() || !chartRef.value) return
+
+  // ✅ 1단계: DOM 스타일을 먼저 설정 (리사이즈 전에!)
+  // 이렇게 하면 차트가 처음부터 올바른 위치에서 렌더링되어 깜빡임이 없음
+  const chartElement = chartRef.value.querySelector('div') as HTMLElement | null
+  if (chartElement) {
+    // ✅ 스타일을 먼저 설정하여 차트가 올바른 위치에서 렌더링되도록 함
+    chartElement.style.width = `${CHART_SIZE}px`
+    chartElement.style.height = `${CHART_SIZE}px`
+    chartElement.style.maxWidth = `${CHART_SIZE}px`
+    chartElement.style.maxHeight = `${CHART_SIZE}px`
+    chartElement.style.minWidth = `${CHART_SIZE}px`
+    chartElement.style.minHeight = `${CHART_SIZE}px`
+    chartElement.style.position = 'absolute'
+    chartElement.style.top = '50%'
+    chartElement.style.left = '50%'
+    chartElement.style.transform = 'translate(-50%, -50%)'
+  }
+
+  // ✅ 2단계: DOM 스타일 적용 후 리사이즈 (스타일이 적용된 상태에서)
+  await nextTick()
+  chart.resize({
+    width: CHART_SIZE,
+    height: CHART_SIZE
+  })
+
+  console.log('차트 리사이즈 완료:', CHART_SIZE)
+}
+
 // ✅ 차트 초기화 함수 수정 - 반응형 크기
 const initChart = () => {
   if (!chartRef.value) return
@@ -1569,14 +1606,12 @@ const initChart = () => {
   }
 
   // ✅ 차트 크기 설정 (차트를 더 크게, Position View 구역 크기와 독립적) - PassSchedulePage와 동일
-  const initialSize = 500
-
   // 차트 인스턴스 생성
   chart = echarts.init(chartRef.value, null, {
-    width: initialSize,
-    height: initialSize
+    width: CHART_SIZE,
+    height: CHART_SIZE
   })
-  console.log('EphemerisDesignation 차트 인스턴스 생성됨, 크기:', initialSize)
+  console.log('EphemerisDesignation 차트 인스턴스 생성됨, 크기:', CHART_SIZE)
 
   // 차트 옵션 설정
   const option = {
@@ -1704,23 +1739,6 @@ const initChart = () => {
         zlevel: 3,
       },
       {
-        name: '위치 선',
-        type: 'line',
-        coordinateSystem: 'polar',
-        symbol: 'none',
-        animation: false, // ✅ 애니메이션 완전 비활성화
-        lineStyle: {
-          color: '#ff5722',
-          width: 2,
-          type: 'dashed',
-        },
-        data: [
-          [0, 0],
-          [0, 0],
-        ],
-        zlevel: 2,
-      },
-      {
         name: '실시간 추적 경로',
         type: 'line',
         coordinateSystem: 'polar',
@@ -1750,66 +1768,37 @@ const initChart = () => {
     ],
   }
 
-  // 차트 옵션 적용 (초기 크기)
+  // 차트 옵션 적용
   chart.setOption(option, true)
-  chart.resize({
-    width: initialSize,
-    height: initialSize
-  })
   console.log('EphemerisDesignation 차트 옵션 적용됨')
 
-  // ✅ 차트 크기 조정 (차트를 더 크게, Position View 구역 크기와 독립적) - PassSchedulePage와 동일
-  const adjustChartSize = async () => {
-    await nextTick() // ✅ Vue의 DOM 업데이트 완료 대기
-
-    if (!chart || chart.isDisposed() || !chartRef.value) return
-
-    // ✅ 차트를 더 크게 설정 (Position View 구역 크기와 독립적)
-    const chartSize = 500
-
-    console.log('차트 크기 설정:', chartSize)
-
-    // 리사이즈 수행
-    chart.resize({
-      width: chartSize,
-      height: chartSize
-    })
-
-    // ✅ ECharts가 생성한 실제 DOM 요소에 크기 설정
-    await nextTick()
-    const chartElement = chartRef.value.querySelector('div') as HTMLElement | null
+  // ✅ DOM 스타일을 먼저 설정 (리사이즈 전에!)
+  void nextTick(() => {
+    const chartElement = chartRef.value?.querySelector('div') as HTMLElement | null
     if (chartElement) {
-      // ✅ 차트를 더 크게 설정
-      chartElement.style.width = `${chartSize}px`
-      chartElement.style.height = `${chartSize}px`
-      chartElement.style.maxWidth = `${chartSize}px`
-      chartElement.style.maxHeight = `${chartSize}px`
-      chartElement.style.minWidth = `${chartSize}px`
-      chartElement.style.minHeight = `${chartSize}px`
-      // ✅ 중앙 정렬
-      chartElement.style.top = '50%'
+      // ✅ 스타일을 먼저 설정하여 차트가 올바른 위치에서 렌더링되도록 함
+      chartElement.style.width = `${CHART_SIZE}px`
+      chartElement.style.height = `${CHART_SIZE}px`
+      chartElement.style.maxWidth = `${CHART_SIZE}px`
+      chartElement.style.maxHeight = `${CHART_SIZE}px`
+      chartElement.style.minWidth = `${CHART_SIZE}px`
+      chartElement.style.minHeight = `${CHART_SIZE}px`
       chartElement.style.position = 'absolute'
+      chartElement.style.top = '50%'
       chartElement.style.left = '50%'
       chartElement.style.transform = 'translate(-50%, -50%)'
-
-      // 다시 리사이즈하여 적용 확인
-      chart.resize({
-        width: chartSize,
-        height: chartSize
-      })
     }
 
-    console.log('차트 리사이즈 완료:', chartSize)
-  }
-
-  // ✅ Vue의 nextTick을 사용하여 안전하게 차트 조정
-  setTimeout(() => {
-    adjustChartSize().catch(console.error)
-    // 추가 리사이즈 (레이아웃 완료 대기)
-    setTimeout(() => {
-      adjustChartSize().catch(console.error)
-    }, 200)
-  }, 100)
+    // ✅ 스타일 적용 후 리사이즈
+    void nextTick(() => {
+      if (chart && !chart.isDisposed()) {
+        chart.resize({
+          width: CHART_SIZE,
+          height: CHART_SIZE
+        })
+      }
+    })
+  })
 
   // ✅ 윈도우 리사이즈 이벤트에 대응 (반응형) - 컨테이너 크기 기반
   chartResizeHandler = () => {
@@ -1917,14 +1906,13 @@ const updateChartWithTrajectory = (data: TrajectoryPoint[]) => {
 
     console.log('생성된 궤적 포인트 샘플:', trajectoryPoints.slice(0, 5))
 
-    // 차트 옵션 업데이트 - 네 번째 시리즈(궤적 라인)만 업데이트
+    // 차트 옵션 업데이트 - 세 번째 시리즈(궤적 라인)만 업데이트
     const trajectoryOption = {
       series: [
-        {}, // 첫 번째 시리즈는 그대로 유지
-        {}, // 두 번째 시리즈는 그대로 유지
-        {}, // 세 번째 시리즈는 그대로 유지
+        {}, // 첫 번째 시리즈(실시간 위치)는 그대로 유지
+        {}, // 두 번째 시리즈(실시간 추적 경로)는 그대로 유지
         {
-          // 네 번째 시리즈(궤적 라인) 업데이트
+          // 세 번째 시리즈(위성 궤적) 업데이트
           data: trajectoryPoints,
         },
       ],
@@ -1937,6 +1925,53 @@ const updateChartWithTrajectory = (data: TrajectoryPoint[]) => {
     console.error('차트 옵션 업데이트 중 오류 발생:', error)
   }
 }
+
+// ✅ 차트 데이터 복원 함수 (이론 경로 + 실시간 경로 한 번에)
+const restoreChartData = () => {
+  if (!chart || chart.isDisposed()) return
+
+  const hasTrackingPath = ephemerisStore.trackingPath?.sampledPath &&
+    ephemerisStore.trackingPath.sampledPath.length > 0
+  const hasTrajectory = ephemerisStore.selectedSchedule &&
+    ephemerisStore.detailData.length > 0
+
+  if (!hasTrackingPath && !hasTrajectory) return
+
+  // ✅ 이론 경로 데이터 변환 (updateChartWithTrajectory 로직 재사용)
+  let trajectoryPoints: [number, number][] = []
+  if (hasTrajectory) {
+    trajectoryPoints = ephemerisStore.detailData.map((point) => {
+      const az = typeof point.Azimuth === 'number' ? point.Azimuth : 0
+      const el = typeof point.Elevation === 'number' ? point.Elevation : 0
+      const normalizedAz = az < 0 ? az + 360 : az
+      const normalizedEl = Math.max(0, Math.min(90, el))
+      return [normalizedEl, normalizedAz] as [number, number]
+    })
+  }
+
+  // ✅ 두 데이터를 한 번에 복원
+  const updateOption: Parameters<typeof chart.setOption>[0] = {
+    series: [
+      {}, // series[0]: 실시간 위치 (updateChart에서 관리)
+      hasTrackingPath
+        ? { data: [...ephemerisStore.trackingPath.sampledPath] }
+        : {}, // series[1]: 실시간 추적 경로
+      hasTrajectory
+        ? { data: trajectoryPoints }
+        : {}, // series[2]: 위성 궤적
+    ],
+  }
+
+  chart.setOption(updateOption, false, true)
+
+  if (hasTrackingPath) {
+    console.log('✅ 추적 경로 복원:', ephemerisStore.trackingPath.sampledPath.length, '개 포인트')
+  }
+  if (hasTrajectory) {
+    console.log('✅ 위성 궤적 복원:', ephemerisStore.detailData.length, '개 포인트')
+  }
+}
+
 // ✅ 개선된 시간 계산 함수 수정
 const updateTimeRemaining = () => {
   if (selectedScheduleInfo.value.startTimeMs > 0) {
@@ -2442,6 +2477,58 @@ const timerIntervalStats = {
 
 // ===== 라이프사이클 훅 =====
 
+// ✅ 컴포넌트 활성화 시 차트 및 데이터 복원
+const handleActivated = () => {
+  console.log('🔄 EphemerisDesignationPage 활성화됨')
+
+  // ✅ 차트가 이미 존재하고 유효하면 재초기화하지 않음
+  if (!chart || chart.isDisposed()) {
+    setTimeout(() => {
+      initChart()
+      console.log('✅ 차트 재초기화 완료')
+    }, 100)
+  } else {
+    // ✅ 차트가 이미 있으면 정상 상태로 복원 (adjustChartSize 사용)
+    console.log('✅ 차트가 이미 존재함 - 정상 상태로 복원')
+
+    // ✅ 정상적으로 표시된 차트 상태를 그대로 복원
+    setTimeout(() => {
+      adjustChartSize().then(() => {
+        console.log('✅ 차트 정상 상태 복원 완료')
+      }).catch(console.error)
+    }, 50) // 짧은 지연으로 DOM 준비 대기
+  }
+
+  // ✅ 차트 데이터 복원 (이론 경로 + 실시간 경로 한 번에)
+  void nextTick(() => {
+    restoreChartData()
+  })
+
+  // ✅ 타이머 재시작
+  if (!updateTimer) {
+    updateTimer = window.setInterval(() => {
+      updateChart()
+    }, 100)
+    console.log('✅ 차트 업데이트 타이머 재시작')
+  }
+}
+
+// ✅ 컴포넌트 비활성화 시 타이머만 정리 (차트와 데이터는 유지)
+const handleDeactivated = () => {
+  console.log('🔄 EphemerisDesignationPage 비활성화됨')
+
+  // ✅ 타이머만 정리 (차트와 추적 경로는 유지)
+  if (updateTimer) {
+    clearInterval(updateTimer)
+    updateTimer = null
+    console.log('✅ 차트 업데이트 타이머 정리됨')
+  }
+}
+
+// ✅ Vue 생명주기 훅 등록
+onActivated(handleActivated)
+onDeactivated(handleDeactivated)
+
 onMounted(async () => {
   console.log('EphemerisDesignation 컴포넌트 마운트됨')
   // ✅ 메인 스레드 모니터링 시작
@@ -2458,40 +2545,15 @@ onMounted(async () => {
     ephemerisStore.offsetValues.time,
   ]
 
-  // ✅ 스토어에 데이터가 없으면 로드 (탭 이동 시에도 데이터 유지)
-  if (ephemerisStore.masterData.length === 0) {
-    await loadScheduleData()
-  }
-
-  // ✅ 스케줄 데이터 로드 (기존 API 사용)
+  // ✅ 스케줄 데이터 로드 (중복 제거)
   await loadScheduleData()
 
-  // ✅ 이미 선택된 스케줄이 있으면 차트 업데이트
-  if (ephemerisStore.selectedSchedule && ephemerisStore.detailData.length > 0) {
-    setTimeout(() => {
-      if (chart) {
-        updateChartWithTrajectory([...ephemerisStore.detailData] as TrajectoryPoint[])
-      }
-    }, 200)
-  }
-  // ✅ 추가: 기존 추적 경로가 있으면 차트에 복원
-  if (ephemerisStore.trackingPath.sampledPath.length > 0) {
-    setTimeout(() => {
-      if (chart) {
-        const updateOption = {
-          series: [
-            {},
-            {},
-            {
-              data: [...ephemerisStore.trackingPath.sampledPath],
-            },
-            {},
-          ],
-        } as unknown as Parameters<typeof chart.setOption>[0]
-        chart.setOption(updateOption)
-      }
-    }, 300)
-  }
+  // ✅ 차트 데이터 복원 (이론 경로 + 실시간 경로 한 번에)
+  setTimeout(() => {
+    if (chart) {
+      restoreChartData()
+    }
+  }, 200) // 차트 초기화 완료 대기
   // 차트 업데이트 타이머 시작
   updateTimer = window.setInterval(() => {
     const currentTime = performance.now()
@@ -2545,17 +2607,21 @@ onUnmounted(() => {
     timeUpdateTimer = null
   }
 
-  // 차트 정리
-  if (chart) {
-    chart.dispose()
-    chart = null
-  }
+  // ✅ 차트는 유지 (dispose하지 않음) - keep-alive나 재마운트 시 재사용
+  // 실제로 컴포넌트가 완전히 제거될 때만 dispose (일반적으로 발생하지 않음)
+  // if (chart) {
+  //   chart.dispose()
+  //   chart = null
+  // }
+
   // ✅ 메인 스레드 모니터링 정리
   if (mainThreadBlockingDetector) {
     cancelAnimationFrame(mainThreadBlockingDetector)
   }
   // ✅ 추가: 추적 경로 정리 (메모리 절약)
-  ephemerisStore.clearTrackingPath()
+  // ✅ 추적 경로는 유지 (dispose하지 않음) - keep-alive나 재마운트 시 재사용
+  // 실제로 컴포넌트가 완전히 제거될 때만 clear (일반적으로 발생하지 않음)
+  // ephemerisStore.clearTrackingPath()
   // ✅ TypeScript Worker 정리
   ephemerisStore.cleanupWorker()
   // 윈도우 이벤트 리스너 정리
