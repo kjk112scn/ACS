@@ -280,9 +280,12 @@
       <div class="col-12 col-md-6 schedule-control-col">
         <q-card class="control-section">
           <q-card-section class="schedule-control-section">
-            <div class="text-subtitle1 text-weight-bold text-primary">TLE Data</div>
+            <!-- ✅ TLE Data 헤더 - PassSchedulePage.vue와 동일한 구조 -->
+            <div class="schedule-header">
+              <div class="text-subtitle1 text-weight-bold text-primary schedule-header-title">TLE Data</div>
+            </div>
             <q-editor v-model="tleData.displayText" readonly flat dense class="tle-display q-mt-sm" :toolbar="[]"
-              style="height: calc(50% - 20px)" :definitions="{
+              style="height: 140px; max-height: 140px;" :definitions="{
                 bold: undefined,
                 italic: undefined,
                 strike: undefined,
@@ -3041,41 +3044,50 @@ q-page-container .ephemeris-mode {
   flex-direction: column !important;
 }
 
-/* ✅ 3번 영역(TLE Data) 카드 섹션 높이 조정 - 버튼을 아래로 내리기 위해 space-between 사용 */
+/* ✅ 3번 영역(TLE Data) 카드 섹션 높이 조정 - PassSchedulePage.vue와 동일한 레이아웃 */
 .ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section {
   min-height: 367px !important;
-  /* ✅ 최소 높이 증가 (365px → 367px) */
+  /* ✅ 최소 높이 유지 (다른 카드와 높이 맞추기) */
   flex: 1 1 auto !important;
   /* ✅ 남은 공간 채우기 (flex-grow: 1, flex-shrink: 1, flex-basis: auto) */
   display: flex !important;
   flex-direction: column !important;
-  justify-content: space-between !important;
-  /* ✅ 위아래 공간을 균등 분배하여 버튼을 아래로 내림 */
+  justify-content: flex-start !important;
+  /* ✅ PassSchedulePage.vue와 동일하게 flex-start 유지 */
   align-items: stretch !important;
+  padding: 16px !important;
+  /* ✅ PassSchedulePage.vue의 .control-section .q-card-section과 동일하게 padding: 16px */
   padding-bottom: 0 !important;
-  /* ✅ 하단 패딩 완전 제거 (상단 공간과 동일하게) */
+  /* ✅ PassSchedulePage.vue와 동일하게 하단 패딩 0 */
   margin-bottom: 0 !important;
   /* ✅ 하단 마진 제거 */
   overflow: hidden !important;
   /* ✅ 하단 여백 방지 */
 }
 
-/* ✅ 3단계: schedule-control-section 내부의 button-group 하단 여백 완전 제거 (더 구체적인 선택자) - PassSchedulePage.vue와 동일 */
+/* ✅ 3단계: schedule-control-section 내부의 button-group 스타일 - 버튼 위 공간 확대 */
 .ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .button-group {
+  margin-top: calc(0.25rem + 28px) !important;
+  /* ✅ PassSchedulePage.vue의 margin-top(0.25rem) + 추가 공간(28px) = 버튼 위 공간 적절히 확대 */
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 제거 */
   flex-shrink: 0 !important;
   /* ✅ 버튼 그룹이 축소되지 않도록 */
+  padding-top: 0.25rem !important;
+  /* ✅ PassSchedulePage.vue와 동일하게 padding-top 유지 */
+  width: 100% !important;
+  /* ✅ 전체 너비 유지 */
 }
 
-/* ✅ schedule-control-section 내부의 마지막 요소 하단 여백 완전 제거 - PassSchedulePage.vue와 동일 */
-.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section>*:last-child {
+/* ✅ schedule-control-section 내부의 마지막 요소 하단 여백 처리 - button-group과 tle-display는 제외 */
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section>*:last-child:not(.button-group):not(.tle-display) {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
 
-/* ✅ schedule-control-section 내부의 모든 직접 자식 요소 하단 여백 제거 - PassSchedulePage.vue와 동일 */
-.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section>* {
+/* ✅ schedule-control-section 내부의 모든 직접 자식 요소 하단 여백 처리 - button-group과 tle-display는 제외 */
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section>*:not(.button-group):not(.tle-display) {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
@@ -3103,19 +3115,37 @@ q-page-container .ephemeris-mode {
   /* ✅ 상단부터 시작 */
 }
 
-/* ✅ button-group 스타일 - 버튼을 카드 하단에 배치 */
+/* ✅ 스케줄 헤더 스타일 - PassSchedulePage.vue와 동일 */
+.schedule-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0 !important;
+  /* ✅ 헤더가 축소되지 않도록 */
+}
+
+.schedule-header-title {
+  line-height: 1.2;
+  margin: 0;
+  padding: 0;
+}
+
+/* ✅ button-group 스타일 - PassSchedulePage.vue와 동일한 스타일 */
 .button-group {
-  margin-top: auto !important;
-  /* ✅ 남는 공간을 위로 밀어서 버튼을 카드 하단으로 이동 */
+  margin-top: 0.25rem !important;
+  /* ✅ 기본 margin-top (일반 버튼 그룹용) */
   margin-bottom: 0 !important;
   /* ✅ 하단 마진 완전 제거 */
   width: 100%;
   flex-shrink: 0 !important;
   /* ✅ 버튼 그룹이 축소되지 않도록 */
-  padding-top: 10px;
-  /* ✅ 간격을 절반으로 줄임 (20px → 10px) */
+  padding-top: 0.25rem !important;
+  /* ✅ PassSchedulePage.vue와 동일하게 padding-top: 0.25rem */
   padding-bottom: 0 !important;
-  /* ✅ 하단 패딩 완전 제거 */
+  /* ✅ 하단 패딩 제거 - PassSchedulePage.vue와 동일 */
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   /* ✅ 상단 테두리 추가 - PassSchedulePage.vue와 동일 */
   box-sizing: border-box !important;
@@ -3127,27 +3157,46 @@ q-page-container .ephemeris-mode {
   /* ✅ 버튼 행 사이 간격 명시 (겹침 방지) - PassSchedulePage.vue와 동일 */
 }
 
+/* ✅ TLE Data 섹션의 button-group은 별도 규칙 적용 (더 구체적인 선택자로 우선순위 보장) */
+.ephemeris-mode .schedule-control-section .button-group,
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .button-group {
+  margin-top: calc(0.25rem + 28px) !important;
+  /* ✅ 버튼 위 공간 28px 확대 (38px에서 10px 감소) - 더 구체적인 선택자로 일반 .button-group 규칙 오버라이드 */
+}
+
+
 /* ✅ 첫 번째 버튼 행 위쪽 여백 추가 (Text / Select Schedule) - 간격 절반으로 줄임 */
 .button-group .button-row:first-child {
   margin-top: 4px !important;
   /* ✅ 간격을 절반으로 줄임 (8px → 4px) */
 }
 
-/* ✅ TLE 에디터가 남는 공간을 차지하도록 설정 - 더 구체적인 선택자로 강제 적용 */
+/* ✅ TLE 에디터 높이 조정 - 텍스트 박스 크기 줄이기 (140px 고정) */
 .ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .tle-display {
   flex: 0 0 auto !important;
-  /* ✅ 필요한 높이만 차지 */
-  min-height: calc(50% - 20px) !important;
-  margin-bottom: 0.25rem !important;
-  /* ✅ 간격을 줄임 */
+  /* ✅ 고정 높이 - flexbox에서 자동으로 늘어나지 않도록 */
+  height: 140px !important;
+  /* ✅ 높이 140px로 고정 (사용자 요구사항) */
+  max-height: 140px !important;
+  /* ✅ 최대 높이 고정 */
+  min-height: 140px !important;
+  /* ✅ 최소 높이 고정 */
+  margin-bottom: 95px !important;
+  /* ✅ 테이블(210px)과 tle-display(140px) 차이(70px) + 추가 공간(25px) = 95px로 설정하여 button-group 위 공간 확대 */
+  margin-top: 0.5rem !important;
+  /* ✅ PassSchedulePage.vue 테이블과 동일하게 q-mt-sm (0.5rem) */
   display: flex !important;
   flex-direction: column !important;
 }
 
 .ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .tle-display :deep(.q-editor),
 .ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .tle-display :deep(.q-editor__content) {
-  flex: 0 0 auto !important;
-  min-height: calc(50% - 20px) !important;
+  flex: 1 1 auto !important;
+  /* ✅ 남은 공간을 차지하도록 flex-grow: 1 설정 */
+  height: 100% !important;
+  /* ✅ 부모 높이(210px)에 맞춤 */
+  min-height: 100% !important;
+  /* ✅ 최소 높이 100% */
   display: flex !important;
   flex-direction: column !important;
   font-size: 1rem !important;
@@ -3184,24 +3233,52 @@ q-page-container .ephemeris-mode {
   /* ✅ 하단 마진 제거 */
 }
 
-/* ✅ 업로드 버튼 스타일 - 크기는 유지하고 폰트만 확대 */
+/* ✅ 업로드 버튼 스타일 - PassSchedulePage.vue와 동일 */
 .upload-btn {
   flex: 1;
   min-width: 0;
-  height: 36px;
-  font-size: 13px;
+  height: 36px !important;
+  /* ✅ PassSchedulePage.vue와 동일하게 height: 36px 강제 적용 */
+  font-size: 13px !important;
   font-weight: 500;
   border-radius: 6px;
   transition: all 0.2s ease;
 }
 
-.ephemeris-mode .button-group :deep(.upload-btn .q-btn__content) {
-  font-size: 13px;
+/* ✅ TLE Data 섹션의 upload-btn에 대한 더 구체적인 선택자 - PassSchedulePage.vue와 동일한 크기 강제 */
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .button-group .upload-btn,
+.ephemeris-mode .schedule-control-section .button-group .upload-btn {
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+  font-size: 13px !important;
+}
+
+/* ✅ Quasar 버튼 내부 요소에도 크기 제한 - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .button-group :deep(.upload-btn),
+.ephemeris-mode .schedule-control-section .button-group :deep(.upload-btn) {
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+}
+
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .button-group :deep(.upload-btn .q-btn__wrapper) {
+  min-height: 36px !important;
+  height: 36px !important;
+}
+
+/* ✅ 버튼 내부 폰트 크기 - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .button-group :deep(.upload-btn .q-btn__content),
+.ephemeris-mode .schedule-control-section .button-group :deep(.upload-btn .q-btn__content),
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .button-group :deep(.upload-btn .q-btn__content) {
+  font-size: 13px !important;
   line-height: 1.2;
 }
 
-.ephemeris-mode :deep(.control-btn .q-btn__content) {
-  font-size: 13px;
+.ephemeris-mode :deep(.control-btn .q-btn__content),
+.ephemeris-mode .schedule-control-section .button-group :deep(.control-btn .q-btn__content),
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .button-group :deep(.control-btn .q-btn__content) {
+  font-size: 13px !important;
   line-height: 1.2;
 }
 
@@ -3210,15 +3287,38 @@ q-page-container .ephemeris-mode {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-/* ✅ 컨트롤 버튼 스타일 - upload-btn과 동일한 높이로 통일 */
+/* ✅ 컨트롤 버튼 스타일 - PassSchedulePage.vue와 동일 */
 .control-btn {
   flex: 1;
   min-width: 0;
-  height: 32px;
-  font-size: 13px;
+  height: 32px !important;
+  /* ✅ PassSchedulePage.vue와 동일하게 height: 32px 강제 적용 */
+  font-size: 13px !important;
   font-weight: 500;
   border-radius: 6px;
   transition: all 0.2s ease;
+}
+
+/* ✅ TLE Data 섹션의 control-btn에 대한 더 구체적인 선택자 - PassSchedulePage.vue와 동일한 크기 강제 */
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .button-group .control-btn,
+.ephemeris-mode .schedule-control-section .button-group .control-btn {
+  height: 32px !important;
+  min-height: 32px !important;
+  max-height: 32px !important;
+  font-size: 13px !important;
+}
+
+/* ✅ Quasar 버튼 내부 요소에도 크기 제한 - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .button-group :deep(.control-btn),
+.ephemeris-mode .schedule-control-section .button-group :deep(.control-btn) {
+  height: 32px !important;
+  min-height: 32px !important;
+  max-height: 32px !important;
+}
+
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .button-group :deep(.control-btn .q-btn__wrapper) {
+  min-height: 32px !important;
+  height: 32px !important;
 }
 
 .control-btn:hover {
@@ -3581,6 +3681,22 @@ q-page-container .ephemeris-mode {
 
 .ephemeris-mode .q-card__section {
   padding: 16px;
+}
+
+/* ✅ schedule-control-section의 모든 하단 패딩 완전 제거 (더 강력한 선택자) - PassSchedulePage.vue와 동일 */
+.ephemeris-mode .main-content-row .schedule-control-col .control-section.q-card .q-card__section.schedule-control-section,
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section,
+.ephemeris-mode .main-content-row .schedule-control-col .q-card.control-section .q-card-section.schedule-control-section,
+.ephemeris-mode .main-content-row .schedule-control-col .q-card.control-section .q-card__section.schedule-control-section {
+  padding-bottom: 0 !important;
+  /* ✅ PassSchedulePage.vue와 동일하게 하단 패딩 0 */
+  margin-bottom: 0 !important;
+}
+
+/* ✅ schedule-control-col의 q-card 하단 패딩 완전 제거 */
+.ephemeris-mode .main-content-row .schedule-control-col .q-card.control-section {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
 }
 
 /* ✅ EphemerisDesignationPage 내부의 q-card만 스타일 적용 - PassSchedulePage.vue와 동일하게 Quasar 기본 그림자 사용 */
