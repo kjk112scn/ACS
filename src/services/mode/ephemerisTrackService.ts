@@ -888,58 +888,6 @@ class EphemerisTrackService {
   }
 
   /**
-   * displayMinElevationAngle 설정값 조회
-   *
-   * SettingsService에서 화면 표시용 최소 Elevation 각도를 조회합니다.
-   *
-   * @returns displayMinElevationAngle 값 (도)
-   */
-  async getDisplayMinElevationAngle(): Promise<number> {
-    try {
-      const response = await api.get('/settings')
-
-      const setting = response.data.find(
-        (s: SettingItem) => s.key === 'ephemeris.tracking.displayMinElevationAngle',
-      )
-
-      const value = setting?.value ? parseFloat(setting.value) : 0.0
-
-      console.log(`⚙️ displayMinElevationAngle 설정값: ${value}°`)
-
-      return value
-    } catch (error) {
-      console.error('❌ 설정값 조회 실패, 기본값 0.0 사용:', error)
-      return 0.0
-    }
-  }
-
-  /**
-   * enableDisplayMinElevationFiltering 설정값 조회
-   *
-   * SettingsService에서 displayMinElevationAngle 필터링 활성화/비활성화 여부를 조회합니다.
-   *
-   * @returns enableDisplayMinElevationFiltering 값 (boolean)
-   */
-  async getEnableDisplayMinElevationFiltering(): Promise<boolean> {
-    try {
-      const response = await api.get('/settings')
-
-      const setting = response.data.find(
-        (s: SettingItem) => s.key === 'ephemeris.tracking.enableDisplayMinElevationFiltering',
-      )
-
-      const value = setting?.value ? setting.value === 'true' || setting.value === true : true // 기본값: true
-
-      console.log(`⚙️ enableDisplayMinElevationFiltering 설정값: ${value}`)
-
-      return value
-    } catch (error) {
-      console.error('❌ 설정값 조회 실패, 기본값 true 사용:', error)
-      return true // 기본값: 활성화
-    }
-  }
-
-  /**
    * sourceMinElevationAngle 설정값 조회
    *
    * @returns sourceMinElevationAngle 값 (도)

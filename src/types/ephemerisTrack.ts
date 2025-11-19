@@ -61,8 +61,8 @@ export interface ScheduleDetailItem {
   vz: number
 
   /**
-   * 필터링 기준으로 사용되는 Elevation 값
-   * displayMinElevationAngle과 비교하여 표시 여부 결정
+   * 백엔드에서 전달된 원본 Elevation 값
+   * 하드웨어 제한 각도(angleElevationMin) 기준으로 백엔드에서 필터링됨
    */
   Elevation: number
 }

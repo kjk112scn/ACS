@@ -139,35 +139,14 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
    */
   const rawDetailData = ref<ScheduleDetailItem[]>([])
 
-  /**
-   * 화면 표시용 최소 Elevation 각도 (도)
-   * SettingsService.displayMinElevationAngle 값
-   */
-  const displayMinElevation = ref<number>(0.0)
-
-  /**
-   * 필터링 활성화/비활성화 여부
-   * SettingsService.enableDisplayMinElevationFiltering 값
-   */
-  const enableDisplayMinElevationFiltering = ref<boolean>(true) // 기본값: 활성화
-
   // ===== 계산된 속성 =====
   const hasValidData = computed(() => masterData.value.length > 0)
   const isTrackingActive = computed(() => trackingStatus.value === 'active')
 
   /**
-   * 화면에 표시할 필터링된 상세 데이터
-   * displayMinElevation 기준으로 필터링 (조건부)
+   * 화면에 표시할 상세 데이터 (백엔드에서 하드웨어 제한 각도로 이미 필터링됨)
    */
-  const filteredDetailData = computed(() => {
-    if (enableDisplayMinElevationFiltering.value) {
-      // 필터링 활성화 시: displayMinElevation 기준으로 필터링
-      return rawDetailData.value.filter((item) => item.Elevation >= displayMinElevation.value)
-    } else {
-      // 필터링 비활성화 시: 모든 데이터 반환 (하드웨어 제한 각도는 백엔드에서 처리)
-      return rawDetailData.value
-    }
-  })
+  const filteredDetailData = computed(() => rawDetailData.value)
 
   /**
    * KEYHOLE 위성 스케줄들만 필터링
@@ -646,21 +625,12 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
       // 2. 전체 데이터 저장
       rawDetailData.value = allData
 
-      // 3. displayMinElevation 설정값 조회 및 저장
-      displayMinElevation.value = await ephemerisTrackService.getDisplayMinElevationAngle()
-
-      // ✅ 4. 필터링 활성화 여부 조회 및 저장
-      enableDisplayMinElevationFiltering.value =
-        await ephemerisTrackService.getEnableDisplayMinElevationFiltering()
-
-      // 5. 기존 detailData도 업데이트 (호환성 유지)
+      // 3. detailData 업데이트 (호환성 유지)
       detailData.value = filteredDetailData.value
 
       console.log(`✅ 스케줄 데이터 로드 완료:
         - 전체 데이터: ${rawDetailData.value.length}개
         - 표시 데이터: ${filteredDetailData.value.length}개
-        - 필터링 활성화: ${enableDisplayMinElevationFiltering.value ? 'YES' : 'NO'}
-        - 필터 기준: ${displayMinElevation.value}°
         - KEYHOLE: ${schedule.IsKeyhole ? 'YES' : 'NO'}
         - Train 각도: ${schedule.RecommendedTrainAngle}°
       `)
@@ -670,36 +640,6 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
       error.value = 'Failed to select schedule'
       throw err
     }
-  }
-
-  /**
-   * displayMinElevation 설정값 업데이트
-   * 설정 변경 시 호출하여 즉시 필터링 반영
-   *
-   * @param newValue 새로운 최소 Elevation 값 (도)
-   */
-  const updateDisplayMinElevation = (newValue: number) => {
-    displayMinElevation.value = newValue
-    // 기존 detailData도 업데이트 (호환성 유지)
-    detailData.value = filteredDetailData.value
-    console.log(
-      `🔄 표시 필터 업데이트: ${newValue}° (표시 데이터: ${filteredDetailData.value.length}개)`,
-    )
-  }
-
-  /**
-   * 필터링 활성화/비활성화 업데이트
-   * 설정 변경 시 호출하여 즉시 필터링 반영
-   *
-   * @param newValue 필터링 활성화 여부
-   */
-  const updateEnableDisplayMinElevationFiltering = (newValue: boolean) => {
-    enableDisplayMinElevationFiltering.value = newValue
-    // 기존 detailData도 업데이트 (호환성 유지)
-    detailData.value = filteredDetailData.value
-    console.log(
-      `🔄 필터링 상태 업데이트: ${newValue ? '활성화' : '비활성화'} (표시 데이터: ${filteredDetailData.value.length}개)`,
-    )
   }
 
   /**
@@ -1075,8 +1015,6 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
 
     // ✅ 새로운 필터링 관련 상태
     rawDetailData: readonly(rawDetailData),
-    displayMinElevation: readonly(displayMinElevation),
-    enableDisplayMinElevationFiltering: readonly(enableDisplayMinElevationFiltering),
 
     // 계산된 속성
     hasValidData,
@@ -1109,10 +1047,6 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     startGeostationaryTracking,
     activateGeostationaryTracking,
     resetGeostationaryAngles,
-
-    // ✅ 새로운 필터링 관련 액션
-    updateDisplayMinElevation,
-    updateEnableDisplayMinElevationFiltering,
   }
 })
 

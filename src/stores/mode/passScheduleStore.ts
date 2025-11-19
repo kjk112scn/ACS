@@ -119,6 +119,16 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
+  const isMidnightStart = (timeString: string): boolean => {
+    const parsedDate = new Date(timeString)
+    if (Number.isNaN(parsedDate.getTime())) {
+      return false
+    }
+    return (
+      parsedDate.getHours() === 0 && parsedDate.getMinutes() === 0 && parsedDate.getSeconds() === 0
+    )
+  }
+
   // TLE 관련 상태
   const tleData = ref<TLEItem[]>([])
   const selectedTLE = ref<TLEItem | null>(null)
@@ -1068,13 +1078,24 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
           }
         })
 
-        scheduleData.value = allSchedules
+        const filteredSchedules = allSchedules.filter((schedule) => {
+          const shouldDrop = isMidnightStart(schedule.startTime)
+          if (shouldDrop) {
+            console.log('⚠️ 자정 시작 패스를 제외합니다:', {
+              satellite: schedule.satelliteName,
+              startTime: schedule.startTime,
+            })
+          }
+          return !shouldDrop
+        })
 
-        console.log('✅ 패스 스케줄 데이터 로드 완료:', allSchedules.length, '개')
+        scheduleData.value = filteredSchedules
+
+        console.log('✅ 패스 스케줄 데이터 로드 완료:', filteredSchedules.length, '개')
 
         $q.notify({
           type: 'positive',
-          message: `${allSchedules.length}개의 패스 스케줄을 로드했습니다.`,
+          message: `${filteredSchedules.length}개의 패스 스케줄을 로드했습니다.`,
         })
 
         return true
