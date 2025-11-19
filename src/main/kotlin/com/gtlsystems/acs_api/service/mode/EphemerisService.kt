@@ -390,7 +390,7 @@ class EphemerisService(
             val sourceMinEl = settingsService.sourceMinElevationAngle.toFloat()
 
             logger.info("📡 OrekitCalculator 호출 중...")
-            val schedule = orekitCalculator.generateSatelliteTrackingSchedule(
+            var schedule = orekitCalculator.generateSatelliteTrackingSchedule(
                 tleLine1 = tleLine1,
                 tleLine2 = tleLine2,
                 startDate = today.withZoneSameInstant(ZoneOffset.UTC),
@@ -400,6 +400,13 @@ class EphemerisService(
                 longitude = locationData.longitude,
                 altitude = locationData.altitude
             )
+
+            val originalPassCount = schedule.trackingPasses.size
+            val filteredSchedule = schedule.removeLeadingMidnightPass()
+            if (filteredSchedule.trackingPasses.size != originalPassCount) {
+                logger.info("⚙️ 자정 직후 잘린 패스 제거: ${originalPassCount - filteredSchedule.trackingPasses.size}개 → ${filteredSchedule.trackingPasses.size}개")
+            }
+            schedule = filteredSchedule
             
             if (schedule.trackingPasses.isEmpty()) {
                 logger.warn("⚠️ 가시성 패스가 없습니다.")
@@ -1248,26 +1255,16 @@ class EphemerisService(
         // 선택된 DataType의 데이터 조회
         val finalTransformedPassDetails = getEphemerisTrackDtlByMstIdAndDataType(passId, finalDataType)
         
-        // ✅ displayMinElevationAngle 기준으로 필터링 (조건부)
-        val enableFiltering = settingsService.enableDisplayMinElevationFiltering
-        val displayMinElevation = settingsService.displayMinElevationAngle
+        // ✅ 하드웨어 제한 각도 기준으로 필터링
+        val elevationMin = settingsService.angleElevationMin
         
-        val filteredFinalTransformed = if (enableFiltering) {
-            finalTransformedPassDetails.filter {
-                (it["Elevation"] as? Double ?: 0.0) >= displayMinElevation
-            }
-        } else {
-            // 필터링 비활성화 시에도 하드웨어 제한 각도는 유지
-            val elevationMin = settingsService.angleElevationMin
-            finalTransformedPassDetails.filter {
-                (it["Elevation"] as? Double ?: 0.0) >= elevationMin
-            }
+        val filteredFinalTransformed = finalTransformedPassDetails.filter {
+            (it["Elevation"] as? Double ?: 0.0) >= elevationMin
         }
         
         // 필터링된 데이터가 비어있으면 로깅
         if (filteredFinalTransformed.isEmpty()) {
-            val filterThreshold = if (enableFiltering) displayMinElevation else settingsService.angleElevationMin
-            logger.warn("⚠️ 패스 ID ${passId}: 필터링 결과 데이터가 없습니다. (기준: ${filterThreshold}°)")
+            logger.warn("⚠️ 패스 ID ${passId}: 필터링 결과 데이터가 없습니다. (기준: ${elevationMin}°)")
             return emptyMap()
         }
 
@@ -1328,12 +1325,8 @@ class EphemerisService(
         val finalTransformedAltitude =
             (theoreticalFinalPoint["Altitude"] as? Double)?.toFloat() ?: axisTransformedAltitude
 
-        // ✅ 필터링 기준 확인 (조건부)
-        val filterThreshold = if (enableFiltering) {
-            displayMinElevation
-        } else {
-            settingsService.angleElevationMin
-        }
+        // ✅ 필터링 기준 확인 (하드웨어 제한 각도)
+        val filterThreshold = settingsService.angleElevationMin
         
         if (finalTransformedElevation < filterThreshold) {
             logger.warn("⚠️ 실시간 추적 데이터: Elevation(${finalTransformedElevation}°) < 필터 기준(${filterThreshold}°)")
@@ -2438,9 +2431,9 @@ class EphemerisService(
                     put("KeyholeFinalTransformedEndElevation", keyhole?.get("EndElevation"))
                     put("KeyholeFinalTransformedMaxElevation", keyhole?.get("MaxElevation"))
                     
-                    // ✅ displayMinElevationAngle 기준으로 필터링된 데이터의 MaxElevation 재계산
+                    // ✅ 하드웨어 제한 각도 기준으로 필터링된 데이터의 MaxElevation 재계산
                     // SelectSchedule 화면에서 필터링된 데이터 기준으로 표시하기 위함
-                    // 필터링된 데이터 조회 (getEphemerisTrackDtlByMstId는 이미 displayMinElevationAngle 기준으로 필터링된 데이터 반환)
+                    // 필터링된 데이터 조회 (getEphemerisTrackDtlByMstId는 이미 하드웨어 제한 각도 기준으로 필터링된 데이터 반환)
                     val filteredData = getEphemerisTrackDtlByMstId(mstId)
                     
                     // 필터링된 데이터 기준 MaxElevation 계산
@@ -2543,31 +2536,16 @@ class EphemerisService(
                 }
             }
             
-            // ✅ Step 2: Select Schedule 목록에서 스케줄 필터링 (조건부)
-            val enableFiltering = settingsService.enableDisplayMinElevationFiltering
-            val displayMinElevation = settingsService.displayMinElevationAngle
+            // ✅ Step 2: Select Schedule 목록에서 스케줄 필터링 (하드웨어 제한 각도 기준)
+            val elevationMin = settingsService.angleElevationMin
             
-            val filteredMergedData = if (enableFiltering) {
-                // 필터링 활성화 시: displayMinElevationAngle 기준으로 필터링
-                mergedData.filter { item ->
-                    val maxElevation = item["MaxElevation"] as? Double
-                    maxElevation != null && maxElevation >= displayMinElevation
-                }
-            } else {
-                // 필터링 비활성화 시: 모든 스케줄 반환 (하드웨어 제한 각도는 유지)
-                val elevationMin = settingsService.angleElevationMin
-                mergedData.filter { item ->
-                    val maxElevation = item["MaxElevation"] as? Double
-                    maxElevation != null && maxElevation >= elevationMin
-                }
+            val filteredMergedData = mergedData.filter { item ->
+                val maxElevation = item["MaxElevation"] as? Double
+                maxElevation != null && maxElevation >= elevationMin
             }
             
             logger.info("✅ [요청 #$requestId] 병합 완료: ${mergedData.size}개 MST 레코드 (KeyholeAxis + KeyholeFinal 데이터 포함)")
-            if (enableFiltering) {
-                logger.info("✅ [요청 #$requestId] 필터링 완료: ${mergedData.size}개 → ${filteredMergedData.size}개 (displayMinElevationAngle=${displayMinElevation}° 기준)")
-            } else {
-                logger.info("✅ [요청 #$requestId] 필터링 완료: ${mergedData.size}개 → ${filteredMergedData.size}개 (elevationMin=${settingsService.angleElevationMin}° 기준)")
-            }
+            logger.info("✅ [요청 #$requestId] 필터링 완료: ${mergedData.size}개 → ${filteredMergedData.size}개 (elevationMin=${elevationMin}° 기준)")
             return filteredMergedData
             
         } catch (error: Exception) {
@@ -2737,10 +2715,10 @@ class EphemerisService(
      *    - Keyhole 발생: keyhole_final_transformed (Train≠0, ±270°)
      *    - Keyhole 미발생: final_transformed (Train=0, ±270°)
      * 
-     * ✅ displayMinElevationAngle 기준으로 필터링:
-     *    - sourceMinElevationAngle = -20도로 넓게 추적했지만
-     *    - 실제 추적 명령은 displayMinElevationAngle = 0도 이상만 사용
-     *    - 백엔드와 프론트엔드 데이터 일치 보장
+     * ✅ 하드웨어 제한 각도 기준으로 필터링:
+     *    - sourceMinElevationAngle로 넓게 추적한 데이터 중
+     *    - 하드웨어 제한 각도(angleElevationMin) 이상만 사용
+     *    - 순수 2축 sourceMinElevationAngle 기준으로만 판단
      * 
      * ✅ 예외 처리:
      *    - final_transformed MST 없음: 빈 리스트 반환 + 경고 로그
@@ -2776,28 +2754,18 @@ class EphemerisService(
             "final_transformed"  // Keyhole 아니면 기본 데이터 사용
         }
         
-        // 3. displayMinElevationAngle 기준으로 필터링 (조건부)
-        // sourceMinElevationAngle = -20도로 넓게 추적했지만
-        // 실제 추적 명령은 displayMinElevationAngle = 0도 이상만 사용 (필터링 활성화 시)
-        val enableFiltering = settingsService.enableDisplayMinElevationFiltering
-        val displayMinElevation = settingsService.displayMinElevationAngle
+        // 3. 하드웨어 제한 각도 기준으로 필터링
+        // 순수 2축 sourceMinElevationAngle 기준으로만 판단
+        val elevationMin = settingsService.angleElevationMin
         
         // 선택된 DataType의 데이터 조회
         val allData = ephemerisTrackDtlStorage.filter {
             it["MstId"] == mstId && it["DataType"] == dataType
         }
         
-        // 필터링 활성화 여부에 따라 조건부 필터링
-        val filteredData = if (enableFiltering) {
-            allData.filter {
-                (it["Elevation"] as? Double ?: 0.0) >= displayMinElevation
-            }
-        } else {
-            // 필터링 비활성화 시에도 하드웨어 제한 각도는 유지
-            val elevationMin = settingsService.angleElevationMin
-            allData.filter {
-                (it["Elevation"] as? Double ?: 0.0) >= elevationMin
-            }
+        // 하드웨어 제한 각도 기준으로 필터링
+        val filteredData = allData.filter {
+            (it["Elevation"] as? Double ?: 0.0) >= elevationMin
         }
         
         // 필터링 결과 로깅
@@ -2807,18 +2775,12 @@ class EphemerisService(
         logger.info("📊 MST ID ${mstId} 데이터 조회:")
         logger.info("   - Keyhole 여부: ${if (isKeyhole) "YES" else "NO"}")
         logger.info("   - 사용 DataType: ${dataType}")
-        logger.info("   - 필터링 활성화: ${if (enableFiltering) "YES" else "NO"}")
-        if (enableFiltering) {
-            logger.info("   - 필터 기준: displayMinElevationAngle = ${displayMinElevation}°")
-        } else {
-            logger.info("   - 필터 기준: elevationMin (하드웨어 제한) = ${settingsService.angleElevationMin}°")
-        }
+        logger.info("   - 필터 기준: elevationMin (하드웨어 제한) = ${elevationMin}°")
         logger.info("   - 전체 데이터: ${totalCount}개")
         logger.info("   - 필터링 후: ${filteredCount}개")
         
         if (filteredCount == 0 && totalCount > 0) {
-            val filterThreshold = if (enableFiltering) displayMinElevation else settingsService.angleElevationMin
-            logger.warn("⚠️ 필터링 결과 데이터가 없습니다. 필터 기준(${filterThreshold}°)가 너무 높을 수 있습니다.")
+            logger.warn("⚠️ 필터링 결과 데이터가 없습니다. 필터 기준(${elevationMin}°)가 너무 높을 수 있습니다.")
         }
         
         if (filteredCount == 0) {
@@ -3615,67 +3577,42 @@ class EphemerisService(
                 "final_transformed"
             }
             
-            // ✅ displayMinElevationAngle 기준으로 필터링 (조건부)
-            val enableFiltering = settingsService.enableDisplayMinElevationFiltering
-            val displayMinElevation = settingsService.displayMinElevationAngle
+            // ✅ 하드웨어 제한 각도 기준으로 필터링
+            val elevationMin = settingsService.angleElevationMin
             
             // 원본 데이터 조회 (필터링 없음 - 비교용)
             val originalDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "original")
             val axisTransformedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "axis_transformed")
             
-            // ✅ 필터링된 final_transformed 데이터 조회 (조건부)
+            // ✅ 필터링된 final_transformed 데이터 조회
             val finalTransformedDtlAll = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "final_transformed")
-            val finalTransformedDtl = if (enableFiltering) {
-                finalTransformedDtlAll.filter {
-                    (it["Elevation"] as? Double ?: 0.0) >= displayMinElevation
-                }
-            } else {
-                // 필터링 비활성화 시에도 하드웨어 제한 각도는 유지
-                val elevationMin = settingsService.angleElevationMin
-                finalTransformedDtlAll.filter {
-                    (it["Elevation"] as? Double ?: 0.0) >= elevationMin
-                }
+            val finalTransformedDtl = finalTransformedDtlAll.filter {
+                (it["Elevation"] as? Double ?: 0.0) >= elevationMin
             }
             
-            // ✅ 필터링된 keyhole_final_transformed 데이터 조회 (Keyhole 발생 시만, 조건부)
+            // ✅ 필터링된 keyhole_final_transformed 데이터 조회 (Keyhole 발생 시만)
             val keyholeFinalDtlAll = if (isKeyhole) {
                 getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "keyhole_final_transformed")
             } else {
                 emptyList()
             }
             val keyholeFinalDtl = if (isKeyhole) {
-                if (enableFiltering) {
-                    keyholeFinalDtlAll.filter {
-                        (it["Elevation"] as? Double ?: 0.0) >= displayMinElevation
-                    }
-                } else {
-                    // 필터링 비활성화 시에도 하드웨어 제한 각도는 유지
-                    val elevationMin = settingsService.angleElevationMin
-                    keyholeFinalDtlAll.filter {
-                        (it["Elevation"] as? Double ?: 0.0) >= elevationMin
-                    }
+                keyholeFinalDtlAll.filter {
+                    (it["Elevation"] as? Double ?: 0.0) >= elevationMin
                 }
             } else {
                 emptyList()
             }
             
-            // ✅ 필터링된 keyhole_optimized_final_transformed 데이터 조회 (Keyhole 발생 시만, 조건부)
+            // ✅ 필터링된 keyhole_optimized_final_transformed 데이터 조회 (Keyhole 발생 시만)
             val keyholeOptimizedFinalDtlAll = if (isKeyhole) {
                 getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "keyhole_optimized_final_transformed")
             } else {
                 emptyList()
             }
             val keyholeOptimizedFinalDtl = if (isKeyhole) {
-                if (enableFiltering) {
-                    keyholeOptimizedFinalDtlAll.filter {
-                        (it["Elevation"] as? Double ?: 0.0) >= displayMinElevation
-                    }
-                } else {
-                    // 필터링 비활성화 시에도 하드웨어 제한 각도는 유지
-                    val elevationMin = settingsService.angleElevationMin
-                    keyholeOptimizedFinalDtlAll.filter {
-                        (it["Elevation"] as? Double ?: 0.0) >= elevationMin
-                    }
+                keyholeOptimizedFinalDtlAll.filter {
+                    (it["Elevation"] as? Double ?: 0.0) >= elevationMin
                 }
             } else {
                 emptyList()
@@ -3697,12 +3634,7 @@ class EphemerisService(
             logger.info("📊 MST ID ${mstId} CSV 생성:")
             logger.info("   - Keyhole 여부: ${if (isKeyhole) "YES" else "NO"}")
             logger.info("   - 사용 DataType: ${finalDataType}")
-            logger.info("   - 필터링 활성화: ${if (enableFiltering) "YES" else "NO"}")
-            if (enableFiltering) {
-                logger.info("   - 필터 기준: displayMinElevationAngle = ${displayMinElevation}°")
-            } else {
-                logger.info("   - 필터 기준: elevationMin (하드웨어 제한) = ${settingsService.angleElevationMin}°")
-            }
+            logger.info("   - 필터 기준: elevationMin (하드웨어 제한) = ${elevationMin}°")
             logger.info("   - Original 데이터: ${originalDtl.size}개")
             logger.info("   - AxisTransformed 데이터: ${axisTransformedDtl.size}개")
             logger.info("   - FinalTransformed 전체: ${finalTransformedDtlAll.size}개")
@@ -3721,8 +3653,7 @@ class EphemerisService(
             
             // ✅ 필터링된 데이터가 없으면 경고
             if (finalTransformedDtl.isEmpty()) {
-                val filterThreshold = if (enableFiltering) displayMinElevation else settingsService.angleElevationMin
-                logger.warn("⚠️ MST ID ${mstId}: 필터링 결과 데이터가 없습니다. (기준: ${filterThreshold}°)")
+                logger.warn("⚠️ MST ID ${mstId}: 필터링 결과 데이터가 없습니다. (기준: ${elevationMin}°)")
                 return mapOf<String, Any?>("success" to false, "error" to "필터링 후 데이터가 없습니다")
             }
             

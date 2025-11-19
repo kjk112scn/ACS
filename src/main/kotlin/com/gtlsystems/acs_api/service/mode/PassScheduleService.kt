@@ -1531,7 +1531,7 @@ class PassScheduleService(
             // ✅ 1. OrekitCalculator로 2축 데이터 생성 (유지)
             // ✅ EphemerisService와 동일한 설정 사용 (sourceMinElevationAngle)
             val sourceMinEl = settingsService.sourceMinElevationAngle.toFloat()
-            val schedule = orekitCalculator.generateSatelliteTrackingSchedule(
+            var schedule = orekitCalculator.generateSatelliteTrackingSchedule(
                 tleLine1 = tleLine1,
                 tleLine2 = tleLine2,
                 startDate = today.withZoneSameInstant(ZoneOffset.UTC),
@@ -1541,6 +1541,13 @@ class PassScheduleService(
                 longitude = locationData.longitude,
                 altitude = locationData.altitude,
             )
+
+            val originalPassCount = schedule.trackingPasses.size
+            val filteredSchedule = schedule.removeLeadingMidnightPass()
+            if (filteredSchedule.trackingPasses.size != originalPassCount) {
+                logger.info("⚙️ 자정 직후 잘린 패스 제거: ${originalPassCount - filteredSchedule.trackingPasses.size}개 → ${filteredSchedule.trackingPasses.size}개")
+            }
+            schedule = filteredSchedule
 
             logger.info("위성 $satelliteId 추적 스케줄 생성 완료: ${schedule.trackingPasses.size}개 패스")
 
@@ -1698,7 +1705,7 @@ class PassScheduleService(
                     put("KeyholeFinalTransformedEndElevation", keyhole?.get("EndElevation"))
                     put("KeyholeFinalTransformedMaxElevation", keyhole?.get("MaxElevation"))
                     
-                    // ✅ displayMinElevationAngle 기준으로 필터링된 데이터의 MaxElevation 재계산
+                    // ✅ 하드웨어 제한 각도 기준으로 필터링된 데이터의 MaxElevation 재계산
                     // 전체 저장소에서 해당 MST ID의 DTL 데이터 조회 (Keyhole-aware)
                     val satelliteId = final["SatelliteID"] as? String
                     val allDtlData = if (satelliteId != null) {
@@ -1709,12 +1716,18 @@ class PassScheduleService(
                     
                     // Keyhole 여부에 따라 적절한 DataType의 DTL 필터링
                     val dataType = determineKeyholeDataType(mstId, passScheduleTrackMstStorage)
-                    val filteredDtl = if (dataType != null) {
+                    val dtlByDataType = if (dataType != null) {
                         allDtlData.filter {
                             it["MstId"] == mstId && it["DataType"] == dataType
                         }
                     } else {
                         emptyList()
+                    }
+                    
+                    // 하드웨어 제한 각도 기준으로 필터링
+                    val elevationMin = settingsService.angleElevationMin
+                    val filteredDtl = dtlByDataType.filter {
+                        (it["Elevation"] as? Double ?: 0.0) >= elevationMin
                     }
                     
                     val filteredMaxElevation = if (filteredDtl.isNotEmpty()) {
@@ -1730,29 +1743,16 @@ class PassScheduleService(
                 }
             }
             
-            // ✅ 필터링 (displayMinElevationAngle 기준)
-            val enableFiltering = settingsService.enableDisplayMinElevationFiltering
-            val displayMinElevation = settingsService.displayMinElevationAngle
+            // ✅ 필터링 (하드웨어 제한 각도 기준)
+            val elevationMin = settingsService.angleElevationMin
             
-            val filteredMergedData = if (enableFiltering) {
-                mergedData.filter { item ->
-                    val maxElevation = item["MaxElevation"] as? Double
-                    maxElevation != null && maxElevation >= displayMinElevation
-                }
-            } else {
-                val elevationMin = settingsService.angleElevationMin
-                mergedData.filter { item ->
-                    val maxElevation = item["MaxElevation"] as? Double
-                    maxElevation != null && maxElevation >= elevationMin
-                }
+            val filteredMergedData = mergedData.filter { item ->
+                val maxElevation = item["MaxElevation"] as? Double
+                maxElevation != null && maxElevation >= elevationMin
             }
             
             logger.info("✅ 병합 완료: ${mergedData.size}개 MST 레코드 (KeyholeAxis + KeyholeFinal 데이터 포함)")
-            if (enableFiltering) {
-                logger.info("✅ 필터링 완료: ${mergedData.size}개 → ${filteredMergedData.size}개 (displayMinElevationAngle=${displayMinElevation}° 기준)")
-            } else {
-                logger.info("✅ 필터링 완료: ${mergedData.size}개 → ${filteredMergedData.size}개 (elevationMin=${settingsService.angleElevationMin}° 기준)")
-            }
+            logger.info("✅ 필터링 완료: ${mergedData.size}개 → ${filteredMergedData.size}개 (elevationMin=${elevationMin}° 기준)")
             return filteredMergedData
             
         } catch (error: Exception) {

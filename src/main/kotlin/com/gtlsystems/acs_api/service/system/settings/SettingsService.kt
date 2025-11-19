@@ -153,8 +153,6 @@ class SettingsService(
 
         // === Ephemeris Tracking 설정 ===
         "ephemeris.tracking.sourceMinElevationAngle" to SettingDefinition("ephemeris.tracking.sourceMinElevationAngle", 0.0, SettingType.DOUBLE, "원본 2축 위성 추적 데이터 생성 시 최소 Elevation 각도 (도). Orekit 계산 시 사용되는 2축 좌표계 기준. Tilt 각도 보정을 위해 음수 값 허용. 권장 공식: -abs(tiltAngle) - 15도 (예: Tilt -7° → -abs(-7) - 15 = -22.0°). 사용자가 수동으로 계산하여 설정해야 함."),
-        "ephemeris.tracking.displayMinElevationAngle" to SettingDefinition("ephemeris.tracking.displayMinElevationAngle", -20.0, SettingType.DOUBLE, "3축 변환 및 방위각 제한 완료 후 화면에 표시할 최소 Elevation 각도 (도). 이 값 미만의 데이터는 차트 및 테이블에 표시되지 않음. 백엔드는 모든 데이터를 저장하며, 프론트엔드에서만 필터링됨."),
-        "ephemeris.tracking.enableDisplayMinElevationFiltering" to SettingDefinition("ephemeris.tracking.enableDisplayMinElevationFiltering", false, SettingType.BOOLEAN, "displayMinElevationAngle 기준 필터링 활성화/비활성화. true: 필터링 적용 (displayMinElevationAngle 이상 데이터만 사용), false: 모든 데이터 반환 (sourceMinElevationAngle 기준 전체 데이터). 필터링 비활성화 시에도 하드웨어 제한 각도(elevationMin)는 유지됨."),
         "ephemeris.tracking.keyholeAzimuthVelocityThreshold" to SettingDefinition("ephemeris.tracking.keyholeAzimuthVelocityThreshold", 10.0, SettingType.DOUBLE, "KEYHOLE 위성 판단을 위한 Azimuth 각속도 임계값 (도/초). 전체 추적 구간에서 최대 Azimuth 각속도가 이 값 이상이면 KEYHOLE 위성으로 판단. KEYHOLE 위성은 Train 각도를 적용하여 ±270° 영역을 회피함. 권장값: 3.0~10.0 (낮을수록 보수적)."),
     )
 
@@ -1075,49 +1073,8 @@ class SettingsService(
      * - 범위: -90.0° ~ 90.0°
      * 
      * @see OrekitCalculator.generateSatelliteTrackingSchedule
-     * @see displayMinElevationAngle 최종 표시용 필터링 기준
      */
     val sourceMinElevationAngle: Double by createSettingProperty("ephemeris.tracking.sourceMinElevationAngle", "원본 2축 위성 추적 데이터 생성 시 최소 Elevation 각도")
-
-    /**
-     * 3축 변환 및 방위각 제한 완료 후 화면에 표시할 최소 Elevation 각도 (도)
-     * 
-     * ## 용도
-     * - 최종 변환 완료된 3축 데이터의 화면 표시 필터링 기준
-     * - 차트, 테이블 등 UI 컴포넌트에서 사용
-     * 
-     * ## 데이터 저장 vs 표시
-     * - **백엔드**: 모든 데이터 저장 (음수 Elevation 포함)
-     * - **프론트엔드**: 이 설정값 기준으로 필터링하여 표시
-     * 
-     * ## 기본값
-     * - 0.0° (지평선 기준)
-     * - 범위: -90.0° ~ 90.0°
-     * 
-     * @see sourceMinElevationAngle 원본 데이터 생성 기준
-     * @see ephemerisTrackService.fetchEphemerisDetailData 프론트엔드 필터링 위치
-     */
-    val displayMinElevationAngle: Double by createSettingProperty("ephemeris.tracking.displayMinElevationAngle", "3축 변환 및 방위각 제한 완료 후 화면에 표시할 최소 Elevation 각도")
-
-    /**
-     * displayMinElevationAngle 기준 필터링 활성화/비활성화
-     * 
-     * ## 용도
-     * - displayMinElevationAngle 기준 필터링을 활성화/비활성화
-     * - true: 필터링 적용 (displayMinElevationAngle 이상 데이터만 사용)
-     * - false: 모든 데이터 반환 (sourceMinElevationAngle 기준 전체 데이터)
-     * 
-     * ## 하드웨어 제한 각도 유지
-     * - 필터링 비활성화 시에도 하드웨어 제한 각도(elevationMin)는 항상 유지
-     * - 음수 Elevation 데이터는 실제 추적 명령에 포함되지 않음
-     * 
-     * ## 기본값
-     * - true (필터링 활성화)
-     * 
-     * @see displayMinElevationAngle 필터링 기준 각도
-     * @see elevationMin 하드웨어 제한 각도
-     */
-    val enableDisplayMinElevationFiltering: Boolean by createSettingProperty("ephemeris.tracking.enableDisplayMinElevationFiltering", "displayMinElevationAngle 기준 필터링 활성화/비활성화")
 
     /**
      * KEYHOLE 위성 판단을 위한 Azimuth 각속도 임계값 (도/초)
