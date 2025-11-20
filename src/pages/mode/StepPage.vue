@@ -1,7 +1,8 @@
 <template>
   <div class="step-mode">
-    <!-- 축별 제어 패널 (중앙 집중형으로 변경) -->
-    <div class="step-container">
+    <q-card class="step-wrapper">
+      <!-- 축별 제어 패널 (중앙 집중형으로 변경) -->
+      <div class="step-container">
       <div class="row q-col-gutter-md justify-center">
         <!-- Azimuth 패널 -->
         <div class="col-12 col-md-4">
@@ -91,7 +92,8 @@
           <q-btn label="Stow" color="warning" icon="home" size="lg" @click="handleStow" />
         </div>
       </div>
-    </div>
+      </div>
+    </q-card>
   </div>
 </template>
 
@@ -264,6 +266,18 @@ const handleBlur = (type: 'speeds' | 'angles', axis: 'azimuth' | 'elevation' | '
 .step-mode {
   height: 100%;
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.step-wrapper {
+  background-color: var(--theme-card-background);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  max-width: 1200px;
+  width: 100%;
+  padding: 1.5rem 2rem 1.75rem 2rem;
 }
 
 /* 전체 섹션 간격 최소화 */

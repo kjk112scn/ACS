@@ -2030,12 +2030,10 @@ const handleAllStatus = () => {
   /* flex: 1을 다시 추가하여 하단까지 확장 */
   margin-bottom: -0.5rem !important;
   /* 음수 마진을 절반으로 줄여서 적절한 하단 공간 확보 */
-  padding: 0 1rem 0 1rem;
-  /* 하단 패딩을 완전히 제거하여 푸터와의 간격 최소화 */
-  height: auto;
-  /* 자동 높이로 설정하여 내용에 맞게 조정 */
-  padding-bottom: 0;
-  /* 하단 패딩을 명시적으로 0으로 설정 */
+  padding: 0 1rem 1rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* mode-selection-section 상단/하단 마진 추가 */
@@ -2055,6 +2053,7 @@ const handleAllStatus = () => {
 .mode-content-section .q-card__section {
   padding: 1rem !important;
   /* q-card-section 내부 패딩 강제 적용 */
+  width: 100%;
 }
 
 /* 컴팩트 탭 스타일 */

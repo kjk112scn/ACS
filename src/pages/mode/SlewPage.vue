@@ -186,6 +186,10 @@ const handleBlur = (axis: 'azimuth' | 'elevation' | 'train') => {
 .slew-mode {
   height: 100%;
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 /* 전체 섹션 간격 최소화 */

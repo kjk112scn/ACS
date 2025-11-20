@@ -89,32 +89,30 @@ const handleStow = async () => {
 .standby-mode {
   height: 100%;
   width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem 0;
 }
 
 .standby-container {
-  padding: 0.5rem 1rem 0 1rem;
-  /* 상단 패딩을 1rem → 0.5rem으로 더 줄여서 공간 최대화 */
   width: 100%;
-  height: 100%;
-  /* height를 100%로 설정하여 전체 공간 사용 */
+  max-width: 1100px;
+  padding: 0.5rem 1rem;
   display: flex;
-  flex-direction: column;
   justify-content: center;
-  /* flex-start에서 center로 변경하여 세로 가운데 정렬 */
-  align-items: center;
-  padding-top: 0;
-  /* 상단 패딩 제거하여 공간 최대화 */
 }
 
 .control-section {
   background-color: var(--theme-card-background);
   border: 1px solid rgba(255, 255, 255, 0.12);
   max-width: 1000px;
-  /* 최대 너비를 800px → 1000px로 늘려서 더 넓게 사용 */
+  width: 100%;
   margin: 0 auto;
-  /* 하단 마진 제거 - DashboardPage에서 통합 관리 */
   padding: 2rem 3rem;
-  /* 패딩을 늘려서 내부 공간 확장 */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .checkbox-group {
