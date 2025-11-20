@@ -1,7 +1,5 @@
 <template>
   <div class="step-mode">
-    <div class="section-title text-h5 text-primary q-mb-xs">Step Mode</div>
-
     <!-- 축별 제어 패널 (중앙 집중형으로 변경) -->
     <div class="step-container">
       <div class="row q-col-gutter-md justify-center">

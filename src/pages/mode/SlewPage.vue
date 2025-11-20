@@ -1,7 +1,5 @@
 <template>
   <div class="slew-mode">
-    <div class="section-title text-h5 text-primary q-mb-xs">Slew Mode</div>
-
     <!-- 축별 제어 패널 (Step 모드와 동일한 구조) -->
     <div class="slew-container">
       <div class="row q-col-gutter-md justify-center">

@@ -244,18 +244,26 @@
     </div>
 
     <!-- 모드 선택 탭 -->
-    <q-card class="mode-selection-section">
-      <q-card-section>
-        <q-tabs v-model="currentMode" class="text-primary compact-tabs" active-color="primary" indicator-color="primary"
-          align="left" narrow-indicator>
-          <q-tab name="standby" label="Standby" @click="navigateToMode('standby')" />
-          <q-tab name="step" label="Step" @click="navigateToMode('step')" />
-          <q-tab name="slew" label="Slew" @click="navigateToMode('slew')" />
-          <q-tab name="pedestal" label="Pedestal Position" @click="navigateToMode('pedestal')" />
-          <q-tab name="ephemeris" label="Ephemeris Designation" @click="navigateToMode('ephemeris')" />
-          <q-tab name="pass-schedule" label="Pass Schedule" @click="navigateToMode('pass-schedule')" />
-          <q-tab name="suntrack" label="Sun Track" @click="navigateToMode('suntrack')" />
-          <q-tab name="feed" label="Feed" @click="navigateToMode('feed')" />
+    <q-card flat bordered class="mode-selection-section">
+      <q-card-section class="mode-selection-wrapper">
+        <q-tabs v-model="currentMode" class="text-primary compact-tabs" active-color="white" indicator-color="transparent"
+          align="left" narrow-indicator dense>
+          <q-tab name="standby" label="Standby" icon="pause_circle_outline" inline-label class="mode-tab"
+            :class="{ 'mode-tab--active': currentMode === 'standby' }" @click="navigateToMode('standby')" />
+          <q-tab name="step" label="Step" icon="stairs" inline-label class="mode-tab"
+            :class="{ 'mode-tab--active': currentMode === 'step' }" @click="navigateToMode('step')" />
+          <q-tab name="slew" label="Slew" icon="sync_alt" inline-label class="mode-tab"
+            :class="{ 'mode-tab--active': currentMode === 'slew' }" @click="navigateToMode('slew')" />
+          <q-tab name="pedestal" label="Pedestal Position" icon="near_me" inline-label class="mode-tab"
+            :class="{ 'mode-tab--active': currentMode === 'pedestal' }" @click="navigateToMode('pedestal')" />
+          <q-tab name="ephemeris" label="Ephemeris Designation" icon="public" inline-label class="mode-tab"
+            :class="{ 'mode-tab--active': currentMode === 'ephemeris' }" @click="navigateToMode('ephemeris')" />
+          <q-tab name="pass-schedule" label="Pass Schedule" icon="event_available" inline-label class="mode-tab"
+            :class="{ 'mode-tab--active': currentMode === 'pass-schedule' }" @click="navigateToMode('pass-schedule')" />
+          <q-tab name="suntrack" label="Sun Track" icon="wb_sunny" inline-label class="mode-tab"
+            :class="{ 'mode-tab--active': currentMode === 'suntrack' }" @click="navigateToMode('suntrack')" />
+          <q-tab name="feed" label="Feed" icon="rss_feed" inline-label class="mode-tab"
+            :class="{ 'mode-tab--active': currentMode === 'feed' }" @click="navigateToMode('feed')" />
         </q-tabs>
       </q-card-section>
     </q-card>
@@ -2050,18 +2058,101 @@ const handleAllStatus = () => {
 }
 
 /* 컴팩트 탭 스타일 */
+.mode-selection-section {
+  background-color: var(--theme-card-background);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.mode-selection-wrapper {
+  padding: 6px 12px !important;
+}
+
 .compact-tabs {
-  height: 42px;
+  height: 54px;
+  min-height: 54px;
+}
+
+.compact-tabs .q-tabs__content {
+  display: flex;
+  gap: 6px;
+  overflow: visible;
 }
 
 .compact-tabs .q-tab {
-  padding: 0 12px;
-  min-height: 42px;
-  color: var(--theme-text-secondary);
+  padding: 8px 18px;
+  min-height: 52px;
+  border-radius: 9px;
+  transition: all 0.18s ease;
 }
 
-.compact-tabs .q-tab--active {
-  color: var(--theme-primary);
+.mode-tab {
+  color: var(--theme-text-secondary);
+  font-weight: 500;
+  font-size: 0.9rem;
+  letter-spacing: 0.03em;
+  background-color: transparent;
+  border: 1px solid transparent;
+  position: relative;
+  white-space: nowrap;
+}
+
+.mode-tab .q-tab__content {
+  gap: 8px;
+  align-items: center;
+  flex-direction: row;
+}
+
+.mode-tab .q-tab__icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.mode-tab .q-tab__label {
+  font-size: 0.87rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.mode-tab::before {
+  content: '';
+  position: absolute;
+  inset: auto 8px -4px 8px;
+  height: 2px;
+  background: transparent;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.mode-tab--active {
+  color: var(--theme-text);
+  background: rgba(25, 118, 210, 0.12);
+  border-color: rgba(33, 150, 243, 0.4);
+  box-shadow: inset 0 0 10px rgba(33, 150, 243, 0.15);
+}
+
+.mode-tab--active::before {
+  background: var(--theme-primary);
+}
+
+.mode-tab:hover:not(.mode-tab--active) {
+  color: var(--theme-text);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.compact-tabs .q-tab__indicator {
+  display: none;
+}
+
+.mode-content-section .q-card-section {
+  padding-top: 8px !important;
+  padding-bottom: 10px !important;
+}
+
+@media (max-width: 1280px) {
+  .compact-tabs .q-tabs__content {
+    flex-wrap: wrap;
+  }
 }
 
 /* Status LED 스타일 */

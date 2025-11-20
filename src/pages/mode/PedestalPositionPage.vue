@@ -1,7 +1,5 @@
 <template>
   <div class="pedestal-position-container">
-    <div class="section-title text-h5 text-primary q-mb-xs">Pedestal Position Mode</div>
-
     <!-- 축별 제어 패널 (중앙 집중형으로 변경) -->
     <div class="pedestal-container">
       <div class="row q-col-gutter-md justify-center">

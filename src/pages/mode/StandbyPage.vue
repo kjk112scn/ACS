@@ -1,6 +1,5 @@
 <template>
   <div class="standby-mode">
-    <div class="section-title text-h5 text-primary q-mb-xs">Standby Mode</div>
     <div class="standby-container">
       <q-card class="control-section">
         <q-card-section>

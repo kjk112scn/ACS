@@ -1,6 +1,5 @@
 <template>
   <div class="feed-mode">
-    <div class="section-title text-h5 text-primary q-mb-xs">Feed Mode</div>
     <div class="feed-container">
       <div class="row q-col-gutter-md">
         <!-- S-Band 섹션 -->
