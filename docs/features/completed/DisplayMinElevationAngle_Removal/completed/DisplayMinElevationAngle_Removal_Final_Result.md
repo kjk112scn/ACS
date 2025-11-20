@@ -279,3 +279,4 @@
 **향후 작업**:
 - 위성 스케줄 00시 처리 개선은 `docs/plans/Midnight_Schedule_Handling.md` 문서에서 별도로 관리됩니다.
 
+
