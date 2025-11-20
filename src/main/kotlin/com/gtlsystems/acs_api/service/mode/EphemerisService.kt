@@ -400,14 +400,6 @@ class EphemerisService(
                 longitude = locationData.longitude,
                 altitude = locationData.altitude
             )
-
-            val originalPassCount = schedule.trackingPasses.size
-            val filteredSchedule = schedule.removeLeadingMidnightPass()
-            if (filteredSchedule.trackingPasses.size != originalPassCount) {
-                logger.info("⚙️ 자정 직후 잘린 패스 제거: ${originalPassCount - filteredSchedule.trackingPasses.size}개 → ${filteredSchedule.trackingPasses.size}개")
-            }
-            schedule = filteredSchedule
-            
             if (schedule.trackingPasses.isEmpty()) {
                 logger.warn("⚠️ 가시성 패스가 없습니다.")
                 return Pair(emptyList(), emptyList())

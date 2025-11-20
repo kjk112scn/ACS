@@ -166,7 +166,7 @@ class SettingsService(
         settings.putAll(defaultSettings)
 
         // 2. DB에서 설정값 조회하여 메모리 업데이트
-        loadSettingsFromDatabase()
+        //loadSettingsFromDatabase()
 
         logger.info("설정 초기화 완료")
     }
@@ -227,7 +227,7 @@ class SettingsService(
 
         logger.info("설정값 변경됨: $key = $oldValue → $newValue")
         settings[key] = newValue
-        saveSettingToDatabase(key, newValue)
+        //saveSettingToDatabase(key, newValue)
         publishSettingChangedEvent(key, oldValue, newValue)
     }
 

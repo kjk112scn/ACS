@@ -1542,13 +1542,6 @@ class PassScheduleService(
                 altitude = locationData.altitude,
             )
 
-            val originalPassCount = schedule.trackingPasses.size
-            val filteredSchedule = schedule.removeLeadingMidnightPass()
-            if (filteredSchedule.trackingPasses.size != originalPassCount) {
-                logger.info("⚙️ 자정 직후 잘린 패스 제거: ${originalPassCount - filteredSchedule.trackingPasses.size}개 → ${filteredSchedule.trackingPasses.size}개")
-            }
-            schedule = filteredSchedule
-
             logger.info("위성 $satelliteId 추적 스케줄 생성 완료: ${schedule.trackingPasses.size}개 패스")
 
             // ✅ 2. SatelliteTrackingProcessor로 모든 변환 수행
