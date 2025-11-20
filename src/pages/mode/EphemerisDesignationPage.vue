@@ -265,8 +265,7 @@
                       'text-positive': timeRemaining > 0,
                       'text-grey': timeRemaining === 0,
                     }">
-                      {{ timeRemaining < 0 ? '지연됨' : timeRemaining > 0 ? `${Math.floor(timeRemaining / 60000)}분
-                        ${Math.floor((timeRemaining % 60000) / 1000)}초` : '완료' }}
+                      {{ formatTimeRemaining(timeRemaining) }}
                     </span>
                   </div>
                 </div>
@@ -284,13 +283,9 @@
             <div class="schedule-header">
               <div class="text-subtitle1 text-weight-bold text-primary schedule-header-title">TLE Data</div>
             </div>
-            <q-editor v-model="tleData.displayText" readonly flat dense class="tle-display q-mt-sm" :toolbar="[]"
-              style="height: 140px; max-height: 140px;" :definitions="{
-                bold: undefined,
-                italic: undefined,
-                strike: undefined,
-                underline: undefined,
-              }" content-class="tle-content" />
+            <div class="tle-display q-mt-sm">
+              <pre class="tle-content">{{ tleData.displayText || 'No TLE data available' }}</pre>
+            </div>
             <!-- ✅ 버튼 그룹을 하나로 통합 - PassSchedulePage.vue와 동일한 구조 -->
             <div class="button-group">
               <div class="button-row">
@@ -679,9 +674,9 @@ const $q = useQuasar()
 // ✅ 알림 시스템 사용
 const { success, error, warning, info } = useNotification()
 
-// ✅ Duration 포맷 함수 추가
+// ✅ Duration 포맷 함수 추가 - 시:분:초 형식
 const formatDuration = (duration: string): string => {
-  if (!duration) return '0분 0초'
+  if (!duration) return '00:00:00'
 
   // ISO 8601 Duration 형식 (PT13M43.6S) 파싱
   const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/)
@@ -689,14 +684,10 @@ const formatDuration = (duration: string): string => {
 
   const hours = parseInt(match[1] || '0')
   const minutes = parseInt(match[2] || '0')
-  const seconds = parseFloat(match[3] || '0')
+  const seconds = Math.round(parseFloat(match[3] || '0'))
 
-  const parts: string[] = []
-  if (hours > 0) parts.push(`${hours}시간`)
-  if (minutes > 0) parts.push(`${minutes}분`)
-  if (seconds > 0) parts.push(`${Math.round(seconds)}초`)
-
-  return parts.length > 0 ? parts.join(' ') : '0분 0초'
+  // ✅ 시:분:초 형식 (24시간 이상도 표시 가능)
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
 // ✅ 스토어 연동 추가
@@ -1962,6 +1953,24 @@ const restoreChartData = () => {
   if (hasTrajectory) {
     console.log('✅ 위성 궤적 복원:', ephemerisStore.detailData.length, '개 포인트')
   }
+}
+
+// ✅ 남은 시간을 시:분:초 형식으로 포맷하는 함수 (24시간 이상도 표시 가능)
+const formatTimeRemaining = (ms: number): string => {
+  if (ms < 0) {
+    return 'Delayed' // 지연됨
+  }
+  if (ms === 0) {
+    return 'Completed' // 완료
+  }
+
+  const totalSeconds = Math.floor(ms / 1000)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  // ✅ 시:분:초 형식 (24시간 이상도 표시 가능)
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
 // ✅ 개선된 시간 계산 함수 수정
@@ -3276,18 +3285,21 @@ q-page-container .ephemeris-mode {
   flex-direction: column !important;
 }
 
-.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .tle-display :deep(.q-editor),
-.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .tle-display :deep(.q-editor__content) {
+/* ✅ pre 태그 스타일 - q-editor 대신 사용 */
+.ephemeris-mode .main-content-row .schedule-control-col .control-section .q-card-section.schedule-control-section .tle-display .tle-content {
   flex: 1 1 auto !important;
   /* ✅ 남은 공간을 차지하도록 flex-grow: 1 설정 */
   height: 100% !important;
-  /* ✅ 부모 높이(210px)에 맞춤 */
+  /* ✅ 부모 높이에 맞춤 */
   min-height: 100% !important;
   /* ✅ 최소 높이 100% */
-  display: flex !important;
-  flex-direction: column !important;
-  font-size: 1rem !important;
+  display: block !important;
+  font-size: 0.9rem !important;
   line-height: 1.4 !important;
+  /* ✅ resize handle 제거 */
+  resize: none !important;
+  /* ✅ 스크롤바 숨기기 */
+  overflow: hidden !important;
 }
 
 /* ✅ button-row 스타일 - PassSchedulePage.vue와 동일 */
@@ -3423,12 +3435,44 @@ q-page-container .ephemeris-mode {
 }
 
 .tle-display {
-  font-family: monospace !important;
   background-color: var(--theme-card-background);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 4px;
-  min-height: 80px;
-  /* ✅ max-height 제거하여 공간을 차지하도록 */
+  height: 140px;
+  max-height: 140px;
+  min-height: 140px;
+  overflow: hidden;
+  position: relative;
+  /* ✅ resize handle 제거 */
+  resize: none !important;
+}
+
+/* ✅ pre 태그 스타일 - 줄바꿈 유지, 스크롤바 없음, 점선 없음 */
+.tle-display .tle-content {
+  font-family: monospace !important;
+  font-size: 0.9rem !important;
+  line-height: 1.4 !important;
+  padding: 8px !important;
+  margin: 0 !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: break-word !important;
+  /* ✅ 스크롤바 완전히 숨기기 */
+  overflow: hidden !important;
+  /* ✅ resize handle 제거 */
+  resize: none !important;
+  /* ✅ 점선 제거 */
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  /* ✅ 배경색 상속 */
+  background-color: transparent !important;
+  /* ✅ 높이 100%로 설정하여 부모 영역 채우기 */
+  height: 100% !important;
+  width: 100% !important;
+  /* ✅ 텍스트 색상 */
+  color: var(--theme-text) !important;
+  /* ✅ 박스 사이징 */
+  box-sizing: border-box !important;
 }
 
 
