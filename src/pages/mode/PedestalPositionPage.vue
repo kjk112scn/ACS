@@ -1,7 +1,9 @@
 <template>
-  <div class="pedestal-position-container">
-    <!-- 축별 제어 패널 (중앙 집중형으로 변경) -->
-    <div class="pedestal-container">
+  <div class="mode-shell pedestal-position-container">
+    <div class="mode-shell__content">
+      <q-card class="mode-card pedestal-card">
+        <!-- 축별 제어 패널 (중앙 집중형으로 변경) -->
+        <div class="pedestal-container">
       <div class="row q-col-gutter-md justify-center">
         <!-- Azimuth 패널 -->
         <div class="col-12 col-md-4">
@@ -85,23 +87,25 @@
         </div>
       </div>
 
-      <!-- 제어 버튼 섹션 -->
-      <div class="button-section">
-        <div class="row justify-center q-gutter-md">
-          <q-btn label="Go" color="positive" icon="play_arrow" size="lg" :disable="!pedestalStore.isAnyAxisSelected()"
-            @click="handleGoCommand" :loading="isGoLoading" />
-          <q-btn label="Stop" color="negative" icon="stop" size="lg" :disable="!pedestalStore.isAnyAxisSelected()"
-            @click="handleStopCommand" :loading="isStopLoading" />
-          <q-btn label="Stow" color="warning" icon="home" size="lg" @click="handleStowCommand"
-            :loading="isStowLoading" />
+        <!-- 제어 버튼 섹션 -->
+        <div class="button-section mode-button-bar">
+          <div class="row justify-center q-gutter-md">
+            <q-btn label="Go" color="positive" icon="play_arrow" size="lg" :disable="!pedestalStore.isAnyAxisSelected()"
+              @click="handleGoCommand" :loading="isGoLoading" />
+            <q-btn label="Stop" color="negative" icon="stop" size="lg" :disable="!pedestalStore.isAnyAxisSelected()"
+              @click="handleStopCommand" :loading="isStopLoading" />
+            <q-btn label="Stow" color="warning" icon="home" size="lg" @click="handleStowCommand"
+              :loading="isStowLoading" />
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- 상태 메시지 -->
-    <q-banner v-if="statusMessage" :class="statusClass" class="q-mt-md">
-      {{ statusMessage }}
-    </q-banner>
+      <!-- 상태 메시지 -->
+      <q-banner v-if="statusMessage" :class="statusClass" class="q-mt-md">
+        {{ statusMessage }}
+      </q-banner>
+      </q-card>
+    </div>
   </div>
 </template>
 
@@ -446,18 +450,8 @@ const handleStowCommand = async () => {
 /* 버튼 섹션 스타일 */
 .button-section {
   margin-top: 1.5rem;
-  /* 버튼 섹션 상단 마진 */
   background: transparent;
-  /* 배경색 제거 */
   border: none;
-}
-
-/* 버튼 크기 통일 */
-.button-section .q-btn {
-  min-width: 150px !important;
-  /* 최소 너비를 150px로 설정 */
-  width: 150px !important;
-  /* 고정 너비 150px */
 }
 
 /* 숫자 입력 필드의 화살표 버튼 숨기기 */

@@ -1,7 +1,7 @@
 <template>
-  <div class="standby-mode">
-    <div class="standby-container">
-      <q-card class="control-section">
+  <div class="mode-shell standby-mode">
+    <div class="mode-shell__content standby-container">
+      <q-card class="mode-card standby-card">
         <q-card-section>
           <!-- 체크박스 그룹 -->
           <div class="checkbox-group q-gutter-x-xl">
@@ -11,7 +11,7 @@
           </div>
 
           <!-- 버튼 그룹 -->
-          <div class="button-group q-mt-lg q-gutter-x-lg">
+          <div class="button-group q-mt-lg q-gutter-x-lg mode-button-bar">
             <q-btn color="primary" label="Standby" @click="handleStandby" size="lg" />
             <q-btn color="secondary" label="All Standby" @click="handleAllStandby" size="lg" />
             <q-btn color="warning" label="Stow" @click="handleStow" size="lg" />
@@ -87,32 +87,16 @@ const handleStow = async () => {
 
 <style scoped>
 .standby-mode {
-  height: 100%;
   width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 1rem 0;
 }
 
 .standby-container {
   width: 100%;
-  max-width: 1100px;
-  padding: 0.5rem 1rem;
-  display: flex;
-  justify-content: center;
+  max-width: 960px;
 }
 
-.control-section {
-  background-color: var(--theme-card-background);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  max-width: 1000px;
-  width: 100%;
-  margin: 0 auto;
+.standby-card {
   padding: 2rem 3rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
 }
 
 .checkbox-group {
@@ -152,16 +136,7 @@ const handleStow = async () => {
   padding-left: 8px;
 }
 
-:deep(.q-btn) {
-  height: 56px;
-  /* 높이를 48px → 56px로 증가 */
-  font-size: 1.3rem;
-  /* 폰트 크기를 1.1rem → 1.3rem으로 증가 */
-  min-width: 200px;
-  /* 최소 너비를 180px → 200px로 증가 */
-  padding: 0.7rem 2.5rem;
-  /* 패딩을 0.5rem 2rem → 0.7rem 2.5rem으로 증가 */
-}
+/* 버튼 스타일은 mode-common.scss의 .mode-button-bar .q-btn로 통일됨 */
 
 /* 섹션 제목 스타일 */
 .section-title {

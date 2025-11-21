@@ -131,59 +131,68 @@
         </q-card>
       </div>
     </div>
-    <!-- Speed 섹션 -->
-    <div class="section-title text-h5 text-primary q-mb-sm q-mt-lg">Speed</div>
 
-    <!-- Speed 입력 박스 -->
-    <q-card class="control-section q-mb-md">
-      <q-card-section>
-        <div class="row q-col-gutter-md">
-          <!-- Azimuth Speed -->
-          <div class="col-4">
-            <div class="text-subtitle2 text-weight-medium text-primary q-mb-xs">Azimuth Speed</div>
-            <q-input v-model="speedInputs.azimuth" dense outlined type="number" step="0.1" class="speed-input" />
-          </div>
+    <!-- 2행: Main Content - EphemerisDesignationPage와 동일한 구조 -->
+    <div class="row q-col-gutter-md main-content-row"
+      style="display: flex; flex-wrap: nowrap; align-items: stretch; margin-bottom: 0 !important; padding-bottom: 0 !important;">
+      <div class="col-12">
+        <q-card class="control-section speed-section-card"
+          style="min-height: 367.19px !important; max-height: 367.19px !important; height: 367.19px !important; display: flex !important; flex-direction: column !important;">
+          <q-card-section class="speed-section-content"
+            style="min-height: 367.19px !important; max-height: 367.19px !important; height: 367.19px !important; flex: 1 !important; display: flex !important; flex-direction: column !important; padding-top: 16px !important; padding-bottom: 0px !important;">
+            <div class="text-subtitle1 text-weight-bold text-primary speed-section-title">Speed Settings</div>
+            <div class="speed-inputs-row"
+              style="min-height: 340px !important; height: 100% !important; flex: 1 !important; padding-top: 0 !important; padding-bottom: 0 !important; margin-bottom: 0 !important;">
+              <div class="speed-content-wrapper">
+                <div class="row q-col-gutter-md">
+                  <!-- Azimuth Speed -->
+                  <div class="col-4">
+                    <div class="text-subtitle2 text-weight-medium text-primary q-mb-xs">Azimuth Speed</div>
+                    <q-input v-model="speedInputs.azimuth" dense outlined type="number" step="0.1"
+                      class="speed-input" />
+                  </div>
 
-          <!-- Elevation Speed -->
-          <div class="col-4">
-            <div class="text-subtitle2 text-weight-medium text-primary q-mb-xs">Elevation Speed</div>
-            <q-input v-model="speedInputs.elevation" dense outlined type="number" step="0.1" class="speed-input" />
-          </div>
+                  <!-- Elevation Speed -->
+                  <div class="col-4">
+                    <div class="text-subtitle2 text-weight-medium text-primary q-mb-xs">Elevation Speed</div>
+                    <q-input v-model="speedInputs.elevation" dense outlined type="number" step="0.1"
+                      class="speed-input" />
+                  </div>
 
-          <!-- Tilt Speed -->
-          <div class="col-4">
-            <div class="text-subtitle2 text-weight-medium text-primary q-mb-xs">Tilt Speed</div>
-            <q-input v-model="speedInputs.train" dense outlined type="number" step="0.1" class="speed-input" />
-          </div>
-        </div>
+                  <!-- Tilt Speed -->
+                  <div class="col-4">
+                    <div class="text-subtitle2 text-weight-medium text-primary q-mb-xs">Tilt Speed</div>
+                    <q-input v-model="speedInputs.train" dense outlined type="number" step="0.1" class="speed-input" />
+                  </div>
+                </div>
 
-        <!-- 설명 텍스트 추가 -->
-        <div class="text-caption q-mt-sm" style="color: var(--theme-text-secondary);">
-          속도 값은 Go 버튼을 클릭할 때 적용됩니다.
-        </div>
-      </q-card-section>
-    </q-card>
+                <!-- 설명 텍스트 추가 -->
+                <div class="speed-description-text text-caption q-mt-sm" style="color: var(--theme-text-secondary);">
+                  속도 값은 Go 버튼을 클릭할 때 적용됩니다.
+                </div>
 
-    <!-- 제어 버튼 섹션 -->
-    <div class="control-buttons-section q-mt-md">
-      <q-card class="control-section">
-        <q-card-section>
-          <div class="row q-col-gutter-md justify-center">
-            <div class="col-auto">
-              <q-btn label="Go" color="positive" icon="play_arrow" size="lg" @click="handleGoCommand"
-                :loading="isGoLoading" />
+                <!-- 제어 버튼 섹션 - Speed 입력 창 바로 아래에 배치 -->
+                <div class="control-buttons-section q-mt-md mode-button-bar">
+                  <div class="row q-col-gutter-md justify-center">
+                    <div class="col-auto">
+                      <q-btn label="Go" color="positive" icon="play_arrow" size="lg" @click="handleGoCommand"
+                        :loading="isGoLoading" />
+                    </div>
+                    <div class="col-auto">
+                      <q-btn label="Stop" color="negative" icon="stop" size="lg" @click="handleStopCommand"
+                        :loading="isStopLoading" />
+                    </div>
+                    <div class="col-auto">
+                      <q-btn label="Stow" color="warning" icon="home" size="lg" @click="handleStowCommand"
+                        :loading="isStowLoading" />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="col-auto">
-              <q-btn label="Stop" color="negative" icon="stop" size="lg" @click="handleStopCommand"
-                :loading="isStopLoading" />
-            </div>
-            <div class="col-auto">
-              <q-btn label="Stow" color="warning" icon="home" size="lg" @click="handleStowCommand"
-                :loading="isStowLoading" />
-            </div>
-          </div>
-        </q-card-section>
-      </q-card>
+          </q-card-section>
+        </q-card>
+      </div>
     </div>
   </div>
 </template>
@@ -538,31 +547,208 @@ input[type='number']::-webkit-outer-spin-button {
 
 input[type='number'] {
   -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* ✅ SunTrackPage 내부 스타일만 적용 - .sun-track-mode로 스코프 제한 */
+.sun-track-mode .q-card__section {
+  padding: 16px;
+}
+
+/* ✅ SunTrackPage 내부의 q-card만 스타일 적용 - EphemerisDesignationPage.vue와 동일하게 Quasar 기본 그림자 사용 */
+.sun-track-mode .q-card {
+  background: var(--theme-card-background);
+  /* ✅ box-shadow 제거 - Quasar 기본 q-card 그림자 사용 (EphemerisDesignationPage.vue와 동일) */
+}
+
+.sun-track-mode .q-btn {
+  flex: 1;
+}
+
+/* ✅ 방법 1: 왼쪽 세로 라벨 (카드 안) - 높이 최적화 - EphemerisDesignationPage와 동일 */
+.position-offset-label {
+  background: linear-gradient(135deg, rgba(25, 118, 210, 0.15) 0%, rgba(25, 118, 210, 0.08) 100%);
+  padding: 4px 8px;
+  /* 높이 줄임: 8px 12px → 4px 8px */
+  border-radius: 6px;
+  border-right: 3px solid var(--q-primary);
+  min-width: 50px;
+  /* 너비도 약간 줄임: 60px → 50px */
+  margin-right: 6px;
+  /* 간격도 줄임: 8px → 6px */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.position-offset-label .text-subtitle2 {
+  font-size: 0.8rem !important;
+  /* 텍스트 크기 줄임 */
+  line-height: 1.2 !important;
+  /* 줄 간격 줄임 */
 }
 </style>
 
 <style scoped>
-/* ✅ 섹션 제목 스타일 */
-.section-title {
-  font-weight: 500;
-  padding-left: 0.5rem;
-  margin-bottom: 0.5rem !important;
+/* ✅ 1단계: sun-track-mode와 부모 요소의 하단 여백 완전 제거 (EphemerisDesignationPage와 동일) */
+/* router-view, q-page-container 내부의 sun-track-mode 하단 여백 제거 */
+router-view .sun-track-mode,
+q-page-container .sun-track-mode,
+q-page .sun-track-mode,
+.sun-track-mode,
+[class*="sun-track-mode"],
+div.sun-track-mode {
+  height: auto !important;
+  /* ✅ height: 100% 제거하여 내용에 맞게 조정 */
+  width: 100%;
+  padding: 0 !important;
+  margin: 0 !important;
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 제거 */
+  padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 제거 */
+  min-height: auto !important;
+  /* ✅ 최소 높이 제거 */
+  max-height: none !important;
+  /* ✅ 최대 높이 제거 */
+  display: flex !important;
+  /* ✅ flexbox로 변경 */
+  flex-direction: column !important;
+  /* ✅ 세로 방향 */
+  gap: 0 !important;
+  /* ✅ flex gap 제거 */
+  row-gap: 0 !important;
+  /* ✅ flex row-gap 제거 */
+  column-gap: 0 !important;
+  /* ✅ flex column-gap 제거 */
 }
 
-/* ✅ 제목과 상태 표시 컨테이너 */
-.section-title-container {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
+/* router-view, q-page-container의 하단 패딩/마진 제거 */
+router-view .sun-track-mode,
+q-page-container .sun-track-mode {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
 }
 
-.tracking-status-chip {
-  font-weight: 500;
-}
-
-/* ✅ 오프셋 컨트롤 행 하단 여백 줄이기 */
+/* ✅ 오프셋 컨트롤 행 하단 여백 줄이기 - EphemerisDesignationPage와 동일한 순서로 배치 */
 .sun-track-mode .offset-control-row {
   margin-bottom: 0.5rem !important;
+  /* ✅ 기본 q-mb-sm (0.5rem) 유지하되 명시적으로 설정 */
+}
+
+/* ✅ ephemeris-mode 내부의 모든 직접 자식 요소 하단 여백 제거 - EphemerisDesignationPage와 동일한 순서 */
+.sun-track-mode>* {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ ephemeris-mode의 마지막 div 요소 하단 여백 완전 제거 (더 강력한 선택자) - EphemerisDesignationPage와 동일 */
+.sun-track-mode>div:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ ephemeris-mode의 마지막 row 요소 하단 여백 완전 제거 - EphemerisDesignationPage와 동일 */
+.sun-track-mode>.row:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ ephemeris-mode의 모든 직접 자식 row 요소 하단 여백 제거 - EphemerisDesignationPage와 동일 */
+.sun-track-mode>.row {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ ephemeris-mode의 모든 직접 자식 div 요소 하단 여백 제거 - EphemerisDesignationPage와 동일 */
+.sun-track-mode>div {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row가 ephemeris-mode의 마지막 자식일 때 하단 여백 완전 제거 - EphemerisDesignationPage와 동일 */
+.sun-track-mode>.main-content-row:last-child,
+.sun-track-mode>.row.main-content-row:last-child,
+.sun-track-mode>div.main-content-row:last-child,
+.sun-track-mode>.main-content-row,
+.sun-track-mode>.row.main-content-row,
+.sun-track-mode>div.main-content-row {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+/* ✅ 메인 콘텐츠 행 하단 여백을 EphemerisDesignationPage.vue와 동일하게 설정 (하단 마진 없음) */
+.sun-track-mode .main-content-row {
+  margin-bottom: 0 !important;
+  /* ✅ EphemerisDesignationPage.vue와 동일하게 하단 마진 없음 */
+  padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 제거 */
+}
+
+/* ✅ Quasar q-col-gutter-md가 행에 추가하는 하단 마진을 EphemerisDesignationPage.vue와 동일하게 설정 (하단 마진 없음) */
+.sun-track-mode .main-content-row.q-col-gutter-md,
+.sun-track-mode .row.q-col-gutter-md.main-content-row {
+  margin-bottom: 0 !important;
+  /* ✅ EphemerisDesignationPage.vue와 동일하게 하단 마진 없음 */
+  padding-bottom: 0 !important;
+}
+
+/* ✅ Quasar row 기본 스타일 오버라이드 (더 강력한 선택자) - EphemerisDesignationPage.vue와 동일하게 설정 (하단 마진 없음) */
+.sun-track-mode .main-content-row.row,
+.sun-track-mode .row.main-content-row {
+  margin-bottom: 0 !important;
+  /* ✅ EphemerisDesignationPage.vue와 동일하게 하단 마진 없음 */
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 모든 컬럼 하단 여백 완전 제거 - EphemerisDesignationPage와 동일 */
+.sun-track-mode .main-content-row>[class*="col-"] {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 마지막 컬럼 하단 여백 완전 제거 (더 구체적인 선택자) - EphemerisDesignationPage와 동일 */
+.sun-track-mode .main-content-row>[class*="col-"]:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 모든 컬럼 내부의 q-card 하단 여백 제거 - EphemerisDesignationPage와 동일 */
+.sun-track-mode .main-content-row>[class*="col-"] .q-card {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 마지막 컬럼 내부의 q-card 하단 여백 제거 (더 구체적인 선택자) - EphemerisDesignationPage와 동일 */
+.sun-track-mode .main-content-row>[class*="col-"]:last-child .q-card {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 모든 컬럼 내부의 q-card-section 하단 여백 제거 - EphemerisDesignationPage와 동일 */
+.sun-track-mode .main-content-row>[class*="col-"] .q-card-section {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 마지막 컬럼 내부의 q-card-section 하단 여백 제거 (더 구체적인 선택자) - EphemerisDesignationPage와 동일 */
+.sun-track-mode .main-content-row>[class*="col-"]:last-child .q-card-section {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 Quasar q-card 하단 마진/패딩 완전 제거 - EphemerisDesignationPage와 동일 */
+.sun-track-mode .main-content-row .q-card {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ main-content-row 내부의 모든 control-section 하단 여백 제거 - EphemerisDesignationPage와 동일 */
+.sun-track-mode .main-content-row .control-section {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 /* ✅ 모든 간격이 동적으로 조정되는 반응형 레이아웃 */
@@ -587,22 +773,15 @@ input[type='number'] {
   align-items: center;
 }
 
-/* ✅ 라벨 스타일 - EphemerisDesignationPage와 동일 */
-.position-offset-label {
-  background: linear-gradient(135deg, rgba(25, 118, 210, 0.15) 0%, rgba(25, 118, 210, 0.08) 100%);
-  padding: 4px 8px;
-  border-radius: 6px;
-  border-right: 3px solid var(--q-primary);
-  min-width: 50px;
-  margin-right: 6px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  position: relative;
-  overflow: hidden;
-}
+/* ✅ 간격 통일 - padding-left 제거하고 gap만으로 간격 관리 */
 
-.position-offset-label .text-subtitle2 {
-  font-size: 0.8rem !important;
-  line-height: 1.2 !important;
+/* 라벨 스타일 - EphemerisDesignationPage와 동일 */
+.position-offset-label {
+  min-width: 80px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: rgba(25, 118, 210, 0.1);
+  border: 1px solid rgba(25, 118, 210, 0.3);
 }
 
 /* ✅ Cal Time 필드 스타일 */
@@ -673,11 +852,152 @@ input[type='number'] {
   background-color: var(--theme-card-background);
   border: 1px solid rgba(255, 255, 255, 0.12);
   width: 100%;
+  height: 100%;
+  max-height: 500px;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0 !important;
 }
 
-.control-card {
-  background-color: var(--theme-card-background);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+/* ✅ Speed Section 카드 높이 강제 고정 - control-section 기본 스타일 오버라이드 */
+.sun-track-mode .control-section.speed-section-card {
+  min-height: 367.19px !important;
+  max-height: 367.19px !important;
+  height: 367.19px !important;
+  /* ✅ 높이를 367.19px로 강제 고정 */
+}
+
+/* ✅ control-section .q-card-section 스타일 - EphemerisDesignationPage와 동일 */
+.control-section .q-card-section {
+  padding: 16px !important;
+  padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 제거 (상단 공간과 동일하게) */
+  /* ✅ 남은 공간을 채우도록 flex 추가 - 내부 구성 변경 없음 */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  /* ✅ 제목 absolute positioning을 위한 기준점 */
+}
+
+/* ✅ Speed Section 카드 섹션 높이 강제 고정 - 더 강력한 선택자로 오버라이드 */
+.sun-track-mode .control-section.speed-section-card .q-card-section.speed-section-content,
+.sun-track-mode .control-section.speed-section-card .q-card__section.speed-section-content,
+.sun-track-mode .q-card.control-section.speed-section-card .q-card-section.speed-section-content,
+.sun-track-mode .q-card.control-section.speed-section-card .q-card__section.speed-section-content,
+.sun-track-mode .control-section.speed-section-card .q-card-section,
+.sun-track-mode .control-section.speed-section-card .q-card__section {
+  min-height: 367.19px !important;
+  max-height: 367.19px !important;
+  height: 367.19px !important;
+  /* ✅ 높이를 367.19px로 강제 고정 */
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* ✅ control-card 스타일 제거 - EphemerisDesignationPage와 동일하게 Quasar 기본 스타일 사용 */
+
+/* ✅ Speed Section 카드 높이 제한 - 367.19px로 고정 */
+.sun-track-mode .control-section.speed-section-card,
+.sun-track-mode .control-section.speed-section-card.q-card {
+  min-height: 367.19px !important;
+  max-height: 367.19px !important;
+  height: 367.19px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* ✅ Speed Section 카드 섹션 높이 조정 - 367.19px로 고정 */
+.sun-track-mode .control-section.speed-section-card .q-card-section.speed-section-content {
+  min-height: 367.19px !important;
+  max-height: 367.19px !important;
+  /* ✅ 최대 높이 제한 */
+  height: 367.19px !important;
+  /* ✅ 고정 높이로 설정하여 카드를 넘지 않도록 */
+  flex: 1 !important;
+  /* ✅ 남은 공간 채우기 */
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* ✅ Speed Section 패딩 오버라이드 - EphemerisDesignationPage의 position-view-section과 동일 */
+.speed-section-content {
+  padding: 16px 16px 0px 16px !important;
+  /* ✅ 상단 패딩을 다른 패널과 동일하게 16px로 맞춤, 하단 패딩 제거 */
+  min-height: 367.19px !important;
+  max-height: 367.19px !important;
+  height: 367.19px !important;
+  /* ✅ 높이를 367.19px로 고정 */
+}
+
+/* ✅ Speed Section 제목 - absolute positioning (EphemerisDesignationPage와 동일) */
+.speed-section-title {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  margin: 0;
+  padding: 0;
+}
+
+/* ✅ Speed 입력 영역 - 높이 제한하여 카드를 넘지 않도록 */
+.speed-inputs-row {
+  min-height: 340px !important;
+  max-height: 340px !important;
+  /* ✅ 최대 높이 제한으로 카드 높이를 넘지 않도록 */
+  height: 340px !important;
+  /* ✅ 고정 높이로 설정하여 카드를 밀어내지 않도록 */
+  flex: 1 !important;
+  /* ✅ 남은 공간 채우기 */
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  /* ✅ 상단 정렬 (chart-area는 center이지만, 컨텐츠가 많으므로 flex-start) */
+  justify-content: center;
+  margin: 0 auto;
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 제거 */
+  padding: 0 !important;
+  /* ✅ chart-area와 동일하게 padding: 0 */
+  padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 제거 */
+  box-sizing: border-box;
+  overflow: hidden !important;
+  /* ✅ overflow: hidden으로 내용이 넘치면 숨김 */
+  text-align: left;
+  position: relative;
+}
+
+/* ✅ Speed 컨텐츠 래퍼 - 제목 아래 공간 확보 */
+.speed-content-wrapper {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding-top: 3rem !important;
+  /* ✅ 제목 아래 공간 확보 (제목 높이 + 여백) */
+  box-sizing: border-box;
+  /* ✅ height: 100% 제거 - 내용에 맞게 자동 조정 */
+}
+
+/* ✅ Speed 설명 텍스트 */
+.speed-description-text {
+  margin-top: 0.5rem;
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+
+/* ✅ 제어 버튼 섹션 - Speed 입력 창 바로 아래에 배치 */
+.sun-track-mode .control-section.speed-section-card .control-buttons-section {
+  margin-top: 1rem !important;
+  /* ✅ 입력 창 바로 아래에 위치 (auto 제거) */
+  padding-top: 0 !important;
+  flex-shrink: 0 !important;
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 /* ✅ 컴팩트 컨트롤 스타일 */
@@ -699,6 +1019,19 @@ input[type='number'] {
   padding: 0.25rem;
 }
 
+/* ✅ 레이아웃 정렬 스타일 - EphemerisDesignationPage와 동일 */
+.sun-track-mode .align-center {
+  align-items: center;
+}
+
+.sun-track-mode .justify-end {
+  justify-content: flex-end;
+}
+
+.sun-track-mode .justify-center {
+  justify-content: center;
+}
+
 /* ✅ 입력 필드 스타일 */
 .sun-track-mode .offset-input {
   width: 110px;
@@ -716,11 +1049,12 @@ input[type='number'] {
   width: 100%;
 }
 
-/* ✅ 카드 테두리 위아래 패딩 완전 제거 */
+/* ✅ 카드 테두리 위아래 패딩 완전 제거 - EphemerisDesignationPage와 동일 */
 .q-card.control-card .q-card-section.compact-control {
   padding: 0px 8px !important;
 }
 
+/* ✅ 추가적인 강제 적용 - EphemerisDesignationPage와 동일 */
 .q-card-section.compact-control {
   padding-top: 0px !important;
   padding-bottom: 0px !important;
@@ -728,7 +1062,26 @@ input[type='number'] {
   padding-right: 8px !important;
 }
 
-/* ✅ 더 강력한 강제 적용 */
+/* ✅ q-gutter-none 전역 스타일 - EphemerisDesignationPage와 동일 */
+.compact-control .row.q-gutter-none {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.compact-control .row.q-gutter-none>div {
+  padding-left: 0.25rem !important;
+  padding-right: 0.25rem !important;
+}
+
+.compact-control .row.q-gutter-none>div:first-child {
+  padding-left: 0 !important;
+}
+
+.compact-control .row.q-gutter-none>div:last-child {
+  padding-right: 0 !important;
+}
+
+/* ✅ 더 강력한 강제 적용 - 모든 가능한 셀렉터 - EphemerisDesignationPage와 동일 */
 .q-card-section.compact-control.purple-1,
 .q-card.control-card .q-card-section.compact-control.purple-1,
 .q-card-section[class*="compact-control"],
@@ -747,36 +1100,8 @@ input[type='number'] {
   align-items: flex-start !important;
 }
 
-/* ✅ 카드 테두리 위아래 패딩 완전 제거 */
-.q-card.control-card .q-card-section.compact-control {
-  padding: 0px 8px !important;
-}
-
-.q-card-section.compact-control {
-  padding-top: 0px !important;
-  padding-bottom: 0px !important;
-  padding-left: 8px !important;
-  padding-right: 8px !important;
-}
-
-/* ✅ 더 강력한 강제 적용 */
-.q-card-section.compact-control.purple-1,
-.q-card.control-card .q-card-section.compact-control.purple-1,
-.q-card-section[class*="compact-control"],
-.q-card-section[class*="purple-1"] {
-  padding-top: 0px !important;
-  padding-bottom: 0px !important;
-  padding-left: 8px !important;
-  padding-right: 8px !important;
-  margin-top: 0px !important;
-  margin-bottom: 0px !important;
-  min-height: auto !important;
-  height: auto !important;
-  line-height: 1 !important;
-  vertical-align: top !important;
-  display: flex !important;
-  align-items: flex-start !important;
-}
+/* ✅ SunTrackPage 전역 스타일 추가 - EphemerisDesignationPage와 동일 */
+/* 전역 스타일은 이미 위에 정의되어 있으므로, .sun-track-mode 스코프 스타일만 추가 */
 
 /* ✅ Quasar 기본 스타일 덮어쓰기 */
 .sun-track-mode .q-card.control-card .q-card-section {
@@ -803,21 +1128,59 @@ input[type='number'] {
   vertical-align: top !important;
 }
 
-/* ✅ SunTrack 전용 보정 */
-.sun-track-mode .flexible-offset-layout {
-  gap: 20px;
-  padding: 0 8px;
+/* ✅ 방법 1: 왼쪽 세로 라벨 (카드 안) - 높이 최적화 - scoped 스타일 안에 전역 선택자 (EphemerisDesignationPage와 동일) */
+.position-offset-label {
+  background: linear-gradient(135deg, rgba(25, 118, 210, 0.15) 0%, rgba(25, 118, 210, 0.08) 100%);
+  padding: 4px 8px;
+  /* 높이 줄임: 8px 12px → 4px 8px */
+  border-radius: 6px;
+  border-right: 3px solid var(--q-primary);
+  min-width: 50px;
+  /* 너비도 약간 줄임: 60px → 50px */
+  margin-right: 6px;
+  /* 간격도 줄임: 8px → 6px */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
 }
 
-.sun-track-mode .q-card.control-card {
-  overflow: visible !important;
+.position-offset-label .text-subtitle2 {
+  font-size: 0.8rem !important;
+  /* 텍스트 크기 줄임 */
+  line-height: 1.2 !important;
+  /* 줄 간격 줄임 */
 }
 
-.sun-track-mode .q-card-section.compact-control {
-  display: block !important;
-  padding-left: 16px !important;
-  padding-right: 16px !important;
-  overflow: visible !important;
+/* ✅ SunTrack 전용 보정 - EphemerisDesignationPage와 동일 */
+.sun-track-mode .position-offset-label {
+  padding: 4px 8px !important;
+  min-width: 50px !important;
+  border-right: 1px solid var(--q-primary) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+}
+
+.sun-track-mode .position-offset-label .text-subtitle2 {
+  font-size: 0.8rem !important;
+  line-height: 1.2 !important;
+}
+
+/* ✅ 간격 제거로 더 타이트하게 - EphemerisDesignationPage와 동일 */
+.sun-track-mode .compact-control .row.q-gutter-none {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.sun-track-mode .compact-control .row.q-gutter-none>div {
+  padding-left: 0.25rem !important;
+  padding-right: 0.25rem !important;
+}
+
+.sun-track-mode .compact-control .row.q-gutter-none>div:first-child {
+  padding-left: 0 !important;
+}
+
+.sun-track-mode .compact-control .row.q-gutter-none>div:last-child {
+  padding-right: 0 !important;
 }
 
 /* ✅ 추가 높이 줄이기 */
@@ -827,6 +1190,10 @@ input[type='number'] {
 
 .sun-track-mode .q-field__control {
   min-height: auto !important;
+}
+
+.sun-track-mode .q-field__native {
+  padding: auto !important;
 }
 
 .sun-track-mode .q-btn {
@@ -870,5 +1237,12 @@ input[type='number'] {
   padding: 0;
   font-size: 0.9rem;
   white-space: nowrap;
+}
+
+.sun-track-mode .compact-control .col-1 {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: fit-content;
 }
 </style>

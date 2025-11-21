@@ -1,6 +1,8 @@
 <template>
-  <div class="feed-mode">
-    <div class="feed-container">
+  <div class="mode-shell feed-mode">
+    <div class="mode-shell__content">
+      <q-card class="mode-card feed-card">
+        <div class="feed-container">
       <div class="row q-col-gutter-md">
         <!-- S-Band 섹션 -->
         <div class="col-12 col-md-6">
@@ -58,17 +60,19 @@
         </div>
       </div>
 
-      <!-- 제어 버튼 -->
-      <div class="row justify-center q-mt-md">
-        <q-btn label="Apply" color="primary" icon="send" :loading="isLoading" @click="applyFeedControls" />
-      </div>
+          <!-- 제어 버튼 -->
+          <div class="row justify-center q-mt-md mode-button-bar">
+            <q-btn label="Apply" color="primary" icon="send" :loading="isLoading" @click="applyFeedControls" />
+          </div>
 
-      <!-- 상태 메시지 표시 -->
-      <div class="status-message q-mt-md" v-if="showStatusMessage">
-        <q-banner :class="statusSuccess ? 'bg-positive text-white' : 'bg-negative text-white'">
-          {{ statusMessage }}
-        </q-banner>
-      </div>
+          <!-- 상태 메시지 표시 -->
+          <div class="status-message q-mt-md" v-if="showStatusMessage">
+            <q-banner :class="statusSuccess ? 'bg-positive text-white' : 'bg-negative text-white'">
+              {{ statusMessage }}
+            </q-banner>
+          </div>
+        </div>
+      </q-card>
     </div>
   </div>
 </template>

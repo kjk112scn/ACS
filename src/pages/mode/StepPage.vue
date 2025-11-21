@@ -1,13 +1,14 @@
 <template>
-  <div class="step-mode">
-    <q-card class="step-wrapper">
-      <!-- 축별 제어 패널 (중앙 집중형으로 변경) -->
-      <div class="step-container">
-      <div class="row q-col-gutter-md justify-center">
-        <!-- Azimuth 패널 -->
-        <div class="col-12 col-md-4">
-          <q-card class="axis-panel" :class="{ 'disabled-panel': !stepStore.selectedAxes.azimuth }">
-            <q-card-section>
+  <div class="mode-shell step-mode">
+    <div class="mode-shell__content">
+      <q-card class="mode-card step-card">
+        <!-- 축별 제어 패널 (중앙 집중형으로 변경) -->
+        <div class="step-container">
+          <div class="row q-col-gutter-md justify-center">
+            <!-- Azimuth 패널 -->
+            <div class="col-12 col-md-4">
+              <q-card class="axis-panel" :class="{ 'disabled-panel': !stepStore.selectedAxes.azimuth }">
+                <q-card-section>
               <div class="axis-header q-mb-md">
                 <div class="checkbox-label-group">
                   <q-checkbox v-model="stepStore.selectedAxes.azimuth" color="primary" class="axis-checkbox" />
@@ -25,15 +26,15 @@
               <q-input v-model="stepStore.speeds.azimuth" type="number" outlined dense suffix="°/s"
                 :disable="!stepStore.selectedAxes.azimuth" min="0" step="0.01" placeholder="0.00"
                 @update:model-value="formatSpeed('azimuth')" @focus="clearValue('speeds', 'azimuth')"
-                @blur="handleBlur('speeds', 'azimuth')" hide-bottom-space />
-            </q-card-section>
-          </q-card>
-        </div>
+                    @blur="handleBlur('speeds', 'azimuth')" hide-bottom-space />
+                </q-card-section>
+              </q-card>
+            </div>
 
-        <!-- Elevation 패널 -->
-        <div class="col-12 col-md-4">
-          <q-card class="axis-panel" :class="{ 'disabled-panel': !stepStore.selectedAxes.elevation }">
-            <q-card-section>
+            <!-- Elevation 패널 -->
+            <div class="col-12 col-md-4">
+              <q-card class="axis-panel" :class="{ 'disabled-panel': !stepStore.selectedAxes.elevation }">
+                <q-card-section>
               <div class="axis-header q-mb-md">
                 <div class="checkbox-label-group">
                   <q-checkbox v-model="stepStore.selectedAxes.elevation" color="primary" class="axis-checkbox" />
@@ -51,15 +52,15 @@
               <q-input v-model="stepStore.speeds.elevation" type="number" outlined dense suffix="°/s"
                 :disable="!stepStore.selectedAxes.elevation" min="0" step="0.01" placeholder="0.00"
                 @update:model-value="formatSpeed('elevation')" @focus="clearValue('speeds', 'elevation')"
-                @blur="handleBlur('speeds', 'elevation')" hide-bottom-space />
-            </q-card-section>
-          </q-card>
-        </div>
+                    @blur="handleBlur('speeds', 'elevation')" hide-bottom-space />
+                </q-card-section>
+              </q-card>
+            </div>
 
-        <!-- Tilt 패널 -->
-        <div class="col-12 col-md-4">
-          <q-card class="axis-panel" :class="{ 'disabled-panel': !stepStore.selectedAxes.train }">
-            <q-card-section>
+            <!-- Tilt 패널 -->
+            <div class="col-12 col-md-4">
+              <q-card class="axis-panel" :class="{ 'disabled-panel': !stepStore.selectedAxes.train }">
+                <q-card-section>
               <div class="axis-header q-mb-md">
                 <div class="checkbox-label-group">
                   <q-checkbox v-model="stepStore.selectedAxes.train" color="primary" class="axis-checkbox" />
@@ -77,23 +78,24 @@
               <q-input v-model="stepStore.speeds.train" type="number" outlined dense suffix="°/s"
                 :disable="!stepStore.selectedAxes.train" min="0" step="0.01" placeholder="0.00"
                 @update:model-value="formatSpeed('train')" @focus="clearValue('speeds', 'train')"
-                @blur="handleBlur('speeds', 'train')" hide-bottom-space />
-            </q-card-section>
-          </q-card>
-        </div>
-      </div>
+                    @blur="handleBlur('speeds', 'train')" hide-bottom-space />
+                </q-card-section>
+              </q-card>
+            </div>
+          </div>
 
-      <!-- 제어 버튼 섹션 -->
-      <div class="button-section">
-        <div class="row justify-center q-gutter-md">
-          <q-btn label="Go" color="positive" icon="play_arrow" size="lg" :disable="!stepStore.isAnyAxisSelected()"
-            @click="handleGo" />
-          <q-btn label="Stop" color="negative" icon="stop" size="lg" @click="handleStop" />
-          <q-btn label="Stow" color="warning" icon="home" size="lg" @click="handleStow" />
+          <!-- 제어 버튼 섹션 -->
+          <div class="button-section mode-button-bar">
+            <div class="row justify-center q-gutter-md">
+              <q-btn label="Go" color="positive" icon="play_arrow" size="lg" :disable="!stepStore.isAnyAxisSelected()"
+                @click="handleGo" />
+              <q-btn label="Stop" color="negative" icon="stop" size="lg" @click="handleStop" />
+              <q-btn label="Stow" color="warning" icon="home" size="lg" @click="handleStow" />
+            </div>
+          </div>
         </div>
-      </div>
-      </div>
-    </q-card>
+      </q-card>
+    </div>
   </div>
 </template>
 
@@ -264,19 +266,10 @@ const handleBlur = (type: 'speeds' | 'angles', axis: 'azimuth' | 'elevation' | '
 <style scoped>
 /* StandbyMode와 동일한 중앙 집중형 스타일 */
 .step-mode {
-  height: 100%;
   width: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
 }
 
-.step-wrapper {
-  background-color: var(--theme-card-background);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  max-width: 1200px;
-  width: 100%;
+.step-card {
   padding: 1.5rem 2rem 1.75rem 2rem;
 }
 
@@ -397,21 +390,9 @@ input[type='number'] {
 /* 제어 버튼 섹션 스타일 - 배경색과 테두리 제거 */
 .button-section {
   background: transparent;
-  /* 배경색 제거 */
   border: none;
-  /* 테두리 제거 */
   padding: 2rem 0 0.25rem 0;
-  /* 상단 패딩을 더 늘려서 버튼을 더 아래로 */
   margin-top: 1.5rem;
-  /* 상단 마진을 더 늘려서 버튼을 더 아래로 */
-}
-
-/* 버튼 넓이 통일 */
-.button-section .q-btn {
-  min-width: 150px !important;
-  /* 최소 너비를 120px → 150px로 늘림 */
-  width: 150px !important;
-  /* 고정 너비를 120px → 150px로 늘림 */
 }
 
 /* 모바일 화면에서는 카드 간격 조정 */

@@ -1,7 +1,9 @@
 <template>
-  <div class="slew-mode">
-    <!-- 축별 제어 패널 (Step 모드와 동일한 구조) -->
-    <div class="slew-container">
+  <div class="mode-shell slew-mode">
+    <div class="mode-shell__content">
+      <q-card class="mode-card slew-card">
+        <!-- 축별 제어 패널 (Step 모드와 동일한 구조) -->
+        <div class="slew-container">
       <div class="row q-col-gutter-md justify-center">
         <!-- Azimuth 패널 -->
         <div class="col-12 col-md-4">
@@ -64,15 +66,17 @@
         </div>
       </div>
 
-      <!-- 제어 버튼 섹션 (Step 모드와 동일) -->
-      <div class="button-section">
-        <div class="row justify-center q-gutter-md">
-          <q-btn label="Go" color="positive" icon="play_arrow" size="lg" :disable="!slewStore.isAnyAxisSelected()"
-            @click="handleGo" />
-          <q-btn label="Stop" color="negative" icon="stop" size="lg" @click="handleStop" />
-          <q-btn label="Stow" color="warning" icon="home" size="lg" @click="handleStow" />
+        <!-- 제어 버튼 섹션 (Step 모드와 동일) -->
+        <div class="button-section mode-button-bar">
+          <div class="row justify-center q-gutter-md">
+            <q-btn label="Go" color="positive" icon="play_arrow" size="lg" :disable="!slewStore.isAnyAxisSelected()"
+              @click="handleGo" />
+            <q-btn label="Stop" color="negative" icon="stop" size="lg" @click="handleStop" />
+            <q-btn label="Stow" color="warning" icon="home" size="lg" @click="handleStow" />
+          </div>
         </div>
       </div>
+      </q-card>
     </div>
   </div>
 </template>
@@ -321,21 +325,9 @@ input[type='number'] {
 /* 제어 버튼 섹션 스타일 - 배경색과 테두리 제거 */
 .button-section {
   background: transparent;
-  /* 배경색 제거 */
   border: none;
-  /* 테두리 제거 */
   padding: 2rem 0 0.25rem 0;
-  /* 상단 패딩을 더 늘려서 버튼을 더 아래로 */
   margin-top: 1.5rem;
-  /* 상단 마진을 더 늘려서 버튼을 더 아래로 */
-}
-
-/* 버튼 넓이 통일 */
-.button-section .q-btn {
-  min-width: 150px !important;
-  /* 최소 너비를 120px → 150px로 늘림 */
-  width: 150px !important;
-  /* 고정 너비를 120px → 150px로 늘림 */
 }
 
 /* 모바일 화면에서는 카드 간격 조정 */
