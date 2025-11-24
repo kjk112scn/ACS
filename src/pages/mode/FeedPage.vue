@@ -66,64 +66,64 @@
 
                 <!-- S-Band Tx Path -->
                 <div class="feed-path-section rf-switch-section">
-                  <div class="rf-switch-wrapper">
-                    <!-- 왼쪽: 입력 라벨 (Rx 경로와 동일한 구조) -->
-                    <div class="path-label-group rf-switch-labels">
-                      <div class="path-label">RHCP(Tx)</div>
-                      <div class="path-label">LHCP(Tx)</div>
-                    </div>
-                    <!-- 오른쪽: 스위치와 출력 -->
-                    <div class="path-content rf-switch-content">
-                      <!-- 왼쪽 입력 화살표들 -->
-                      <div class="rf-switch-inputs-container">
-                        <div class="arrow-container arrow-left rf-switch-arrow">
-                          <div class="arrow-line"></div>
-                        </div>
-                        <div class="arrow-container arrow-left rf-switch-arrow">
-                          <div class="arrow-line"></div>
-                        </div>
+                  <div class="feed-path rf-switch-path">
+                    <div class="rf-switch-wrapper">
+                      <!-- 왼쪽: 입력 라벨 (Rx 경로와 동일한 구조) -->
+                      <div class="path-label-group rf-switch-labels">
+                        <div class="path-label">RHCP(Tx)</div>
+                        <div class="path-label">LHCP(Tx)</div>
                       </div>
-                      <!-- 중앙: 하나의 스위치 -->
-                      <div class="rf-switch-container">
-                        <div class="rf-switch-icon" :class="getRFSwitchStatusClass()" @click="toggleRFSwitch()">
-                          <svg viewBox="0 0 24 24" width="60" height="60">
-                            <rect x="2" y="2" width="20" height="20" rx="2" :fill="getRFSwitchFillColor()"
-                              :stroke="getRFSwitchStrokeColor()" stroke-width="2" />
-                            <!-- RHCP: 위-왼쪽 원 → 중간-오른쪽 원 연결, 아래-왼쪽 원은 연결 안됨 -->
-                            <template v-if="icdStore.feedSBoardStatusInfo.rfSwitchStatus.isRHCP">
-                              <!-- 위 왼쪽 원(6,6)의 아래쪽(6, 7.5)에서 우측 가운데 원(18,12)의 왼쪽 중앙(16.5, 12)으로 연결 -->
-                              <line x1="6" y1="7.5" x2="16.5" y2="12" :stroke="getRFSwitchLineColor()"
-                                stroke-width="1" />
-                              <circle cx="6" cy="6" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
-                                stroke-width="1" />
-                              <circle cx="18" cy="12" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
-                                stroke-width="1" />
-                              <circle cx="6" cy="18" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
-                                stroke-width="1" />
-                            </template>
-                            <!-- LHCP: 아래-왼쪽 원 → 중간-오른쪽 원 연결, 위-왼쪽 원은 연결 안됨 -->
-                            <template v-else>
-                              <!-- 아래 왼쪽 원(6,18)의 위쪽(6, 16.5)에서 우측 가운데 원(18,12)의 왼쪽 중앙(16.5, 12)으로 연결 -->
-                              <line x1="6" y1="16.5" x2="16.5" y2="12" :stroke="getRFSwitchLineColor()"
-                                stroke-width="1" />
-                              <circle cx="6" cy="18" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
-                                stroke-width="1" />
-                              <circle cx="18" cy="12" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
-                                stroke-width="1" />
-                              <circle cx="6" cy="6" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
-                                stroke-width="1" />
-                            </template>
-                          </svg>
+                      <!-- 오른쪽: 스위치와 출력 -->
+                      <div class="path-content rf-switch-content">
+                        <!-- 왼쪽 입력 화살표들 -->
+                        <div class="rf-switch-inputs-container">
+                          <div class="arrow-container arrow-left rf-switch-arrow">
+                            <div class="arrow-line"></div>
+                          </div>
+                          <div class="arrow-container arrow-left rf-switch-arrow">
+                            <div class="arrow-line"></div>
+                          </div>
                         </div>
-                      </div>
-                      <!-- 오른쪽: 출력 -->
-                      <div class="rf-switch-output-group">
-                        <div class="arrow-container arrow-left rf-switch-arrow">
-                          <div class="arrow-line"></div>
+                        <!-- 중앙: 하나의 스위치 -->
+                        <div class="rf-switch-container">
+                          <div class="rf-switch-icon" :class="getRFSwitchStatusClass()" @click="toggleRFSwitch()">
+                            <svg viewBox="0 0 24 24" width="60" height="60">
+                              <rect x="2" y="2" width="20" height="20" rx="2" :fill="getRFSwitchFillColor()"
+                                :stroke="getRFSwitchStrokeColor()" stroke-width="2" />
+                              <!-- RHCP 경로 -->
+                              <template v-if="icdStore.feedSBoardStatusInfo.rfSwitchStatus.isRHCP">
+                                <line x1="6" y1="7.5" x2="16.5" y2="12" :stroke="getRFSwitchLineColor()"
+                                  stroke-width="1" />
+                                <circle cx="6" cy="6" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
+                                  stroke-width="1" />
+                                <circle cx="18" cy="12" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
+                                  stroke-width="1" />
+                                <circle cx="6" cy="18" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
+                                  stroke-width="1" />
+                              </template>
+                              <!-- LHCP 경로 -->
+                              <template v-else>
+                                <line x1="6" y1="16.5" x2="16.5" y2="12" :stroke="getRFSwitchLineColor()"
+                                  stroke-width="1" />
+                                <circle cx="6" cy="18" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
+                                  stroke-width="1" />
+                                <circle cx="18" cy="12" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
+                                  stroke-width="1" />
+                                <circle cx="6" cy="6" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
+                                  stroke-width="1" />
+                              </template>
+                            </svg>
+                          </div>
                         </div>
-                        <div class="path-output-multiline">
-                          <div>Tx (Selective)</div>
-                          <div>RHCP or LHCP</div>
+                        <!-- 오른쪽: 출력 -->
+                        <div class="rf-switch-output-group">
+                          <div class="arrow-container arrow-left rf-switch-arrow">
+                            <div class="arrow-line"></div>
+                          </div>
+                          <div class="path-output-multiline">
+                            <div>Tx (Selective)</div>
+                            <div>RHCP or LHCP</div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -617,43 +617,199 @@ const toggleFan = async () => {
 </script>
 
 <style scoped>
-.feed-mode {
-  height: 100%;
+/* ✅ router-view, q-page-container 내부의 feed-mode 하단 여백 제거 - 다른 페이지들과 동일 */
+router-view .feed-mode,
+q-page-container .feed-mode,
+q-page .feed-mode,
+.mode-shell.feed-mode,
+.feed-mode,
+[class*="feed-mode"],
+div.feed-mode {
+  height: auto !important;
+  /* ✅ height: 100% 제거하여 내용에 맞게 조정 */
+  width: 100%;
+  padding: 0 !important;
+  margin: 0 !important;
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 제거 */
+  padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 제거 */
+  min-height: auto !important;
+  /* ✅ 최소 높이 제거 */
+  max-height: none !important;
+  /* ✅ 최대 높이 제거 */
+  display: flex !important;
+  /* ✅ flexbox로 변경 */
+  flex-direction: column !important;
+  /* ✅ 세로 방향 */
+  gap: 0 !important;
+  /* ✅ flex gap 제거 */
+  row-gap: 0 !important;
+  /* ✅ flex row-gap 제거 */
+  column-gap: 0 !important;
+  /* ✅ flex column-gap 제거 */
+}
+
+/* router-view, q-page-container의 하단 패딩/마진 제거 */
+router-view .feed-mode,
+q-page-container .feed-mode {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✅ .mode-shell의 하단 패딩 제거 - 공통 CSS 오버라이드 */
+.mode-shell.feed-mode {
+  padding: var(--theme-spacing-lg, 1.5rem) var(--theme-spacing-md, 1rem) 0 var(--theme-spacing-md, 1rem) !important;
+  margin-bottom: 0 !important;
+  min-height: auto !important;
+  /* ✅ 공통 CSS의 min-height: 100% 오버라이드 */
+}
+
+/* ✅ mode-shell__content 하단 여백 제거 - SunTrackPage와 동일 */
+.feed-mode .mode-shell__content {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+  gap: 0 !important;
 }
 
 .feed-container {
-  padding: 0.5rem 1rem 0.5rem 1rem;
+  padding: 0.5rem 1rem 0 1rem;
   max-width: 1400px;
   margin: 0 auto;
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+  /* ✅ 고정 높이 제거 - 내용에 맞게 자동 조정 */
+}
+
+/* ✅ row stretch - S-Band, X-Band, Legend 섹션이 동일한 높이를 가지도록 */
+.feed-container .row {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: stretch !important;
+  /* ✅ flex container로 명시적으로 설정하고 stretch로 동일한 높이 유지 */
+}
+
+/* ✅ col 높이를 100%로 설정하여 모든 섹션이 동일한 높이를 가지도록 */
+.feed-container .row>[class*="col-"] {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  /* ✅ col의 높이는 row의 stretch로 자동 결정됨 */
+}
+
+/* ✅ q-col-gutter-md가 추가하는 padding을 고려하여 높이 조정 */
+.feed-container .row.q-col-gutter-md>[class*="col-"] {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  /* ✅ gutter padding이 있어도 높이는 stretch로 자동 결정됨 */
+}
+
+/* ✅ col 내부의 q-card도 높이를 100%로 설정 - X-Band 높이 기준 */
+.feed-container .row>[class*="col-"] .q-card,
+.feed-container .row>[class*="col-"] .q-card.control-section {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  align-self: stretch !important;
+  /* ✅ X-Band 높이에 맞춰 S-Band와 Legend도 동일한 높이 유지 */
+  /* ✅ flex: 1 1 auto로 남은 공간을 채우고, min-height: 0으로 축소 가능하도록 설정 */
+}
+
+/* ✅ q-card-section도 높이를 100%로 설정 */
+.feed-container .row>[class*="col-"] .q-card .q-card-section,
+.feed-container .row>[class*="col-"] .q-card .q-card__section {
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  /* ✅ min-height: 0으로 설정하여 flex item이 축소 가능하도록 함 */
+  /* ✅ flex: 1 1 auto로 남은 공간을 채우도록 설정 */
+}
+
+/* ✅ 마지막 row 하단 여백 제거 */
+.feed-container .row:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 .control-section {
-  height: 100%;
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  /* ✅ flex: 1 1 auto로 남은 공간을 채우고, min-height: 0으로 축소 가능하도록 설정 */
   background-color: var(--theme-card-background);
   border: 1px solid var(--theme-border);
+  /* ✅ col의 높이에 맞춰 늘어나도록 flex 설정 */
 }
 
 /* q-card-section의 패딩 조정 */
 .control-section :deep(.q-card-section) {
   padding-top: 0.75rem;
-  padding-bottom: 0.375rem;
+  padding-bottom: 0.405rem;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  /* ✅ 모든 q-card-section이 동일한 높이를 가지도록 flex 설정 */
+  /* ✅ 높이 조정: padding-bottom을 0.375rem → 0.405rem으로 증가 (498.66px → 499.47px) */
+}
+
+/* S-Band와 X-Band의 행을 수평으로 정렬하기 위한 스타일 */
+.feed-container .row>[class*="col-"] .control-section :deep(.q-card-section) {
+  padding-top: 0.75rem;
+  /* ✅ S-Band와 X-Band 모두 동일한 상단 패딩으로 수평 정렬 */
+}
+
+.feed-container .row>[class*="col-"] .feed-path-section {
+  margin-bottom: 0.5rem;
+  /* ✅ 섹션 간 간격 (1·2행 섹션과 3행 섹션 사이) */
+}
+
+.feed-container .row>[class*="col-"] .feed-path {
+  margin-bottom: 0.5rem;
+  padding: 2.2rem 1rem 0.375rem 1rem;
+  /* ✅ 모든 행 간격은 .feed-path의 margin-bottom으로만 제어 */
+}
+
+/* 각 feed-path-section 내 마지막 feed-path는 margin 제거 */
+.feed-container .row>[class*="col-"] .feed-path-section .feed-path:last-child {
+  margin-bottom: 0 !important;
+  /* ✅ !important로 우선순위 강제 - 각 섹션 마지막 행은 여백 없음 */
 }
 
 /* Legend 섹션의 상단 패딩 조정 - X-Band RHCP 테두리 상단에 맞추기 */
+.control-section:has(.legend-grid) {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  /* ✅ Legend 섹션이 S-Band와 동일한 높이를 유지하도록 flex 설정 */
+}
+
 .control-section:has(.legend-grid) :deep(.q-card-section) {
   padding-top: 0.75rem;
   padding-bottom: 0.375rem;
   padding-left: 0.75rem;
   padding-right: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  /* ✅ Legend 컨텐츠를 수직 가운데 정렬 */
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  /* ✅ Legend 섹션이 S-Band와 동일한 높이를 유지하도록 flex 설정 */
+  /* ✅ 높이를 명시적으로 100%로 설정 */
 }
 
 .feed-path-section {
-  margin-bottom: 0.25rem;
+  margin-bottom: 0;
+  /* ✅ 행 간격은 .feed-path의 margin-bottom으로만 제어 */
 }
 
 /* 마지막 feed-path-section의 하단 여백 제거 */
-.feed-path-section:last-of-type {
-  margin-bottom: 0;
+.feed-container .row>[class*="col-"] .feed-path-section:last-of-type {
+  margin-bottom: 0 !important;
+  /* ✅ !important로 우선순위 강제 - 마지막 섹션은 여백 없음 */
 }
 
 /* S-Band 스위치 섹션과 X-Band FAN 섹션을 같은 선상에 배치 */
@@ -662,9 +818,10 @@ const toggleFan = async () => {
   margin-bottom: 0;
 }
 
-/* rf-switch-section이 feed-path-section 클래스도 가지고 있어서 margin-bottom이 적용되는 것을 방지 */
+/* rf-switch-section이 feed-path-section 클래스도 가지고 있어서 margin-bottom이 적용되도록 수정 */
 .rf-switch-section.feed-path-section {
   margin-bottom: 0;
+  /* ✅ 행 간격은 .feed-path의 margin-bottom으로만 제어 */
 }
 
 .fan-section {
@@ -672,12 +829,26 @@ const toggleFan = async () => {
   margin-bottom: 0;
 }
 
+@media (max-width: 1200px) {
+  .rf-switch-wrapper {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .rf-switch-wrapper>* {
+    justify-content: center;
+  }
+}
+
 .feed-path {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.5rem;
+  /* ✅ RHCP와 LHCP 사이 간격을 LHCP와 스위치 사이 간격(0.5rem)과 동일하게 설정 */
   /* LNA 라벨이 위로 25px(약 1.5rem) 나가 있으므로, LNA 위의 공간과 하단 공간을 동일하게 맞춤 */
   /* 하단 패딩을 더 줄여서 아래 공간을 최소화 */
   padding: 2.2rem 1rem 0.375rem 1rem;
@@ -689,6 +860,22 @@ const toggleFan = async () => {
   overflow: visible;
   /* 테두리 안의 전체 내용을 가운데 정렬 */
   width: 100%;
+}
+
+.rf-switch-path {
+  padding: 0.6rem 1rem 0.375rem 1rem !important;
+  /* ✅ LNA 라벨이 없으므로 상단 패딩을 줄임 (2.2rem → 0.6rem) */
+  justify-content: center;
+  align-items: center;
+  /* ✅ 스위치 행을 상하좌우 가운데 정렬 */
+  min-height: calc(60px + 2.2rem);
+  /* ✅ 1행과 동일한 최소 높이 확보 */
+}
+
+/* feed-path-section 내부의 마지막 feed-path는 margin-bottom 제거 (feed-path-section의 margin-bottom이 적용됨) */
+.feed-path-section .feed-path:last-child {
+  margin-bottom: 0;
+  /* ✅ feed-path-section의 margin-bottom과 중복되지 않도록 제거 */
 }
 
 .path-label {
@@ -860,14 +1047,23 @@ const toggleFan = async () => {
 .rf-switch-wrapper {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 1rem;
-  border-radius: 6px;
-  background-color: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  /* 내부 콘텐츠 높이(60px) + 위아래 패딩(1rem * 2 = 32px) = 92px */
+  gap: 1rem;
+  padding: 0;
+  border-radius: 0;
+  background-color: transparent;
+  border: none;
   min-height: 60px;
-  /* LNA 부분(.feed-path)과 동일한 테두리 스타일, 위아래 패딩 증가 */
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 0;
+  width: auto;
+  /* ✅ 폭 제한 제거하여 컨텐츠 크기만큼만 사용하고 가운데 정렬 */
+  max-width: 100%;
+  text-align: center;
+}
+
+.rf-switch-wrapper>* {
+  flex-shrink: 0;
 }
 
 .rf-switch-labels {
@@ -1106,18 +1302,17 @@ const toggleFan = async () => {
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
-  /* FAN 라벨 제거 후 여백 조정 */
+  padding: 0.6rem 1rem 0.375rem 1rem;
+  /* ✅ S-Band 3행(.rf-switch-path)과 동일한 패딩 적용 */
   margin-top: 0;
-  margin-bottom: 0;
-  /* 스위치 테두리(.rf-switch-wrapper)와 동일한 높이 및 정렬 */
-  min-height: 60px;
-  /* 스위치 테두리 기준으로 가운데 수평 정렬 */
-  /* 스위치 컨테이너와 동일한 정렬을 위해 align-items: center 사용 */
-  /* 스위치 테두리(.rf-switch-wrapper)와 동일한 테두리 스타일 */
+  margin-bottom: 0.5rem;
+  /* ✅ 1·2행과 동일한 간격 */
+  min-height: calc(60px + 2.2rem);
+  /* ✅ 1행과 동일한 최소 높이 확보 */
   border-radius: 6px;
   background-color: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  /* ✅ S-Band 3행과 동일한 테두리 스타일 */
 }
 
 .fan-button-container {
@@ -1171,6 +1366,8 @@ const toggleFan = async () => {
 /* 상태 메시지 스타일 */
 .status-message {
   transition: opacity 0.3s;
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 /* 반응형: 작은 화면에서 요소들이 함께 비례적으로 줄어들도록 */
