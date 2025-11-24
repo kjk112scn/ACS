@@ -91,7 +91,9 @@
                               :stroke="getRFSwitchStrokeColor()" stroke-width="2" />
                             <!-- RHCP: 위-왼쪽 원 → 중간-오른쪽 원 연결, 아래-왼쪽 원은 연결 안됨 -->
                             <template v-if="icdStore.feedSBoardStatusInfo.rfSwitchStatus.isRHCP">
-                              <line x1="6" y1="6" x2="18" y2="12" :stroke="getRFSwitchLineColor()" stroke-width="1.5" />
+                              <!-- 위 왼쪽 원(6,6)의 아래쪽(6, 7.5)에서 우측 가운데 원(18,12)의 왼쪽 중앙(16.5, 12)으로 연결 -->
+                              <line x1="6" y1="7.5" x2="16.5" y2="12" :stroke="getRFSwitchLineColor()"
+                                stroke-width="1" />
                               <circle cx="6" cy="6" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
                                 stroke-width="1" />
                               <circle cx="18" cy="12" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
@@ -101,8 +103,9 @@
                             </template>
                             <!-- LHCP: 아래-왼쪽 원 → 중간-오른쪽 원 연결, 위-왼쪽 원은 연결 안됨 -->
                             <template v-else>
-                              <line x1="6" y1="18" x2="18" y2="12" :stroke="getRFSwitchLineColor()"
-                                stroke-width="1.5" />
+                              <!-- 아래 왼쪽 원(6,18)의 위쪽(6, 16.5)에서 우측 가운데 원(18,12)의 왼쪽 중앙(16.5, 12)으로 연결 -->
+                              <line x1="6" y1="16.5" x2="16.5" y2="12" :stroke="getRFSwitchLineColor()"
+                                stroke-width="1" />
                               <circle cx="6" cy="18" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
                                 stroke-width="1" />
                               <circle cx="18" cy="12" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
@@ -194,26 +197,18 @@
                 <!-- FAN 섹션 (X-Band 안에 포함) -->
                 <div class="fan-section">
                   <div class="fan-button-container">
-                    <q-btn
-                      :class="getFanStatusClass()"
-                      class="fan-button"
-                      :color="getFanButtonColor()"
+                    <q-btn :class="getFanStatusClass()" class="fan-button" :color="getFanButtonColor()"
                       :outline="!icdStore.feedXBoardStatusInfo.fanStatus.isActive && !icdStore.feedXBoardStatusInfo.fanStatus.hasError"
-                      :flat="false"
-                      @click="toggleFan()"
-                    >
+                      :flat="false" @click="toggleFan()">
                       <svg class="fan-icon q-mr-sm" viewBox="0 0 24 24" width="20" height="20">
                         <!-- 팬 외곽 원 -->
                         <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5" />
                         <!-- 팬 블레이드 1 - 3개 블레이드로 선풍기 느낌 -->
-                        <path d="M12 12 L12 2 A10 10 0 0 1 19 7 L12 12 Z"
-                          fill="currentColor" opacity="0.6" />
+                        <path d="M12 12 L12 2 A10 10 0 0 1 19 7 L12 12 Z" fill="currentColor" opacity="0.6" />
                         <!-- 팬 블레이드 2 -->
-                        <path d="M12 12 L20 19 A10 10 0 0 1 12 22 L12 12 Z"
-                          fill="currentColor" opacity="0.6" />
+                        <path d="M12 12 L20 19 A10 10 0 0 1 12 22 L12 12 Z" fill="currentColor" opacity="0.6" />
                         <!-- 팬 블레이드 3 -->
-                        <path d="M12 12 L5 19 A10 10 0 0 1 4 7 L12 12 Z"
-                          fill="currentColor" opacity="0.6" />
+                        <path d="M12 12 L5 19 A10 10 0 0 1 4 7 L12 12 Z" fill="currentColor" opacity="0.6" />
                         <!-- 중앙 원 -->
                         <circle cx="12" cy="12" r="2.5" fill="currentColor" />
                       </svg>
@@ -241,49 +236,50 @@
                   </div>
                   <div class="legend-item">
                     <svg viewBox="0 0 24 24" width="24" height="24" class="legend-icon">
-                      <polygon points="22,12 2,2 2,22" fill="none" stroke="white" stroke-width="2" />
+                      <polygon points="22,12 2,2 2,22" fill="none" stroke="var(--theme-text-secondary)"
+                        stroke-width="2" />
                     </svg>
                     <span class="legend-text">LNA Power Off</span>
                   </div>
                   <div class="legend-item">
                     <svg viewBox="0 0 24 24" width="24" height="24" class="legend-icon">
-                      <polygon points="22,12 2,2 2,22" fill="#ff9800" stroke="#ff9800" stroke-width="1" />
+                      <polygon points="22,12 2,2 2,22" fill="#f44336" stroke="#f44336" stroke-width="1" />
                     </svg>
                     <span class="legend-text">LNA Error</span>
                   </div>
                   <div class="legend-item">
                     <svg viewBox="0 0 24 24" width="24" height="24" class="legend-icon">
                       <rect x="2" y="2" width="20" height="20" rx="2" fill="#4caf50" stroke="#4caf50"
-                        stroke-width="1" />
-                      <!-- RHCP: 위-왼쪽 → 아래-오른쪽, 아래-왼쪽에 원 하나 -->
-                      <line x1="6" y1="6" x2="18" y2="18" stroke="white" stroke-width="2" />
-                      <circle cx="6" cy="6" r="2.5" fill="none" stroke="white" stroke-width="1.5" />
-                      <circle cx="18" cy="18" r="2.5" fill="none" stroke="white" stroke-width="1.5" />
-                      <circle cx="6" cy="18" r="2.5" fill="none" stroke="white" stroke-width="1.5" />
+                        stroke-width="2" />
+                      <!-- RHCP: 위 왼쪽 원(6,6)의 아래쪽(6, 7.5)에서 우측 가운데 원(18,12)의 왼쪽 중앙(16.5, 12)으로 연결 -->
+                      <line x1="6" y1="7.5" x2="16.5" y2="12" stroke="white" stroke-width="1" />
+                      <circle cx="6" cy="6" r="1.5" fill="none" stroke="white" stroke-width="1" />
+                      <circle cx="18" cy="12" r="1.5" fill="none" stroke="white" stroke-width="1" />
+                      <circle cx="6" cy="18" r="1.5" fill="none" stroke="white" stroke-width="1" />
                     </svg>
                     <span class="legend-text">RHCP Select</span>
                   </div>
                   <div class="legend-item">
                     <svg viewBox="0 0 24 24" width="24" height="24" class="legend-icon">
                       <rect x="2" y="2" width="20" height="20" rx="2" fill="#2196f3" stroke="#2196f3"
-                        stroke-width="1" />
-                      <!-- LHCP: 아래-왼쪽 → 위-오른쪽, 위-왼쪽에 원 하나 -->
-                      <line x1="6" y1="18" x2="18" y2="6" stroke="white" stroke-width="2" />
-                      <circle cx="6" cy="18" r="2.5" fill="none" stroke="white" stroke-width="1.5" />
-                      <circle cx="18" cy="6" r="2.5" fill="none" stroke="white" stroke-width="1.5" />
-                      <circle cx="6" cy="6" r="2.5" fill="none" stroke="white" stroke-width="1.5" />
+                        stroke-width="2" />
+                      <!-- LHCP: 아래 왼쪽 원(6,18)의 위쪽(6, 16.5)에서 우측 가운데 원(18,12)의 왼쪽 중앙(16.5, 12)으로 연결 -->
+                      <line x1="6" y1="16.5" x2="16.5" y2="12" stroke="white" stroke-width="1" />
+                      <circle cx="6" cy="18" r="1.5" fill="none" stroke="white" stroke-width="1" />
+                      <circle cx="18" cy="12" r="1.5" fill="none" stroke="white" stroke-width="1" />
+                      <circle cx="6" cy="6" r="1.5" fill="none" stroke="white" stroke-width="1" />
                     </svg>
                     <span class="legend-text">LHCP Select</span>
                   </div>
                   <div class="legend-item">
                     <svg viewBox="0 0 24 24" width="24" height="24" class="legend-icon">
-                      <rect x="2" y="2" width="20" height="20" rx="2" fill="#ff9800" stroke="#ff9800"
-                        stroke-width="1" />
+                      <rect x="2" y="2" width="20" height="20" rx="2" fill="#f44336" stroke="#f44336"
+                        stroke-width="2" />
                       <!-- Error: RHCP와 동일한 형태 -->
-                      <line x1="6" y1="6" x2="18" y2="18" stroke="white" stroke-width="2" />
-                      <circle cx="6" cy="6" r="2.5" fill="none" stroke="white" stroke-width="1.5" />
-                      <circle cx="18" cy="18" r="2.5" fill="none" stroke="white" stroke-width="1.5" />
-                      <circle cx="6" cy="18" r="2.5" fill="none" stroke="white" stroke-width="1.5" />
+                      <line x1="6" y1="7.5" x2="16.5" y2="12" stroke="white" stroke-width="1" />
+                      <circle cx="6" cy="6" r="1.5" fill="none" stroke="white" stroke-width="1" />
+                      <circle cx="18" cy="12" r="1.5" fill="none" stroke="white" stroke-width="1" />
+                      <circle cx="6" cy="18" r="1.5" fill="none" stroke="white" stroke-width="1" />
                     </svg>
                     <span class="legend-text">RF Switch Error</span>
                   </div>
@@ -302,7 +298,7 @@
                   </div>
                   <div class="legend-item">
                     <svg viewBox="0 0 24 24" width="24" height="24" class="legend-icon">
-                      <rect x="2" y="2" width="20" height="20" rx="2" fill="#ff9800" stroke="#ff9800"
+                      <rect x="2" y="2" width="20" height="20" rx="2" fill="#f44336" stroke="#f44336"
                         stroke-width="1" />
                     </svg>
                     <span class="legend-text">FAN Error</span>
@@ -382,7 +378,7 @@ const getLNAFillColor = (band: 's' | 'x', type: 'lhcp' | 'rhcp'): string => {
   const statusInfo = band === 's' ? icdStore.feedSBoardStatusInfo : icdStore.feedXBoardStatusInfo
   const lnaStatus = type === 'lhcp' ? statusInfo.lnaStatus.lhcp : statusInfo.lnaStatus.rhcp
 
-  if (lnaStatus.hasError) return '#ff9800' // 주황색 (Error)
+  if (lnaStatus.hasError) return '#f44336' // 빨간색 (Error)
   if (lnaStatus.isActive) return '#4caf50' // 녹색 (ON)
   return 'none' // 채우기 없음 (OFF)
 }
@@ -394,7 +390,7 @@ const getLNAStrokeColor = (band: 's' | 'x', type: 'lhcp' | 'rhcp'): string => {
   const statusInfo = band === 's' ? icdStore.feedSBoardStatusInfo : icdStore.feedXBoardStatusInfo
   const lnaStatus = type === 'lhcp' ? statusInfo.lnaStatus.lhcp : statusInfo.lnaStatus.rhcp
 
-  if (lnaStatus.hasError) return '#ff9800' // 주황색 (Error)
+  if (lnaStatus.hasError) return '#f44336' // 빨간색 (Error)
   if (lnaStatus.isActive) return '#4caf50' // 녹색 (ON)
   // OFF일 때 화살표 색상과 동일하게 설정
   return getComputedStyle(document.documentElement).getPropertyValue('--theme-text-secondary').trim() || '#b0bec5'
@@ -416,7 +412,7 @@ const getRFSwitchStatusClass = (): string => {
  */
 const getRFSwitchFillColor = (): string => {
   const statusInfo = icdStore.feedSBoardStatusInfo
-  if (statusInfo.rfSwitchStatus.hasError) return '#ff9800' // 주황색 (Error)
+  if (statusInfo.rfSwitchStatus.hasError) return '#f44336' // 빨간색 (Error)
   if (statusInfo.rfSwitchStatus.isRHCP) return '#4caf50' // 녹색 (RHCP)
   return '#2196f3' // 파란색 (LHCP)
 }
@@ -426,7 +422,7 @@ const getRFSwitchFillColor = (): string => {
  */
 const getRFSwitchStrokeColor = (): string => {
   const statusInfo = icdStore.feedSBoardStatusInfo
-  if (statusInfo.rfSwitchStatus.hasError) return '#ff9800' // 주황색 (Error)
+  if (statusInfo.rfSwitchStatus.hasError) return '#f44336' // 빨간색 (Error)
   if (statusInfo.rfSwitchStatus.isRHCP) return '#4caf50' // 녹색 (RHCP)
   return '#2196f3' // 파란색 (LHCP)
 }
@@ -453,7 +449,7 @@ const getFanStatusClass = (): string => {
  */
 const getFanButtonColor = (): string => {
   const statusInfo = icdStore.feedXBoardStatusInfo
-  if (statusInfo.fanStatus.hasError) return 'orange'
+  if (statusInfo.fanStatus.hasError) return 'red'
   if (statusInfo.fanStatus.isActive) return 'green'
   return 'grey-7'
 }
@@ -754,14 +750,14 @@ const applyFeedControls = async () => {
 }
 
 /* 화살표와 출력 라벨 사이 간격 추가 - Tx (Selective)의 gap: 0.5rem과 동일하게 */
-.path-content > .arrow-container:last-of-type {
+.path-content>.arrow-container:last-of-type {
   margin-right: 0;
   /* 간격은 출력 라벨의 margin-left로 처리 */
   flex-shrink: 0;
 }
 
 /* 마지막 화살표의 화살표 끝 부분 위치 조정 - 출력 라벨과의 간격을 명확히 */
-.path-content > .arrow-container:last-of-type .arrow-line::after {
+.path-content>.arrow-container:last-of-type .arrow-line::after {
   right: 0;
   /* 화살표 끝이 출력 라벨과 너무 가까워 보이지 않도록 */
 }
@@ -1109,7 +1105,7 @@ const applyFeedControls = async () => {
 }
 
 /* path-content 내부의 path-output에만 간격 적용 */
-.path-content > .path-output {
+.path-content>.path-output {
   margin-left: 0.5rem !important;
 }
 
