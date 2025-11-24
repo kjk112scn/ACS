@@ -7,7 +7,7 @@
           <div class="col-12 col-md-5">
             <q-card class="control-section">
               <q-card-section>
-                <div class="text-h6 text-primary q-mb-md">S-Band</div>
+                <div class="text-h6 text-primary q-mb-sm">S-Band</div>
 
                 <!-- S-Band Rx Paths -->
                 <div class="feed-path-section">
@@ -65,7 +65,7 @@
                 </div>
 
                 <!-- S-Band Tx Path -->
-                <div class="feed-path-section q-mt-md">
+                <div class="feed-path-section rf-switch-section">
                   <div class="rf-switch-wrapper">
                     <!-- 왼쪽: 입력 라벨 (Rx 경로와 동일한 구조) -->
                     <div class="path-label-group rf-switch-labels">
@@ -137,7 +137,7 @@
           <div class="col-12 col-md-5">
             <q-card class="control-section">
               <q-card-section>
-                <div class="text-h6 text-primary q-mb-md">X-Band</div>
+                <div class="text-h6 text-primary q-mb-sm">X-Band</div>
 
                 <!-- X-Band Rx Paths -->
                 <div class="feed-path-section">
@@ -226,7 +226,7 @@
           <div class="col-12 col-md-2">
             <q-card class="control-section">
               <q-card-section>
-                <div class="text-h6 text-primary q-mb-md">Legend</div>
+                <div class="text-h6 text-primary q-mb-xs">Legend</div>
                 <div class="legend-grid">
                   <div class="legend-item">
                     <svg viewBox="0 0 24 24" width="24" height="24" class="legend-icon">
@@ -307,11 +307,6 @@
               </q-card-section>
             </q-card>
           </div>
-        </div>
-
-        <!-- 제어 버튼 (테스트용 유지) -->
-        <div class="row justify-center q-mt-md mode-button-bar">
-          <q-btn label="Apply" color="primary" icon="send" :loading="isLoading" @click="applyFeedControls" />
         </div>
 
         <!-- 상태 메시지 표시 -->
@@ -619,44 +614,6 @@ const toggleFan = async () => {
   }
 }
 
-/**
- * Feed 제어 적용 함수 (Apply 버튼용 - 테스트용)
- */
-const applyFeedControls = async () => {
-  try {
-    isLoading.value = true
-
-    // 현재 상태 읽기
-    const sStatus = icdStore.feedSBoardStatusInfo
-    const xStatus = icdStore.feedXBoardStatusInfo
-
-    // Feed On/Off 명령 API 호출
-    await icdStore.sendFeedOnOffCommand(
-      sStatus.sLnaLHCPPower,
-      sStatus.sLnaRHCPPower,
-      sStatus.sRFSwitchMode,
-      xStatus.xLnaLHCPPower,
-      xStatus.xLnaRHCPPower,
-      xStatus.fanPower,
-    )
-
-    // 성공 메시지 설정
-    success('Feed 제어 명령이 성공적으로 전송되었습니다.')
-    statusMessage.value = 'Feed 제어 명령이 성공적으로 전송되었습니다.'
-    statusSuccess.value = true
-    statusTimestamp.value = Date.now()
-  } catch (error) {
-    console.error('Feed 제어 명령 처리 중 오류:', error)
-
-    // 오류 메시지 설정
-    notifyError('Feed 제어 명령 전송 중 오류가 발생했습니다.')
-    statusMessage.value = 'Feed 제어 명령 전송 중 오류가 발생했습니다.'
-    statusSuccess.value = false
-    statusTimestamp.value = Date.now()
-  } finally {
-    isLoading.value = false
-  }
-}
 </script>
 
 <style scoped>
@@ -665,7 +622,7 @@ const applyFeedControls = async () => {
 }
 
 .feed-container {
-  padding: 1rem;
+  padding: 0.5rem 1rem 0.5rem 1rem;
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -676,8 +633,43 @@ const applyFeedControls = async () => {
   border: 1px solid var(--theme-border);
 }
 
+/* q-card-section의 패딩 조정 */
+.control-section :deep(.q-card-section) {
+  padding-top: 0.75rem;
+  padding-bottom: 0.375rem;
+}
+
+/* Legend 섹션의 상단 패딩 조정 - X-Band RHCP 테두리 상단에 맞추기 */
+.control-section:has(.legend-grid) :deep(.q-card-section) {
+  padding-top: 0.75rem;
+  padding-bottom: 0.375rem;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
 .feed-path-section {
-  margin-bottom: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+/* 마지막 feed-path-section의 하단 여백 제거 */
+.feed-path-section:last-of-type {
+  margin-bottom: 0;
+}
+
+/* S-Band 스위치 섹션과 X-Band FAN 섹션을 같은 선상에 배치 */
+.rf-switch-section {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* rf-switch-section이 feed-path-section 클래스도 가지고 있어서 margin-bottom이 적용되는 것을 방지 */
+.rf-switch-section.feed-path-section {
+  margin-bottom: 0;
+}
+
+.fan-section {
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 .feed-path {
@@ -685,10 +677,10 @@ const applyFeedControls = async () => {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.25rem;
   /* LNA 라벨이 위로 25px(약 1.5rem) 나가 있으므로, LNA 위의 공간과 하단 공간을 동일하게 맞춤 */
   /* 하단 패딩을 더 줄여서 아래 공간을 최소화 */
-  padding: 2.2rem 1rem 0.75rem 1rem;
+  padding: 2.2rem 1rem 0.375rem 1rem;
   border-radius: 6px;
   background-color: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1117,6 +1109,7 @@ const applyFeedControls = async () => {
   padding: 1rem;
   /* FAN 라벨 제거 후 여백 조정 */
   margin-top: 0;
+  margin-bottom: 0;
   /* 스위치 테두리(.rf-switch-wrapper)와 동일한 높이 및 정렬 */
   min-height: 60px;
   /* 스위치 테두리 기준으로 가운데 수평 정렬 */
@@ -1138,16 +1131,26 @@ const applyFeedControls = async () => {
 
 
 .legend-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0.5rem 0.25rem 0.75rem;
+  /* 범례 항목들을 왼쪽 정렬 */
+  align-items: flex-start;
+  /* 최소 너비 제한 제거 */
+  min-width: 0;
+  width: 100%;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  /* 텍스트 줄바꿈 방지 */
+  white-space: nowrap;
+  /* 최소 너비 제한 제거 */
+  min-width: 0;
+  width: 100%;
 }
 
 .legend-icon {
@@ -1157,6 +1160,12 @@ const applyFeedControls = async () => {
 .legend-text {
   color: var(--theme-text);
   font-size: 0.9rem;
+  /* 텍스트 줄바꿈 방지 */
+  white-space: nowrap;
+  flex-shrink: 0;
+  /* 텍스트 오버플로우 처리 */
+  overflow: visible;
+  text-overflow: clip;
 }
 
 /* 상태 메시지 스타일 */
@@ -1236,7 +1245,7 @@ const applyFeedControls = async () => {
 
 @media (max-width: 768px) {
   .feed-path {
-    padding: 2rem 0.75rem 0.75rem 0.75rem;
+    padding: 2rem 0.75rem 0.375rem 0.75rem;
   }
 
   .arrow-container {
