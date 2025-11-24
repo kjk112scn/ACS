@@ -687,6 +687,7 @@ const applyFeedControls = async () => {
 .feed-path {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   margin-bottom: 1rem;
   /* LNA 라벨이 위로 25px(약 1.5rem) 나가 있으므로, LNA 위의 공간과 하단 공간을 동일하게 맞춤 */
@@ -698,6 +699,8 @@ const applyFeedControls = async () => {
   /* 전체 경로가 하나의 배경색으로 통일되도록 */
   position: relative;
   overflow: visible;
+  /* 테두리 안의 전체 내용을 가운데 정렬 */
+  width: 100%;
 }
 
 .path-label {
@@ -715,7 +718,7 @@ const applyFeedControls = async () => {
   padding-top: 0;
   padding-right: 0;
   /* 반응형: 작은 화면에서도 비례적으로 줄어들도록 */
-  flex-shrink: 1;
+  flex-shrink: 0;
   /* 화살표와 수평 정렬을 위해 transform 추가 */
   transform: translateY(2px);
 }
@@ -733,8 +736,9 @@ const applyFeedControls = async () => {
 .path-content {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0;
-  flex: 1;
+  /* flex: 1을 제거하여 내용에 맞는 너비만 사용 */
   position: relative;
   min-height: 60px;
   height: 60px;
@@ -742,8 +746,11 @@ const applyFeedControls = async () => {
   background-color: transparent;
   /* 첫 번째 요소(화살표) 앞의 간격을 feed-path의 gap과 동일하게 */
   margin-left: 0;
+  margin-right: 0;
   /* 반응형: 작은 화면에서도 요소들이 함께 줄어들도록 */
   min-width: 0;
+  /* 내부 요소들이 가운데 정렬되도록 */
+  flex-shrink: 0;
 }
 
 /* 화살표와 출력 라벨 사이 간격 추가 - Tx (Selective)의 gap: 0.5rem과 동일하게 */
@@ -764,7 +771,8 @@ const applyFeedControls = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 60px;
+  /* 모든 화살표의 길이(너비)를 80px로 통일 */
+  min-width: 80px;
   width: 80px;
   max-width: 80px;
   height: 60px;
@@ -871,7 +879,6 @@ const applyFeedControls = async () => {
   border: 1px solid rgba(255, 255, 255, 0.08);
   /* 내부 콘텐츠 높이(60px) + 위아래 패딩(1rem * 2 = 32px) = 92px */
   min-height: 60px;
-  height: auto;
   /* LNA 부분(.feed-path)과 동일한 테두리 스타일, 위아래 패딩 증가 */
 }
 
@@ -903,9 +910,11 @@ const applyFeedControls = async () => {
 .rf-switch-content {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 0;
   flex: 1;
   /* 스위치와 화살표를 붙이기 위해 gap 제거 */
+  /* path-content의 justify-content: center가 적용되지 않도록 명시적으로 설정 */
 }
 
 .rf-switch-inputs-container {
@@ -916,18 +925,22 @@ const applyFeedControls = async () => {
   align-items: center;
   min-width: 80px;
   width: 80px;
-  /* Rx 경로의 화살표와 동일한 너비와 높이로 정렬 */
+  /* Rx 경로의 화살표와 동일한 너비로 정렬, 높이는 두 개의 화살표가 세로로 배치되므로 60px */
   height: 60px;
   /* RHCP(Tx), LHCP(Tx) 화살표 사이 간격을 라벨과 동일하게 더 좁게 조정 */
 }
 
-/* Tx 부분의 화살표 컨테이너 높이 조정 - 라벨과 수평 정렬 */
+/* Tx 부분의 입력 화살표 컨테이너 높이 조정 - 두 개가 세로로 배치되므로 각각 30px */
 .rf-switch-inputs-container .arrow-container {
   height: 30px;
   min-height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
+  /* 화살표 길이(너비)는 모든 화살표와 동일하게 80px 유지 */
+  width: 80px;
+  min-width: 80px;
+  max-width: 80px;
 }
 
 .rf-switch-container {
@@ -952,7 +965,10 @@ const applyFeedControls = async () => {
 }
 
 .arrow-left {
+  /* 모든 화살표의 길이(너비)를 80px로 통일 */
   width: 80px;
+  min-width: 80px;
+  max-width: 80px;
 }
 
 .arrow-left .arrow-line::after {
@@ -966,13 +982,19 @@ const applyFeedControls = async () => {
 }
 
 .arrow-right {
+  /* 모든 화살표의 길이(너비)를 80px로 통일 */
   width: 80px;
+  min-width: 80px;
+  max-width: 80px;
 }
 
 .arrow-container.rf-switch-arrow {
   width: 80px;
+  min-width: 80px;
+  max-width: 80px;
+  /* 출력 화살표는 60px 높이 유지 */
   height: 60px;
-  /* Rx 경로의 arrow-container와 동일한 너비와 높이 */
+  /* Rx 경로의 arrow-container와 동일한 너비(길이) */
 }
 
 .path-output-multiline {
@@ -1100,18 +1122,13 @@ const applyFeedControls = async () => {
   /* FAN 라벨 제거 후 여백 조정 */
   margin-top: 0;
   /* 스위치 테두리(.rf-switch-wrapper)와 동일한 높이 및 정렬 */
-  /* 스위치 테두리와 정확히 동일한 높이로 설정 - padding 포함 */
-  /* 내부 콘텐츠 높이(60px) + 위아래 패딩(1rem * 2 = 32px) = 92px */
   min-height: 60px;
-  height: auto;
   /* 스위치 테두리 기준으로 가운데 수평 정렬 */
   /* 스위치 컨테이너와 동일한 정렬을 위해 align-items: center 사용 */
   /* 스위치 테두리(.rf-switch-wrapper)와 동일한 테두리 스타일 */
   border-radius: 6px;
   background-color: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  /* 스위치 섹션과 동일한 높이를 보장하기 위해 box-sizing 확인 */
-  box-sizing: border-box;
 }
 
 .fan-button-container {
