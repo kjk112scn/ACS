@@ -1,25 +1,105 @@
 :root {
   --mode-shell-max-width: 1200px;
+  /* ✅ 모드 페이지 높이 통일 - 테마 설정에서 관리 (기본값은 fallback용) */
+  --theme-layout-modePageMinHeight: 500px;
+  --theme-layout-modePageContentHeight: 500px;
 }
 
-.mode-shell {
+/* ✅ 모든 모드 페이지에 공통 높이 적용 - SunTrackPage.vue 기준으로 통일 */
+/* ✅ DashboardPage의 .mode-content-section .q-card__section 패딩(16px 상하 = 32px)과 border(1px 상하 = 2px)를 고려 */
+/* ✅ mode-shell의 padding(24px 상하 = 48px)은 box-sizing: border-box에 포함되므로 높이에 포함됨 */
+/* ✅ 목표: 총 높이 500px = mode-shell 높이 466px + Dashboard 패딩 32px + Border 2px */
+.mode-shell,
+.mode-shell.feed-mode,
+.mode-shell.sun-track-mode,
+.mode-shell.standby-mode,
+.mode-shell.step-mode,
+.mode-shell.slew-mode,
+.mode-shell.ephemeris-mode,
+.mode-shell.pass-schedule-mode {
   width: 100%;
-  min-height: 100%;
+  height: calc(var(--theme-layout-modePageMinHeight, 500px) - 34px - 16px) !important;
+  /* ✅ 높이를 (500px - 32px 패딩 - 2px border - 16px 추가 여백) = 450px로 설정 */
+  /* ✅ padding 48px은 box-sizing: border-box에 포함되어 높이에 포함됨 */
+  /* ✅ 16px는 mode-shell__content나 내부 요소의 추가 여백 */
+  min-height: calc(var(--theme-layout-modePageMinHeight, 500px) - 34px - 16px) !important;
+  /* ✅ 최소 높이도 테마 변수 사용 */
+  max-height: calc(var(--theme-layout-modePageMinHeight, 500px) - 34px - 16px) !important;
+  /* ✅ 최대 높이도 테마 변수 사용 */
   padding: var(--theme-spacing-lg, 1.5rem) var(--theme-spacing-md, 1rem);
+  /* ✅ mode-shell padding 유지 (24px 상하 = 48px) - box-sizing: border-box에 포함 */
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--theme-spacing-lg, 1.5rem);
+  justify-content: center;
+  /* ✅ 컨텐츠를 가운데 정렬 */
+  gap: 0 !important;
+  /* ✅ gap 제거하여 높이 계산 정확히 맞추기 */
   color: var(--theme-text, #ffffff);
   box-sizing: border-box;
+  overflow: hidden;
+  /* ✅ 내용이 넘치면 숨김 */
 }
 
-.mode-shell__content {
+/* ✅ mode-shell을 사용하지 않는 모드 페이지들에 직접 높이 적용 - SunTrackPage.vue 기준 */
+/* ✅ DashboardPage의 .mode-content-section .q-card__section 패딩(16px 상하 = 32px)과 border(1px 상하 = 2px)를 고려 */
+/* ✅ q-mb-sm (8px) + q-col-gutter-md 마진/패딩 (약 8px) = 16px 추가 차감 */
+/* ✅ 목표: 총 높이 500px = Content 450px + Padding 32px + Border 2px + 여백 16px */
+.sun-track-mode,
+.feed-mode,
+.ephemeris-mode,
+.pass-schedule-mode {
+  height: calc(var(--theme-layout-modePageMinHeight, 500px) - 34px - 16px) !important;
+  /* ✅ 높이를 (500px - 32px 패딩 - 2px border - 16px 여백) = 450px로 설정하여 실제 표시 높이가 500px가 되도록 */
+  min-height: calc(var(--theme-layout-modePageMinHeight, 500px) - 34px - 16px) !important;
+  /* ✅ 최소 높이도 테마 변수 사용 */
+  max-height: calc(var(--theme-layout-modePageMinHeight, 500px) - 34px - 16px) !important;
+  /* ✅ 최대 높이도 테마 변수 사용 */
+  width: 100%;
+  padding: 0 !important;
+  margin: 0 !important;
+  margin-bottom: 0 !important;
+  /* ✅ 하단 마진 제거 */
+  padding-bottom: 0 !important;
+  /* ✅ 하단 패딩 제거 */
+  overflow: hidden;
+  /* ✅ 내용이 넘치면 숨김 */
+  display: flex !important;
+  /* ✅ flexbox로 변경 */
+  flex-direction: column !important;
+  /* ✅ 세로 방향 */
+  gap: 0 !important;
+  /* ✅ flex gap 제거 */
+  row-gap: 0 !important;
+  /* ✅ flex row-gap 제거 */
+  column-gap: 0 !important;
+  /* ✅ flex column-gap 제거 */
+  box-sizing: border-box;
+  /* ✅ !important로 개별 페이지의 min-height: auto 오버라이드 방지 */
+}
+
+.mode-shell__content,
+.feed-mode .mode-shell__content,
+.sun-track-mode .mode-shell__content,
+.standby-mode .mode-shell__content,
+.step-mode .mode-shell__content,
+.slew-mode .mode-shell__content,
+.ephemeris-mode .mode-shell__content,
+.pass-schedule-mode .mode-shell__content {
   width: 100%;
   max-width: var(--mode-shell-max-width);
+  min-height: auto !important;
+  /* ✅ min-height를 auto로 설정하여 mode-shell의 높이에 맞춤 */
+  height: 100% !important;
+  /* ✅ 높이를 100%로 설정하여 mode-shell의 높이에 맞춤 */
   display: flex;
   flex-direction: column;
-  gap: var(--theme-spacing-lg, 1.5rem);
+  justify-content: center;
+  /* ✅ 컨텐츠를 가운데 정렬 */
+  align-items: center;
+  /* ✅ 컨텐츠를 가운데 정렬 */
+  gap: 0 !important;
+  /* ✅ gap 제거하여 높이 계산 정확히 맞추기 */
 }
 
 .mode-card {
@@ -205,8 +285,38 @@ input[type='number'] {
   margin-bottom: 0.5rem !important;
 }
 
+/* ✅ 반응형: 작은 화면에서는 모드 페이지 높이를 자동 조정 */
 @media (max-width: 1024px) {
   .mode-card {
     padding: var(--theme-spacing-lg, 1.5rem);
+  }
+
+  /* ✅ mode-shell 반응형 조정 */
+  .mode-shell {
+    min-height: auto;
+    /* ✅ 내용에 맞게 자동 조정 */
+  }
+
+  .mode-shell__content {
+    min-height: auto;
+    /* ✅ 내용에 맞게 자동 조정 */
+  }
+
+  /* ✅ mode-shell 반응형 조정 */
+  .mode-shell {
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+  }
+
+  /* ✅ mode-shell을 사용하지 않는 모드 페이지들 반응형 조정 */
+  .sun-track-mode,
+  .feed-mode,
+  .ephemeris-mode,
+  .pass-schedule-mode {
+    height: auto !important;
+    /* ✅ 작은 화면에서는 내용에 맞게 자동 조정 */
+    min-height: auto !important;
+    max-height: none !important;
   }
 }

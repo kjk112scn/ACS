@@ -4,106 +4,107 @@
       <q-card class="mode-card pedestal-card">
         <!-- 축별 제어 패널 (중앙 집중형으로 변경) -->
         <div class="pedestal-container">
-      <div class="row q-col-gutter-md justify-center">
-        <!-- Azimuth 패널 -->
-        <div class="col-12 col-md-4">
-          <q-card class="axis-panel" :class="{ 'disabled-panel': !pedestalStore.selectedAxes.azimuth }">
-            <q-card-section>
-              <div class="axis-header q-mb-md">
-                <div class="checkbox-label-group">
-                  <q-checkbox v-model="pedestalStore.selectedAxes.azimuth" color="primary" class="axis-checkbox" />
-                  <div class="text-h6 text-primary axis-title">Azimuth</div>
-                </div>
-              </div>
+          <div class="row q-col-gutter-md justify-center">
+            <!-- Azimuth 패널 -->
+            <div class="col-12 col-md-4">
+              <q-card class="axis-panel" :class="{ 'disabled-panel': !pedestalStore.selectedAxes.azimuth }">
+                <q-card-section>
+                  <div class="axis-header q-mb-md">
+                    <div class="checkbox-label-group">
+                      <q-checkbox v-model="pedestalStore.selectedAxes.azimuth" color="primary" class="axis-checkbox" />
+                      <div class="text-h6 text-primary axis-title">Azimuth</div>
+                    </div>
+                  </div>
 
-              <div class="text-subtitle2">Current Position</div>
-              <q-input v-model="currentPositions.azimuth" outlined readonly dense suffix="°" class="q-mb-sm" />
+                  <div class="text-subtitle2">Current Position</div>
+                  <q-input v-model="currentPositions.azimuth" outlined readonly dense suffix="°" class="q-mb-sm" />
 
-              <div class="text-subtitle2">Target Position</div>
-              <q-input v-model="pedestalStore.targetPositions.azimuth" outlined dense type="number" suffix="°"
-                :disable="!pedestalStore.selectedAxes.azimuth" min="-360" max="360" step="0.01"
-                @update:model-value="formatTargetPosition('azimuth')" class="q-mb-sm" />
+                  <div class="text-subtitle2">Target Position</div>
+                  <q-input v-model="pedestalStore.targetPositions.azimuth" outlined dense type="number" suffix="°"
+                    :disable="!pedestalStore.selectedAxes.azimuth" min="-360" max="360" step="0.01"
+                    @update:model-value="formatTargetPosition('azimuth')" class="q-mb-sm" />
 
-              <div class="text-subtitle2">Target Speed</div>
-              <q-input v-model="pedestalStore.targetSpeeds.azimuth" outlined dense type="number" suffix="°/s"
-                :disable="!pedestalStore.selectedAxes.azimuth" min="7" max="173" step="0.01"
-                @update:model-value="formatTargetSpeed('azimuth')" />
-            </q-card-section>
-          </q-card>
-        </div>
+                  <div class="text-subtitle2">Target Speed</div>
+                  <q-input v-model="pedestalStore.targetSpeeds.azimuth" outlined dense type="number" suffix="°/s"
+                    :disable="!pedestalStore.selectedAxes.azimuth" min="7" max="173" step="0.01"
+                    @update:model-value="formatTargetSpeed('azimuth')" />
+                </q-card-section>
+              </q-card>
+            </div>
 
-        <!-- Elevation 패널 -->
-        <div class="col-12 col-md-4">
-          <q-card class="axis-panel" :class="{ 'disabled-panel': !pedestalStore.selectedAxes.elevation }">
-            <q-card-section>
-              <div class="axis-header q-mb-md">
-                <div class="checkbox-label-group">
-                  <q-checkbox v-model="pedestalStore.selectedAxes.elevation" color="primary" class="axis-checkbox" />
-                  <div class="text-h6 text-primary axis-title">Elevation</div>
-                </div>
-              </div>
+            <!-- Elevation 패널 -->
+            <div class="col-12 col-md-4">
+              <q-card class="axis-panel" :class="{ 'disabled-panel': !pedestalStore.selectedAxes.elevation }">
+                <q-card-section>
+                  <div class="axis-header q-mb-md">
+                    <div class="checkbox-label-group">
+                      <q-checkbox v-model="pedestalStore.selectedAxes.elevation" color="primary"
+                        class="axis-checkbox" />
+                      <div class="text-h6 text-primary axis-title">Elevation</div>
+                    </div>
+                  </div>
 
-              <div class="text-subtitle2">Current Position</div>
-              <q-input v-model="currentPositions.elevation" outlined readonly dense suffix="°" class="q-mb-sm" />
+                  <div class="text-subtitle2">Current Position</div>
+                  <q-input v-model="currentPositions.elevation" outlined readonly dense suffix="°" class="q-mb-sm" />
 
-              <div class="text-subtitle2">Target Position</div>
-              <q-input v-model="pedestalStore.targetPositions.elevation" outlined dense type="number" suffix="°"
-                :disable="!pedestalStore.selectedAxes.elevation" min="-360" max="360" step="0.01"
-                @update:model-value="formatTargetPosition('elevation')" class="q-mb-sm" />
+                  <div class="text-subtitle2">Target Position</div>
+                  <q-input v-model="pedestalStore.targetPositions.elevation" outlined dense type="number" suffix="°"
+                    :disable="!pedestalStore.selectedAxes.elevation" min="-360" max="360" step="0.01"
+                    @update:model-value="formatTargetPosition('elevation')" class="q-mb-sm" />
 
-              <div class="text-subtitle2">Target Speed</div>
-              <q-input v-model="pedestalStore.targetSpeeds.elevation" outlined dense type="number" suffix="°/s"
-                :disable="!pedestalStore.selectedAxes.elevation" min="0" step="0.01"
-                @update:model-value="formatTargetSpeed('elevation')" />
-            </q-card-section>
-          </q-card>
-        </div>
+                  <div class="text-subtitle2">Target Speed</div>
+                  <q-input v-model="pedestalStore.targetSpeeds.elevation" outlined dense type="number" suffix="°/s"
+                    :disable="!pedestalStore.selectedAxes.elevation" min="0" step="0.01"
+                    @update:model-value="formatTargetSpeed('elevation')" />
+                </q-card-section>
+              </q-card>
+            </div>
 
-        <!-- Tilt 패널 -->
-        <div class="col-12 col-md-4">
-          <q-card class="axis-panel" :class="{ 'disabled-panel': !pedestalStore.selectedAxes.train }">
-            <q-card-section>
-              <div class="axis-header q-mb-md">
-                <div class="checkbox-label-group">
-                  <q-checkbox v-model="pedestalStore.selectedAxes.train" color="primary" class="axis-checkbox" />
-                  <div class="text-h6 text-primary axis-title">Tilt</div>
-                </div>
-              </div>
+            <!-- Tilt 패널 -->
+            <div class="col-12 col-md-4">
+              <q-card class="axis-panel" :class="{ 'disabled-panel': !pedestalStore.selectedAxes.train }">
+                <q-card-section>
+                  <div class="axis-header q-mb-md">
+                    <div class="checkbox-label-group">
+                      <q-checkbox v-model="pedestalStore.selectedAxes.train" color="primary" class="axis-checkbox" />
+                      <div class="text-h6 text-primary axis-title">Tilt</div>
+                    </div>
+                  </div>
 
-              <div class="text-subtitle2">Current Position</div>
-              <q-input v-model="currentPositions.train" outlined readonly dense suffix="°" class="q-mb-sm" />
+                  <div class="text-subtitle2">Current Position</div>
+                  <q-input v-model="currentPositions.train" outlined readonly dense suffix="°" class="q-mb-sm" />
 
-              <div class="text-subtitle2">Target Position</div>
-              <q-input v-model="pedestalStore.targetPositions.train" outlined dense type="number" suffix="°"
-                :disable="!pedestalStore.selectedAxes.train" min="-360" max="360" step="0.01"
-                @update:model-value="formatTargetPosition('train')" class="q-mb-sm" />
+                  <div class="text-subtitle2">Target Position</div>
+                  <q-input v-model="pedestalStore.targetPositions.train" outlined dense type="number" suffix="°"
+                    :disable="!pedestalStore.selectedAxes.train" min="-360" max="360" step="0.01"
+                    @update:model-value="formatTargetPosition('train')" class="q-mb-sm" />
 
-              <div class="text-subtitle2">Target Speed</div>
-              <q-input v-model="pedestalStore.targetSpeeds.train" outlined dense type="number" suffix="°/s"
-                :disable="!pedestalStore.selectedAxes.train" min="-360" max="360" step="0.01"
-                @update:model-value="formatTargetSpeed('train')" />
-            </q-card-section>
-          </q-card>
-        </div>
-      </div>
+                  <div class="text-subtitle2">Target Speed</div>
+                  <q-input v-model="pedestalStore.targetSpeeds.train" outlined dense type="number" suffix="°/s"
+                    :disable="!pedestalStore.selectedAxes.train" min="-360" max="360" step="0.01"
+                    @update:model-value="formatTargetSpeed('train')" />
+                </q-card-section>
+              </q-card>
+            </div>
+          </div>
 
-        <!-- 제어 버튼 섹션 -->
-        <div class="button-section mode-button-bar">
-          <div class="row justify-center q-gutter-md">
-            <q-btn label="Go" color="positive" icon="play_arrow" size="lg" :disable="!pedestalStore.isAnyAxisSelected()"
-              @click="handleGoCommand" :loading="isGoLoading" />
-            <q-btn label="Stop" color="negative" icon="stop" size="lg" :disable="!pedestalStore.isAnyAxisSelected()"
-              @click="handleStopCommand" :loading="isStopLoading" />
-            <q-btn label="Stow" color="warning" icon="home" size="lg" @click="handleStowCommand"
-              :loading="isStowLoading" />
+          <!-- 제어 버튼 섹션 -->
+          <div class="button-section mode-button-bar">
+            <div class="row justify-center q-gutter-md">
+              <q-btn label="Go" color="positive" icon="play_arrow" size="lg"
+                :disable="!pedestalStore.isAnyAxisSelected()" @click="handleGoCommand" :loading="isGoLoading" />
+              <q-btn label="Stop" color="negative" icon="stop" size="lg" :disable="!pedestalStore.isAnyAxisSelected()"
+                @click="handleStopCommand" :loading="isStopLoading" />
+              <q-btn label="Stow" color="warning" icon="home" size="lg" @click="handleStowCommand"
+                :loading="isStowLoading" />
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- 상태 메시지 -->
-      <q-banner v-if="statusMessage" :class="statusClass" class="q-mt-md">
-        {{ statusMessage }}
-      </q-banner>
+        <!-- 상태 메시지 -->
+        <q-banner v-if="statusMessage" :class="statusClass" class="q-mt-md">
+          {{ statusMessage }}
+        </q-banner>
       </q-card>
     </div>
   </div>
@@ -338,8 +339,9 @@ const handleStowCommand = async () => {
 
 <style scoped>
 .pedestal-position-container {
-  height: 100%;
   width: 100%;
+  /* ✅ height: 100% 제거 - mode-shell의 높이 설정 사용 */
+  /* ✅ justify-content와 align-items는 mode-shell__content에서 처리 */
 }
 
 /* 섹션 제목 간격 최소화 */

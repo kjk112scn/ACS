@@ -2,7 +2,7 @@
   <div class="sun-track-mode">
 
     <!-- 1행: Offset Controls - EphemerisDesignationPage와 동일한 구조 -->
-    <div class="row q-col-gutter-md q-mb-sm offset-control-row">
+    <div class="row q-col-gutter-md offset-control-row">
       <div class="col-12">
         <q-card flat bordered class="control-card">
           <q-card-section class="compact-control purple-1">
@@ -144,25 +144,26 @@
             <div class="speed-inputs-row"
               style="min-height: 340px !important; height: 100% !important; flex: 1 !important; padding-top: 0 !important; padding-bottom: 0 !important; margin-bottom: 0 !important;">
               <div class="speed-content-wrapper">
-                <div class="row q-col-gutter-md">
+                <div class="row q-col-gutter-xl">
                   <!-- Azimuth Speed -->
-                  <div class="col-4">
+                  <div class="col-12 col-md-4">
                     <div class="text-subtitle2 text-weight-medium text-primary q-mb-xs">Azimuth Speed</div>
-                    <q-input v-model="speedInputs.azimuth" dense outlined type="number" step="0.1"
-                      class="speed-input" />
+                    <q-input v-model="speedInputs.azimuth" dense outlined type="number" step="0.1" class="speed-input"
+                      style="min-width: 200px !important; width: 100% !important;" />
                   </div>
 
                   <!-- Elevation Speed -->
-                  <div class="col-4">
+                  <div class="col-12 col-md-4">
                     <div class="text-subtitle2 text-weight-medium text-primary q-mb-xs">Elevation Speed</div>
-                    <q-input v-model="speedInputs.elevation" dense outlined type="number" step="0.1"
-                      class="speed-input" />
+                    <q-input v-model="speedInputs.elevation" dense outlined type="number" step="0.1" class="speed-input"
+                      style="min-width: 200px !important; width: 100% !important;" />
                   </div>
 
                   <!-- Tilt Speed -->
-                  <div class="col-4">
+                  <div class="col-12 col-md-4">
                     <div class="text-subtitle2 text-weight-medium text-primary q-mb-xs">Tilt Speed</div>
-                    <q-input v-model="speedInputs.train" dense outlined type="number" step="0.1" class="speed-input" />
+                    <q-input v-model="speedInputs.train" dense outlined type="number" step="0.1" class="speed-input"
+                      style="min-width: 200px !important; width: 100% !important;" />
                   </div>
                 </div>
 
@@ -598,8 +599,14 @@ q-page .sun-track-mode,
 .sun-track-mode,
 [class*="sun-track-mode"],
 div.sun-track-mode {
-  height: auto !important;
-  /* ✅ height: 100% 제거하여 내용에 맞게 조정 */
+  height: calc(var(--theme-layout-modePageMinHeight, 500px) - 34px - 16px) !important;
+  /* ✅ 테마 변수를 사용하여 높이 설정: (500px - 32px 패딩 - 2px border - 16px 여백) = 450px */
+  /* ✅ DashboardPage의 .mode-content-section .q-card__section 패딩(16px 상하 = 32px)과 border(1px 상하 = 2px)를 고려 */
+  /* ✅ q-mb-sm (8px) + q-col-gutter-md 마진/패딩 (약 8px) = 16px 추가 차감 */
+  min-height: calc(var(--theme-layout-modePageMinHeight, 500px) - 34px - 16px) !important;
+  /* ✅ 최소 높이도 테마 변수 사용 */
+  max-height: calc(var(--theme-layout-modePageMinHeight, 500px) - 34px - 16px) !important;
+  /* ✅ 최대 높이도 테마 변수 사용 */
   width: 100%;
   padding: 0 !important;
   margin: 0 !important;
@@ -607,20 +614,23 @@ div.sun-track-mode {
   /* ✅ 하단 마진 제거 */
   padding-bottom: 0 !important;
   /* ✅ 하단 패딩 제거 */
-  min-height: auto !important;
-  /* ✅ 최소 높이 제거 */
-  max-height: none !important;
-  /* ✅ 최대 높이 제거 */
+  overflow: hidden;
+  /* ✅ 내용이 넘치면 숨김 */
   display: flex !important;
   /* ✅ flexbox로 변경 */
   flex-direction: column !important;
   /* ✅ 세로 방향 */
+  justify-content: center;
+  /* ✅ 컨텐츠를 가운데 정렬 */
+  align-items: center;
+  /* ✅ 컨텐츠를 가운데 정렬 */
   gap: 0 !important;
   /* ✅ flex gap 제거 */
   row-gap: 0 !important;
   /* ✅ flex row-gap 제거 */
   column-gap: 0 !important;
   /* ✅ flex column-gap 제거 */
+  box-sizing: border-box;
 }
 
 /* router-view, q-page-container의 하단 패딩/마진 제거 */
@@ -630,10 +640,10 @@ q-page-container .sun-track-mode {
   padding-bottom: 0 !important;
 }
 
-/* ✅ 오프셋 컨트롤 행 하단 여백 줄이기 - EphemerisDesignationPage와 동일한 순서로 배치 */
+/* ✅ 오프셋 컨트롤 행 하단 여백 - 높이 계산에 포함 */
 .sun-track-mode .offset-control-row {
   margin-bottom: 0.5rem !important;
-  /* ✅ 기본 q-mb-sm (0.5rem) 유지하되 명시적으로 설정 */
+  /* ✅ q-mb-sm (0.5rem = 8px) 유지 - 높이 계산에 포함됨 */
 }
 
 /* ✅ ephemeris-mode 내부의 모든 직접 자식 요소 하단 여백 제거 - EphemerisDesignationPage와 동일한 순서 */
@@ -865,6 +875,12 @@ q-page-container .sun-track-mode {
   max-height: 367.19px !important;
   height: 367.19px !important;
   /* ✅ 높이를 367.19px로 강제 고정 */
+  width: 100% !important;
+  /* ✅ 너비를 100%로 설정하여 전체 너비 사용 */
+  max-width: none !important;
+  /* ✅ 최대 너비 제한 제거 */
+  overflow: visible !important;
+  /* ✅ overflow를 visible로 변경하여 확대된 내용이 보이도록 */
 }
 
 /* ✅ control-section .q-card-section 스타일 - EphemerisDesignationPage와 동일 */
@@ -891,9 +907,22 @@ q-page-container .sun-track-mode {
   max-height: 367.19px !important;
   height: 367.19px !important;
   /* ✅ 높이를 367.19px로 강제 고정 */
+  width: 100% !important;
+  /* ✅ 너비를 100%로 설정 */
+  max-width: none !important;
+  /* ✅ 최대 너비 제한 제거 */
   flex: 1 !important;
   display: flex !important;
   flex-direction: column !important;
+  justify-content: center;
+  /* ✅ 컨텐츠를 세로 가운데 정렬 */
+  align-items: center;
+  /* ✅ 컨텐츠를 가로 가운데 정렬 */
+  overflow: visible !important;
+  /* ✅ overflow를 visible로 변경하여 확대된 내용이 보이도록 */
+  padding-left: 2rem !important;
+  padding-right: 2rem !important;
+  /* ✅ 좌우 패딩을 늘려서 넓이 확대 */
 }
 
 /* ✅ control-card 스타일 제거 - EphemerisDesignationPage와 동일하게 Quasar 기본 스타일 사용 */
@@ -943,28 +972,29 @@ q-page-container .sun-track-mode {
 
 /* ✅ Speed 입력 영역 - 높이 제한하여 카드를 넘지 않도록 */
 .speed-inputs-row {
-  min-height: 340px !important;
-  max-height: 340px !important;
-  /* ✅ 최대 높이 제한으로 카드 높이를 넘지 않도록 */
-  height: 340px !important;
-  /* ✅ 고정 높이로 설정하여 카드를 밀어내지 않도록 */
-  flex: 1 !important;
-  /* ✅ 남은 공간 채우기 */
+  min-height: auto !important;
+  /* ✅ 최소 높이를 auto로 변경하여 내용에 맞게 조정 */
+  max-height: none !important;
+  /* ✅ 최대 높이 제한 제거 */
+  height: auto !important;
+  /* ✅ 고정 높이 제거하여 내용에 맞게 조정 */
+  flex: 0 0 auto !important;
+  /* ✅ flex-shrink와 flex-grow를 0으로 설정하여 내용 크기만큼만 차지 */
   width: 100%;
   display: flex;
-  align-items: flex-start;
-  /* ✅ 상단 정렬 (chart-area는 center이지만, 컨텐츠가 많으므로 flex-start) */
+  align-items: center;
+  /* ✅ 컨텐츠를 가운데 정렬 */
   justify-content: center;
   margin: 0 auto;
   margin-bottom: 0 !important;
   /* ✅ 하단 마진 제거 */
-  padding: 0 !important;
-  /* ✅ chart-area와 동일하게 padding: 0 */
+  padding: 0 2rem !important;
+  /* ✅ 좌우 패딩을 늘려서 넓이 확대 */
   padding-bottom: 0 !important;
   /* ✅ 하단 패딩 제거 */
   box-sizing: border-box;
-  overflow: hidden !important;
-  /* ✅ overflow: hidden으로 내용이 넘치면 숨김 */
+  overflow: visible !important;
+  /* ✅ overflow를 visible로 변경하여 확대된 내용이 보이도록 */
   text-align: left;
   position: relative;
 }
@@ -972,15 +1002,25 @@ q-page-container .sun-track-mode {
 /* ✅ Speed 컨텐츠 래퍼 - 제목 아래 공간 확보 */
 .speed-content-wrapper {
   width: 100%;
-  max-width: 100%;
+  max-width: none !important;
+  /* ✅ 최대 너비 제한 제거 */
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
-  padding-top: 3rem !important;
-  /* ✅ 제목 아래 공간 확보 (제목 높이 + 여백) */
+  align-items: center;
+  /* ✅ 컨텐츠를 가운데 정렬 */
+  justify-content: center;
+  /* ✅ 컨텐츠를 세로 가운데 정렬 */
+  padding-top: 0 !important;
+  /* ✅ 상단 패딩 제거 - 가운데 정렬을 위해 */
+  padding-left: 2rem !important;
+  padding-right: 2rem !important;
+  /* ✅ 좌우 패딩을 늘려서 넓이 확대 */
   box-sizing: border-box;
   /* ✅ height: 100% 제거 - 내용에 맞게 자동 조정 */
+  margin: 0 auto;
+  /* ✅ 가운데 정렬 */
+  height: 100%;
+  /* ✅ 높이를 100%로 설정하여 가운데 정렬 가능하도록 */
 }
 
 /* ✅ Speed 설명 텍스트 */

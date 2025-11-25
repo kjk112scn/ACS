@@ -4,78 +4,78 @@
       <q-card class="mode-card slew-card">
         <!-- 축별 제어 패널 (Step 모드와 동일한 구조) -->
         <div class="slew-container">
-      <div class="row q-col-gutter-md justify-center">
-        <!-- Azimuth 패널 -->
-        <div class="col-12 col-md-4">
-          <q-card class="axis-panel" :class="{ 'disabled-panel': !slewStore.selectedAxes.azimuth }">
-            <q-card-section>
-              <div class="axis-header q-mb-md">
-                <div class="checkbox-label-group">
-                  <q-checkbox v-model="slewStore.selectedAxes.azimuth" color="primary" class="axis-checkbox" />
-                  <div class="text-h6 text-primary axis-title">Azimuth</div>
-                </div>
-              </div>
+          <div class="row q-col-gutter-md justify-center">
+            <!-- Azimuth 패널 -->
+            <div class="col-12 col-md-4">
+              <q-card class="axis-panel" :class="{ 'disabled-panel': !slewStore.selectedAxes.azimuth }">
+                <q-card-section>
+                  <div class="axis-header q-mb-md">
+                    <div class="checkbox-label-group">
+                      <q-checkbox v-model="slewStore.selectedAxes.azimuth" color="primary" class="axis-checkbox" />
+                      <div class="text-h6 text-primary axis-title">Azimuth</div>
+                    </div>
+                  </div>
 
-              <div class="text-subtitle2">Speed</div>
-              <q-input v-model="slewStore.speeds.azimuth" type="number" outlined dense suffix="°/s"
-                :disable="!slewStore.selectedAxes.azimuth" step="0.01" placeholder="0.00"
-                @update:model-value="formatSpeed('azimuth')" @focus="clearValue('azimuth')"
-                @blur="handleBlur('azimuth')" hide-bottom-space />
-            </q-card-section>
-          </q-card>
-        </div>
+                  <div class="text-subtitle2">Speed</div>
+                  <q-input v-model="slewStore.speeds.azimuth" type="number" outlined dense suffix="°/s"
+                    :disable="!slewStore.selectedAxes.azimuth" step="0.01" placeholder="0.00"
+                    @update:model-value="formatSpeed('azimuth')" @focus="clearValue('azimuth')"
+                    @blur="handleBlur('azimuth')" hide-bottom-space />
+                </q-card-section>
+              </q-card>
+            </div>
 
-        <!-- Elevation 패널 -->
-        <div class="col-12 col-md-4">
-          <q-card class="axis-panel" :class="{ 'disabled-panel': !slewStore.selectedAxes.elevation }">
-            <q-card-section>
-              <div class="axis-header q-mb-md">
-                <div class="checkbox-label-group">
-                  <q-checkbox v-model="slewStore.selectedAxes.elevation" color="primary" class="axis-checkbox" />
-                  <div class="text-h6 text-primary axis-title">Elevation</div>
-                </div>
-              </div>
+            <!-- Elevation 패널 -->
+            <div class="col-12 col-md-4">
+              <q-card class="axis-panel" :class="{ 'disabled-panel': !slewStore.selectedAxes.elevation }">
+                <q-card-section>
+                  <div class="axis-header q-mb-md">
+                    <div class="checkbox-label-group">
+                      <q-checkbox v-model="slewStore.selectedAxes.elevation" color="primary" class="axis-checkbox" />
+                      <div class="text-h6 text-primary axis-title">Elevation</div>
+                    </div>
+                  </div>
 
-              <div class="text-subtitle2">Speed</div>
-              <q-input v-model="slewStore.speeds.elevation" type="number" outlined dense suffix="°/s"
-                :disable="!slewStore.selectedAxes.elevation" step="0.01" placeholder="0.00"
-                @update:model-value="formatSpeed('elevation')" @focus="clearValue('elevation')"
-                @blur="handleBlur('elevation')" hide-bottom-space />
-            </q-card-section>
-          </q-card>
-        </div>
+                  <div class="text-subtitle2">Speed</div>
+                  <q-input v-model="slewStore.speeds.elevation" type="number" outlined dense suffix="°/s"
+                    :disable="!slewStore.selectedAxes.elevation" step="0.01" placeholder="0.00"
+                    @update:model-value="formatSpeed('elevation')" @focus="clearValue('elevation')"
+                    @blur="handleBlur('elevation')" hide-bottom-space />
+                </q-card-section>
+              </q-card>
+            </div>
 
-        <!-- Tilt 패널 -->
-        <div class="col-12 col-md-4">
-          <q-card class="axis-panel" :class="{ 'disabled-panel': !slewStore.selectedAxes.train }">
-            <q-card-section>
-              <div class="axis-header q-mb-md">
-                <div class="checkbox-label-group">
-                  <q-checkbox v-model="slewStore.selectedAxes.train" color="primary" class="axis-checkbox" />
-                  <div class="text-h6 text-primary axis-title">Tilt</div>
-                </div>
-              </div>
+            <!-- Tilt 패널 -->
+            <div class="col-12 col-md-4">
+              <q-card class="axis-panel" :class="{ 'disabled-panel': !slewStore.selectedAxes.train }">
+                <q-card-section>
+                  <div class="axis-header q-mb-md">
+                    <div class="checkbox-label-group">
+                      <q-checkbox v-model="slewStore.selectedAxes.train" color="primary" class="axis-checkbox" />
+                      <div class="text-h6 text-primary axis-title">Tilt</div>
+                    </div>
+                  </div>
 
-              <div class="text-subtitle2">Speed</div>
-              <q-input v-model="slewStore.speeds.train" type="number" outlined dense suffix="°/s"
-                :disable="!slewStore.selectedAxes.train" step="0.01" placeholder="0.00"
-                @update:model-value="formatSpeed('train')" @focus="clearValue('train')" @blur="handleBlur('train')"
-                hide-bottom-space />
-            </q-card-section>
-          </q-card>
-        </div>
-      </div>
+                  <div class="text-subtitle2">Speed</div>
+                  <q-input v-model="slewStore.speeds.train" type="number" outlined dense suffix="°/s"
+                    :disable="!slewStore.selectedAxes.train" step="0.01" placeholder="0.00"
+                    @update:model-value="formatSpeed('train')" @focus="clearValue('train')" @blur="handleBlur('train')"
+                    hide-bottom-space />
+                </q-card-section>
+              </q-card>
+            </div>
+          </div>
 
-        <!-- 제어 버튼 섹션 (Step 모드와 동일) -->
-        <div class="button-section mode-button-bar">
-          <div class="row justify-center q-gutter-md">
-            <q-btn label="Go" color="positive" icon="play_arrow" size="lg" :disable="!slewStore.isAnyAxisSelected()"
-              @click="handleGo" />
-            <q-btn label="Stop" color="negative" icon="stop" size="lg" @click="handleStop" />
-            <q-btn label="Stow" color="warning" icon="home" size="lg" @click="handleStow" />
+          <!-- 제어 버튼 섹션 (Step 모드와 동일) -->
+          <div class="button-section mode-button-bar">
+            <div class="row justify-center q-gutter-md">
+              <q-btn label="Go" color="positive" icon="play_arrow" size="lg" :disable="!slewStore.isAnyAxisSelected()"
+                @click="handleGo" />
+              <q-btn label="Stop" color="negative" icon="stop" size="lg" @click="handleStop" />
+              <q-btn label="Stow" color="warning" icon="home" size="lg" @click="handleStow" />
+            </div>
           </div>
         </div>
-      </div>
       </q-card>
     </div>
   </div>
@@ -188,12 +188,9 @@ const handleBlur = (axis: 'azimuth' | 'elevation' | 'train') => {
 <style scoped>
 /* Step 모드와 동일한 중앙 집중형 스타일 */
 .slew-mode {
-  height: 100%;
   width: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  /* ✅ height: 100% 제거 - mode-shell의 높이 설정 사용 */
+  /* ✅ justify-content와 align-items 제거 - mode-shell에서 처리 */
 }
 
 /* 전체 섹션 간격 최소화 */

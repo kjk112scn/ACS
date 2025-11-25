@@ -200,7 +200,7 @@
                     <span class="info-label">시작/종료 시간:</span>
                     <span class="info-value">{{
                       formatToLocalTime(selectedScheduleInfo.startTime)
-                      }} / {{
+                    }} / {{
                         formatToLocalTime(selectedScheduleInfo.endTime)
                       }}</span>
                   </div>
@@ -230,7 +230,7 @@
                       <span class="info-label">권장 Train 각도:</span>
                       <span class="info-value text-positive">{{
                         safeToFixed(selectedScheduleInfo.recommendedTrainAngle, 6)
-                        }}°</span>
+                      }}°</span>
                     </div>
                     <div class="info-row">
                       <span class="info-label">최대 Azimuth 속도:</span>
@@ -2764,8 +2764,7 @@ div.ephemeris-mode {
   /* ✅ 하단 마진 제거 */
   padding-bottom: 0 !important;
   /* ✅ 하단 패딩 제거 */
-  min-height: auto !important;
-  /* ✅ 최소 높이 제거 */
+  /* ✅ min-height는 공통 CSS의 var(--theme-layout-modePageMinHeight, 500px) 사용 */
   max-height: none !important;
   /* ✅ 최대 높이 제거 */
   display: flex !important;

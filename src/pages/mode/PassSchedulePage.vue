@@ -2662,8 +2662,7 @@ div.pass-schedule-mode {
   /* ✅ 하단 마진 제거 */
   padding-bottom: 0 !important;
   /* ✅ 하단 패딩 제거 */
-  min-height: auto !important;
-  /* ✅ 최소 높이 제거 */
+  /* ✅ min-height는 공통 CSS의 var(--theme-layout-modePageMinHeight, 500px) 사용 */
   max-height: none !important;
   /* ✅ 최대 높이 제거 */
   display: flex !important;

@@ -75,6 +75,12 @@ export interface ThemeConfig {
     xl: string // 2rem (32px)
   }
 
+  // 레이아웃 시스템
+  layout: {
+    modePageMinHeight: string // 모드 페이지 최소 높이 (기본: 500px)
+    modePageContentHeight: string // 모드 페이지 콘텐츠 높이 (기본: 500px)
+  }
+
   // 테두리 시스템
   borders: {
     width: string
@@ -312,6 +318,12 @@ export const THEME_PRESETS: Record<string, ThemeConfig> = {
       xl: '2rem', // 32px
     },
 
+    // 레이아웃 시스템
+    layout: {
+      modePageMinHeight: '500px', // 모드 페이지 최소 높이
+      modePageContentHeight: '500px', // 모드 페이지 콘텐츠 높이
+    },
+
     // 테두리 시스템
     borders: {
       width: '1px',
@@ -464,6 +476,12 @@ export const THEME_PRESETS: Record<string, ThemeConfig> = {
       md: '1rem',
       lg: '1.5rem',
       xl: '2rem',
+    },
+
+    // 레이아웃 시스템
+    layout: {
+      modePageMinHeight: '500px', // 모드 페이지 최소 높이
+      modePageContentHeight: '500px', // 모드 페이지 콘텐츠 높이
     },
 
     // 테두리 시스템
@@ -639,6 +657,12 @@ export const THEME_PRESETS: Record<string, ThemeConfig> = {
       xl: '2rem', // 32px
     },
 
+    // 레이아웃 시스템
+    layout: {
+      modePageMinHeight: '500px', // 모드 페이지 최소 높이
+      modePageContentHeight: '500px', // 모드 페이지 콘텐츠 높이
+    },
+
     // 테두리 시스템
     borders: {
       width: '1px',
@@ -770,6 +794,13 @@ export function useTheme() {
     Object.entries(config.shadows).forEach(([key, value]) => {
       root.style.setProperty(`--theme-shadow-${key}`, value)
     })
+
+    // 레이아웃 변수 설정
+    if (config.layout) {
+      Object.entries(config.layout).forEach(([key, value]) => {
+        root.style.setProperty(`--theme-layout-${key}`, value)
+      })
+    }
 
     // Quasar 색상 변수도 업데이트
     root.style.setProperty('--q-primary', config.colors.primary)

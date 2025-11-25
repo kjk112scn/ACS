@@ -25,7 +25,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.azimuthSpeed)
-              }}</q-item-label>
+                }}</q-item-label>
             </div>
           </div>
         </q-card-section>
@@ -53,7 +53,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.elevationSpeed)
-              }}</q-item-label>
+                }}</q-item-label>
             </div>
           </div>
         </q-card-section>
@@ -81,7 +81,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.trainSpeed)
-              }}</q-item-label>
+                }}</q-item-label>
             </div>
           </div>
         </q-card-section>
@@ -246,8 +246,8 @@
     <!-- 모드 선택 탭 -->
     <q-card flat bordered class="mode-selection-section">
       <q-card-section class="mode-selection-wrapper">
-        <q-tabs v-model="currentMode" class="text-primary compact-tabs" active-color="white" indicator-color="transparent"
-          align="left" narrow-indicator dense>
+        <q-tabs v-model="currentMode" class="text-primary compact-tabs" active-color="white"
+          indicator-color="transparent" align="left" narrow-indicator dense>
           <q-tab name="standby" label="Standby" icon="pause_circle_outline" inline-label class="mode-tab"
             :class="{ 'mode-tab--active': currentMode === 'standby' }" @click="navigateToMode('standby')" />
           <q-tab name="step" label="Step" icon="stairs" inline-label class="mode-tab"
