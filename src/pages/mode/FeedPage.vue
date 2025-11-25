@@ -86,7 +86,7 @@
                       <!-- 중앙: 하나의 스위치 -->
                       <div class="rf-switch-container">
                         <div class="rf-switch-icon" :class="getRFSwitchStatusClass()" @click="toggleRFSwitch()">
-                          <svg viewBox="0 0 24 24" width="60" height="60">
+                          <svg viewBox="0 0 24 24" width="80" height="80">
                             <rect x="2" y="2" width="20" height="20" rx="2" :fill="getRFSwitchFillColor()"
                               :stroke="getRFSwitchStrokeColor()" stroke-width="2" />
                             <!-- RHCP 경로 -->
@@ -706,9 +706,20 @@ q-page-container .feed-mode {
   flex: 1 1 auto !important;
   display: flex !important;
   flex-direction: column !important;
-  min-height: 0 !important;
-  /* ✅ min-height: 0으로 설정하여 flex item이 축소 가능하도록 함 */
+  justify-content: center !important;
+  align-items: stretch !important;
+  min-height: auto !important;
+  /* ✅ min-height: auto로 설정하여 flex 컨테이너가 내용에 맞게 크기를 조정하도록 */
   /* ✅ flex: 1 1 auto로 남은 공간을 채우도록 설정 */
+  /* ✅ justify-content: center로 행들을 가운데 정렬 */
+  /* ✅ align-items: stretch로 자식 요소들이 전체 너비를 사용하도록 */
+}
+
+/* ✅ LEGEND 섹션은 상단 정렬로 오버라이드 */
+.feed-container .row>[class*="col-"] .control-section:has(.legend-grid) .q-card-section,
+.feed-container .row>[class*="col-"] .control-section:has(.legend-grid) .q-card__section {
+  justify-content: flex-start !important;
+  /* ✅ Legend를 X-BAND 라벨과 동일한 선상에 위치 (상단 정렬) */
 }
 
 /* ✅ 마지막 row 하단 여백 제거 */
@@ -721,8 +732,10 @@ q-page-container .feed-mode {
   display: flex !important;
   flex-direction: column !important;
   flex: 1 1 auto !important;
+  justify-content: center !important;
   min-height: 0 !important;
   /* ✅ flex: 1 1 auto로 남은 공간을 채우고, min-height: 0으로 축소 가능하도록 설정 */
+  /* ✅ justify-content: center로 행들을 가운데 정렬 */
   background-color: var(--theme-card-background);
   /* ✅ border, border-radius, box-shadow는 mode-common.scss에서 통일 관리 */
   /* ✅ col의 높이에 맞춰 늘어나도록 flex 설정 */
@@ -743,17 +756,23 @@ q-page-container .feed-mode {
 .feed-container .row>[class*="col-"] .control-section :deep(.q-card-section) {
   padding-top: 0.75rem;
   /* ✅ S-Band와 X-Band 모두 동일한 상단 패딩으로 수평 정렬 */
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  /* ✅ 행들을 가운데 정렬 */
 }
 
 .feed-container .row>[class*="col-"] .feed-path-section {
   margin-bottom: 0.5rem;
   /* ✅ 섹션 간 간격 (1·2행 섹션과 3행 섹션 사이) */
+  flex-shrink: 0;
+  /* ✅ flex item이 축소되지 않도록 설정 */
 }
 
 .feed-container .row>[class*="col-"] .feed-path {
   margin-bottom: 0.5rem;
-  padding: 2.2rem 1rem 0.375rem 1rem;
-  /* ✅ 모든 행 간격은 .feed-path의 margin-bottom으로만 제어 */
+  /* ✅ .feed-path의 패딩이 직접 설정되므로 여기서는 패딩 제거 */
+  /* padding은 .feed-path에서 직접 관리 */
 }
 
 /* 각 feed-path-section 내 마지막 feed-path는 margin 제거 */
@@ -773,11 +792,12 @@ q-page-container .feed-mode {
   padding-top: 0.75rem;
   padding-bottom: 0.456rem;
   padding-left: 0.75rem;
-  padding-right: 0.75rem;
+  padding-right: calc(1.05rem + 0.3125rem);
+  /* ✅ 우측 패딩 추가 5px 증가: 1.05rem → 1.05rem + 0.3125rem (5px) */
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  /* ✅ Legend 컨텐츠를 수직 가운데 정렬 */
+  justify-content: flex-start !important;
+  /* ✅ Legend를 X-BAND 라벨과 동일한 선상에 위치 (상단 정렬) - !important로 오버라이드 */
   flex: 1 1 auto !important;
   min-height: 0 !important;
   /* ✅ Legend 섹션이 S-Band와 동일한 높이를 유지하도록 flex 설정 */
@@ -792,7 +812,7 @@ q-page-container .feed-mode {
 /* 마지막 feed-path-section의 하단 여백 제거 */
 .feed-container .row>[class*="col-"] .feed-path-section:last-of-type {
   margin-bottom: 0 !important;
-  /* ✅ !important로 우선순위 강제 - 마지막 섹션은 여백 없음 */
+  /* ✅ 3행 아래 공간 제거하여 가운데 정렬 가능하도록 */
 }
 
 /* S-Band 스위치 섹션과 X-Band FAN 섹션을 같은 선상에 배치 */
@@ -827,14 +847,18 @@ q-page-container .feed-mode {
 
 .feed-path {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: center !important;
+  justify-content: center !important;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
-  /* ✅ RHCP와 LHCP 사이 간격을 LHCP와 스위치 사이 간격(0.5rem)과 동일하게 설정 */
-  /* LNA 라벨이 위로 25px(약 1.5rem) 나가 있으므로, LNA 위의 공간과 하단 공간을 동일하게 맞춤 */
-  /* 하단 패딩을 더 줄여서 아래 공간을 최소화 */
-  padding: 2.2rem 1rem 0.375rem 1rem;
+  /* ✅ 복잡한 패딩 계산 대신 단순하고 명확한 패딩 사용 */
+  /* ✅ 상하 패딩을 동일하게 설정하고 flex 정렬에 의존 */
+  padding: 1.5rem 1rem;
+  /* ✅ 상하 패딩 동일: 1.5rem (24px) */
+  height: 115px !important;
+  min-height: 115px !important;
+  max-height: 115px !important;
+  box-sizing: border-box !important;
   border-radius: 6px;
   background-color: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -843,16 +867,26 @@ q-page-container .feed-mode {
   overflow: visible;
   /* 테두리 안의 전체 내용을 가운데 정렬 */
   width: 100%;
+  /* ✅ 내부 컨텐츠를 완전히 가운데 정렬하기 위한 추가 설정 */
+  /* ✅ 좌우 균형을 맞추기 위해 내부 요소들의 flex 속성 조정 */
+  /* ✅ 수평 정렬을 위해 내부 요소들을 감싸는 wrapper처럼 동작하도록 설정 */
+  flex-wrap: nowrap;
+  /* ✅ 수직 정렬을 강제하기 위해 추가 설정 */
+  align-content: center;
 }
 
 .rf-switch-path {
-  padding: 0.6rem 1rem 0.375rem 1rem !important;
-  /* ✅ LNA 라벨이 없으므로 상단 패딩을 줄임 (2.2rem → 0.6rem) */
-  justify-content: center;
-  align-items: center;
+  /* ✅ 상하 패딩을 동일하게 설정하고 flex 정렬에 의존 */
+  padding: 1.5rem 1rem !important;
+  /* ✅ 상하 패딩 동일: 1.5rem (24px) */
+  height: 115px !important;
+  min-height: 115px !important;
+  max-height: 115px !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
   /* ✅ 스위치 행을 상하좌우 가운데 정렬 */
-  min-height: calc(60px + 2.2rem);
-  /* ✅ 1행과 동일한 최소 높이 확보 */
 }
 
 /* feed-path-section 내부의 마지막 feed-path는 margin-bottom 제거 (feed-path-section의 margin-bottom이 적용됨) */
@@ -870,15 +904,25 @@ q-page-container .feed-mode {
   text-align: right;
   /* 화살표와 평행하게 배치 - path-content와 같은 높이로 맞춤 */
   display: flex;
-  align-items: center;
+  align-items: center !important;
   justify-content: flex-end;
+  /* ✅ 고정 높이 제거, min-height만 사용하여 유연성 확보 */
+  /* ✅ 하지만 align-items: center가 제대로 작동하도록 height도 설정 */
+  min-height: 60px;
   height: 60px;
   padding-top: 0;
   padding-right: 0;
   /* 반응형: 작은 화면에서도 비례적으로 줄어들도록 */
   flex-shrink: 0;
-  /* 화살표와 수평 정렬을 위해 transform 추가 */
-  transform: translateY(2px);
+  /* ✅ 수직 가운데 정렬을 위해 transform 제거 */
+  transform: none;
+  /* ✅ 좌우 균형을 맞추기 위해 margin 제거 */
+  margin: 0;
+  /* ✅ 수평 정렬을 위해 flex 속성 조정 */
+  flex-grow: 0;
+  flex-basis: auto;
+  /* ✅ 수직 정렬을 강제하기 위해 추가 설정 */
+  align-self: center;
 }
 
 .path-label-group {
@@ -889,26 +933,35 @@ q-page-container .feed-mode {
   font-weight: 500;
   color: var(--theme-text);
   text-align: right;
+  /* ✅ 좌우 균형을 맞추기 위해 margin 초기화 */
+  margin: 0;
 }
 
 .path-content {
   display: flex;
-  align-items: center;
+  align-items: center !important;
   justify-content: center;
   gap: 0;
   /* flex: 1을 제거하여 내용에 맞는 너비만 사용 */
   position: relative;
+  /* ✅ 고정 높이 제거, min-height만 사용하여 유연성 확보 */
+  /* ✅ 하지만 align-items: center가 제대로 작동하도록 height도 설정 */
   min-height: 60px;
   height: 60px;
   /* feed-path의 배경색과 통일되도록 배경색 제거 */
   background-color: transparent;
   /* 첫 번째 요소(화살표) 앞의 간격을 feed-path의 gap과 동일하게 */
-  margin-left: 0;
-  margin-right: 0;
+  margin: 0;
+  /* ✅ 좌우 균형을 맞추기 위해 margin 초기화 */
   /* 반응형: 작은 화면에서도 요소들이 함께 줄어들도록 */
   min-width: 0;
   /* 내부 요소들이 가운데 정렬되도록 */
   flex-shrink: 0;
+  /* ✅ 수평 정렬을 위해 너비를 내용에 맞게 조정 */
+  width: auto;
+  max-width: 100%;
+  /* ✅ 수직 정렬을 강제하기 위해 추가 설정 */
+  align-self: center;
 }
 
 /* 화살표와 출력 라벨 사이 간격 추가 - Tx (Selective)의 gap: 0.5rem과 동일하게 */
@@ -933,11 +986,14 @@ q-page-container .feed-mode {
   min-width: 80px;
   width: 80px;
   max-width: 80px;
+  /* ✅ 고정 높이 제거, min-height만 사용하여 유연성 확보 */
+  /* ✅ 하지만 align-items: center가 제대로 작동하도록 height도 설정 */
+  min-height: 60px;
   height: 60px;
   /* 삼각형과 화살표를 붙이기 위한 마진 조정 */
   margin: 0;
-  /* 화살표를 삼각형과 완벽하게 정렬 - 조금 더 아래로 내림 */
-  transform: translateY(2px);
+  /* ✅ 수직 가운데 정렬을 위해 transform 제거 */
+  transform: none;
   /* 반응형: 작은 화면에서도 비례적으로 줄어들도록 */
   flex-shrink: 1;
 }
@@ -992,9 +1048,11 @@ q-page-container .feed-mode {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  /* 라벨을 위쪽에 배치 */
+  /* ✅ 고정 높이 유지 */
   height: 60px;
-  /* 삼각형과 화살표를 붙이기 위한 마진 조정 */
+  /* ✅ 마진 제거 */
   margin: 0;
   /* 반응형: 작은 화면에서도 비례적으로 줄어들도록 */
   flex-shrink: 0;
@@ -1003,8 +1061,7 @@ q-page-container .feed-mode {
 
 .lna-label {
   position: absolute;
-  /* LNA 라벨을 삼각형 위에 위치하도록 조정 - 조금 내려서 삼각형에 더 가깝게 */
-  top: -25px;
+  top: -15px;
   left: 50%;
   transform: translateX(-50%);
   font-size: 0.75rem;
@@ -1020,25 +1077,36 @@ q-page-container .feed-mode {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* ✅ 고정 높이 제거, min-height만 사용하여 유연성 확보 */
+  /* ✅ 하지만 align-items: center가 제대로 작동하도록 height도 설정 */
+  min-height: 60px;
   height: 60px;
   /* 화살표와 정확히 정렬하기 위한 미세 조정 */
-  position: relative;
-  /* 삼각형을 화살표와 완벽하게 정렬 - 화살표와 평행하게 맞춤 */
-  transform: translateY(1px);
+  position: relative !important;
+  /* LNA 라벨의 기준점 - !important로 우선순위 확보 */
+  /* ✅ 수직 가운데 정렬을 위해 transform 제거 */
+  transform: none;
+  /* flex 컨테이너이지만 absolute 자식 요소를 위한 설정 */
+  flex-wrap: nowrap;
 }
 
 .rf-switch-wrapper {
   display: flex;
-  align-items: center;
+  align-items: center !important;
+  /* 강제로 가운데 정렬 */
   gap: 1rem;
   padding: 0;
   border-radius: 0;
   background-color: transparent;
   border: none;
-  min-height: 60px;
-  justify-content: center;
+  min-height: 80px !important;
+  /* ✅ 모든 요소가 80px이므로 최소 높이도 80px */
+  height: 100% !important;
+  /* 부모 높이에 맞춤 */
+  justify-content: center !important;
   flex-wrap: wrap;
-  margin: 0;
+  margin: 0 !important;
+  /* ✅ 좌우 균형을 맞추기 위해 margin 초기화 */
   width: auto;
   /* ✅ 폭 제한 제거하여 컨텐츠 크기만큼만 사용하고 가운데 정렬 */
   max-width: 100%;
@@ -1057,8 +1125,9 @@ q-page-container .feed-mode {
   min-width: 70px;
   width: 70px;
   /* Rx 경로의 path-label과 동일한 너비 */
-  height: 60px;
-  /* 라벨 컨테이너 높이를 화살표와 동일하게 */
+  height: 80px;
+  /* ✅ 스위치 아이콘과 동일한 높이로 맞춤 */
+  /* 라벨 컨테이너 높이를 스위치 아이콘과 동일하게 */
   /* RHCP(Tx), LHCP(Tx) 라벨 사이 간격을 더 좁게 조정 */
 }
 
@@ -1070,8 +1139,10 @@ q-page-container .feed-mode {
   align-items: center;
   justify-content: flex-end;
   padding: 0;
-  /* 스위치 아이콘과 평행하게 정렬 */
-  transform: translateY(2px);
+  /* ✅ 수직 가운데 정렬을 위해 transform 제거 */
+  transform: none;
+  /* ✅ 좌우 균형을 맞추기 위해 margin 초기화 */
+  margin: 0;
 }
 
 .rf-switch-content {
@@ -1082,6 +1153,8 @@ q-page-container .feed-mode {
   flex: 1;
   /* 스위치와 화살표를 붙이기 위해 gap 제거 */
   /* path-content의 justify-content: center가 적용되지 않도록 명시적으로 설정 */
+  /* ✅ 좌우 균형을 맞추기 위해 margin 초기화 */
+  margin: 0;
 }
 
 .rf-switch-inputs-container {
@@ -1092,8 +1165,9 @@ q-page-container .feed-mode {
   align-items: center;
   min-width: 80px;
   width: 80px;
-  /* Rx 경로의 화살표와 동일한 너비로 정렬, 높이는 두 개의 화살표가 세로로 배치되므로 60px */
-  height: 60px;
+  /* Rx 경로의 화살표와 동일한 너비로 정렬 */
+  height: 80px;
+  /* ✅ 스위치 아이콘과 동일한 높이로 맞춤 */
   /* RHCP(Tx), LHCP(Tx) 화살표 사이 간격을 라벨과 동일하게 더 좁게 조정 */
 }
 
@@ -1116,10 +1190,9 @@ q-page-container .feed-mode {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  height: 60px;
-  /* 라벨과 화살표 묶음의 중앙과 스위치 아이콘을 평행하게 정렬 */
-  /* RHCP(Tx), LHCP(Tx) 라벨 2개 + gap의 중앙에 맞추기 위해 더 내림 */
-  transform: translateY(4px);
+  height: 80px;
+  /* ✅ 스위치 아이콘과 동일한 높이로 맞춤 */
+  /* ✅ 모든 요소(라벨, 화살표, 스위치)를 80px로 통일하여 정렬 문제 해결 */
 }
 
 .rf-switch-output-group {
@@ -1128,7 +1201,8 @@ q-page-container .feed-mode {
   gap: 0.5rem;
   margin-left: 0;
   /* 화살표와 출력 라벨 사이 간격 - RHCP(Rx) 라벨과 화살표 사이 간격과 동일하게 */
-  height: 60px;
+  height: 80px;
+  /* ✅ 스위치 아이콘과 동일한 높이로 맞춤 */
 }
 
 .arrow-left {
@@ -1185,6 +1259,21 @@ q-page-container .feed-mode {
   cursor: pointer;
   transition: transform 0.2s ease, opacity 0.2s ease;
   user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ✅ 스위치 아이콘 - 80px 컨테이너에 80px 아이콘이므로 정렬이 자동으로 맞춰짐 */
+
+/* ✅ 스위치 아이콘 SVG 크기 증가 */
+.rf-switch-icon svg {
+  width: 80px !important;
+  height: 80px !important;
+  min-width: 80px !important;
+  min-height: 80px !important;
+  max-width: 80px !important;
+  max-height: 80px !important;
 }
 
 /* Quasar q-btn 컴포넌트에 직접 스타일 적용 */
@@ -1200,9 +1289,10 @@ q-page-container .feed-mode {
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
-  /* 스위치 컨테이너와 동일한 높이로 설정하여 섹션 높이 통일 */
+  /* ✅ FAN 버튼 높이 감소 */
   height: 60px !important;
   min-height: 60px !important;
+  max-height: 60px !important;
   /* .fan-section이 align-items: center로 설정되어 있으므로 버튼이 자동으로 가운데 정렬됨 */
   /* transform 제거하여 자연스러운 가운데 정렬 유지 */
   transform: none !important;
@@ -1232,8 +1322,8 @@ q-page-container .feed-mode {
 .lna-icon svg {
   display: block;
   vertical-align: middle;
-  /* 삼각형을 화살표와 완벽하게 정렬 - 화살표와 평행하게 맞춤 */
-  transform: translateY(1px);
+  /* ✅ 수직 가운데 정렬을 위해 transform 제거 */
+  transform: none;
 }
 
 .lna-icon:hover,
@@ -1248,7 +1338,11 @@ q-page-container .feed-mode {
 
 .lna-icon:active,
 .rf-switch-icon:active {
-  transform: scale(0.95);
+  transform: scale(0.95) !important;
+}
+
+.rf-switch-icon:hover {
+  transform: scale(1.05) !important;
 }
 
 .fan-button:active,
@@ -1264,12 +1358,15 @@ q-page-container .feed-mode {
   /* 카드 중앙 정렬을 위해 높이와 정렬 명시 */
   display: flex;
   align-items: center;
+  /* ✅ 고정 높이 제거, min-height만 사용하여 유연성 확보 */
+  /* ✅ 하지만 align-items: center가 제대로 작동하도록 height도 설정 */
+  min-height: 60px;
   height: 60px;
   /* 반응형: 작은 화면에서도 비례적으로 줄어들도록 */
   min-width: 0;
   flex-shrink: 1;
-  /* 화살표와 수평 정렬을 위해 transform 추가 */
-  transform: translateY(2px);
+  /* ✅ 수직 가운데 정렬을 위해 transform 제거 */
+  transform: none;
   /* 화살표와의 간격을 명확히 하기 위해 왼쪽 마진 제거 */
   margin-left: 0 !important;
   padding-left: 0 !important;
@@ -1285,13 +1382,17 @@ q-page-container .feed-mode {
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  padding: 0.6rem 1rem 0.375rem 1rem;
-  /* ✅ S-Band 3행(.rf-switch-path)과 동일한 패딩 적용 */
+  /* ✅ 복잡한 패딩 계산 대신 단순하고 명확한 패딩 사용 */
+  /* ✅ 상하 패딩을 동일하게 설정하고 flex 정렬에 의존 */
+  padding: 1.5rem 1rem;
+  /* ✅ 상하 패딩 동일: 1.5rem (24px) */
+  height: 115px !important;
+  min-height: 115px !important;
+  max-height: 115px !important;
+  box-sizing: border-box !important;
   margin-top: 0;
   margin-bottom: 0.5rem;
   /* ✅ 1·2행과 동일한 간격 */
-  min-height: calc(60px + 2.2rem);
-  /* ✅ 1행과 동일한 최소 높이 확보 */
   border-radius: 6px;
   background-color: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1303,6 +1404,8 @@ q-page-container .feed-mode {
   justify-content: center;
   align-items: center;
   /* 스위치 테두리 기준으로 가운데 수평 정렬 */
+  /* ✅ 좌우 균형을 맞추기 위해 margin 초기화 */
+  margin: 0;
   width: 100%;
   /* 버튼이 컨테이너 중앙에 위치하도록 */
 }
@@ -1312,7 +1415,8 @@ q-page-container .feed-mode {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 0.5rem 0.5rem 0.25rem 0.75rem;
+  padding: 0.5rem calc(0.65rem + 0.3125rem + 0.3125rem) 0.25rem 0.75rem;
+  /* ✅ 우측 패딩 추가 5px 증가: 0.65rem + 0.3125rem → 0.65rem + 0.3125rem + 0.3125rem (추가 5px) */
   /* 범례 항목들을 왼쪽 정렬 */
   align-items: flex-start;
   /* 최소 너비 제한 제거 */
@@ -1333,6 +1437,10 @@ q-page-container .feed-mode {
 
 .legend-icon {
   flex-shrink: 0;
+  width: 32px !important;
+  /* ✅ 아이콘 크기 증가: 24px → 32px */
+  height: 32px !important;
+  /* ✅ 아이콘 크기 증가: 24px → 32px */
 }
 
 .legend-text {
@@ -1425,7 +1533,8 @@ q-page-container .feed-mode {
 
 @media (max-width: 768px) {
   .feed-path {
-    padding: 2rem 0.75rem 0.375rem 0.75rem;
+    padding: calc(2rem + 0.3125rem) 0.75rem calc(0.375rem + 0.3125rem) 0.75rem;
+    /* ✅ 높이를 5px씩 증가: padding-top과 padding-bottom에 각각 0.3125rem(5px) 추가 */
   }
 
   .arrow-container {
