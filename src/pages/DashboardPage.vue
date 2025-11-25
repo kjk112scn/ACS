@@ -4,7 +4,7 @@
     <!-- 기존의 q-card와 q-card-section 제거하고 axis-grid만 남기기 -->
     <div class="axis-grid">
       <!-- Azimuth 축 데이터 -->
-      <q-card class="axis-card azimuth-card">
+      <q-card :class="['axis-card', 'azimuth-card', motorStateBorderClassMap[azimuthMotorState]]">
         <q-card-section>
           <div class="text-subtitle1 text-weight-bold text-center">Azimuth</div>
 
@@ -25,14 +25,19 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.azimuthSpeed)
-              }}</q-item-label>
+                }}</q-item-label>
+            </div>
+            <div class="axis-data-item axis-data-item--motor">
+              <div class="motor-status-chip" :class="motorStateCardClassMap[azimuthMotorState]">
+                {{ motorStateLabels[azimuthMotorState] }}
+              </div>
             </div>
           </div>
         </q-card-section>
       </q-card>
 
       <!-- Elevation 축 데이터 -->
-      <q-card class="axis-card elevation-card">
+      <q-card :class="['axis-card', 'elevation-card', motorStateBorderClassMap[elevationMotorState]]">
         <q-card-section>
           <div class="text-subtitle1 text-weight-bold text-center">Elevation</div>
 
@@ -53,14 +58,19 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.elevationSpeed)
-              }}</q-item-label>
+                }}</q-item-label>
+            </div>
+            <div class="axis-data-item axis-data-item--motor">
+              <div class="motor-status-chip" :class="motorStateCardClassMap[elevationMotorState]">
+                {{ motorStateLabels[elevationMotorState] }}
+              </div>
             </div>
           </div>
         </q-card-section>
       </q-card>
 
       <!-- Tilt 축 데이터 -->
-      <q-card class="axis-card tilt-card">
+      <q-card :class="['axis-card', 'tilt-card', motorStateBorderClassMap[trainMotorState]]">
         <q-card-section>
           <div class="text-subtitle1 text-weight-bold text-center">Tilt</div>
 
@@ -81,7 +91,12 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.trainSpeed)
-              }}</q-item-label>
+                }}</q-item-label>
+            </div>
+            <div class="axis-data-item axis-data-item--motor">
+              <div class="motor-status-chip" :class="motorStateCardClassMap[trainMotorState]">
+                {{ motorStateLabels[trainMotorState] }}
+              </div>
             </div>
           </div>
         </q-card-section>
@@ -127,7 +142,7 @@
         </q-dialog>
 
         <!-- Control 카드 -->
-        <q-card class="control-card">
+        <q-card :class="['control-card', controlCardClass]">
           <q-card-section>
             <div class="text-subtitle1 text-weight-bold">Control</div>
             <div class="control-content">
@@ -135,7 +150,8 @@
                 <!-- 1행: Control LED 인디케이터 -->
                 <div class="control-status-item">
                   <div class="control-led-container">
-                    <div class="control-led led-control"></div>
+                    <div class="control-led" :class="controlLedState === 'active' ? 'led-control' : 'led-inactive'">
+                    </div>
                     <span class="control-label">Control</span>
                   </div>
                 </div>
@@ -157,7 +173,7 @@
       </div>
 
       <!-- Status 카드 -->
-      <q-card class="status-card">
+      <q-card :class="['status-card', statusCardHasError ? 'status-card--error' : 'status-card--normal']">
         <q-card-section>
           <div class="text-subtitle1 text-weight-bold">Status</div>
           <div class="status-content">
@@ -400,6 +416,120 @@ const stowPinActive = computed(() => {
     icdStore.azimuthBoardStatusInfo.stowPin ||
     icdStore.elevationBoardStatusInfo.stowPin
   )
+})
+
+/**
+ * Status 카드의 전체 오류 상태를 계산합니다.
+ * Emergency, Positioner, Feed, Protocol, Power 중 하나라도 에러면 true입니다.
+ */
+const statusCardHasError = computed(() => {
+  return (
+    errorEmergencyActive.value ||
+    errorPositionerActive.value ||
+    errorFeedActive.value ||
+    errorProtocolActive.value ||
+    errorPowerActive.value
+  )
+})
+
+/**
+ * Control LED 상태 (현재 단순 상태 값, 후속 기능에서 제어 가능)
+ */
+const controlLedState = ref<'active' | 'inactive'>('active')
+
+const controlCardClass = computed(() => {
+  return controlLedState.value === 'active' ? 'control-card--active' : 'control-card--inactive'
+})
+
+type MotorState = 'MOVING' | 'STANDBY' | 'ERROR'
+
+const motorStateLabels: Record<MotorState, string> = {
+  MOVING: 'MOVING',
+  STANDBY: 'STANDBY',
+  ERROR: 'ERROR',
+}
+
+const motorStateCardClassMap: Record<MotorState, string> = {
+  MOVING: 'motor-status--moving',
+  STANDBY: 'motor-status--standby',
+  ERROR: 'motor-status--error',
+}
+
+const motorStateBorderClassMap: Record<MotorState, string> = {
+  MOVING: 'axis-card--moving',
+  STANDBY: 'axis-card--standby',
+  ERROR: 'axis-card--error',
+}
+
+/**
+ * 각 축의 서보 상태를 기준으로 모터 상태를 계산합니다.
+ * @param servoMotor - 모터 구동 여부
+ * @param servoBrake - 브레이크 체결 여부
+ * @param errorSources - 에러로 간주되는 센서 목록
+ */
+const determineMotorState = ({
+  servoMotor,
+  servoBrake,
+  errorSources,
+}: {
+  servoMotor: boolean
+  servoBrake: boolean
+  errorSources: boolean[]
+}): MotorState => {
+  if (errorSources.some(Boolean)) {
+    return 'ERROR'
+  }
+
+  if (servoMotor) {
+    return 'MOVING'
+  }
+
+  if (servoBrake) {
+    return 'STANDBY'
+  }
+
+  return 'STANDBY'
+}
+
+const azimuthMotorState = computed<MotorState>(() => {
+  return determineMotorState({
+    servoMotor: Boolean(icdStore.azimuthBoardServoStatusInfo.servoMotor),
+    servoBrake: Boolean(icdStore.azimuthBoardServoStatusInfo.servoBrake),
+    errorSources: [
+      icdStore.azimuthBoardStatusInfo.limitSwitchNegative275,
+      icdStore.azimuthBoardStatusInfo.limitSwitchPositive275,
+      icdStore.azimuthBoardStatusInfo.encoder,
+      icdStore.azimuthBoardServoStatusInfo.servoAlarm,
+    ],
+  })
+})
+
+const elevationMotorState = computed<MotorState>(() => {
+  return determineMotorState({
+    servoMotor: Boolean(icdStore.elevationBoardServoStatusInfo.servoMotor),
+    servoBrake: Boolean(icdStore.elevationBoardServoStatusInfo.servoBrake),
+    errorSources: [
+      icdStore.elevationBoardStatusInfo.limitSwitchNegative5,
+      icdStore.elevationBoardStatusInfo.limitSwitchNegative0,
+      icdStore.elevationBoardStatusInfo.limitSwitchPositive180,
+      icdStore.elevationBoardStatusInfo.limitSwitchPositive185,
+      icdStore.elevationBoardStatusInfo.encoder,
+      icdStore.elevationBoardServoStatusInfo.servoAlarm,
+    ],
+  })
+})
+
+const trainMotorState = computed<MotorState>(() => {
+  return determineMotorState({
+    servoMotor: Boolean(icdStore.trainBoardServoStatusInfo.servoMotor),
+    servoBrake: Boolean(icdStore.trainBoardServoStatusInfo.servoBrake),
+    errorSources: [
+      icdStore.trainBoardStatusInfo.limitSwitchNegative275,
+      icdStore.trainBoardStatusInfo.limitSwitchPositive275,
+      icdStore.trainBoardStatusInfo.encoder,
+      icdStore.trainBoardServoStatusInfo.servoAlarm,
+    ],
+  })
 })
 
 // 추가 상태 LED들
@@ -1726,11 +1856,78 @@ const handleAllStatus = () => {
 
 .axis-data-row {
   margin-top: 0.05rem !important;
-  /* 상단 마진 50% 감소: 0.1rem → 0.05rem (약 0.8px) - margin-top: auto 제거 */
+  /* 상단 마진 50% 감소: 0.1rem → 0.05rem (약 0.8px) */
   margin-bottom: 0;
   padding-bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.12rem;
+  align-items: center;
+  max-width: 340px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.axis-data-item {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.08rem;
+  padding: 0.1rem 0.25rem;
+}
+
+.axis-data-item:first-child {
+  justify-self: start;
+  margin-left: 0.12rem;
+}
+
+.axis-data-item--motor {
+  align-items: center;
+  justify-self: end;
+  margin-right: 0.12rem;
+}
+
+.motor-status-chip {
+  min-width: 110px;
+  padding: 0.5rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  text-align: center;
+  border: 1px solid transparent;
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.motor-status--moving {
+  border-color: var(--theme-led-normal);
+  color: var(--theme-led-normal);
+  box-shadow: 0 0 6px rgba(76, 175, 80, 0.35);
+}
+
+.motor-status--standby {
+  border-color: var(--theme-primary);
+  color: var(--theme-primary);
+  box-shadow: 0 0 6px rgba(33, 150, 243, 0.35);
+}
+
+.motor-status--error {
+  border-color: var(--theme-led-error);
+  color: var(--theme-led-error);
+  box-shadow: 0 0 6px rgba(244, 67, 54, 0.4);
+}
+
+.axis-card--moving {
+  border-top-color: var(--theme-led-normal) !important;
+}
+
+.axis-card--standby {
+  border-top-color: var(--theme-primary) !important;
+}
+
+.axis-card--error {
+  border-top-color: var(--theme-led-error) !important;
 }
 
 /* 주석: .azimuth-card .text-subtitle1 등에서 이미 스타일이 설정되어 있으므로 중복 제거 */
@@ -1800,6 +1997,14 @@ const handleAllStatus = () => {
   flex: 1;
   /* ✅ Emergency와 동일한 flex 설정 */
   box-shadow: 0 2px 4px var(--theme-shadow-light);
+}
+
+.control-card--active {
+  border-top-color: var(--theme-led-normal) !important;
+}
+
+.control-card--inactive {
+  border-top-color: var(--theme-led-inactive) !important;
 }
 
 /* Control 카드 하단 패딩 줄이기 */
@@ -1893,6 +2098,14 @@ const handleAllStatus = () => {
   border-radius: 8px;
   height: 100%;
   box-shadow: 0 2px 4px var(--theme-shadow-light);
+}
+
+.status-card--normal {
+  border-top-color: var(--theme-led-normal) !important;
+}
+
+.status-card--error {
+  border-top-color: var(--theme-led-error) !important;
 }
 
 /* Status 카드 하단 패딩 줄이기 */
@@ -2013,13 +2226,6 @@ const handleAllStatus = () => {
   margin-top: 0.1rem;
   margin-bottom: 0;
   padding-bottom: 0;
-}
-
-.axis-data-item {
-  flex: 1;
-  text-align: center;
-  padding: 0.1rem 0.5rem;
-  margin-bottom: 0;
 }
 
 /* q-item-label 마진 제거 */
