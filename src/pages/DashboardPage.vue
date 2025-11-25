@@ -1742,6 +1742,8 @@ const handleAllStatus = () => {
   flex-direction: column;
   gap: 0.5rem;
   height: 100%;
+  /* ✅ Control 카드 위치 고정을 위해 align-items 설정 */
+  align-items: stretch;
 }
 
 /* Emergency 카드 - 빨간색 상단 테두리 유지 */
@@ -1752,8 +1754,18 @@ const handleAllStatus = () => {
   border-top: 5px solid #f44336 !important;
   /* 빨간색 상단 테두리 유지하되 두께는 5px로 증가 */
   border-radius: 8px;
-  flex: 1;
+  flex: 0.6;
+  /* ✅ flex 비율을 0.6으로 낮춰 Emergency 영역 높이를 추가 축소 */
   box-shadow: 0 2px 4px var(--theme-shadow-light);
+}
+
+/* Emergency 카드 - 빨간색 상단 테두리 유지 */
+.emergency-card .q-card-section {
+  padding: 0.5rem 1rem !important;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  /* ✅ 높이를 100%로 설정하여 카드 크기 고정 */
 }
 
 .emergency-content {
@@ -1763,16 +1775,20 @@ const handleAllStatus = () => {
   /* 버튼이 전체 높이를 사용하도록 */
   justify-content: center;
   padding: 0.5rem 0;
-  /* Control과 Status와 동일한 패딩으로 통일 */
+  /* ✅ Control과 Status와 동일한 패딩으로 통일 */
 }
 
-/* Emergency Stop 버튼 높이 50% 감소 */
+/* Emergency Stop 버튼 높이 - Control에 영향 없도록 조정 */
 .emergency-content .q-btn {
-  height: 50% !important;
-  min-height: 40px !important;
-  font-size: 0.9rem !important;
+  height: 77% !important;
+  /* ✅ Emergency 버튼 높이를 10% 증가 */
+  min-height: 61px !important;
+  /* ✅ 버튼 최소 높이도 동일 비율로 증가 */
+  font-size: 0.93rem !important;
+  /* ✅ 폰트 크기 유지 */
   font-weight: 600 !important;
-  padding: 0.5rem 0.5rem !important;
+  padding: 0.55rem 0.75rem !important;
+  /* ✅ 패딩 유지 */
 }
 
 /* Control 카드 - 밝은 회색 테두리 */
@@ -1782,6 +1798,7 @@ const handleAllStatus = () => {
   border-top: 5px solid var(--theme-border) !important;
   border-radius: 8px;
   flex: 1;
+  /* ✅ Emergency와 동일한 flex 설정 */
   box-shadow: 0 2px 4px var(--theme-shadow-light);
 }
 

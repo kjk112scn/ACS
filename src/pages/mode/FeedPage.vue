@@ -611,14 +611,14 @@ const toggleFan = async () => {
 
 <style scoped>
 /* ✅ router-view, q-page-container 내부의 feed-mode 하단 여백 제거 - 다른 페이지들과 동일 */
+/* ✅ mode-common.scss의 높이 제한을 따르도록 설정 (500px - 34px - 16px = 450px) */
 router-view .feed-mode,
 q-page-container .feed-mode,
 q-page .feed-mode,
 .feed-mode,
 [class*="feed-mode"],
 div.feed-mode {
-  height: auto !important;
-  /* ✅ height: 100% 제거하여 내용에 맞게 조정 */
+  /* ✅ mode-common.scss의 높이 제한을 따르도록 height: auto 제거 */
   width: 100%;
   padding: 0 !important;
   margin: 0 !important;
@@ -626,9 +626,9 @@ div.feed-mode {
   /* ✅ 하단 마진 제거 */
   padding-bottom: 0 !important;
   /* ✅ 하단 패딩 제거 */
-  /* ✅ min-height는 공통 CSS의 var(--theme-layout-modePageMinHeight, 500px) 사용 */
-  max-height: none !important;
-  /* ✅ 최대 높이 제거 */
+  /* ✅ mode-common.scss에서 높이 제한 설정 (450px) */
+  overflow: visible !important;
+  /* ✅ 테두리가 보이도록 overflow: visible로 변경 */
   display: flex !important;
   /* ✅ flexbox로 변경 */
   flex-direction: column !important;
@@ -744,12 +744,12 @@ q-page-container .feed-mode {
 /* q-card-section의 패딩 조정 */
 .control-section :deep(.q-card-section) {
   padding-top: 0.75rem;
-  padding-bottom: 0.456rem;
+  padding-bottom: 0.25rem;
+  /* ✅ 하단 패딩 감소: 0.456rem → 0.25rem (테두리가 보이도록 공간 확보) */
   flex: 1 !important;
   display: flex !important;
   flex-direction: column !important;
   /* ✅ 모든 q-card-section이 동일한 높이를 가지도록 flex 설정 */
-  /* ✅ 높이 조정: padding-bottom을 0.405rem → 0.456rem으로 증가 (498.66px → 499.47px) */
 }
 
 /* S-Band와 X-Band의 행을 수평으로 정렬하기 위한 스타일 */
@@ -790,7 +790,8 @@ q-page-container .feed-mode {
 
 .control-section:has(.legend-grid) :deep(.q-card-section) {
   padding-top: 0.75rem;
-  padding-bottom: 0.456rem;
+  padding-bottom: 0.25rem;
+  /* ✅ 하단 패딩 감소: 0.456rem → 0.25rem (테두리가 보이도록 공간 확보) */
   padding-left: 0.75rem;
   padding-right: calc(1.05rem + 0.3125rem);
   /* ✅ 우측 패딩 추가 5px 증가: 1.05rem → 1.05rem + 0.3125rem (5px) */
@@ -801,7 +802,6 @@ q-page-container .feed-mode {
   flex: 1 1 auto !important;
   min-height: 0 !important;
   /* ✅ Legend 섹션이 S-Band와 동일한 높이를 유지하도록 flex 설정 */
-  /* ✅ 높이 조정: padding-bottom을 0.375rem → 0.456rem으로 증가 (498.66px → 499.47px) */
 }
 
 .feed-path-section {
