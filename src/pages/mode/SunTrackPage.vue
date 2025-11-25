@@ -858,9 +858,10 @@ q-page-container .sun-track-mode {
 }
 
 /* ✅ 카드 스타일 통일 */
+/* ✅ 테두리는 mode-common.scss의 .control-section에서 통일 관리 */
 .control-section {
   background-color: var(--theme-card-background);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  /* ✅ border, border-radius, box-shadow는 mode-common.scss에서 통일 관리 */
   width: 100%;
   height: 100%;
   max-height: 500px;

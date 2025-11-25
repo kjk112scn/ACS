@@ -367,9 +367,10 @@ const handleStowCommand = async () => {
 }
 
 /* 축 패널 스타일 - 공간 최적화 */
+/* ✅ 테두리는 mode-common.scss의 .axis-panel에서 통일 관리 */
 .axis-panel {
   background-color: var(--theme-card-background);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  /* ✅ border, border-radius, box-shadow는 mode-common.scss에서 통일 관리 */
   height: 100%;
   min-height: 200px;
   /* 높이 줄임 */

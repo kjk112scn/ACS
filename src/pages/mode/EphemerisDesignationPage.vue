@@ -200,7 +200,7 @@
                     <span class="info-label">시작/종료 시간:</span>
                     <span class="info-value">{{
                       formatToLocalTime(selectedScheduleInfo.startTime)
-                    }} / {{
+                      }} / {{
                         formatToLocalTime(selectedScheduleInfo.endTime)
                       }}</span>
                   </div>
@@ -230,7 +230,7 @@
                       <span class="info-label">권장 Train 각도:</span>
                       <span class="info-value text-positive">{{
                         safeToFixed(selectedScheduleInfo.recommendedTrainAngle, 6)
-                      }}°</span>
+                        }}°</span>
                     </div>
                     <div class="info-row">
                       <span class="info-label">최대 Azimuth 속도:</span>
@@ -2910,7 +2910,7 @@ q-page-container .ephemeris-mode {
   /* ✅ PassSchedulePage.vue와 동일하게 설정 */
   width: 100%;
   background-color: var(--theme-card-background);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  /* ✅ border, border-radius, box-shadow는 mode-common.scss에서 통일 관리 */
   /* ✅ EphemerisDesignationPage.vue와 동일한 높이를 위해 flex 추가 - 내부 구성 변경 없음 */
   display: flex;
   flex-direction: column;

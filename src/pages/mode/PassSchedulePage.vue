@@ -2763,7 +2763,7 @@ q-page-container .pass-schedule-mode {
   max-height: 500px;
   width: 100%;
   background-color: var(--theme-card-background);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  /* ✅ border, border-radius, box-shadow는 mode-common.scss에서 통일 관리 */
   /* ✅ EphemerisDesignationPage.vue와 동일한 높이를 위해 flex 추가 - 내부 구성 변경 없음 */
   display: flex;
   flex-direction: column;

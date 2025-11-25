@@ -9,23 +9,23 @@
             <div class="col-12 col-md-4">
               <q-card class="axis-panel" :class="{ 'disabled-panel': !stepStore.selectedAxes.azimuth }">
                 <q-card-section>
-              <div class="axis-header q-mb-md">
-                <div class="checkbox-label-group">
-                  <q-checkbox v-model="stepStore.selectedAxes.azimuth" color="primary" class="axis-checkbox" />
-                  <div class="text-h6 text-primary axis-title">Azimuth</div>
-                </div>
-              </div>
+                  <div class="axis-header q-mb-md">
+                    <div class="checkbox-label-group">
+                      <q-checkbox v-model="stepStore.selectedAxes.azimuth" color="primary" class="axis-checkbox" />
+                      <div class="text-h6 text-primary axis-title">Azimuth</div>
+                    </div>
+                  </div>
 
-              <div class="text-subtitle2">Angle</div>
-              <q-input v-model="stepStore.angles.azimuth" type="number" outlined dense class="q-mb-sm" suffix="°"
-                :disable="!stepStore.selectedAxes.azimuth" step="0.01" placeholder="0.00"
-                @update:model-value="formatAngle('azimuth')" @focus="clearValue('angles', 'azimuth')"
-                @blur="handleBlur('angles', 'azimuth')" hide-bottom-space />
+                  <div class="text-subtitle2">Angle</div>
+                  <q-input v-model="stepStore.angles.azimuth" type="number" outlined dense class="q-mb-sm" suffix="°"
+                    :disable="!stepStore.selectedAxes.azimuth" step="0.01" placeholder="0.00"
+                    @update:model-value="formatAngle('azimuth')" @focus="clearValue('angles', 'azimuth')"
+                    @blur="handleBlur('angles', 'azimuth')" hide-bottom-space />
 
-              <div class="text-subtitle2">Speed</div>
-              <q-input v-model="stepStore.speeds.azimuth" type="number" outlined dense suffix="°/s"
-                :disable="!stepStore.selectedAxes.azimuth" min="0" step="0.01" placeholder="0.00"
-                @update:model-value="formatSpeed('azimuth')" @focus="clearValue('speeds', 'azimuth')"
+                  <div class="text-subtitle2">Speed</div>
+                  <q-input v-model="stepStore.speeds.azimuth" type="number" outlined dense suffix="°/s"
+                    :disable="!stepStore.selectedAxes.azimuth" min="0" step="0.01" placeholder="0.00"
+                    @update:model-value="formatSpeed('azimuth')" @focus="clearValue('speeds', 'azimuth')"
                     @blur="handleBlur('speeds', 'azimuth')" hide-bottom-space />
                 </q-card-section>
               </q-card>
@@ -35,23 +35,23 @@
             <div class="col-12 col-md-4">
               <q-card class="axis-panel" :class="{ 'disabled-panel': !stepStore.selectedAxes.elevation }">
                 <q-card-section>
-              <div class="axis-header q-mb-md">
-                <div class="checkbox-label-group">
-                  <q-checkbox v-model="stepStore.selectedAxes.elevation" color="primary" class="axis-checkbox" />
-                  <div class="text-h6 text-primary axis-title">Elevation</div>
-                </div>
-              </div>
+                  <div class="axis-header q-mb-md">
+                    <div class="checkbox-label-group">
+                      <q-checkbox v-model="stepStore.selectedAxes.elevation" color="primary" class="axis-checkbox" />
+                      <div class="text-h6 text-primary axis-title">Elevation</div>
+                    </div>
+                  </div>
 
-              <div class="text-subtitle2">Angle</div>
-              <q-input v-model="stepStore.angles.elevation" type="number" outlined dense class="q-mb-sm" suffix="°"
-                :disable="!stepStore.selectedAxes.elevation" step="0.01" placeholder="0.00"
-                @update:model-value="formatAngle('elevation')" @focus="clearValue('angles', 'elevation')"
-                @blur="handleBlur('angles', 'elevation')" hide-bottom-space />
+                  <div class="text-subtitle2">Angle</div>
+                  <q-input v-model="stepStore.angles.elevation" type="number" outlined dense class="q-mb-sm" suffix="°"
+                    :disable="!stepStore.selectedAxes.elevation" step="0.01" placeholder="0.00"
+                    @update:model-value="formatAngle('elevation')" @focus="clearValue('angles', 'elevation')"
+                    @blur="handleBlur('angles', 'elevation')" hide-bottom-space />
 
-              <div class="text-subtitle2">Speed</div>
-              <q-input v-model="stepStore.speeds.elevation" type="number" outlined dense suffix="°/s"
-                :disable="!stepStore.selectedAxes.elevation" min="0" step="0.01" placeholder="0.00"
-                @update:model-value="formatSpeed('elevation')" @focus="clearValue('speeds', 'elevation')"
+                  <div class="text-subtitle2">Speed</div>
+                  <q-input v-model="stepStore.speeds.elevation" type="number" outlined dense suffix="°/s"
+                    :disable="!stepStore.selectedAxes.elevation" min="0" step="0.01" placeholder="0.00"
+                    @update:model-value="formatSpeed('elevation')" @focus="clearValue('speeds', 'elevation')"
                     @blur="handleBlur('speeds', 'elevation')" hide-bottom-space />
                 </q-card-section>
               </q-card>
@@ -61,23 +61,23 @@
             <div class="col-12 col-md-4">
               <q-card class="axis-panel" :class="{ 'disabled-panel': !stepStore.selectedAxes.train }">
                 <q-card-section>
-              <div class="axis-header q-mb-md">
-                <div class="checkbox-label-group">
-                  <q-checkbox v-model="stepStore.selectedAxes.train" color="primary" class="axis-checkbox" />
-                  <div class="text-h6 text-primary axis-title">Tilt</div>
-                </div>
-              </div>
+                  <div class="axis-header q-mb-md">
+                    <div class="checkbox-label-group">
+                      <q-checkbox v-model="stepStore.selectedAxes.train" color="primary" class="axis-checkbox" />
+                      <div class="text-h6 text-primary axis-title">Tilt</div>
+                    </div>
+                  </div>
 
-              <div class="text-subtitle2">Angle</div>
-              <q-input v-model="stepStore.angles.train" type="number" outlined dense class="q-mb-sm" suffix="°"
-                :disable="!stepStore.selectedAxes.train" step="0.01" placeholder="0.00"
-                @update:model-value="formatAngle('train')" @focus="clearValue('angles', 'train')"
-                @blur="handleBlur('angles', 'train')" hide-bottom-space />
+                  <div class="text-subtitle2">Angle</div>
+                  <q-input v-model="stepStore.angles.train" type="number" outlined dense class="q-mb-sm" suffix="°"
+                    :disable="!stepStore.selectedAxes.train" step="0.01" placeholder="0.00"
+                    @update:model-value="formatAngle('train')" @focus="clearValue('angles', 'train')"
+                    @blur="handleBlur('angles', 'train')" hide-bottom-space />
 
-              <div class="text-subtitle2">Speed</div>
-              <q-input v-model="stepStore.speeds.train" type="number" outlined dense suffix="°/s"
-                :disable="!stepStore.selectedAxes.train" min="0" step="0.01" placeholder="0.00"
-                @update:model-value="formatSpeed('train')" @focus="clearValue('speeds', 'train')"
+                  <div class="text-subtitle2">Speed</div>
+                  <q-input v-model="stepStore.speeds.train" type="number" outlined dense suffix="°/s"
+                    :disable="!stepStore.selectedAxes.train" min="0" step="0.01" placeholder="0.00"
+                    @update:model-value="formatSpeed('train')" @focus="clearValue('speeds', 'train')"
                     @blur="handleBlur('speeds', 'train')" hide-bottom-space />
                 </q-card-section>
               </q-card>
@@ -296,9 +296,10 @@ const handleBlur = (type: 'speeds' | 'angles', axis: 'azimuth' | 'elevation' | '
 }
 
 /* 축 패널 스타일 - 공간 최적화 */
+/* ✅ 테두리는 mode-common.scss의 .axis-panel에서 통일 관리 */
 .axis-panel {
   background-color: var(--theme-card-background);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  /* ✅ border, border-radius, box-shadow는 mode-common.scss에서 통일 관리 */
   height: 100%;
   min-height: 200px;
   /* 높이 줄임 */

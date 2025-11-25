@@ -724,7 +724,7 @@ q-page-container .feed-mode {
   min-height: 0 !important;
   /* ✅ flex: 1 1 auto로 남은 공간을 채우고, min-height: 0으로 축소 가능하도록 설정 */
   background-color: var(--theme-card-background);
-  border: 1px solid var(--theme-border);
+  /* ✅ border, border-radius, box-shadow는 mode-common.scss에서 통일 관리 */
   /* ✅ col의 높이에 맞춰 늘어나도록 flex 설정 */
 }
 
