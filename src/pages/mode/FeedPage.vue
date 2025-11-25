@@ -7,121 +7,122 @@
           <q-card class="control-section">
             <q-card-section>
               <div class="text-h6 text-primary q-mb-sm">S-Band</div>
-
-              <!-- S-Band Rx Paths -->
-              <div class="feed-path-section">
-                <!-- RHCP(Rx) Path -->
-                <div class="feed-path">
-                  <div class="path-label">RHCP(Rx)</div>
-                  <div class="path-content">
-                    <div class="arrow-container">
-                      <div class="arrow-line"></div>
-                      <div class="current-display-above">{{ formatCurrent(icdStore.currentSBandLNARHCP) }} A</div>
-                    </div>
-                    <div class="lna-wrapper">
-                      <div class="lna-label">LNA</div>
-                      <div class="lna-container">
-                        <div class="lna-icon" :class="getLNAStatusClass('s', 'rhcp')" @click="toggleLNA('s', 'rhcp')">
-                          <svg viewBox="0 0 24 24" width="60" height="60">
-                            <polygon points="22,12 2,2 2,22" :fill="getLNAFillColor('s', 'rhcp')"
-                              :stroke="getLNAStrokeColor('s', 'rhcp')" stroke-width="2" />
-                          </svg>
+              <div class="feed-path-wrapper">
+                <!-- S-Band Rx Paths -->
+                <div class="feed-path-section">
+                  <!-- RHCP(Rx) Path -->
+                  <div class="feed-path">
+                    <div class="path-label">RHCP(Rx)</div>
+                    <div class="path-content">
+                      <div class="arrow-container">
+                        <div class="arrow-line"></div>
+                        <div class="current-display-above">{{ formatCurrent(icdStore.currentSBandLNARHCP) }} A</div>
+                      </div>
+                      <div class="lna-wrapper">
+                        <div class="lna-label">LNA</div>
+                        <div class="lna-container">
+                          <div class="lna-icon" :class="getLNAStatusClass('s', 'rhcp')" @click="toggleLNA('s', 'rhcp')">
+                            <svg viewBox="0 0 24 24" width="60" height="60">
+                              <polygon points="22,12 2,2 2,22" :fill="getLNAFillColor('s', 'rhcp')"
+                                :stroke="getLNAStrokeColor('s', 'rhcp')" stroke-width="2" />
+                            </svg>
+                          </div>
                         </div>
                       </div>
+                      <div class="arrow-container">
+                        <div class="arrow-line"></div>
+                      </div>
+                      <div class="path-output">TM RHCP</div>
                     </div>
-                    <div class="arrow-container">
-                      <div class="arrow-line"></div>
+                  </div>
+
+                  <!-- LHCP(Rx) Path -->
+                  <div class="feed-path">
+                    <div class="path-label">LHCP(Rx)</div>
+                    <div class="path-content">
+                      <div class="arrow-container">
+                        <div class="arrow-line"></div>
+                        <div class="current-display-above">{{ formatCurrent(icdStore.currentSBandLNALHCP) }} A</div>
+                      </div>
+                      <div class="lna-wrapper">
+                        <div class="lna-label">LNA</div>
+                        <div class="lna-container">
+                          <div class="lna-icon" :class="getLNAStatusClass('s', 'lhcp')" @click="toggleLNA('s', 'lhcp')">
+                            <svg viewBox="0 0 24 24" width="60" height="60">
+                              <polygon points="22,12 2,2 2,22" :fill="getLNAFillColor('s', 'lhcp')"
+                                :stroke="getLNAStrokeColor('s', 'lhcp')" stroke-width="2" />
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="arrow-container">
+                        <div class="arrow-line"></div>
+                      </div>
+                      <div class="path-output">TM LHCP</div>
                     </div>
-                    <div class="path-output">TM RHCP</div>
                   </div>
                 </div>
 
-                <!-- LHCP(Rx) Path -->
-                <div class="feed-path">
-                  <div class="path-label">LHCP(Rx)</div>
-                  <div class="path-content">
-                    <div class="arrow-container">
-                      <div class="arrow-line"></div>
-                      <div class="current-display-above">{{ formatCurrent(icdStore.currentSBandLNALHCP) }} A</div>
-                    </div>
-                    <div class="lna-wrapper">
-                      <div class="lna-label">LNA</div>
-                      <div class="lna-container">
-                        <div class="lna-icon" :class="getLNAStatusClass('s', 'lhcp')" @click="toggleLNA('s', 'lhcp')">
-                          <svg viewBox="0 0 24 24" width="60" height="60">
-                            <polygon points="22,12 2,2 2,22" :fill="getLNAFillColor('s', 'lhcp')"
-                              :stroke="getLNAStrokeColor('s', 'lhcp')" stroke-width="2" />
-                          </svg>
-                        </div>
+                <!-- S-Band Tx Path -->
+                <div class="feed-path-section rf-switch-section">
+                  <div class="feed-path rf-switch-path">
+                    <div class="rf-switch-wrapper">
+                      <!-- 왼쪽: 입력 라벨 (Rx 경로와 동일한 구조) -->
+                      <div class="path-label-group rf-switch-labels">
+                        <div class="path-label">RHCP(Tx)</div>
+                        <div class="path-label">LHCP(Tx)</div>
                       </div>
-                    </div>
-                    <div class="arrow-container">
-                      <div class="arrow-line"></div>
-                    </div>
-                    <div class="path-output">TM LHCP</div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- S-Band Tx Path -->
-              <div class="feed-path-section rf-switch-section">
-                <div class="feed-path rf-switch-path">
-                  <div class="rf-switch-wrapper">
-                    <!-- 왼쪽: 입력 라벨 (Rx 경로와 동일한 구조) -->
-                    <div class="path-label-group rf-switch-labels">
-                      <div class="path-label">RHCP(Tx)</div>
-                      <div class="path-label">LHCP(Tx)</div>
-                    </div>
-                    <!-- 오른쪽: 스위치와 출력 -->
-                    <div class="path-content rf-switch-content">
-                      <!-- 왼쪽 입력 화살표들 -->
-                      <div class="rf-switch-inputs-container">
-                        <div class="arrow-container arrow-left rf-switch-arrow">
-                          <div class="arrow-line"></div>
+                      <!-- 오른쪽: 스위치와 출력 -->
+                      <div class="path-content rf-switch-content">
+                        <!-- 왼쪽 입력 화살표들 -->
+                        <div class="rf-switch-inputs-container">
+                          <div class="arrow-container arrow-left rf-switch-arrow">
+                            <div class="arrow-line"></div>
+                          </div>
+                          <div class="arrow-container arrow-left rf-switch-arrow">
+                            <div class="arrow-line"></div>
+                          </div>
                         </div>
-                        <div class="arrow-container arrow-left rf-switch-arrow">
-                          <div class="arrow-line"></div>
+                        <!-- 중앙: 하나의 스위치 -->
+                        <div class="rf-switch-container">
+                          <div class="rf-switch-icon" :class="getRFSwitchStatusClass()" @click="toggleRFSwitch()">
+                            <svg viewBox="0 0 24 24" width="80" height="80">
+                              <rect x="2" y="2" width="20" height="20" rx="2" :fill="getRFSwitchFillColor()"
+                                :stroke="getRFSwitchStrokeColor()" stroke-width="2" />
+                              <!-- RHCP 경로 -->
+                              <template v-if="icdStore.feedSBoardStatusInfo.rfSwitchStatus.isRHCP">
+                                <line x1="6" y1="7.5" x2="16.5" y2="12" :stroke="getRFSwitchLineColor()"
+                                  stroke-width="1" />
+                                <circle cx="6" cy="6" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
+                                  stroke-width="1" />
+                                <circle cx="18" cy="12" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
+                                  stroke-width="1" />
+                                <circle cx="6" cy="18" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
+                                  stroke-width="1" />
+                              </template>
+                              <!-- LHCP 경로 -->
+                              <template v-else>
+                                <line x1="6" y1="16.5" x2="16.5" y2="12" :stroke="getRFSwitchLineColor()"
+                                  stroke-width="1" />
+                                <circle cx="6" cy="18" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
+                                  stroke-width="1" />
+                                <circle cx="18" cy="12" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
+                                  stroke-width="1" />
+                                <circle cx="6" cy="6" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
+                                  stroke-width="1" />
+                              </template>
+                            </svg>
+                          </div>
                         </div>
-                      </div>
-                      <!-- 중앙: 하나의 스위치 -->
-                      <div class="rf-switch-container">
-                        <div class="rf-switch-icon" :class="getRFSwitchStatusClass()" @click="toggleRFSwitch()">
-                          <svg viewBox="0 0 24 24" width="80" height="80">
-                            <rect x="2" y="2" width="20" height="20" rx="2" :fill="getRFSwitchFillColor()"
-                              :stroke="getRFSwitchStrokeColor()" stroke-width="2" />
-                            <!-- RHCP 경로 -->
-                            <template v-if="icdStore.feedSBoardStatusInfo.rfSwitchStatus.isRHCP">
-                              <line x1="6" y1="7.5" x2="16.5" y2="12" :stroke="getRFSwitchLineColor()"
-                                stroke-width="1" />
-                              <circle cx="6" cy="6" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
-                                stroke-width="1" />
-                              <circle cx="18" cy="12" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
-                                stroke-width="1" />
-                              <circle cx="6" cy="18" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
-                                stroke-width="1" />
-                            </template>
-                            <!-- LHCP 경로 -->
-                            <template v-else>
-                              <line x1="6" y1="16.5" x2="16.5" y2="12" :stroke="getRFSwitchLineColor()"
-                                stroke-width="1" />
-                              <circle cx="6" cy="18" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
-                                stroke-width="1" />
-                              <circle cx="18" cy="12" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
-                                stroke-width="1" />
-                              <circle cx="6" cy="6" r="1.5" fill="none" :stroke="getRFSwitchLineColor()"
-                                stroke-width="1" />
-                            </template>
-                          </svg>
-                        </div>
-                      </div>
-                      <!-- 오른쪽: 출력 -->
-                      <div class="rf-switch-output-group">
-                        <div class="arrow-container arrow-left rf-switch-arrow">
-                          <div class="arrow-line"></div>
-                        </div>
-                        <div class="path-output-multiline">
-                          <div>Tx (Selective)</div>
-                          <div>RHCP or LHCP</div>
+                        <!-- 오른쪽: 출력 -->
+                        <div class="rf-switch-output-group">
+                          <div class="arrow-container arrow-left rf-switch-arrow">
+                            <div class="arrow-line"></div>
+                          </div>
+                          <div class="path-output-multiline">
+                            <div>Tx (Selective)</div>
+                            <div>RHCP or LHCP</div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -137,84 +138,85 @@
           <q-card class="control-section">
             <q-card-section>
               <div class="text-h6 text-primary q-mb-sm">X-Band</div>
-
-              <!-- X-Band Rx Paths -->
-              <div class="feed-path-section">
-                <!-- RHCP(Rx) Path -->
-                <div class="feed-path">
-                  <div class="path-label">RHCP(Rx)</div>
-                  <div class="path-content">
-                    <div class="arrow-container">
-                      <div class="arrow-line"></div>
-                      <div class="current-display-above">{{ formatCurrent(icdStore.currentXBandLNARHCP) }} A</div>
-                    </div>
-                    <div class="lna-wrapper">
-                      <div class="lna-label">LNA</div>
-                      <div class="lna-container">
-                        <div class="lna-icon" :class="getLNAStatusClass('x', 'rhcp')" @click="toggleLNA('x', 'rhcp')">
-                          <svg viewBox="0 0 24 24" width="60" height="60">
-                            <polygon points="22,12 2,2 2,22" :fill="getLNAFillColor('x', 'rhcp')"
-                              :stroke="getLNAStrokeColor('x', 'rhcp')" stroke-width="2" />
-                          </svg>
+              <div class="feed-path-wrapper">
+                <!-- X-Band Rx Paths -->
+                <div class="feed-path-section">
+                  <!-- RHCP(Rx) Path -->
+                  <div class="feed-path">
+                    <div class="path-label">RHCP(Rx)</div>
+                    <div class="path-content">
+                      <div class="arrow-container">
+                        <div class="arrow-line"></div>
+                        <div class="current-display-above">{{ formatCurrent(icdStore.currentXBandLNARHCP) }} A</div>
+                      </div>
+                      <div class="lna-wrapper">
+                        <div class="lna-label">LNA</div>
+                        <div class="lna-container">
+                          <div class="lna-icon" :class="getLNAStatusClass('x', 'rhcp')" @click="toggleLNA('x', 'rhcp')">
+                            <svg viewBox="0 0 24 24" width="60" height="60">
+                              <polygon points="22,12 2,2 2,22" :fill="getLNAFillColor('x', 'rhcp')"
+                                :stroke="getLNAStrokeColor('x', 'rhcp')" stroke-width="2" />
+                            </svg>
+                          </div>
                         </div>
                       </div>
+                      <div class="arrow-container">
+                        <div class="arrow-line"></div>
+                      </div>
+                      <div class="path-output">TM RHCP</div>
                     </div>
-                    <div class="arrow-container">
-                      <div class="arrow-line"></div>
+                  </div>
+
+                  <!-- LHCP(Rx) Path -->
+                  <div class="feed-path">
+                    <div class="path-label">LHCP(Rx)</div>
+                    <div class="path-content">
+                      <div class="arrow-container">
+                        <div class="arrow-line"></div>
+                        <div class="current-display-above">{{ formatCurrent(icdStore.currentXBandLNALHCP) }} A</div>
+                      </div>
+                      <div class="lna-wrapper">
+                        <div class="lna-label">LNA</div>
+                        <div class="lna-container">
+                          <div class="lna-icon" :class="getLNAStatusClass('x', 'lhcp')" @click="toggleLNA('x', 'lhcp')">
+                            <svg viewBox="0 0 24 24" width="60" height="60">
+                              <polygon points="22,12 2,2 2,22" :fill="getLNAFillColor('x', 'lhcp')"
+                                :stroke="getLNAStrokeColor('x', 'lhcp')" stroke-width="2" />
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="arrow-container">
+                        <div class="arrow-line"></div>
+                      </div>
+                      <div class="path-output">TM LHCP</div>
                     </div>
-                    <div class="path-output">TM RHCP</div>
                   </div>
                 </div>
 
-                <!-- LHCP(Rx) Path -->
-                <div class="feed-path">
-                  <div class="path-label">LHCP(Rx)</div>
-                  <div class="path-content">
-                    <div class="arrow-container">
-                      <div class="arrow-line"></div>
-                      <div class="current-display-above">{{ formatCurrent(icdStore.currentXBandLNALHCP) }} A</div>
-                    </div>
-                    <div class="lna-wrapper">
-                      <div class="lna-label">LNA</div>
-                      <div class="lna-container">
-                        <div class="lna-icon" :class="getLNAStatusClass('x', 'lhcp')" @click="toggleLNA('x', 'lhcp')">
-                          <svg viewBox="0 0 24 24" width="60" height="60">
-                            <polygon points="22,12 2,2 2,22" :fill="getLNAFillColor('x', 'lhcp')"
-                              :stroke="getLNAStrokeColor('x', 'lhcp')" stroke-width="2" />
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="arrow-container">
-                      <div class="arrow-line"></div>
-                    </div>
-                    <div class="path-output">TM LHCP</div>
+                <!-- FAN 섹션 (X-Band 안에 포함) -->
+                <div class="fan-section">
+                  <div class="fan-button-container">
+                    <q-btn :class="getFanStatusClass()" class="fan-button" :color="getFanButtonColor()"
+                      :outline="!icdStore.feedXBoardStatusInfo.fanStatus.isActive && !icdStore.feedXBoardStatusInfo.fanStatus.hasError"
+                      :flat="false" @click="toggleFan()">
+                      <svg class="fan-icon q-mr-sm" viewBox="0 0 24 24" width="20" height="20">
+                        <!-- 팬 외곽 원 -->
+                        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5" />
+                        <!-- 팬 블레이드 1 - 3개 블레이드로 선풍기 느낌 -->
+                        <path d="M12 12 L12 2 A10 10 0 0 1 19 7 L12 12 Z" fill="currentColor" opacity="0.6" />
+                        <!-- 팬 블레이드 2 -->
+                        <path d="M12 12 L20 19 A10 10 0 0 1 12 22 L12 12 Z" fill="currentColor" opacity="0.6" />
+                        <!-- 팬 블레이드 3 -->
+                        <path d="M12 12 L5 19 A10 10 0 0 1 4 7 L12 12 Z" fill="currentColor" opacity="0.6" />
+                        <!-- 중앙 원 -->
+                        <circle cx="12" cy="12" r="2.5" fill="currentColor" />
+                      </svg>
+                      <span class="fan-button-text">
+                        FAN {{ icdStore.feedXBoardStatusInfo.fanStatus.power }}
+                      </span>
+                    </q-btn>
                   </div>
-                </div>
-              </div>
-
-              <!-- FAN 섹션 (X-Band 안에 포함) -->
-              <div class="fan-section">
-                <div class="fan-button-container">
-                  <q-btn :class="getFanStatusClass()" class="fan-button" :color="getFanButtonColor()"
-                    :outline="!icdStore.feedXBoardStatusInfo.fanStatus.isActive && !icdStore.feedXBoardStatusInfo.fanStatus.hasError"
-                    :flat="false" @click="toggleFan()">
-                    <svg class="fan-icon q-mr-sm" viewBox="0 0 24 24" width="20" height="20">
-                      <!-- 팬 외곽 원 -->
-                      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5" />
-                      <!-- 팬 블레이드 1 - 3개 블레이드로 선풍기 느낌 -->
-                      <path d="M12 12 L12 2 A10 10 0 0 1 19 7 L12 12 Z" fill="currentColor" opacity="0.6" />
-                      <!-- 팬 블레이드 2 -->
-                      <path d="M12 12 L20 19 A10 10 0 0 1 12 22 L12 12 Z" fill="currentColor" opacity="0.6" />
-                      <!-- 팬 블레이드 3 -->
-                      <path d="M12 12 L5 19 A10 10 0 0 1 4 7 L12 12 Z" fill="currentColor" opacity="0.6" />
-                      <!-- 중앙 원 -->
-                      <circle cx="12" cy="12" r="2.5" fill="currentColor" />
-                    </svg>
-                    <span class="fan-button-text">
-                      FAN {{ icdStore.feedXBoardStatusInfo.fanStatus.power }}
-                    </span>
-                  </q-btn>
                 </div>
               </div>
             </q-card-section>
@@ -706,7 +708,7 @@ q-page-container .feed-mode {
   flex: 1 1 auto !important;
   display: flex !important;
   flex-direction: column !important;
-  justify-content: center !important;
+  justify-content: flex-start !important;
   align-items: stretch !important;
   min-height: auto !important;
   /* ✅ min-height: auto로 설정하여 flex 컨테이너가 내용에 맞게 크기를 조정하도록 */
@@ -749,7 +751,7 @@ q-page-container .feed-mode {
   flex: 1 !important;
   display: flex !important;
   flex-direction: column !important;
-  /* ✅ 모든 q-card-section이 동일한 높이를 가지도록 flex 설정 */
+  justify-content: flex-start !important;
 }
 
 /* S-Band와 X-Band의 행을 수평으로 정렬하기 위한 스타일 */
@@ -758,7 +760,7 @@ q-page-container .feed-mode {
   /* ✅ S-Band와 X-Band 모두 동일한 상단 패딩으로 수평 정렬 */
   display: flex !important;
   flex-direction: column !important;
-  justify-content: center !important;
+  justify-content: flex-start !important;
   /* ✅ 행들을 가운데 정렬 */
 }
 
@@ -873,6 +875,39 @@ q-page-container .feed-mode {
   flex-wrap: nowrap;
   /* ✅ 수직 정렬을 강제하기 위해 추가 설정 */
   align-content: center;
+}
+
+.feed-path-wrapper {
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.feed-path-wrapper .feed-path,
+.feed-path-wrapper .rf-switch-path {
+  background-color: transparent;
+  border: none;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+.feed-path-wrapper .fan-section {
+  background-color: transparent;
+  border: none;
+  padding: 1.5rem 0.5rem;
+  margin: 0;
+  height: 115px !important;
+  min-height: 115px !important;
+  max-height: 115px !important;
+  box-sizing: border-box !important;
+}
+
+.feed-path-wrapper .fan-button-container {
+  margin: 0;
 }
 
 .rf-switch-path {
