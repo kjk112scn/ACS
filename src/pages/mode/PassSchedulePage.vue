@@ -1193,6 +1193,29 @@ const handleDeactivated = () => {
   }
 }
 
+// ✅ localStorage 자동 저장을 위한 watch 설정
+watch(
+  [
+    () => passScheduleStore.predictedTrackingPath,
+    () => passScheduleStore.actualTrackingPath,
+    () => passScheduleStore.selectedSchedule,
+    () => passScheduleStore.selectedScheduleList,
+  ],
+  () => {
+    // ✅ 디바운스 처리 (500ms)
+    if (saveTimeout) {
+      clearTimeout(saveTimeout)
+    }
+    saveTimeout = window.setTimeout(() => {
+      passScheduleStore.saveToLocalStorage()
+    }, 500)
+  },
+  { deep: true }
+)
+
+// ✅ 저장 타이머 변수
+let saveTimeout: number | null = null
+
 // 🆕 Vue 생명주기 훅 등록
 onActivated(handleActivated)
 onDeactivated(handleDeactivated)
@@ -1505,8 +1528,22 @@ const handleTLEUpload = async () => {
       height: 860,
       modalClass: 'tle-upload-modal',
       onClose: () => {
-        console.log('TLE 업로드 모달 닫힘')
-        // 모달 닫힌 후 스케줄 데이터 새로고침
+        void (async () => {
+          console.log('TLE 업로드 모달 닫힘')
+
+          // ✅ TLE 업로드 후 스케줄 데이터 갱신
+          // 업로드가 성공했을 가능성이 있으므로 스케줄 데이터를 강제로 다시 로드
+          try {
+            console.log('🔄 TLE 업로드 후 스케줄 데이터 갱신 시작')
+
+            // ✅ 최신 스케줄 데이터 로드 (fetchScheduleDataFromServer가 내부에서 자동으로 덮어씀)
+            await passScheduleStore.fetchScheduleDataFromServer()
+
+            console.log('✅ 스케줄 데이터 갱신 완료:', passScheduleStore.scheduleData.length, '개')
+          } catch (error) {
+            console.error('❌ 스케줄 데이터 갱신 실패:', error)
+          }
+        })()
       },
       onError: (error) => {
         console.error('TLE 업로드 모달 오류:', error)
@@ -2041,6 +2078,29 @@ const selectScheduleData = async () => {
   try {
     console.log('스케줄 선택 모달 열기')
 
+    // ✅ 모달을 열 때 항상 최신 데이터 확인 (TLE 업로드 후 반영을 위해)
+    // 데이터가 없거나, 마지막 로드 후 시간이 지났으면 다시 로드
+    const shouldReload =
+      passScheduleStore.scheduleData.length === 0 ||
+      !passScheduleStore.scheduleData.length // 데이터가 없으면 로드
+
+    if (shouldReload) {
+      console.log('📡 스케줄 데이터 로드 시작')
+      try {
+        await passScheduleStore.fetchScheduleDataFromServer()
+        console.log('✅ 스케줄 데이터 로드 완료:', passScheduleStore.scheduleData.length, '개')
+      } catch (error) {
+        console.error('❌ 스케줄 데이터 로드 실패:', error)
+        $q.notify({
+          type: 'negative',
+          message: '스케줄 데이터를 불러오는데 실패했습니다',
+        })
+        return
+      }
+    } else {
+      console.log('✅ 기존 스케줄 데이터 사용:', passScheduleStore.scheduleData.length, '개')
+    }
+
     const modal = await openModal('select-schedule', {
       width: 1200,
       height: 700,
@@ -2482,11 +2542,22 @@ onMounted(() => {
   try {
     console.log('PassSchedulePage 컴포넌트 마운트됨')
 
+    // ✅ localStorage에서 데이터 복원
+    const restored = passScheduleStore.loadFromLocalStorage()
+    if (restored) {
+      console.log('✅ localStorage 데이터 복원 완료')
+    }
+
     // ✅ 차트는 즉시 초기화 (서버 연결과 무관)
     void nextTick(() => {
       try {
         initChart()
         console.log('✅ 차트 즉시 초기화 완료')
+
+        // ✅ 복원된 데이터가 있으면 차트에 반영
+        if (restored) {
+          restoreChartData()
+        }
 
         // 차트 업데이트 타이머 시작
         if (updateTimer) {
@@ -2504,30 +2575,9 @@ onMounted(() => {
       }
     })
 
-    // ✅ 서버 데이터 로딩은 비동기로 처리 (차트와 분리)
-    const hasExistingData = passScheduleStore.selectedScheduleList.length > 0
-    console.log('기존 데이터 확인:', {
-      hasExistingData,
-      scheduleCount: passScheduleStore.selectedScheduleList.length,
-      currentTrackingMstId: icdStore.currentTrackingMstId,
-      nextTrackingMstId: icdStore.nextTrackingMstId
-    })
-
-    if (!hasExistingData) {
-      // ✅ 비동기로 처리하여 차트 렌더링을 막지 않음
-      passScheduleStore.init().then(() => {
-        console.log('✅ 스케줄 데이터 로드 완료:', passScheduleStore.scheduleData.length, '개')
-      }).catch((error) => {
-        console.error('스케줄 데이터 로드 실패:', error)
-        $q.notify({
-          type: 'warning',
-          message: '스케줄 데이터를 불러오는데 실패했습니다',
-          caption: '차트는 정상적으로 표시됩니다'
-        })
-      })
-    } else {
-      console.log('✅ 기존 스케줄 데이터 사용:', passScheduleStore.selectedScheduleList.length, '개')
-    }
+    // ✅ 서버 데이터 로드는 "Select Schedule" 버튼 클릭 시에만 수행
+    // selectScheduleData()에서 모달을 열 때 데이터가 없으면 로드하도록 처리
+    // 페이지 접근 시 불필요한 API 호출 방지
   } catch (error) {
     console.error('PassSchedulePage 마운트 중 오류:', error)
   }
@@ -2564,6 +2614,15 @@ onUnmounted(() => {
     window.removeEventListener('resize', chartResizeHandler)
     chartResizeHandler = null
   }
+
+  // ✅ 저장 타이머 정리
+  if (saveTimeout) {
+    clearTimeout(saveTimeout)
+    saveTimeout = null
+  }
+
+  // ✅ 마지막 저장 실행
+  passScheduleStore.saveToLocalStorage()
 
   console.log('✅ PassSchedulePage 정리 완료 (차트는 유지)')
 })

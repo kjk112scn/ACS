@@ -1589,6 +1589,47 @@ const updateChart = () => {
   })
 }
 
+const applyLastKnownPosition = () => {
+  if (!chart || chart.isDisposed()) {
+    return
+  }
+
+  try {
+    const isTrackingActive =
+      icdStore.ephemerisTrackingState === 'TRACKING' ||
+      icdStore.passScheduleStatusInfo.isActive
+
+    let azimuth = parseFloat(icdStore.azimuthAngle) || 0
+    let elevation = parseFloat(icdStore.elevationAngle) || 0
+
+    if (isTrackingActive) {
+      const trackingAz = parseFloat(icdStore.trackingActualAzimuthAngle) || 0
+      const trackingEl = parseFloat(icdStore.trackingActualElevationAngle) || 0
+      if (trackingAz !== 0 || azimuth === 0) {
+        azimuth = trackingAz
+      }
+      if (trackingEl !== 0 || elevation === 0) {
+        elevation = trackingEl
+      }
+    }
+
+    const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
+    const normalizedEl = Math.max(0, Math.min(90, elevation))
+
+    currentPosition.value.azimuth = azimuth
+    currentPosition.value.elevation = elevation
+    currentPosition.value.date = date.formatDate(new Date(), 'YYYY/MM/DD')
+    currentPosition.value.time = date.formatDate(new Date(), 'HH:mm:ss')
+
+    const option = chartPool.updatePosition(normalizedEl, normalizedAz)
+    if (chart && !chart.isDisposed()) {
+      chart.setOption(option, false, true)
+    }
+  } catch (error) {
+    console.error('마지막 위치 적용 중 오류:', error)
+  }
+}
+
 // ✅ 차트 크기 조정 함수 (외부에서도 호출 가능) - DOM 스타일을 먼저 설정하여 깜빡임 방지
 const adjustChartSize = async () => {
   await nextTick() // ✅ Vue의 DOM 업데이트 완료 대기
@@ -1935,14 +1976,28 @@ const updateChartWithTrajectory = (data: TrajectoryPoint[]) => {
 
 // ✅ 차트 데이터 복원 함수 (이론 경로 + 실시간 경로 한 번에)
 const restoreChartData = () => {
-  if (!chart || chart.isDisposed()) return
+  if (!chart || chart.isDisposed()) {
+    console.warn('⚠️ 차트가 없거나 disposed되어 데이터 복원 불가')
+    return
+  }
 
   const hasTrackingPath = ephemerisStore.trackingPath?.sampledPath &&
     ephemerisStore.trackingPath.sampledPath.length > 0
   const hasTrajectory = ephemerisStore.selectedSchedule &&
     ephemerisStore.detailData.length > 0
 
-  if (!hasTrackingPath && !hasTrajectory) return
+  console.log('📊 차트 데이터 복원 시도:', {
+    hasTrackingPath,
+    hasTrajectory,
+    trackingPathLength: ephemerisStore.trackingPath?.sampledPath?.length || 0,
+    detailDataLength: ephemerisStore.detailData.length,
+    selectedSchedule: !!ephemerisStore.selectedSchedule
+  })
+
+  if (!hasTrackingPath && !hasTrajectory) {
+    console.warn('⚠️ 복원할 데이터가 없음')
+    return
+  }
 
   // ✅ 이론 경로 데이터 변환 (updateChartWithTrajectory 로직 재사용)
   let trajectoryPoints: [number, number][] = []
@@ -2542,6 +2597,7 @@ const handleActivated = () => {
       void nextTick(() => {
         if (chart && !chart.isDisposed()) {
           restoreChartData()
+          applyLastKnownPosition()
         }
       })
     }, 100)
@@ -2554,6 +2610,7 @@ const handleActivated = () => {
     void nextTick(() => {
       if (chart && !chart.isDisposed()) {
         restoreChartData()
+        applyLastKnownPosition()
       }
     })
   }
@@ -2579,6 +2636,61 @@ const handleDeactivated = () => {
   }
 }
 
+// ✅ localStorage 자동 저장을 위한 watch 설정
+watch(
+  [
+    () => ephemerisStore.detailData,
+    () => ephemerisStore.trackingPath.sampledPath,
+    () => ephemerisStore.selectedSchedule,
+    () => ephemerisStore.tleDisplayData,
+  ],
+  () => {
+    // ✅ 디바운스 처리 (500ms)
+    if (saveTimeout) {
+      clearTimeout(saveTimeout)
+    }
+    saveTimeout = window.setTimeout(() => {
+      ephemerisStore.saveToLocalStorage()
+    }, 500)
+  },
+  { deep: true }
+)
+
+// ✅ 저장 타이머 변수
+let saveTimeout: number | null = null
+
+// ✅ 데이터 복원 상태 추적
+let lastRestoredDetailCount = 0
+let lastRestoredTrackingCount = 0
+
+// ✅ detailData 혹은 trackingPath가 복구되면 차트 선을 다시 반영
+watch(
+  () => ({
+    detailCount: ephemerisStore.detailData.length,
+    trackingCount: ephemerisStore.trackingPath.sampledPath.length,
+  }),
+  ({ detailCount, trackingCount }) => {
+    const hasNewDetail = detailCount > 0 && detailCount !== lastRestoredDetailCount
+    const hasNewTracking = trackingCount > 0 && trackingCount !== lastRestoredTrackingCount
+
+    if (!chart || chart.isDisposed()) {
+      return
+    }
+
+    if (hasNewDetail || hasNewTracking) {
+      restoreChartData()
+      applyLastKnownPosition()
+      if (hasNewDetail) {
+        lastRestoredDetailCount = detailCount
+      }
+      if (hasNewTracking) {
+        lastRestoredTrackingCount = trackingCount
+      }
+    }
+  },
+  { deep: false }
+)
+
 // ✅ Vue 생명주기 훅 등록
 onActivated(handleActivated)
 onDeactivated(handleDeactivated)
@@ -2597,11 +2709,34 @@ onMounted(() => {
       ephemerisStore.offsetValues.time,
     ]
 
+    // ✅ localStorage에서 데이터 복원
+    const restored = ephemerisStore.loadFromLocalStorage()
+    if (restored) {
+      console.log('✅ localStorage 데이터 복원 완료')
+    }
+
     // ✅ 차트는 즉시 초기화 (서버 연결과 무관) - PassSchedulePage와 동일
     void nextTick(() => {
       try {
         initChart()
         console.log('✅ 차트 즉시 초기화 완료')
+
+        // ✅ 복원된 데이터가 있으면 차트에 반영
+        // 차트가 완전히 렌더링된 후 복원하도록 추가 대기
+        if (restored) {
+          // ✅ 차트 크기 조정 완료 후 데이터 복원
+          void nextTick(() => {
+            setTimeout(() => {
+              if (chart && !chart.isDisposed()) {
+                restoreChartData()
+                console.log('✅ 새로고침 후 차트 데이터 복원 완료')
+              }
+            }, 200) // 차트 렌더링 완료 대기
+          })
+        }
+
+        // ✅ 초기 프레임에서도 마지막 위치를 즉시 반영
+        applyLastKnownPosition()
 
         // 차트 업데이트 타이머 시작
         if (updateTimer) {
@@ -2693,6 +2828,16 @@ onUnmounted(() => {
   if (mainThreadBlockingDetector) {
     cancelAnimationFrame(mainThreadBlockingDetector)
   }
+
+  // ✅ 저장 타이머 정리
+  if (saveTimeout) {
+    clearTimeout(saveTimeout)
+    saveTimeout = null
+  }
+
+  // ✅ 마지막 저장 실행
+  ephemerisStore.saveToLocalStorage()
+
   // ✅ 추가: 추적 경로 정리 (메모리 절약)
   // ✅ 추적 경로는 유지 (dispose하지 않음) - keep-alive나 재마운트 시 재사용
   // 실제로 컴포넌트가 완전히 제거될 때만 clear (일반적으로 발생하지 않음)

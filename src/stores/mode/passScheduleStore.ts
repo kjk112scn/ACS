@@ -1414,6 +1414,160 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
     offsetValues.value[type] = value
   }
 
+  /**
+   * ✅ localStorage에 데이터 저장
+   */
+  const saveToLocalStorage = () => {
+    try {
+      const storageKey = 'pass-schedule-data'
+
+      const dataToSave = {
+        // Position View - 예측 경로
+        predictedTrackingPath: predictedTrackingPath.value,
+        // Position View - 실제 이동 경로
+        actualTrackingPath: actualTrackingPath.value,
+        // Schedule Information
+        selectedSchedule: selectedSchedule.value,
+        // Schedule Control
+        selectedScheduleList: selectedScheduleList.value,
+        // 현재 추적 경로 정보
+        currentTrackingPathInfo: currentTrackingPathInfo.value,
+        // 저장 시간
+        savedAt: Date.now(),
+      }
+
+      localStorage.setItem(storageKey, JSON.stringify(dataToSave))
+      console.log('✅ PassSchedule 데이터 localStorage 저장 완료:', {
+        predictedPath: predictedTrackingPath.value.length,
+        actualPath: actualTrackingPath.value.length,
+        scheduleCount: selectedScheduleList.value.length,
+        hasSelectedSchedule: !!selectedSchedule.value,
+      })
+    } catch (error) {
+      console.error('❌ localStorage 저장 실패:', error)
+    }
+  }
+
+  /**
+   * ✅ localStorage에서 데이터 복원
+   */
+  const loadFromLocalStorage = (): boolean => {
+    try {
+      const storageKey = 'pass-schedule-data'
+      const savedData = localStorage.getItem(storageKey)
+
+      if (!savedData) {
+        console.log('⚠️ 저장된 PassSchedule 데이터 없음')
+        return false
+      }
+
+      const parsed = JSON.parse(savedData) as {
+        predictedTrackingPath?: [number, number][]
+        actualTrackingPath?: [number, number][]
+        selectedSchedule?: ScheduleItem | null
+        selectedScheduleList?: ScheduleItem[]
+        currentTrackingPathInfo?: {
+          satelliteId: string | number | null
+          passId: number | null
+          pointCount: number
+          lastUpdated: string | number | null
+          dataType?: string
+        }
+        savedAt?: number
+      }
+
+      // ✅ 복원할 데이터가 있는지 확인
+      if (
+        !parsed.predictedTrackingPath &&
+        !parsed.actualTrackingPath &&
+        !parsed.selectedSchedule &&
+        (!parsed.selectedScheduleList || parsed.selectedScheduleList.length === 0)
+      ) {
+        console.log('⚠️ 복원할 유효한 데이터 없음')
+        return false
+      }
+
+      // ✅ 예측 경로 복원
+      if (
+        parsed.predictedTrackingPath &&
+        Array.isArray(parsed.predictedTrackingPath) &&
+        parsed.predictedTrackingPath.length > 0
+      ) {
+        predictedTrackingPath.value = parsed.predictedTrackingPath
+        console.log('✅ 예측 경로 복원:', parsed.predictedTrackingPath.length, '개 포인트')
+      }
+
+      // ✅ 실제 이동 경로 복원
+      if (
+        parsed.actualTrackingPath &&
+        Array.isArray(parsed.actualTrackingPath) &&
+        parsed.actualTrackingPath.length > 0
+      ) {
+        actualTrackingPath.value = parsed.actualTrackingPath
+        console.log('✅ 실제 이동 경로 복원:', parsed.actualTrackingPath.length, '개 포인트')
+      }
+
+      // ✅ 선택된 스케줄 목록 복원
+      if (
+        parsed.selectedScheduleList &&
+        Array.isArray(parsed.selectedScheduleList) &&
+        parsed.selectedScheduleList.length > 0
+      ) {
+        selectedScheduleList.value = parsed.selectedScheduleList
+        console.log('✅ 스케줄 목록 복원:', parsed.selectedScheduleList.length, '개')
+      }
+
+      // ✅ 선택된 스케줄 복원
+      if (parsed.selectedSchedule) {
+        selectedSchedule.value = parsed.selectedSchedule
+        console.log(
+          '✅ 선택된 스케줄 복원:',
+          parsed.selectedSchedule.satelliteName || parsed.selectedSchedule.satelliteId,
+        )
+      }
+
+      // ✅ 현재 추적 경로 정보 복원
+      if (parsed.currentTrackingPathInfo) {
+        // ✅ 타입 변환: JSON.parse로 인한 타입 불일치 해결
+        currentTrackingPathInfo.value = {
+          satelliteId:
+            parsed.currentTrackingPathInfo.satelliteId !== null
+              ? String(parsed.currentTrackingPathInfo.satelliteId)
+              : null,
+          passId: parsed.currentTrackingPathInfo.passId,
+          pointCount: parsed.currentTrackingPathInfo.pointCount,
+          lastUpdated:
+            parsed.currentTrackingPathInfo.lastUpdated !== null
+              ? typeof parsed.currentTrackingPathInfo.lastUpdated === 'string'
+                ? new Date(parsed.currentTrackingPathInfo.lastUpdated).getTime()
+                : parsed.currentTrackingPathInfo.lastUpdated
+              : null,
+          dataType: parsed.currentTrackingPathInfo.dataType,
+        }
+        console.log('✅ 추적 경로 정보 복원 완료')
+      }
+
+      console.log('✅ PassSchedule 데이터 localStorage 복원 완료')
+      return true
+    } catch (error) {
+      console.error('❌ localStorage 복원 실패:', error)
+      return false
+    }
+  }
+
+  /**
+   * ✅ localStorage 데이터 삭제
+   */
+  const clearLocalStorage = () => {
+    try {
+      const storageKey = 'pass-schedule-data'
+      localStorage.removeItem(storageKey)
+      console.log('✅ PassSchedule localStorage 데이터 삭제 완료')
+    } catch (error) {
+      console.error('❌ localStorage 삭제 실패:', error)
+    }
+  }
+
   // ===== Worker-related 메서드들 (EphemerisTrackStore와 동일한 성능 최적화) =====
 
   /**
@@ -1896,5 +2050,10 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
 
     // 🆕 computed 속성들
     trackingPath,
+
+    // ✅ localStorage 관련 메서드
+    saveToLocalStorage,
+    loadFromLocalStorage,
+    clearLocalStorage,
   }
 })

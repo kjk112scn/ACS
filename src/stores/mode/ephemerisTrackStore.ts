@@ -995,6 +995,169 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     currentTrackingPassId.value = null
   }
 
+  /**
+   * ✅ localStorage에 데이터 저장
+   */
+  const saveToLocalStorage = () => {
+    try {
+      const storageKey = 'ephemeris-designation-data'
+
+      // ✅ detailData를 차트용 [number, number][] 형태로 변환
+      const trajectoryPoints: [number, number][] = []
+      if (detailData.value && detailData.value.length > 0) {
+        detailData.value.forEach((point) => {
+          const az = typeof point.Azimuth === 'number' ? point.Azimuth : 0
+          const el = typeof point.Elevation === 'number' ? point.Elevation : 0
+          const normalizedAz = az < 0 ? az + 360 : az
+          const normalizedEl = Math.max(0, Math.min(90, el))
+          trajectoryPoints.push([normalizedEl, normalizedAz])
+        })
+      }
+
+      const dataToSave = {
+        // Position View - 목표 이동 경로 (위성 궤적)
+        trajectoryPath: trajectoryPoints,
+        // Position View - 실제 이동 경로 (추적 경로)
+        trackingPath: trackingPath.value.sampledPath,
+        // 위성 추적 정보
+        selectedSchedule: selectedSchedule.value,
+        // TLE Data
+        tleDisplayData: tleDisplayData.value,
+        // 저장 시간
+        savedAt: Date.now(),
+      }
+
+      localStorage.setItem(storageKey, JSON.stringify(dataToSave))
+      console.log('✅ Ephemeris 데이터 localStorage 저장 완료:', {
+        trajectoryPoints: trajectoryPoints.length,
+        trackingPath: trackingPath.value.sampledPath.length,
+        hasSchedule: !!selectedSchedule.value,
+        hasTLE: !!tleDisplayData.value.displayText,
+      })
+    } catch (error) {
+      console.error('❌ localStorage 저장 실패:', error)
+    }
+  }
+
+  /**
+   * ✅ localStorage에서 데이터 복원
+   */
+  const loadFromLocalStorage = (): boolean => {
+    try {
+      const storageKey = 'ephemeris-designation-data'
+      const savedData = localStorage.getItem(storageKey)
+
+      if (!savedData) {
+        console.log('⚠️ 저장된 Ephemeris 데이터 없음')
+        return false
+      }
+
+      const parsed = JSON.parse(savedData) as {
+        trajectoryPath?: [number, number][]
+        trackingPath?: [number, number][]
+        selectedSchedule?: ScheduleItem | null
+        tleDisplayData?: TLEData
+        savedAt?: number
+      }
+
+      // ✅ 복원할 데이터가 있는지 확인
+      if (
+        !parsed.trajectoryPath &&
+        !parsed.trackingPath &&
+        !parsed.selectedSchedule &&
+        !parsed.tleDisplayData
+      ) {
+        console.log('⚠️ 복원할 유효한 데이터 없음')
+        return false
+      }
+
+      // ✅ 추적 경로 복원
+      if (
+        parsed.trackingPath &&
+        Array.isArray(parsed.trackingPath) &&
+        parsed.trackingPath.length > 0
+      ) {
+        const safeTrackingPath = parsed.trackingPath
+          .filter((point): point is [number, number] => Array.isArray(point) && point.length === 2)
+          .map(([el, az]) => {
+            const safeEl = typeof el === 'number' && isFinite(el) ? el : 0
+            const safeAz = typeof az === 'number' && isFinite(az) ? az : 0
+            return [safeEl, safeAz] as [number, number]
+          })
+
+        trackingPath.value.sampledPath = safeTrackingPath
+        trackingPath.value.rawPath = safeTrackingPath
+        trackingPath.value.lastUpdateTime = parsed.savedAt || Date.now()
+        console.log('✅ 추적 경로 복원:', safeTrackingPath.length, '개 포인트')
+      }
+
+      // ✅ 궤적(trajectory) 데이터 복원 → detailData/ rawDetailData 에 직접 주입
+      if (
+        parsed.trajectoryPath &&
+        Array.isArray(parsed.trajectoryPath) &&
+        parsed.trajectoryPath.length > 0
+      ) {
+        const baseTime = parsed.savedAt || Date.now()
+        const restoredDetail = parsed.trajectoryPath
+          .filter((point): point is [number, number] => Array.isArray(point) && point.length === 2)
+          .map(([el, az], index) => {
+            const safeEl = typeof el === 'number' && isFinite(el) ? el : 0
+            const safeAz = typeof az === 'number' && isFinite(az) ? az : 0
+            return {
+              Time: new Date(baseTime + index * 1000).toISOString(),
+              Azimuth: safeAz,
+              Elevation: safeEl,
+            } as ScheduleDetailItem
+          })
+
+        detailData.value = restoredDetail
+        rawDetailData.value = restoredDetail
+        console.log('✅ 궤적 데이터 복원:', restoredDetail.length, '개 포인트')
+      }
+
+      // ✅ TLE Data 복원
+      if (parsed.tleDisplayData) {
+        tleDisplayData.value = parsed.tleDisplayData
+        console.log('✅ TLE Data 복원 완료')
+      }
+
+      // ✅ 선택된 스케줄 복원 (trajectoryPath가 있으면 detailData도 복원 필요)
+      if (parsed.selectedSchedule) {
+        selectedSchedule.value = parsed.selectedSchedule
+        // ✅ ScheduleItem 타입 확인: satelliteName 또는 satelliteId 사용
+        const scheduleName =
+          (parsed.selectedSchedule as Record<string, unknown>).satelliteName ||
+          (parsed.selectedSchedule as Record<string, unknown>).SatelliteName ||
+          (parsed.selectedSchedule as Record<string, unknown>).satelliteId ||
+          (parsed.selectedSchedule as Record<string, unknown>).SatelliteID ||
+          'Unknown'
+        console.log('✅ 선택된 스케줄 복원:', scheduleName)
+      }
+
+      // ✅ trajectoryPath는 차트 복원 시 사용 (컴포넌트에서 처리)
+      // detailData는 selectSchedule 호출 시 자동으로 로드되므로 여기서는 저장만
+
+      console.log('✅ Ephemeris 데이터 localStorage 복원 완료')
+      return true
+    } catch (error) {
+      console.error('❌ localStorage 복원 실패:', error)
+      return false
+    }
+  }
+
+  /**
+   * ✅ localStorage 데이터 삭제
+   */
+  const clearLocalStorage = () => {
+    try {
+      const storageKey = 'ephemeris-designation-data'
+      localStorage.removeItem(storageKey)
+      console.log('✅ Ephemeris localStorage 데이터 삭제 완료')
+    } catch (error) {
+      console.error('❌ localStorage 삭제 실패:', error)
+    }
+  }
+
   return {
     // 상태 (readonly로 외부 수정 방지)
     masterData: readonly(masterData),
@@ -1047,6 +1210,11 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     startGeostationaryTracking,
     activateGeostationaryTracking,
     resetGeostationaryAngles,
+
+    // ✅ localStorage 관련 메서드
+    saveToLocalStorage,
+    loadFromLocalStorage,
+    clearLocalStorage,
   }
 })
 
