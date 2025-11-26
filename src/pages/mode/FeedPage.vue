@@ -133,9 +133,10 @@
           </q-card>
         </div>
 
-        <!-- X-Band 섹션 (FAN 포함) -->
-        <div class="col-12 col-md-5">
-          <q-card class="control-section">
+        <!-- X-Band와 FAN 컨테이너 (세로로 2행) -->
+        <div class="col-12 col-md-5 xband-fan-container">
+          <!-- X-Band 섹션 -->
+          <q-card class="control-section xband-card">
             <q-card-section>
               <div class="text-h6 text-primary q-mb-sm">X-Band</div>
               <div class="feed-path-wrapper">
@@ -194,7 +195,14 @@
                   </div>
                 </div>
               </div>
-              <div class="fan-panel q-mt-md">
+            </q-card-section>
+          </q-card>
+
+          <!-- FAN 섹션 (X-Band 아래) -->
+          <q-card class="control-section fan-section-card">
+            <q-card-section>
+              <div class="text-h6 text-primary q-mb-sm">FAN</div>
+              <div class="fan-panel">
                 <div class="fan-button-container">
                   <q-btn :class="getFanStatusClass()" class="fan-button" :color="getFanButtonColor()"
                     :outline="!icdStore.feedXBoardStatusInfo.fanStatus.isActive && !icdStore.feedXBoardStatusInfo.fanStatus.hasError"
@@ -659,7 +667,7 @@ q-page-container .feed-mode {
   /* ✅ 높이 조정: padding-top을 0.5rem → 0.531rem으로 증가 (498.66px → 499.47px) */
 }
 
-/* ✅ row stretch - S-Band, X-Band, Legend 섹션이 동일한 높이를 가지도록 */
+/* ✅ row stretch - S-Band, X-Band+FAN, Legend 섹션이 동일한 높이를 가지도록 */
 .feed-container .row {
   display: flex !important;
   flex-wrap: wrap !important;
@@ -683,16 +691,49 @@ q-page-container .feed-mode {
   /* ✅ gutter padding이 있어도 높이는 stretch로 자동 결정됨 */
 }
 
-/* ✅ col 내부의 q-card도 높이를 100%로 설정 - X-Band 높이 기준 */
-.feed-container .row>[class*="col-"] .q-card,
-.feed-container .row>[class*="col-"] .q-card.control-section {
+/* ✅ X-Band와 FAN 컨테이너 - 세로로 배치 */
+.xband-fan-container {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.5rem !important;
+  /* ✅ X-Band와 FAN 사이 간격 */
+}
+
+/* ✅ X-Band 카드 - 높이를 자동으로 조정 (S-Band 높이를 넘지 않도록) */
+.xband-fan-container .xband-card {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  /* ✅ X-Band가 남은 공간을 사용하되 S-Band 높이를 넘지 않도록 */
+}
+
+/* ✅ FAN 카드 - 필요한 만큼만 공간 사용 */
+.xband-fan-container .fan-section-card {
+  flex: 0 0 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  /* ✅ FAN은 내용에 맞는 높이만 사용 */
+}
+
+/* ✅ col 내부의 q-card도 높이를 100%로 설정 - S-Band 높이 기준 */
+.feed-container .row>[class*="col-"]:first-child .q-card,
+.feed-container .row>[class*="col-"]:first-child .q-card.control-section {
   display: flex !important;
   flex-direction: column !important;
   flex: 1 1 auto !important;
   min-height: 0 !important;
   align-self: stretch !important;
-  /* ✅ X-Band 높이에 맞춰 S-Band와 Legend도 동일한 높이 유지 */
-  /* ✅ flex: 1 1 auto로 남은 공간을 채우고, min-height: 0으로 축소 가능하도록 설정 */
+  /* ✅ S-Band 높이 기준 */
+}
+
+/* ✅ Legend 카드도 S-Band 높이에 맞춤 */
+.feed-container .row>[class*="col-md-2"] .q-card {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  align-self: stretch !important;
 }
 
 /* ✅ q-card-section도 높이를 100%로 설정 */
@@ -757,23 +798,12 @@ q-page-container .feed-mode {
   /* ✅ 행들을 가운데 정렬 */
 }
 
+/* ✅ feed-path-section 설정 */
 .feed-container .row>[class*="col-"] .feed-path-section {
-  margin-bottom: 0.5rem;
-  /* ✅ 섹션 간 간격 (1·2행 섹션과 3행 섹션 사이) */
   flex-shrink: 0;
   /* ✅ flex item이 축소되지 않도록 설정 */
-}
-
-.feed-container .row>[class*="col-"] .feed-path {
-  margin-bottom: 0.5rem;
-  /* ✅ .feed-path의 패딩이 직접 설정되므로 여기서는 패딩 제거 */
-  /* padding은 .feed-path에서 직접 관리 */
-}
-
-/* 각 feed-path-section 내 마지막 feed-path는 margin 제거 */
-.feed-container .row>[class*="col-"] .feed-path-section .feed-path:last-child {
   margin-bottom: 0 !important;
-  /* ✅ !important로 우선순위 강제 - 각 섹션 마지막 행은 여백 없음 */
+  /* ✅ 섹션들 사이 간격은 feed-path-wrapper의 gap으로 제어 */
 }
 
 /* Legend 섹션의 상단 패딩 조정 - X-Band RHCP 테두리 상단에 맞추기 */
@@ -799,27 +829,38 @@ q-page-container .feed-mode {
   /* ✅ Legend 섹션이 S-Band와 동일한 높이를 유지하도록 flex 설정 */
 }
 
+/* ✅ feed-path-section을 flex container로 변경하여 gap으로 간격 제어 */
 .feed-path-section {
-  margin-bottom: 0;
-  /* ✅ 행 간격은 .feed-path의 margin-bottom으로만 제어 */
+  display: flex !important;
+  flex-direction: column !important;
+  row-gap: 0.25rem !important;
+  column-gap: 0 !important;
+  gap: 0.25rem !important;
+  /* ✅ RHCP(Rx)와 LHCP(Rx) 사이 간격 50% 감소: 0.5rem → 0.25rem */
+  margin-bottom: 0 !important;
+  /* ✅ 섹션들 사이 간격은 feed-path-wrapper의 gap으로 제어 */
 }
 
-/* 마지막 feed-path-section의 하단 여백 제거 */
-.feed-container .row>[class*="col-"] .feed-path-section:last-of-type {
+/* ✅ 더 구체적인 선택자로 강제 적용 */
+.control-section .q-card-section .feed-path-wrapper .feed-path-section {
+  display: flex !important;
+  flex-direction: column !important;
+  row-gap: 0.25rem !important;
+  gap: 0.25rem !important;
   margin-bottom: 0 !important;
-  /* ✅ 3행 아래 공간 제거하여 가운데 정렬 가능하도록 */
 }
 
 /* S-Band 스위치 섹션과 X-Band FAN 섹션을 같은 선상에 배치 */
 .rf-switch-section {
   margin-top: 0;
-  margin-bottom: 0;
+  margin-bottom: 0 !important;
+  /* ✅ RF Switch 섹션 간격은 feed-path-wrapper의 gap으로 제어 */
 }
 
 /* rf-switch-section이 feed-path-section 클래스도 가지고 있어서 margin-bottom이 적용되도록 수정 */
 .rf-switch-section.feed-path-section {
-  margin-bottom: 0;
-  /* ✅ 행 간격은 .feed-path의 margin-bottom으로만 제어 */
+  margin-bottom: 0 !important;
+  /* ✅ RF Switch 섹션 간격은 feed-path-wrapper의 gap으로 제어 */
 }
 
 .fan-section {
@@ -845,7 +886,8 @@ q-page-container .feed-mode {
   align-items: center !important;
   justify-content: center !important;
   gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0 !important;
+  /* ✅ margin-bottom 제거 - feed-path-section의 gap으로 제어 */
   /* ✅ 복잡한 패딩 계산 대신 단순하고 명확한 패딩 사용 */
   /* ✅ 상하 패딩을 동일하게 설정하고 flex 정렬에 의존 */
   padding: 1.5rem 1rem;
@@ -870,14 +912,36 @@ q-page-container .feed-mode {
   align-content: center;
 }
 
+/* ✅ feed-path-section 내부의 feed-path들 사이 간격은 feed-path-section의 gap으로 제어됨 */
+
 .feed-path-wrapper {
   background-color: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   padding: 0.75rem 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  display: flex !important;
+  flex-direction: column !important;
+  row-gap: 0.375rem !important;
+  column-gap: 0 !important;
+  gap: 0.375rem !important;
+  /* ✅ 섹션들 사이 간격 50% 감소: 0.75rem → 0.375rem (LHCP 섹션 ↔ RF Switch 섹션) */
+}
+
+/* ✅ feed-path-wrapper 내부 간격 명시적으로 설정 */
+.feed-container .row>[class*="col-"] .feed-path-wrapper {
+  display: flex !important;
+  flex-direction: column !important;
+  row-gap: 0.375rem !important;
+  gap: 0.375rem !important;
+  /* ✅ 섹션들 사이 간격 50% 감소 */
+}
+
+/* ✅ 더 구체적인 선택자로 강제 적용 */
+.control-section .q-card-section .feed-path-wrapper {
+  display: flex !important;
+  flex-direction: column !important;
+  row-gap: 0.375rem !important;
+  gap: 0.375rem !important;
 }
 
 .feed-path-wrapper .feed-path,
@@ -886,6 +950,8 @@ q-page-container .feed-mode {
   border: none;
   padding-left: 0.5rem;
   padding-right: 0.5rem;
+  margin-bottom: 0 !important;
+  /* ✅ feed-path들 사이 간격은 feed-path-section 내부에서 제어 */
 }
 
 .feed-path-wrapper .fan-section {
@@ -904,13 +970,23 @@ q-page-container .feed-mode {
 }
 
 .fan-panel {
-  background-color: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 0.75rem;
+  background-color: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
   display: flex;
   justify-content: center;
   align-items: center;
+  flex: 1;
+  /* ✅ FAN 섹션 내부에서 중앙 정렬 */
+}
+
+/* ✅ FAN 섹션 카드 스타일 */
+.fan-section-card {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  min-height: 0 !important;
 }
 
 .rf-switch-path {
@@ -927,11 +1003,6 @@ q-page-container .feed-mode {
   /* ✅ 스위치 행을 상하좌우 가운데 정렬 */
 }
 
-/* feed-path-section 내부의 마지막 feed-path는 margin-bottom 제거 (feed-path-section의 margin-bottom이 적용됨) */
-.feed-path-section .feed-path:last-child {
-  margin-bottom: 0;
-  /* ✅ feed-path-section의 margin-bottom과 중복되지 않도록 제거 */
-}
 
 .path-label {
   min-width: 60px;

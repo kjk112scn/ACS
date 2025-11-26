@@ -25,7 +25,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.azimuthSpeed)
-                }}</q-item-label>
+              }}</q-item-label>
             </div>
             <div class="axis-data-item axis-data-item--motor">
               <div class="motor-status-chip" :class="motorStateCardClassMap[azimuthMotorState]">
@@ -58,7 +58,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.elevationSpeed)
-                }}</q-item-label>
+              }}</q-item-label>
             </div>
             <div class="axis-data-item axis-data-item--motor">
               <div class="motor-status-chip" :class="motorStateCardClassMap[elevationMotorState]">
@@ -91,7 +91,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.trainSpeed)
-                }}</q-item-label>
+              }}</q-item-label>
             </div>
             <div class="axis-data-item axis-data-item--motor">
               <div class="motor-status-chip" :class="motorStateCardClassMap[trainMotorState]">
