@@ -193,30 +193,23 @@
                     </div>
                   </div>
                 </div>
-
-                <!-- FAN 섹션 (X-Band 안에 포함) -->
-                <div class="fan-section">
-                  <div class="fan-button-container">
-                    <q-btn :class="getFanStatusClass()" class="fan-button" :color="getFanButtonColor()"
-                      :outline="!icdStore.feedXBoardStatusInfo.fanStatus.isActive && !icdStore.feedXBoardStatusInfo.fanStatus.hasError"
-                      :flat="false" @click="toggleFan()">
-                      <svg class="fan-icon q-mr-sm" viewBox="0 0 24 24" width="20" height="20">
-                        <!-- 팬 외곽 원 -->
-                        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5" />
-                        <!-- 팬 블레이드 1 - 3개 블레이드로 선풍기 느낌 -->
-                        <path d="M12 12 L12 2 A10 10 0 0 1 19 7 L12 12 Z" fill="currentColor" opacity="0.6" />
-                        <!-- 팬 블레이드 2 -->
-                        <path d="M12 12 L20 19 A10 10 0 0 1 12 22 L12 12 Z" fill="currentColor" opacity="0.6" />
-                        <!-- 팬 블레이드 3 -->
-                        <path d="M12 12 L5 19 A10 10 0 0 1 4 7 L12 12 Z" fill="currentColor" opacity="0.6" />
-                        <!-- 중앙 원 -->
-                        <circle cx="12" cy="12" r="2.5" fill="currentColor" />
-                      </svg>
-                      <span class="fan-button-text">
-                        FAN {{ icdStore.feedXBoardStatusInfo.fanStatus.power }}
-                      </span>
-                    </q-btn>
-                  </div>
+              </div>
+              <div class="fan-panel q-mt-md">
+                <div class="fan-button-container">
+                  <q-btn :class="getFanStatusClass()" class="fan-button" :color="getFanButtonColor()"
+                    :outline="!icdStore.feedXBoardStatusInfo.fanStatus.isActive && !icdStore.feedXBoardStatusInfo.fanStatus.hasError"
+                    :flat="false" @click="toggleFan()">
+                    <svg class="fan-icon q-mr-sm" viewBox="0 0 24 24" width="20" height="20">
+                      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5" />
+                      <path d="M12 12 L12 2 A10 10 0 0 1 19 7 L12 12 Z" fill="currentColor" opacity="0.6" />
+                      <path d="M12 12 L20 19 A10 10 0 0 1 12 22 L12 12 Z" fill="currentColor" opacity="0.6" />
+                      <path d="M12 12 L5 19 A10 10 0 0 1 4 7 L12 12 Z" fill="currentColor" opacity="0.6" />
+                      <circle cx="12" cy="12" r="2.5" fill="currentColor" />
+                    </svg>
+                    <span class="fan-button-text">
+                      FAN {{ icdStore.feedXBoardStatusInfo.fanStatus.power }}
+                    </span>
+                  </q-btn>
                 </div>
               </div>
             </q-card-section>
@@ -908,6 +901,16 @@ q-page-container .feed-mode {
 
 .feed-path-wrapper .fan-button-container {
   margin: 0;
+}
+
+.fan-panel {
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .rf-switch-path {

@@ -25,14 +25,7 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
       const i18nKey = `hardwareErrors.${key}`
       const translatedMessage = t(i18nKey)
 
-      console.log('🔍 hardwareErrorLogStore translateErrorKey:', {
-        errorKey,
-        isResolved,
-        key,
-        i18nKey,
-        translatedMessage,
-        currentLocale: locale.value,
-      })
+      // 로그 제거 (상태 변경 시에만 로그가 출력되도록)
 
       if (translatedMessage === i18nKey) {
         console.warn(`🚨 에러 메시지 번역 실패: ${i18nKey}`)
@@ -101,9 +94,6 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
 
   // 액션
   const addErrorLog = (error: HardwareErrorLog) => {
-    console.log('🔍 addErrorLog 호출됨:', error)
-    console.log('🔍 추가 전 로그 개수:', errorLogs.value.length)
-
     // 에러 메시지가 이미 변환되어 있지 않은 경우 변환
     const processedError = error.message
       ? error
@@ -115,18 +105,37 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
             : undefined,
         }
 
-    console.log('🔍 processedError:', processedError)
-
     // 중복 ID 체크
     const existingIndex = errorLogs.value.findIndex(
       (existingLog) => existingLog.id === processedError.id,
     )
 
     if (existingIndex !== -1) {
-      // 기존 로그 업데이트
-      errorLogs.value[existingIndex] = processedError
+      // 기존 로그와 비교하여 실제로 변경되었는지 확인
+      const existingLog = errorLogs.value[existingIndex]
+      const hasChanged =
+        existingLog.isResolved !== processedError.isResolved ||
+        existingLog.message !== processedError.message ||
+        existingLog.severity !== processedError.severity ||
+        existingLog.timestamp !== processedError.timestamp
+
+      if (hasChanged) {
+        // 상태가 변경되었을 때만 로그 출력
+        console.log('🔄 에러 로그 상태 변경:', {
+          id: processedError.id,
+          errorKey: processedError.errorKey,
+          isResolved: `${existingLog.isResolved} → ${processedError.isResolved}`,
+        })
+        errorLogs.value[existingIndex] = processedError
+      }
+      // 변경되지 않았으면 아무것도 하지 않음 (로그도 출력하지 않음)
     } else {
-      // 새 로그 추가
+      // 새 로그 추가 시에만 로그 출력
+      console.log('➕ 새 에러 로그 추가:', {
+        id: processedError.id,
+        errorKey: processedError.errorKey,
+        severity: processedError.severity,
+      })
       errorLogs.value.unshift(processedError) // 최신순으로 추가
     }
 
@@ -134,9 +143,6 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
     if (errorLogs.value.length > 1000) {
       errorLogs.value = errorLogs.value.slice(0, 1000)
     }
-
-    console.log('🔍 추가 후 로그 개수:', errorLogs.value.length)
-    console.log('🔍 최신 로그:', errorLogs.value[0])
 
     // 로컬 스토리지에 저장
     saveToLocalStorage()

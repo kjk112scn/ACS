@@ -76,13 +76,7 @@ export const useICDStore = defineStore('icd', () => {
       // 번역 시도
       const translatedMessage = t(i18nKey)
 
-      console.log('🔍 translateHardwareError:', {
-        errorKey,
-        isResolved,
-        key,
-        i18nKey,
-        translatedMessage,
-      })
+      // 로그 제거 (상태 변경 시에만 로그가 출력되도록)
 
       // 번역이 실패한 경우 (키가 없으면 키 자체를 반환)
       if (translatedMessage === i18nKey) {
@@ -1295,7 +1289,7 @@ export const useICDStore = defineStore('icd', () => {
                 const localizedErrorLog = addLocalizedMessage(
                   rawStatusBarData.latestError as HardwareErrorLog,
                 )
-                console.log('🔍 icdStore - localizedErrorLog:', localizedErrorLog)
+                // 로그 제거 (addErrorLog 내부에서 상태 변경 시에만 로그 출력)
                 hardwareErrorLogStore.addErrorLog(localizedErrorLog)
               }
             }

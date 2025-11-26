@@ -441,23 +441,26 @@ const controlCardClass = computed(() => {
   return controlLedState.value === 'active' ? 'control-card--active' : 'control-card--inactive'
 })
 
-type MotorState = 'MOVING' | 'STANDBY' | 'ERROR'
+type MotorState = 'MOVING' | 'STANDBY' | 'READY' | 'ERROR'
 
 const motorStateLabels: Record<MotorState, string> = {
   MOVING: 'MOVING',
   STANDBY: 'STANDBY',
+  READY: 'READY',
   ERROR: 'ERROR',
 }
 
 const motorStateCardClassMap: Record<MotorState, string> = {
   MOVING: 'motor-status--moving',
   STANDBY: 'motor-status--standby',
+  READY: 'motor-status--ready',
   ERROR: 'motor-status--error',
 }
 
 const motorStateBorderClassMap: Record<MotorState, string> = {
   MOVING: 'axis-card--moving',
   STANDBY: 'axis-card--standby',
+  READY: 'axis-card--ready',
   ERROR: 'axis-card--error',
 }
 
@@ -488,13 +491,14 @@ const determineMotorState = ({
     return 'STANDBY'
   }
 
-  return 'STANDBY'
+  // 기본 상태는 READY (servoMotor와 servoBrake가 모두 false인 경우)
+  return 'READY'
 }
 
 const azimuthMotorState = computed<MotorState>(() => {
   return determineMotorState({
     servoMotor: Boolean(icdStore.azimuthBoardServoStatusInfo.servoMotor),
-    servoBrake: Boolean(icdStore.azimuthBoardServoStatusInfo.servoBrake),
+    servoBrake: Boolean(icdStore.azimuthBoardServoStatusInfo.servoBrake ?? false),
     errorSources: [
       icdStore.azimuthBoardStatusInfo.limitSwitchNegative275,
       icdStore.azimuthBoardStatusInfo.limitSwitchPositive275,
@@ -507,7 +511,7 @@ const azimuthMotorState = computed<MotorState>(() => {
 const elevationMotorState = computed<MotorState>(() => {
   return determineMotorState({
     servoMotor: Boolean(icdStore.elevationBoardServoStatusInfo.servoMotor),
-    servoBrake: Boolean(icdStore.elevationBoardServoStatusInfo.servoBrake),
+    servoBrake: Boolean(icdStore.elevationBoardServoStatusInfo.servoBrake ?? false),
     errorSources: [
       icdStore.elevationBoardStatusInfo.limitSwitchNegative5,
       icdStore.elevationBoardStatusInfo.limitSwitchNegative0,
@@ -522,7 +526,7 @@ const elevationMotorState = computed<MotorState>(() => {
 const trainMotorState = computed<MotorState>(() => {
   return determineMotorState({
     servoMotor: Boolean(icdStore.trainBoardServoStatusInfo.servoMotor),
-    servoBrake: Boolean(icdStore.trainBoardServoStatusInfo.servoBrake),
+    servoBrake: Boolean(icdStore.trainBoardServoStatusInfo.servoBrake ?? false),
     errorSources: [
       icdStore.trainBoardStatusInfo.limitSwitchNegative275,
       icdStore.trainBoardStatusInfo.limitSwitchPositive275,
@@ -1908,8 +1912,16 @@ const handleAllStatus = () => {
 
 .motor-status--standby {
   border-color: var(--theme-primary);
+  /* 파란색 */
   color: var(--theme-primary);
   box-shadow: 0 0 6px rgba(33, 150, 243, 0.35);
+}
+
+.motor-status--ready {
+  border-color: #9e9e9e;
+  /* 회색 */
+  color: #9e9e9e;
+  box-shadow: 0 0 6px rgba(158, 158, 158, 0.35);
 }
 
 .motor-status--error {
@@ -1924,6 +1936,12 @@ const handleAllStatus = () => {
 
 .axis-card--standby {
   border-top-color: var(--theme-primary) !important;
+  /* 파란색 */
+}
+
+.axis-card--ready {
+  border-top-color: #9e9e9e !important;
+  /* 회색 */
 }
 
 .axis-card--error {
