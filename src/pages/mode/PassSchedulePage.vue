@@ -1036,87 +1036,149 @@ watch(
   { immediate: true, deep: true }
 )
 
-// 🆕 컴포넌트 활성화 시 데이터 복원
-const handleActivated = () => {
-  console.log('🔄 PassSchedulePage 활성화됨')
-
-  // ✅ 차트가 이미 존재하고 유효하면 재초기화하지 않음
-  if (!passChart || passChart.isDisposed()) {
-    setTimeout(() => {
-      initChart()
-      console.log('✅ 차트 재초기화 완료')
-    }, 100)
-  } else {
-    // ✅ 차트가 이미 있으면 정상 상태로 복원 (DOM 스타일 먼저 설정)
-    console.log('✅ 차트가 이미 존재함 - 정상 상태로 복원')
-
-    // ✅ 1단계: DOM 스타일을 동기적으로 먼저 설정 (리사이즈 전에!)
-    // 이렇게 하면 차트가 처음부터 올바른 크기로 렌더링됨
-    const chartSize = 500
-    const chartElement = chartRef.value?.querySelector('div') as HTMLElement | null
-    if (chartElement && passChart && !passChart.isDisposed()) {
-      // ✅ 스타일을 먼저 설정하여 차트가 올바른 위치에서 렌더링되도록 함
-      chartElement.style.width = `${chartSize}px`
-      chartElement.style.height = `${chartSize}px`
-      chartElement.style.maxWidth = `${chartSize}px`
-      chartElement.style.maxHeight = `${chartSize}px`
-      chartElement.style.minWidth = `${chartSize}px`
-      chartElement.style.minHeight = `${chartSize}px`
-      chartElement.style.position = 'absolute'
-      chartElement.style.top = '50%'
-      chartElement.style.left = '50%'
-      chartElement.style.transform = 'translate(-50%, -50%)'
+// ✅ 차트 데이터 복원 함수 (EphemerisDesignationPage.vue와 유사)
+const restoreChartData = () => {
+  try {
+    // ✅ 안전한 null 체크
+    if (!passChart || passChart.isDisposed() || !chartRef.value) {
+      console.warn('⚠️ 차트가 초기화되지 않아 데이터 복원을 건너뜁니다')
+      return
     }
 
-    // ✅ 2단계: Vue 렌더링 사이클과 동기화하여 리사이즈
-    void nextTick(() => {
-      if (passChart && !passChart.isDisposed()) {
-        passChart.resize({
-          width: chartSize,
-          height: chartSize
-        })
-        console.log('✅ 차트 정상 상태 복원 완료')
-      }
-    })
-  }
+    // ✅ Store에서 데이터 확인
+    const actualPath = passScheduleStore.actualTrackingPath
+    const predictedPath = passScheduleStore.predictedTrackingPath
+    const hasActualPath = actualPath && actualPath.length > 0
+    const hasPredictedPath = predictedPath && predictedPath.length > 0
 
-  // ✅ 추적 경로 데이터 복원 (Store에 데이터가 있으면 차트에 복원)
-  void nextTick(() => {
+    // ✅ 데이터가 없으면 복원하지 않음 (자동 로드 제거 - 에러 방지)
+    if (!hasActualPath && !hasPredictedPath) {
+      console.log('⚠️ 복원할 경로 데이터가 없습니다')
+      return
+    }
+
+    // ✅ 실시간 추적 경로 복원
+    if (hasActualPath) {
+      passChartPool.updateTrackingPath(actualPath as [number, number][])
+      console.log('✅ 실시간 추적 경로 복원:', actualPath.length, '개 포인트')
+    }
+
+    // ✅ 예측 경로 복원
+    if (hasPredictedPath) {
+      passChartPool.updatePredictedPath(predictedPath as [number, number][])
+      console.log('✅ 예측 경로 복원:', predictedPath.length, '개 포인트')
+    }
+
+    // ✅ 차트 재초기화 없이 데이터만 업데이트 (안전한 체크 추가)
     if (passChart && !passChart.isDisposed()) {
-      // 실시간 추적 경로 복원
-      const actualPath = passScheduleStore.actualTrackingPath
-      if (actualPath && actualPath.length > 0) {
-        passChartPool.updateTrackingPath(actualPath as [number, number][])
-        console.log('✅ 실시간 추적 경로 복원:', actualPath.length, '개 포인트')
-      }
-
-      // 예측 경로 복원
-      const predictedPath = passScheduleStore.predictedTrackingPath
-      if (predictedPath && predictedPath.length > 0) {
-        passChartPool.updatePredictedPath(predictedPath as [number, number][])
-        console.log('✅ 예측 경로 복원:', predictedPath.length, '개 포인트')
-      }
-
-      // ✅ 차트 재초기화 없이 데이터만 업데이트
       const updateOption = passChartPool.getUpdateOption()
       passChart.setOption(updateOption, false, true) // ✅ notMerge: false, lazyUpdate: true
       console.log('✅ 차트 데이터 복원 완료 (재초기화 없음)')
     }
-  })
-
-  // 🆕 타이머 재시작
-  if (!updateTimer) {
-    // ✅ 타이머를 100ms로 변경하여 백엔드 모니터링 주기(100ms)와 일치
-    updateTimer = window.setInterval(() => {
-      updateChart()
-    }, 100)
-    console.log('✅ 차트 업데이트 타이머 재시작 (100ms)')
+  } catch (error) {
+    console.error('❌ 차트 데이터 복원 중 오류:', error)
   }
+}
 
-  // 🆕 DOM 하이라이트 강제 적용
-  setTimeout(() => {
-    applyRowColors()
-  }, 200)
+// 🆕 컴포넌트 활성화 시 데이터 복원
+const handleActivated = () => {
+  try {
+    console.log('🔄 PassSchedulePage 활성화됨')
+
+    // ✅ 차트가 이미 존재하고 유효하면 재초기화하지 않음
+    if (!passChart || passChart.isDisposed() || !chartRef.value) {
+      setTimeout(() => {
+        // ✅ 컴포넌트가 여전히 마운트되어 있는지 확인
+        if (!chartRef.value) {
+          console.warn('⚠️ 차트 컨테이너가 없어 초기화를 건너뜁니다')
+          return
+        }
+
+        try {
+          initChart()
+          console.log('✅ 차트 재초기화 완료')
+
+          // ✅ 차트 초기화 후 데이터 복원
+          void nextTick(() => {
+            if (passChart && !passChart.isDisposed() && chartRef.value) {
+              restoreChartData()
+            }
+          })
+        } catch (error) {
+          console.error('❌ 차트 초기화 중 오류:', error)
+        }
+      }, 100)
+    } else {
+      // ✅ 차트가 이미 있으면 정상 상태로 복원 (DOM 스타일 먼저 설정)
+      console.log('✅ 차트가 이미 존재함 - 정상 상태로 복원')
+
+      // ✅ 1단계: DOM 스타일을 동기적으로 먼저 설정 (리사이즈 전에!)
+      // 이렇게 하면 차트가 처음부터 올바른 크기로 렌더링됨
+      const chartSize = 500
+      const chartElement = chartRef.value?.querySelector('div') as HTMLElement | null
+      if (chartElement && passChart && !passChart.isDisposed()) {
+        // ✅ 스타일을 먼저 설정하여 차트가 올바른 위치에서 렌더링되도록 함
+        chartElement.style.width = `${chartSize}px`
+        chartElement.style.height = `${chartSize}px`
+        chartElement.style.maxWidth = `${chartSize}px`
+        chartElement.style.maxHeight = `${chartSize}px`
+        chartElement.style.minWidth = `${chartSize}px`
+        chartElement.style.minHeight = `${chartSize}px`
+        chartElement.style.position = 'absolute'
+        chartElement.style.top = '50%'
+        chartElement.style.left = '50%'
+        chartElement.style.transform = 'translate(-50%, -50%)'
+      }
+
+      // ✅ 2단계: Vue 렌더링 사이클과 동기화하여 리사이즈
+      void nextTick(() => {
+        // ✅ 컴포넌트가 여전히 마운트되어 있는지 확인
+        if (!chartRef.value) {
+          console.warn('⚠️ 차트 컨테이너가 없어 복원을 건너뜁니다')
+          return
+        }
+
+        if (passChart && !passChart.isDisposed()) {
+          try {
+            passChart.resize({
+              width: chartSize,
+              height: chartSize
+            })
+            console.log('✅ 차트 정상 상태 복원 완료')
+
+            // ✅ 차트 복원 후 데이터 복원
+            restoreChartData()
+          } catch (error) {
+            console.error('❌ 차트 리사이즈 중 오류:', error)
+          }
+        }
+      })
+    }
+
+    // 🆕 타이머 재시작
+    if (!updateTimer) {
+      // ✅ 타이머를 100ms로 변경하여 백엔드 모니터링 주기(100ms)와 일치
+      updateTimer = window.setInterval(() => {
+        try {
+          updateChart()
+        } catch (error) {
+          console.error('❌ 차트 업데이트 타이머 오류:', error)
+        }
+      }, 100)
+      console.log('✅ 차트 업데이트 타이머 재시작 (100ms)')
+    }
+
+    // 🆕 DOM 하이라이트 강제 적용
+    setTimeout(() => {
+      try {
+        applyRowColors()
+      } catch (error) {
+        console.error('❌ DOM 하이라이트 적용 중 오류:', error)
+      }
+    }, 200)
+  } catch (error) {
+    console.error('❌ handleActivated 중 오류:', error)
+  }
 }
 
 // 🆕 컴포넌트 비활성화 시 정리
@@ -1245,6 +1307,84 @@ const stopTimeTimer = () => {
   if (timeUpdateTimer) {
     clearInterval(timeUpdateTimer)
     timeUpdateTimer = null
+  }
+}
+
+// 🆕 선택된 스케줄의 추적 경로 로드 (watch보다 먼저 선언)
+// ✅ 현재 추적 중인 스케줄이 있으면 해당 스케줄의 경로만 로드
+const loadSelectedScheduleTrackingPath = async () => {
+  try {
+    // ✅ 현재 추적 중인 스케줄 우선 확인
+    const currentTrackingMstId = icdStore.currentTrackingMstId
+    let scheduleToLoad: ScheduleItem | null = null
+
+    if (currentTrackingMstId !== null) {
+      // 현재 추적 중인 스케줄이 있으면 해당 스케줄 사용
+      const currentSchedule = sortedScheduleList.value.find(s => Number(s.index) === Number(currentTrackingMstId))
+      if (currentSchedule) {
+        scheduleToLoad = currentSchedule
+        console.log('🎯 현재 추적 중인 스케줄의 경로 로드:', currentSchedule.satelliteName)
+      }
+    } else {
+      // 현재 추적 중인 스케줄이 없으면 선택된 스케줄 사용
+      scheduleToLoad = displaySchedule.value
+      if (scheduleToLoad) {
+        console.log('📌 선택된 스케줄의 경로 로드:', scheduleToLoad.satelliteName)
+      }
+    }
+
+    if (!scheduleToLoad) {
+      console.log('⚠️ 로드할 스케줄이 없음')
+      return
+    }
+
+    const satelliteId = scheduleToLoad.satelliteId || scheduleToLoad.satelliteName
+    // ✅ index만 사용 (no는 재생성된 값이므로 사용하지 않음)
+    const passId = scheduleToLoad.index
+
+    if (!satelliteId || !passId) {
+      console.log('⚠️ 위성 ID 또는 패스 ID가 없음')
+      return
+    }
+
+    // ✅ 스케줄의 keyhole 여부에 따라 DataType 결정
+    const isKeyhole = scheduleToLoad.isKeyhole || scheduleToLoad.IsKeyhole || false
+    const dataType = isKeyhole ? 'keyhole_optimized_final_transformed' : 'final_transformed'
+
+    console.log('🚀 스케줄 추적 경로 로드 시작:', {
+      satelliteName: scheduleToLoad.satelliteName,
+      satelliteId,
+      passId,
+      isKeyhole,
+      dataType,
+    })
+
+    // ✅ DataType을 Store에 전달
+    const success = await passScheduleStore.loadTrackingDetailData(
+      satelliteId,
+      passId,
+      dataType  // ✅ DataType 전달
+    )
+
+    if (success) {
+      console.log('✅ 추적 경로 로드 완료, 차트 업데이트')
+      // ✅ 예정 경로 길이 초기화 (새 경로 로드)
+      lastPredictedPathLength.value = 0
+      // 차트가 초기화되어 있다면 즉시 업데이트 (안전한 호출)
+      void nextTick(() => {
+        if (passChart && !passChart.isDisposed() && typeof updateChart === 'function') {
+          try {
+            updateChart()
+          } catch (error) {
+            console.error('❌ 차트 업데이트 중 오류:', error)
+          }
+        }
+      })
+    } else {
+      console.warn('⚠️ 추적 경로 로드 실패')
+    }
+  } catch (error) {
+    console.error('❌ 추적 경로 로드 중 오류:', error)
   }
 }
 
@@ -1680,77 +1820,6 @@ const initChart = () => {
 }
 
 
-// 🆕 선택된 스케줄의 추적 경로 로드
-// ✅ 현재 추적 중인 스케줄이 있으면 해당 스케줄의 경로만 로드
-const loadSelectedScheduleTrackingPath = async () => {
-  try {
-    // ✅ 현재 추적 중인 스케줄 우선 확인
-    const currentTrackingMstId = icdStore.currentTrackingMstId
-    let scheduleToLoad: ScheduleItem | null = null
-
-    if (currentTrackingMstId !== null) {
-      // 현재 추적 중인 스케줄이 있으면 해당 스케줄 사용
-      const currentSchedule = sortedScheduleList.value.find(s => Number(s.index) === Number(currentTrackingMstId))
-      if (currentSchedule) {
-        scheduleToLoad = currentSchedule
-        console.log('🎯 현재 추적 중인 스케줄의 경로 로드:', currentSchedule.satelliteName)
-      }
-    } else {
-      // 현재 추적 중인 스케줄이 없으면 선택된 스케줄 사용
-      scheduleToLoad = displaySchedule.value
-      if (scheduleToLoad) {
-        console.log('📌 선택된 스케줄의 경로 로드:', scheduleToLoad.satelliteName)
-      }
-    }
-
-    if (!scheduleToLoad) {
-      console.log('⚠️ 로드할 스케줄이 없음')
-      return
-    }
-
-    const satelliteId = scheduleToLoad.satelliteId || scheduleToLoad.satelliteName
-    // ✅ index만 사용 (no는 재생성된 값이므로 사용하지 않음)
-    const passId = scheduleToLoad.index
-
-    if (!satelliteId || !passId) {
-      console.log('⚠️ 위성 ID 또는 패스 ID가 없음')
-      return
-    }
-
-    // ✅ 스케줄의 keyhole 여부에 따라 DataType 결정
-    const isKeyhole = scheduleToLoad.isKeyhole || scheduleToLoad.IsKeyhole || false
-    const dataType = isKeyhole ? 'keyhole_optimized_final_transformed' : 'final_transformed'
-
-    console.log('🚀 스케줄 추적 경로 로드 시작:', {
-      satelliteName: scheduleToLoad.satelliteName,
-      satelliteId,
-      passId,
-      isKeyhole,
-      dataType,
-    })
-
-    // ✅ DataType을 Store에 전달
-    const success = await passScheduleStore.loadTrackingDetailData(
-      satelliteId,
-      passId,
-      dataType  // ✅ DataType 전달
-    )
-
-    if (success) {
-      console.log('✅ 추적 경로 로드 완료, 차트 업데이트')
-      // ✅ 예정 경로 길이 초기화 (새 경로 로드)
-      lastPredictedPathLength.value = 0
-      // 차트가 초기화되어 있다면 즉시 업데이트
-      if (passChart) {
-        updateChart()
-      }
-    } else {
-      console.warn('⚠️ 추적 경로 로드 실패')
-    }
-  } catch (error) {
-    console.error('❌ 추적 경로 로드 중 오류:', error)
-  }
-}
 
 // 🆕 성능 최적화를 위한 변수들
 const lastUpdateTime = ref(0)

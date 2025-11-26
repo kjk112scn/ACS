@@ -1484,33 +1484,54 @@ export const useICDStore = defineStore('icd', () => {
         }
       }
 
-      // 명령 데이터 업데이트
-      if (message.cmdAzimuthAngle !== undefined) {
-        cmdAzimuthAngle.value = safeToString(message.cmdAzimuthAngle)
-      }
-
-      if (message.cmdElevationAngle !== undefined) {
-        cmdElevationAngle.value = safeToString(message.cmdElevationAngle)
-      }
-
-      if (message.cmdTrainAngle !== undefined) {
-        cmdTrainAngle.value = safeToString(message.cmdTrainAngle)
-      }
-
-      // 🆕 추적 스케줄 정보 업데이트
-      if (message.currentTrackingMstId !== undefined) {
-        const newCurrentMstId = message.currentTrackingMstId as number | null
-        if (currentTrackingMstId.value !== newCurrentMstId) {
-          console.log(`📋 현재 추적 MstId 변경: ${currentTrackingMstId.value} → ${newCurrentMstId}`)
-          currentTrackingMstId.value = newCurrentMstId
+      // 명령 데이터 업데이트 - data 객체 안에서 찾기
+      if (message.data && typeof message.data === 'object' && 'cmdAzimuthAngle' in message.data) {
+        const dataCmdAzimuth = (message.data as Record<string, unknown>).cmdAzimuthAngle
+        if (dataCmdAzimuth !== undefined && dataCmdAzimuth !== null) {
+          cmdAzimuthAngle.value = safeToString(dataCmdAzimuth)
         }
       }
 
-      if (message.nextTrackingMstId !== undefined) {
-        const newNextMstId = message.nextTrackingMstId as number | null
-        if (nextTrackingMstId.value !== newNextMstId) {
-          console.log(`📋 다음 추적 MstId 변경: ${nextTrackingMstId.value} → ${newNextMstId}`)
-          nextTrackingMstId.value = newNextMstId
+      if (message.data && typeof message.data === 'object' && 'cmdElevationAngle' in message.data) {
+        const dataCmdElevation = (message.data as Record<string, unknown>).cmdElevationAngle
+        if (dataCmdElevation !== undefined && dataCmdElevation !== null) {
+          cmdElevationAngle.value = safeToString(dataCmdElevation)
+        }
+      }
+
+      if (message.data && typeof message.data === 'object' && 'cmdTrainAngle' in message.data) {
+        const dataCmdTrain = (message.data as Record<string, unknown>).cmdTrainAngle
+        if (dataCmdTrain !== undefined && dataCmdTrain !== null) {
+          cmdTrainAngle.value = safeToString(dataCmdTrain)
+        }
+      }
+
+      // 🆕 추적 스케줄 정보 업데이트 - data 객체 안에서 찾기
+      if (
+        message.data &&
+        typeof message.data === 'object' &&
+        'currentTrackingMstId' in message.data
+      ) {
+        const dataCurrentMstId = (message.data as Record<string, unknown>).currentTrackingMstId
+        if (dataCurrentMstId !== undefined) {
+          const newCurrentMstId = dataCurrentMstId as number | null
+          if (currentTrackingMstId.value !== newCurrentMstId) {
+            console.log(
+              `📋 현재 추적 MstId 변경: ${currentTrackingMstId.value} → ${newCurrentMstId}`,
+            )
+            currentTrackingMstId.value = newCurrentMstId
+          }
+        }
+      }
+
+      if (message.data && typeof message.data === 'object' && 'nextTrackingMstId' in message.data) {
+        const dataNextMstId = (message.data as Record<string, unknown>).nextTrackingMstId
+        if (dataNextMstId !== undefined) {
+          const newNextMstId = dataNextMstId as number | null
+          if (nextTrackingMstId.value !== newNextMstId) {
+            console.log(`📋 다음 추적 MstId 변경: ${nextTrackingMstId.value} → ${newNextMstId}`)
+            nextTrackingMstId.value = newNextMstId
+          }
         }
       }
 
@@ -1524,9 +1545,12 @@ export const useICDStore = defineStore('icd', () => {
         }
       }
 
-      // 추적 상태 데이터 업데이트
-      if (message.trackingStatus && typeof message.trackingStatus === 'object') {
-        updataTrackingStatus(message.trackingStatus)
+      // 추적 상태 데이터 업데이트 - data 객체 안에서 찾기
+      if (message.data && typeof message.data === 'object' && 'trackingStatus' in message.data) {
+        const dataTrackingStatus = (message.data as Record<string, unknown>).trackingStatus
+        if (dataTrackingStatus && typeof dataTrackingStatus === 'object') {
+          updataTrackingStatus(dataTrackingStatus as Record<string, unknown>)
+        }
       }
       if (message.communicationStatus !== undefined) {
         communicationStatus.value = safeToString(message.communicationStatus)

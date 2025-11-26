@@ -651,7 +651,7 @@ ISS (ZARYA)
 </template>
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, onActivated, onDeactivated, computed, watch, nextTick } from 'vue'
-import { date, useQuasar } from 'quasar'
+import { date } from 'quasar'
 
 import type { QTableProps } from 'quasar'
 import { useICDStore } from '../../stores/icd/icdStore'
@@ -667,9 +667,6 @@ import {
 } from '../../services/mode/ephemerisTrackService'
 import { openPopup } from '../../utils/windowUtils'
 import { useNotification } from '../../composables/useNotification'
-
-// ✅ Quasar 인스턴스
-const $q = useQuasar()
 
 // ✅ 알림 시스템 사용
 const { success, error, warning, info } = useNotification()
@@ -1080,6 +1077,7 @@ const selectedScheduleInfo = computed(() => {
       duration: '',
       maxElevation: ephemerisStore.geostationaryAngles.elevation,
       startTimeMs: 0,
+      endTimeMs: 0, // ✅ 정지궤도는 종료 시간 없음
       timeRemaining: 0,
       startAzimuth: ephemerisStore.geostationaryAngles.azimuth,
       endAzimuth: ephemerisStore.geostationaryAngles.azimuth,
@@ -1118,6 +1116,7 @@ const selectedScheduleInfo = computed(() => {
         ? (selected.KeyholeFinalTransformedMaxElevation ?? selected.FinalTransformedMaxElevation ?? (typeof selected.MaxElevation === 'number' ? selected.MaxElevation : 0))
         : (selected.FinalTransformedMaxElevation ?? (typeof selected.MaxElevation === 'number' ? selected.MaxElevation : 0)),
       startTimeMs: new Date(selected.StartTime).getTime(),
+      endTimeMs: new Date(selected.EndTime).getTime(), // ✅ 종료 시간 추가
       timeRemaining: 0,
       startAzimuth: selected.isKeyhole
         ? (selected.KeyholeFinalTransformedStartAzimuth ?? selected.FinalTransformedStartAzimuth ?? (typeof selected.StartAzimuth === 'number' ? selected.StartAzimuth : 0))
@@ -1159,6 +1158,7 @@ const selectedScheduleInfo = computed(() => {
     duration: '',
     maxElevation: 0,
     startTimeMs: 0,
+    endTimeMs: 0, // ✅ 기본값에도 종료 시간 추가
     timeRemaining: 0,
     startAzimuth: 0,
     endAzimuth: 0,
@@ -1521,12 +1521,21 @@ const updateChart = () => {
       // ✅ 추적 상태에 따라 다른 데이터 소스 사용
       const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
 
-      const azimuth = isTrackingActive
-        ? parseFloat(icdStore.trackingActualAzimuthAngle) || 0
-        : parseFloat(icdStore.azimuthAngle) || 0
-      const elevation = isTrackingActive
-        ? parseFloat(icdStore.trackingActualElevationAngle) || 0
-        : parseFloat(icdStore.elevationAngle) || 0
+      // ✅ 추적 시작 직후 tracking 값이 없으면 일반 값 사용 (0으로 이동하는 문제 해결)
+      let azimuth = parseFloat(icdStore.azimuthAngle) || 0
+      let elevation = parseFloat(icdStore.elevationAngle) || 0
+
+      if (isTrackingActive) {
+        const trackingAz = parseFloat(icdStore.trackingActualAzimuthAngle) || 0
+        const trackingEl = parseFloat(icdStore.trackingActualElevationAngle) || 0
+        // ✅ tracking 값이 유효하면 사용, 아니면 일반 값 유지
+        if (trackingAz !== 0 || azimuth === 0) {
+          azimuth = trackingAz
+        }
+        if (trackingEl !== 0 || elevation === 0) {
+          elevation = trackingEl
+        }
+      }
 
       const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
       const normalizedEl = Math.max(0, Math.min(90, elevation))
@@ -1546,8 +1555,28 @@ const updateChart = () => {
 
       // ✅ 안전한 차트 옵션 업데이트
       const option = chartPool.updatePosition(normalizedEl, normalizedAz)
+
+      // ✅ 위성 궤적 데이터 유지 (series[2]) - 파란색 선이 사라지는 문제 해결
+      if (ephemerisStore.detailData && ephemerisStore.detailData.length > 0) {
+        const trajectoryPoints = ephemerisStore.detailData.map((point) => {
+          const az = typeof point.Azimuth === 'number' ? point.Azimuth : 0
+          const el = typeof point.Elevation === 'number' ? point.Elevation : 0
+          const normalizedAz = az < 0 ? az + 360 : az
+          const normalizedEl = Math.max(0, Math.min(90, el))
+          return [normalizedEl, normalizedAz] as [number, number]
+        })
+        if (!option.series[2]) {
+          option.series[2] = {}
+        }
+        option.series[2].data = trajectoryPoints
+      }
+
       if (ephemerisStore.trackingPath?.sampledPath) {
-        chartPool.updateTrackingPath(ephemerisStore.trackingPath.sampledPath as [number, number][])
+        // ✅ 추적 경로 업데이트 (반환값의 series[1] 데이터를 option에 반영)
+        const trackingOption = chartPool.updateTrackingPath(ephemerisStore.trackingPath.sampledPath as [number, number][])
+        if (trackingOption.series[1] && option.series[1]) {
+          option.series[1].data = trackingOption.series[1].data
+        }
       }
 
       // ✅ 차트가 여전히 존재하는지 확인
@@ -1905,9 +1934,6 @@ const updateChartWithTrajectory = (data: TrajectoryPoint[]) => {
 }
 
 // ✅ 차트 데이터 복원 함수 (이론 경로 + 실시간 경로 한 번에)
-// ⚠️ 현재 사용하지 않음 - 화면 복귀 시 불필요한 리렌더링 방지를 위해 제거
-// updateChart()가 100ms마다 업데이트하므로 별도 복원이 필요 없음
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const restoreChartData = () => {
   if (!chart || chart.isDisposed()) return
 
@@ -1958,7 +1984,14 @@ const restoreChartData = () => {
 // ✅ 남은 시간을 시:분:초 형식으로 포맷하는 함수 (24시간 이상도 표시 가능)
 const formatTimeRemaining = (ms: number): string => {
   if (ms < 0) {
-    return 'Delayed' // 지연됨
+    // ✅ 추적 진행 중일 때는 경과 시간 표시 (음수를 양수로 변환)
+    const elapsedMs = Math.abs(ms)
+    const totalSeconds = Math.floor(elapsedMs / 1000)
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
+
+    return `+${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
   }
   if (ms === 0) {
     return 'Completed' // 완료
@@ -1978,12 +2011,27 @@ const updateTimeRemaining = () => {
   if (selectedScheduleInfo.value.startTimeMs > 0) {
     try {
       const currentCalTime = getCalTimeTimestamp(icdStore.resultTimeOffsetCalTime)
-      const remainingMs = selectedScheduleInfo.value.startTimeMs - currentCalTime
-      timeRemaining.value = remainingMs
+      const isTracking = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
+
+      if (isTracking && selectedScheduleInfo.value.endTimeMs > 0) {
+        // ✅ 추적 진행 중: 종료 시간까지 남은 시간 계산
+        const remainingMs = selectedScheduleInfo.value.endTimeMs - currentCalTime
+        timeRemaining.value = remainingMs
+      } else {
+        // ✅ 추적 전: 시작 시간까지 남은 시간 계산
+        const remainingMs = selectedScheduleInfo.value.startTimeMs - currentCalTime
+        timeRemaining.value = remainingMs
+      }
     } catch (error) {
       console.error('시간 계산 오류:', error)
       const clientTime = Date.now()
-      timeRemaining.value = Math.max(0, selectedScheduleInfo.value.startTimeMs - clientTime)
+      const isTracking = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
+
+      if (isTracking && selectedScheduleInfo.value.endTimeMs > 0) {
+        timeRemaining.value = selectedScheduleInfo.value.endTimeMs - clientTime
+      } else {
+        timeRemaining.value = Math.max(0, selectedScheduleInfo.value.startTimeMs - clientTime)
+      }
     }
   }
 }
@@ -2489,21 +2537,26 @@ const handleActivated = () => {
     setTimeout(() => {
       initChart()
       console.log('✅ 차트 재초기화 완료')
+
+      // ✅ 차트 초기화 후 데이터 복원
+      void nextTick(() => {
+        if (chart && !chart.isDisposed()) {
+          restoreChartData()
+        }
+      })
     }, 100)
   } else {
     // ✅ 차트가 이미 존재하면 그대로 유지 (추가 리사이즈/스타일 변경 없음)
     //    초기 마운트 시 initChart + adjustChartSize에서 한 번만 리사이즈함
     console.log('✅ 차트가 이미 존재함 - 그대로 유지 (리사이즈/스타일 변경 없음)')
-  }
 
-  // ✅ 차트 데이터 복원 제거 - 화면 복귀 시 불필요한 리렌더링 방지
-  // 차트는 이미 데이터를 가지고 있고, updateChart()가 100ms마다 업데이트하므로
-  // 화면 복귀 시 별도 복원이 필요 없음 (불필요한 setOption 호출로 인한 깜빡임 방지)
-  // void nextTick(() => {
-  //   if (chart && !chart.isDisposed()) {
-  //     restoreChartData()
-  //   }
-  // })
+    // ✅ 차트가 이미 존재하면 데이터만 복원
+    void nextTick(() => {
+      if (chart && !chart.isDisposed()) {
+        restoreChartData()
+      }
+    })
+  }
 
   // ✅ 타이머 재시작
   if (!updateTimer) {
@@ -2606,17 +2659,9 @@ onMounted(() => {
       }
     })
 
-    // ✅ 서버 데이터 로딩은 비동기로 처리 (차트와 분리) - PassSchedulePage와 동일
-    void loadScheduleData().then(() => {
-      console.log('✅ 스케줄 데이터 로드 완료')
-    }).catch((error) => {
-      console.error('스케줄 데이터 로드 실패:', error)
-      $q.notify({
-        type: 'warning',
-        message: '스케줄 데이터를 불러오는데 실패했습니다',
-        caption: '차트는 정상적으로 표시됩니다'
-      })
-    })
+    // ✅ 스케줄 데이터 로드는 "Select Schedule" 버튼 클릭 시에만 수행
+    // openScheduleModal()에서 loadScheduleData()를 호출하므로 여기서는 제거
+    // 페이지 접근 시 불필요한 API 호출 방지
   } catch (error) {
     console.error('EphemerisDesignationPage 마운트 중 오류:', error)
   }
