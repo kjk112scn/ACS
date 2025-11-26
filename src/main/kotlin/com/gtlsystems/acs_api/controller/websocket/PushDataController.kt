@@ -55,6 +55,7 @@ class PushDataController(
     private val dataGenerationCount = AtomicLong(0)
     private val broadcastStartCount = AtomicLong(0)
     private var lastSessionCount = 0 // 이전 세션 수 추적
+    private var wasEmpty = false // ✅ 이전 "브로드캐스트 대상 없음" 상태 추적
 
     // === 실시간 전송 설정 (ConfigurationService에서 로드) ===
     private val REALTIME_TRANSMISSION_INTERVAL_MS: Long get() = settingsService.systemWebsocketTransmissionInterval
@@ -200,9 +201,21 @@ class PushDataController(
     private fun broadcastToAllSubscribers(data: String) {
         val activeSessions = connectedSessions.values.filter { it.isActive.get() && it.session.isOpen }
         
-        if (activeSessions.isEmpty()) {
-            logger.debug("📡 브로드캐스트 대상 없음")
+        val isEmpty = activeSessions.isEmpty()
+        
+        // ✅ 상태가 변경될 때만 로그 출력
+        if (isEmpty) {
+            if (!wasEmpty) {
+                logger.debug("📡 브로드캐스트 대상 없음 (상태 변경: 세션 있음 → 없음)")
+                wasEmpty = true
+            }
             return
+        } else {
+            // ✅ 세션이 생겼을 때만 로그 출력 (이전에 없었던 경우)
+            if (wasEmpty) {
+                logger.debug("📡 브로드캐스트 대상 복구: {}개 세션", activeSessions.size)
+                wasEmpty = false
+            }
         }
         
         // ✅ 로그 최적화: 세션 수가 변동될 때만 출력
