@@ -1923,41 +1923,43 @@ class EphemerisService(
             // ✅ 시간 정보 가져오기
             val (startTime, endTime) = getCurrentTrackingPassTimes()
             val calTime = GlobalData.Time.calUtcTimeOffsetTime
-            
-            // ✅ time offset 적용: calTime은 이미 offset이 적용된 시간이므로,
-            // 실제 추적 시작 시간 기준으로 계산하기 위해 offset을 빼서 원래 시간을 구함
             val timeOffsetSeconds = GlobalData.Offset.TimeOffset
-            val adjustedCalTime = if (timeOffsetSeconds != 0.0f) {
-                calTime.minusSeconds(timeOffsetSeconds.toLong())
-            } else {
-                calTime
-            }
+            
+            logger.info("⏰ Time Offset 정보: offset=${timeOffsetSeconds}s, calTime=${calTime}, startTime=${startTime}")
 
-            val timeStatus = checkTimeInTrackingRange(adjustedCalTime, startTime, endTime)
+            // ✅ time offset 적용 시: calTime은 이미 offset이 적용된 시간이므로,
+            // 추적 데이터의 Time 필드와 직접 비교하여 가장 가까운 포인트를 찾아야 함
+            // time offset이 양수면 calTime은 미래 시간이므로, 해당 시간에 해당하는 데이터 포인트를 찾음
+            val timeStatus = checkTimeInTrackingRange(calTime, startTime, endTime)
             when (timeStatus) {
                 TimeRangeStatus.IN_RANGE -> {
                     logger.info("🎯 현재 시간이 추적 범위 내에 있습니다 - 실시간 추적 모드")
-                    logger.info("⏰ Time Offset 적용: ${timeOffsetSeconds}s, 조정된 시간: ${adjustedCalTime}")
 
-                    // ✅ 실시간 추적: time offset을 고려한 시간 차이 계산
-                    val timeDifferenceMs = Duration.between(startTime, adjustedCalTime).toMillis()
-                    
-                    // 필터링된 데이터에서 시간 기준으로 가장 가까운 데이터 찾기
+                    // ✅ time offset이 적용된 calTime과 데이터 포인트의 Time을 직접 비교
+                    // calTime은 offset이 적용된 시간이므로, 이 시간에 해당하는 데이터 포인트를 찾음
                     val closestPoint = passDetails.minByOrNull { point ->
                         val pointTime = point["Time"] as? ZonedDateTime
                         if (pointTime != null) {
-                            abs(Duration.between(startTime, pointTime).toMillis())
+                            abs(Duration.between(calTime, pointTime).toMillis())
                         } else {
                             Long.MAX_VALUE
                         }
                     }
                     
                     val calculatedIndex = if (closestPoint != null) {
-                        passDetails.indexOf(closestPoint)
+                        val index = passDetails.indexOf(closestPoint)
+                        val pointTime = closestPoint["Time"] as? ZonedDateTime
+                        logger.info("🔍 가장 가까운 포인트 찾음: 인덱스=${index}, 포인트 시간=${pointTime}, calTime=${calTime}, 시간 차이=${if (pointTime != null) Duration.between(calTime, pointTime).toMillis() else 0}ms")
+                        index
                     } else {
-                        // 시간 정보가 없으면 원본 방식 사용
-                        (timeDifferenceMs / 100).toInt()
+                        // 시간 정보가 없으면 startTime과 calTime의 차이로 계산
+                        val timeDifferenceMs = Duration.between(startTime, calTime).toMillis()
+                        val index = (timeDifferenceMs / 100).toInt()
+                        logger.info("🔍 포인트를 찾지 못함, 시간 차이로 계산: timeDifferenceMs=${timeDifferenceMs}ms, calculatedIndex=${index}")
+                        index
                     }
+                    
+                    logger.info("🔍 최종 인덱스 계산: calculatedIndex=${calculatedIndex}")
 
                     val totalSize = passDetails.size
                     val safeStartIndex = when {
@@ -1992,7 +1994,7 @@ class EphemerisService(
                 TimeRangeStatus.BEFORE_START -> {
                     logger.info("추적 시작 전입니다. 대기 중...")
                     // 대기 로직
-                    val timeUntilStart = Duration.between(adjustedCalTime, startTime)
+                    val timeUntilStart = Duration.between(calTime, startTime)
                     val secondsUntilStart = timeUntilStart.seconds
                     val minutesUntilStart = timeUntilStart.toMinutes()
 
