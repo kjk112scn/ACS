@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, readonly } from 'vue'
+import { getSavedConnectionState } from '@/utils/connectionManager'
 import {
   ephemerisTrackService,
   type ScheduleItem,
@@ -1044,6 +1045,13 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
    */
   const loadFromLocalStorage = (): boolean => {
     try {
+      // ✅ 연결 상태 확인 - 연결이 끊어진 상태면 복원하지 않음 (추가 보안)
+      const connectionState = getSavedConnectionState()
+      if (connectionState === 'disconnected') {
+        console.log('⚠️ 연결이 끊어진 상태 - localStorage 복원 건너뜀')
+        return false
+      }
+
       const storageKey = 'ephemeris-designation-data'
       const savedData = localStorage.getItem(storageKey)
 

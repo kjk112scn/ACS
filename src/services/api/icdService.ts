@@ -1,4 +1,5 @@
 import { api } from '@/boot/axios'
+import { handleConnectionChange } from '@/utils/connectionManager'
 export interface TrackingStatus {
   ephemerisStatus?: boolean | null
   ephemerisTrackingState?: string | null
@@ -158,6 +159,15 @@ class WebSocketService {
           )
           console.log('WebSocket 연결 성공')
           this.reconnectAttempts = 0
+
+          // ✅ 연결 상태 업데이트 및 재연결 감지
+          handleConnectionChange(true, {
+            minDisconnectDuration: 5000, // 5초 이상 끊겼으면 백엔드 재시작으로 간주
+            onReconnected: () => {
+              console.log('🔄 백엔드 재연결 감지 - localStorage 초기화됨')
+            },
+          })
+
           resolve()
         }
 
@@ -213,6 +223,9 @@ class WebSocketService {
             // 기타 코드 처리...
           }
 
+          // ✅ 연결 끊김 상태 업데이트
+          handleConnectionChange(false)
+
           this.cleanup()
 
           // 정상 종료가 아닌 경우에만 재연결 시도
@@ -241,6 +254,10 @@ class WebSocketService {
         this.websocket.onerror = (event) => {
           const error = new Error(`WebSocket error: ${event.type}`)
           console.error('WebSocket 오류:', error)
+
+          // ✅ 에러 발생 시 연결 끊김 상태 업데이트
+          handleConnectionChange(false)
+
           reject(error)
         }
       } catch (error) {
