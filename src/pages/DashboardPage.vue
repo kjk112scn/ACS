@@ -905,32 +905,78 @@ const trainActualValue = computed((): number => {
  */
 
 const azimuthCmdValue = computed((): number => {
+  // ✅ COMPLETED 상태에서도 마지막 추적 값 유지
+  const isTrackingActive =
+    icdStore.ephemerisTrackingState === 'TRACKING' ||
+    icdStore.ephemerisTrackingState === 'COMPLETED' ||
+    icdStore.passScheduleStatusInfo.isActive
 
-  const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
-  const value = isTrackingActive ? icdStore.trackingCMDAzimuthAngle : icdStore.cmdAzimuthAngle
+  // ✅ trackingCMDAzimuthAngle이 유효한 값이면 사용, 아니면 cmdAzimuthAngle 사용
+  const trackingValue = icdStore.trackingCMDAzimuthAngle
+  const hasValidTrackingValue =
+    trackingValue && trackingValue !== '' && !isNaN(Number(trackingValue))
+
+  const value =
+    isTrackingActive && hasValidTrackingValue
+      ? trackingValue
+      : icdStore.cmdAzimuthAngle
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
-
 })
 
 const azimuthActualValue = computed((): number => {
-  const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
-  const value = isTrackingActive ? icdStore.trackingActualAzimuthAngle : icdStore.azimuthAngle
+  // ✅ COMPLETED 상태에서도 마지막 추적 값 유지
+  const isTrackingActive =
+    icdStore.ephemerisTrackingState === 'TRACKING' ||
+    icdStore.ephemerisTrackingState === 'COMPLETED' ||
+    icdStore.passScheduleStatusInfo.isActive
+
+  const trackingValue = icdStore.trackingActualAzimuthAngle
+  const hasValidTrackingValue =
+    trackingValue && trackingValue !== '' && !isNaN(Number(trackingValue))
+
+  const value =
+    isTrackingActive && hasValidTrackingValue
+      ? trackingValue
+      : icdStore.azimuthAngle
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
-
 const elevationCmdValue = computed((): number => {
-  const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
-  const value = isTrackingActive ? icdStore.trackingCMDElevationAngle : icdStore.cmdElevationAngle
+  // ✅ COMPLETED 상태에서도 마지막 추적 값 유지
+  const isTrackingActive =
+    icdStore.ephemerisTrackingState === 'TRACKING' ||
+    icdStore.ephemerisTrackingState === 'COMPLETED' ||
+    icdStore.passScheduleStatusInfo.isActive
+
+  const trackingValue = icdStore.trackingCMDElevationAngle
+  const hasValidTrackingValue =
+    trackingValue && trackingValue !== '' && !isNaN(Number(trackingValue))
+
+  const value =
+    isTrackingActive && hasValidTrackingValue
+      ? trackingValue
+      : icdStore.cmdElevationAngle
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
 const elevationActualValue = computed((): number => {
-  const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
-  const value = isTrackingActive ? icdStore.trackingActualElevationAngle : icdStore.elevationAngle
+  // ✅ COMPLETED 상태에서도 마지막 추적 값 유지
+  const isTrackingActive =
+    icdStore.ephemerisTrackingState === 'TRACKING' ||
+    icdStore.ephemerisTrackingState === 'COMPLETED' ||
+    icdStore.passScheduleStatusInfo.isActive
+
+  const trackingValue = icdStore.trackingActualElevationAngle
+  const hasValidTrackingValue =
+    trackingValue && trackingValue !== '' && !isNaN(Number(trackingValue))
+
+  const value =
+    isTrackingActive && hasValidTrackingValue
+      ? trackingValue
+      : icdStore.elevationAngle
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })

@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref, computed, readonly } from 'vue'
-import { getSavedConnectionState } from '@/utils/connectionManager'
 import {
   ephemerisTrackService,
   type ScheduleItem,
@@ -1045,12 +1044,8 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
    */
   const loadFromLocalStorage = (): boolean => {
     try {
-      // ✅ 연결 상태 확인 - 연결이 끊어진 상태면 복원하지 않음 (추가 보안)
-      const connectionState = getSavedConnectionState()
-      if (connectionState === 'disconnected') {
-        console.log('⚠️ 연결이 끊어진 상태 - localStorage 복원 건너뜀')
-        return false
-      }
+      // ✅ 연결 상태 체크 제거 - 항상 복원 시도
+      // (백엔드 재시작 감지는 connectionManager에서 처리하므로 여기서는 불필요)
 
       const storageKey = 'ephemeris-designation-data'
       const savedData = localStorage.getItem(storageKey)
@@ -1132,6 +1127,14 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
       // ✅ 선택된 스케줄 복원 (trajectoryPath가 있으면 detailData도 복원 필요)
       if (parsed.selectedSchedule) {
         selectedSchedule.value = parsed.selectedSchedule
+
+        // ✅ currentTrackingPassId도 함께 복원
+        const scheduleNo = (parsed.selectedSchedule as Record<string, unknown>).No
+        if (scheduleNo && typeof scheduleNo === 'number') {
+          currentTrackingPassId.value = scheduleNo
+          console.log('✅ currentTrackingPassId 복원:', currentTrackingPassId.value)
+        }
+
         // ✅ ScheduleItem 타입 확인: satelliteName 또는 satelliteId 사용
         const scheduleName =
           (parsed.selectedSchedule as Record<string, unknown>).satelliteName ||

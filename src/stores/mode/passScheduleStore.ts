@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, readonly } from 'vue' // computed, readonly import 추가
 import { useQuasar } from 'quasar'
-import { getSavedConnectionState } from '@/utils/connectionManager'
 import {
   passScheduleService,
   type AddTleAndTrackingRequest,
@@ -1454,12 +1453,8 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
    */
   const loadFromLocalStorage = (): boolean => {
     try {
-      // ✅ 연결 상태 확인 - 연결이 끊어진 상태면 복원하지 않음 (추가 보안)
-      const connectionState = getSavedConnectionState()
-      if (connectionState === 'disconnected') {
-        console.log('⚠️ 연결이 끊어진 상태 - localStorage 복원 건너뜀')
-        return false
-      }
+      // ✅ 연결 상태 체크 제거 - 항상 복원 시도
+      // (백엔드 재시작 감지는 connectionManager에서 처리하므로 여기서는 불필요)
 
       const storageKey = 'pass-schedule-data'
       const savedData = localStorage.getItem(storageKey)

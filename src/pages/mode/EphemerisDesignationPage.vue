@@ -1187,14 +1187,27 @@ const selectedScheduleInfo = computed(() => {
 watch(() => icdStore.ephemerisTrackingState, (newState, oldState) => {
   console.log('🔄 추적 상태 변경:', oldState, '→', newState)
 
-  // 추적 시작 또는 완료 시 경로 초기화
-  if (newState === 'TRACKING' || newState === 'COMPLETED' || newState === 'IDLE') {
+  // ✅ 추적 시작 시에만 경로 초기화 (TRACKING으로 전환될 때)
+  if (newState === 'TRACKING' && oldState !== 'TRACKING') {
     // ✅ 현재 위치를 기준으로 경로 초기화 (0도에서 시작하는 문제 해결)
     const currentAzimuth = parseFloat(icdStore.azimuthAngle) || 0
     const currentElevation = parseFloat(icdStore.elevationAngle) || 0
 
     ephemerisStore.clearTrackingPath(currentAzimuth, currentElevation)
-    console.log('🧹 추적 경로 초기화 완료 - 현재 위치 기준:', {
+    console.log('🧹 추적 시작 - 경로 초기화 완료 - 현재 위치 기준:', {
+      azimuth: currentAzimuth,
+      elevation: currentElevation
+    })
+  }
+  // ✅ COMPLETED 상태에서는 경로 유지 (삭제하지 않음)
+  // ✅ IDLE 상태로 전환될 때만 경로 초기화 (새 추적 시작 전)
+  else if (newState === 'IDLE' && oldState !== 'IDLE') {
+    // IDLE 상태로 전환될 때만 경로 초기화
+    const currentAzimuth = parseFloat(icdStore.azimuthAngle) || 0
+    const currentElevation = parseFloat(icdStore.elevationAngle) || 0
+
+    ephemerisStore.clearTrackingPath(currentAzimuth, currentElevation)
+    console.log('🧹 IDLE 상태 전환 - 경로 초기화 완료:', {
       azimuth: currentAzimuth,
       elevation: currentElevation
     })
@@ -2455,6 +2468,19 @@ const handleEphemerisCommand = async () => {
       return
     }
 
+    // ✅ currentTrackingPassId가 없으면 selectedScheduleInfo.passId로 설정
+    if (!ephemerisStore.currentTrackingPassId && selectedScheduleInfo.value.passId) {
+      // selectedSchedule이 있으면 currentTrackingPassId 설정
+      if (ephemerisStore.selectedSchedule) {
+        ephemerisStore.currentTrackingPassId = ephemerisStore.selectedSchedule.No
+        console.log('✅ currentTrackingPassId 자동 설정:', ephemerisStore.currentTrackingPassId)
+      } else {
+        // selectedSchedule이 없으면 경고
+        warning('스케줄 정보가 없습니다. 다시 스케줄을 선택해주세요.')
+        return
+      }
+    }
+
     // ✅ 추적 시작 전 경로 초기화 (현재 위치 기준)
     const currentAzimuth = parseFloat(icdStore.azimuthAngle) || 0
     const currentElevation = parseFloat(icdStore.elevationAngle) || 0
@@ -2462,10 +2488,12 @@ const handleEphemerisCommand = async () => {
     ephemerisStore.clearTrackingPath(currentAzimuth, currentElevation)
     await ephemerisStore.startTracking()
 
+    success('Ephemeris 추적이 시작되었습니다')
     console.log('Ephemeris 추적이 시작되었습니다')
   } catch (error) {
     console.error('Failed to start tracking:', error)
-    console.error('추적 시작에 실패했습니다')
+    const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'
+    error(`추적 시작에 실패했습니다: ${errorMessage}`)
   }
 }
 

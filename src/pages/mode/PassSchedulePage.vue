@@ -612,16 +612,14 @@ watch(() => icdStore.currentTrackingMstId, (newMstId, oldMstId) => {
     })
 
   } else if (oldMstId !== null && newMstId === null) {
-    // 추적 완료 시 경로 초기화
-    console.log('🛑 추적 완료 - 모든 경로 초기화')
-    passScheduleStore.clearTrackingPaths()
-    // ✅ 차트 풀의 경로도 초기화
-    passChartPool.updateTrackingPath([])
+    // ✅ 추적 완료 시 경로는 유지 (초기화하지 않음)
+    console.log('🛑 추적 완료 - 경로 유지 (초기화하지 않음)')
+
+    // ✅ 이론치 경로만 초기화 (실제 이동 경로는 유지)
     passChartPool.updatePredictedPath([])
-    // ✅ 경로 길이 추적 변수 초기화
-    lastTrackingPathLength.value = 0
     lastPredictedPathLength.value = 0
-    // ✅ 차트 업데이트
+
+    // ✅ 실제 이동 경로는 유지하되 차트만 업데이트
     if (passChart && !passChart.isDisposed()) {
       updateChart()
     }
