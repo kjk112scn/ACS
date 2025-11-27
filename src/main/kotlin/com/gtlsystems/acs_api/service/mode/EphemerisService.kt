@@ -1923,14 +1923,24 @@ class EphemerisService(
             // ✅ 시간 정보 가져오기
             val (startTime, endTime) = getCurrentTrackingPassTimes()
             val calTime = GlobalData.Time.calUtcTimeOffsetTime
+            
+            // ✅ time offset 적용: calTime은 이미 offset이 적용된 시간이므로,
+            // 실제 추적 시작 시간 기준으로 계산하기 위해 offset을 빼서 원래 시간을 구함
+            val timeOffsetSeconds = GlobalData.Offset.TimeOffset
+            val adjustedCalTime = if (timeOffsetSeconds != 0.0f) {
+                calTime.minusSeconds(timeOffsetSeconds.toLong())
+            } else {
+                calTime
+            }
 
-            val timeStatus = checkTimeInTrackingRange(calTime, startTime, endTime)
+            val timeStatus = checkTimeInTrackingRange(adjustedCalTime, startTime, endTime)
             when (timeStatus) {
                 TimeRangeStatus.IN_RANGE -> {
                     logger.info("🎯 현재 시간이 추적 범위 내에 있습니다 - 실시간 추적 모드")
+                    logger.info("⏰ Time Offset 적용: ${timeOffsetSeconds}s, 조정된 시간: ${adjustedCalTime}")
 
-                    // ✅ 실시간 추적: 필터링된 데이터에서 현재 시간에 가장 가까운 데이터 찾기
-                    val timeDifferenceMs = Duration.between(startTime, calTime).toMillis()
+                    // ✅ 실시간 추적: time offset을 고려한 시간 차이 계산
+                    val timeDifferenceMs = Duration.between(startTime, adjustedCalTime).toMillis()
                     
                     // 필터링된 데이터에서 시간 기준으로 가장 가까운 데이터 찾기
                     val closestPoint = passDetails.minByOrNull { point ->
@@ -1982,7 +1992,7 @@ class EphemerisService(
                 TimeRangeStatus.BEFORE_START -> {
                     logger.info("추적 시작 전입니다. 대기 중...")
                     // 대기 로직
-                    val timeUntilStart = Duration.between(calTime, startTime)
+                    val timeUntilStart = Duration.between(adjustedCalTime, startTime)
                     val secondsUntilStart = timeUntilStart.seconds
                     val minutesUntilStart = timeUntilStart.toMinutes()
 
@@ -2095,9 +2105,10 @@ class EphemerisService(
         logger.info("requestDataLength :${requestDataLength}.")
         val passId = currentTrackingPass!!["No"] as UInt
 
-        // timeAcc를 기반으로 시작 인덱스 계산 (timeAcc는 ms 단위)
-        val startIndex = (timeAcc.toInt()) //
-        logger.info("startIndex :${startIndex}.")
+        // ✅ timeAcc를 인덱스로 변환 (timeAcc는 누적 시간 ms 단위, 인덱스는 100ms 단위)
+        // timeAcc를 100으로 나눠서 데이터 포인트 인덱스를 구하고, 다시 100을 곱해서 ms 단위 startIndex 계산
+        val startIndex = (timeAcc.toInt() / 100) * 100  // 100ms 단위로 정렬
+        logger.info("startIndex :${startIndex} (timeAcc: ${timeAcc}ms -> 인덱스: ${timeAcc.toInt() / 100})")
         // 요청된 데이터 길이에 따라 데이터 포인트 수 계산
         sendAdditionalTrackingData(passId, startIndex, requestDataLength.toInt())
         //dataStoreService.setEphemerisTracking(true)
