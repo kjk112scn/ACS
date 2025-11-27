@@ -1157,11 +1157,11 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
       console.log('🚀 추적 대상 설정 시작:', schedules.length, '개')
 
       const trackingTargets: TrackingTarget[] = schedules.map((schedule, arrayIndex) => {
-        // 🔧 안전한 mstId 결정 - 항상 유효한 number 반환
-        const mstId = schedule.index || schedule.no || arrayIndex + 1
+        // 🔧 mstId는 백엔드 MST ID(index)에 맞춰 전달 (no는 단순 UI 순번)
+        const mstId = schedule.index ?? schedule.no ?? arrayIndex + 1
 
         console.log(
-          `🔍 스케줄 ${arrayIndex}: mstId=${mstId}, index=${schedule.index}, no=${schedule.no}`,
+          `🔍 스케줄 ${arrayIndex}: mstId=${mstId} (index=${schedule.index}, no=${schedule.no})`,
         )
 
         return {

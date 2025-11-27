@@ -3991,87 +3991,55 @@ q-page-container .pass-schedule-mode {
 
 /* 현재 추적 중인 스케줄 하이라이트 - 더 강력한 선택자 */
 .schedule-table tbody tr.highlight-current-schedule {
-  background-color: #c8e6c9 !important;
-  border-left: 4px solid #4caf50 !important;
+  background-color: rgba(27, 94, 32, 0.92) !important;
+  border-left: 4px solid #66bb6a !important;
+  color: #e8f5e9 !important;
 }
 
 .schedule-table tbody tr.highlight-current-schedule td {
-  background-color: #c8e6c9 !important;
-  color: #2e7d32 !important;
-  font-weight: 500 !important;
+  background-color: transparent !important;
+  color: inherit !important;
+  font-weight: 600 !important;
 }
 
-/* 모든 하위 요소들에도 강제 적용 */
 .schedule-table tbody tr.highlight-current-schedule * {
-  background-color: #c8e6c9 !important;
-  color: #2e7d32 !important;
+  background-color: transparent !important;
+  color: inherit !important;
 }
 
-/* 특정 클래스들도 명시적으로 적용 */
-.schedule-table tbody tr.highlight-current-schedule .start-time,
-.schedule-table tbody tr.highlight-current-schedule .end-time,
-.schedule-table tbody tr.highlight-current-schedule .satellite-name,
-.schedule-table tbody tr.highlight-current-schedule .satellite-id,
-.schedule-table tbody tr.highlight-current-schedule .start-az,
-.schedule-table tbody tr.highlight-current-schedule .end-az,
-.schedule-table tbody tr.highlight-current-schedule .max-elevation,
-.schedule-table tbody tr.highlight-current-schedule .train {
-  background-color: #c8e6c9 !important;
-  color: #2e7d32 !important;
-  font-weight: 500 !important;
-}
-
-/* Quasar 컴포넌트들 오버라이드 */
 .schedule-table tbody tr.highlight-current-schedule .q-btn,
 .schedule-table tbody tr.highlight-current-schedule .q-icon {
-  background-color: #c8e6c9 !important;
+  background-color: transparent !important;
 }
 
-/* 다음 예정 스케줄 하이라이트 - 더 강력한 선택자 */
+.schedule-table tbody tr.highlight-current-schedule:hover td {
+  background-color: rgba(46, 125, 50, 0.95) !important;
+}
+
 .schedule-table tbody tr.highlight-next-schedule {
-  background-color: #e3f2fd !important;
-  border-left: 4px solid #2196f3 !important;
+  background-color: rgba(13, 71, 161, 0.9) !important;
+  border-left: 4px solid #42a5f5 !important;
+  color: #e3f2fd !important;
 }
 
 .schedule-table tbody tr.highlight-next-schedule td {
-  background-color: #e3f2fd !important;
-  color: #1565c0 !important;
-  font-weight: 500 !important;
+  background-color: transparent !important;
+  color: inherit !important;
+  font-weight: 600 !important;
 }
 
-/* 모든 하위 요소들에도 강제 적용 */
 .schedule-table tbody tr.highlight-next-schedule * {
-  background-color: #e3f2fd !important;
-  color: #1565c0 !important;
+  background-color: transparent !important;
+  color: inherit !important;
 }
 
-/* 특정 클래스들도 명시적으로 적용 */
-.schedule-table tbody tr.highlight-next-schedule .start-time,
-.schedule-table tbody tr.highlight-next-schedule .end-time,
-.schedule-table tbody tr.highlight-next-schedule .satellite-name,
-.schedule-table tbody tr.highlight-next-schedule .satellite-id,
-.schedule-table tbody tr.highlight-next-schedule .start-az,
-.schedule-table tbody tr.highlight-next-schedule .end-az,
-.schedule-table tbody tr.highlight-next-schedule .max-elevation,
-.schedule-table tbody tr.highlight-next-schedule .train {
-  background-color: #e3f2fd !important;
-  color: #1565c0 !important;
-  font-weight: 500 !important;
-}
-
-/* Quasar 컴포넌트들 오버라이드 */
 .schedule-table tbody tr.highlight-next-schedule .q-btn,
 .schedule-table tbody tr.highlight-next-schedule .q-icon {
-  background-color: #e3f2fd !important;
-}
-
-/* 하이라이트된 행에서 호버 효과 유지 */
-.schedule-table tbody tr.highlight-current-schedule:hover td {
-  background-color: #a5d6a7 !important;
+  background-color: transparent !important;
 }
 
 .schedule-table tbody tr.highlight-next-schedule:hover td {
-  background-color: #bbdefb !important;
+  background-color: rgba(25, 118, 210, 0.92) !important;
 }
 
 
