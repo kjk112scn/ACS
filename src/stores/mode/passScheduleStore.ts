@@ -360,6 +360,8 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
         // 서버 설정 성공 시에만 로컬 배열에 추가
         selectedScheduleList.value.push(schedule)
         console.log('✅ 스케줄이 선택 목록에 추가됨:', schedule.satelliteName)
+        // ✅ 선택된 스케줄 목록 변경 시 localStorage에 저장
+        saveSelectedScheduleNosToLocalStorage()
         return true
       } else {
         console.error('❌ 서버 추적 대상 설정 실패')
@@ -425,6 +427,9 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
             name: s.satelliteName,
           })),
         })
+
+        // ✅ 선택된 스케줄 목록 변경 시 localStorage에 저장
+        saveSelectedScheduleNosToLocalStorage()
 
         // 🔧 강제 반응성 트리거 (필요한 경우)
         // nextTick(() => {
@@ -496,6 +501,9 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
           wasCleared: clearExisting,
         })
 
+        // ✅ 선택된 스케줄 목록 변경 시 localStorage에 저장
+        saveSelectedScheduleNosToLocalStorage()
+
         $q.notify({
           type: 'positive',
           message: clearExisting
@@ -532,6 +540,8 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
     if (!exists) {
       selectedScheduleList.value.push(schedule)
       console.log('✅ 스케줄이 로컬 선택 목록에 추가됨:', schedule.satelliteName)
+      // ✅ 선택된 스케줄 목록 변경 시 localStorage에 저장
+      saveSelectedScheduleNosToLocalStorage()
     } else {
       console.log('⚠️ 이미 선택된 스케줄:', schedule.satelliteName)
     }
@@ -548,6 +558,9 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
       if (selectedSchedule.value?.no === scheduleNo) {
         selectedSchedule.value = null
       }
+
+      // ✅ 선택된 스케줄 목록 변경 시 localStorage에 저장
+      saveSelectedScheduleNosToLocalStorage()
     }
   }
 
@@ -556,6 +569,8 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
     selectedScheduleList.value = []
     selectedSchedule.value = null
     console.log('✅ 선택된 스케줄 목록이 초기화됨')
+    // ✅ 선택된 스케줄 목록 변경 시 localStorage에 저장
+    saveSelectedScheduleNosToLocalStorage()
   }
 
   // 스케줄 선택
@@ -892,6 +907,26 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
       if (successCount > 0) {
         console.log('🔄 업로드 완료 후 서버 데이터 재로드')
         await loadTLEDataFromServer()
+
+        // ✅ TLE 업로드 성공 시 스케줄 데이터도 새로 로드하고 저장
+        const scheduleLoaded = await fetchScheduleDataFromServer(true) // 강제 새로고침
+        if (scheduleLoaded) {
+          // ✅ TLE 업로드로 스케줄이 새로 생성되었으므로 선택 상태 초기화
+          selectedScheduleList.value = []
+          selectedSchedule.value = null
+
+          // ✅ localStorage의 선택 상태도 초기화
+          try {
+            const storageKey = 'pass-schedule-selected-nos'
+            localStorage.removeItem(storageKey)
+            console.log('✅ TLE 업로드 - 선택 상태 초기화 완료')
+          } catch (error) {
+            console.error('❌ 선택 상태 초기화 실패:', error)
+          }
+
+          saveScheduleDataToLocalStorage() // localStorage에 저장
+          console.log('✅ TLE 업로드 성공 - 스케줄 데이터 저장 완료')
+        }
       }
 
       return uploadResult
@@ -922,8 +957,137 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
   }
 
   // 🔧 사용하지 않는 함수 제거하고 실제 데이터 처리 로직 수정
-  const fetchScheduleDataFromServer = async (): Promise<boolean> => {
+  // ✅ 스케줄 데이터 localStorage 저장 함수
+  const saveScheduleDataToLocalStorage = () => {
     try {
+      const storageKey = 'pass-schedule-schedule-data'
+      const dataToSave = {
+        scheduleData: scheduleData.value,
+        savedAt: Date.now(),
+      }
+      localStorage.setItem(storageKey, JSON.stringify(dataToSave))
+      console.log('✅ 스케줄 데이터 localStorage 저장 완료:', scheduleData.value.length, '개')
+    } catch (error) {
+      console.error('❌ 스케줄 데이터 저장 실패:', error)
+    }
+  }
+
+  // ✅ 스케줄 데이터 localStorage 로드 함수
+  const loadScheduleDataFromLocalStorage = (): boolean => {
+    try {
+      const storageKey = 'pass-schedule-schedule-data'
+      const savedData = localStorage.getItem(storageKey)
+
+      if (!savedData) {
+        console.log('⚠️ 저장된 스케줄 데이터 없음')
+        return false
+      }
+
+      const parsed = JSON.parse(savedData) as {
+        scheduleData?: ScheduleItem[]
+        savedAt?: number
+      }
+
+      if (
+        parsed.scheduleData &&
+        Array.isArray(parsed.scheduleData) &&
+        parsed.scheduleData.length > 0
+      ) {
+        scheduleData.value = parsed.scheduleData
+        console.log('✅ 스케줄 데이터 localStorage에서 복원:', parsed.scheduleData.length, '개')
+        return true
+      }
+
+      return false
+    } catch (error) {
+      console.error('❌ 스케줄 데이터 복원 실패:', error)
+      return false
+    }
+  }
+
+  // ✅ 선택된 스케줄 번호 localStorage 저장 함수
+  const saveSelectedScheduleNosToLocalStorage = () => {
+    try {
+      const storageKey = 'pass-schedule-selected-nos'
+      const selectedNos = selectedScheduleList.value.map((s) => s.no)
+      const dataToSave = {
+        selectedNos,
+        savedAt: Date.now(),
+      }
+      localStorage.setItem(storageKey, JSON.stringify(dataToSave))
+      console.log('✅ 선택된 스케줄 번호 저장 완료:', selectedNos.length, '개')
+    } catch (error) {
+      console.error('❌ 선택된 스케줄 번호 저장 실패:', error)
+    }
+  }
+
+  // ✅ 선택된 스케줄 번호 localStorage 로드 함수
+  const loadSelectedScheduleNosFromLocalStorage = (): number[] => {
+    try {
+      const storageKey = 'pass-schedule-selected-nos'
+      const savedData = localStorage.getItem(storageKey)
+
+      if (!savedData) {
+        return []
+      }
+
+      const parsed = JSON.parse(savedData) as {
+        selectedNos?: number[]
+        selectedIndexes?: number[]
+        savedAt?: number
+      }
+
+      if (parsed.selectedNos && Array.isArray(parsed.selectedNos)) {
+        console.log('✅ 선택된 스케줄 번호 복원:', parsed.selectedNos.length, '개')
+        return parsed.selectedNos
+      }
+
+      return []
+    } catch (error) {
+      console.error('❌ 선택된 스케줄 번호 복원 실패:', error)
+      return []
+    }
+  }
+
+  // ✅ 선택된 스케줄 Index localStorage 로드 함수
+  const loadSelectedScheduleIndexesFromLocalStorage = (): number[] => {
+    try {
+      const storageKey = 'pass-schedule-selected-nos'
+      const savedData = localStorage.getItem(storageKey)
+
+      if (!savedData) {
+        return []
+      }
+
+      const parsed = JSON.parse(savedData) as {
+        selectedNos?: number[]
+        selectedIndexes?: number[]
+        savedAt?: number
+      }
+
+      if (parsed.selectedIndexes && Array.isArray(parsed.selectedIndexes)) {
+        console.log('✅ 선택된 스케줄 Index 복원:', parsed.selectedIndexes.length, '개')
+        return parsed.selectedIndexes
+      }
+
+      return []
+    } catch (error) {
+      console.error('❌ 선택된 스케줄 Index 복원 실패:', error)
+      return []
+    }
+  }
+
+  const fetchScheduleDataFromServer = async (forceRefresh = false): Promise<boolean> => {
+    try {
+      // ✅ 캐시 우선 확인 (강제 새로고침이 아닐 때만)
+      if (!forceRefresh) {
+        const cached = loadScheduleDataFromLocalStorage()
+        if (cached) {
+          console.log('✅ 캐시된 스케줄 데이터 사용 (API 호출 생략)')
+          return true
+        }
+      }
+
       loading.value = true
       error.value = null
 
@@ -1093,6 +1257,9 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
 
         console.log('✅ 패스 스케줄 데이터 로드 완료:', filteredSchedules.length, '개')
 
+        // ✅ API 호출 성공 시 localStorage에 저장
+        saveScheduleDataToLocalStorage()
+
         $q.notify({
           type: 'positive',
           message: `${filteredSchedules.length}개의 패스 스케줄을 로드했습니다.`,
@@ -1157,16 +1324,16 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
       console.log('🚀 추적 대상 설정 시작:', schedules.length, '개')
 
       const trackingTargets: TrackingTarget[] = schedules.map((schedule, arrayIndex) => {
-        // 🔧 mstId는 백엔드 MST ID(index)에 맞춰 전달 (no는 단순 UI 순번)
-        const mstId = schedule.index ?? schedule.no ?? arrayIndex + 1
+        // ✅ mstId는 항상 no(원본 백엔드 값) 사용 - 동기화 보장
+        const mstId = schedule.no
 
         console.log(
-          `🔍 스케줄 ${arrayIndex}: mstId=${mstId} (index=${schedule.index}, no=${schedule.no})`,
+          `🔍 스케줄 ${arrayIndex}: mstId=${mstId} (no=${schedule.no}, index=${schedule.index})`,
         )
 
         return {
-          mstId: Number(mstId), // 🔧 명시적 number 변환
-          no: schedule.no,
+          mstId: Number(mstId), // ✅ 원본 백엔드 No 값 사용
+          no: schedule.no, // ✅ 원본 백엔드 No 값
           satelliteId: schedule.satelliteId || '',
           satelliteName: schedule.satelliteName,
           startTime: schedule.startTime,
@@ -2058,5 +2225,10 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
     saveToLocalStorage,
     loadFromLocalStorage,
     clearLocalStorage,
+    saveScheduleDataToLocalStorage,
+    loadScheduleDataFromLocalStorage,
+    saveSelectedScheduleNosToLocalStorage,
+    loadSelectedScheduleNosFromLocalStorage,
+    loadSelectedScheduleIndexesFromLocalStorage,
   }
 })

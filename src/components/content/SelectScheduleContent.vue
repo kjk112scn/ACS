@@ -17,11 +17,11 @@
 
     <div class="content-body">
       <!-- 스케줄 테이블 -->
-      <q-table flat bordered dark :rows="scheduleData" :columns="scheduleColumns" row-key="no" :loading="loading"
-        selection="multiple" v-model:selected="selectedRows" @row-click="onRowClick" class="schedule-table"
+      <q-table flat bordered dark :rows="scheduleData" :columns="scheduleColumns" row-key="index" :loading="loading"
+        v-model:selected="selectedRows" selection="multiple" class="schedule-table"
         style="height: 500px; background-color: var(--theme-card-background);" virtual-scroll
         :virtual-scroll-sticky-size-start="48" hide-pagination :rows-per-page-options="[0]" :row-class="getRowClass"
-        :grid="false" dense>
+        :grid="false" :selected-rows-label="getSelectedLabel" dense>
 
         <template v-slot:loading>
           <q-inner-loading showing color="primary">
@@ -36,18 +36,18 @@
           </div>
         </template>
 
-        <!-- ✅ 체크박스 컬럼 완전 차단 처리 -->
+        <!-- ✅ 헤더 체크박스 - 전체 선택/해제 -->
+        <template v-slot:header-selection>
+          <q-checkbox :model-value="isAllSelected" :indeterminate="isIndeterminate"
+            @update:model-value="toggleSelectAll" color="primary" class="header-checkbox" />
+        </template>
+
+        <!-- ✅ 체크박스 컬럼 - 선택 가능 여부만 제어 -->
         <template v-slot:body-cell-selection="props">
-          <q-td :props="props" @click.stop.prevent="handleCheckboxInteraction(props.row, $event)"
-            @mousedown.stop.prevent="handleCheckboxInteraction(props.row, $event)"
-            @touchstart.stop.prevent="handleCheckboxInteraction(props.row, $event)">
+          <q-td>
             <q-checkbox :model-value="isScheduleSelected(props.row)" :disable="!canSelectSchedule(props.row)"
               :color="isScheduleOverlapping(props.row.no) ? 'warning' : 'primary'"
-              @click.stop.prevent="handleCheckboxInteraction(props.row, $event)"
-              @update:model-value="handleCheckboxInteraction(props.row, $event)"
-              @mousedown.stop.prevent="handleCheckboxInteraction(props.row, $event)"
-              @touchstart.stop.prevent="handleCheckboxInteraction(props.row, $event)" class="schedule-checkbox"
-              :class="{ 'checkbox-blocked': !canSelectSchedule(props.row) }" />
+              @update:model-value="(val) => handleCheckboxChange(props.row, val)" class="schedule-checkbox" />
             <q-tooltip v-if="!canSelectSchedule(props.row)" class="bg-warning text-black">
               시간이 겹치는 다른 스케줄이 이미 선택되어 있습니다
             </q-tooltip>
@@ -89,7 +89,8 @@
           <q-td :props="props" class="text-center satellite-name-cell">
             <div class="satellite-name-container">
               <div class="satellite-name-text">{{ props.value || props.row?.satelliteId || '이름 없음' }}</div>
-              <q-badge v-if="props.row?.IsKeyhole || props.row?.isKeyhole" color="red" class="keyhole-badge" label="KEYHOLE" />
+              <q-badge v-if="props.row?.IsKeyhole || props.row?.isKeyhole" color="red" class="keyhole-badge"
+                label="KEYHOLE" />
             </div>
           </q-td>
         </template>
@@ -136,12 +137,7 @@
         <!-- ✅ Keyhole 정보 컬럼 템플릿 -->
         <template v-slot:body-cell-isKeyhole="props">
           <q-td :props="props" class="keyhole-cell">
-            <q-badge
-              v-if="props.value"
-              color="red"
-              label="KEYHOLE"
-              class="keyhole-badge"
-            />
+            <q-badge v-if="props.value" color="red" label="KEYHOLE" class="keyhole-badge" />
             <span v-else class="text-grey-5">-</span>
           </q-td>
         </template>
@@ -297,7 +293,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref, onMounted, computed, getCurrentInstance, onUnmounted } from 'vue'
+import { ref, onMounted, computed, getCurrentInstance, onUnmounted, watch, nextTick } from 'vue'
 import { useQuasar } from 'quasar'
 import { usePassScheduleModeStore, type ScheduleItem } from '@/stores'
 import type { QTableProps } from 'quasar'
@@ -326,7 +322,7 @@ const scheduleData = computed(() => {
     }
   })
 
-  // 원본 no를 index로 보존하고, no를 1부터 순서대로 재생성
+  // ✅ no를 원본 그대로 유지하고, index는 정렬된 순서로 설정
   const result = sortedData.map((item, sortedIndex) => {
     // 디버깅: 원본 item의 구조 확인
     if (sortedIndex < 3) {
@@ -339,8 +335,9 @@ const scheduleData = computed(() => {
 
     return {
       ...item,
-      index: item.no, // 원본 no 값을 index로 보존
-      no: sortedIndex + 1 // 정렬된 순서로 1부터 재생성
+      // ✅ no는 원본 그대로 유지 (백엔드 원본 No 값)
+      // no: item.no, // 이미 spread로 포함됨
+      index: sortedIndex + 1 // 정렬된 순서로 1부터 설정 (표시용)
     }
   })
 
@@ -350,8 +347,48 @@ const scheduleData = computed(() => {
 
 const loading = computed(() => passScheduleStore.loading)
 
+// 선택된 행 레이블 표시 함수
+const getSelectedLabel = (count: number) => {
+  return `${count}개의 스케줄이 선택되었습니다.`
+}
 
 const selectedRows = ref<ScheduleItem[]>([])
+
+// ✅ 선택 상태 변경 시 localStorage에 저장 (Index 기준으로도 저장)
+watch(
+  () => selectedRows.value,
+  (newSelected) => {
+    // 선택된 스케줄을 index 순서로 정렬
+    const sortedSelected = [...newSelected].sort((a, b) => {
+      const indexA = a.index || 0
+      const indexB = b.index || 0
+      return indexA - indexB
+    })
+
+    // Index 목록 저장 (PassSchedulePage의 No와 매칭)
+    const selectedIndexes = sortedSelected.map(s => s.index || s.no)
+    // no 목록도 함께 저장 (호환성)
+    const selectedNos = sortedSelected.map(s => s.no)
+
+    try {
+      const storageKey = 'pass-schedule-selected-nos'
+      const dataToSave = {
+        selectedNos, // no(원본) 저장 (호환성)
+        selectedIndexes, // Index 저장 (새로운 방식)
+        savedAt: Date.now()
+      }
+      localStorage.setItem(storageKey, JSON.stringify(dataToSave))
+      console.log('💾 선택 상태 저장 (Index 기준):', {
+        indexes: selectedIndexes,
+        nos: selectedNos,
+        count: selectedIndexes.length
+      })
+    } catch (error) {
+      console.error('❌ 선택 상태 저장 실패:', error)
+    }
+  },
+  { deep: true }
+)
 
 // ✅ 시간 겹침 검사 함수 수정 - 더 엄격한 겹침 검사
 const checkTimeOverlap = (schedule1: ScheduleItem, schedule2: ScheduleItem): boolean => {
@@ -447,80 +484,196 @@ const getOverlappingGroup = (scheduleNo: number): number[] => {
   return group || []
 }
 
-// ✅ 선택 가능 여부 확인 함수 - 로직 강화
+// ✅ 선택 가능 여부 확인 함수 - no 기준으로 수정
 const canSelectSchedule = (schedule: ScheduleItem): boolean => {
   // 겹치지 않는 스케줄은 항상 선택 가능
   if (!isScheduleOverlapping(schedule.no)) {
-    console.log('✅ 겹치지 않는 스케줄 - 선택 가능:', schedule.satelliteName)
     return true
   }
 
   // 겹치는 스케줄인 경우, 같은 그룹의 다른 스케줄이 선택되어 있는지 확인
   const overlappingGroup = getOverlappingGroup(schedule.no)
-  const otherSelectedInGroup = selectedRows.value.filter(selected =>
-    overlappingGroup.includes(selected.no) && selected.no !== schedule.no
-  )
 
-  const canSelect = otherSelectedInGroup.length === 0
-
-  console.log('🔍 겹치는 스케줄 선택 가능 여부:', {
-    scheduleName: schedule.satelliteName,
-    scheduleNo: schedule.no,
-    overlappingGroup,
-    otherSelectedInGroup: otherSelectedInGroup.map(s => `${s.satelliteName}(${s.no})`),
-    canSelect
+  // selectedRows에서 같은 그룹에 속하는 다른 스케줄이 선택되어 있는지 확인 (Index 기준)
+  const otherSelectedInGroup = selectedRows.value.filter(selected => {
+    // selectedRows의 스케줄이 scheduleData에서 어떤 스케줄인지 찾기
+    const selectedSchedule = scheduleData.value.find(s => s.index === selected.index)
+    // 같은 그룹에 있고, 다른 스케줄인지 확인
+    return selectedSchedule &&
+      overlappingGroup.includes(selectedSchedule.no) &&
+      selected.index !== schedule.index
   })
 
-  return canSelect
+  return otherSelectedInGroup.length === 0
 }
 
-// ✅ 체크박스 상태 확인 함수 (통합)
+// ✅ 체크박스 선택 상태 확인 함수 (Index 기준 비교)
 const isScheduleSelected = (schedule: ScheduleItem): boolean => {
-  return selectedRows.value.some(selected => selected.no === schedule.no)
+  return selectedRows.value.some(selected => selected.index === schedule.index)
 }
 
-// ✅ 스케줄 선택 토글 함수 - 검증 강화
-const toggleScheduleSelection = (row: ScheduleItem) => {
-  console.log('🔄 스케줄 선택 토글 시도:', {
-    scheduleName: row.satelliteName,
-    scheduleNo: row.no,
-    startTime: row.startTime,
-    endTime: row.endTime
+// ✅ 체크박스 변경 핸들러
+const handleCheckboxChange = (row: ScheduleItem, value: boolean) => {
+  console.log('☑️ 체크박스 변경:', {
+    satelliteName: row.satelliteName,
+    index: row.index,
+    value
   })
 
-  if (!canSelectSchedule(row)) {
-    console.log('❌ 선택 불가능한 스케줄')
-    showOverlapWarning(row)
-    return
-  }
+  if (value) {
+    // 선택 시도
+    if (!canSelectSchedule(row)) {
+      console.log('❌ 선택 불가능한 스케줄')
+      showOverlapWarning(row)
+      // 선택 불가능하면 추가하지 않음
+      return
+    }
 
-  const index = selectedRows.value.findIndex(item => item.no === row.no)
-
-  if (index >= 0) {
-    // 선택 해제
-    selectedRows.value.splice(index, 1)
-    console.log('✅ 스케줄 선택 해제:', row.satelliteName)
-  } else {
-    // 선택 추가 - 추가 검증
-    const wouldOverlap = selectedRows.value.some(selected =>
-      checkTimeOverlap(row, selected)
-    )
+    // 겹침 검증
+    const wouldOverlap = selectedRows.value.some(selected => {
+      const selectedSchedule = scheduleData.value.find(s => s.index === selected.index)
+      return selectedSchedule && checkTimeOverlap(row, selectedSchedule)
+    })
 
     if (wouldOverlap) {
-      console.log('❌ 추가 겹침 검증 실패')
+      console.log('❌ 시간 겹침 검증 실패')
       showOverlapWarning(row)
       return
     }
 
-    selectedRows.value.push(row)
-    console.log('✅ 스케줄 선택 추가:', row.satelliteName)
+    // 이미 선택되어 있지 않으면 추가
+    if (!selectedRows.value.some(s => s.index === row.index)) {
+      selectedRows.value.push({ ...row })
+      console.log('✅ 스케줄 선택 추가:', row.satelliteName)
+    }
+  } else {
+    // 선택 해제
+    const idx = selectedRows.value.findIndex(s => s.index === row.index)
+    if (idx >= 0) {
+      selectedRows.value.splice(idx, 1)
+      console.log('✅ 스케줄 선택 해제:', row.satelliteName)
+    }
   }
 }
 
-// ✅ 겹침 경고 메시지 표시 함수 - 더 상세한 정보 제공
+// ✅ 전체 선택 상태 확인 (Index 기준)
+const isAllSelected = computed(() => {
+  if (scheduleData.value.length === 0) return false
+  if (selectedRows.value.length === 0) return false
+
+  // 겹치지 않고 선택 가능한 스케줄만 카운트
+  const selectableSchedules = scheduleData.value.filter(schedule =>
+    !isScheduleOverlapping(schedule.no)
+  )
+
+  if (selectableSchedules.length === 0) return false
+
+  // 선택 가능한 모든 스케줄이 선택되었는지 확인
+  const allSelected = selectableSchedules.every(schedule =>
+    selectedRows.value.some(selected => selected.index === schedule.index)
+  )
+
+  console.log('🔍 isAllSelected:', {
+    allSelected,
+    selectableCount: selectableSchedules.length,
+    selectedCount: selectedRows.value.length
+  })
+
+  return allSelected
+})
+
+// ✅ 일부 선택 상태 확인 (indeterminate) - Index 기준
+const isIndeterminate = computed(() => {
+  if (scheduleData.value.length === 0) return false
+  if (selectedRows.value.length === 0) return false
+
+  // 겹치지 않고 선택 가능한 스케줄만 카운트
+  const selectableSchedules = scheduleData.value.filter(schedule =>
+    !isScheduleOverlapping(schedule.no)
+  )
+
+  if (selectableSchedules.length === 0) return false
+
+  const selectedCount = selectableSchedules.filter(schedule =>
+    selectedRows.value.some(selected => selected.index === schedule.index)
+  ).length
+
+  const isIndeterminate = selectedCount > 0 && selectedCount < selectableSchedules.length
+
+  console.log('🔍 isIndeterminate:', {
+    isIndeterminate,
+    selectedCount,
+    selectableCount: selectableSchedules.length
+  })
+
+  return isIndeterminate
+})
+
+// ✅ 전체 선택/해제 토글
+const toggleSelectAll = (value: boolean) => {
+  console.log('🔄 전체 선택/해제:', value, '현재 선택:', selectedRows.value.length)
+
+  if (value) {
+    // 전체 선택
+    console.log('📋 전체 선택 시작')
+
+    // 선택 가능한 모든 스케줄 찾기 (겹치지 않는 것만)
+    const selectableSchedules = scheduleData.value.filter(schedule => {
+      // 이미 선택된 항목은 제외
+      if (isScheduleSelected(schedule)) {
+        console.log('⏭️ 이미 선택됨:', schedule.index, schedule.satelliteName)
+        return false
+      }
+
+      // 겹치는 스케줄은 제외
+      if (isScheduleOverlapping(schedule.no)) {
+        console.log('⚠️ 겹침으로 제외:', schedule.index, schedule.satelliteName)
+        return false
+      }
+
+      return true
+    })
+
+    console.log('✅ 선택 가능한 스케줄:', selectableSchedules.length, '개')
+
+    // 시간 겹침 검증을 통과한 스케줄만 추가
+    const validSchedules: ScheduleItem[] = []
+
+    selectableSchedules.forEach(schedule => {
+      // 현재 선택된 항목들 + 이미 추가하려는 항목들과 시간 겹침 체크
+      const wouldOverlap = [...selectedRows.value, ...validSchedules].some(selected =>
+        checkTimeOverlap(schedule, selected)
+      )
+
+      if (!wouldOverlap) {
+        validSchedules.push(schedule)
+        console.log('➕ 추가:', schedule.index, schedule.satelliteName)
+      } else {
+        console.log('⚠️ 시간 겹침으로 제외:', schedule.index, schedule.satelliteName)
+      }
+    })
+
+    // 추가
+    selectedRows.value.push(...validSchedules.map(s => ({ ...s })))
+    console.log('✅ 전체 선택 완료:', validSchedules.length, '개 추가, 총', selectedRows.value.length, '개 선택됨')
+  } else {
+    // 전체 해제
+    console.log('🗑️ 전체 해제 실행')
+    selectedRows.value = []
+    console.log('✅ 전체 해제 완료')
+  }
+}
+
+
+// ✅ 겹침 경고 메시지 표시 함수 - no 기준으로 수정
 const showOverlapWarning = (row: ScheduleItem) => {
   const overlappingGroup = getOverlappingGroup(row.no)
-  const selectedInGroup = selectedRows.value.filter(s => overlappingGroup.includes(s.no))
+
+  // selectedRows의 스케줄이 scheduleData에서 어떤 스케줄인지 찾아서 비교 (Index 기준)
+  const selectedInGroup = selectedRows.value.filter(selected => {
+    const selectedSchedule = scheduleData.value.find(s => s.index === selected.index)
+    return selectedSchedule && overlappingGroup.includes(selectedSchedule.no)
+  })
 
   // 🔧 겹치는 다른 스케줄들의 시간 정보도 표시
   const overlappingSchedules = scheduleData.value.filter(s =>
@@ -563,48 +716,6 @@ const showOverlapWarning = (row: ScheduleItem) => {
   }
 }
 
-// ✅ 체크박스 관련 모든 이벤트 통합 처리 (완전 차단)
-const handleCheckboxInteraction = (row: ScheduleItem, event: Event) => {
-  event.stopPropagation()
-  event.preventDefault()
-
-  console.log('☑️ 체크박스 상호작용:', row.satelliteName, '선택 가능:', canSelectSchedule(row))
-
-  if (!canSelectSchedule(row)) {
-    console.log('❌ 선택 불가능한 체크박스 상호작용 완전 차단')
-    showOverlapWarning(row)
-    return false
-  }
-
-  // 선택 가능한 경우에도 직접 체크박스 조작은 차단
-  console.log('✅ 체크박스 직접 조작 차단, 토글 처리')
-  toggleScheduleSelection(row)
-  return false
-}
-
-// ✅ 행 클릭 이벤트 핸들러 (체크박스 영역 완전 제외)
-const onRowClick = (evt: Event, row: ScheduleItem) => {
-  console.log('🖱️ 행 클릭:', row.satelliteName)
-
-  // 체크박스 영역 클릭 감지 및 완전 차단
-  const target = evt.target as HTMLElement
-  const isCheckboxArea = target.closest('.q-checkbox') ||
-    target.closest('[data-col="selection"]') ||
-    target.classList.contains('q-checkbox__inner') ||
-    target.classList.contains('q-checkbox__bg') ||
-    target.classList.contains('schedule-checkbox') ||
-    target.closest('td[data-col="selection"]')
-
-  if (isCheckboxArea) {
-    console.log('☑️ 체크박스 영역 클릭 감지, 행 클릭 이벤트 무시')
-    evt.stopPropagation()
-    evt.preventDefault()
-    return
-  }
-
-  // 선택 가능 여부 확인 후 토글
-  toggleScheduleSelection(row)
-}
 
 // 테이블 컬럼 정의
 type QTableColumn = NonNullable<QTableProps['columns']>[0]
@@ -895,6 +1006,33 @@ const handleSelect = async () => {
         }))
       })
 
+      // ✅ 선택 완료 시 localStorage에 저장 (Index 기준)
+      const sortedSelected = [...selectedRows.value].sort((a, b) => {
+        const indexA = a.index || 0
+        const indexB = b.index || 0
+        return indexA - indexB
+      })
+
+      const selectedIndexes = sortedSelected.map(s => s.index || s.no)
+      const selectedNos = sortedSelected.map(s => s.no)
+
+      try {
+        const storageKey = 'pass-schedule-selected-nos'
+        const dataToSave = {
+          selectedNos, // no(원본) 저장 (호환성)
+          selectedIndexes, // Index 저장 (새로운 방식)
+          savedAt: Date.now()
+        }
+        localStorage.setItem(storageKey, JSON.stringify(dataToSave))
+        console.log('💾 선택 완료 - 선택 상태 저장 (Index 기준):', {
+          indexes: selectedIndexes,
+          nos: selectedNos,
+          count: selectedIndexes.length
+        })
+      } catch (error) {
+        console.error('❌ 선택 상태 저장 실패:', error)
+      }
+
       if ($q && typeof $q.notify === 'function') {
         $q.notify({
           type: 'positive',
@@ -1040,6 +1178,213 @@ onMounted(async () => {
     if (success) {
       console.log('✅ 패스 스케줄 데이터 로드 성공:', scheduleData.value.length, '개')
       console.log('🔍 겹치는 스케줄 그룹:', overlappingGroups.value)
+
+      // ✅ 데이터 로드 후 이전 선택 상태 복원
+      await nextTick() // scheduleData가 준비될 때까지 대기
+
+      // ✅ passScheduleStore.selectedScheduleList를 직접 사용하여 복원
+      const storeSelectedList = passScheduleStore.selectedScheduleList
+
+      if (storeSelectedList.length > 0 && scheduleData.value.length > 0) {
+        console.log('🔄 Store에서 선택된 스케줄 복원 시작:', {
+          storeCount: storeSelectedList.length,
+          scheduleDataCount: scheduleData.value.length,
+          storeNos: storeSelectedList.map(s => ({ no: s.no, index: s.index, name: s.satelliteName })),
+          scheduleDataNos: scheduleData.value.slice(0, 5).map(s => ({ no: s.no, index: s.index, name: s.satelliteName }))
+        })
+
+        // ✅ Store의 selectedScheduleList를 시간 순으로 정렬 (PassSchedulePage와 동일한 순서)
+        const sortedStoreList = [...storeSelectedList].sort((a, b) => {
+          try {
+            return new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+          } catch {
+            return 0
+          }
+        })
+
+        // ✅ Store에 저장된 index 값을 직접 사용하여 매칭
+        const restoredSchedules: ScheduleItem[] = []
+
+        sortedStoreList.forEach((storeSchedule) => {
+          // ✅ storeSchedule의 index 값을 직접 사용 (순서가 아닌 저장된 값)
+          const savedIndex = storeSchedule.index || storeSchedule.no
+
+          // scheduleData에서 같은 index를 가진 스케줄 찾기
+          const matchedSchedule = scheduleData.value.find(s => s.index === savedIndex)
+
+          if (matchedSchedule) {
+            console.log('✅ Index 기준 복원 매칭:', {
+              savedIndex: savedIndex,
+              scheduleIndex: matchedSchedule.index,
+              scheduleNo: matchedSchedule.no,
+              storeNo: storeSchedule.no,
+              scheduleName: matchedSchedule.satelliteName
+            })
+            restoredSchedules.push(matchedSchedule)
+          } else {
+            console.warn('⚠️ Index 매칭 실패:', {
+              savedIndex: savedIndex,
+              storeNo: storeSchedule.no,
+              scheduleDataIndexes: scheduleData.value.slice(0, 5).map(s => s.index)
+            })
+          }
+        })
+
+        if (restoredSchedules.length > 0) {
+          console.log('✅ 복원 가능한 스케줄:', restoredSchedules.length, '개')
+
+          // ✅ 겹침 검증 후 선택 가능한 항목만 복원
+          const validSchedules: ScheduleItem[] = []
+
+          restoredSchedules.forEach(schedule => {
+            // 이미 선택되지 않은 경우만 확인 (index 기준)
+            const alreadySelected = selectedRows.value.some(selected =>
+              selected.index === schedule.index
+            )
+
+            if (alreadySelected) return
+
+            // 겹침이 없는 경우
+            if (!isScheduleOverlapping(schedule.no)) {
+              validSchedules.push(schedule)
+            } else {
+              // 겹치는 항목은 같은 그룹에 다른 선택이 없을 때만 추가
+              const overlappingGroup = getOverlappingGroup(schedule.no)
+              const hasOtherSelected = selectedRows.value.some(selected => {
+                const selectedSchedule = scheduleData.value.find(s => s.index === selected.index)
+                return selectedSchedule &&
+                  overlappingGroup.includes(selectedSchedule.no) &&
+                  selected.index !== schedule.index
+              })
+
+              if (!hasOtherSelected) {
+                // 추가 전에 겹침 체크
+                const wouldOverlap = selectedRows.value.some(selected => {
+                  const selectedSchedule = scheduleData.value.find(s => s.index === selected.index)
+                  return selectedSchedule && checkTimeOverlap(schedule, selectedSchedule)
+                })
+
+                if (!wouldOverlap) {
+                  validSchedules.push(schedule)
+                }
+              }
+            }
+          })
+
+          // ✅ 유효한 스케줄들을 selectedRows에 추가 (객체 복사로 참조 분리)
+          selectedRows.value.push(...validSchedules.map(s => ({ ...s })))
+
+          console.log('✅ 이전 선택 상태 복원 완료:', {
+            count: validSchedules.length,
+            restoredNos: validSchedules.map(s => s.no),
+            restoredIndexes: validSchedules.map(s => s.index)
+          })
+        } else {
+          console.log('⚠️ 복원 가능한 스케줄 없음')
+          console.log('🔍 Store 선택 목록 no (원본):', storeSelectedList.map(s => s.no))
+          console.log('🔍 scheduleData의 no (원본):', scheduleData.value.slice(0, 5).map(s => s.no))
+        }
+      } else {
+        // ✅ Store에 선택 목록이 없으면 localStorage에서 복원 시도
+        const savedData = passScheduleStore.loadSelectedScheduleNosFromLocalStorage()
+        const savedIndexes = passScheduleStore.loadSelectedScheduleIndexesFromLocalStorage()
+
+        // ✅ Index가 있으면 Index 기준으로, 없으면 no 기준으로 복원 (하위 호환성)
+        const useIndex = savedIndexes.length > 0 && savedIndexes.length === savedData.length
+
+        if ((savedData.length > 0 || savedIndexes.length > 0) && scheduleData.value.length > 0) {
+          console.log('🔄 localStorage에서 선택 상태 복원 시작:', {
+            savedNosCount: savedData.length,
+            savedIndexesCount: savedIndexes.length,
+            useIndex,
+            savedData: savedData,
+            savedIndexes: savedIndexes,
+            scheduleDataCount: scheduleData.value.length,
+            scheduleDataNos: scheduleData.value.slice(0, 5).map(s => ({ no: s.no, index: s.index }))
+          })
+
+          let restoredSchedules: ScheduleItem[] = []
+
+          if (useIndex && savedIndexes.length > 0) {
+            // ✅ Index 기준으로 복원 (새로운 방식)
+            savedIndexes.forEach((savedIndex) => {
+              const matchedSchedule = scheduleData.value.find(s => s.index === savedIndex)
+              if (matchedSchedule) {
+                console.log('✅ localStorage Index 기준 복원 매칭:', {
+                  savedIndex: savedIndex,
+                  scheduleIndex: matchedSchedule.index,
+                  scheduleNo: matchedSchedule.no,
+                  scheduleName: matchedSchedule.satelliteName
+                })
+                restoredSchedules.push(matchedSchedule)
+              }
+            })
+          } else {
+            // ✅ no 기준으로 복원 (하위 호환성)
+            restoredSchedules = scheduleData.value.filter(schedule => {
+              const found = savedData.includes(schedule.no)
+              if (found) {
+                console.log('✅ localStorage no 기준 복원 매칭:', {
+                  scheduleNo: schedule.no,
+                  scheduleIndex: schedule.index,
+                  savedNo: savedData.find(n => n === schedule.no)
+                })
+              }
+              return found
+            })
+          }
+
+          if (restoredSchedules.length > 0) {
+            console.log('✅ 복원 가능한 스케줄:', restoredSchedules.length, '개')
+
+            // ✅ 겹침 검증 후 선택 가능한 항목만 복원
+            const validSchedules: ScheduleItem[] = []
+
+            restoredSchedules.forEach(schedule => {
+              // 이미 선택되지 않은 경우만 확인 (index 기준)
+              const alreadySelected = selectedRows.value.some(selected =>
+                selected.index === schedule.index
+              )
+
+              if (alreadySelected) return
+
+              // 겹침이 없는 경우
+              if (!isScheduleOverlapping(schedule.no)) {
+                validSchedules.push(schedule)
+              } else {
+                // 겹치는 항목은 같은 그룹에 다른 선택이 없을 때만 추가
+                const overlappingGroup = getOverlappingGroup(schedule.no)
+                const hasOtherSelected = selectedRows.value.some(selected => {
+                  const selectedSchedule = scheduleData.value.find(s => s.index === selected.index)
+                  return selectedSchedule &&
+                    overlappingGroup.includes(selectedSchedule.no) &&
+                    selected.index !== schedule.index
+                })
+
+                if (!hasOtherSelected) {
+                  const wouldOverlap = selectedRows.value.some(selected => {
+                    const selectedSchedule = scheduleData.value.find(s => s.index === selected.index)
+                    return selectedSchedule && checkTimeOverlap(schedule, selectedSchedule)
+                  })
+
+                  if (!wouldOverlap) {
+                    validSchedules.push(schedule)
+                  }
+                }
+              }
+            })
+
+            // ✅ 유효한 스케줄들을 selectedRows에 추가 (객체 복사로 참조 분리)
+            selectedRows.value.push(...validSchedules.map(s => ({ ...s })))
+
+            console.log('✅ localStorage에서 선택 상태 복원 완료:', {
+              count: validSchedules.length,
+              restoredNos: validSchedules.map(s => s.no),
+              restoredIndexes: validSchedules.map(s => s.index)
+            })
+          }
+        }
+      }
     } else {
       console.log('⚠️ 패스 스케줄 데이터 없음')
     }
@@ -1155,7 +1500,8 @@ onUnmounted(async () => {
 
 .content-body {
   flex: 1;
-  overflow: hidden; /* ✅ 자식 요소에서 스크롤 처리 */
+  overflow: hidden;
+  /* ✅ 자식 요소에서 스크롤 처리 */
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -1233,7 +1579,8 @@ onUnmounted(async () => {
   border: 1px solid var(--theme-border);
   border-radius: 6px;
   max-height: 100%;
-  overflow: hidden; /* ✅ 컨테이너는 스크롤 없음, 하위 요소에서 처리 */
+  overflow: hidden;
+  /* ✅ 컨테이너는 스크롤 없음, 하위 요소에서 처리 */
   display: flex;
   flex-direction: column;
 
@@ -1257,9 +1604,12 @@ onUnmounted(async () => {
   position: sticky;
   top: 0;
   z-index: 10;
-  font-weight: 600 !important; /* ✅ 헤더 폰트 굵기 증가 */
-  padding: 12px 8px !important; /* ✅ 헤더 패딩 증가 */
-  font-size: 13px !important; /* ✅ 헤더 폰트 크기 증가 */
+  font-weight: 600 !important;
+  /* ✅ 헤더 폰트 굵기 증가 */
+  padding: 12px 8px !important;
+  /* ✅ 헤더 패딩 증가 */
+  font-size: 13px !important;
+  /* ✅ 헤더 폰트 크기 증가 */
 }
 
 /* ✅ 헤더 호버 효과 */
@@ -1369,8 +1719,10 @@ onUnmounted(async () => {
   background-color: transparent !important;
   color: white !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-  padding: 10px 8px; /* ✅ 상하 패딩 증가로 가독성 향상 */
-  font-size: 13px; /* ✅ 폰트 크기 증가 */
+  padding: 10px 8px;
+  /* ✅ 상하 패딩 증가로 가독성 향상 */
+  font-size: 13px;
+  /* ✅ 폰트 크기 증가 */
 }
 
 /* ✅ 시간 관련 셀 내용 폰트 크기 증가 */
@@ -1395,152 +1747,60 @@ onUnmounted(async () => {
   padding: 10px 8px !important;
 }
 
-/* ✅ 체크박스 영역 완전 차단 스타일 */
+/* ✅ 체크박스 셀 스타일 (이벤트 허용) */
 .schedule-table :deep(.q-table tbody td[data-col="selection"]) {
-  pointer-events: none !important;
-  user-select: none !important;
-  -webkit-user-select: none !important;
-  -moz-user-select: none !important;
-  -ms-user-select: none !important;
+  padding: 10px 8px;
 }
 
-/* ✅ 체크박스 자체도 완전 차단 */
+/* ✅ 체크박스 스타일 (이벤트 허용) */
 .schedule-table :deep(.schedule-checkbox) {
-  pointer-events: none !important;
-  user-select: none !important;
-  -webkit-user-select: none !important;
-  -moz-user-select: none !important;
-  -ms-user-select: none !important;
   color: #1976d2 !important;
 }
 
 .schedule-table :deep(.schedule-checkbox .q-checkbox__inner) {
-  pointer-events: none !important;
-  user-select: none !important;
   color: #1976d2 !important;
 }
 
-.schedule-table :deep(.schedule-checkbox .q-checkbox__bg) {
-  pointer-events: none !important;
-  user-select: none !important;
-}
-
-/* ✅ 비활성화된 체크박스 스타일 강화 */
-.schedule-table :deep(.schedule-checkbox.disabled) {
+/* ✅ 비활성화된 체크박스 스타일 */
+.schedule-table :deep(.q-checkbox.disabled) {
   opacity: 0.4 !important;
   cursor: not-allowed !important;
-  pointer-events: none !important;
 }
 
-.schedule-table :deep(.schedule-checkbox.disabled .q-checkbox__inner) {
+.schedule-table :deep(.q-checkbox.disabled .q-checkbox__inner) {
   color: #666 !important;
   cursor: not-allowed !important;
-  pointer-events: none !important;
-}
-
-.schedule-table :deep(.schedule-checkbox.disabled:hover) {
-  opacity: 0.4 !important;
 }
 
 /* ✅ 겹치는 스케줄의 체크박스 스타일 */
-.schedule-table :deep(.overlapping-row .schedule-checkbox) {
+.schedule-table :deep(.overlapping-row .q-checkbox:not(.disabled)) {
   color: #ff9800 !important;
-  pointer-events: none !important;
 }
 
-.schedule-table :deep(.overlapping-row .schedule-checkbox .q-checkbox__inner) {
+.schedule-table :deep(.overlapping-row .q-checkbox:not(.disabled) .q-checkbox__inner) {
   color: #ff9800 !important;
-  pointer-events: none !important;
 }
 
 /* ✅ 겹치는 스케줄의 비활성화된 체크박스 */
-.schedule-table :deep(.overlapping-row .schedule-checkbox.disabled) {
+.schedule-table :deep(.overlapping-row .q-checkbox.disabled) {
   color: #ff9800 !important;
   opacity: 0.3 !important;
-  pointer-events: none !important;
 }
 
-.schedule-table :deep(.overlapping-row .schedule-checkbox.disabled .q-checkbox__inner) {
+.schedule-table :deep(.overlapping-row .q-checkbox.disabled .q-checkbox__inner) {
   color: #ff9800 !important;
   opacity: 0.3 !important;
-  pointer-events: none !important;
 }
 
-/* ✅ 선택 불가능한 행의 체크박스 영역 완전 차단 */
-.schedule-table :deep(.disabled-row .schedule-checkbox) {
-  pointer-events: none !important;
+/* ✅ 선택 불가능한 행의 체크박스 */
+.schedule-table :deep(.disabled-row .q-checkbox) {
   opacity: 0.3 !important;
-  user-select: none !important;
-  -webkit-user-select: none !important;
-  -moz-user-select: none !important;
-  -ms-user-select: none !important;
-}
-
-.schedule-table :deep(.disabled-row td[data-col="selection"]) {
-  pointer-events: none !important;
   cursor: not-allowed !important;
-  user-select: none !important;
-  -webkit-user-select: none !important;
-  -moz-user-select: none !important;
-  -ms-user-select: none !important;
 }
 
-/* ✅ 체크박스 차단 표시 */
-.schedule-table :deep(.checkbox-blocked) {
-  position: relative;
-}
-
-.schedule-table :deep(.checkbox-blocked::after) {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(255, 0, 0, 0.1);
-  pointer-events: none;
-  border-radius: 2px;
-}
-
-/* ✅ 모든 체크박스 관련 요소 터치/마우스 이벤트 완전 차단 */
-.schedule-table :deep(.q-checkbox),
-.schedule-table :deep(.q-checkbox *),
-.schedule-table :deep(.q-checkbox__inner),
-.schedule-table :deep(.q-checkbox__bg),
-.schedule-table :deep(.q-checkbox__svg),
-.schedule-table :deep(.q-checkbox__truthy),
-.schedule-table :deep(.q-checkbox__falsy) {
-  pointer-events: none !important;
-  user-select: none !important;
-  -webkit-user-select: none !important;
-  -moz-user-select: none !important;
-  -ms-user-select: none !important;
-  -webkit-touch-callout: none !important;
-  -webkit-tap-highlight-color: transparent !important;
-}
-
-/* ✅ 체크박스 셀 전체 터치/마우스 이벤트 차단 */
-.schedule-table :deep(td[data-col="selection"]) {
-  pointer-events: none !important;
-  user-select: none !important;
-  -webkit-user-select: none !important;
-  -moz-user-select: none !important;
-  -ms-user-select: none !important;
-  -webkit-touch-callout: none !important;
-  -webkit-tap-highlight-color: transparent !important;
-}
-
-/* ✅ 모바일에서 터치 이벤트 완전 차단 */
-@media (max-width: 768px) {
-
-  .schedule-table :deep(.q-checkbox),
-  .schedule-table :deep(.q-checkbox *),
-  .schedule-table :deep(td[data-col="selection"]) {
-    -webkit-touch-callout: none !important;
-    -webkit-tap-highlight-color: transparent !important;
-    touch-action: none !important;
-    pointer-events: none !important;
-  }
+/* ✅ 체크박스 호버 효과 */
+.schedule-table :deep(.q-checkbox:not(.disabled):hover) {
+  opacity: 0.8;
 }
 
 /* ✅ 위성 ID 칩 스타일 */
@@ -1635,8 +1895,10 @@ onUnmounted(async () => {
 
 /* ✅ 테이블 전체 스크롤 영역 스타일 */
 .schedule-table :deep(.q-table__middle) {
-  overflow-x: auto; /* ✅ 가로 스크롤바 추가 */
-  overflow-y: auto; /* ✅ 세로 스크롤바 유지 */
+  overflow-x: auto;
+  /* ✅ 가로 스크롤바 추가 */
+  overflow-y: auto;
+  /* ✅ 세로 스크롤바 유지 */
   max-height: 100%;
   flex: 1;
   min-width: 0;
@@ -1644,8 +1906,10 @@ onUnmounted(async () => {
 
 /* ✅ 테이블 자체에 최소 너비 설정 (컬럼 총 너비보다 크게) */
 .schedule-table :deep(.q-table) {
-  min-width: 2000px; /* ✅ 컬럼들의 총 너비보다 큰 값 설정 */
-  table-layout: auto; /* ✅ 컬럼 너비 자동 조정 */
+  min-width: 2000px;
+  /* ✅ 컬럼들의 총 너비보다 큰 값 설정 */
+  table-layout: auto;
+  /* ✅ 컬럼 너비 자동 조정 */
   width: 100%;
 }
 
@@ -1844,4 +2108,3 @@ onUnmounted(async () => {
   }
 }
 </style>
-

@@ -2076,14 +2076,14 @@ const selectScheduleData = async () => {
   try {
     console.log('스케줄 선택 모달 열기')
 
-    // ✅ 모달을 열 때 항상 최신 데이터 확인 (TLE 업로드 후 반영을 위해)
-    // 데이터가 없거나, 마지막 로드 후 시간이 지났으면 다시 로드
-    const shouldReload =
-      passScheduleStore.scheduleData.length === 0 ||
-      !passScheduleStore.scheduleData.length // 데이터가 없으면 로드
+    // ✅ 1순위: localStorage에서 스케줄 데이터 로드 (빠름)
+    const cached = passScheduleStore.loadScheduleDataFromLocalStorage()
 
-    if (shouldReload) {
-      console.log('📡 스케줄 데이터 로드 시작')
+    if (cached && passScheduleStore.scheduleData.length > 0) {
+      console.log('✅ 캐시된 스케줄 데이터 사용 (API 호출 생략):', passScheduleStore.scheduleData.length, '개')
+    } else {
+      // ✅ 2순위: API 호출 (캐시가 없을 때만)
+      console.log('📡 스케줄 데이터 API 호출 시작 (캐시 없음)')
       try {
         await passScheduleStore.fetchScheduleDataFromServer()
         console.log('✅ 스케줄 데이터 로드 완료:', passScheduleStore.scheduleData.length, '개')
@@ -2095,8 +2095,6 @@ const selectScheduleData = async () => {
         })
         return
       }
-    } else {
-      console.log('✅ 기존 스케줄 데이터 사용:', passScheduleStore.scheduleData.length, '개')
     }
 
     const modal = await openModal('select-schedule', {
