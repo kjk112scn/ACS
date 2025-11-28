@@ -554,6 +554,13 @@ const handleCheckboxChange = (row: ScheduleItem, value: boolean) => {
       console.log('✅ 스케줄 선택 해제:', row.satelliteName)
     }
   }
+
+  // 선택 후 전체 선택된 항목 로그
+  console.log('📋 현재 선택된 항목들:', selectedRows.value.map(s => ({
+    index: s.index,
+    no: s.no,
+    name: s.satelliteName
+  })))
 }
 
 // ✅ 전체 선택 상태 확인 (Index 기준)
@@ -991,15 +998,42 @@ const handleSelect = async () => {
     }
 
     console.log('🚀 스케줄 선택 처리 시작 (기존 목록 초기화):', selectedRows.value.length, '개')
+    console.log('📋 선택된 스케줄 상세:', selectedRows.value.map(s => ({
+      no: s.no,
+      index: s.index,
+      satelliteName: s.satelliteName,
+      satelliteId: s.satelliteId,
+      startTime: s.startTime,
+      endTime: s.endTime
+    })))
+
+    // ✅ index를 no로 덮어쓰기 (고유 식별자로 사용)
+    const schedulesWithIndexAsNo = selectedRows.value.map(s => ({
+      ...s,
+      no: s.index || s.no // index를 no로 사용
+    }))
+
+    console.log('🔄 index를 no로 변환:', schedulesWithIndexAsNo.map(s => ({
+      no: s.no,
+      index: s.index,
+      satelliteName: s.satelliteName
+    })))
 
     // 🔧 기존 목록 초기화 후 새 스케줄 추가
-    const success = await passScheduleStore.replaceSelectedSchedules(selectedRows.value)
+    const success = await passScheduleStore.replaceSelectedSchedules(schedulesWithIndexAsNo)
+
+    console.log('🔍 replaceSelectedSchedules 결과:', success)
+    console.log('🔍 Store 상태 확인:', {
+      selectedScheduleListCount: passScheduleStore.selectedScheduleList.length,
+      selectedSchedule: passScheduleStore.selectedSchedule?.satelliteName
+    })
 
     if (success) {
       console.log('✅ 스케줄 목록 교체 완료:', {
         count: selectedRows.value.length,
         schedules: selectedRows.value.map(s => ({
           no: s.no, // 서버 원본 No 값
+          index: s.index,
           name: s.satelliteName,
           satelliteId: s.satelliteId,
           startTime: s.startTime
