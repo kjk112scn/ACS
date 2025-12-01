@@ -48,6 +48,15 @@ class PushDataService(
 				null
 			}
 
+			// ✅ 디버깅: DataStoreService에서 가져온 값 확인
+			val currentMstId = dataStoreService.getCurrentTrackingMstId()
+			val currentDetailId = dataStoreService.getCurrentTrackingDetailId()
+			val nextMstId = dataStoreService.getNextTrackingMstId()
+			val nextDetailId = dataStoreService.getNextTrackingDetailId()
+			
+			logger.info("🔍 [디버깅] WebSocket 전송 - currentTrackingMstId: $currentMstId, currentTrackingDetailId: $currentDetailId")
+			logger.info("🔍 [디버깅] WebSocket 전송 - nextTrackingMstId: $nextMstId, nextTrackingDetailId: $nextDetailId")
+			
 			// 필수 데이터만 포함하여 처리 시간 최소화
 			val dataWithInfo = mapOf(
 				"data" to currentData,
@@ -59,9 +68,11 @@ class PushDataService(
 				"cmdTrainAngle" to PushData.CMD.cmdTrainAngle,
 				"udpConnected" to isUdpConnected,
 				"lastUdpUpdateTime" to dataStoreService.getLastUdpUpdateTime().toString(),
-				// ✅ mstId 정보 추가
-				"currentTrackingMstId" to dataStoreService.getCurrentTrackingMstId(),
-				"nextTrackingMstId" to dataStoreService.getNextTrackingMstId(),
+				// ✅ mstId와 detailId 정보 추가
+				"currentTrackingMstId" to currentMstId,
+				"currentTrackingDetailId" to currentDetailId,
+				"nextTrackingMstId" to nextMstId,
+				"nextTrackingDetailId" to nextDetailId,
 				// ✅ 에러 데이터 추가 (클라이언트별 맞춤)
 				"errorData" to errorData
 			)

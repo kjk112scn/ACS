@@ -523,7 +523,8 @@ class PassScheduleController(
         }
             .flatMap { tleData ->
                 val (tleLine1, tleLine2) = tleData
-                passScheduleService.generatePassScheduleTrackingDataAsync(satelliteId, tleLine1, tleLine2)
+                // ✅ startMstId를 null로 전달하면 자동으로 전역 카운터에서 할당됨
+                passScheduleService.generatePassScheduleTrackingDataAsync(satelliteId, tleLine1, tleLine2, null, null)
             }
             .map { (mstData, dtlData) ->
                 logger.info("위성 $satelliteId 추적 데이터 생성 완료: ${mstData.size}개 패스, ${dtlData.size}개 추적 포인트")
@@ -539,7 +540,10 @@ class PassScheduleController(
                             "trackingPointCount" to dtlData.size,
                             "passes" to mstData.map { pass ->
                                 mapOf(
-                                    "passId" to pass["No"],
+                                    // ✅ "No" → "MstId" 변경
+                                    "passId" to pass["MstId"],  // ✅ 전역 고유 MstId
+                                    "mstId" to pass["MstId"],    // ✅ 명시적으로 mstId 필드 추가
+                                    "detailId" to (pass["DetailId"] ?: 0),  // ✅ DetailId 필드 추가
                                     "startTime" to pass["StartTime"],
                                     "endTime" to pass["EndTime"],
                                     "duration" to pass["Duration"],
@@ -666,30 +670,42 @@ class PassScheduleController(
     /**
      * 특정 위성의 특정 패스에 대한 세부 데이터를 조회합니다.
      */
-    @GetMapping("/tracking/detail/{satelliteId}/pass/{passId}")
+    @GetMapping("/tracking/detail/{mstId}/pass/{detailId}")
     @Operation(
         operationId = "getpassscheduledetailbypass",
         tags = ["Mode - Pass Schedule"]
     )
+    /**
+     * MstId와 DetailId로 세부 데이터를 조회하는 함수
+     * 
+     * 기존 경로 구조 유지: /tracking/detail/{satelliteId}/pass/{passId}
+     * → /tracking/detail/{mstId}/pass/{detailId}로 변경
+     * 
+     * @param mstId 전역 고유 패스 ID (Long 타입, 기존 satelliteId 자리)
+     * @param detailId 패스 인덱스 (Int 타입, 기존 passId 자리)
+     * @param dataType DataType (optional)
+     * @return 세부 데이터 응답
+     */
     fun getTrackingDetailDataByPass(
-        @PathVariable satelliteId: String,
-        @PathVariable passId: UInt,
+        @PathVariable mstId: Long,  // ✅ 기존 satelliteId 자리
+        @PathVariable detailId: Int,  // ✅ 기존 passId 자리
         @RequestParam(required = false) dataType: String? = null  // ✅ DataType 파라미터 추가
     ): ResponseEntity<Map<String, Any>> {
         return try {
-            // ✅ DataType 파라미터를 서비스에 전달
-            val dtlData = passScheduleService.getPassScheduleTrackDtlByMstId(satelliteId, passId, dataType)
+            // ✅ DataType 파라미터를 서비스에 전달 (satelliteId 제거)
+            val dtlData = passScheduleService.getPassScheduleTrackDtlByMstIdAndDetailId(mstId, detailId, dataType)
 
             if (dtlData.isNotEmpty()) {
-                logger.info("위성 $satelliteId 패스 $passId 세부 데이터 조회 성공: ${dtlData.size}개 추적 포인트 (DataType: ${dataType ?: "auto"})")
+                // ✅ mstId와 detailId만 사용 (satelliteId 제거)
+                logger.info("mstId=$mstId, detailId=$detailId 세부 데이터 조회 성공: ${dtlData.size}개 추적 포인트 (DataType: ${dataType ?: "auto"})")
 
                 ResponseEntity.ok(
                     mapOf(
                         "success" to true,
                         "message" to "패스별 세부 데이터 조회 성공",
                         "data" to mapOf(
-                            "satelliteId" to satelliteId,
-                            "passId" to passId,
+                            "mstId" to mstId,
+                            "detailId" to detailId,
                             "trackingPointCount" to dtlData.size,
                             "trackingPoints" to dtlData,
                             "dataType" to (dataType ?: "auto")  // ✅ 반환된 DataType 정보 추가
@@ -698,17 +714,17 @@ class PassScheduleController(
                     )
                 )
             } else {
-                logger.warn("위성 $satelliteId 패스 $passId 세부 데이터 없음 (DataType: ${dataType ?: "auto"})")
+                logger.warn("mstId=$mstId, detailId=$detailId 세부 데이터 없음 (DataType: ${dataType ?: "auto"})")
                 ResponseEntity.status(404).body(
                     mapOf(
                         "success" to false,
-                        "message" to "해당 위성의 패스에 대한 추적 세부 데이터를 찾을 수 없습니다.",
+                        "message" to "해당 MstId와 DetailId에 대한 추적 세부 데이터를 찾을 수 없습니다.",
                         "timestamp" to System.currentTimeMillis()
                     )
                 )
             }
         } catch (e: Exception) {
-            logger.error("위성 $satelliteId 패스 $passId 세부 데이터 조회 실패: ${e.message}", e)
+            logger.error("mstId=$mstId, detailId=$detailId 세부 데이터 조회 실패: ${e.message}", e)
             ResponseEntity.internalServerError().body(
                 mapOf(
                     "success" to false,
@@ -838,7 +854,10 @@ class PassScheduleController(
             if (mstData != null && mstData.isNotEmpty()) {
                 val summary = mstData.map { pass ->
                     mapOf(
-                        "passId" to pass["No"],
+                        // ✅ "No" → "MstId" 변경
+                        "passId" to pass["MstId"],  // ✅ 전역 고유 MstId
+                        "mstId" to pass["MstId"],    // ✅ 명시적으로 mstId 필드 추가
+                        "detailId" to (pass["DetailId"] ?: 0),  // ✅ DetailId 필드 추가
                         "satelliteName" to pass["SatelliteName"],
                         "startTime" to pass["StartTime"],
                         "endTime" to pass["EndTime"],
@@ -908,7 +927,10 @@ class PassScheduleController(
                     val dtlData = allDtlData[satelliteId] ?: emptyList()
                     val passSummaries = mstData.map { pass ->
                         mapOf(
-                            "passId" to pass["No"],
+                            // ✅ "No" → "MstId" 변경
+                            "passId" to pass["MstId"],  // ✅ 전역 고유 MstId
+                            "mstId" to pass["MstId"],    // ✅ 명시적으로 mstId 필드 추가
+                            "detailId" to (pass["DetailId"] ?: 0),  // ✅ DetailId 필드 추가
                             "startTime" to pass["StartTime"],
                             "endTime" to pass["EndTime"],
                             "duration" to pass["Duration"],
@@ -1124,11 +1146,13 @@ class PassScheduleController(
         }
             .flatMap { (satelliteId, satelliteName, request) ->
                 // 추적 데이터 생성
+                // ✅ startMstId를 null로 전달하면 자동으로 전역 카운터에서 할당됨
                 passScheduleService.generatePassScheduleTrackingDataAsync(
                     satelliteId,
                     request.tleLine1,
                     request.tleLine2,
-                    satelliteName  // 위성 이름 전달
+                    satelliteName,  // 위성 이름 전달
+                    null  // ✅ null이면 자동으로 전역 카운터에서 MstId 할당
                 ).map { (mstData, dtlData) ->
                     Triple(satelliteId, mstData, dtlData)
                 }
@@ -1150,7 +1174,10 @@ class PassScheduleController(
                             "satelliteIdSource" to if (request.satelliteId.isNullOrBlank()) "extracted_from_tle" else "provided",
                             "passes" to mstData.map { pass ->
                                 mapOf(
-                                    "passId" to pass["No"],
+                                    // ✅ "No" → "MstId" 변경
+                                    "passId" to pass["MstId"],  // ✅ 전역 고유 MstId
+                                    "mstId" to pass["MstId"],    // ✅ 명시적으로 mstId 필드 추가
+                                    "detailId" to (pass["DetailId"] ?: 0),  // ✅ DetailId 필드 추가
                                     "startTime" to pass["StartTime"],
                                     "endTime" to pass["EndTime"],
                                     "duration" to pass["Duration"],
@@ -1205,7 +1232,8 @@ class PassScheduleController(
                 if (target.satelliteId.isBlank()) {
                     invalidTargets.add("인덱스 $index: satelliteId가 비어있습니다.")
                 }
-                if (target.mstId == 0u) {
+                // ✅ UInt → Long 변경에 따라 0u → 0L로 변경
+                if (target.mstId == 0L) {
                     invalidTargets.add("인덱스 $index: mstId가 0입니다.")
                 }
                 if (target.startTime.isAfter(target.endTime)) {
@@ -1380,7 +1408,15 @@ class PassScheduleController(
         operationId = "getpassscheduletargetbymstid",
         tags = ["Mode - Pass Schedule"]
     )
-    fun getTrackingTargetByMstId(@PathVariable mstId: UInt): ResponseEntity<Map<String, Any>> {
+    /**
+     * 특정 MST ID의 추적 대상을 조회하는 함수
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * 
+     * @param mstId 전역 고유 MstId (Long 타입)
+     * @return 추적 대상 응답
+     */
+    fun getTrackingTargetByMstId(@PathVariable mstId: Long): ResponseEntity<Map<String, Any>> {  // ✅ UInt → Long 변경
         return try {
             val trackingTarget = passScheduleService.getTrackingTargetByMstId(mstId)
 
@@ -1570,13 +1606,13 @@ class PassScheduleController(
 
     /**
      * ✅ 특정 MST ID의 선별된 세부 데이터를 조회합니다.
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * 
+     * @param mstId 전역 고유 MstId (Long 타입)
+     * @return 선별된 세부 데이터 응답
      */
-    @GetMapping("/selected-tracking/detail/mst/{mstId}")
-    @Operation(
-        operationId = "getselectedpassscheduledetailbymstid",
-        tags = ["Mode - Pass Schedule"]
-    )
-    fun getSelectedTrackingDetailByMstId(@PathVariable mstId: UInt): ResponseEntity<Map<String, Any>> {
+    fun getSelectedTrackingDetailByMstId(@PathVariable mstId: Long): ResponseEntity<Map<String, Any>> {  // ✅ UInt → Long 변경
         return try {
             val selectedDtlData = passScheduleService.getSelectedTrackDtlByMstId(mstId)
 
@@ -1966,9 +2002,18 @@ data class SetTrackingTargetsRequest(
 
 /**
  * ✅ 추적 대상 요청 데이터 클래스
+ * 
+ * PassSchedule 데이터 구조 리팩토링에 따라 mstId 타입을 UInt → Long으로 변경.
+ * 
+ * @param mstId 전역 고유 MstId (Long 타입)
+ * @param satelliteId 위성 카탈로그 번호
+ * @param satelliteName 위성 이름 (선택적)
+ * @param startTime 추적 시작 시간
+ * @param endTime 추적 종료 시간
+ * @param maxElevation 최대 고도각
  */
 data class TrackingTargetRequest(
-    val mstId: UInt,
+    val mstId: Long,  // ✅ UInt → Long 변경
     val satelliteId: String,
     val satelliteName: String? = null,
     val startTime: ZonedDateTime,

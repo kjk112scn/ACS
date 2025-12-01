@@ -34,18 +34,24 @@ class SatelliteTrackingProcessor(
     /**
      * OrekitCalculator의 순수 2축 데이터를 받아 모든 변환 및 분석 수행
      *
+     * PassSchedule 데이터 구조 리팩토링에 따라 startMstId 파라미터 추가.
+     * 전역 고유 MstId 생성을 위해 startMstId를 사용.
+     *
      * @param schedule OrekitCalculator가 생성한 위성 추적 스케줄
      * @param satelliteName 위성 이름 (선택)
+     * @param startMstId 전역 고유 MstId 시작값 (기본값: 0)
      * @return 모든 DataType의 Mst/Dtl 데이터
      *
      * ✅ MstId 기반 연결 구조 유지
      * ✅ DataType별 저장 (original, axis_transformed, final_transformed)
+     * ✅ 전역 고유 MstId 생성 (startMstId + index + 1)
      */
     fun processFullTransformation(
         schedule: OrekitCalculator.SatelliteTrackingSchedule,
-        satelliteName: String? = null
+        satelliteName: String? = null,
+        startMstId: Long = 0  // ✅ 전역 시작 MstId 파라미터 추가
     ): ProcessedTrackingData {
-        logger.info("🔄 위성 추적 데이터 변환 및 분석 시작")
+        logger.info("🔄 위성 추적 데이터 변환 및 분석 시작 (시작 MstId: $startMstId)")
 
         val satelliteId = schedule.satelliteTle1.substring(2, 7).trim()
         val actualSatelliteName = satelliteName ?: satelliteId
@@ -54,7 +60,8 @@ class SatelliteTrackingProcessor(
         val (originalMst, originalDtl) = structureOriginalData(
             schedule,
             satelliteId,
-            actualSatelliteName
+            actualSatelliteName,
+            startMstId  // ✅ 전역 시작 MstId 전달
         )
         logger.info("✅ Original 데이터 구조화 완료: ${originalMst.size}개 마스터, ${originalDtl.size}개 상세")
 
@@ -88,7 +95,9 @@ class SatelliteTrackingProcessor(
         val keyholeOptimizedFinalTransformedDtl = mutableListOf<Map<String, Any?>>()
 
         finalTransformedMst.forEachIndexed { _, mstData ->
-            val mstId = mstData["No"] as UInt
+            // ✅ "No" → "MstId" 변경, UInt → Long 변경
+            val mstId = (mstData["MstId"] as? Number)?.toLong()
+                ?: throw IllegalStateException("MstId 필드가 없거나 유효하지 않습니다: $mstData")
 
             /**
              * Keyhole 판단 및 Train≠0 재계산
@@ -220,7 +229,10 @@ class SatelliteTrackingProcessor(
                 
                 // 방법 2: Keyhole Optimized 데이터 생성
                 // ✅ mstId로 originalMst에서 찾기 (index 대신 사용하여 데이터 불일치 방지)
-                val originalMstDataForOptimized = originalMst.find { it["No"] == mstId }
+                // ✅ PassSchedule 데이터 구조 리팩토링: "No" → "MstId", UInt → Long
+                val originalMstDataForOptimized = originalMst.find { 
+                    (it["MstId"] as? Number)?.toLong() == mstId 
+                }
                 if (originalMstDataForOptimized == null) {
                     logger.error("❌ Original MST를 찾을 수 없습니다: mstId=$mstId (방법 2)")
                     return@forEachIndexed  // 이 패스는 건너뛰기
@@ -277,8 +289,9 @@ class SatelliteTrackingProcessor(
                 
                 keyholeOptimizedFinalMst.forEach { mst ->
                     // 🔍 디버깅: 저장 직전 값 확인
-                    val mstId = mst["No"] as? UInt
-                    logger.info("🔍 [저장 직전] MST #$mstId - applyAngleLimitTransformation 반환값:")
+                    // ✅ "No" → "MstId" 변경, UInt → Long 변경
+                    val optimizedMstId = (mst["MstId"] as? Number)?.toLong()
+                    logger.info("🔍 [저장 직전] MST #$optimizedMstId - applyAngleLimitTransformation 반환값:")
                     logger.info("   RecommendedTrainAngle: ${mst["RecommendedTrainAngle"]}")
                     logger.info("   MaxAzRate: ${mst["MaxAzRate"]}")
                     logger.info("   optimalTrainAngle: $optimalTrainAngle")
@@ -292,7 +305,7 @@ class SatelliteTrackingProcessor(
                         put("MaxAzRate", optimalMaxAzRate)  // ✅ 계산된 결과를 본인의 정보로 저장
                         
                         // 🔍 디버깅: 저장 직후 값 확인
-                        logger.info("🔍 [저장 직후] MST #$mstId - 저장된 값:")
+                        logger.info("🔍 [저장 직후] MST #$optimizedMstId - 저장된 값:")
                         logger.info("   RecommendedTrainAngle: ${get("RecommendedTrainAngle")}")
                         logger.info("   MaxAzRate: ${get("MaxAzRate")}")
                         logger.info("   DataType: ${get("DataType")}")
@@ -352,27 +365,44 @@ class SatelliteTrackingProcessor(
     /**
      * Original 데이터 구조화 (순수 2축 → Mst/Dtl 구조)
      *
+     * PassSchedule 데이터 구조 리팩토링에 따라 startMstId 파라미터 추가.
+     * 전역 고유 MstId 생성 및 DTL의 "No" 필드를 "Index"로 변경 (0-based).
+     *
      * ✅ MstId로 연결 (1개 MstId에 모든 DataType 연결)
      * ✅ 메타데이터는 상세 데이터에서 계산
+     * ✅ 전역 고유 MstId 생성 (startMstId + index + 1)
+     * ✅ DTL Index는 0부터 시작 (기존: 1부터 시작)
+     *
+     * @param schedule 위성 추적 스케줄
+     * @param satelliteId 위성 카탈로그 번호
+     * @param satelliteName 위성 이름
+     * @param startMstId 전역 고유 MstId 시작값
+     * @return MST와 DTL 데이터 쌍
      */
     private fun structureOriginalData(
         schedule: OrekitCalculator.SatelliteTrackingSchedule,
         satelliteId: String,
-        satelliteName: String
+        satelliteName: String,
+        startMstId: Long = 0  // ✅ 전역 시작 MstId 파라미터 추가
     ): Pair<List<Map<String, Any?>>, List<Map<String, Any?>>> {
 
         val originalMst = mutableListOf<Map<String, Any?>>()
         val originalDtl = mutableListOf<Map<String, Any?>>()
 
         schedule.trackingPasses.forEachIndexed { index, pass ->
-            val mstId = (index + 1).toUInt()  // ✅ MstId (1, 2, 3, ...)
+            // ✅ 전역 고유 MstId 생성 (startMstId는 이미 getAndAdd() + 1로 계산되어 있으므로 index만 더함)
+            val mstId = startMstId + index  // Long 타입 (startMstId는 이미 1부터 시작)
+            // ✅ DetailId는 패스 인덱스로 설정 (각 패스마다 고유한 detailId 부여)
+            val detailId = index
 
             // ✅ 상세 데이터 먼저 생성 (MstId로 연결)
             pass.trackingData.forEachIndexed { dtlIndex, data ->
                 originalDtl.add(
                     mapOf(
-                        "No" to (dtlIndex + 1).toUInt(),
-                        "MstId" to mstId,  // ← 마스터와 연결!
+                        // ✅ "No" → "Index" 변경, 1-based → 0-based 변경
+                        "Index" to dtlIndex,  // ✅ 0부터 시작 (기존: "No" to (dtlIndex + 1).toUInt())
+                        "MstId" to mstId,  // ✅ Long 타입 (전역 고유 ID)
+                        "DetailId" to detailId,  // ✅ Detail 구분자 (신규 추가)
                         "Time" to data.timestamp,
                         "Azimuth" to data.azimuth,
                         "Elevation" to data.elevation,
@@ -384,7 +414,8 @@ class SatelliteTrackingProcessor(
             }
 
             // ✅ 상세 데이터에서 메타데이터 계산
-            val passDtl = originalDtl.filter { it["MstId"] == mstId }
+            // ✅ MstId 비교 시 Long 타입으로 변환
+            val passDtl = originalDtl.filter { (it["MstId"] as? Number)?.toLong() == mstId }
             val metrics = calculateMetrics(passDtl)
 
             // Keyhole 분석
@@ -454,9 +485,10 @@ class SatelliteTrackingProcessor(
             // ✅ 마스터 데이터 생성
             originalMst.add(
                 mapOf(
-                    "No" to mstId,
-                    "SatelliteID" to satelliteId,
-                    "SatelliteName" to satelliteName,
+                    "MstId" to mstId,                  // ✅ 전역 고유 ID (Long 타입, 기존: "No" to mstId)
+                    "DetailId" to detailId,            // ✅ Detail 구분자 (신규 추가)
+                    "SatelliteID" to satelliteId,      // ✅ 카탈로그 번호
+                    "SatelliteName" to satelliteName,   // ✅ 위성 이름
                     "StartTime" to metrics["StartTime"],
                     "EndTime" to metrics["EndTime"],
                     "Duration" to metrics["Duration"],
@@ -499,12 +531,15 @@ class SatelliteTrackingProcessor(
         val axisTransformedDtl = mutableListOf<Map<String, Any?>>()
 
         originalMst.forEach { mstData ->
-            // ✅ null 안전성 체크 추가
-            val mstId = mstData["No"] as? UInt
-            if (mstId == null) {
-                logger.error("❌ MST 데이터에 No 필드가 없거나 null입니다: $mstData")
+            // ✅ PassSchedule 데이터 구조 리팩토링: "No" → "MstId", UInt → Long
+            val mstId = (mstData["MstId"] as? Number)?.toLong()
+            if (mstId == null) { 
+                logger.error("❌ MST 데이터에 MstId 필드가 없거나 null입니다: $mstData")
                 return@forEach  // 이 MST는 건너뛰기
             }
+            
+            // ✅ DetailId도 가져오기 (있으면 사용, 없으면 0)
+            val detailId = (mstData["DetailId"] as? Number)?.toInt() ?: 0
             
             /**
              * 3축 변환용 Train 각도 (trainAngleForTransformation)
@@ -521,13 +556,16 @@ class SatelliteTrackingProcessor(
             logger.debug("패스 #$mstId 3축 변환 중 (Train: ${trainAngleForTransformation}°${if (forcedTrainAngle != null) " [강제 적용]" else " [MST에서 읽음]"})")
 
             // 해당 패스의 상세 데이터 조회 (MstId로 필터링!)
-            val passDtl = originalDtl.filter { it["MstId"] == mstId }
+            // ✅ Long 타입으로 비교
+            val passDtl = originalDtl.filter { (it["MstId"] as? Number)?.toLong() == mstId }
 
             // 각 좌표에 3축 변환 적용
             passDtl.forEachIndexed { index, point ->
                 val originalAz = point["Azimuth"] as Double
                 val originalEl = point["Elevation"] as Double
                 val time = point["Time"] as ZonedDateTime
+                // ✅ Index 필드 가져오기 (있으면 사용, 없으면 index 사용)
+                val dtlIndex = (point["Index"] as? Number)?.toInt() ?: index
 
                 // 3축 변환 적용
                 val (transformedAz, transformedEl) = CoordinateTransformer.transformCoordinatesWithTrain(
@@ -539,8 +577,9 @@ class SatelliteTrackingProcessor(
 
                 axisTransformedDtl.add(
                     mapOf(
-                        "No" to (index + 1).toUInt(),
-                        "MstId" to mstId,  // ← 마스터와 연결 유지!
+                        "Index" to dtlIndex,  // ✅ 0부터 시작 (기존: "No" to (index + 1).toUInt())
+                        "MstId" to mstId,  // ✅ Long 타입 (전역 고유 ID)
+                        "DetailId" to detailId,  // ✅ Detail 구분자
                         "Time" to time,
                         "Azimuth" to transformedAz,
                         "Elevation" to transformedEl,
@@ -551,7 +590,8 @@ class SatelliteTrackingProcessor(
             }
 
             // ✅ 변환 후 메타데이터 재계산
-            val transformedPassDtl = axisTransformedDtl.filter { it["MstId"] == mstId }
+            // ✅ Long 타입으로 비교
+            val transformedPassDtl = axisTransformedDtl.filter { (it["MstId"] as? Number)?.toLong() == mstId }
             val metrics = calculateMetrics(transformedPassDtl)
 
             // Keyhole 재분석 (본인 기준)
@@ -587,7 +627,8 @@ class SatelliteTrackingProcessor(
 
             axisTransformedMst.add(
                 mapOf(
-                    "No" to mstId,
+                    "MstId" to mstId,  // ✅ Long 타입 (전역 고유 ID, 기존: "No" to mstId)
+                    "DetailId" to detailId,  // ✅ Detail 구분자
                     "SatelliteID" to mstData["SatelliteID"],
                     "SatelliteName" to mstData["SatelliteName"],
                     "StartTime" to metrics["StartTime"],
@@ -641,17 +682,21 @@ class SatelliteTrackingProcessor(
         val finalTransformedDtl = mutableListOf<Map<String, Any?>>()
 
         axisTransformedMst.forEach { mstData ->
-            // ✅ null 안전성 체크 추가
-            val mstId = mstData["No"] as? UInt
+            // ✅ PassSchedule 데이터 구조 리팩토링: "No" → "MstId", UInt → Long
+            val mstId = (mstData["MstId"] as? Number)?.toLong()
             if (mstId == null) {
-                logger.error("❌ MST 데이터에 No 필드가 없거나 null입니다: $mstData")
+                logger.error("❌ MST 데이터에 MstId 필드가 없거나 null입니다: $mstData")
                 return@forEach  // 이 MST는 건너뛰기
             }
+            
+            // ✅ DetailId도 가져오기 (있으면 사용, 없으면 0)
+            val detailId = (mstData["DetailId"] as? Number)?.toInt() ?: 0
 
             logger.debug("패스 #$mstId 각도제한 변환 중")
 
             // 해당 패스의 상세 데이터 조회
-            val passDtl = axisTransformedDtl.filter { it["MstId"] == mstId }
+            // ✅ Long 타입으로 비교
+            val passDtl = axisTransformedDtl.filter { (it["MstId"] as? Number)?.toLong() == mstId }
 
             // LimitAngleCalculator로 각도 제한 적용
             val (_, convertedDtl) = limitAngleCalculator.convertTrackingData(
@@ -660,16 +705,25 @@ class SatelliteTrackingProcessor(
             )
 
             // DataType을 targetDataType로 변경
+            // ✅ MstId, DetailId, Index 필드 보존
             convertedDtl.forEach { dtl ->
                 finalTransformedDtl.add(
                     dtl.toMutableMap().apply {
                         put("DataType", targetDataType)
+                        // ✅ MstId, DetailId, Index 필드 명시적으로 보존
+                        put("MstId", mstId)
+                        put("DetailId", detailId)
+                        // Index는 이미 있으면 유지, 없으면 0
+                        if (!containsKey("Index")) {
+                            put("Index", 0)
+                        }
                     }
                 )
             }
 
             // ✅ 변환 후 메타데이터 재계산
-            val finalPassDtl = finalTransformedDtl.filter { it["MstId"] == mstId }
+            // ✅ Long 타입으로 비교
+            val finalPassDtl = finalTransformedDtl.filter { (it["MstId"] as? Number)?.toLong() == mstId }
             val metrics = calculateMetrics(finalPassDtl)
 
             // Keyhole 재분석 (본인 기준)
@@ -708,7 +762,8 @@ class SatelliteTrackingProcessor(
 
             finalTransformedMst.add(
                 mapOf(
-                    "No" to mstId,
+                    "MstId" to mstId,  // ✅ Long 타입 (전역 고유 ID, 기존: "No" to mstId)
+                    "DetailId" to detailId,  // ✅ Detail 구분자
                     "SatelliteID" to mstData["SatelliteID"],
                     "SatelliteName" to mstData["SatelliteName"],
                     "StartTime" to metrics["StartTime"],
@@ -1036,10 +1091,18 @@ class SatelliteTrackingProcessor(
      * @note Train 각도는 ±270도 범위 내에서만 유효합니다.
      * @note 계산 시간이 오래 걸릴 수 있으므로, 대용량 데이터의 경우 성능 고려가 필요합니다.
      */
+    /**
+     * 최적 Train 각도를 찾는 함수
+     * 
+     * @param originalDtl 원본 DTL 데이터
+     * @param finalTransformedMst 최종 변환된 MST 데이터
+     * @param _threshold 임계값 (현재 미사용, 향후 확장용)
+     * @return 최적 Train 각도와 최대 AzRate 쌍
+     */
     private fun findOptimalTrainAngle(
         originalDtl: List<Map<String, Any?>>,
         finalTransformedMst: Map<String, Any?>,
-        threshold: Double
+        _threshold: Double  // ✅ 현재 미사용, 향후 확장용
     ): Pair<Double, Double> {
         // 1단계: 현재 방식으로 초기값 계산
         logger.info("🔍 1단계: 초기값 계산 (현재 방식)")

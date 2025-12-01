@@ -184,37 +184,96 @@ class DataStoreService {
             "trackingActualTrainAngle" to data.trackingActualTrainAngle
         )
     }
-    private val currentTrackingMstId = AtomicReference<UInt?>(null)
-    private val nextTrackingMstId = AtomicReference<UInt?>(null)
+    /**
+     * ✅ 현재 추적 중인 전역 고유 MstId (Long 타입)
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 UInt → Long으로 변경
+     * 전역 고유 ID를 지원하기 위해 Long 타입 사용
+     */
+    private val currentTrackingMstId = AtomicReference<Long?>(null)
+    
+    /**
+     * ✅ 다음 추적 예정 전역 고유 MstId (Long 타입)
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 UInt → Long으로 변경
+     * 전역 고유 ID를 지원하기 위해 Long 타입 사용
+     */
+    private val nextTrackingMstId = AtomicReference<Long?>(null)
 
     /**
-     * ✅ 현재 추적 중인 mstId 설정
+     * ✅ 현재 추적 중인 DetailId (Int 타입)
+     * 
+     * mstId와 함께 사용하여 정확한 스케줄 식별
      */
-    fun setCurrentTrackingMstId(mstId: UInt?) {
+    private val currentTrackingDetailId = AtomicReference<Int?>(null)
+    
+    /**
+     * ✅ 다음 추적 예정 DetailId (Int 타입)
+     * 
+     * mstId와 함께 사용하여 정확한 스케줄 식별
+     */
+    private val nextTrackingDetailId = AtomicReference<Int?>(null)
+
+    /**
+     * ✅ 현재 추적 중인 mstId와 detailId 설정
+     * 
+     * @param mstId 전역 고유 MstId (Long 타입)
+     * @param detailId 패스 인덱스 (Int 타입, null 가능)
+     */
+    fun setCurrentTrackingMstId(mstId: Long?, detailId: Int? = null) {
         currentTrackingMstId.set(mstId)
+        currentTrackingDetailId.set(detailId)
         dataVersion.incrementAndGet()
     }
 
     /**
-     * ✅ 다음 추적 예정 mstId 설정
+     * ✅ 다음 추적 예정 mstId와 detailId 설정
+     * 
+     * @param mstId 전역 고유 MstId (Long 타입)
+     * @param detailId 패스 인덱스 (Int 타입, null 가능)
      */
-    fun setNextTrackingMstId(mstId: UInt?) {
+    fun setNextTrackingMstId(mstId: Long?, detailId: Int? = null) {
         nextTrackingMstId.set(mstId)
+        nextTrackingDetailId.set(detailId)
         dataVersion.incrementAndGet()
     }
 
     /**
-     * ✅ mstId 조회 메서드들
+     * ✅ 현재 추적 중인 mstId 조회
+     * 
+     * @return 전역 고유 MstId (Long 타입, null 가능)
      */
-    fun getCurrentTrackingMstId(): UInt? = currentTrackingMstId.get()
-    fun getNextTrackingMstId(): UInt? = nextTrackingMstId.get()
+    fun getCurrentTrackingMstId(): Long? = currentTrackingMstId.get()
+    
+    /**
+     * ✅ 다음 추적 예정 mstId 조회
+     * 
+     * @return 전역 고유 MstId (Long 타입, null 가능)
+     */
+    fun getNextTrackingMstId(): Long? = nextTrackingMstId.get()
 
     /**
-     * ✅ 추적 mstId 초기화
+     * ✅ 현재 추적 중인 detailId 조회
+     * 
+     * @return 패스 인덱스 (Int 타입, null 가능)
+     */
+    fun getCurrentTrackingDetailId(): Int? = currentTrackingDetailId.get()
+    
+    /**
+     * ✅ 다음 추적 예정 detailId 조회
+     * 
+     * @return 패스 인덱스 (Int 타입, null 가능)
+     */
+    fun getNextTrackingDetailId(): Int? = nextTrackingDetailId.get()
+
+    /**
+     * ✅ 추적 mstId와 detailId 초기화
      */
     fun clearTrackingMstIds() {
         currentTrackingMstId.set(null)
         nextTrackingMstId.set(null)
+        currentTrackingDetailId.set(null)
+        nextTrackingDetailId.set(null)
         dataVersion.incrementAndGet()
     }
     /**

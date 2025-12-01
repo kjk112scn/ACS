@@ -114,9 +114,12 @@ class PassScheduleService(
     private var currentPreparingStep = PreparingStep.INIT
 
     /**
-     * PREPARING 상태에서 처리 중인 패스 ID
+     * PREPARING 상태에서 처리 중인 전역 고유 패스 ID (Long 타입)
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 UInt → Long으로 변경.
+     * 전역 고유 MstId를 저장하기 위해 Long 타입 사용.
      */
-    private var preparingPassId: UInt? = null
+    private var preparingPassId: Long? = null
 
     /**
      * 목표 Azimuth 각도
@@ -149,6 +152,12 @@ class PassScheduleService(
      * 너무 빈번한 상태 변경을 방지하기 위한 설정
      */
     private val MIN_STATE_CHANGE_INTERVAL = 500 // 0.5초
+    
+    /**
+     * 디버깅 로그 출력 제어 변수
+     */
+    private var lastDebugLogTime = 0L
+    private val DEBUG_LOG_INTERVAL = 10000L // 10초
 
     // ===== 기존 저장소들 (변경 없음) =====
     private val passScheduleTleCache = ConcurrentHashMap<String, Triple<String, String, String>>()
@@ -163,13 +172,27 @@ class PassScheduleService(
     private val subscriptions: MutableList<Disposable> = mutableListOf()
 
     // ✅ 새로 추가: 성능 최적화용 캐시 및 스레드 (기존 동작에 영향 없음)
-    private val trackingDataCache = ConcurrentHashMap<UInt, TrackingDataCache>()
+    /**
+     * 추적 데이터 캐시 (Long 타입으로 변경)
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 UInt → Long으로 변경.
+     * 전역 고유 MstId를 키로 사용.
+     */
+    private val trackingDataCache = ConcurrentHashMap<Long, TrackingDataCache>()
     // ✅ ThreadManager 통합 사용 (LOW 우선순위)
     private val batchExecutor = threadManager.getBatchExecutor()
 
     // ✅ 새로 추가: 성능 최적화용 데이터 클래스
+    /**
+     * 추적 데이터 캐시 데이터 클래스
+     * 
+     * @param passId 전역 고유 MstId (Long 타입)
+     * @param trackingPoints 추적 포인트 배열
+     * @param totalSize 전체 크기
+     * @param createdAt 생성 시간 (밀리초)
+     */
     data class TrackingDataCache(
-        val passId: UInt,
+        val passId: Long,  // ✅ UInt → Long 변경
         val trackingPoints: Array<TrackingPoint>,
         val totalSize: Int,
         val createdAt: Long = System.currentTimeMillis()
@@ -184,9 +207,20 @@ class PassScheduleService(
             System.currentTimeMillis() - createdAt > maxAgeMs
     }
 
-    // ✅ 기존 데이터 클래스들 (변경 없음)
+    // ✅ 기존 데이터 클래스들 (타입 변경)
+    /**
+     * 추적 대상 데이터 클래스
+     * 
+     * @param mstId 전역 고유 MstId (Long 타입으로 변경)
+     * @param satelliteId 위성 카탈로그 번호
+     * @param satelliteName 위성 이름
+     * @param startTime 추적 시작 시간
+     * @param endTime 추적 종료 시간
+     * @param maxElevation 최대 고도
+     * @param createdAt 생성 시간
+     */
     data class TrackingTarget(
-        val mstId: UInt,
+        val mstId: Long,  // ✅ UInt → Long 변경
         val satelliteId: String,
         val satelliteName: String? = null,
         val startTime: ZonedDateTime,
@@ -198,7 +232,20 @@ class PassScheduleService(
     // ✅ 기존 설정들 (변경 없음)
     private val locationData = settingsService.locationData
     private val limitAngleCalculator = LimitAngleCalculator()
-    private var globalMstId = 0
+    
+    /**
+     * ✅ 전역 고유 MstId 카운터 (AtomicLong)
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 추가됨.
+     * 모든 위성의 MST에 대해 전역적으로 고유한 ID를 생성하기 위해 사용.
+     * 위성별 인덱스가 아닌 전역 넘버링을 보장.
+     * 
+     * 초기값: 0 (첫 번째 MST는 1부터 시작)
+     * 
+     * @see generateAllPassScheduleTrackingDataAsync 전체 위성 스케줄 생성 시 초기화
+     * @see generatePassScheduleTrackingDataAsync 개별 위성 스케줄 생성 시 사용
+     */
+    private val mstIdCounter = AtomicLong(0)
 
     @PostConstruct
     fun init() {
@@ -206,13 +253,20 @@ class PassScheduleService(
         setupEventSubscriptions()
     }
 
+    /**
+     * 이벤트 구독 설정
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 "No" 필드 → "MstId" 필드로 변경.
+     * 타입 캐스팅도 UInt → Long으로 변경.
+     */
     private fun setupEventSubscriptions() {
-        // ✅ 기존 이벤트 구독 로직 유지
+        // ✅ 기존 이벤트 구독 로직 유지 (필드명 및 타입 변경)
         val headerSubscription =
             acsEventBus.subscribeToType<ACSEvent.ICDEvent.SatelliteTrackHeaderReceived>().subscribe { event ->
                 val currentSchedule = getCurrentSelectedTrackingPassWithTime(GlobalData.Time.calUtcTimeOffsetTime)
                 currentSchedule?.let { schedule ->
-                    val passId = schedule["No"] as? UInt
+                    // ✅ "No" → "MstId" 변경, UInt → Long 변경
+                    val passId = (schedule["MstId"] as? Number)?.toLong()
                     if (passId != null) {
                         sendInitialTrackingData(passId)
                     }
@@ -223,7 +277,8 @@ class PassScheduleService(
             acsEventBus.subscribeToType<ACSEvent.ICDEvent.SatelliteTrackDataRequested>().subscribe { event ->
                 val currentSchedule = getCurrentSelectedTrackingPassWithTime(GlobalData.Time.calUtcTimeOffsetTime)
                 currentSchedule?.let { schedule ->
-                    val passId = schedule["No"] as? UInt
+                    // ✅ "No" → "MstId" 변경, UInt → Long 변경
+                    val passId = (schedule["MstId"] as? Number)?.toLong()
                     if (passId != null) {
                         val requestData = event.requestData as ICDService.SatelliteTrackThree.GetDataFrame
                         // ✅ 최적화된 메서드 호출 (기존 인터페이스 유지)
@@ -428,7 +483,8 @@ class PassScheduleService(
                 // ✅ 현재 스케줄 추적 중 - 추적 시작 처리
                 if (currentSchedule != null) {
                     val satelliteName = currentSchedule["SatelliteName"] as? String ?: "Unknown"
-                    val mstId = currentSchedule["No"] as? UInt
+                    // ✅ "No" → "MstId" 변경, UInt → Long 변경
+                    val mstId = (currentSchedule["MstId"] as? Number)?.toLong()
                     logger.info("[ACTION] TRACKING 상태 - 추적 중: $satelliteName (ID: $mstId)")
                     
                     // ✅ 추적 시작 처리 (캐시 로딩 + 헤더 전송)
@@ -444,7 +500,8 @@ class PassScheduleService(
             
             TrackingState.PREPARING -> {
                 // ✅ PREPARING 상태 내에서 단계별 처리
-                val nextMstId = nextSchedule?.get("No") as? UInt
+                // ✅ "No" → "MstId" 변경, UInt → Long 변경
+                val nextMstId = (nextSchedule?.get("MstId") as? Number)?.toLong()
                 
                 when (currentPreparingStep) {
                     PreparingStep.INIT -> {
@@ -506,7 +563,8 @@ class PassScheduleService(
                 
                 // ✅ 이전 추적 종료 처리
                 lastDisplayedSchedule?.let { completedSchedule ->
-                    val completedMstId = completedSchedule["No"] as? UInt
+                    // ✅ "No" → "MstId" 변경, UInt → Long 변경
+                    val completedMstId = (completedSchedule["MstId"] as? Number)?.toLong()
                     if (completedMstId != null) {
                         cleanupTrackingEnd(completedMstId, completedSchedule)
                     }
@@ -662,7 +720,8 @@ class PassScheduleService(
 
             // 추적 변경 (로깅만)
             lastDisplayedSchedule != null && currentSchedule != null &&
-                    lastDisplayedSchedule!!["No"] != currentSchedule["No"] -> {
+                    // ✅ "No" → "MstId" 변경
+                    lastDisplayedSchedule!!["MstId"] != currentSchedule["MstId"] -> {
                 outputScheduleChange(lastDisplayedSchedule!!, currentSchedule, calTime)
                 outputNextScheduleInfo(calTime)
             }
@@ -670,27 +729,65 @@ class PassScheduleService(
         lastDisplayedSchedule = currentSchedule
     }
 
-    // ✅ 새로 추가할 함수 (mstId 업데이트용)
+    /**
+     * 추적 중인 mstId 업데이트 함수
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 "No" 필드 → "MstId" 필드로 변경.
+     * 타입도 UInt → Long으로 변경.
+     * 
+     * @param currentSchedule 현재 추적 중인 스케줄
+     * @param calTime 현재 시간
+     */
     private fun updateTrackingMstIds(currentSchedule: Map<String, Any?>?, calTime: ZonedDateTime) {
-        // 현재 추적 중인 mstId 업데이트
-        val currentMstId = currentSchedule?.get("No") as? UInt
-        dataStoreService.setCurrentTrackingMstId(currentMstId)
+        // 현재 추적 중인 mstId와 detailId 업데이트
+        // ✅ "No" → "MstId" 변경, UInt → Long 변경
+        val currentMstId = (currentSchedule?.get("MstId") as? Number)?.toLong()
+        val currentDetailId = (currentSchedule?.get("DetailId") as? Number)?.toInt()
+        
+        // ✅ 디버깅: currentSchedule의 모든 키와 DetailId 값 확인
+        if (currentSchedule != null) {
+            logger.info("🔍 [디버깅] currentSchedule 키 목록: ${currentSchedule.keys}")
+            logger.info("🔍 [디버깅] currentSchedule DetailId 값: ${currentSchedule["DetailId"]} (타입: ${currentSchedule["DetailId"]?.javaClass?.simpleName})")
+            logger.info("🔍 [디버깅] currentSchedule MstId 값: ${currentSchedule["MstId"]} (타입: ${currentSchedule["MstId"]?.javaClass?.simpleName})")
+            logger.info("🔍 [디버깅] 추출된 currentDetailId: $currentDetailId")
+            logger.info("🔍 [디버깅] 추출된 currentMstId: $currentMstId")
+        } else {
+            logger.info("🔍 [디버깅] currentSchedule이 null입니다")
+        }
+        
+        dataStoreService.setCurrentTrackingMstId(currentMstId, currentDetailId)
 
-        // 다음 추적 예정 mstId 업데이트
+        // 다음 추적 예정 mstId와 detailId 업데이트
         val nextSchedule = getNextSelectedTrackingPassWithTime(calTime)
-        val nextMstId = nextSchedule?.get("No") as? UInt
-        dataStoreService.setNextTrackingMstId(nextMstId)
+        // ✅ "No" → "MstId" 변경, UInt → Long 변경
+        val nextMstId = (nextSchedule?.get("MstId") as? Number)?.toLong()
+        val nextDetailId = (nextSchedule?.get("DetailId") as? Number)?.toInt()
+        
+        // ✅ 디버깅: nextSchedule의 모든 키와 DetailId 값 확인
+        if (nextSchedule != null) {
+            logger.info("🔍 [디버깅] nextSchedule 키 목록: ${nextSchedule.keys}")
+            logger.info("🔍 [디버깅] nextSchedule DetailId 값: ${nextSchedule["DetailId"]} (타입: ${nextSchedule["DetailId"]?.javaClass?.simpleName})")
+            logger.info("🔍 [디버깅] nextSchedule MstId 값: ${nextSchedule["MstId"]} (타입: ${nextSchedule["MstId"]?.javaClass?.simpleName})")
+            logger.info("🔍 [디버깅] 추출된 nextDetailId: $nextDetailId")
+            logger.info("🔍 [디버깅] 추출된 nextMstId: $nextMstId")
+        } else {
+            logger.info("🔍 [디버깅] nextSchedule이 null입니다")
+        }
+        
+        dataStoreService.setNextTrackingMstId(nextMstId, nextDetailId)
 
         // 로그 출력
-        logger.debug("🔄 mstId 업데이트: 현재={}, 다음={}", currentMstId, nextMstId)
+        logger.debug("🔄 mstId/detailId 업데이트: 현재={}/{}, 다음={}/{}", currentMstId, currentDetailId, nextMstId, nextDetailId)
     }
 
     /**
      * 추적 시작을 준비하는 함수
      * 
-     * @param mstId 추적할 위성의 MST ID
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * 
+     * @param mstId 추적할 위성의 전역 고유 MST ID (Long 타입)
      */
-    private fun prepareTrackingStart(mstId: UInt?) {
+    private fun prepareTrackingStart(mstId: Long?) {
         if (mstId == null) return
         
         try {
@@ -715,10 +812,12 @@ class PassScheduleService(
     /**
      * 추적 종료 시 정리 작업을 수행하는 함수
      * 
-     * @param mstId 종료된 추적의 MST ID
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * 
+     * @param mstId 종료된 추적의 전역 고유 MST ID (Long 타입)
      * @param completedSchedule 완료된 스케줄 정보
      */
-    private fun cleanupTrackingEnd(mstId: UInt, completedSchedule: Map<String, Any?>) {
+    private fun cleanupTrackingEnd(mstId: Long, completedSchedule: Map<String, Any?>) {
         try {
             val satelliteName = completedSchedule["SatelliteName"] as? String ?: "Unknown"
             logger.info("🛑 추적 종료 정리: $satelliteName (ID: $mstId)")
@@ -803,8 +902,14 @@ class PassScheduleService(
         return kotlin.math.abs(cmdTrain - currentTrain.toFloat()) <= 0.1f
     }
 
-    // ✅ 기존 메서드들 유지 (변경 없음)
-    private fun moveToStartPosition(passId: UInt) {
+    /**
+     * 시작 위치로 이동하는 함수
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * 
+     * @param passId 전역 고유 패스 ID (Long 타입)
+     */
+    private fun moveToStartPosition(passId: Long) {  // ✅ UInt → Long 변경
         // ✅ Keyhole 여부에 따라 적절한 MST 선택
         val selectedPass = getTrackingPassMst(passId)
         
@@ -888,7 +993,14 @@ class PassScheduleService(
     // 12.1
     // ✅ 기존 메서드 시그니처 유지하면서 내부 최적화
 
-    fun sendHeaderTrackingData(passId: UInt) {
+    /**
+     * 헤더 추적 데이터를 전송하는 함수
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * 
+     * @param passId 전역 고유 패스 ID (Long 타입)
+     */
+    fun sendHeaderTrackingData(passId: Long) {  // ✅ UInt → Long 변경
         try {
             udpFwICDService.writeNTPCommand()
             
@@ -941,8 +1053,14 @@ class PassScheduleService(
             logger.error("위성 추적 시작 중 오류 발생: ${e.message}", e)
         }
     }
-    //12.2
-    fun sendInitialTrackingData(passId: UInt) {
+    /**
+     * 초기 추적 데이터를 전송하는 함수
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * 
+     * @param passId 전역 고유 패스 ID (Long 타입)
+     */
+    fun sendInitialTrackingData(passId: Long) {  // ✅ UInt → Long 변경
         try {
             // ✅ Keyhole 여부에 따라 적절한 MST 선택
             val selectedPass = getTrackingPassMst(passId)
@@ -1055,24 +1173,34 @@ class PassScheduleService(
     }
 
 
-    // ✅ 기존 메서드 시그니처 유지하면서 내부 최적화
-    fun handleTrackingDataRequest(passId: UInt, timeAcc: UInt, requestDataLength: UShort) {
+    /**
+     * 추적 데이터 요청을 처리하는 함수
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * 
+     * @param passId 전역 고유 패스 ID (Long 타입)
+     * @param timeAcc 시간 누적값
+     * @param requestDataLength 요청 데이터 길이
+     */
+    fun handleTrackingDataRequest(passId: Long, timeAcc: UInt, requestDataLength: UShort) {  // ✅ UInt → Long 변경
         val startIndex = timeAcc.toInt()
         sendAdditionalTrackingData(passId, startIndex, requestDataLength.toInt())
     }
 
     /**
-     * 추가 추적 데이터를 전송합니다.
+     * 추가 추적 데이터를 전송하는 함수
+     *
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
      *
      * 이 함수는 캐시 여부에 따라 동기/비동기 처리를 선택합니다:
      * - 캐시 있으면: 동기 처리 (빠름, 즉시 전송)
      * - 캐시 없으면: 비동기 처리 (메모리 저장소 조회는 느릴 수 있으므로 블로킹 방지)
      *
-     * @param passId 패스 ID
+     * @param passId 전역 고유 패스 ID (Long 타입)
      * @param startIndex 시작 인덱스
      * @param requestDataLength 요청 데이터 길이
      */
-    private fun sendAdditionalTrackingData(passId: UInt, startIndex: Int, requestDataLength: Int = 25) {
+    private fun sendAdditionalTrackingData(passId: Long, startIndex: Int, requestDataLength: Int = 25) {  // ✅ UInt → Long 변경
         val cache = trackingDataCache[passId]
         
         if (cache != null && !cache.isExpired()) {
@@ -1173,16 +1301,18 @@ class PassScheduleService(
     /**
      * 메모리 저장소에서 추가 추적 데이터를 전송합니다.
      *
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     *
      * 현재는 메모리 저장소(passScheduleTrackDtlStorage)에서 조회하지만,
      * 추후 getSelectedTrackDtlByMstId() 내부를 DB 조회로 변경하면 자동으로 DB 연계됩니다.
      *
-     * @param passId 패스 ID
+     * @param passId 전역 고유 패스 ID (Long 타입)
      * @param startIndex 시작 인덱스
      * @param requestDataLength 요청 데이터 길이
      * @param processingStart 처리 시작 시간 (성능 측정용)
      */
     private fun sendAdditionalTrackingDataFromDatabase(
-        passId: UInt,
+        passId: Long,  // ✅ UInt → Long 변경
         startIndex: Int,
         requestDataLength: Int,
         processingStart: Long
@@ -1288,9 +1418,17 @@ class PassScheduleService(
         )
     }
 
-    // ✅ 캐시 상태 확인
-    fun getCacheStatus(passId: UInt): Map<String, Any> {
-        val cache = trackingDataCache[passId]
+    /**
+     * 캐시 상태를 확인하는 함수
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * 
+     * @param passId 전역 고유 패스 ID (Long 타입)
+     * @return 캐시 상태 정보
+     */
+    fun getCacheStatus(passId: Long): Map<String, Any> {  // ✅ UInt → Long 변경
+        // ✅ Long 타입 명시
+        val cache: TrackingDataCache? = trackingDataCache[passId]
         return if (cache != null) {
             mapOf(
                 "cached" to true,
@@ -1309,44 +1447,196 @@ class PassScheduleService(
         }
     }
 
-    // ✅ 캐시 수동 정리 (필요시)
+    /**
+     * 만료된 캐시를 수동으로 정리하는 함수
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 Long 타입 명시.
+     */
     fun clearExpiredCache() {
-        val expiredKeys = trackingDataCache.filter { (_, cache) -> cache.isExpired() }.keys
-        expiredKeys.forEach { trackingDataCache.remove(it) }
+        // ✅ Long 타입 명시 (타입 추론 실패 방지)
+        val expiredKeys: Set<Long> = trackingDataCache.filter { (_, cache) -> cache.isExpired() }.keys.toSet()
+        expiredKeys.forEach { key: Long -> trackingDataCache.remove(key) }
 
         if (expiredKeys.isNotEmpty()) {
             logger.info("만료된 캐시 정리 완료: ${expiredKeys.size}개 항목")
         }
     }
 
-    // ✅ 캐시 강제 새로고침
-    fun refreshCache(passId: UInt) {
-        trackingDataCache.remove(passId)
-        preloadTrackingDataCache(passId)
+    /**
+     * 캐시를 강제로 새로고침하는 함수
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * 
+     * @param passId 전역 고유 패스 ID (Long 타입)
+     */
+    fun refreshCache(passId: Long) {  // ✅ UInt → Long 변경
+        trackingDataCache.remove(passId)  // ✅ Long 타입으로 제거
+        preloadTrackingDataCache(passId)  // ✅ Long 타입으로 전달
         logger.info("캐시 강제 새로고침: passId=$passId")
     }
 
     // ✅ 기존 메서드들 - 변경 없음 (호환성 보장)
     private fun getCurrentSelectedTrackingPassWithTime(targetTime: ZonedDateTime): Map<String, Any?>? {
-        selectedTrackMstStorage.values.forEach { mstDataList ->
-            val currentPass = mstDataList.find { mstRecord ->
-                val startTime = mstRecord["StartTime"] as? ZonedDateTime
-                val endTime = mstRecord["EndTime"] as? ZonedDateTime
-
-                startTime != null && endTime != null && !targetTime.isBefore(startTime) && !targetTime.isAfter(endTime)
+        // ✅ 디버깅: selectedTrackMstStorage 상태 확인 (10초마다만 출력)
+        val now = System.currentTimeMillis()
+        val shouldLog = (now - lastDebugLogTime) >= DEBUG_LOG_INTERVAL
+        
+        if (shouldLog) {
+            logger.info("🔍 [디버깅] getCurrentSelectedTrackingPassWithTime 시작: targetTime=$targetTime, selectedTrackMstStorage 크기=${selectedTrackMstStorage.size}")
+            selectedTrackMstStorage.forEach { (satelliteId, mstDataList) ->
+                logger.info("🔍 [디버깅] 위성 $satelliteId: ${mstDataList.size}개 스케줄")
+                mstDataList.take(3).forEach { schedule ->
+                    val mstId = (schedule["MstId"] as? Number)?.toLong()
+                    val detailId = (schedule["DetailId"] as? Number)?.toInt()
+                    val dataType = schedule["DataType"] as? String
+                    val startTime = schedule["StartTime"] as? ZonedDateTime
+                    logger.info("🔍 [디버깅] 스케줄: MstId=$mstId, DetailId=$detailId, DataType=$dataType, StartTime=$startTime")
+                }
             }
-            if (currentPass != null) return currentPass
+            lastDebugLogTime = now
         }
+        
+        // ✅ 모든 스케줄을 수집한 후 DataType별로 필터링하여 중복 제거
+        val allSchedules = mutableListOf<Map<String, Any?>>()
+        selectedTrackMstStorage.values.forEach { mstDataList ->
+            allSchedules.addAll(mstDataList)
+        }
+        
+        if (shouldLog) {
+            logger.info("🔍 [디버깅] allSchedules 총 개수: ${allSchedules.size}")
+        }
+        
+        // ✅ final_transformed 또는 keyhole_final_transformed만 사용하여 중복 제거
+        val uniqueSchedules = allSchedules
+            .filter { schedule ->
+                val dataType = schedule["DataType"] as? String
+                dataType == "final_transformed" || dataType == "keyhole_final_transformed"
+            }
+            .distinctBy { schedule ->
+                // MstId와 DetailId 조합으로 고유성 보장
+                val mstId = (schedule["MstId"] as? Number)?.toLong()
+                val detailId = (schedule["DetailId"] as? Number)?.toInt()
+                Pair(mstId, detailId)
+            }
+        
+        // ✅ 디버깅: uniqueSchedules에 MstId 52가 있는지 확인
+        val mstId52Schedule = uniqueSchedules.find { 
+            (it["MstId"] as? Number)?.toLong() == 52L 
+        }
+        if (mstId52Schedule != null) {
+            val startTime52 = mstId52Schedule["StartTime"] as? ZonedDateTime
+            val endTime52 = mstId52Schedule["EndTime"] as? ZonedDateTime
+            logger.info("🔍 [디버깅] uniqueSchedules에 MstId 52 발견: startTime=$startTime52, endTime=$endTime52, targetTime=$targetTime")
+        } else {
+            logger.warn("⚠️ [디버깅] uniqueSchedules에 MstId 52가 없음. 전체 스케줄 수: ${uniqueSchedules.size}")
+            uniqueSchedules.forEach { schedule ->
+                val mstId = (schedule["MstId"] as? Number)?.toLong()
+                val detailId = (schedule["DetailId"] as? Number)?.toInt()
+                val dataType = schedule["DataType"] as? String
+                logger.info("🔍 [디버깅] uniqueSchedules 항목: MstId=$mstId, DetailId=$detailId, DataType=$dataType")
+            }
+        }
+        
+        // ✅ 현재 시간이 시작 시간과 종료 시간 사이에 있는 스케줄 찾기
+        val currentPass = uniqueSchedules.find { mstRecord ->
+            val startTime = mstRecord["StartTime"] as? ZonedDateTime
+            val endTime = mstRecord["EndTime"] as? ZonedDateTime
+            val mstId = (mstRecord["MstId"] as? Number)?.toLong()
+            val detailId = (mstRecord["DetailId"] as? Number)?.toInt()
+
+            if (startTime != null && endTime != null) {
+                val isAfterStart = !targetTime.isBefore(startTime)  // targetTime >= startTime
+                val isBeforeEnd = targetTime.isBefore(endTime)     // targetTime < endTime
+                val isInRange = isAfterStart && isBeforeEnd
+                
+                // ✅ 디버깅: 시간 비교 상세 로그 (MstId 52인 경우만)
+                if (mstId == 52L || mstId == 28L) {
+                    logger.info("🔍 [시간 비교] MstId=$mstId, DetailId=$detailId: targetTime=$targetTime, startTime=$startTime, endTime=$endTime")
+                    logger.info("🔍 [시간 비교] isAfterStart=$isAfterStart, isBeforeEnd=$isBeforeEnd, isInRange=$isInRange")
+                }
+                
+                isInRange
+            } else {
+                false
+            }
+        }
+        
+        if (currentPass != null) {
+            // ✅ 디버깅: 반환되는 데이터의 DetailId 확인
+            logger.info("🔍 [디버깅] getCurrentSelectedTrackingPassWithTime 반환 데이터 키: ${currentPass.keys}")
+            logger.info("🔍 [디버깅] getCurrentSelectedTrackingPassWithTime DetailId: ${currentPass["DetailId"]} (타입: ${currentPass["DetailId"]?.javaClass?.simpleName})")
+            logger.info("🔍 [디버깅] getCurrentSelectedTrackingPassWithTime MstId: ${currentPass["MstId"]} (타입: ${currentPass["MstId"]?.javaClass?.simpleName})")
+            return currentPass
+        }
+        
         return null
     }
 
     private fun getNextSelectedTrackingPassWithTime(targetTime: ZonedDateTime): Map<String, Any?>? {
-        return getSelectedTrackingSchedule().filter { mstRecord ->
+        // ✅ 현재 스케줄을 먼저 확인하여 제외
+        val currentSchedule = getCurrentSelectedTrackingPassWithTime(targetTime)
+        val currentMstId = (currentSchedule?.get("MstId") as? Number)?.toLong()
+        val currentDetailId = (currentSchedule?.get("DetailId") as? Number)?.toInt()
+        
+        val allSchedules = getSelectedTrackingSchedule()
+        
+        // ✅ 디버깅: 전체 스케줄 목록 확인
+        logger.info("🔍 [디버깅] getNextSelectedTrackingPassWithTime 전체 스케줄 수: ${allSchedules.size}")
+        logger.info("🔍 [디버깅] getNextSelectedTrackingPassWithTime 현재 시간: $targetTime")
+        logger.info("🔍 [디버깅] getNextSelectedTrackingPassWithTime 현재 스케줄: MstId=$currentMstId, DetailId=$currentDetailId")
+        
+        if (allSchedules.isNotEmpty()) {
+            allSchedules.take(3).forEachIndexed { index, schedule ->
+                val startTime = schedule["StartTime"] as? ZonedDateTime
+                val mstId = schedule["MstId"]
+                val detailId = schedule["DetailId"]
+                logger.info("🔍 [디버깅] 스케줄[$index]: MstId=$mstId, DetailId=$detailId, StartTime=$startTime, isAfter=${startTime?.isAfter(targetTime)}")
+            }
+        }
+        
+        // ✅ DataType별로 중복 제거: final_transformed 또는 keyhole_final_transformed만 사용
+        // 같은 MstId와 DetailId 조합에 대해 하나만 선택
+        val uniqueSchedules = allSchedules
+            .filter { schedule ->
+                val dataType = schedule["DataType"] as? String
+                dataType == "final_transformed" || dataType == "keyhole_final_transformed"
+            }
+            .distinctBy { schedule ->
+                // MstId와 DetailId 조합으로 고유성 보장
+                val mstId = (schedule["MstId"] as? Number)?.toLong()
+                val detailId = (schedule["DetailId"] as? Number)?.toInt()
+                Pair(mstId, detailId)
+            }
+        
+        // ✅ 다음 스케줄 필터링: 시작 시간이 현재 시간보다 나중이고, 현재 스케줄이 아닌 것만
+        val filteredSchedules = uniqueSchedules.filter { mstRecord ->
             val startTime = mstRecord["StartTime"] as? ZonedDateTime
-            startTime != null && startTime.isAfter(targetTime)
-        }.minByOrNull { mstRecord ->
+            val mstId = (mstRecord["MstId"] as? Number)?.toLong()
+            val detailId = (mstRecord["DetailId"] as? Number)?.toInt()
+            
+            // ✅ 시작 시간이 현재 시간보다 나중이고, 현재 스케줄이 아닌 것만
+            val isAfterCurrentTime = startTime != null && startTime.isAfter(targetTime)
+            val isNotCurrentSchedule = !(mstId == currentMstId && detailId == currentDetailId)
+            
+            isAfterCurrentTime && isNotCurrentSchedule
+        }
+        
+        logger.info("🔍 [디버깅] getNextSelectedTrackingPassWithTime 필터링 후 스케줄 수: ${filteredSchedules.size}")
+        
+        val nextSchedule = filteredSchedules.minByOrNull { mstRecord ->
             mstRecord["StartTime"] as ZonedDateTime
         }
+        
+        // ✅ 디버깅: 반환되는 데이터의 DetailId 확인
+        if (nextSchedule != null) {
+            logger.info("🔍 [디버깅] getNextSelectedTrackingPassWithTime 반환 데이터 키: ${nextSchedule.keys}")
+            logger.info("🔍 [디버깅] getNextSelectedTrackingPassWithTime DetailId: ${nextSchedule["DetailId"]} (타입: ${nextSchedule["DetailId"]?.javaClass?.simpleName})")
+            logger.info("🔍 [디버깅] getNextSelectedTrackingPassWithTime MstId: ${nextSchedule["MstId"]} (타입: ${nextSchedule["MstId"]?.javaClass?.simpleName})")
+        } else {
+            logger.info("🔍 [디버깅] getNextSelectedTrackingPassWithTime nextSchedule이 null입니다 (필터링된 스케줄이 없음)")
+        }
+        
+        return nextSchedule
     }
 
     fun getCurrentSelectedTrackingPass(): Map<String, Any?>? {
@@ -1384,9 +1674,15 @@ class PassScheduleService(
         )
     }
 
-    // ✅ 시간 표시 개선된 로그 메서드들
+    /**
+     * 현재 스케줄 정보를 출력하는 함수
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 "No" 필드 → "MstId" 필드로 변경.
+     * 타입도 UInt → Long으로 변경.
+     */
     private fun outputCurrentScheduleInfo(schedule: Map<String, Any?>, calTime: ZonedDateTime) {
-        val passId = schedule["No"] as? UInt
+        // ✅ "No" → "MstId" 변경, UInt → Long 변경
+        val passId = (schedule["MstId"] as? Number)?.toLong()
         val satelliteName = schedule["SatelliteName"] as? String ?: "Unknown"
         val startTime = schedule["StartTime"] as? ZonedDateTime
         val endTime = schedule["EndTime"] as? ZonedDateTime
@@ -1400,7 +1696,9 @@ class PassScheduleService(
         logger.info("   🕐 계산시간: $calTime")
 
         if (passId != null) {
+            // ✅ null 체크 후 Long 타입으로 사용
             val detailData = getSelectedTrackDtlByMstId(passId)
+            // ✅ Long 타입으로 캐시 확인 (null 체크 후)
             val cacheStatus = if (trackingDataCache.containsKey(passId)) "캐시됨" else "DB조회"
             logger.info("   📊 추적포인트: ${detailData.size}개 ($cacheStatus)")  // ✅ 캐시 상태 표시
         }
@@ -1485,16 +1783,41 @@ class PassScheduleService(
         }
 
         logger.info("전체 위성 패스 스케줄 추적 데이터 생성 시작 (비동기 병렬 처리) - 총 ${allTleIds.size}개 위성")
+        
+        // ✅ 전역 MstId 카운터 초기화 (전체 생성 시작 시)
+        mstIdCounter.set(0)
+        logger.info("🔄 전역 MstId 카운터 초기화 완료 (시작값: 0)")
 
         return Flux.fromIterable(allTleIds).flatMap { satelliteId ->
             val tleData = passScheduleTleCache[satelliteId]
             if (tleData != null) {
                 val (tleLine1, tleLine2, satelliteName) = tleData
 
-                generatePassScheduleTrackingDataAsync(
-                    satelliteId, tleLine1, tleLine2, satelliteName
-                ).map { trackingData ->
-                    satelliteId to trackingData
+                // ✅ 동시성 문제 해결: 패스 개수만 먼저 계산 (빠른 계산)
+                val today = ZonedDateTime.now().truncatedTo(ChronoUnit.DAYS)
+                val sourceMinEl = settingsService.sourceMinElevationAngle.toFloat()
+                val schedule = orekitCalculator.generateSatelliteTrackingSchedule(
+                    tleLine1 = tleLine1,
+                    tleLine2 = tleLine2,
+                    startDate = today.withZoneSameInstant(ZoneOffset.UTC),
+                    durationDays = 2,
+                    minElevation = sourceMinEl,
+                    latitude = locationData.latitude,
+                    longitude = locationData.longitude,
+                    altitude = locationData.altitude,
+                )
+                val passCount = schedule.trackingPasses.size
+                
+                // ✅ 원자적으로 범위 할당 (동시성 문제 해결)
+                val startMstId = mstIdCounter.getAndAdd(passCount.toLong()) + 1
+                logger.debug("📊 위성 $satelliteId($satelliteName) 할당된 MstId 범위: $startMstId ~ ${startMstId + passCount - 1} (${passCount}개 패스)")
+                
+                // ✅ 계산된 schedule을 재사용하여 실제 데이터 생성 (중복 계산 없음)
+                generatePassScheduleTrackingDataAsyncWithSchedule(
+                    satelliteId, tleLine1, tleLine2, satelliteName, startMstId, schedule
+                ).map { (mstData, dtlData) ->
+                    logger.debug("📊 위성 $satelliteId($satelliteName) 생성 완료: ${passCount}개 패스, MstId 범위: $startMstId ~ ${startMstId + passCount - 1}")
+                    satelliteId to (mstData to dtlData)
                 }.doOnSuccess {
                     logger.info("위성 $satelliteId($satelliteName) 추적 데이터 생성 완료")
                 }.onErrorResume { error ->
@@ -1506,7 +1829,8 @@ class PassScheduleService(
                 Mono.empty()
             }
         }.collectMap({ it.first }, { it.second }).doOnSuccess { results ->
-            logger.info("전체 위성 패스 스케줄 추적 데이터 생성 완료 (비동기) - ${results.size}개 위성 처리 완료")
+            val finalCounter = mstIdCounter.get()
+            logger.info("전체 위성 패스 스케줄 추적 데이터 생성 완료 (비동기) - ${results.size}개 위성 처리 완료, 최종 MstId 카운터: $finalCounter")
         }.doOnError { error ->
             logger.error("전체 위성 패스 스케줄 추적 데이터 생성 실패 (비동기): ${error.message}", error)
         }.timeout(Duration.ofMinutes(60)).onErrorMap { error ->
@@ -1518,38 +1842,41 @@ class PassScheduleService(
         }
     }
 
-    fun generatePassScheduleTrackingDataAsync(
-        satelliteId: String, tleLine1: String, tleLine2: String, satelliteName: String? = null
+    /**
+     * 개별 위성의 패스 스케줄 추적 데이터를 비동기로 생성하는 함수 (schedule 재사용 버전)
+     * 
+     * 동시성 문제 해결을 위해 미리 계산된 schedule을 재사용하여 중복 계산을 방지합니다.
+     * 
+     * @param satelliteId 위성 카탈로그 번호
+     * @param tleLine1 TLE 라인 1
+     * @param tleLine2 TLE 라인 2
+     * @param satelliteName 위성 이름 (선택)
+     * @param startMstId 전역 고유 MstId 시작값
+     * @param schedule 미리 계산된 위성 추적 스케줄 (중복 계산 방지)
+     * @return MST와 DTL 데이터 쌍
+     */
+    private fun generatePassScheduleTrackingDataAsyncWithSchedule(
+        satelliteId: String, 
+        tleLine1: String, 
+        tleLine2: String, 
+        satelliteName: String? = null,
+        startMstId: Long,
+        schedule: OrekitCalculator.SatelliteTrackingSchedule  // ✅ 미리 계산된 schedule
     ): Mono<Pair<List<Map<String, Any?>>, List<Map<String, Any?>>>> {
         return Mono.fromCallable {
             val actualSatelliteName = satelliteName ?: satelliteId
 
-            logger.info("$actualSatelliteName 위성의 패스 스케줄 추적 시작")
+            logger.info("$actualSatelliteName 위성의 패스 스케줄 추적 시작 (MstId: $startMstId ~ ${startMstId + schedule.trackingPasses.size - 1})")
 
-            val today = ZonedDateTime.now().truncatedTo(ChronoUnit.DAYS)
-
-            // ✅ 1. OrekitCalculator로 2축 데이터 생성 (유지)
-            // ✅ EphemerisService와 동일한 설정 사용 (sourceMinElevationAngle)
-            val sourceMinEl = settingsService.sourceMinElevationAngle.toFloat()
-            var schedule = orekitCalculator.generateSatelliteTrackingSchedule(
-                tleLine1 = tleLine1,
-                tleLine2 = tleLine2,
-                startDate = today.withZoneSameInstant(ZoneOffset.UTC),
-                durationDays = 2,
-                minElevation = sourceMinEl,
-                latitude = locationData.latitude,
-                longitude = locationData.longitude,
-                altitude = locationData.altitude,
-            )
-
-            logger.info("위성 $satelliteId 추적 스케줄 생성 완료: ${schedule.trackingPasses.size}개 패스")
+            // ✅ generateSatelliteTrackingSchedule 호출 제거 (이미 전달받은 schedule 사용)
 
             // ✅ 2. SatelliteTrackingProcessor로 모든 변환 수행
-            logger.info("🔄 SatelliteTrackingProcessor로 데이터 변환 시작...")
+            logger.info("🔄 SatelliteTrackingProcessor로 데이터 변환 시작... (시작 MstId: $startMstId)")
             val processedData = try {
                 satelliteTrackingProcessor.processFullTransformation(
-                    schedule,
-                    actualSatelliteName
+                    schedule,  // ✅ 전달받은 schedule 사용
+                    actualSatelliteName,
+                    startMstId  // ✅ 전역 시작 MstId 전달
                 )
             } catch (e: Exception) {
                 logger.error("❌ 위성 추적 데이터 처리 실패: ${e.message}", e)
@@ -1595,6 +1922,84 @@ class PassScheduleService(
         }
     }
 
+    /**
+     * 개별 위성의 패스 스케줄 추적 데이터를 비동기로 생성하는 함수 (하위 호환성 유지)
+     * 
+     * 내부적으로 schedule을 생성합니다. 동시성 문제 해결을 위해서는
+     * `generatePassScheduleTrackingDataAsyncWithSchedule`를 사용하세요.
+     * 
+     * @param satelliteId 위성 카탈로그 번호
+     * @param tleLine1 TLE 라인 1
+     * @param tleLine2 TLE 라인 2
+     * @param satelliteName 위성 이름 (선택)
+     * @param startMstId 전역 고유 MstId 시작값 (null이면 자동 할당, 0이면 자동 할당)
+     * @return MST와 DTL 데이터 쌍
+     */
+    fun generatePassScheduleTrackingDataAsync(
+        satelliteId: String, 
+        tleLine1: String, 
+        tleLine2: String, 
+        satelliteName: String? = null,
+        startMstId: Long? = null  // ✅ null이면 자동 할당, 0이면 자동 할당
+    ): Mono<Pair<List<Map<String, Any?>>, List<Map<String, Any?>>>> {
+        return Mono.fromCallable {
+            val actualSatelliteName = satelliteName ?: satelliteId
+
+            logger.info("$actualSatelliteName 위성의 패스 스케줄 추적 시작")
+
+            val today = ZonedDateTime.now().truncatedTo(ChronoUnit.DAYS)
+
+            // ✅ 1. OrekitCalculator로 2축 데이터 생성 (유지)
+            // ✅ EphemerisService와 동일한 설정 사용 (sourceMinElevationAngle)
+            val sourceMinEl = settingsService.sourceMinElevationAngle.toFloat()
+            val schedule = orekitCalculator.generateSatelliteTrackingSchedule(
+                tleLine1 = tleLine1,
+                tleLine2 = tleLine2,
+                startDate = today.withZoneSameInstant(ZoneOffset.UTC),
+                durationDays = 2,
+                minElevation = sourceMinEl,
+                latitude = locationData.latitude,
+                longitude = locationData.longitude,
+                altitude = locationData.altitude,
+            )
+
+            val passCount = schedule.trackingPasses.size
+            logger.info("위성 $satelliteId 추적 스케줄 생성 완료: ${passCount}개 패스")
+
+            // ✅ 2. startMstId가 null이거나 0이면 자동으로 전역 카운터에서 할당
+            val actualStartMstId = if (startMstId == null || startMstId == 0L) {
+                // ✅ 동시성 문제 해결: 원자적으로 범위 할당
+                val allocatedStartMstId = mstIdCounter.getAndAdd(passCount.toLong()) + 1
+                logger.debug("📊 위성 $satelliteId($actualSatelliteName) 자동 할당된 MstId 범위: $allocatedStartMstId ~ ${allocatedStartMstId + passCount - 1} (${passCount}개 패스)")
+                allocatedStartMstId
+            } else {
+                logger.debug("📊 위성 $satelliteId($actualSatelliteName) 지정된 MstId 범위: $startMstId ~ ${startMstId + passCount - 1} (${passCount}개 패스)")
+                startMstId
+            }
+
+            // ✅ schedule과 actualStartMstId를 Pair로 반환하여 flatMap에서 사용
+            Pair(schedule, actualStartMstId)
+        }.flatMap { (schedule, actualStartMstId) ->
+            // ✅ 3. 계산된 schedule을 재사용하여 실제 데이터 생성 (중복 계산 없음)
+            val actualSatelliteName = satelliteName ?: satelliteId
+            generatePassScheduleTrackingDataAsyncWithSchedule(
+                satelliteId, tleLine1, tleLine2, actualSatelliteName, actualStartMstId, schedule
+            )
+        }.subscribeOn(Schedulers.boundedElastic()).doOnSubscribe {
+            logger.info("위성 패스 스케줄 추적 데이터 생성 시작 (비동기): $satelliteId")
+        }.doOnSuccess {
+            logger.info("위성 패스 스케줄 추적 데이터 생성 완료 (비동기): $satelliteId")
+        }.doOnError { error ->
+            logger.error("위성 패스 스케줄 추적 데이터 생성 실패 (비동기): $satelliteId - ${error.message}", error)
+        }.timeout(Duration.ofMinutes(30)).onErrorMap { error ->
+            when (error) {
+                is IOException -> RuntimeException("네트워크 연결 오류: ${error.message}", error)
+                is TimeoutException -> RuntimeException("계산 시간 초과", error)
+                else -> RuntimeException("위성 패스 스케줄 추적 데이터 생성 실패: $satelliteId - ${error.message}", error)
+            }
+        }
+    }
+
     // ✅ 기존 조회 메서드들 - 변경 없음
     fun getPassScheduleTrackMstBySatelliteId(satelliteId: String): List<Map<String, Any?>>? {
         return passScheduleTrackMstStorage[satelliteId]
@@ -1604,9 +2009,20 @@ class PassScheduleService(
         return passScheduleTrackDtlStorage[satelliteId]
     }
 
-    fun getPassScheduleTrackDtlByMstId(satelliteId: String, mstId: UInt): List<Map<String, Any?>> {
+    /**
+     * 특정 위성의 특정 MstId에 대한 DTL 데이터를 조회하는 함수 (간단 버전)
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * MstId 비교 시 Long 타입으로 변환.
+     * 
+     * @param satelliteId 위성 카탈로그 번호
+     * @param mstId 전역 고유 MstId (Long 타입)
+     * @return 필터링된 DTL 데이터 리스트
+     */
+    fun getPassScheduleTrackDtlByMstId(satelliteId: String, mstId: Long): List<Map<String, Any?>> {  // ✅ UInt → Long 변경
         val dtlData = passScheduleTrackDtlStorage[satelliteId] ?: return emptyList()
-        return dtlData.filter { it["MstId"] == mstId }
+        // ✅ MstId 비교 시 Long 타입으로 변환
+        return dtlData.filter { (it["MstId"] as? Number)?.toLong() == mstId }
     }
 
     fun getAllPassScheduleTrackMst(): Map<String, List<Map<String, Any?>>> {
@@ -1651,10 +2067,12 @@ class PassScheduleService(
             
             // final_transformed MST 기준으로 병합
             val mergedData = finalMst.map { final ->
-                val mstId = final["No"] as UInt
-                val original = originalMst.find { it["No"] == mstId }
-                val keyholeAxis = keyholeAxisMst.find { it["No"] == mstId }
-                val keyhole = keyholeMst.find { it["No"] == mstId }
+                // ✅ "No" → "MstId" 변경, UInt → Long 변경
+                val mstId = (final["MstId"] as? Number)?.toLong()
+                    ?: throw IllegalStateException("MstId 필드가 없거나 유효하지 않습니다: $final")
+                val original = originalMst.find { (it["MstId"] as? Number)?.toLong() == mstId }
+                val keyholeAxis = keyholeAxisMst.find { (it["MstId"] as? Number)?.toLong() == mstId }
+                val keyhole = keyholeMst.find { (it["MstId"] as? Number)?.toLong() == mstId }
                 
                 // Keyhole 판단: final_transformed (Train=0) 기준으로 판단
                 val train0MaxAzRate = final["MaxAzRate"] as? Double ?: 0.0
@@ -1663,6 +2081,10 @@ class PassScheduleService(
                 
                 // 병합된 데이터 생성 (EphemerisService와 동일한 구조)
                 final.toMutableMap().apply {
+                    // ✅ MstId와 DetailId 명시적으로 보존 (중요!)
+                    put("MstId", mstId)  // ✅ 명시적으로 MstId 설정
+                    put("DetailId", final["DetailId"] ?: 0)  // ✅ DetailId도 명시적으로 설정
+                    
                     // Original (2축) 메타데이터 추가
                     put("OriginalMaxElevation", original?.get("MaxElevation"))
                     put("OriginalMaxAzRate", original?.get("MaxAzRate"))
@@ -1764,14 +2186,20 @@ class PassScheduleService(
         logger.info("위성 $satelliteId 의 패스 스케줄 추적 데이터가 삭제되었습니다.")
     }
 
+    /**
+     * 모든 패스 스케줄 추적 데이터를 삭제하는 함수
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 globalMstId → mstIdCounter로 변경.
+     */
     fun clearAllPassScheduleTrackingData() {
         val mstSize = passScheduleTrackMstStorage.size
         val dtlSize = passScheduleTrackDtlStorage.values.sumOf { it.size }
-        globalMstId = 0
+        // ✅ globalMstId → mstIdCounter로 변경
+        mstIdCounter.set(0)
         passScheduleTrackMstStorage.clear()
         passScheduleTrackDtlStorage.clear()
 
-        logger.info("모든 패스 스케줄 추적 데이터가 삭제되었습니다. (마스터: ${mstSize}개, 세부: ${dtlSize}개)")
+        logger.info("모든 패스 스케줄 추적 데이터가 삭제되었습니다. (마스터: ${mstSize}개, 세부: ${dtlSize}개, MstId 카운터 초기화)")
     }    // ✅ 기존 추적 대상 관리 메서드들 - 변경 없음
 
     fun setTrackingTargetList(targets: List<TrackingTarget>) {
@@ -1793,21 +2221,46 @@ class PassScheduleService(
     
     /**
      * ✅ 추적 대상 설정 후 mstId 업데이트
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 "No" 필드 → "MstId" 필드로 변경.
+     * 타입도 UInt → Long으로 변경.
      */
     private fun updateTrackingMstIdsAfterTargetSet() {
         val calTime = GlobalData.Time.calUtcTimeOffsetTime
         val currentSchedule = getCurrentSelectedTrackingPassWithTime(calTime)
         val nextSchedule = getNextSelectedTrackingPassWithTime(calTime)
         
-        // 현재 추적 중인 mstId 설정
-        val currentMstId = currentSchedule?.get("No") as? UInt
-        dataStoreService.setCurrentTrackingMstId(currentMstId)
+        // ✅ 디버깅: nextSchedule의 DetailId 확인
+        if (nextSchedule != null) {
+            logger.info("🔍 [디버깅] updateTrackingMstIdsAfterTargetSet nextSchedule 키: ${nextSchedule.keys}")
+            logger.info("🔍 [디버깅] updateTrackingMstIdsAfterTargetSet nextSchedule DetailId: ${nextSchedule["DetailId"]} (타입: ${nextSchedule["DetailId"]?.javaClass?.simpleName})")
+            logger.info("🔍 [디버깅] updateTrackingMstIdsAfterTargetSet nextSchedule MstId: ${nextSchedule["MstId"]} (타입: ${nextSchedule["MstId"]?.javaClass?.simpleName})")
+        } else {
+            logger.info("🔍 [디버깅] updateTrackingMstIdsAfterTargetSet nextSchedule이 null입니다")
+        }
         
-        // 다음 추적 예정 mstId 설정
-        val nextMstId = nextSchedule?.get("No") as? UInt
-        dataStoreService.setNextTrackingMstId(nextMstId)
+        // 현재 추적 중인 mstId와 detailId 설정
+        // ✅ "No" → "MstId" 변경, UInt → Long 변경
+        val currentMstId = (currentSchedule?.get("MstId") as? Number)?.toLong()
+        val currentDetailId = (currentSchedule?.get("DetailId") as? Number)?.toInt()
+        dataStoreService.setCurrentTrackingMstId(currentMstId, currentDetailId)
         
-        logger.info("🎯 추적 대상 설정 후 mstId 업데이트: 현재={}, 다음={}", currentMstId, nextMstId)
+        // 다음 추적 예정 mstId와 detailId 설정
+        // ✅ "No" → "MstId" 변경, UInt → Long 변경
+        val nextMstId = (nextSchedule?.get("MstId") as? Number)?.toLong()
+        val nextDetailId = (nextSchedule?.get("DetailId") as? Number)?.toInt()
+        
+        // ✅ 디버깅: 추출된 값 확인
+        logger.info("🔍 [디버깅] updateTrackingMstIdsAfterTargetSet 추출된 nextDetailId: $nextDetailId")
+        logger.info("🔍 [디버깅] updateTrackingMstIdsAfterTargetSet 추출된 nextMstId: $nextMstId")
+        
+        dataStoreService.setNextTrackingMstId(nextMstId, nextDetailId)
+        
+        // ✅ 디버깅: DataStoreService에 저장된 값 확인
+        logger.info("🔍 [디버깅] DataStoreService 저장 후 nextDetailId: ${dataStoreService.getNextTrackingDetailId()}")
+        logger.info("🔍 [디버깅] DataStoreService 저장 후 nextMstId: ${dataStoreService.getNextTrackingMstId()}")
+        
+        logger.info("🎯 추적 대상 설정 후 mstId/detailId 업데이트: 현재={}/{}, 다음={}/{}", currentMstId, currentDetailId, nextMstId, nextDetailId)
     }
 
     fun getTrackingTargetList(): List<TrackingTarget> {
@@ -1822,7 +2275,15 @@ class PassScheduleService(
         }
     }
 
-    fun getTrackingTargetByMstId(mstId: UInt): TrackingTarget? {
+    /**
+     * MstId로 추적 대상을 조회하는 함수
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * 
+     * @param mstId 전역 고유 MstId (Long 타입)
+     * @return 추적 대상, 없으면 null
+     */
+    fun getTrackingTargetByMstId(mstId: Long): TrackingTarget? {
         return synchronized(trackingTargetList) {
             trackingTargetList.find { it.mstId == mstId }
         }
@@ -1876,7 +2337,8 @@ class PassScheduleService(
                 // 각 DataType별로 필터링
                 dataTypes.forEach { dataType ->
                     val filteredByDataType = allMstData.filter { mstRecord ->
-                        val mstId = mstRecord["No"] as? UInt
+                        // ✅ "No" → "MstId" 변경, UInt → Long 변경
+                        val mstId = (mstRecord["MstId"] as? Number)?.toLong()
                         val recordDataType = mstRecord["DataType"] as? String
                         mstId != null && targetMstIds.contains(mstId) && recordDataType == dataType
                     }
@@ -1918,14 +2380,25 @@ class PassScheduleService(
      * @note final_transformed MST에 IsKeyhole 정보가 저장되어 있어야 함
      * @note keyhole_final_transformed 데이터가 없으면 final_transformed로 폴백
      */
+    /**
+     * Keyhole 여부를 확인하고 적절한 DataType을 반환하는 함수
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * "No" 필드 → "MstId" 필드로 변경.
+     * 
+     * @param passId 전역 고유 패스 ID (Long 타입)
+     * @param storage 조회할 저장소
+     * @return Keyhole 여부에 따라 선택된 DataType, 없으면 null
+     */
     private fun determineKeyholeDataType(
-        passId: UInt,
+        passId: Long,  // ✅ UInt → Long 변경
         storage: Map<String, List<Map<String, Any?>>>
     ): String? {
         // final_transformed MST에서 IsKeyhole 확인
         val allMstData = storage.values.flatten()
+        // ✅ "No" → "MstId" 변경, UInt → Long 변경
         val finalMst = allMstData.find {
-            it["No"] == passId && it["DataType"] == "final_transformed"
+            (it["MstId"] as? Number)?.toLong() == passId && it["DataType"] == "final_transformed"
         } ?: return null
         
         val isKeyhole = finalMst["IsKeyhole"] as? Boolean ?: false
@@ -1933,7 +2406,7 @@ class PassScheduleService(
         return if (isKeyhole) {
             // Keyhole 발생 시 keyhole_final_transformed 데이터 존재 여부 확인
             val keyholeDataExists = allMstData.any {
-                it["No"] == passId && it["DataType"] == "keyhole_final_transformed"
+                (it["MstId"] as? Number)?.toLong() == passId && it["DataType"] == "keyhole_final_transformed"
             }
             
             if (!keyholeDataExists) {
@@ -1971,13 +2444,23 @@ class PassScheduleService(
      * @note selectedTrackMstStorage를 사용하는 함수들과 달리, 전체 저장소에서 조회합니다.
      * @note DataType은 정해져 있지 않고, Keyhole 여부에 따라 동적으로 선택됩니다.
      */
-    private fun getTrackingPassMst(passId: UInt): Map<String, Any?>? {
+    /**
+     * Keyhole 여부에 따라 적절한 MST 데이터를 반환하는 함수
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * "No" 필드 → "MstId" 필드로 변경.
+     * 
+     * @param passId 전역 고유 패스 ID (Long 타입)
+     * @return Keyhole 여부에 따라 선택된 MST 데이터, 없으면 null
+     */
+    private fun getTrackingPassMst(passId: Long): Map<String, Any?>? {  // ✅ UInt → Long 변경
         // determineKeyholeDataType()을 사용하여 적절한 DataType 결정
         val dataType = determineKeyholeDataType(passId, passScheduleTrackMstStorage) ?: return null
         
         // 선택된 DataType의 MST 반환
+        // ✅ "No" → "MstId" 변경, UInt → Long 변경
         val selectedMst = passScheduleTrackMstStorage.values.flatten().find {
-            it["No"] == passId && it["DataType"] == dataType
+            (it["MstId"] as? Number)?.toLong() == passId && it["DataType"] == dataType
         }
         
         if (selectedMst == null) {
@@ -1991,9 +2474,19 @@ class PassScheduleService(
         return selectedMst
     }
 
-    fun getSelectedTrackMstByMstId(mstId: UInt): Map<String, Any?>? {
+    /**
+     * MstId로 선택된 MST 데이터를 조회하는 함수
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * "No" 필드 → "MstId" 필드로 변경.
+     * 
+     * @param mstId 전역 고유 MstId (Long 타입)
+     * @return 선택된 MST 데이터, 없으면 null
+     */
+    fun getSelectedTrackMstByMstId(mstId: Long): Map<String, Any?>? {  // ✅ UInt → Long 변경
         selectedTrackMstStorage.values.forEach { mstDataList ->
-            val found = mstDataList.find { it["No"] == mstId }
+            // ✅ "No" → "MstId" 변경, UInt → Long 변경
+            val found = mstDataList.find { (it["MstId"] as? Number)?.toLong() == mstId }
             if (found != null) return found
         }
         return null
@@ -2011,7 +2504,16 @@ class PassScheduleService(
      * @see getTrackingPassMst 동일한 Keyhole 판단 로직 사용 (MST 데이터 반환)
      * @see getEphemerisTrackDtlByMstId EphemerisService의 동일한 로직 참고
      */
-    fun getSelectedTrackDtlByMstId(mstId: UInt): List<Map<String, Any?>> {
+    /**
+     * 선택된 패스의 DTL 데이터를 조회하는 함수
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * "No" 필드 → "MstId" 필드로 변경.
+     * 
+     * @param mstId 전역 고유 MstId (Long 타입)
+     * @return Keyhole 여부에 따라 선택된 DataType의 DTL 데이터 리스트
+     */
+    fun getSelectedTrackDtlByMstId(mstId: Long): List<Map<String, Any?>> {  // ✅ UInt → Long 변경
         // 1. selectedTrackMstStorage에서 MST 조회
         val selectedMst = getSelectedTrackMstByMstId(mstId) ?: return emptyList()
         val satelliteId = selectedMst["SatelliteID"] as? String ?: return emptyList()
@@ -2022,12 +2524,14 @@ class PassScheduleService(
         // 3. 선택된 DataType의 DTL 데이터 조회
         val allDtlData = passScheduleTrackDtlStorage[satelliteId] ?: return emptyList()
         
+        // ✅ MstId 비교 시 Long 타입으로 변환
         val filteredDtl = allDtlData.filter {
-            it["MstId"] == mstId && it["DataType"] == dataType
+            (it["MstId"] as? Number)?.toLong() == mstId && it["DataType"] == dataType
         }
         
+        // ✅ "No" → "MstId" 변경, UInt → Long 변경
         val isKeyhole = selectedTrackMstStorage.values.flatten().find {
-            it["No"] == mstId && it["DataType"] == "final_transformed"
+            (it["MstId"] as? Number)?.toLong() == mstId && it["DataType"] == "final_transformed"
         }?.get("IsKeyhole") as? Boolean ?: false
         
         logger.info("📊 MST ID ${mstId} DTL 조회: Keyhole=${if (isKeyhole) "YES" else "NO"}, DataType=${dataType}, ${filteredDtl.size}개 포인트")
@@ -2044,39 +2548,176 @@ class PassScheduleService(
      * @param dataType DataType (optional) - null이면 기존 로직 사용 (하위 호환성)
      * @return 필터링된 DTL 데이터 리스트
      */
-    fun getPassScheduleTrackDtlByMstId(
-        satelliteId: String,
-        passId: UInt,
-        dataType: String? = null  // ✅ DataType 파라미터 추가
+    /**
+     * 특정 위성의 특정 패스에 대한 DTL 데이터를 조회하는 함수
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * "No" 필드 → "MstId" 필드로 변경.
+     * 
+     * @param satelliteId 위성 카탈로그 번호
+     * @param passId 전역 고유 패스 ID (Long 타입)
+     * @param dataType DataType (optional) - null이면 기존 로직 사용
+     * @return 필터링된 DTL 데이터 리스트
+     */
+    /**
+     * MstId와 DetailId로 DTL 데이터를 조회하는 함수 (satelliteId 불필요)
+     * 
+     * 모든 위성의 DTL 데이터를 순회하여 mstId와 detailId로 필터링합니다.
+     * 
+     * @param mstId 전역 고유 패스 ID (Long 타입)
+     * @param detailId 패스 인덱스 (Int 타입)
+     * @param dataType DataType (optional)
+     * @return 세부 데이터 리스트
+     */
+    fun getPassScheduleTrackDtlByMstIdAndDetailId(
+        mstId: Long,
+        detailId: Int,
+        dataType: String? = null
     ): List<Map<String, Any?>> {
-        // 1. DTL 데이터 조회
-        val allDtlData = passScheduleTrackDtlStorage[satelliteId] ?: return emptyList()
+        // ✅ 디버깅: 조회 파라미터 확인
+        logger.info("🔍 DTL 조회 시작: mstId=$mstId, detailId=$detailId, dataType=$dataType")
+        
+        // ✅ 디버깅: 저장소 상태 확인
+        val storageSize = passScheduleTrackDtlStorage.size
+        val storageKeys = passScheduleTrackDtlStorage.keys.toList()
+        logger.info("🔍 DTL 저장소 상태: 위성 개수=$storageSize, 위성 ID 목록=$storageKeys")
+        
+        // 1. ✅ 모든 위성의 DTL 데이터를 순회하여 mstId와 detailId로 필터링
+        val allDtlData = passScheduleTrackDtlStorage.values.flatten()
+        
+        // ✅ 디버깅: 사용 가능한 MstId 목록 확인
+        val uniqueMstIds = allDtlData.mapNotNull { (it["MstId"] as? Number)?.toLong() }.distinct().sorted()
+        logger.info("🔍 사용 가능한 전체 MstId 목록: $uniqueMstIds (전체 DTL 데이터 개수: ${allDtlData.size})")
         
         // 2. DataType 결정
         val targetDataType = if (dataType != null) {
             // ✅ 프론트엔드에서 명시적으로 DataType을 전달한 경우
             dataType
         } else {
-            // ✅ 기존 로직: determineKeyholeDataType() 사용 (하위 호환성)
-            // selectedTrackMstStorage에서 먼저 확인
+            // ✅ Keyhole 판단을 위해 MST 데이터에서 확인
+            val allMstData = passScheduleTrackMstStorage.values.flatten()
+            val mstData = allMstData.find { (it["MstId"] as? Number)?.toLong() == mstId }
+            
+            if (mstData != null) {
+                // ✅ selectedTrackMstStorage에서 먼저 확인
             val selectedMst = selectedTrackMstStorage.values.flatten().find {
-                it["No"] == passId
+                    (it["MstId"] as? Number)?.toLong() == mstId
             }
             
             if (selectedMst != null) {
-                determineKeyholeDataType(passId, selectedTrackMstStorage) ?: return emptyList()
+                    determineKeyholeDataType(mstId, selectedTrackMstStorage) ?: "final_transformed"
             } else {
                 // selectedTrackMstStorage에 없으면 전체 저장소에서 확인
-                determineKeyholeDataType(passId, passScheduleTrackMstStorage) ?: return emptyList()
+                    determineKeyholeDataType(mstId, passScheduleTrackMstStorage) ?: "final_transformed"
+                }
+            } else {
+                "final_transformed" // 기본값
             }
         }
         
-        // 3. 선택된 DataType의 DTL 데이터 필터링
-        val filteredDtl = allDtlData.filter {
-            it["MstId"] == passId && it["DataType"] == targetDataType
+        // 3. MstId, DetailId, DataType으로 필터링
+        // ✅ 디버깅: 필터링 전 DTL 데이터 샘플 확인
+        if (allDtlData.isNotEmpty()) {
+            val sampleDtl = allDtlData.first()
+            logger.info("🔍 DTL 데이터 샘플 (첫 번째 항목): MstId=${sampleDtl["MstId"]}, DetailId=${sampleDtl["DetailId"]}, Index=${sampleDtl["Index"]}, DataType=${sampleDtl["DataType"]}, 모든 키=${sampleDtl.keys}")
         }
         
-        logger.info("📊 위성 $satelliteId 패스 $passId DTL 조회: DataType=${targetDataType}, ${filteredDtl.size}개 포인트")
+        // ✅ mstId에 해당하는 모든 데이터 샘플 확인 (처음 5개)
+        val mstIdSamples = allDtlData.filter { (it["MstId"] as? Number)?.toLong() == mstId }.take(5)
+        if (mstIdSamples.isNotEmpty()) {
+            logger.info("🔍 mstId=${mstId}에 해당하는 DTL 데이터 샘플 (처음 5개):")
+            mstIdSamples.forEachIndexed { index, dtl ->
+                logger.info("   [$index] MstId=${dtl["MstId"]}, DetailId=${dtl["DetailId"]}, DataType=${dtl["DataType"]}")
+            }
+        }
+        
+        // ✅ mstId와 detailId에 해당하는 모든 DataType 확인
+        val mstIdAndDetailIdSamples = allDtlData.filter { 
+            (it["MstId"] as? Number)?.toLong() == mstId && 
+            (it["DetailId"] as? Number)?.toInt() == detailId 
+        }
+        val dataTypesForMstIdAndDetailId = mstIdAndDetailIdSamples.mapNotNull { it["DataType"] as? String }.distinct().sorted()
+        logger.info("🔍 mstId=${mstId}, detailId=${detailId}에 해당하는 모든 DataType: $dataTypesForMstIdAndDetailId")
+        logger.info("🔍 mstId=${mstId}, detailId=${detailId}의 총 DTL 개수: ${mstIdAndDetailIdSamples.size}")
+        
+        // ✅ 필터링 전에 mstId, detailId, targetDataType에 해당하는 데이터 개수 확인
+        val preFilteredCount = allDtlData.count {
+            val dtlMstId = (it["MstId"] as? Number)?.toLong()
+            val dtlDetailId = (it["DetailId"] as? Number)?.toInt()
+            val dtlDataType = it["DataType"] as? String
+            dtlMstId == mstId && dtlDetailId == detailId && dtlDataType == targetDataType
+        }
+        logger.info("🔍 필터링 전 예상 개수: mstId=$mstId, detailId=$detailId, DataType=$targetDataType → ${preFilteredCount}개")
+        
+        // ✅ 성능 최적화: indexOf 대신 forEachIndexed 사용
+        val filteredDtl = mutableListOf<Map<String, Any?>>()
+        var checkCount = 0
+        val startTime = System.currentTimeMillis()
+        
+        allDtlData.forEachIndexed { index, it ->
+            val dtlMstId = (it["MstId"] as? Number)?.toLong()
+            val dtlDetailId = (it["DetailId"] as? Number)?.toInt()
+            val dtlDataType = it["DataType"] as? String
+            
+            val matches = dtlMstId == mstId && 
+                         dtlDetailId == detailId && 
+                         dtlDataType == targetDataType
+            
+            // ✅ 디버깅: 필터링 과정 로그 (처음 3개만)
+            if (index < 3) {
+                logger.info("🔍 필터링 체크 [$index]: dtlMstId=$dtlMstId, mstId=$mstId, dtlDetailId=$dtlDetailId, detailId=$detailId, dtlDataType=$dtlDataType, targetDataType=$targetDataType, matches=$matches")
+            }
+            
+            if (matches) {
+                filteredDtl.add(it)
+                checkCount++
+                
+                // ✅ 디버깅: 매칭된 데이터 샘플 (처음 3개만)
+                if (filteredDtl.size <= 3) {
+                    logger.info("✅ 매칭 발견 [${filteredDtl.size}]: MstId=$dtlMstId, DetailId=$dtlDetailId, DataType=$dtlDataType, Index=${it["Index"]}")
+                }
+            }
+        }
+        
+        val endTime = System.currentTimeMillis()
+        val processingTime = endTime - startTime
+        
+        logger.info("📊 mstId=$mstId, detailId=$detailId DTL 조회: DataType=${targetDataType}, ${filteredDtl.size}개 포인트 (처리 시간: ${processingTime}ms, 전체 데이터: ${allDtlData.size}개)")
+        
+        // ✅ 필터링 결과 샘플 확인 (처음 3개)
+        if (filteredDtl.isNotEmpty()) {
+            logger.info("✅ 필터링 성공 - 결과 샘플 (처음 3개):")
+            filteredDtl.take(3).forEachIndexed { index, dtl ->
+                logger.info("   [$index] MstId=${dtl["MstId"]}, DetailId=${dtl["DetailId"]}, DataType=${dtl["DataType"]}, Index=${dtl["Index"]}")
+            }
+        }
+        
+        // ✅ 디버깅: 조회 결과가 없을 때 상세 정보 출력
+        if (filteredDtl.isEmpty()) {
+            // ✅ 해당 DataType의 모든 DTL 데이터의 MstId 확인
+            val dtlByDataType = allDtlData.filter { it["DataType"] == targetDataType }
+            val mstIdsInDtl = dtlByDataType.mapNotNull { (it["MstId"] as? Number)?.toLong() }.distinct().sorted()
+            
+            // ✅ 해당 mstId의 모든 detailId 확인
+            val dtlByMstId = allDtlData.filter { (it["MstId"] as? Number)?.toLong() == mstId }
+            val detailIdsForMstId = dtlByMstId.mapNotNull { (it["DetailId"] as? Number)?.toInt() }.distinct().sorted()
+            
+            // ✅ 해당 mstId와 dataType의 모든 detailId 확인
+            val dtlByMstIdAndDataType = allDtlData.filter { 
+                (it["MstId"] as? Number)?.toLong() == mstId && 
+                it["DataType"] == targetDataType 
+            }
+            val detailIdsForMstIdAndDataType = dtlByMstIdAndDataType.mapNotNull { (it["DetailId"] as? Number)?.toInt() }.distinct().sorted()
+            
+            logger.warn("⚠️ mstId=$mstId, detailId=$detailId DTL 조회 실패:")
+            logger.warn("   요청한 mstId=$mstId, detailId=$detailId, DataType=$targetDataType")
+            logger.warn("   사용 가능한 전체 MstId=$uniqueMstIds")
+            logger.warn("   해당 DataType의 DTL에 있는 MstId=$mstIdsInDtl")
+            logger.warn("   해당 DataType의 DTL 총 개수=${dtlByDataType.size}")
+            logger.warn("   mstId=${mstId}의 모든 DetailId=$detailIdsForMstId")
+            logger.warn("   mstId=${mstId}, DataType=${targetDataType}의 DetailId=$detailIdsForMstIdAndDataType")
+            logger.warn("   mstId=${mstId}, DataType=${targetDataType}의 DTL 총 개수=${dtlByMstIdAndDataType.size}")
+        }
         
         return filteredDtl
     }
@@ -2086,6 +2727,20 @@ class PassScheduleService(
 
         selectedTrackMstStorage.values.forEach { mstDataList ->
             allSelectedPasses.addAll(mstDataList)
+        }
+        
+        // ✅ 디버깅: 선택된 스케줄 정보 확인
+        logger.info("🔍 [디버깅] getSelectedTrackingSchedule 전체 스케줄 수: ${allSelectedPasses.size}")
+        logger.info("🔍 [디버깅] getSelectedTrackingSchedule 위성 수: ${selectedTrackMstStorage.size}")
+        
+        if (allSelectedPasses.isNotEmpty()) {
+            allSelectedPasses.take(3).forEachIndexed { index, schedule ->
+                val mstId = schedule["MstId"]
+                val detailId = schedule["DetailId"]
+                val startTime = schedule["StartTime"] as? ZonedDateTime
+                val dataType = schedule["DataType"]
+                logger.info("🔍 [디버깅] getSelectedTrackingSchedule[$index]: MstId=$mstId, DetailId=$detailId, StartTime=$startTime, DataType=$dataType")
+            }
         }
 
         return allSelectedPasses.sortedBy { mstRecord ->
@@ -2183,8 +2838,15 @@ class PassScheduleService(
         )
     }
 
-    // ✅ 헬퍼 메서드들 (기존 로직 유지)
-    private fun calculateDataLength(passId: UInt): Int {
+    /**
+     * 데이터 길이를 계산하는 헬퍼 함수
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * 
+     * @param passId 전역 고유 패스 ID (Long 타입)
+     * @return 데이터 길이
+     */
+    private fun calculateDataLength(passId: Long): Int {  // ✅ UInt → Long 변경
         val passDetails = getSelectedTrackDtlByMstId(passId)
         logger.debug("전체 데이터 길이 계산: 패스 ID = $passId, 사이즈: ${passDetails.size}")
         return passDetails.size
@@ -2211,8 +2873,16 @@ class PassScheduleService(
         )
     }
 
-    // ✅ 성능 테스트 메서드 (개발/테스트용)
-    fun performanceTest(passId: UInt, iterations: Int = 100): Map<String, Any> {
+    /**
+     * 성능 테스트 메서드 (개발/테스트용)
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * 
+     * @param passId 전역 고유 패스 ID (Long 타입)
+     * @param iterations 반복 횟수
+     * @return 성능 테스트 결과
+     */
+    fun performanceTest(passId: Long, iterations: Int = 100): Map<String, Any> {  // ✅ UInt → Long 변경
         logger.info("성능 테스트 시작: passId=$passId, iterations=$iterations")
 
         val results = mutableMapOf<String, Any>()
@@ -2263,8 +2933,14 @@ class PassScheduleService(
         return results
     }
 
-    // ✅ 새로 추가: 비동기 캐시 로딩 (기존 동작에 영향 없음)
-    private fun preloadTrackingDataCache(passId: UInt) {
+    /**
+     * 추적 데이터 캐시를 비동기로 미리 로딩하는 함수
+     * 
+     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
+     * 
+     * @param passId 전역 고유 패스 ID (Long 타입)
+     */
+    private fun preloadTrackingDataCache(passId: Long) {  // ✅ UInt → Long 변경
         CompletableFuture.runAsync({
             try {
                 val startTime = System.nanoTime()

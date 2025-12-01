@@ -56,6 +56,8 @@ class LimitAngleCalculator {
 
     /**
      * 세부 추적 데이터의 방위각을 ±270도 범위로 변환
+     * 
+     * ✅ PassSchedule 데이터 구조 리팩토링: "No" → "Index", UInt → Long
      */
     private fun convertDetailData(ephemerisTrackDtl: List<Map<String, Any?>>): List<Map<String, Any?>> {
         if (ephemerisTrackDtl.isEmpty()) return ephemerisTrackDtl
@@ -63,7 +65,8 @@ class LimitAngleCalculator {
         val convertedData = mutableListOf<Map<String, Any?>>()
 
         // MstId별로 그룹화하여 처리
-        val groupedByMstId = ephemerisTrackDtl.groupBy { it["MstId"] as UInt }
+        // ✅ PassSchedule 데이터 구조 리팩토링: UInt → Long
+        val groupedByMstId = ephemerisTrackDtl.groupBy { (it["MstId"] as? Number)?.toLong() ?: 0L }
 
         groupedByMstId.forEach { (mstId, dtlList) ->
             logger.debug("MstId $mstId 처리 중 - ${dtlList.size}개 데이터 포인트")
@@ -77,14 +80,17 @@ class LimitAngleCalculator {
 
     /**
      * ✅ 회전 방향성을 보장하는 방위각 경로 변환
+     * 
+     * ✅ PassSchedule 데이터 구조 리팩토링: "No" → "Index", UInt → Long
      */
     private fun convertAzimuthPath(dtlList: List<Map<String, Any?>>): List<Map<String, Any?>> {
         if (dtlList.isEmpty()) return dtlList
 
         val convertedList = mutableListOf<Map<String, Any?>>()
 
-        // No 순서로 정렬 (시간 순서 보장)
-        val sortedList = dtlList.sortedBy { it["No"] as UInt }
+        // Index 순서로 정렬 (시간 순서 보장)
+        // ✅ PassSchedule 데이터 구조 리팩토링: "No" → "Index", UInt → Int
+        val sortedList = dtlList.sortedBy { (it["Index"] as? Number)?.toInt() ?: 0 }
         val originalAzimuths = sortedList.map { it["Azimuth"] as Double }
 
         // ✅ 회전 방향성을 보장하는 변환
@@ -103,7 +109,8 @@ class LimitAngleCalculator {
         }
 
         // 변환 결과 로깅
-        val mstId = dtlList.firstOrNull()?.get("MstId") as? UInt ?: 0u
+        // ✅ PassSchedule 데이터 구조 리팩토링: UInt → Long
+        val mstId = (dtlList.firstOrNull()?.get("MstId") as? Number)?.toLong() ?: 0L
         logger.info("MstId $mstId 변환 완료: ${originalAzimuths.size}개 포인트")
         logger.info("  원본 범위: ${String.format("%.2f", originalAzimuths.minOrNull() ?: 0.0)}° ~ ${String.format("%.2f", originalAzimuths.maxOrNull() ?: 0.0)}°")
         logger.info("  변환 범위: ${String.format("%.2f", convertedAzimuths.minOrNull() ?: 0.0)}° ~ ${String.format("%.2f", convertedAzimuths.maxOrNull() ?: 0.0)}°")
