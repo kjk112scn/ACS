@@ -278,7 +278,9 @@ export const useICDStore = defineStore('icd', () => {
   const sunTrackTrackingState = ref<string | null>(null) // ✅ 추가
   const communicationStatus = ref('')
   const currentTrackingMstId = ref<number | null>(null)
+  const currentTrackingDetailId = ref<number | null>(null) // ✅ detailId 추가
   const nextTrackingMstId = ref<number | null>(null)
+  const nextTrackingDetailId = ref<number | null>(null) // ✅ detailId 추가
   const udpConnected = ref<boolean>(false)
   const lastUdpUpdateTime = ref<string>('')
 
@@ -1194,17 +1196,48 @@ export const useICDStore = defineStore('icd', () => {
     resetUpdateIntervalStats() // 업데이트 간격 통계도 함께 초기화
     console.log('📊 메시지 지연 통계 및 업데이트 카운트 초기화됨')
   }
+  // ✅ 디버깅: WebSocket 메시지 수신 카운터
+  const wsMessageCount = ref(0)
+
   // WebSocket 메시지 핸들러 - 데이터를 버퍼에만 저장
   const handleWebSocketMessage = async (message: MessageData) => {
     try {
-      // console.log('🔍 [Frontend] WebSocket 메시지 수신:', message)
-      // console.log('🔍 [Frontend] 메시지 구조 분석:', {
-      //   hasServerTime: 'serverTime' in message,
-      //   serverTimeValue: message.serverTime,
-      //   serverTimeType: typeof message.serverTime,
-      //   messageType: typeof message,
-      //   messageKeys: Object.keys(message),
-      // })
+      // ✅ 디버깅: WebSocket 메시지 수신 확인 (100번마다)
+      wsMessageCount.value++
+
+      if (wsMessageCount.value % 100 === 0) {
+        console.log('🔍 [디버깅] WebSocket 메시지 수신 (handleWebSocketMessage):', {
+          messageCount: wsMessageCount.value,
+          hasData: !!message.data,
+          dataType: typeof message.data,
+          dataKeys:
+            message.data && typeof message.data === 'object'
+              ? Object.keys(message.data)
+              : 'no data',
+          hasCurrentTrackingMstId:
+            message.data &&
+            typeof message.data === 'object' &&
+            'currentTrackingMstId' in message.data,
+          hasNextTrackingMstId:
+            message.data && typeof message.data === 'object' && 'nextTrackingMstId' in message.data,
+          currentTrackingMstId:
+            message.data && typeof message.data === 'object'
+              ? (message.data as Record<string, unknown>).currentTrackingMstId
+              : undefined,
+          currentTrackingDetailId:
+            message.data && typeof message.data === 'object'
+              ? (message.data as Record<string, unknown>).currentTrackingDetailId
+              : undefined,
+          nextTrackingMstId:
+            message.data && typeof message.data === 'object'
+              ? (message.data as Record<string, unknown>).nextTrackingMstId
+              : undefined,
+          nextTrackingDetailId:
+            message.data && typeof message.data === 'object'
+              ? (message.data as Record<string, unknown>).nextTrackingDetailId
+              : undefined,
+        })
+      }
 
       // 받은 데이터를 버퍼에 저장만 하고 즉시 UI 업데이트하지 않음
       latestDataBuffer.value = message
@@ -1409,10 +1442,15 @@ export const useICDStore = defineStore('icd', () => {
     }
   }
 
+  // ✅ 디버깅: 마지막 로그 출력 시간 (10초당 1개씩만 출력)
+  const lastDebugLogTime = ref(0)
+  const DEBUG_LOG_INTERVAL = 10000 // 10초
+
   // 30ms 타이머로 실행되는 UI 업데이트 함수
   const updateUIFromBuffer = () => {
     try {
       const startTime = performance.now()
+      const currentTime = Date.now()
 
       // 업데이트 간격 측정 (더 정확하게)
       if (lastUpdateTimestamp.value > 0) {
@@ -1506,31 +1544,109 @@ export const useICDStore = defineStore('icd', () => {
         }
       }
 
-      // 🆕 추적 스케줄 정보 업데이트 - data 객체 안에서 찾기
+      // ✅ 디버깅: 메시지 구조 전체 확인 (10초당 1개씩만 출력)
+      if (currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
+        console.log('🔍 [디버깅] WebSocket 메시지 구조 확인:', {
+          hasData: !!message.data,
+          dataType: typeof message.data,
+          dataKeys:
+            message.data && typeof message.data === 'object'
+              ? Object.keys(message.data)
+              : 'no data',
+          hasCurrentTrackingMstId:
+            message.data &&
+            typeof message.data === 'object' &&
+            'currentTrackingMstId' in message.data,
+          hasNextTrackingMstId:
+            message.data && typeof message.data === 'object' && 'nextTrackingMstId' in message.data,
+          currentTrackingMstId:
+            message.data && typeof message.data === 'object'
+              ? (message.data as Record<string, unknown>).currentTrackingMstId
+              : undefined,
+          currentTrackingDetailId:
+            message.data && typeof message.data === 'object'
+              ? (message.data as Record<string, unknown>).currentTrackingDetailId
+              : undefined,
+          nextTrackingMstId:
+            message.data && typeof message.data === 'object'
+              ? (message.data as Record<string, unknown>).nextTrackingMstId
+              : undefined,
+          nextTrackingDetailId:
+            message.data && typeof message.data === 'object'
+              ? (message.data as Record<string, unknown>).nextTrackingDetailId
+              : undefined,
+        })
+      }
+
+      // 🆕 추적 스케줄 정보 업데이트 - data 객체 안에서 찾기 (mstId와 detailId)
       if (
         message.data &&
         typeof message.data === 'object' &&
         'currentTrackingMstId' in message.data
       ) {
         const dataCurrentMstId = (message.data as Record<string, unknown>).currentTrackingMstId
+        const dataCurrentDetailId = (message.data as Record<string, unknown>)
+          .currentTrackingDetailId
+
+        // ✅ 디버깅: WebSocket 메시지의 DetailId 확인 (10초당 1개씩만 출력)
+        if (currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
+          console.log('🔍 [디버깅] WebSocket currentTrackingDetailId:', {
+            value: dataCurrentDetailId,
+            type: typeof dataCurrentDetailId,
+            isNull: dataCurrentDetailId === null,
+            isUndefined: dataCurrentDetailId === undefined,
+            rawMessage: message.data,
+          })
+          lastDebugLogTime.value = currentTime
+        }
+
         if (dataCurrentMstId !== undefined) {
           const newCurrentMstId = dataCurrentMstId as number | null
-          if (currentTrackingMstId.value !== newCurrentMstId) {
+          const newCurrentDetailId =
+            dataCurrentDetailId !== undefined ? (dataCurrentDetailId as number | null) : null
+          if (
+            currentTrackingMstId.value !== newCurrentMstId ||
+            currentTrackingDetailId.value !== newCurrentDetailId
+          ) {
             console.log(
-              `📋 현재 추적 MstId 변경: ${currentTrackingMstId.value} → ${newCurrentMstId}`,
+              `📋 현재 추적 MstId/DetailId 변경: ${currentTrackingMstId.value}/${currentTrackingDetailId.value} → ${newCurrentMstId}/${newCurrentDetailId}`,
             )
             currentTrackingMstId.value = newCurrentMstId
+            currentTrackingDetailId.value = newCurrentDetailId
           }
         }
       }
 
       if (message.data && typeof message.data === 'object' && 'nextTrackingMstId' in message.data) {
         const dataNextMstId = (message.data as Record<string, unknown>).nextTrackingMstId
+        const dataNextDetailId = (message.data as Record<string, unknown>).nextTrackingDetailId
+
+        // ✅ 디버깅: WebSocket 메시지의 DetailId 확인 (10초당 1개씩만 출력)
+        if (currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
+          console.log('🔍 [디버깅] WebSocket nextTrackingDetailId:', {
+            value: dataNextDetailId,
+            type: typeof dataNextDetailId,
+            isNull: dataNextDetailId === null,
+            isUndefined: dataNextDetailId === undefined,
+            rawMessage: message.data,
+            updateCount: updateCount.value,
+          })
+          lastDebugLogTime.value = currentTime
+        }
+
         if (dataNextMstId !== undefined) {
           const newNextMstId = dataNextMstId as number | null
-          if (nextTrackingMstId.value !== newNextMstId) {
-            console.log(`📋 다음 추적 MstId 변경: ${nextTrackingMstId.value} → ${newNextMstId}`)
+          const newNextDetailId =
+            dataNextDetailId !== undefined ? (dataNextDetailId as number | null) : null
+          if (
+            nextTrackingMstId.value !== newNextMstId ||
+            nextTrackingDetailId.value !== newNextDetailId
+          ) {
+            console.log(
+              `📋 다음 추적 MstId/DetailId 변경: ${nextTrackingMstId.value}/${nextTrackingDetailId.value} → ${newNextMstId}/${newNextDetailId}`,
+            )
             nextTrackingMstId.value = newNextMstId
+            nextTrackingDetailId.value = newNextDetailId
           }
         }
       }
@@ -2615,7 +2731,9 @@ export const useICDStore = defineStore('icd', () => {
 
     // 추적 스케줄 정보
     currentTrackingMstId: readonly(currentTrackingMstId),
+    currentTrackingDetailId: readonly(currentTrackingDetailId), // ✅ detailId 추가
     nextTrackingMstId: readonly(nextTrackingMstId),
+    nextTrackingDetailId: readonly(nextTrackingDetailId), // ✅ detailId 추가
     udpConnected: readonly(udpConnected),
     lastUdpUpdateTime: readonly(lastUdpUpdateTime),
 

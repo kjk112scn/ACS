@@ -98,8 +98,24 @@ export interface TleAndTrackingResponse {
  * EphemerisService의 ScheduleItem과 동일한 수준의 정보를 포함합니다.
  * Keyhole 정보 및 축 변환 정보를 포함합니다.
  */
+/**
+ * PassSchedule 마스터 데이터 인터페이스
+ *
+ * PassSchedule 데이터 구조 리팩토링에 따라 필드 변경:
+ * - No 필드 제거 (위성별 인덱스, 전역 고유하지 않음)
+ * - MstId 필드 추가 (전역 고유 ID)
+ * - DetailId 필드 추가 (패스 인덱스, 현재는 항상 0)
+ */
 export interface PassScheduleMasterData {
-  No: number
+  // ✅ 전역 고유 ID (필수)
+  MstId: number // Long 타입 (백엔드) → number 타입 (프론트엔드)
+
+  // ✅ Detail 구분자 (필수)
+  DetailId: number // 현재는 항상 0
+
+  // ❌ No 필드 제거 (위성별 인덱스, 전역 고유하지 않음)
+  // No: number  // Deprecated - MstId 사용
+
   SatelliteID: string
   SatelliteName: string
   StartTime: string
@@ -183,8 +199,28 @@ export interface GetAllTrackingMasterResponse {
   satellites: Record<string, PassScheduleMasterData[]>
 }
 
-// 추적 경로 데이터 인터페이스 추가
+/**
+ * 추적 경로 데이터 인터페이스
+ *
+ * PassSchedule 데이터 구조 리팩토링에 따라 필드 추가:
+ * - MstId 필드 추가 (전역 고유 ID)
+ * - DetailId 필드 추가 (패스 인덱스)
+ * - Index 필드 추가 (100ms 포인트 순번, 0부터 시작)
+ * - No 필드 제거 (Index로 대체)
+ */
 export interface TrackingDetailItem {
+  // ✅ 전역 고유 ID (필수)
+  MstId: number // Long 타입 (백엔드) → number 타입 (프론트엔드)
+
+  // ✅ Detail 구분자 (필수)
+  DetailId: number // 현재는 항상 0
+
+  // ✅ 100ms 포인트 순번 (필수, 0부터 시작)
+  Index: number // 기존 No 필드 대체 (0-based)
+
+  // ❌ No 필드 제거 (Index로 대체)
+  // No: number  // Deprecated - Index 사용
+
   Time: string
   Azimuth: number
   Elevation: number
@@ -918,23 +954,27 @@ class PassScheduleService {
   // ===== Pass Schedule 추적 경로 API 메서드들 =====
 
   /**
-   * 특정 위성의 특정 패스에 대한 세부 추적 데이터 조회
-   * 백엔드 API: GET /tracking/detail/{satelliteId}/pass/{passId}?dataType={dataType}
+   * MstId와 DetailId로 세부 추적 데이터 조회
+   * 백엔드 API: GET /tracking/detail/{mstId}/pass/{detailId}?dataType={dataType}
    *
-   * @param satelliteId 위성 ID
-   * @param passId 패스 ID (MST ID)
+   * 기존 경로 구조 유지: /tracking/detail/{satelliteId}/pass/{passId}
+   * → /tracking/detail/{mstId}/pass/{detailId}로 변경
+   *
+   * @param mstId 전역 고유 패스 ID (기존 satelliteId 자리)
+   * @param detailId 패스 인덱스 (기존 passId 자리)
    * @param dataType DataType (optional) - 'final_transformed' 또는 'keyhole_final_transformed'
    */
   async getTrackingDetailByPass(
-    satelliteId: string,
-    passId: number,
+    mstId: number,
+    detailId: number,
     dataType?: string, // ✅ DataType 파라미터 추가
   ): Promise<{
     success: boolean
     message: string
     data?: {
+      mstId: number
+      detailId: number
       satelliteId: string
-      passId: number
       trackingPointCount: number
       trackingPoints: TrackingDetailItem[]
       dataType?: string // ✅ 반환된 DataType 정보
@@ -942,13 +982,13 @@ class PassScheduleService {
     timestamp?: number
   }> {
     try {
-      // ✅ DataType 파라미터가 있으면 쿼리 파라미터로 추가
+      // ✅ 기존 경로 구조 유지: /tracking/detail/{mstId}/pass/{detailId}
       const url = dataType
-        ? `/pass-schedule/tracking/detail/${satelliteId}/pass/${passId}?dataType=${dataType}`
-        : `/pass-schedule/tracking/detail/${satelliteId}/pass/${passId}`
+        ? `/pass-schedule/tracking/detail/${mstId}/pass/${detailId}?dataType=${dataType}`
+        : `/pass-schedule/tracking/detail/${mstId}/pass/${detailId}`
 
       console.log(
-        `📡 추적 세부 데이터 조회 요청: satelliteId=${satelliteId}, passId=${passId}, dataType=${dataType || 'auto'}`,
+        `📡 추적 세부 데이터 조회 요청: mstId=${mstId}, detailId=${detailId}, dataType=${dataType || 'auto'}`,
       )
 
       const response = await api.get(url)

@@ -229,7 +229,7 @@
                   <q-icon :name="currentDisplaySchedule.type === 'current' ? 'play_arrow' : 'schedule'"
                     :color="currentDisplaySchedule.type === 'current' ? 'positive' : 'primary'" size="sm" />
                   <span class="text-body2 q-ml-xs">
-                    {{ currentDisplaySchedule.label }}: Index {{ currentDisplaySchedule.mstId }}
+                    {{ currentDisplaySchedule.label }}: MstId {{ currentDisplaySchedule.mstId }}
                   </span>
                   <q-badge :color="currentDisplaySchedule.type === 'current' ? 'positive' : 'primary'"
                     :label="currentDisplaySchedule.type === 'current' ? '추적중' : '대기중'" class="q-ml-sm" />
@@ -465,10 +465,22 @@ class PassChartUpdatePool {
 const passChartPool = new PassChartUpdatePool()
 
 // 🔧 모든 computed를 먼저 정의
+// ✅ PassSchedule 데이터 구조 리팩토링: 선택된 스케줄만 표시 (selectedScheduleList 사용)
 const scheduleData = computed(() => {
   try {
+    // ✅ selectedScheduleList 사용 (선택된 스케줄만 표시)
     const data = passScheduleStore.selectedScheduleList || []
-    console.log('🔍 PassSchedulePage scheduleData:', data.length, '개')
+    console.log('🔍 PassSchedulePage scheduleData (선택된 스케줄):', data.length, '개')
+    // ✅ 디버깅: 첫 번째 항목의 mstId 확인
+    if (data.length > 0) {
+      console.log('🔍 첫 번째 항목 mstId 확인:', {
+        mstId: data[0].mstId,
+        detailId: data[0].detailId,
+        no: data[0].no,
+        satelliteName: data[0].satelliteName,
+        allKeys: Object.keys(data[0])  // ✅ 모든 키 확인
+      })
+    }
     return data
   } catch (error) {
     console.error('❌ scheduleData computed 에러:', error)
@@ -502,11 +514,20 @@ const reactivityTrigger = ref(0)
 const lastTrackingPathLength = ref(0)
 const lastPredictedPathLength = ref(0)
 
+// ✅ 디버깅: 마지막 로그 출력 시간 (10초당 1개씩만 출력)
+const lastDebugLogTime = ref(0)
+const DEBUG_LOG_INTERVAL = 10000 // 10초
+
 // 🆕 Store 값 변경 감지
 // ✅ 스케줄 전환 시 경로 초기화 및 신규 스케줄 이론치 경로 로드 로직
-watch(() => icdStore.currentTrackingMstId, (newMstId, oldMstId) => {
-  console.log(`🔄 currentTrackingMstId 변경 감지: ${oldMstId} → ${newMstId}`)
+watch([() => icdStore.currentTrackingMstId, () => icdStore.currentTrackingDetailId], ([newMstId, newDetailId], [oldMstId, oldDetailId]) => {
+  console.log(`🔄 currentTrackingMstId/detailId 변경 감지: ${oldMstId}/${oldDetailId} → ${newMstId}/${newDetailId}`)
   reactivityTrigger.value++
+
+  // ✅ 하이라이트 즉시 업데이트
+  void nextTick(() => {
+    applyRowColors()
+  })
 
   // 스케줄이 변경된 경우 (이전 스케줄 완료, 다음 스케줄 시작)
   if (oldMstId !== null && newMstId !== null && oldMstId !== newMstId) {
@@ -525,33 +546,43 @@ watch(() => icdStore.currentTrackingMstId, (newMstId, oldMstId) => {
     // ✅ 4. 신규 스케줄의 이론치 경로 자동 로드
     void nextTick(async () => {
       try {
-        const newSchedule = sortedScheduleList.value.find(s => Number(s.index) === Number(newMstId))
+        // ✅ mstId와 detailId 기준으로 매칭 (detailId는 WebSocket에서 받아올 수 있지만, 일단 mstId만으로 찾기)
+        const newSchedule = sortedScheduleList.value.find(s => Number(s.mstId) === Number(newMstId))
         if (newSchedule) {
-          console.log('🚀 신규 스케줄의 이론치 경로 로드 시작:', newSchedule.satelliteName)
+          console.log('🚀 신규 스케줄의 이론치 경로 로드 시작:', newSchedule.satelliteName, newSchedule.mstId, newSchedule.detailId)
 
-          const satelliteId = newSchedule.satelliteId || newSchedule.satelliteName
-          const passId = newSchedule.index
+          // ✅ mstId와 detailId 사용 (satelliteId 불필요)
+          const mstId = newSchedule.mstId
+          const detailId = newSchedule.detailId
 
-          if (satelliteId && passId) {
-            // ✅ 스케줄의 keyhole 여부에 따라 DataType 결정
-            const isKeyhole = newSchedule.isKeyhole || newSchedule.IsKeyhole || false
-            const dataType = isKeyhole ? 'keyhole_optimized_final_transformed' : 'final_transformed'
+          if (!mstId || detailId == null) {
+            console.warn('⚠️ MstId 또는 DetailId가 없음:', {
+              mstId: newSchedule.mstId,
+              detailId: newSchedule.detailId,
+              no: newSchedule.no,
+              satelliteName: newSchedule.satelliteName
+            })
+            return
+          }
 
-            const success = await passScheduleStore.loadTrackingDetailData(
-              satelliteId,
-              passId,
-              dataType
-            )
+          // ✅ 스케줄의 keyhole 여부에 따라 DataType 결정
+          const isKeyhole = newSchedule.isKeyhole || newSchedule.IsKeyhole || false
+          const dataType = isKeyhole ? 'keyhole_optimized_final_transformed' : 'final_transformed'
 
-            if (success) {
-              console.log('✅ 신규 스케줄의 이론치 경로 로드 완료')
-              // ✅ 차트 업데이트
-              if (passChart && !passChart.isDisposed()) {
-                updateChart()
-              }
-            } else {
-              console.warn('⚠️ 신규 스케줄의 이론치 경로 로드 실패')
+          const success = await passScheduleStore.loadTrackingDetailData(
+            mstId,
+            detailId,
+            dataType
+          )
+
+          if (success) {
+            console.log('✅ 신규 스케줄의 이론치 경로 로드 완료')
+            // ✅ 차트 업데이트
+            if (passChart && !passChart.isDisposed()) {
+              updateChart()
             }
+          } else {
+            console.warn('⚠️ 신규 스케줄의 이론치 경로 로드 실패')
           }
         } else {
           console.warn('⚠️ 신규 스케줄을 찾을 수 없음:', newMstId)
@@ -575,33 +606,43 @@ watch(() => icdStore.currentTrackingMstId, (newMstId, oldMstId) => {
     // ✅ 신규 스케줄의 이론치 경로 자동 로드
     void nextTick(async () => {
       try {
-        const newSchedule = sortedScheduleList.value.find(s => Number(s.index) === Number(newMstId))
+        // ✅ mstId와 detailId 기준으로 매칭 (detailId는 WebSocket에서 받아올 수 있지만, 일단 mstId만으로 찾기)
+        const newSchedule = sortedScheduleList.value.find(s => Number(s.mstId) === Number(newMstId))
         if (newSchedule) {
-          console.log('🚀 추적 시작 - 신규 스케줄의 이론치 경로 로드 시작:', newSchedule.satelliteName)
+          console.log('🚀 추적 시작 - 신규 스케줄의 이론치 경로 로드 시작:', newSchedule.satelliteName, newSchedule.mstId, newSchedule.detailId)
 
-          const satelliteId = newSchedule.satelliteId || newSchedule.satelliteName
-          const passId = newSchedule.index
+          // ✅ mstId와 detailId 사용 (satelliteId 불필요)
+          const mstId = newSchedule.mstId
+          const detailId = newSchedule.detailId
 
-          if (satelliteId && passId) {
-            // ✅ 스케줄의 keyhole 여부에 따라 DataType 결정
-            const isKeyhole = newSchedule.isKeyhole || newSchedule.IsKeyhole || false
-            const dataType = isKeyhole ? 'keyhole_optimized_final_transformed' : 'final_transformed'
+          if (!mstId || detailId == null) {
+            console.warn('⚠️ MstId 또는 DetailId가 없음:', {
+              mstId: newSchedule.mstId,
+              detailId: newSchedule.detailId,
+              no: newSchedule.no,
+              satelliteName: newSchedule.satelliteName
+            })
+            return
+          }
 
-            const success = await passScheduleStore.loadTrackingDetailData(
-              satelliteId,
-              passId,
-              dataType
-            )
+          // ✅ 스케줄의 keyhole 여부에 따라 DataType 결정
+          const isKeyhole = newSchedule.isKeyhole || newSchedule.IsKeyhole || false
+          const dataType = isKeyhole ? 'keyhole_optimized_final_transformed' : 'final_transformed'
 
-            if (success) {
-              console.log('✅ 추적 시작 - 신규 스케줄의 이론치 경로 로드 완료')
-              // ✅ 차트 업데이트
-              if (passChart && !passChart.isDisposed()) {
-                updateChart()
-              }
-            } else {
-              console.warn('⚠️ 추적 시작 - 신규 스케줄의 이론치 경로 로드 실패')
+          const success = await passScheduleStore.loadTrackingDetailData(
+            mstId,
+            detailId,
+            dataType
+          )
+
+          if (success) {
+            console.log('✅ 추적 시작 - 신규 스케줄의 이론치 경로 로드 완료')
+            // ✅ 차트 업데이트
+            if (passChart && !passChart.isDisposed()) {
+              updateChart()
             }
+          } else {
+            console.warn('⚠️ 추적 시작 - 신규 스케줄의 이론치 경로 로드 실패')
           }
         } else {
           console.warn('⚠️ 추적 시작 - 신규 스케줄을 찾을 수 없음:', newMstId)
@@ -626,31 +667,32 @@ watch(() => icdStore.currentTrackingMstId, (newMstId, oldMstId) => {
   }
 }, { immediate: true })
 
-watch(() => icdStore.nextTrackingMstId, (newVal, oldVal) => {
-  console.log(`🔄 nextTrackingMstId 변경 감지: ${oldVal} → ${newVal}`)
+watch([() => icdStore.nextTrackingMstId, () => icdStore.nextTrackingDetailId], ([newMstId, newDetailId], [oldMstId, oldDetailId]) => {
+  console.log(`🔄 nextTrackingMstId/detailId 변경 감지: ${oldMstId}/${oldDetailId} → ${newMstId}/${newDetailId}`)
   reactivityTrigger.value++
+
+  // ✅ 하이라이트 즉시 업데이트
+  void nextTick(() => {
+    applyRowColors()
+  })
 }, { immediate: true })
 
 const highlightedRows = computed(() => {
   try {
     // 강제 반응성 트리거 (값을 읽어서 의존성 생성)
-    const trigger = reactivityTrigger.value
+    void reactivityTrigger.value // ✅ 의존성 생성용 (사용하지 않지만 반응성 유지)
 
     const current = icdStore.currentTrackingMstId
+    const currentDetailId = icdStore.currentTrackingDetailId // ✅ detailId 추가
     const next = icdStore.nextTrackingMstId
+    const nextDetailId = icdStore.nextTrackingDetailId // ✅ detailId 추가
 
-    console.log('🎯 highlightedRows computed 실행:', {
-      current,
-      next,
-      currentType: typeof current,
-      nextType: typeof next,
-      trigger
-    })
+    // ✅ 디버깅 로그 제거 (computed는 순수 함수여야 함)
 
-    return { current, next }
+    return { current, currentDetailId, next, nextDetailId }
   } catch (error) {
     console.error('❌ highlightedRows computed 에러:', error)
-    return { current: null, next: null }
+    return { current: null, currentDetailId: null, next: null, nextDetailId: null }
   }
 })
 
@@ -676,26 +718,40 @@ const currentDisplaySchedule = computed(() => {
     return null
   }
 })
-// 🔧 직접 스타일 적용 함수
+/**
+ * 직접 스타일 적용 함수
+ *
+ * PassSchedule 데이터 구조 리팩토링에 따라 mstId 기준 매칭.
+ *
+ * @param props 행 데이터
+ * @returns 인라인 스타일 객체
+ */
 const getRowStyleDirect = (props: { row: ScheduleItem }) => {
   try {
     if (!props || !props.row) {
       return ''
     }
     const schedule = props.row
-    const tableIndex = schedule.index
-    const { current, next } = highlightedRows.value
+    // ✅ mstId와 detailId 기준으로 매칭 (전역 고유 ID + 패스 인덱스)
+    const scheduleMstId = schedule.mstId ?? schedule.no
+    const scheduleDetailId = schedule.detailId ?? null
+    const { current, currentDetailId, next, nextDetailId } = highlightedRows.value
 
-    console.log(`🎨 getRowStyleDirect 호출: index=${tableIndex}, current=${current}, next=${next}`)
+    console.log(`🎨 getRowStyleDirect 호출: mstId=${scheduleMstId}, detailId=${scheduleDetailId}, current=${current}/${currentDetailId}, next=${next}/${nextDetailId}`)
 
-    if (tableIndex !== undefined) {
-      const currentMatch = current !== null && Number(tableIndex) === Number(current)
-      const nextMatch = next !== null && Number(tableIndex) === Number(next)
+    if (scheduleMstId !== undefined) {
+      // ✅ mstId와 detailId 모두 비교 (detailId가 항상 존재한다고 가정)
+      const currentMatch = current !== null &&
+        Number(scheduleMstId) === Number(current) &&
+        (currentDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(currentDetailId))
+      const nextMatch = next !== null &&
+        Number(scheduleMstId) === Number(next) &&
+        (nextDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(nextDetailId))
 
       // 현재 추적 중인 스케줄이 있는 경우
       if (current !== null) {
         if (currentMatch) {
-          console.log('✅ 현재 스케줄 매칭 - 직접 녹색 스타일 적용:', tableIndex)
+          console.log('✅ 현재 스케줄 매칭 - 직접 녹색 스타일 적용:', scheduleMstId, scheduleDetailId)
           return {
             backgroundColor: '#c8e6c9 !important',
             borderLeft: '4px solid #4caf50 !important',
@@ -704,7 +760,7 @@ const getRowStyleDirect = (props: { row: ScheduleItem }) => {
           }
         }
         if (nextMatch) {
-          console.log('✅ 다음 스케줄 매칭 - 직접 파란색 스타일 적용:', tableIndex)
+          console.log('✅ 다음 스케줄 매칭 - 직접 파란색 스타일 적용:', scheduleMstId, scheduleDetailId)
           return {
             backgroundColor: '#e3f2fd !important',
             borderLeft: '4px solid #2196f3 !important',
@@ -713,13 +769,13 @@ const getRowStyleDirect = (props: { row: ScheduleItem }) => {
           }
         }
       }
-      // 현재 추적 중인 스케줄이 없고 다음 예정만 있는 경우
-      else if (current === null && next !== null && nextMatch) {
-        console.log('✅ 현재 없음 + 다음 스케줄 매칭 - 직접 녹색 스타일 적용:', tableIndex)
+      // 다음 예정 스케줄 (현재 추적 중인 스케줄이 있든 없든 파란색으로 표시)
+      if (next !== null && nextMatch) {
+        console.log('✅ 다음 스케줄 매칭 - 직접 파란색 스타일 적용:', scheduleMstId, scheduleDetailId)
         return {
-          backgroundColor: '#c8e6c9 !important',
-          borderLeft: '4px solid #4caf50 !important',
-          color: '#2e7d32 !important',
+          backgroundColor: '#e3f2fd !important',
+          borderLeft: '4px solid #2196f3 !important',
+          color: '#1565c0 !important',
           fontWeight: '500 !important'
         }
       }
@@ -732,73 +788,122 @@ const getRowStyleDirect = (props: { row: ScheduleItem }) => {
   }
 }
 
-// 🔧 CSS 클래스 기반 행 스타일링
+/**
+ * 행 스타일 클래스 반환 함수
+ *
+ * PassSchedule 데이터 구조 리팩토링에 따라 mstId 기준 매칭.
+ *
+ * @param props 행 데이터
+ * @returns CSS 클래스명
+ */
 const getRowClass = (props: { row: ScheduleItem }) => {
   try {
     if (!props || !props.row) {
       return ''
     }
     const schedule = props.row
-    const tableIndex = schedule.index
-    const { current, next } = highlightedRows.value
+    // ✅ mstId와 detailId 기준으로 매칭 (전역 고유 ID + 패스 인덱스)
+    const scheduleMstId = schedule.mstId ?? schedule.no
+    const scheduleDetailId = schedule.detailId ?? null
+    const { current, currentDetailId, next, nextDetailId } = highlightedRows.value
 
-    // 모든 getRowClass 호출 로그 (임시 디버깅)
-    console.log(`📋 getRowClass 호출: index=${tableIndex}, current=${current}, next=${next}`)
+    // ✅ 디버깅: getRowClass 호출 로그 (10초당 1개씩만 출력)
+    const currentTime = Date.now()
+    if (currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
+      console.log(`📋 getRowClass 호출: mstId=${scheduleMstId}, detailId=${scheduleDetailId}, current=${current}/${currentDetailId}, next=${next}/${nextDetailId}`)
+      lastDebugLogTime.value = currentTime
+    }
 
-    // 🔧 스케줄 하이라이트 로직 - 강화된 디버깅
-    if (tableIndex !== undefined) {
-      const currentMatch = current !== null && Number(tableIndex) === Number(current)
-      const nextMatch = next !== null && Number(tableIndex) === Number(next)
+    // ✅ 스케줄 하이라이트 로직 - mstId와 detailId 모두 비교
+    if (scheduleMstId !== undefined) {
+      // ✅ mstId와 detailId 모두 비교 (detailId가 항상 존재한다고 가정)
+      const currentMatch = current !== null &&
+        Number(scheduleMstId) === Number(current) &&
+        (currentDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(currentDetailId))
+      const nextMatch = next !== null &&
+        Number(scheduleMstId) === Number(next) &&
+        (nextDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(nextDetailId))
 
-      // index 14인 경우 강제로 상세 로그 출력
-      if (Number(tableIndex) === 14) {
-        console.log('🔥 INDEX 14 디버깅:', {
+      // ✅ mstId 디버깅 로그 (14와 28 모두, 10초당 1개씩만 출력)
+      if ((Number(scheduleMstId) === 14 || Number(scheduleMstId) === 28) &&
+          currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
+        console.log(`🔥 MSTID ${scheduleMstId} 디버깅:`, {
           satelliteName: schedule.satelliteName,
-          tableIndex,
-          tableIndexNumber: Number(tableIndex),
+          scheduleMstId,
+          scheduleDetailId,
+          scheduleMstIdNumber: Number(scheduleMstId),
           current,
+          currentDetailId,
           currentNumber: Number(current),
           next,
+          nextDetailId,
           nextNumber: Number(next),
           currentMatch,
           nextMatch,
           currentIsNull: current === null,
-          nextIsNotNull: next !== null
+          nextIsNotNull: next !== null,
+          nextDetailIdIsNotNull: nextDetailId !== null,
+          scheduleDetailIdIsNotNull: scheduleDetailId !== null,
+          nextDetailIdNumber: nextDetailId !== null ? Number(nextDetailId) : null,
+          scheduleDetailIdNumber: scheduleDetailId !== null ? Number(scheduleDetailId) : null,
+          detailIdMatch: nextDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(nextDetailId)
         })
+        lastDebugLogTime.value = currentTime
       }
 
       // 1. 현재 추적 중인 스케줄이 있는 경우
       if (current !== null) {
         if (currentMatch) {
-          console.log('✅ 현재 스케줄 매칭 - 녹색 적용:', tableIndex)
+          // ✅ 디버깅: 10초당 1개씩만 출력
+          if (currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
+            console.log('✅ 현재 스케줄 매칭 - 녹색 적용:', scheduleMstId, scheduleDetailId)
+            lastDebugLogTime.value = currentTime
+          }
           return 'highlight-current-schedule'
         }
         if (nextMatch) {
-          console.log('✅ 다음 스케줄 매칭 - 파란색 적용:', tableIndex)
+          // ✅ 디버깅: 10초당 1개씩만 출력
+          if (currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
+            console.log('✅ 다음 스케줄 매칭 - 파란색 적용:', scheduleMstId, scheduleDetailId)
+            lastDebugLogTime.value = currentTime
+          }
           return 'highlight-next-schedule'
         }
       }
-      // 2. 현재 추적 중인 스케줄이 없고 다음 예정만 있는 경우
-      else if (current === null && next !== null && nextMatch) {
-        console.log('🎯 현재 없음 + 다음 스케줄 매칭 - 녹색 적용:', tableIndex)
-        console.log('🎨 반환할 클래스: highlight-current-schedule')
-        return 'highlight-current-schedule'  // 다음 스케줄을 현재 색상으로
+      // 2. 다음 예정 스케줄 (현재 추적 중인 스케줄이 있든 없든 파란색으로 표시)
+      if (next !== null && nextMatch) {
+        // ✅ 디버깅: 10초당 1개씩만 출력
+        if (currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
+          console.log('✅ 다음 스케줄 매칭 - 파란색 적용:', scheduleMstId, scheduleDetailId)
+          lastDebugLogTime.value = currentTime
+        }
+        return 'highlight-next-schedule'  // 다음 스케줄은 항상 파란색
       }
 
-      // index 14인데 매칭되지 않은 경우 원인 분석
-      if (Number(tableIndex) === 14 && !currentMatch && !nextMatch) {
-        console.log('❌ INDEX 14 매칭 실패 원인:', {
+      // ✅ mstId 14 또는 28인데 매칭되지 않은 경우 원인 분석 (10초당 1개씩만 출력)
+      if ((Number(scheduleMstId) === 14 || Number(scheduleMstId) === 28) &&
+          !currentMatch && !nextMatch &&
+          currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
+        console.log(`❌ MSTID ${scheduleMstId} 매칭 실패 원인:`, {
           current값: current,
+          currentDetailId값: currentDetailId,
           current타입: typeof current,
           next값: next,
+          nextDetailId값: nextDetailId,
           next타입: typeof next,
-          tableIndex값: tableIndex,
-          tableIndex타입: typeof tableIndex,
+          scheduleMstId값: scheduleMstId,
+          scheduleDetailId값: scheduleDetailId,
+          scheduleMstId타입: typeof scheduleMstId,
           조건1_current가null: current === null,
           조건2_next가notNull: next !== null,
+          조건3_nextDetailId가notNull: nextDetailId !== null,
+          조건4_scheduleDetailId가notNull: scheduleDetailId !== null,
+          조건5_mstId매칭: Number(scheduleMstId) === Number(next),
+          조건6_detailId매칭: nextDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(nextDetailId),
           조건3_nextMatch: nextMatch,
           전체조건: current === null && next !== null && nextMatch
         })
+        lastDebugLogTime.value = currentTime
       }
     }
 
@@ -819,19 +924,36 @@ const applyRowColors = () => {
     console.log('🎨 DOM 직접 조작으로 색상 적용 시작')
 
     const current = icdStore.currentTrackingMstId
+    const currentDetailId = icdStore.currentTrackingDetailId // ✅ detailId 추가
     const next = icdStore.nextTrackingMstId
+    const nextDetailId = icdStore.nextTrackingDetailId // ✅ detailId 추가
 
-    console.log('현재 Store 상태:', { current, next })
+    console.log('현재 Store 상태:', { current, currentDetailId, next, nextDetailId })
 
     setTimeout(() => {
       const rows = document.querySelectorAll('.schedule-table tbody tr')
       console.log(`총 ${rows.length}개 행 처리`)
 
-      rows.forEach((row) => {
+      // ✅ sortedScheduleList를 사용하여 정확한 매칭
+      const schedules = sortedScheduleList.value
+
+      rows.forEach((row, rowIndex) => {
         const htmlRow = row as HTMLElement
-        const indexCell = htmlRow.querySelector('td:nth-child(2)') // index 컬럼
-        const indexValue = indexCell?.textContent?.trim()
-        const indexNumber = Number(indexValue)
+        const schedule = schedules[rowIndex]
+
+        if (!schedule) return
+
+        // ✅ mstId와 detailId 모두 비교
+        const scheduleMstId = schedule.mstId ?? schedule.no
+        const scheduleDetailId = schedule.detailId ?? null
+
+        // ✅ mstId와 detailId 모두 비교 (detailId가 항상 존재한다고 가정)
+        const currentMatch = current !== null &&
+          Number(scheduleMstId) === Number(current) &&
+          (currentDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(currentDetailId))
+        const nextMatch = next !== null &&
+          Number(scheduleMstId) === Number(next) &&
+          (nextDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(nextDetailId))
 
         // 기존 스타일 제거
         htmlRow.classList.remove('highlight-current-schedule', 'highlight-next-schedule')
@@ -846,26 +968,26 @@ const applyRowColors = () => {
           htmlCell.style.removeProperty('font-weight')
         })
 
-        // 매칭 확인 및 색상 적용
+        // ✅ 매칭 확인 및 색상 적용 (mstId와 detailId 기준)
         let shouldHighlight = false
         let bgColor = ''
         let borderColor = ''
         let textColor = ''
 
-        if (current !== null && indexNumber === current) {
+        if (current !== null && currentMatch) {
           // 현재 스케줄 - 녹색
           shouldHighlight = true
           bgColor = '#c8e6c9'
           borderColor = '#4caf50'
           textColor = '#2e7d32'
-          console.log(`✅ 현재 스케줄 매칭 - index ${indexValue}를 녹색으로 적용`)
-        } else if (next !== null && indexNumber === next) {
-          // 다음 스케줄은 항상 파란색
+          console.log(`✅ 현재 스케줄 매칭 - mstId ${scheduleMstId}/detailId ${scheduleDetailId}를 녹색으로 적용`)
+        } else if (next !== null && nextMatch) {
+          // 다음 스케줄 - 파란색 (현재 추적 중인 스케줄이 있든 없든 항상 파란색)
           shouldHighlight = true
           bgColor = '#e3f2fd'
           borderColor = '#2196f3'
           textColor = '#1565c0'
-          console.log(`✅ 다음 스케줄 매칭 - index ${indexValue}를 파란색으로 적용`)
+          console.log(`✅ 다음 스케줄 매칭 - mstId ${scheduleMstId}/detailId ${scheduleDetailId}를 파란색으로 적용`)
         }
 
         if (shouldHighlight) {
@@ -985,14 +1107,16 @@ const forceTableUpdate = () => {
 
 // 🔧 Store 값 변경 시 DOM 직접 조작
 watch(
-  [() => icdStore?.currentTrackingMstId, () => icdStore?.nextTrackingMstId],
+  [() => icdStore?.currentTrackingMstId, () => icdStore?.currentTrackingDetailId, () => icdStore?.nextTrackingMstId, () => icdStore?.nextTrackingDetailId],
   (newValues, oldValues) => {
     try {
       console.log('🔄 Store 상태 변경 감지:', {
         이전값: oldValues,
         새값: newValues,
         current: icdStore.currentTrackingMstId,
-        next: icdStore.nextTrackingMstId
+        currentDetailId: icdStore.currentTrackingDetailId,
+        next: icdStore.nextTrackingMstId,
+        nextDetailId: icdStore.nextTrackingDetailId
       })
 
       // 🆕 지연된 DOM 직접 조작으로 색상 적용
@@ -1159,6 +1283,8 @@ const handleActivated = () => {
       updateTimer = window.setInterval(() => {
         try {
           updateChart()
+          // ✅ 하이라이트도 주기적으로 업데이트 (실시간 반영)
+          applyRowColors()
         } catch (error) {
           console.error('❌ 차트 업데이트 타이머 오류:', error)
         }
@@ -1224,23 +1350,33 @@ const selectedSchedule = ref<ScheduleItem | null>(null)
 const autoSelectedSchedule = computed(() => {
   try {
     const current = icdStore.currentTrackingMstId
+    const currentDetailId = icdStore.currentTrackingDetailId // ✅ detailId 추가
     const next = icdStore.nextTrackingMstId
+    const nextDetailId = icdStore.nextTrackingDetailId // ✅ detailId 추가
     const schedules = sortedScheduleList.value
 
     // 1순위: current 스케줄 찾기
     if (current !== null) {
-      const currentSchedule = schedules.find(s => Number(s.index) === Number(current))
+      // ✅ mstId와 detailId 기준으로 매칭 (전역 고유 ID + 패스 인덱스, detailId가 항상 존재한다고 가정)
+      const currentSchedule = schedules.find(s =>
+        Number(s.mstId) === Number(current) &&
+        (currentDetailId !== null && s.detailId !== null && Number(s.detailId) === Number(currentDetailId))
+      )
       if (currentSchedule) {
-        console.log('🎯 current 기준 자동 선택:', currentSchedule.satelliteName)
+        console.log('🎯 current 기준 자동 선택:', currentSchedule.satelliteName, currentSchedule.mstId, currentSchedule.detailId)
         return currentSchedule
       }
     }
 
     // 2순위: next 스케줄 찾기 (current가 없을 때)
     if (next !== null) {
-      const nextSchedule = schedules.find(s => Number(s.index) === Number(next))
+      // ✅ mstId와 detailId 기준으로 매칭 (전역 고유 ID + 패스 인덱스, detailId가 항상 존재한다고 가정)
+      const nextSchedule = schedules.find(s =>
+        Number(s.mstId) === Number(next) &&
+        (nextDetailId !== null && s.detailId !== null && Number(s.detailId) === Number(nextDetailId))
+      )
       if (nextSchedule) {
-        console.log('🎯 next 기준 자동 선택:', nextSchedule.satelliteName)
+        console.log('🎯 next 기준 자동 선택:', nextSchedule.satelliteName, nextSchedule.mstId, nextSchedule.detailId)
         return nextSchedule
       }
     }
@@ -1264,19 +1400,27 @@ const currentScheduleStatus = computed(() => {
 
   try {
     const current = icdStore.currentTrackingMstId
+    const currentDetailId = icdStore.currentTrackingDetailId // ✅ detailId 추가
     const next = icdStore.nextTrackingMstId
-    const scheduleIndex = Number(schedule.index)
+    const nextDetailId = icdStore.nextTrackingDetailId // ✅ detailId 추가
+    // ✅ mstId와 detailId 기준으로 매칭 (전역 고유 ID + 패스 인덱스)
+    const scheduleMstId = Number(schedule.mstId ?? schedule.no)
+    const scheduleDetailId = schedule.detailId ?? null
 
-    // 현재 추적 중인 스케줄인지 확인
-    if (current !== null && scheduleIndex === Number(current)) {
+    // 현재 추적 중인 스케줄인지 확인 (mstId와 detailId 모두 비교, detailId가 항상 존재한다고 가정)
+    if (current !== null &&
+        scheduleMstId === Number(current) &&
+        (currentDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(currentDetailId))) {
       return {
         color: 'positive',
         label: '추적중'
       }
     }
 
-    // 다음 예정 스케줄인지 확인
-    if (next !== null && scheduleIndex === Number(next)) {
+    // 다음 예정 스케줄인지 확인 (mstId와 detailId 모두 비교, detailId가 항상 존재한다고 가정)
+    if (next !== null &&
+        scheduleMstId === Number(next) &&
+        (nextDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(nextDetailId))) {
       return {
         color: 'primary',
         label: '대기중'
@@ -1341,10 +1485,15 @@ const loadSelectedScheduleTrackingPath = async () => {
 
     if (currentTrackingMstId !== null) {
       // 현재 추적 중인 스케줄이 있으면 해당 스케줄 사용
-      const currentSchedule = sortedScheduleList.value.find(s => Number(s.index) === Number(currentTrackingMstId))
+      // ✅ mstId와 detailId 기준으로 매칭 (전역 고유 ID + 패스 인덱스, detailId가 항상 존재한다고 가정)
+      const currentDetailId = icdStore.currentTrackingDetailId
+      const currentSchedule = sortedScheduleList.value.find(s =>
+        Number(s.mstId) === Number(currentTrackingMstId) &&
+        (currentDetailId !== null && s.detailId !== null && Number(s.detailId) === Number(currentDetailId))
+      )
       if (currentSchedule) {
         scheduleToLoad = currentSchedule
-        console.log('🎯 현재 추적 중인 스케줄의 경로 로드:', currentSchedule.satelliteName)
+        console.log('🎯 현재 추적 중인 스케줄의 경로 로드:', currentSchedule.satelliteName, currentSchedule.mstId, currentSchedule.detailId)
       }
     } else {
       // 현재 추적 중인 스케줄이 없으면 선택된 스케줄 사용
@@ -1359,12 +1508,17 @@ const loadSelectedScheduleTrackingPath = async () => {
       return
     }
 
-    const satelliteId = scheduleToLoad.satelliteId || scheduleToLoad.satelliteName
-    // ✅ index만 사용 (no는 재생성된 값이므로 사용하지 않음)
-    const passId = scheduleToLoad.index
+    // ✅ mstId와 detailId 사용 (satelliteId 불필요)
+    const mstId = scheduleToLoad.mstId
+    const detailId = scheduleToLoad.detailId
 
-    if (!satelliteId || !passId) {
-      console.log('⚠️ 위성 ID 또는 패스 ID가 없음')
+    if (!mstId || detailId == null) {
+      console.warn('⚠️ MstId 또는 DetailId가 없음:', {
+        mstId: scheduleToLoad.mstId,
+        detailId: scheduleToLoad.detailId,
+        no: scheduleToLoad.no,
+        satelliteName: scheduleToLoad.satelliteName
+      })
       return
     }
 
@@ -1374,16 +1528,16 @@ const loadSelectedScheduleTrackingPath = async () => {
 
     console.log('🚀 스케줄 추적 경로 로드 시작:', {
       satelliteName: scheduleToLoad.satelliteName,
-      satelliteId,
-      passId,
+      mstId,
+      detailId,
       isKeyhole,
       dataType,
     })
 
     // ✅ DataType을 Store에 전달
     const success = await passScheduleStore.loadTrackingDetailData(
-      satelliteId,
-      passId,
+      mstId,
+      detailId,
       dataType  // ✅ DataType 전달
     )
 
@@ -1433,7 +1587,8 @@ type QTableColumn = NonNullable<QTableProps['columns']>[0]
 
 const scheduleColumns: QTableColumn[] = [
   { name: 'no', label: 'No', field: 'no', align: 'center' as const, sortable: true, style: 'width: 60px' },
-  { name: 'index', label: 'Index', field: 'index', align: 'center' as const, sortable: true, style: 'width: 70px' },
+  { name: 'mstId', label: 'MstId', field: 'mstId', align: 'center' as const, sortable: true, style: 'width: 70px' },
+  { name: 'detailId', label: 'DetailId', field: 'detailId', align: 'center' as const, sortable: true, style: 'width: 70px' },
   {
     name: 'satelliteInfo',
     label: '위성 ID\n위성 이름',
@@ -1863,6 +2018,16 @@ const lastPathLength = ref(0)
 const pathUpdateThreshold = 5 // 경로 포인트가 5개 이상 변경될 때만 업데이트
 // ✅ appendData를 위한 이전 경로 길이 추적 (이미 위에서 선언됨)
 
+// 🆕 경로 매칭 로그 스로틀링
+const lastPathMatchLogTime = ref(0)
+const PATH_MATCH_LOG_INTERVAL = 10000 // 10초
+
+// 🆕 이전 상태 추적 (변경 감지용)
+const lastPosition = ref<{ azimuth: number; elevation: number } | null>(null)
+const lastPathInfo = ref<{ mstId: number | null; detailId: number | null } | null>(null)
+// ✅ lastPredictedPathLength는 이미 515라인에서 선언됨 (중복 선언 제거)
+const POSITION_CHANGE_THRESHOLD = 0.1 // 0.1도 이상 변경될 때만 업데이트
+
 // 🆕 성능 모니터링 및 적응형 해상도 조정
 const performanceMonitor = {
   lastFrameTime: 0,
@@ -1945,7 +2110,13 @@ const updateChartWithPerformanceMonitoring = () => {
     const normalizedAz = azimuth
     const normalizedEl = Math.max(0, Math.min(90, elevation))
 
-    currentPosition.value = { azimuth: normalizedAz, elevation: normalizedEl }
+    // 🆕 위치 변경 감지 (실제 변경이 있을 때만 업데이트)
+    const currentPos = { azimuth: normalizedAz, elevation: normalizedEl }
+    const hasPositionChanged = !lastPosition.value ||
+      Math.abs(currentPos.azimuth - lastPosition.value.azimuth) > POSITION_CHANGE_THRESHOLD ||
+      Math.abs(currentPos.elevation - lastPosition.value.elevation) > POSITION_CHANGE_THRESHOLD
+
+    currentPosition.value = currentPos
 
     // 경로 업데이트 조건
     const shouldUpdatePath = icdStore.passScheduleStatusInfo?.isActive === true ||
@@ -1971,46 +2142,102 @@ const updateChartWithPerformanceMonitoring = () => {
     const selectedSchedule = displaySchedule.value
     const shouldShowPredictedPath = currentTrackingMstId !== null || selectedSchedule !== null
 
+    // 🆕 pathInfo를 함수 상단에서 선언 (스코프 문제 해결)
+    const pathInfo = passScheduleStore.currentTrackingPathInfo
+
     // 현재 추적 중인 스케줄이 있으면 해당 스케줄의 경로만, 없으면 선택된 스케줄의 경로만 표시
     let predictedPathToShow: [number, number][] = []
 
     if (shouldShowPredictedPath) {
-      // 현재 추적 중인 스케줄이 있으면 해당 스케줄의 경로 사용
-      if (currentTrackingMstId !== null) {
-        const currentSchedule = sortedScheduleList.value.find(s => Number(s.index) === Number(currentTrackingMstId))
-        if (currentSchedule) {
-          // ✅ 현재 스케줄의 satelliteId와 passId 확인하여 일치하는 경로만 사용
-          const currentPath = passScheduleStore.predictedTrackingPath
-          const pathInfo = passScheduleStore.currentTrackingPathInfo
-          const scheduleSatelliteId = currentSchedule.satelliteId || currentSchedule.satelliteName
-          // ✅ index만 사용 (no는 재생성된 값이므로 사용하지 않음)
-          const schedulePassId = currentSchedule.index
+      const currentPath = passScheduleStore.predictedTrackingPath
 
-          if (currentPath && currentPath.length > 0 &&
-            pathInfo.satelliteId === scheduleSatelliteId &&
-            pathInfo.passId === schedulePassId) {
+      // ✅ 경로가 있으면 매칭 확인, 없으면 표시하지 않음 (mstId, detailId만 비교)
+      if (currentPath && currentPath.length > 0) {
+        // 현재 추적 중인 스케줄이 있으면 해당 스케줄의 경로 사용
+        if (currentTrackingMstId !== null) {
+          // ✅ mstId 기준으로 매칭 (전역 고유 ID)
+          const currentSchedule = sortedScheduleList.value.find(s => Number(s.mstId) === Number(currentTrackingMstId))
+          if (currentSchedule) {
+            const scheduleMstId = currentSchedule.mstId
+            const scheduleDetailId = currentSchedule.detailId
+
+            // ✅ 경로 매칭: mstId와 detailId만 비교
+            if (!pathInfo.passId ||
+                (pathInfo.passId === scheduleMstId &&
+                 pathInfo.detailId === scheduleDetailId)) {
+              predictedPathToShow = currentPath.map((point: readonly [number, number]) => [...point])
+
+              // 🆕 로그 스로틀링 (10초당 1개)
+              const currentTime = Date.now()
+              if (currentTime - lastPathMatchLogTime.value >= PATH_MATCH_LOG_INTERVAL) {
+                console.log('✅ 현재 추적 스케줄 경로 표시:', {
+                  scheduleMstId,
+                  scheduleDetailId,
+                  pathInfoMstId: pathInfo.passId,
+                  pathInfoDetailId: pathInfo.detailId,
+                  pathLength: currentPath.length
+                })
+                lastPathMatchLogTime.value = currentTime
+              }
+            } else {
+              // 🆕 로그 스로틀링 (10초당 1개)
+              const currentTime = Date.now()
+              if (currentTime - lastPathMatchLogTime.value >= PATH_MATCH_LOG_INTERVAL) {
+                console.log('⚠️ 경로 매칭 실패 (현재 추적):', {
+                  scheduleMstId,
+                  scheduleDetailId,
+                  pathInfoMstId: pathInfo.passId,
+                  pathInfoDetailId: pathInfo.detailId
+                })
+                lastPathMatchLogTime.value = currentTime
+              }
+            }
+          }
+        } else if (selectedSchedule) {
+          // ✅ 선택된 스케줄의 경로 사용
+          const scheduleMstId = selectedSchedule.mstId
+          const scheduleDetailId = selectedSchedule.detailId
+
+          // ✅ 경로 매칭: mstId와 detailId만 비교
+          if (!pathInfo.passId ||
+              (pathInfo.passId === scheduleMstId &&
+               pathInfo.detailId === scheduleDetailId)) {
             predictedPathToShow = currentPath.map((point: readonly [number, number]) => [...point])
+
+            // 🆕 로그 스로틀링 (10초당 1개)
+            const currentTime = Date.now()
+            if (currentTime - lastPathMatchLogTime.value >= PATH_MATCH_LOG_INTERVAL) {
+              console.log('✅ 선택된 스케줄 경로 표시:', {
+                scheduleMstId,
+                scheduleDetailId,
+                pathInfoMstId: pathInfo.passId,
+                pathInfoDetailId: pathInfo.detailId,
+                pathLength: currentPath.length
+              })
+              lastPathMatchLogTime.value = currentTime
+            }
           } else {
-            // ✅ 경로가 일치하지 않으면 빈 배열로 초기화
-            predictedPathToShow = []
+            // 🆕 로그 스로틀링 (10초당 1개)
+            const currentTime = Date.now()
+            if (currentTime - lastPathMatchLogTime.value >= PATH_MATCH_LOG_INTERVAL) {
+              console.log('⚠️ 경로 매칭 실패 (선택된 스케줄):', {
+                scheduleMstId,
+                scheduleDetailId,
+                pathInfoMstId: pathInfo.passId,
+                pathInfoDetailId: pathInfo.detailId
+              })
+              lastPathMatchLogTime.value = currentTime
+            }
+          }
+        } else {
+          // ✅ 스케줄이 없어도 경로가 있으면 표시 (pathInfo가 없을 때)
+          if (!pathInfo.passId) {
+            predictedPathToShow = currentPath.map((point: readonly [number, number]) => [...point])
+            console.log('✅ 경로 정보 없음 - 경로 표시:', currentPath.length, '개 포인트')
           }
         }
-      } else if (selectedSchedule) {
-        // ✅ 선택된 스케줄의 satelliteId와 passId 확인하여 일치하는 경로만 사용
-        const selectedPath = passScheduleStore.predictedTrackingPath
-        const pathInfo = passScheduleStore.currentTrackingPathInfo
-        const scheduleSatelliteId = selectedSchedule.satelliteId || selectedSchedule.satelliteName
-        // ✅ index만 사용 (no는 재생성된 값이므로 사용하지 않음)
-        const schedulePassId = selectedSchedule.index
-
-        if (selectedPath && selectedPath.length > 0 &&
-          pathInfo.satelliteId === scheduleSatelliteId &&
-          pathInfo.passId === schedulePassId) {
-          predictedPathToShow = selectedPath.map((point: readonly [number, number]) => [...point])
-        } else {
-          // ✅ 경로가 일치하지 않으면 빈 배열로 초기화
-          predictedPathToShow = []
-        }
+      } else {
+        console.log('⚠️ 예상 경로 데이터 없음')
       }
     }
 
@@ -2025,40 +2252,66 @@ const updateChartWithPerformanceMonitoring = () => {
     const displayPath = shouldShowTrackingPath ?
       optimizePathAdaptive(actualPath as [number, number][], resolution) : []
 
+    // 🆕 변경 감지: 경로 길이, 위치, 경로 정보가 변경되었는지 확인
+    const currentPathInfo = {
+      mstId: pathInfo?.passId ?? null,
+      detailId: pathInfo?.detailId ?? null
+    }
+    const hasPathInfoChanged = !lastPathInfo.value ||
+      lastPathInfo.value.mstId !== currentPathInfo.mstId ||
+      lastPathInfo.value.detailId !== currentPathInfo.detailId
+    const hasPredictedPathLengthChanged = predictedPathToShow.length !== lastPredictedPathLength.value
+    const hasDisplayPathChanged = displayPath.length !== lastTrackingPathLength.value
+
+    // 🆕 실제 변경이 있을 때만 차트 업데이트
+    // 이론치만 표시: 경로 정보(mstId, detailId) 변경 시만 업데이트
+    // 추적 중: 위치 변경이나 실제 경로 변경 시만 업데이트
+    const shouldUpdateChart = shouldShowTrackingPath
+      ? (hasPositionChanged || hasDisplayPathChanged) // ✅ 추적 중: 위치나 실제 경로 변경 시만
+      : (hasPathInfoChanged || hasPredictedPathLengthChanged) // ✅ 이론치만: 경로 정보 변경 시만
+
     // ✅ PassChartUpdatePool을 사용한 차트 업데이트 (기존 방식으로 복원)
     try {
-      passChartPool.updatePosition(normalizedEl, normalizedAz)
-      passChartPool.updateTrackingPath(displayPath)
-      // ✅ 현재 추적 중인 스케줄 또는 선택된 스케줄의 경로만 표시
-      passChartPool.updatePredictedPath(predictedPathToShow)
+      if (shouldUpdateChart) {
+        passChartPool.updatePosition(normalizedEl, normalizedAz)
+        passChartPool.updateTrackingPath(displayPath)
+        // ✅ 현재 추적 중인 스케줄 또는 선택된 스케줄의 경로만 표시
+        passChartPool.updatePredictedPath(predictedPathToShow)
 
-      // ✅ 전체 업데이트 (appendData 대신 setOption 사용)
-      const finalOption = passChartPool.getUpdateOption()
+        // ✅ 전체 업데이트 (appendData 대신 setOption 사용)
+        const finalOption = passChartPool.getUpdateOption()
 
-      if (passChart && !passChart.isDisposed()) {
-        passChart.setOption(finalOption, false, true)
+        if (passChart && !passChart.isDisposed()) {
+          passChart.setOption(finalOption, false, true)
 
-        // ✅ 경로 길이 추적 업데이트
-        if (shouldShowTrackingPath) {
-          lastTrackingPathLength.value = displayPath.length
+          // ✅ 경로 길이 추적 업데이트
+          if (shouldShowTrackingPath) {
+            lastTrackingPathLength.value = displayPath.length
+          } else {
+            lastTrackingPathLength.value = 0
+          }
+          lastPredictedPathLength.value = predictedPathToShow.length
+
+          // 🆕 이전 상태 업데이트
+          lastPosition.value = currentPos
+          lastPathInfo.value = currentPathInfo
+
+          lastUpdateTime.value = now
+        }
+          // 성능 통계 업데이트
+          performanceMonitor.frameCount++
+          performanceMonitor.averageFrameTime =
+            (performanceMonitor.averageFrameTime * (performanceMonitor.frameCount - 1) + currentFrameTime) /
+            performanceMonitor.frameCount
+
+          // 성능 로그 (10프레임마다)
+          if (performanceMonitor.frameCount % 10 === 0) {
+            console.log(`📊 성능 통계: 평균 ${performanceMonitor.averageFrameTime.toFixed(2)}ms, 해상도: 1/${resolution}, 포인트: ${displayPath.length}/${actualPath?.length || 0}`)
+          }
         } else {
-          lastTrackingPathLength.value = 0
+          // 🆕 변경이 없으면 스킵 (리소스 절약)
+          return
         }
-        lastPredictedPathLength.value = predictedPathToShow.length
-
-        lastUpdateTime.value = now
-
-        // 성능 통계 업데이트
-        performanceMonitor.frameCount++
-        performanceMonitor.averageFrameTime =
-          (performanceMonitor.averageFrameTime * (performanceMonitor.frameCount - 1) + currentFrameTime) /
-          performanceMonitor.frameCount
-
-        // 성능 로그 (10프레임마다)
-        if (performanceMonitor.frameCount % 10 === 0) {
-          console.log(`📊 성능 통계: 평균 ${performanceMonitor.averageFrameTime.toFixed(2)}ms, 해상도: 1/${resolution}, 포인트: ${displayPath.length}/${actualPath?.length || 0}`)
-        }
-      }
     } catch (chartError) {
       console.error('차트 업데이트 중 오류:', chartError)
       // 차트 업데이트 실패해도 컴포넌트는 계속 동작하도록 함
@@ -2136,6 +2389,7 @@ const onRowClick = (evt: Event, row: ScheduleItem) => {
   void updateScheduleChart() // 비동기 함수를 명시적으로 무시
 
   console.log('스케줄 선택됨:', {
+    mstId: row.mstId,
     no: row.no,
     satelliteName: row.satelliteName,
     startTime: row.startTime,
@@ -2150,36 +2404,46 @@ const updateScheduleChart = async () => {
     // Store의 추적 경로 초기화
     passScheduleStore.clearTrackingPaths()
 
-    // 선택된 스케줄에서 satelliteId와 passId 추출
-    const satelliteId = selectedSchedule.value.satelliteId || selectedSchedule.value.satelliteName
-    const passId = selectedSchedule.value.index || selectedSchedule.value.no
+    // ✅ mstId와 detailId 사용 (satelliteId 불필요)
+    const mstId = selectedSchedule.value.mstId
+    const detailId = selectedSchedule.value.detailId
 
-    if (satelliteId && passId) {
+    console.log('🔍 updateScheduleChart - mstId/detailId 확인:', {
+      mstId: selectedSchedule.value.mstId,
+      detailId: selectedSchedule.value.detailId,
+      no: selectedSchedule.value.no,
+      satelliteName: selectedSchedule.value.satelliteName,
+      schedule: selectedSchedule.value // ✅ 전체 스케줄 객체 확인
+    })
+
+    if (!mstId || detailId == null) {
+      console.warn('⚠️ MstId 또는 DetailId가 없음:', {
+        mstId: selectedSchedule.value.mstId,
+        detailId: selectedSchedule.value.detailId,
+        no: selectedSchedule.value.no,
+        satelliteName: selectedSchedule.value.satelliteName
+      })
+      return
+    }
+
+    if (mstId && detailId != null) {
       // ✅ 스케줄의 keyhole 여부에 따라 DataType 결정
       const isKeyhole = selectedSchedule.value.isKeyhole || selectedSchedule.value.IsKeyhole || false
       const dataType = isKeyhole ? 'keyhole_final_transformed' : 'final_transformed'
 
-      console.log(`🛰️ 스케줄 선택 - 추적 경로 조회: ${satelliteId}, 패스: ${passId}, DataType: ${dataType}`)
+      console.log(`🛰️ 스케줄 선택 - 추적 경로 조회: mstId=${mstId}, detailId=${detailId}, DataType: ${dataType}`)
 
       // ✅ DataType을 Store에 전달
-      const success = await passScheduleStore.loadTrackingDetailData(satelliteId, passId, dataType)
+      const success = await passScheduleStore.loadTrackingDetailData(mstId, detailId, dataType)
 
       if (success) {
         console.log('✅ 추적 경로 데이터 로드 성공')
         updateChart()
       } else {
-        console.warn('❌ 추적 경로 데이터 로드 실패')
-        // 백업용 더미 경로 설정
-        const dummyTrajectory = [
-          { azimuth: 0, elevation: 10 },
-          { azimuth: 30, elevation: 20 },
-          { azimuth: 60, elevation: 35 },
-          { azimuth: 90, elevation: 45 },
-          { azimuth: 120, elevation: 35 },
-          { azimuth: 150, elevation: 20 },
-          { azimuth: 180, elevation: 10 }
-        ]
-        setPredictedPath(dummyTrajectory)
+        console.warn('❌ 추적 경로 데이터 로드 실패 - 데이터가 없어 경로를 표시하지 않습니다')
+        // ✅ 데이터가 없으면 더미 경로를 설정하지 않음 (경로 표시 안 함)
+        passScheduleStore.clearTrackingPaths()
+        updateChart()
       }
     } else {
       console.warn('❌ 스케줄에서 필요한 정보를 찾을 수 없음:', selectedSchedule.value)
@@ -2191,19 +2455,7 @@ const updateScheduleChart = async () => {
 }
 
 // 🆕 예상 경로 설정 함수 (Store 통해서)
-const setPredictedPath = (trajectoryData: Array<{ azimuth: number, elevation: number }>) => {
-  try {
-    const predictedPath: [number, number][] = trajectoryData.map(point => [
-      Math.max(0, Math.min(90, point.elevation)),
-      point.azimuth < 0 ? point.azimuth + 360 : point.azimuth
-    ])
-
-    passScheduleStore.setPredictedTrackingPath(predictedPath)
-    updateChart()
-  } catch (error) {
-    console.error('예상 경로 설정 오류:', error)
-  }
-}
+// ✅ 더미 경로 설정 함수 제거 - 데이터가 없으면 경로를 표시하지 않음
 /*
 // 🆕 실제 추적 경로 초기화 (Store 통해서)
 const clearActualPath = () => {
@@ -2297,6 +2549,7 @@ const updateOffset = async (index: number, value: string) => {
     console.error('Error updating offset:', error)
   }
 }
+
 // 명령 핸들러들 - handleStartCommand 수정
 const handleStartCommand = async () => {
   // 🔧 선택된 스케줄이 아닌 등록된 모든 스케줄을 처리
@@ -2349,13 +2602,24 @@ const handleStartCommand = async () => {
       if (scheduleData.value.length > 0) {
         const firstSchedule = scheduleData.value[0]
         if (firstSchedule) {
-          const satelliteId = firstSchedule.satelliteId || firstSchedule.satelliteName
-          const passId = firstSchedule.index || firstSchedule.no
+          // ✅ mstId와 detailId 사용 (satelliteId 불필요)
+          const mstId = firstSchedule.mstId
+          const detailId = firstSchedule.detailId
 
-          if (satelliteId && passId) {
-            console.log('🛰️ 예측 경로 로드 시작:', satelliteId, passId)
+          if (!mstId || detailId == null) {
+            console.warn('⚠️ MstId 또는 DetailId가 없음:', {
+              mstId: firstSchedule.mstId,
+              detailId: firstSchedule.detailId,
+              no: firstSchedule.no,
+              satelliteName: firstSchedule.satelliteName
+            })
+            return
+          }
+
+          if (mstId && detailId != null) {
+            console.log('🛰️ 예측 경로 로드 시작: mstId=', mstId, 'detailId=', detailId)
             try {
-              const pathLoaded = await passScheduleStore.loadTrackingDetailData(satelliteId, passId)
+              const pathLoaded = await passScheduleStore.loadTrackingDetailData(mstId, detailId)
               if (pathLoaded) {
                 console.log('✅ 예측 경로 로드 성공')
               } else {

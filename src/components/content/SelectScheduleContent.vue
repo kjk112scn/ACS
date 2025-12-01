@@ -17,7 +17,8 @@
 
     <div class="content-body">
       <!-- 스케줄 테이블 -->
-      <q-table flat bordered dark :rows="scheduleData" :columns="scheduleColumns" row-key="index" :loading="loading"
+      <!-- ✅ PassSchedule 데이터 구조 리팩토링: row-key를 mstId와 detailId 조합으로 변경 -->
+      <q-table flat bordered dark :rows="scheduleData" :columns="scheduleColumns" :row-key="(row) => `${row.mstId}-${row.detailId}`" :loading="loading"
         v-model:selected="selectedRows" selection="multiple" class="schedule-table"
         style="height: 500px; background-color: var(--theme-card-background);" virtual-scroll
         :virtual-scroll-sticky-size-start="48" hide-pagination :rows-per-page-options="[0]" :row-class="getRowClass"
@@ -111,10 +112,17 @@
           </q-td>
         </template>
 
-        <!-- ✅ Index 컬럼 템플릿 추가 -->
-        <template v-slot:body-cell-index="props">
-          <q-td :props="props" class="index-cell">
-            <span class="index-value">{{ props.value }}</span>
+        <!-- ✅ MstId 컬럼 템플릿 추가 -->
+        <template v-slot:body-cell-mstId="props">
+          <q-td :props="props" class="mstid-cell">
+            <span class="mstid-value">{{ props.value }}</span>
+          </q-td>
+        </template>
+
+        <!-- ✅ DetailId 컬럼 템플릿 추가 -->
+        <template v-slot:body-cell-detailId="props">
+          <q-td :props="props" class="detailid-cell">
+            <span class="detailid-value">{{ props.value ?? 0 }}</span>
           </q-td>
         </template>
 
@@ -322,22 +330,30 @@ const scheduleData = computed(() => {
     }
   })
 
-  // ✅ no를 원본 그대로 유지하고, index는 정렬된 순서로 설정
+  // ✅ PassSchedule 데이터 구조 리팩토링: mstId, detailId 매핑 (index 필드 제거)
   const result = sortedData.map((item, sortedIndex) => {
     // 디버깅: 원본 item의 구조 확인
     if (sortedIndex < 3) {
       console.log(`🔍 Item ${sortedIndex}:`, {
+        mstId: item.mstId,
         originalNo: item.no,
         satelliteName: item.satelliteName,
         allKeys: Object.keys(item)
       })
     }
 
+    // ✅ index 필드 제거, mstId만 사용
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { index: _index, ...itemWithoutIndex } = item as ScheduleItem & { index?: number } // index 필드 제거 (타입 안전)
+
     return {
-      ...item,
-      // ✅ no는 원본 그대로 유지 (백엔드 원본 No 값)
-      // no: item.no, // 이미 spread로 포함됨
-      index: sortedIndex + 1 // 정렬된 순서로 1부터 설정 (표시용)
+      ...itemWithoutIndex,
+      // ✅ 전역 고유 ID (필수) - index 필드를 대체
+      mstId: item.mstId ?? item.no,
+      // ✅ Detail 구분자 (필수) - mstId와 함께 고유 식별
+      detailId: item.detailId ?? 0,
+      // ✅ UI 표시용 재순번 (1, 2, 3...)
+      no: sortedIndex + 1
     }
   })
 
@@ -354,34 +370,40 @@ const getSelectedLabel = (count: number) => {
 
 const selectedRows = ref<ScheduleItem[]>([])
 
-// ✅ 선택 상태 변경 시 localStorage에 저장 (Index 기준으로도 저장)
+/**
+ * 선택 상태 변경 시 localStorage에 저장
+ *
+ * PassSchedule 데이터 구조 리팩토링에 따라 selectedMstIds 저장.
+ */
 watch(
   () => selectedRows.value,
   (newSelected) => {
-    // 선택된 스케줄을 index 순서로 정렬
+    // ✅ 선택된 스케줄을 mstId 순서로 정렬
     const sortedSelected = [...newSelected].sort((a, b) => {
-      const indexA = a.index || 0
-      const indexB = b.index || 0
-      return indexA - indexB
+      const mstIdA = a.mstId || 0
+      const mstIdB = b.mstId || 0
+      return mstIdA - mstIdB
     })
 
-    // Index 목록 저장 (PassSchedulePage의 No와 매칭)
-    const selectedIndexes = sortedSelected.map(s => s.index || s.no)
-    // no 목록도 함께 저장 (호환성)
+    // ✅ mstId와 detailId 조합으로 저장 (필수)
+    const selectedMstIds = sortedSelected.map(s => s.mstId)
+    const selectedDetailIds = sortedSelected.map(s => s.detailId ?? 0)
+    // ✅ 하위 호환성을 위해 no도 함께 저장
     const selectedNos = sortedSelected.map(s => s.no)
 
     try {
       const storageKey = 'pass-schedule-selected-nos'
       const dataToSave = {
-        selectedNos, // no(원본) 저장 (호환성)
-        selectedIndexes, // Index 저장 (새로운 방식)
+        selectedMstIds, // ✅ 전역 고유 ID (필수)
+        selectedDetailIds, // ✅ Detail 구분자 (필수)
+        selectedNos, // ✅ 하위 호환성
         savedAt: Date.now()
       }
       localStorage.setItem(storageKey, JSON.stringify(dataToSave))
-      console.log('💾 선택 상태 저장 (Index 기준):', {
-        indexes: selectedIndexes,
+      console.log('💾 선택 상태 저장 (mstId 기준):', {
+        mstIds: selectedMstIds,
         nos: selectedNos,
-        count: selectedIndexes.length
+        count: selectedMstIds.length
       })
     } catch (error) {
       console.error('❌ 선택 상태 저장 실패:', error)
@@ -494,31 +516,43 @@ const canSelectSchedule = (schedule: ScheduleItem): boolean => {
   // 겹치는 스케줄인 경우, 같은 그룹의 다른 스케줄이 선택되어 있는지 확인
   const overlappingGroup = getOverlappingGroup(schedule.no)
 
-  // selectedRows에서 같은 그룹에 속하는 다른 스케줄이 선택되어 있는지 확인 (Index 기준)
+  // ✅ selectedRows에서 같은 그룹에 속하는 다른 스케줄이 선택되어 있는지 확인 (mstId와 detailId 조합 기준)
   const otherSelectedInGroup = selectedRows.value.filter(selected => {
-    // selectedRows의 스케줄이 scheduleData에서 어떤 스케줄인지 찾기
-    const selectedSchedule = scheduleData.value.find(s => s.index === selected.index)
+    // ✅ mstId와 detailId 조합으로 매칭
+    const selectedSchedule = scheduleData.value.find(s =>
+      s.mstId === selected.mstId && s.detailId === selected.detailId
+    )
     // 같은 그룹에 있고, 다른 스케줄인지 확인
     return selectedSchedule &&
       overlappingGroup.includes(selectedSchedule.no) &&
-      selected.index !== schedule.index
+      (selected.mstId !== schedule.mstId || selected.detailId !== schedule.detailId)
   })
 
   return otherSelectedInGroup.length === 0
 }
 
-// ✅ 체크박스 선택 상태 확인 함수 (Index 기준 비교)
+/**
+ * 체크박스 선택 상태 확인 함수
+ *
+ * PassSchedule 데이터 구조 리팩토링에 따라 mstId와 detailId 조합으로 비교.
+ *
+ * @param schedule 확인할 스케줄
+ * @returns 선택 여부
+ */
 const isScheduleSelected = (schedule: ScheduleItem): boolean => {
-  return selectedRows.value.some(selected => selected.index === schedule.index)
+  // ✅ mstId와 detailId 조합으로 비교 (고유 식별)
+  return selectedRows.value.some(selected =>
+    selected.mstId === schedule.mstId && selected.detailId === schedule.detailId
+  )
 }
 
 // ✅ 체크박스 변경 핸들러
 const handleCheckboxChange = (row: ScheduleItem, value: boolean) => {
-  console.log('☑️ 체크박스 변경:', {
-    satelliteName: row.satelliteName,
-    index: row.index,
-    value
-  })
+    console.log('☑️ 체크박스 변경:', {
+      satelliteName: row.satelliteName,
+      mstId: row.mstId,
+      value
+    })
 
   if (value) {
     // 선택 시도
@@ -531,7 +565,10 @@ const handleCheckboxChange = (row: ScheduleItem, value: boolean) => {
 
     // 겹침 검증
     const wouldOverlap = selectedRows.value.some(selected => {
-      const selectedSchedule = scheduleData.value.find(s => s.index === selected.index)
+      // ✅ mstId와 detailId 조합으로 매칭
+      const selectedSchedule = scheduleData.value.find(s =>
+        s.mstId === selected.mstId && s.detailId === selected.detailId
+      )
       return selectedSchedule && checkTimeOverlap(row, selectedSchedule)
     })
 
@@ -542,13 +579,14 @@ const handleCheckboxChange = (row: ScheduleItem, value: boolean) => {
     }
 
     // 이미 선택되어 있지 않으면 추가
-    if (!selectedRows.value.some(s => s.index === row.index)) {
+    if (!selectedRows.value.some(s => s.mstId === row.mstId && s.detailId === row.detailId)) {
       selectedRows.value.push({ ...row })
-      console.log('✅ 스케줄 선택 추가:', row.satelliteName)
+      console.log('✅ 스케줄 선택 추가:', row.satelliteName, `mstId=${row.mstId}, detailId=${row.detailId}`)
     }
   } else {
     // 선택 해제
-    const idx = selectedRows.value.findIndex(s => s.index === row.index)
+    // ✅ mstId와 detailId 조합으로 찾기
+    const idx = selectedRows.value.findIndex(s => s.mstId === row.mstId && s.detailId === row.detailId)
     if (idx >= 0) {
       selectedRows.value.splice(idx, 1)
       console.log('✅ 스케줄 선택 해제:', row.satelliteName)
@@ -557,13 +595,13 @@ const handleCheckboxChange = (row: ScheduleItem, value: boolean) => {
 
   // 선택 후 전체 선택된 항목 로그
   console.log('📋 현재 선택된 항목들:', selectedRows.value.map(s => ({
-    index: s.index,
+    mstId: s.mstId,
     no: s.no,
     name: s.satelliteName
   })))
 }
 
-// ✅ 전체 선택 상태 확인 (Index 기준)
+// ✅ 전체 선택 상태 확인 (mstId 기준)
 const isAllSelected = computed(() => {
   if (scheduleData.value.length === 0) return false
   if (selectedRows.value.length === 0) return false
@@ -575,9 +613,11 @@ const isAllSelected = computed(() => {
 
   if (selectableSchedules.length === 0) return false
 
-  // 선택 가능한 모든 스케줄이 선택되었는지 확인
+  // ✅ 선택 가능한 모든 스케줄이 선택되었는지 확인 (mstId와 detailId 조합)
   const allSelected = selectableSchedules.every(schedule =>
-    selectedRows.value.some(selected => selected.index === schedule.index)
+    selectedRows.value.some(selected =>
+      selected.mstId === schedule.mstId && selected.detailId === schedule.detailId
+    )
   )
 
   console.log('🔍 isAllSelected:', {
@@ -589,7 +629,7 @@ const isAllSelected = computed(() => {
   return allSelected
 })
 
-// ✅ 일부 선택 상태 확인 (indeterminate) - Index 기준
+// ✅ 일부 선택 상태 확인 (indeterminate) - mstId 기준
 const isIndeterminate = computed(() => {
   if (scheduleData.value.length === 0) return false
   if (selectedRows.value.length === 0) return false
@@ -601,8 +641,11 @@ const isIndeterminate = computed(() => {
 
   if (selectableSchedules.length === 0) return false
 
+  // ✅ mstId 기준으로 선택된 개수 확인
   const selectedCount = selectableSchedules.filter(schedule =>
-    selectedRows.value.some(selected => selected.index === schedule.index)
+    selectedRows.value.some(selected =>
+      selected.mstId === schedule.mstId && selected.detailId === schedule.detailId
+    )
   ).length
 
   const isIndeterminate = selectedCount > 0 && selectedCount < selectableSchedules.length
@@ -628,13 +671,13 @@ const toggleSelectAll = (value: boolean) => {
     const selectableSchedules = scheduleData.value.filter(schedule => {
       // 이미 선택된 항목은 제외
       if (isScheduleSelected(schedule)) {
-        console.log('⏭️ 이미 선택됨:', schedule.index, schedule.satelliteName)
+        console.log('⏭️ 이미 선택됨:', schedule.mstId, schedule.satelliteName)
         return false
       }
 
       // 겹치는 스케줄은 제외
       if (isScheduleOverlapping(schedule.no)) {
-        console.log('⚠️ 겹침으로 제외:', schedule.index, schedule.satelliteName)
+        console.log('⚠️ 겹침으로 제외:', schedule.mstId, schedule.satelliteName)
         return false
       }
 
@@ -654,9 +697,9 @@ const toggleSelectAll = (value: boolean) => {
 
       if (!wouldOverlap) {
         validSchedules.push(schedule)
-        console.log('➕ 추가:', schedule.index, schedule.satelliteName)
+        console.log('➕ 추가:', schedule.mstId, schedule.satelliteName)
       } else {
-        console.log('⚠️ 시간 겹침으로 제외:', schedule.index, schedule.satelliteName)
+        console.log('⚠️ 시간 겹침으로 제외:', schedule.mstId, schedule.satelliteName)
       }
     })
 
@@ -676,9 +719,9 @@ const toggleSelectAll = (value: boolean) => {
 const showOverlapWarning = (row: ScheduleItem) => {
   const overlappingGroup = getOverlappingGroup(row.no)
 
-  // selectedRows의 스케줄이 scheduleData에서 어떤 스케줄인지 찾아서 비교 (Index 기준)
+  // ✅ selectedRows의 스케줄이 scheduleData에서 어떤 스케줄인지 찾아서 비교 (mstId 기준)
   const selectedInGroup = selectedRows.value.filter(selected => {
-    const selectedSchedule = scheduleData.value.find(s => s.index === selected.index)
+    const selectedSchedule = scheduleData.value.find(s => s.mstId === selected.mstId)
     return selectedSchedule && overlappingGroup.includes(selectedSchedule.no)
   })
 
@@ -728,7 +771,8 @@ const showOverlapWarning = (row: ScheduleItem) => {
 type QTableColumn = NonNullable<QTableProps['columns']>[0]
 
 const scheduleColumns: QTableColumn[] = [
-  { name: 'index', label: 'Index', field: 'index', align: 'left' as const, sortable: true, style: 'width: 80px' },
+  { name: 'mstId', label: 'MstId', field: 'mstId', align: 'left' as const, sortable: true, style: 'width: 80px' },
+  { name: 'detailId', label: 'DetailId', field: 'detailId', align: 'left' as const, sortable: true, style: 'width: 80px' },
   { name: 'no', label: 'No', field: 'no', align: 'left' as const, sortable: true, style: 'width: 70px' },
   { name: 'satelliteId', label: '위성 ID', field: 'satelliteId', align: 'center' as const, sortable: true, style: 'width: 120px' },
   { name: 'satelliteName', label: '위성명', field: 'satelliteName', align: 'center' as const, sortable: true, style: 'min-width: 150px' },
@@ -999,28 +1043,29 @@ const handleSelect = async () => {
 
     console.log('🚀 스케줄 선택 처리 시작 (기존 목록 초기화):', selectedRows.value.length, '개')
     console.log('📋 선택된 스케줄 상세:', selectedRows.value.map(s => ({
+      mstId: s.mstId,
       no: s.no,
-      index: s.index,
       satelliteName: s.satelliteName,
       satelliteId: s.satelliteId,
       startTime: s.startTime,
       endTime: s.endTime
     })))
 
-    // ✅ index를 no로 덮어쓰기 (고유 식별자로 사용)
-    const schedulesWithIndexAsNo = selectedRows.value.map(s => ({
+    // ✅ PassSchedule 데이터 구조 리팩토링: mstId 사용
+    const schedulesWithMstId = selectedRows.value.map(s => ({
       ...s,
-      no: s.index || s.no // index를 no로 사용
+      mstId: s.mstId, // ✅ 전역 고유 ID (필수)
+      detailId: s.detailId ?? 0, // ✅ Detail 구분자
     }))
 
-    console.log('🔄 index를 no로 변환:', schedulesWithIndexAsNo.map(s => ({
+    console.log('🔄 mstId 기준 변환:', schedulesWithMstId.map(s => ({
+      mstId: s.mstId,
       no: s.no,
-      index: s.index,
       satelliteName: s.satelliteName
     })))
 
     // 🔧 기존 목록 초기화 후 새 스케줄 추가
-    const success = await passScheduleStore.replaceSelectedSchedules(schedulesWithIndexAsNo)
+    const success = await passScheduleStore.replaceSelectedSchedules(schedulesWithMstId)
 
     console.log('🔍 replaceSelectedSchedules 결과:', success)
     console.log('🔍 Store 상태 확인:', {
@@ -1032,36 +1077,50 @@ const handleSelect = async () => {
       console.log('✅ 스케줄 목록 교체 완료:', {
         count: selectedRows.value.length,
         schedules: selectedRows.value.map(s => ({
-          no: s.no, // 서버 원본 No 값
-          index: s.index,
+          mstId: s.mstId, // 전역 고유 ID
+          no: s.no, // UI 표시용 재순번
           name: s.satelliteName,
           satelliteId: s.satelliteId,
           startTime: s.startTime
         }))
       })
 
-      // ✅ 선택 완료 시 localStorage에 저장 (Index 기준)
+      // ✅ 선택 완료 시 localStorage에 저장 (mstId와 detailId 조합)
       const sortedSelected = [...selectedRows.value].sort((a, b) => {
-        const indexA = a.index || 0
-        const indexB = b.index || 0
-        return indexA - indexB
+        const mstIdA = a.mstId || 0
+        const mstIdB = b.mstId || 0
+        if (mstIdA !== mstIdB) return mstIdA - mstIdB
+        // mstId가 같으면 detailId로 정렬
+        const detailIdA = a.detailId ?? 0
+        const detailIdB = b.detailId ?? 0
+        return detailIdA - detailIdB
       })
 
-      const selectedIndexes = sortedSelected.map(s => s.index || s.no)
+      // ✅ mstId와 detailId 조합으로 저장
+      const selectedMstIds = sortedSelected.map(s => s.mstId)
+      const selectedDetailIds = sortedSelected.map(s => s.detailId ?? 0)
       const selectedNos = sortedSelected.map(s => s.no)
+
+      console.log('💾 localStorage 저장:', {
+        selectedMstIds,
+        selectedDetailIds,
+        selectedNos,
+        count: selectedMstIds.length
+      })
 
       try {
         const storageKey = 'pass-schedule-selected-nos'
         const dataToSave = {
-          selectedNos, // no(원본) 저장 (호환성)
-          selectedIndexes, // Index 저장 (새로운 방식)
+          selectedMstIds, // ✅ 전역 고유 ID (필수)
+          selectedDetailIds, // ✅ Detail 구분자 (필수)
+          selectedNos, // ✅ 하위 호환성
           savedAt: Date.now()
         }
         localStorage.setItem(storageKey, JSON.stringify(dataToSave))
-        console.log('💾 선택 완료 - 선택 상태 저장 (Index 기준):', {
-          indexes: selectedIndexes,
+        console.log('💾 선택 완료 - 선택 상태 저장 (mstId 기준):', {
+          mstIds: selectedMstIds,
           nos: selectedNos,
-          count: selectedIndexes.length
+          count: selectedMstIds.length
         })
       } catch (error) {
         console.error('❌ 선택 상태 저장 실패:', error)
@@ -1216,15 +1275,66 @@ onMounted(async () => {
       // ✅ 데이터 로드 후 이전 선택 상태 복원
       await nextTick() // scheduleData가 준비될 때까지 대기
 
-      // ✅ passScheduleStore.selectedScheduleList를 직접 사용하여 복원
+      // ✅ PassSchedule 데이터 구조 리팩토링: localStorage에서 selectedMstIds와 selectedDetailIds 복원
+      const savedMstIds = passScheduleStore.loadSelectedScheduleNosFromLocalStorage()
+      const savedDetailIds = passScheduleStore.loadSelectedScheduleDetailIdsFromLocalStorage()
+
+      if (savedMstIds.length > 0 && scheduleData.value.length > 0) {
+        console.log('🔄 localStorage에서 선택된 스케줄 복원 시작:', {
+          savedMstIdsCount: savedMstIds.length,
+          savedDetailIdsCount: savedDetailIds.length,
+          scheduleDataCount: scheduleData.value.length,
+          savedMstIds: savedMstIds.slice(0, 5),
+          savedDetailIds: savedDetailIds.slice(0, 5)
+        })
+
+        // ✅ mstId와 detailId 조합으로 복원
+        savedMstIds.forEach((mstId, index) => {
+          const savedDetailId = savedDetailIds[index] ?? 0
+          // ✅ mstId와 detailId 조합으로 매칭
+          const matchedSchedule = scheduleData.value.find(s =>
+            s.mstId === mstId && (s.detailId ?? 0) === savedDetailId
+          )
+          if (matchedSchedule) {
+            console.log('🔍 복원 시도:', {
+              savedMstId: mstId,
+              matchedMstId: matchedSchedule.mstId,
+              matchedDetailId: matchedSchedule.detailId,
+              matchedNo: matchedSchedule.no,
+              satelliteName: matchedSchedule.satelliteName,
+              canSelect: canSelectSchedule(matchedSchedule)
+            })
+
+            if (canSelectSchedule(matchedSchedule)) {
+              if (!selectedRows.value.some(s =>
+                s.mstId === matchedSchedule.mstId && s.detailId === matchedSchedule.detailId
+              )) {
+                selectedRows.value.push({ ...matchedSchedule })
+                console.log('✅ 스케줄 복원:', matchedSchedule.satelliteName, `mstId=${matchedSchedule.mstId}, detailId=${matchedSchedule.detailId}`)
+              } else {
+                console.log('⚠️ 이미 복원된 스케줄:', matchedSchedule.satelliteName, `mstId=${matchedSchedule.mstId}, detailId=${matchedSchedule.detailId}`)
+              }
+            } else {
+              console.log('❌ 선택 불가능한 스케줄 (겹침):', matchedSchedule.satelliteName, `mstId=${matchedSchedule.mstId}, detailId=${matchedSchedule.detailId}`)
+            }
+          } else {
+            console.warn('⚠️ mstId 매칭 실패:', {
+              savedMstId: mstId,
+              availableMstIds: scheduleData.value.slice(0, 5).map(s => ({ mstId: s.mstId, detailId: s.detailId, no: s.no, name: s.satelliteName }))
+            })
+          }
+        })
+      }
+
+      // ✅ passScheduleStore.selectedScheduleList를 직접 사용하여 복원 (추가 복원)
       const storeSelectedList = passScheduleStore.selectedScheduleList
 
       if (storeSelectedList.length > 0 && scheduleData.value.length > 0) {
         console.log('🔄 Store에서 선택된 스케줄 복원 시작:', {
           storeCount: storeSelectedList.length,
           scheduleDataCount: scheduleData.value.length,
-          storeNos: storeSelectedList.map(s => ({ no: s.no, index: s.index, name: s.satelliteName })),
-          scheduleDataNos: scheduleData.value.slice(0, 5).map(s => ({ no: s.no, index: s.index, name: s.satelliteName }))
+          storeNos: storeSelectedList.map(s => ({ no: s.no, mstId: s.mstId, name: s.satelliteName })),
+          scheduleDataNos: scheduleData.value.slice(0, 5).map(s => ({ no: s.no, mstId: s.mstId, name: s.satelliteName }))
         })
 
         // ✅ Store의 selectedScheduleList를 시간 순으로 정렬 (PassSchedulePage와 동일한 순서)
@@ -1236,30 +1346,35 @@ onMounted(async () => {
           }
         })
 
-        // ✅ Store에 저장된 index 값을 직접 사용하여 매칭
+        // ✅ PassSchedule 데이터 구조 리팩토링: mstId 기준 복원
         const restoredSchedules: ScheduleItem[] = []
 
         sortedStoreList.forEach((storeSchedule) => {
-          // ✅ storeSchedule의 index 값을 직접 사용 (순서가 아닌 저장된 값)
-          const savedIndex = storeSchedule.index || storeSchedule.no
+          // ✅ mstId와 detailId 조합으로 매칭 (전역 고유 ID)
+          const savedMstId = storeSchedule.mstId ?? storeSchedule.no
+          const savedDetailId = storeSchedule.detailId ?? 0
 
-          // scheduleData에서 같은 index를 가진 스케줄 찾기
-          const matchedSchedule = scheduleData.value.find(s => s.index === savedIndex)
+          // scheduleData에서 같은 mstId와 detailId를 가진 스케줄 찾기
+          const matchedSchedule = scheduleData.value.find(s =>
+            s.mstId === savedMstId && (s.detailId ?? 0) === savedDetailId
+          )
 
           if (matchedSchedule) {
-            console.log('✅ Index 기준 복원 매칭:', {
-              savedIndex: savedIndex,
-              scheduleIndex: matchedSchedule.index,
+            console.log('✅ mstId와 detailId 조합 복원 매칭:', {
+              savedMstId: savedMstId,
+              savedDetailId: savedDetailId,
+              scheduleMstId: matchedSchedule.mstId,
+              scheduleDetailId: matchedSchedule.detailId,
               scheduleNo: matchedSchedule.no,
               storeNo: storeSchedule.no,
               scheduleName: matchedSchedule.satelliteName
             })
             restoredSchedules.push(matchedSchedule)
           } else {
-            console.warn('⚠️ Index 매칭 실패:', {
-              savedIndex: savedIndex,
+            console.warn('⚠️ mstId 매칭 실패:', {
+              savedMstId: savedMstId,
               storeNo: storeSchedule.no,
-              scheduleDataIndexes: scheduleData.value.slice(0, 5).map(s => s.index)
+              scheduleDataMstIds: scheduleData.value.slice(0, 5).map(s => s.mstId)
             })
           }
         })
@@ -1271,9 +1386,9 @@ onMounted(async () => {
           const validSchedules: ScheduleItem[] = []
 
           restoredSchedules.forEach(schedule => {
-            // 이미 선택되지 않은 경우만 확인 (index 기준)
+            // ✅ 이미 선택되지 않은 경우만 확인 (mstId와 detailId 조합)
             const alreadySelected = selectedRows.value.some(selected =>
-              selected.index === schedule.index
+              selected.mstId === schedule.mstId && selected.detailId === schedule.detailId
             )
 
             if (alreadySelected) return
@@ -1285,18 +1400,24 @@ onMounted(async () => {
               // 겹치는 항목은 같은 그룹에 다른 선택이 없을 때만 추가
               const overlappingGroup = getOverlappingGroup(schedule.no)
               const hasOtherSelected = selectedRows.value.some(selected => {
-                const selectedSchedule = scheduleData.value.find(s => s.index === selected.index)
+                // ✅ mstId와 detailId 조합으로 매칭
+                const selectedSchedule = scheduleData.value.find(s =>
+                  s.mstId === selected.mstId && s.detailId === selected.detailId
+                )
                 return selectedSchedule &&
                   overlappingGroup.includes(selectedSchedule.no) &&
-                  selected.index !== schedule.index
+                  (selected.mstId !== schedule.mstId || selected.detailId !== schedule.detailId)
               })
 
-              if (!hasOtherSelected) {
-                // 추가 전에 겹침 체크
-                const wouldOverlap = selectedRows.value.some(selected => {
-                  const selectedSchedule = scheduleData.value.find(s => s.index === selected.index)
-                  return selectedSchedule && checkTimeOverlap(schedule, selectedSchedule)
-                })
+                if (!hasOtherSelected) {
+                  // 추가 전에 겹침 체크
+                  const wouldOverlap = selectedRows.value.some(selected => {
+                    // ✅ mstId와 detailId 조합으로 매칭
+                    const selectedSchedule = scheduleData.value.find(s =>
+                      s.mstId === selected.mstId && s.detailId === selected.detailId
+                    )
+                    return selectedSchedule && checkTimeOverlap(schedule, selectedSchedule)
+                  })
 
                 if (!wouldOverlap) {
                   validSchedules.push(schedule)
@@ -1311,7 +1432,7 @@ onMounted(async () => {
           console.log('✅ 이전 선택 상태 복원 완료:', {
             count: validSchedules.length,
             restoredNos: validSchedules.map(s => s.no),
-            restoredIndexes: validSchedules.map(s => s.index)
+            restoredMstIds: validSchedules.map(s => s.mstId)
           })
         } else {
           console.log('⚠️ 복원 가능한 스케줄 없음')
@@ -1334,19 +1455,20 @@ onMounted(async () => {
             savedData: savedData,
             savedIndexes: savedIndexes,
             scheduleDataCount: scheduleData.value.length,
-            scheduleDataNos: scheduleData.value.slice(0, 5).map(s => ({ no: s.no, index: s.index }))
+            scheduleDataNos: scheduleData.value.slice(0, 5).map(s => ({ no: s.no, mstId: s.mstId }))
           })
 
           let restoredSchedules: ScheduleItem[] = []
 
           if (useIndex && savedIndexes.length > 0) {
-            // ✅ Index 기준으로 복원 (새로운 방식)
+            // ✅ mstId 기준으로 복원 (index는 mstId와 동일)
             savedIndexes.forEach((savedIndex) => {
-              const matchedSchedule = scheduleData.value.find(s => s.index === savedIndex)
+              // ✅ index는 mstId와 연계되어 있으므로 mstId로 매칭
+              const matchedSchedule = scheduleData.value.find(s => s.mstId === savedIndex)
               if (matchedSchedule) {
-                console.log('✅ localStorage Index 기준 복원 매칭:', {
+                console.log('✅ localStorage mstId 기준 복원 매칭:', {
                   savedIndex: savedIndex,
-                  scheduleIndex: matchedSchedule.index,
+                  scheduleMstId: matchedSchedule.mstId,
                   scheduleNo: matchedSchedule.no,
                   scheduleName: matchedSchedule.satelliteName
                 })
@@ -1360,7 +1482,7 @@ onMounted(async () => {
               if (found) {
                 console.log('✅ localStorage no 기준 복원 매칭:', {
                   scheduleNo: schedule.no,
-                  scheduleIndex: schedule.index,
+                  scheduleMstId: schedule.mstId,
                   savedNo: savedData.find(n => n === schedule.no)
                 })
               }
@@ -1375,9 +1497,9 @@ onMounted(async () => {
             const validSchedules: ScheduleItem[] = []
 
             restoredSchedules.forEach(schedule => {
-              // 이미 선택되지 않은 경우만 확인 (index 기준)
+              // ✅ 이미 선택되지 않은 경우만 확인 (mstId와 detailId 조합)
               const alreadySelected = selectedRows.value.some(selected =>
-                selected.index === schedule.index
+                selected.mstId === schedule.mstId && selected.detailId === schedule.detailId
               )
 
               if (alreadySelected) return
@@ -1389,15 +1511,19 @@ onMounted(async () => {
                 // 겹치는 항목은 같은 그룹에 다른 선택이 없을 때만 추가
                 const overlappingGroup = getOverlappingGroup(schedule.no)
                 const hasOtherSelected = selectedRows.value.some(selected => {
-                  const selectedSchedule = scheduleData.value.find(s => s.index === selected.index)
+                  // ✅ mstId와 detailId 조합으로 매칭
+                  const selectedSchedule = scheduleData.value.find(s =>
+                    s.mstId === selected.mstId && s.detailId === selected.detailId
+                  )
                   return selectedSchedule &&
                     overlappingGroup.includes(selectedSchedule.no) &&
-                    selected.index !== schedule.index
+                    (selected.mstId !== schedule.mstId || selected.detailId !== schedule.detailId)
                 })
 
                 if (!hasOtherSelected) {
                   const wouldOverlap = selectedRows.value.some(selected => {
-                    const selectedSchedule = scheduleData.value.find(s => s.index === selected.index)
+                    // ✅ mstId 기준으로 매칭
+                    const selectedSchedule = scheduleData.value.find(s => s.mstId === selected.mstId)
                     return selectedSchedule && checkTimeOverlap(schedule, selectedSchedule)
                   })
 
@@ -1414,7 +1540,7 @@ onMounted(async () => {
             console.log('✅ localStorage에서 선택 상태 복원 완료:', {
               count: validSchedules.length,
               restoredNos: validSchedules.map(s => s.no),
-              restoredIndexes: validSchedules.map(s => s.index)
+              restoredMstIds: validSchedules.map(s => s.mstId)
             })
           }
         }

@@ -12,9 +12,26 @@ import {
 } from '../../services/mode/passScheduleService'
 import { useICDStore } from '../icd/icdStore'
 
+/**
+ * 스케줄 아이템 인터페이스
+ *
+ * PassSchedule 데이터 구조 리팩토링에 따라 필드 추가:
+ * - mstId 필드 추가 (전역 고유 ID, 필수) - index 필드를 대체
+ * - detailId 필드 추가 (패스 인덱스, 현재는 항상 0)
+ * - no 필드는 UI 표시용 재순번 (1, 2, 3...)
+ *
+ * ✅ index 필드 제거: mstId로 통일
+ */
 export interface ScheduleItem {
+  // ✅ 전역 고유 ID (필수) - index 필드를 대체
+  mstId: number // Long 타입 (백엔드) → number 타입 (프론트엔드)
+
+  // ✅ Detail 구분자 (필수) - mstId와 함께 고유 식별
+  detailId: number // 현재는 항상 0이지만 필수 필드
+
+  // ✅ UI 표시용 재순번 (1, 2, 3...)
   no: number
-  index?: number // 🔧 index 필드 확인/추가
+
   satelliteId?: string
   satelliteName: string
   startTime: string
@@ -158,15 +175,17 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
   })
   const trackingPathLoading = ref(false)
 
-  // 🆕 현재 로드된 추적 경로 정보
+  // 🆕 현재 로드된 추적 경로 정보 (mstId, detailId만 사용)
   const currentTrackingPathInfo = ref<{
-    satelliteId: string | null
-    passId: number | null
+    mstId: number | null // ✅ mstId 추가
+    detailId: number | null // ✅ detailId 추가
+    passId: number | null // ✅ 하위 호환성을 위해 유지 (mstId와 동일)
     pointCount: number
     lastUpdated: number | null
     dataType?: string // ✅ DataType 정보 추가
   }>({
-    satelliteId: null,
+    mstId: null,
+    detailId: null,
     passId: null,
     pointCount: 0,
     lastUpdated: null,
@@ -534,9 +553,16 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
     }
   }
 
-  // 🔧 단순 로컬 추가 함수 (API 호출 없이)
+  /**
+   * 단순 로컬 추가 함수 (API 호출 없이)
+   *
+   * PassSchedule 데이터 구조 리팩토링에 따라 mstId 기준 비교.
+   *
+   * @param schedule 추가할 스케줄
+   */
   const addSelectedScheduleLocal = (schedule: ScheduleItem) => {
-    const exists = selectedScheduleList.value.find((item) => item.no === schedule.no)
+    // ✅ mstId 기준으로 중복 확인
+    const exists = selectedScheduleList.value.find((item) => item.mstId === schedule.mstId)
     if (!exists) {
       selectedScheduleList.value.push(schedule)
       console.log('✅ 스케줄이 로컬 선택 목록에 추가됨:', schedule.satelliteName)
@@ -547,15 +573,22 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
     }
   }
 
-  // 🆕 선택된 스케줄을 목록에서 제거
-  const removeSelectedSchedule = (scheduleNo: number) => {
-    const index = selectedScheduleList.value.findIndex((item) => item.no === scheduleNo)
+  /**
+   * 선택된 스케줄을 목록에서 제거
+   *
+   * PassSchedule 데이터 구조 리팩토링에 따라 mstId 기준 제거.
+   *
+   * @param scheduleMstId 제거할 스케줄의 mstId
+   */
+  const removeSelectedSchedule = (scheduleMstId: number) => {
+    // ✅ mstId 기준으로 찾기
+    const index = selectedScheduleList.value.findIndex((item) => item.mstId === scheduleMstId)
     if (index >= 0) {
       const removed = selectedScheduleList.value.splice(index, 1)[0]
       console.log('✅ 스케줄이 선택 목록에서 제거됨:', removed?.satelliteName)
 
       // 현재 선택된 스케줄이 제거된 경우 선택 해제
-      if (selectedSchedule.value?.no === scheduleNo) {
+      if (selectedSchedule.value?.mstId === scheduleMstId) {
         selectedSchedule.value = null
       }
 
@@ -1005,23 +1038,52 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
     }
   }
 
-  // ✅ 선택된 스케줄 번호 localStorage 저장 함수
+  /**
+   * 선택된 스케줄 localStorage 저장 함수
+   *
+   * PassSchedule 데이터 구조 리팩토링에 따라 selectedMstIds와 selectedDetailIds 저장.
+   *
+   * @description
+   * - selectedMstIds: 전역 고유 ID 저장 (필수)
+   * - selectedDetailIds: Detail 구분자 저장 (필수)
+   * - selectedNos: 하위 호환성을 위해 함께 저장 (선택적)
+   */
   const saveSelectedScheduleNosToLocalStorage = () => {
     try {
       const storageKey = 'pass-schedule-selected-nos'
+      // ✅ mstId와 detailId 조합으로 저장 (필수)
+      const selectedMstIds = selectedScheduleList.value.map((s) => s.mstId)
+      const selectedDetailIds = selectedScheduleList.value.map((s) => s.detailId ?? 0)
+      // ✅ 하위 호환성을 위해 no도 함께 저장
       const selectedNos = selectedScheduleList.value.map((s) => s.no)
+
       const dataToSave = {
-        selectedNos,
+        selectedMstIds, // ✅ 전역 고유 ID (필수)
+        selectedDetailIds, // ✅ Detail 구분자 (필수)
+        selectedNos, // ✅ 하위 호환성 (선택적)
         savedAt: Date.now(),
       }
       localStorage.setItem(storageKey, JSON.stringify(dataToSave))
-      console.log('✅ 선택된 스케줄 번호 저장 완료:', selectedNos.length, '개')
+      console.log('✅ 선택된 스케줄 저장 완료:', {
+        mstIds: selectedMstIds.length,
+        detailIds: selectedDetailIds.length,
+        nos: selectedNos.length,
+      })
     } catch (error) {
-      console.error('❌ 선택된 스케줄 번호 저장 실패:', error)
+      console.error('❌ 선택된 스케줄 저장 실패:', error)
     }
   }
 
-  // ✅ 선택된 스케줄 번호 localStorage 로드 함수
+  /**
+   * 선택된 스케줄 localStorage 로드 함수
+   *
+   * PassSchedule 데이터 구조 리팩토링에 따라 selectedMstIds와 selectedDetailIds 우선 로드.
+   *
+   * @returns 전역 고유 ID 배열 (mstId) - detailId는 별도 함수로 로드
+   * @description
+   * - selectedMstIds 우선 사용 (새로운 형식)
+   * - selectedNos는 하위 호환성을 위해 폴백 (레거시 형식)
+   */
   const loadSelectedScheduleNosFromLocalStorage = (): number[] => {
     try {
       const storageKey = 'pass-schedule-selected-nos'
@@ -1032,19 +1094,67 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
       }
 
       const parsed = JSON.parse(savedData) as {
-        selectedNos?: number[]
+        selectedMstIds?: number[] // ✅ 전역 고유 ID (새로운 형식)
+        selectedDetailIds?: number[] // ✅ Detail 구분자 (새로운 형식)
+        selectedNos?: number[] // ✅ 하위 호환성 (레거시 형식)
         selectedIndexes?: number[]
         savedAt?: number
       }
 
+      // ✅ selectedMstIds 우선 사용 (새로운 형식)
+      if (parsed.selectedMstIds && Array.isArray(parsed.selectedMstIds)) {
+        console.log('✅ 선택된 스케줄 MstId 복원:', parsed.selectedMstIds.length, '개')
+        return parsed.selectedMstIds
+      }
+
+      // ✅ 하위 호환성: selectedNos 폴백 (레거시 형식)
       if (parsed.selectedNos && Array.isArray(parsed.selectedNos)) {
-        console.log('✅ 선택된 스케줄 번호 복원:', parsed.selectedNos.length, '개')
+        console.log('⚠️ 레거시 형식 복원 (selectedNos):', parsed.selectedNos.length, '개')
         return parsed.selectedNos
       }
 
       return []
     } catch (error) {
-      console.error('❌ 선택된 스케줄 번호 복원 실패:', error)
+      console.error('❌ 선택된 스케줄 복원 실패:', error)
+      return []
+    }
+  }
+
+  /**
+   * 선택된 스케줄의 detailId localStorage 로드 함수
+   *
+   * @returns Detail 구분자 배열 (detailId)
+   */
+  const loadSelectedScheduleDetailIdsFromLocalStorage = (): number[] => {
+    try {
+      const storageKey = 'pass-schedule-selected-nos'
+      const savedData = localStorage.getItem(storageKey)
+
+      if (!savedData) {
+        return []
+      }
+
+      const parsed = JSON.parse(savedData) as {
+        selectedMstIds?: number[]
+        selectedDetailIds?: number[] // ✅ Detail 구분자 (새로운 형식)
+        selectedNos?: number[]
+        savedAt?: number
+      }
+
+      // ✅ selectedDetailIds 사용 (새로운 형식)
+      if (parsed.selectedDetailIds && Array.isArray(parsed.selectedDetailIds)) {
+        console.log('✅ 선택된 스케줄 DetailId 복원:', parsed.selectedDetailIds.length, '개')
+        return parsed.selectedDetailIds
+      }
+
+      // ✅ 하위 호환성: mstId 개수만큼 0으로 채움
+      if (parsed.selectedMstIds && Array.isArray(parsed.selectedMstIds)) {
+        return new Array(parsed.selectedMstIds.length).fill(0)
+      }
+
+      return []
+    } catch (error) {
+      console.error('❌ 선택된 스케줄 DetailId 복원 실패:', error)
       return []
     }
   }
@@ -1154,10 +1264,43 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
             return
           }
 
-          passes.forEach((pass: PassScheduleMasterData) => {
+          passes.forEach((pass: PassScheduleMasterData, passIndex: number) => {
             try {
+              // ✅ 디버깅: API 응답의 원본 데이터 확인
+              if (passIndex < 3) {
+                // 처음 3개만 로그
+                console.log(`🔍 패스 데이터 원본 (위성=${satelliteId}, 인덱스=${passIndex}):`, {
+                  MstId: pass.MstId,
+                  DetailId: pass.DetailId,
+                  SatelliteID: pass.SatelliteID,
+                  SatelliteName: pass.SatelliteName,
+                  allKeys: Object.keys(pass), // ✅ 모든 키 확인
+                })
+              }
+
+              // ✅ PassSchedule 데이터 구조 리팩토링: MstId, DetailId 매핑
+              // ✅ MstId는 필수 필드이므로 반드시 존재해야 함
+              if (!pass.MstId) {
+                console.error(
+                  `❌ MstId가 없는 패스 데이터: 위성=${satelliteId}, 인덱스=${passIndex}`,
+                  pass, // ✅ 전체 객체 로그
+                )
+                return // MstId가 없으면 스킵
+              }
+
+              const mstId = pass.MstId // ✅ 전역 고유 ID (필수)
+              const detailId = pass.DetailId ?? 0 // ✅ Detail 구분자 (기본값 0)
+
               const scheduleItem: ScheduleItem = {
-                no: pass.No,
+                // ✅ 전역 고유 ID (필수) - index 필드를 대체
+                mstId: mstId,
+
+                // ✅ Detail 구분자 (필수)
+                detailId: detailId,
+
+                // ✅ UI 표시용 재순번 (나중에 정렬 후 재순번 처리)
+                no: passIndex + 1, // ✅ 정렬 후 재순번 처리됨
+
                 satelliteId: pass.SatelliteID || satelliteId,
                 satelliteName: pass.SatelliteName || satelliteId,
                 startTime: pass.StartTime || '',
@@ -1242,6 +1385,12 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
           }
         })
 
+        // ✅ 정렬 후 UI 표시용 재순번 처리 (no 필드)
+        allSchedules.forEach((schedule, index) => {
+          schedule.no = index + 1 // ✅ UI 표시용 재순번 (1, 2, 3...)
+          // ✅ index 필드 제거: mstId만 사용
+        })
+
         const filteredSchedules = allSchedules.filter((schedule) => {
           const shouldDrop = isMidnightStart(schedule.startTime)
           if (shouldDrop) {
@@ -1316,24 +1465,28 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
     }
   }
 
-  // 추적 대상 설정 함수 추가
-  // 🔧 간단한 버전 - 기본값 보장
+  /**
+   * 추적 대상 설정 함수
+   *
+   * PassSchedule 데이터 구조 리팩토링에 따라 mstId 사용.
+   *
+   * @param schedules 선택된 스케줄 목록
+   * @returns 성공 여부
+   */
   const setTrackingTargets = async (schedules: ScheduleItem[]): Promise<boolean> => {
     try {
       loading.value = true
       console.log('🚀 추적 대상 설정 시작:', schedules.length, '개')
 
       const trackingTargets: TrackingTarget[] = schedules.map((schedule, arrayIndex) => {
-        // ✅ mstId는 항상 no(원본 백엔드 값) 사용 - 동기화 보장
-        const mstId = schedule.no
+        // ✅ 전역 고유 ID 사용 (mstId 필수) - index 필드 제거
+        const mstId = schedule.mstId ?? schedule.no
 
-        console.log(
-          `🔍 스케줄 ${arrayIndex}: mstId=${mstId} (no=${schedule.no}, index=${schedule.index})`,
-        )
+        console.log(`🔍 스케줄 ${arrayIndex}: mstId=${mstId} (no=${schedule.no})`)
 
         return {
-          mstId: Number(mstId), // ✅ 원본 백엔드 No 값 사용
-          no: schedule.no, // ✅ 원본 백엔드 No 값
+          mstId: Number(mstId), // ✅ 전역 고유 ID (필수)
+          no: schedule.no, // ✅ UI 표시용 재순번 (하위 호환성)
           satelliteId: schedule.satelliteId || '',
           satelliteName: schedule.satelliteName,
           startTime: schedule.startTime,
@@ -1440,17 +1593,25 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
     }
   }
 
-  // 🆕 추적 경로 세부 데이터 조회 (개선된 버전)
+  /**
+   * 추적 경로 세부 데이터 조회 함수 (satelliteId 불필요)
+   *
+   * PassSchedule 데이터 구조 리팩토링에 따라 mstId와 detailId만 사용합니다.
+   *
+   * @param mstId 전역 고유 MstId (Long 타입)
+   * @param detailId 패스 인덱스 (Int 타입)
+   * @param dataType DataType (optional)
+   * @returns 성공 여부
+   */
   async function loadTrackingDetailData(
-    satelliteId: string,
-    passId: number,
+    mstId: number, // ✅ mstId (전역 고유 ID)
+    detailId: number, // ✅ detailId (패스 인덱스)
     dataType?: string, // ✅ DataType 파라미터 추가
   ): Promise<boolean> {
     try {
       // 이미 같은 데이터가 로드되어 있는지 확인
       if (
-        currentTrackingPathInfo.value.satelliteId === satelliteId &&
-        currentTrackingPathInfo.value.passId === passId &&
+        currentTrackingPathInfo.value.passId === mstId &&
         predictedTrackingPath.value.length > 0
       ) {
         console.log('✅ 이미 로드된 추적 경로 데이터 사용')
@@ -1459,15 +1620,11 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
 
       trackingPathLoading.value = true
       console.log(
-        `📡 Store: 추적 경로 세부 데이터 조회 - 위성: ${satelliteId}, 패스: ${passId}, DataType: ${dataType || 'auto'}`,
+        `📡 Store: 추적 경로 세부 데이터 조회 - mstId: ${mstId}, detailId: ${detailId}, DataType: ${dataType || 'auto'}`,
       )
 
-      // ✅ DataType을 서비스에 전달
-      const response = await passScheduleService.getTrackingDetailByPass(
-        satelliteId,
-        passId,
-        dataType,
-      )
+      // ✅ DataType을 서비스에 전달 (satelliteId 제거)
+      const response = await passScheduleService.getTrackingDetailByPass(mstId, detailId, dataType)
 
       if (response.success && response.data?.trackingPoints) {
         const trackingPoints = response.data.trackingPoints
@@ -1480,10 +1637,11 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
         const chartData = passScheduleService.convertToChartData(trackingPoints)
         predictedTrackingPath.value = chartData
 
-        // 추적 경로 정보 업데이트
+        // 추적 경로 정보 업데이트 (mstId, detailId만 사용)
         currentTrackingPathInfo.value = {
-          satelliteId,
-          passId,
+          mstId: mstId, // ✅ mstId 저장
+          detailId: detailId, // ✅ detailId 저장
+          passId: mstId, // ✅ 하위 호환성
           pointCount: trackingPoints.length,
           lastUpdated: Date.now(),
           dataType: response.data.dataType || dataType, // ✅ DataType 정보 저장
@@ -1492,8 +1650,8 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
         console.log(`✅ Store: 추적 경로 데이터 로드 완료:`, {
           rawPointCount: trackingPoints.length,
           chartPointCount: chartData.length,
-          satelliteId,
-          passId,
+          mstId,
+          detailId,
           dataType: response.data.dataType || dataType,
         })
 
@@ -1549,7 +1707,8 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
     trackingDetailData.value = []
     currentTrackingPosition.value = { azimuth: 0, elevation: 0 }
     currentTrackingPathInfo.value = {
-      satelliteId: null,
+      mstId: null,
+      detailId: null,
       passId: null,
       pointCount: 0,
       lastUpdated: null,
@@ -1637,10 +1796,12 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
         selectedSchedule?: ScheduleItem | null
         selectedScheduleList?: ScheduleItem[]
         currentTrackingPathInfo?: {
-          satelliteId: string | number | null
-          passId: number | null
-          pointCount: number
-          lastUpdated: string | number | null
+          mstId?: number | null // ✅ mstId 추가
+          detailId?: number | null // ✅ detailId 추가
+          satelliteId?: string | number | null // ✅ 하위 호환성을 위해 유지 (기존 데이터 복원용)
+          passId?: number | null
+          pointCount?: number
+          lastUpdated?: string | number | null
           dataType?: string
         }
         savedAt?: number
@@ -1696,16 +1857,19 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
         )
       }
 
-      // ✅ 현재 추적 경로 정보 복원
+      // ✅ 현재 추적 경로 정보 복원 (mstId, detailId만 사용)
       if (parsed.currentTrackingPathInfo) {
         // ✅ 타입 변환: JSON.parse로 인한 타입 불일치 해결
+        // ✅ 하위 호환성: 기존 데이터에 satelliteId가 있으면 passId로 변환
+        const mstId =
+          parsed.currentTrackingPathInfo.mstId ?? parsed.currentTrackingPathInfo.passId ?? null
+        const detailId = parsed.currentTrackingPathInfo.detailId ?? null
+
         currentTrackingPathInfo.value = {
-          satelliteId:
-            parsed.currentTrackingPathInfo.satelliteId !== null
-              ? String(parsed.currentTrackingPathInfo.satelliteId)
-              : null,
-          passId: parsed.currentTrackingPathInfo.passId,
-          pointCount: parsed.currentTrackingPathInfo.pointCount,
+          mstId: mstId !== null ? Number(mstId) : null,
+          detailId: detailId !== null ? Number(detailId) : null,
+          passId: mstId !== null ? Number(mstId) : null, // ✅ 하위 호환성
+          pointCount: parsed.currentTrackingPathInfo.pointCount ?? 0,
           lastUpdated:
             parsed.currentTrackingPathInfo.lastUpdated !== null
               ? typeof parsed.currentTrackingPathInfo.lastUpdated === 'string'
@@ -1714,7 +1878,10 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
               : null,
           dataType: parsed.currentTrackingPathInfo.dataType,
         }
-        console.log('✅ 추적 경로 정보 복원 완료')
+        console.log('✅ 추적 경로 정보 복원 완료:', {
+          mstId: currentTrackingPathInfo.value.mstId,
+          detailId: currentTrackingPathInfo.value.detailId,
+        })
       }
 
       console.log('✅ PassSchedule 데이터 localStorage 복원 완료')
@@ -2229,6 +2396,7 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
     loadScheduleDataFromLocalStorage,
     saveSelectedScheduleNosToLocalStorage,
     loadSelectedScheduleNosFromLocalStorage,
+    loadSelectedScheduleDetailIdsFromLocalStorage,
     loadSelectedScheduleIndexesFromLocalStorage,
   }
 })
