@@ -771,9 +771,11 @@ const isExportingCsv = ref(false)
 // QTable 컬럼 타입 정의
 type QTableColumn = NonNullable<QTableProps['columns']>[0]
 
-// ✅ 기존 스케줄 테이블 컬럼 정의 (원래대로 복구)
+// ✅ 기존 스케줄 테이블 컬럼 정의 (PassSchedulePage와 동일한 구조)
 const scheduleColumns: QTableColumn[] = [
-  { name: 'No', label: 'No', field: 'No', align: 'left', sortable: true },
+  { name: 'No', label: 'No', field: 'No', align: 'center' as const, sortable: true, style: 'width: 60px' },
+  { name: 'mstId', label: 'MstId', field: 'mstId', align: 'center' as const, sortable: true, style: 'width: 70px' },
+  { name: 'detailId', label: 'DetailId', field: 'detailId', align: 'center' as const, sortable: true, style: 'width: 70px' },
   {
     name: 'SatelliteName',
     label: '위성 이름',
@@ -1105,8 +1107,14 @@ const selectedScheduleInfo = computed(() => {
   // 기존 스케줄 정보 로직
   const selected = ephemerisStore.selectedSchedule
   if (selected) {
+    // ✅ mstId와 detailId 사용 (PassSchedule과 동일한 구조)
+    const mstId = selected.mstId ?? selected.No
+    const detailId = selected.detailId ?? 0
+
     return {
-      passId: selected.No,
+      passId: selected.No, // 하위 호환성을 위해 유지
+      mstId: mstId, // ✅ mstId 추가
+      detailId: detailId, // ✅ detailId 추가
       satelliteName: selected.SatelliteName || selected.SatelliteID || '알 수 없음',
       satelliteId: selected.SatelliteID || 'N/A',
       startTime: selected.StartTime,
@@ -1150,7 +1158,9 @@ const selectedScheduleInfo = computed(() => {
   }
 
   return {
-    passId: 0,
+    passId: 0, // 하위 호환성을 위해 유지
+    mstId: 0, // ✅ mstId 기본값
+    detailId: 0, // ✅ detailId 기본값
     satelliteName: '',
     satelliteId: '',
     startTime: '',
@@ -2126,6 +2136,16 @@ const selectSchedule = async () => {
     // 스토어의 detailData는 selectSchedule 메서드 내에서 이미 로드됨
     const detailData = ephemerisStore.detailData
 
+    // ✅ 디버깅: detailData 로드 확인
+    console.log('📊 스케줄 선택 후 detailData 확인:', {
+      mstId: selectedItem.mstId ?? selectedItem.No,
+      detailId: selectedItem.detailId ?? 0,
+      detailDataLength: detailData?.length || 0,
+      hasDetailData: !!detailData && detailData.length > 0,
+      chartExists: !!chart,
+      firstPoint: detailData?.[0],
+    })
+
     // KEYHOLE 정보 로깅
     if (selectedItem.IsKeyhole) {
       console.log('🚀 KEYHOLE 위성 선택됨:', {
@@ -2139,7 +2159,14 @@ const selectSchedule = async () => {
 
     // 차트 업데이트
     if (detailData && detailData.length > 0 && chart) {
+      console.log('📈 이론치 경로 차트 업데이트 시작:', detailData.length, '개 포인트')
       updateChartWithTrajectory([...detailData] as TrajectoryPoint[])
+    } else {
+      console.warn('⚠️ 차트 업데이트 실패:', {
+        hasDetailData: !!detailData,
+        detailDataLength: detailData?.length || 0,
+        hasChart: !!chart,
+      })
     }
 
     success(`${selectedItem.SatelliteName || selectedItem.SatelliteID} 스케줄이 선택되었습니다`)
@@ -2463,17 +2490,27 @@ const handleEphemerisCommand = async () => {
     }
 
     // 기존 스케줄 추적 로직
-    if (!selectedScheduleInfo.value.passId) {
+    // ✅ mstId와 detailId 확인 (PassSchedule과 동일한 구조)
+    const schedule = ephemerisStore.selectedSchedule
+    if (!schedule) {
       warning('먼저 스케줄을 선택하거나 TLE를 입력하세요')
       return
     }
 
-    // ✅ currentTrackingPassId가 없으면 selectedScheduleInfo.passId로 설정
-    if (!ephemerisStore.currentTrackingPassId && selectedScheduleInfo.value.passId) {
-      // selectedSchedule이 있으면 currentTrackingPassId 설정
+    // ✅ mstId와 detailId 사용
+    const mstId = schedule.mstId ?? schedule.No
+    const detailId = schedule.detailId ?? 0
+
+    // ✅ currentTrackingMstId가 없으면 selectedSchedule의 mstId로 설정
+    if (!ephemerisStore.currentTrackingMstId && mstId) {
+      // selectedSchedule이 있으면 currentTrackingMstId/detailId 설정
       if (ephemerisStore.selectedSchedule) {
-        ephemerisStore.currentTrackingPassId = ephemerisStore.selectedSchedule.No
-        console.log('✅ currentTrackingPassId 자동 설정:', ephemerisStore.currentTrackingPassId)
+        ephemerisStore.currentTrackingMstId = mstId
+        ephemerisStore.currentTrackingDetailId = detailId
+        console.log('✅ currentTrackingMstId/detailId 자동 설정:', {
+          mstId: ephemerisStore.currentTrackingMstId,
+          detailId: ephemerisStore.currentTrackingDetailId
+        })
       } else {
         // selectedSchedule이 없으면 경고
         warning('스케줄 정보가 없습니다. 다시 스케줄을 선택해주세요.')

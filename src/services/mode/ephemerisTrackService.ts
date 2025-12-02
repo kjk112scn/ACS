@@ -40,6 +40,9 @@ export interface ComparisonScheduleItem {
 // 타입 정의
 export interface ScheduleItem {
   No: number
+  // ✅ mstId와 detailId 필드 추가 (PassSchedule과 동일한 구조)
+  mstId?: number // 전역 고유 마스터 ID
+  detailId?: number // 패스 인덱스
   SatelliteID: string
   SatelliteName: string
   StartTime: string
@@ -445,18 +448,33 @@ class EphemerisTrackService {
       const response = await api.get('/ephemeris/tracking/mst/merged')
       console.log('✅ API 응답 받음:', response.status, response.data?.data?.length || 0, '개')
 
-      // ✅ 병합 API 응답 구조: { status: 'success', data: [...] }
-      const mergedData =
-        response.data?.status === 'success'
-          ? (response.data.data as Record<string, unknown>[])
-          : Array.isArray(response.data)
-            ? response.data
-            : []
+      // ✅ 병합 API 응답 구조: { status: 'success', data: [...] } (PassSchedule과 동일)
+      let mergedData: Record<string, unknown>[] = []
+
+      if (response.data?.status === 'success' && Array.isArray(response.data.data)) {
+        // ✅ 정상 응답: { status: 'success', data: [...] }
+        mergedData = response.data.data as Record<string, unknown>[]
+      } else if (Array.isArray(response.data)) {
+        // ✅ 배열 직접 응답: [...]
+        mergedData = response.data as Record<string, unknown>[]
+      } else if (response.data?.data && Array.isArray(response.data.data)) {
+        // ✅ data 필드에 배열이 있는 경우
+        mergedData = response.data.data as Record<string, unknown>[]
+      } else {
+        console.warn('⚠️ 응답 데이터가 배열이 아님:', typeof response.data, response.data)
+        mergedData = []
+      }
 
       // 백엔드가 병합 데이터를 반환하므로 매핑 처리
       if (Array.isArray(mergedData) && mergedData.length > 0) {
         const mappedData = mergedData.map((item: Record<string, unknown>) => ({
-          No: item.No as number,
+          // ✅ 하위 호환성을 위해 No 필드 유지하되 MstId 값 사용
+          No: (item.MstId ?? item.No) as number,
+          // ✅ mstId와 detailId 매핑 추가 (PassSchedule과 동일한 구조)
+          // ✅ No 필드 제거, MstId만 사용
+          mstId: item.MstId as number,
+          // Ephemeris는 일반적으로 detailId가 0이지만, 백엔드에서 제공하는 경우 사용
+          detailId: (item.DetailId ?? 0) as number,
           SatelliteID: item.SatelliteID as string,
           SatelliteName: item.SatelliteName as string,
           StartTime: item.StartTime as string,
@@ -598,8 +616,13 @@ class EphemerisTrackService {
         return mappedData
       }
 
-      console.log('⚠️ 응답 데이터가 배열이 아님:', typeof mergedData)
-      return mergedData || []
+      // ✅ mergedData가 비어있거나 매핑되지 않은 경우 빈 배열 반환 (타입 명시)
+      console.log(
+        '⚠️ 응답 데이터가 배열이 아님 또는 비어있음:',
+        typeof mergedData,
+        mergedData.length,
+      )
+      return [] as ScheduleItem[]
     } catch (error) {
       console.error('❌ API 호출 실패:', error)
       console.error('❌ 요청 URL:', '/ephemeris/tracking/mst/merged')
@@ -619,9 +642,17 @@ class EphemerisTrackService {
     }
   }
 
-  async startEphemerisTracking(passId: number): Promise<unknown> {
+  /**
+   * 위성 추적 시작
+   * ✅ mstId와 detailId를 사용하여 추적 시작 (PassSchedule과 동일한 구조)
+   *
+   * @param mstId 추적할 마스터 ID
+   * @param detailId 패스 인덱스 (기본값: 0)
+   * @returns 추적 시작 응답
+   */
+  async startEphemerisTracking(mstId: number, detailId: number = 0): Promise<unknown> {
     try {
-      const response = await api.post(`/ephemeris/tracking/start/${passId}`)
+      const response = await api.post(`/ephemeris/tracking/start/${mstId}/pass/${detailId}`)
       return response.data
     } catch (error) {
       return this.handleApiError(error, '위성 추적 시작에 실패했습니다')
@@ -874,11 +905,30 @@ class EphemerisTrackService {
    * @param mstId 스케줄 마스터 ID
    * @returns 전체 상세 데이터 배열
    */
-  async fetchEphemerisDetailData(mstId: number): Promise<ScheduleDetailItem[]> {
+  /**
+   * 상세 데이터 조회
+   *
+   * 백엔드에서 모든 데이터를 가져옵니다 (음수 Elevation 포함).
+   * 필터링은 Store의 Computed에서 수행됩니다.
+   *
+   * ✅ mstId와 detailId를 사용하여 상세 데이터 조회 (PassSchedule과 동일한 구조)
+   *
+   * @param mstId 스케줄 마스터 ID
+   * @param detailId 패스 인덱스 (기본값: 0)
+   * @returns 전체 상세 데이터 배열
+   */
+  async fetchEphemerisDetailData(
+    mstId: number,
+    detailId: number = 0,
+  ): Promise<ScheduleDetailItem[]> {
     try {
-      const response = await api.get<ScheduleDetailItem[]>(`/ephemeris/detail/${mstId}`)
+      const response = await api.get<ScheduleDetailItem[]>(
+        `/ephemeris/detail/${mstId}/pass/${detailId}`,
+      )
 
-      console.log(`📡 백엔드에서 전체 데이터 수신: ${response.data.length}개`)
+      console.log(
+        `📡 백엔드에서 전체 데이터 수신: ${response.data.length}개 (mstId: ${mstId}, detailId: ${detailId})`,
+      )
 
       return response.data
     } catch (error) {

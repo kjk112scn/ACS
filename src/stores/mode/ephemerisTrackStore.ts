@@ -60,7 +60,11 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
   const masterData = ref<ScheduleItem[]>([])
   const detailData = ref<ScheduleDetailItem[]>([])
   const selectedSchedule = ref<ScheduleItem | null>(null)
-  const currentTrackingPassId = ref<number | null>(null)
+  // ✅ currentTrackingPassId를 currentTrackingMstId/detailId로 변경 (PassSchedule과 동일한 구조)
+  const currentTrackingMstId = ref<number | null>(null)
+  const currentTrackingDetailId = ref<number | null>(null)
+  // 하위 호환성을 위해 currentTrackingPassId 유지 (deprecated)
+  const currentTrackingPassId = computed(() => currentTrackingMstId.value)
   const trackingStatus = ref<'idle' | 'active' | 'paused' | 'error'>('idle')
   const tleData = ref<EphemerisTrackRequest | null>(null)
 
@@ -610,17 +614,31 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
   /**
    * 스케줄 선택 및 상세 데이터 로드
    *
+   * ✅ mstId와 detailId를 사용하여 스케줄 선택 (PassSchedule과 동일한 구조)
+   *
    * @param schedule 선택된 스케줄 아이템
    */
   const selectSchedule = async (schedule: ScheduleItem) => {
     selectedSchedule.value = schedule
-    currentTrackingPassId.value = schedule.No
+
+    // ✅ mstId와 detailId 사용 (PassSchedule과 동일한 구조)
+    // ✅ No 필드 제거, mstId만 사용
+    const mstId = schedule.mstId
+    if (!mstId) {
+      throw new Error(`스케줄에 mstId가 없습니다: ${JSON.stringify(schedule)}`)
+    }
+    const detailId = schedule.detailId ?? 0
+
+    currentTrackingMstId.value = mstId
+    currentTrackingDetailId.value = detailId
 
     try {
-      await ephemerisTrackService.setCurrentTrackingPassId(schedule.No)
+      await ephemerisTrackService.setCurrentTrackingPassId(mstId)
 
       // 1. 백엔드에서 전체 데이터 조회 (필터링 없음)
-      const allData = await ephemerisTrackService.fetchEphemerisDetailData(schedule.No)
+      // ✅ mstId와 detailId 사용
+      console.log(`📡 백엔드에서 상세 데이터 요청: mstId=${mstId}, detailId=${detailId}`)
+      const allData = await ephemerisTrackService.fetchEphemerisDetailData(mstId, detailId)
 
       // 2. 전체 데이터 저장
       rawDetailData.value = allData
@@ -633,7 +651,16 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
         - 표시 데이터: ${filteredDetailData.value.length}개
         - KEYHOLE: ${schedule.IsKeyhole ? 'YES' : 'NO'}
         - Train 각도: ${schedule.RecommendedTrainAngle}°
+        - mstId: ${mstId}
+        - detailId: ${detailId}
       `)
+
+      // ✅ 데이터가 없을 경우 경고
+      if (allData.length === 0) {
+        console.warn(
+          `⚠️ 백엔드에서 데이터를 가져오지 못했습니다: mstId=${mstId}, detailId=${detailId}`,
+        )
+      }
 
       return filteredDetailData.value
     } catch (err) {
@@ -691,14 +718,19 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
 
   /**
    * 추적 시작
+   * ✅ mstId와 detailId를 사용하여 추적 시작 (PassSchedule과 동일한 구조)
    */
   const startTracking = async () => {
-    if (!currentTrackingPassId.value) {
+    if (!currentTrackingMstId.value) {
       throw new Error('No schedule selected')
     }
 
     try {
-      await ephemerisTrackService.startEphemerisTracking(currentTrackingPassId.value)
+      // ✅ mstId와 detailId 사용
+      const mstId = currentTrackingMstId.value
+      const detailId = currentTrackingDetailId.value ?? 0
+
+      await ephemerisTrackService.startEphemerisTracking(mstId, detailId)
       trackingStatus.value = 'active'
       trackingStartTime.value = Date.now() // 추적 시작 시간 기록
       isInitialDelayActive.value = true // 지연 시작 활성화
@@ -878,7 +910,9 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
 
       // 추적 상태를 활성화
       trackingStatus.value = 'active'
-      currentTrackingPassId.value = 0 // 정지궤도는 passId가 없음
+      // ✅ 정지궤도는 mstId와 detailId가 없으므로 null로 설정
+      currentTrackingMstId.value = null
+      currentTrackingDetailId.value = null
 
       console.log('정지궤도 추적 활성화됨')
       return { success: true }
@@ -910,7 +944,9 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     masterData.value = []
     detailData.value = []
     selectedSchedule.value = null
-    currentTrackingPassId.value = null
+    // ✅ mstId와 detailId 초기화
+    currentTrackingMstId.value = null
+    currentTrackingDetailId.value = null
     trackingStatus.value = 'idle'
     tleData.value = null
 
@@ -971,10 +1007,12 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
 
   /**
    * 선택 상태 클리어
+   * ✅ mstId와 detailId 초기화
    */
   const clearSelection = () => {
     selectedSchedule.value = null
-    currentTrackingPassId.value = null
+    currentTrackingMstId.value = null
+    currentTrackingDetailId.value = null
     detailData.value = []
   }
 
@@ -987,12 +1025,14 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
 
   /**
    * 스케줄 데이터만 초기화
+   * ✅ mstId와 detailId 초기화
    */
   const clearScheduleData = () => {
     masterData.value = []
     detailData.value = []
     selectedSchedule.value = null
-    currentTrackingPassId.value = null
+    currentTrackingMstId.value = null
+    currentTrackingDetailId.value = null
   }
 
   /**
@@ -1128,11 +1168,18 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
       if (parsed.selectedSchedule) {
         selectedSchedule.value = parsed.selectedSchedule
 
-        // ✅ currentTrackingPassId도 함께 복원
-        const scheduleNo = (parsed.selectedSchedule as Record<string, unknown>).No
-        if (scheduleNo && typeof scheduleNo === 'number') {
-          currentTrackingPassId.value = scheduleNo
-          console.log('✅ currentTrackingPassId 복원:', currentTrackingPassId.value)
+        // ✅ mstId와 detailId 복원 (PassSchedule과 동일한 구조)
+        const schedule = parsed.selectedSchedule as Record<string, unknown>
+        const mstId = (schedule.mstId ?? schedule.No) as number
+        const detailId = (schedule.detailId ?? 0) as number
+
+        if (mstId && typeof mstId === 'number') {
+          currentTrackingMstId.value = mstId
+          currentTrackingDetailId.value = detailId
+          console.log('✅ currentTrackingMstId/detailId 복원:', {
+            mstId: currentTrackingMstId.value,
+            detailId: currentTrackingDetailId.value,
+          })
         }
 
         // ✅ ScheduleItem 타입 확인: satelliteName 또는 satelliteId 사용
@@ -1178,6 +1225,10 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     tleData: readonly(tleData),
     isLoading: readonly(isLoading),
     error: readonly(error),
+    // ✅ mstId와 detailId 추가 (PassSchedule과 동일한 구조)
+    currentTrackingMstId: readonly(currentTrackingMstId),
+    currentTrackingDetailId: readonly(currentTrackingDetailId),
+    // 하위 호환성을 위해 currentTrackingPassId 유지 (deprecated)
     currentTrackingPassId: readonly(currentTrackingPassId),
 
     // ✅ 새로 추가된 상태들
