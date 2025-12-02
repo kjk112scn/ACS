@@ -66,7 +66,7 @@ class EphemerisService(
     // 현재 추적 중인 위성 정보
     private var currentTrackingPass: Map<String, Any?>? = null
 
-    private var currentTrackingPassId: UInt? = null
+    private var currentTrackingPassId: Long? = null  // ✅ UInt → Long 변경 (PassSchedule과 동일)
     private var subscriptions: MutableList<Disposable> = mutableListOf()
 
     // ✅ 간단한 실행 완료 플래그 (Set 사용)
@@ -807,26 +807,29 @@ class EphemerisService(
      * 위성 추적을 시작하고 상태머신을 초기화합니다.
      * Keyhole 여부에 따라 적절한 MST를 currentTrackingPass에 설정합니다.
      * 
-     * @param passId 추적할 패스 ID (MST ID)
+     * ✅ mstId와 detailId를 사용하여 추적 시작 (PassSchedule과 동일한 구조)
+     * 
+     * @param mstId 추적할 마스터 ID
+     * @param detailId 패스 인덱스 (기본값: 0)
      * 
      * @see getTrackingPassMst Keyhole 여부에 따라 적절한 MST 선택
      * @see moveToStartPosition 시작 위치로 이동
      * @see startModeTimer 모드 타이머 시작
      */
-    fun startEphemerisTracking(passId: UInt) {
-        logger.info("🚀 위성 추적 시작: 패스 ID = {}", passId)
+    fun startEphemerisTracking(mstId: Long, detailId: Int = 0) {  // ✅ UInt → Long/Int 변경 (PassSchedule과 동일)
+        logger.info("🚀 위성 추적 시작: mstId = {}, detailId = {}", mstId, detailId)
         stopModeTimer()
         executedActions.clear()
         logger.info("🔄 실행 플래그 초기화 완료")
-        currentTrackingPassId = passId
+        currentTrackingPassId = mstId
         
         // ✅ Keyhole 여부에 따라 적절한 MST 선택
         // Keyhole 발생: keyhole_final_transformed MST
         // Keyhole 미발생: final_transformed MST
-        val selectedPass = getTrackingPassMst(passId)
+        val selectedPass = getTrackingPassMst(mstId)
         
         if (selectedPass == null) {
-            logger.error("패스 ID {}에 해당하는 데이터를 찾을 수 없습니다", passId)
+            logger.error("MstId {}에 해당하는 데이터를 찾을 수 없습니다", mstId)
             return
         }
         
@@ -840,7 +843,7 @@ class EphemerisService(
         
         logger.info("✅ ephemeris 추적 준비 완료 (실제 추적 시작 전)")
         // 상태머신 진입
-        moveToStartPosition(passId)
+        moveToStartPosition(mstId, detailId)
         startModeTimer()
         logger.info("✅ 위성 추적 및 통합 모드 타이머 시작 완료")
     }
@@ -1066,11 +1069,13 @@ class EphemerisService(
                         logger.debug("🔄 정지궤도 추적 활성 상태 유지")
                     } else {
                         // 저궤도: 시간 기반 스케줄 추적
-                        val passId = currentTrackingPassId
-                        if (passId == null) {
-                            logger.warn("현재 추적 중인 패스 ID가 설정되지 않았습니다.")
+                        // ✅ mstId와 detailId 사용
+                        val mstId = currentTrackingPassId
+                        if (mstId == null) {
+                            logger.warn("현재 추적 중인 MstId가 설정되지 않았습니다.")
                             return
                         }
+                        val detailId = (currentTrackingPass?.get("DetailId") as? Number)?.toInt() ?: 0  // ✅ UInt → Int 변경 (PassSchedule과 동일)
                         val (startTime, endTime) = getCurrentTrackingPassTimes()
                         val calTime = GlobalData.Time.calUtcTimeOffsetTime
                         val timeDifference = Duration.between(startTime, calTime).seconds
@@ -1093,9 +1098,9 @@ class EphemerisService(
                                 if (!executedActions.contains("IN_PROGRESS")) {
                                     executedActions.add("IN_PROGRESS")
                                     logger.info("📡 추적 진행 중 처리 실행 - 데이터 전송 시작")
-                                    handleInProgress(passId)
+                                    handleInProgress(mstId, detailId)
                                 }
-                                saveRealtimeTrackingData(passId, calTime, startTime)
+                                saveRealtimeTrackingData(mstId, detailId, calTime, startTime)
                                 //moveTiltToZero(GlobalData.Offset.tiltPositionOffset+ GlobalData.Offset.trueNorthOffset)
 
                             }
@@ -1122,21 +1127,23 @@ class EphemerisService(
 
     /**
      * 추적 시작 전 처리
+     * ✅ mstId와 detailId를 사용하여 시작 전 처리
      */
-    private fun handleBeforeStart(passId: UInt) {
+    private fun handleBeforeStart(mstId: Long, detailId: Int = 0) {  // ✅ UInt → Long/Int 변경 (PassSchedule과 동일)
         logger.info("📍 시작 전 상태 - 시작 위치로 이동")
-        moveToStartPosition(passId)
+        moveToStartPosition(mstId, detailId)
 
     }
 
     /**                                                                        R
      * 추적 진행 중 처리
+     * ✅ mstId와 detailId를 사용하여 진행 중 처리
      */
-    private fun handleInProgress(passId: UInt) {
+    private fun handleInProgress(mstId: Long, detailId: Int = 0) {  // ✅ UInt → Long/Int 변경 (PassSchedule과 동일)
         logger.info("📡 진행 중 상태 - 추적 데이터 전송 시작")
         trackingStatus.ephemerisTrackingState = "TRACKING"  // ✅ 추가
         dataStoreService.setEphemerisTracking(true)
-        sendHeaderTrackingData(passId)
+        sendHeaderTrackingData(mstId, detailId)
     }
 
     /**
@@ -1162,11 +1169,12 @@ class EphemerisService(
 
     /**
      * ✅ 배치 처리를 사용한 실시간 추적 데이터 저장
+     * ✅ mstId와 detailId를 사용하여 실시간 데이터 저장
      */
-    private fun saveRealtimeTrackingData(passId: UInt, currentTime: ZonedDateTime, startTime: ZonedDateTime) {
+    private fun saveRealtimeTrackingData(mstId: Long, detailId: Int, currentTime: ZonedDateTime, startTime: ZonedDateTime) {  // ✅ UInt → Long/Int 변경 (PassSchedule과 동일)
         try {
             // ✅ 실시간 추적 데이터 생성
-            val realtimeData = createRealtimeTrackingData(passId, currentTime, startTime)
+            val realtimeData = createRealtimeTrackingData(mstId, detailId, currentTime, startTime)
 
             // ✅ 배치 처리로 변경
             batchStorageManager.addToBatch(realtimeData)
@@ -1202,21 +1210,30 @@ class EphemerisService(
      * - 필터링 후 데이터 없음: 빈 Map 반환
      * - Keyhole 발생 시 keyhole_final_transformed 데이터 없음: null 반환
      * 
-     * @param passId 패스 ID (MST ID)
+     * ✅ mstId와 detailId를 사용하여 실시간 데이터 생성
+     * 
+     * @param mstId 마스터 ID
+     * @param detailId 패스 인덱스 (기본값: 0)
      * @param currentTime 현재 시간
      * @param startTime 추적 시작 시간
      * @return 실시간 추적 데이터 Map
      */
     private fun createRealtimeTrackingData(
-        passId: UInt,
+        mstId: Long,  // ✅ UInt → Long 변경 (PassSchedule과 동일)
+        detailId: Int = 0,  // ✅ UInt → Int 변경 (PassSchedule과 동일)
         currentTime: ZonedDateTime,
         startTime: ZonedDateTime
     ): Map<String, Any?> {
         val elapsedTimeSeconds = Duration.between(startTime, currentTime).toMillis() / 1000.0f
 
         // 1. 이론치 데이터 타입별로 분리해서 가져오기
-        val originalPassDetails = getEphemerisTrackDtlByMstIdAndDataType(passId, "original")
-        val axisTransformedPassDetails = getEphemerisTrackDtlByMstIdAndDataType(passId, "axis_transformed")
+        // ✅ mstId와 detailId를 사용하여 데이터 조회
+        val originalPassDetails = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId).filter {
+            it["DataType"] == "original"
+        }
+        val axisTransformedPassDetails = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId).filter {
+            it["DataType"] == "axis_transformed"
+        }
 
         if (originalPassDetails.isEmpty()) {
             logger.debug("원본 이론치 데이터가 없어 실시간 데이터 저장을 건너뜁니다.")
@@ -1224,12 +1241,14 @@ class EphemerisService(
         }
         
         // ✅ Keyhole 여부 확인 (final_transformed MST에서)
+        // ✅ MstId 필드만 사용 (No 필드 제거)
         val finalMst = ephemerisTrackMstStorage.find { 
-            it["No"] == passId && it["DataType"] == "final_transformed" 
+            val dataMstId = (it["MstId"] as? Number)?.toLong()
+            dataMstId == mstId && it["DataType"] == "final_transformed" 
         }
         
         if (finalMst == null) {
-            logger.warn("⚠️ 패스 ID ${passId}에 해당하는 final_transformed MST 데이터를 찾을 수 없습니다.")
+            logger.warn("⚠️ MstId(${mstId})에 해당하는 final_transformed MST 데이터를 찾을 수 없습니다.")
             return emptyMap()
         }
         
@@ -1237,15 +1256,17 @@ class EphemerisService(
         
         // ✅ Keyhole 여부에 따라 DataType 선택
         val finalDataType = if (isKeyhole) {
-            logger.debug("🔑 실시간 추적: 패스 ID ${passId} Keyhole 발생 → keyhole_optimized_final_transformed 사용")
+            logger.debug("🔑 실시간 추적: MstId(${mstId}) Keyhole 발생 → keyhole_optimized_final_transformed 사용")
             "keyhole_optimized_final_transformed"  // Keyhole이면 최적화 데이터 사용
         } else {
-            logger.debug("✅ 실시간 추적: 패스 ID ${passId} Keyhole 미발생 → final_transformed 사용")
+            logger.debug("✅ 실시간 추적: MstId(${mstId}) Keyhole 미발생 → final_transformed 사용")
             "final_transformed"  // Keyhole 아니면 기본 데이터 사용
         }
         
-        // 선택된 DataType의 데이터 조회
-        val finalTransformedPassDetails = getEphemerisTrackDtlByMstIdAndDataType(passId, finalDataType)
+        // 선택된 DataType의 데이터 조회 (mstId와 detailId 모두 일치하는 데이터만)
+        val finalTransformedPassDetails = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId).filter {
+            it["DataType"] == finalDataType
+        }
         
         // ✅ 하드웨어 제한 각도 기준으로 필터링
         val elevationMin = settingsService.angleElevationMin
@@ -1256,7 +1277,7 @@ class EphemerisService(
         
         // 필터링된 데이터가 비어있으면 로깅
         if (filteredFinalTransformed.isEmpty()) {
-            logger.warn("⚠️ 패스 ID ${passId}: 필터링 결과 데이터가 없습니다. (기준: ${elevationMin}°)")
+            logger.warn("⚠️ MstId(${mstId}), DetailId(${detailId}): 필터링 결과 데이터가 없습니다. (기준: ${elevationMin}°)")
             return emptyMap()
         }
 
@@ -1327,7 +1348,9 @@ class EphemerisService(
 
         // ✅ Keyhole Final 변환 데이터 추출 (Keyhole 발생 시만)
         val keyholeFinalTransformedAzimuth = if (isKeyhole) {
-            val keyholeFinalPassDetails = getEphemerisTrackDtlByMstIdAndDataType(passId, "keyhole_final_transformed")
+            val keyholeFinalPassDetails = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId).filter {
+                it["DataType"] == "keyhole_final_transformed"
+            }
             if (keyholeFinalPassDetails.isNotEmpty()) {
                 val keyholeFinalPoint = if (theoreticalIndex < keyholeFinalPassDetails.size) {
                     keyholeFinalPassDetails[theoreticalIndex]
@@ -1336,13 +1359,15 @@ class EphemerisService(
                 }
                 (keyholeFinalPoint?.get("Azimuth") as? Double)?.toFloat()
             } else {
-                logger.warn("⚠️ 패스 ID ${passId}: Keyhole 발생 시 keyhole_final_transformed 데이터가 없습니다.")
+                logger.warn("⚠️ MstId(${mstId}), DetailId(${detailId}): Keyhole 발생 시 keyhole_final_transformed 데이터가 없습니다.")
                 null
             }
         } else null
         
         val keyholeFinalTransformedElevation = if (isKeyhole) {
-            val keyholeFinalPassDetails = getEphemerisTrackDtlByMstIdAndDataType(passId, "keyhole_final_transformed")
+            val keyholeFinalPassDetails = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId).filter {
+                it["DataType"] == "keyhole_final_transformed"
+            }
             if (keyholeFinalPassDetails.isNotEmpty()) {
                 val keyholeFinalPoint = if (theoreticalIndex < keyholeFinalPassDetails.size) {
                     keyholeFinalPassDetails[theoreticalIndex]
@@ -1356,7 +1381,9 @@ class EphemerisService(
         } else null
         
         val keyholeFinalTransformedRange = if (isKeyhole) {
-            val keyholeFinalPassDetails = getEphemerisTrackDtlByMstIdAndDataType(passId, "keyhole_final_transformed")
+            val keyholeFinalPassDetails = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId).filter {
+                it["DataType"] == "keyhole_final_transformed"
+            }
             if (keyholeFinalPassDetails.isNotEmpty()) {
                 val keyholeFinalPoint = if (theoreticalIndex < keyholeFinalPassDetails.size) {
                     keyholeFinalPassDetails[theoreticalIndex]
@@ -1370,7 +1397,9 @@ class EphemerisService(
         } else null
         
         val keyholeFinalTransformedAltitude = if (isKeyhole) {
-            val keyholeFinalPassDetails = getEphemerisTrackDtlByMstIdAndDataType(passId, "keyhole_final_transformed")
+            val keyholeFinalPassDetails = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId).filter {
+                it["DataType"] == "keyhole_final_transformed"
+            }
             if (keyholeFinalPassDetails.isNotEmpty()) {
                 val keyholeFinalPoint = if (theoreticalIndex < keyholeFinalPassDetails.size) {
                     keyholeFinalPassDetails[theoreticalIndex]
@@ -1459,7 +1488,9 @@ class EphemerisService(
             "trackingTrainTime" to trackingCmdTrainTime,
             "trackingCMDTrainAngle" to trackingCmdTrain,
             "trackingActualTrainAngle" to trackingActualTrain,
-            "passId" to passId,
+            "passId" to mstId, // 하위 호환성을 위해 유지
+            "mstId" to mstId, // ✅ mstId 추가
+            "detailId" to detailId, // ✅ detailId 추가
 
             // ✅ 변환 오차 계산
             "originalToAxisTransformationError" to (axisTransformedAzimuth - originalAzimuth),
@@ -1795,9 +1826,10 @@ class EphemerisService(
 
     /**
      * 시작 위치로 이동 (공통)
+     * ✅ mstId와 detailId를 사용하여 시작 위치 조회
      */
-    private fun moveToStartPosition(passId: UInt) {
-        val passDetails = getEphemerisTrackDtlByMstId(passId)
+    private fun moveToStartPosition(mstId: Long, detailId: Int = 0) {  // ✅ UInt → Long/Int 변경 (PassSchedule과 동일)
+        val passDetails = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId)
         if (passDetails.isNotEmpty()) {
             val startPoint = passDetails.first()
             targetAzimuth = (startPoint["Azimuth"] as Double).toFloat()
@@ -1814,22 +1846,25 @@ class EphemerisService(
      * 2.12.1 위성 추적 해더 정보 송신 프로토콜 사용
      * Keyhole 여부에 따라 적절한 MST를 currentTrackingPass에 설정합니다.
      * 
-     * @param passId 추적할 패스 ID (MST ID)
+     * ✅ mstId와 detailId를 사용하여 헤더 정보 전송
+     * 
+     * @param mstId 추적할 마스터 ID
+     * @param detailId 패스 인덱스 (기본값: 0)
      * 
      * @see getTrackingPassMst Keyhole 여부에 따라 적절한 MST 선택
      */
-    fun sendHeaderTrackingData(passId: UInt) {
+    fun sendHeaderTrackingData(mstId: Long, detailId: Int = 0) {  // ✅ UInt → Long/Int 변경 (PassSchedule과 동일)
         try {
             udpFwICDService.writeNTPCommand()
-            currentTrackingPassId = passId
+            currentTrackingPassId = mstId
             
             // ✅ Keyhole 여부에 따라 적절한 MST 선택
             // Keyhole 발생: keyhole_final_transformed MST
             // Keyhole 미발생: final_transformed MST
-            val selectedPass = getTrackingPassMst(passId)
+            val selectedPass = getTrackingPassMst(mstId)
             
             if (selectedPass == null) {
-                logger.error("선택된 패스 ID($passId)에 해당하는 데이터를 찾을 수 없습니다.")
+                logger.error("선택된 MstId($mstId)에 해당하는 데이터를 찾을 수 없습니다.")
                 return
             }
             
@@ -1846,7 +1881,7 @@ class EphemerisService(
             val endTime = (selectedPass["EndTime"] as ZonedDateTime).withZoneSameInstant(ZoneOffset.UTC)
 
             // 시작 시간과 종료 시간을 문자열로 변환 (밀리초 포함)
-            logger.info("위성 추적 시작: ${selectedPass["SatelliteName"]} (패스 ID: $passId)")
+            logger.info("위성 추적 시작: ${selectedPass["SatelliteName"]} (MstId: $mstId, DetailId: $detailId)")
             logger.info("시작 시간: $startTime, 종료 시간: $endTime")
 
             // 밀리초 추출
@@ -1854,14 +1889,14 @@ class EphemerisService(
             val endTimeMs = (endTime.nano / 1_000_000).toUShort()
 
             // 전체 데이터 길이 검증
-            val totalLength = calculateDataLength(passId)
-            val actualDataCount = getEphemerisTrackDtlByMstId(passId).size
+            val totalLength = calculateDataLength(mstId, detailId)
+            val actualDataCount = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId).size
             logger.info("전체 데이터 길이: ${totalLength}개")
             logger.info("실제 데이터 개수: ${actualDataCount}개")
 
             // ✅ 필터링 후 데이터가 없으면 추적 시작 중단
             if (actualDataCount == 0) {
-                logger.error("❌ 패스 ID ${passId}: 필터링 후 데이터가 없어 추적을 시작할 수 없습니다.")
+                logger.error("❌ MstId($mstId), DetailId($detailId): 필터링 후 데이터가 없어 추적을 시작할 수 없습니다.")
                 dataStoreService.setEphemerisTracking(false)
                 return
             }
@@ -1895,7 +1930,7 @@ class EphemerisService(
 
             // UdpFwICDService를 통해 데이터 전송
             udpFwICDService.sendSatelliteTrackHeader(headerFrame)
-            logger.info("위성 추적 전체 길이 ${calculateDataByteSize(passId).toUShort()}")
+            logger.info("위성 추적 전체 길이 ${calculateDataByteSize(mstId, detailId).toUShort()}")
             logger.info("위성 추적 헤더 정보 전송 완료")
 
             dataStoreService.setEphemerisTracking(true)
@@ -1910,15 +1945,16 @@ class EphemerisService(
     /**
      * 위성 추적 초기 제어 명령 전송
      * 2.12.2 위성 추적 초기 제어 명령 프로토콜 사용
+     * ✅ mstId와 detailId를 사용하여 초기 데이터 전송
      */
-    fun sendInitialTrackingData(passId: UInt) {
+    fun sendInitialTrackingData(mstId: Long, detailId: Int = 0) {  // ✅ UInt → Long/Int 변경 (PassSchedule과 동일)
         try {
             if (currentTrackingPass == null || trackingStatus.ephemerisStatus != true) {
                 logger.error("위성 추적이 시작되지 않았습니다. 먼저 startSatelliteTracking을 호출하세요.")
                 return
             }
             var initialTrackingData: List<Triple<UInt, Float, Float>> = emptyList()
-            val passDetails = getEphemerisTrackDtlByMstId(passId)
+            val passDetails = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId)
 
             // ✅ 시간 정보 가져오기
             val (startTime, endTime) = getCurrentTrackingPassTimes()
@@ -2026,7 +2062,7 @@ class EphemerisService(
                 }
             }
             if (passDetails.isEmpty()) {
-                logger.error("선택된 패스 ID($passId)에 해당하는 세부 데이터를 찾을 수 없습니다.")
+                logger.error("선택된 MstId($mstId), DetailId($detailId)에 해당하는 세부 데이터를 찾을 수 없습니다.")
                 dataStoreService.setEphemerisTracking(false)
                 return
             }
@@ -2097,6 +2133,7 @@ class EphemerisService(
     /**
      * 위성 추적 데이터 요청 처리 (ACU F/W로부터 요청 수신 시)
      * 2.12.3 위성 추적 추가 데이터 요청에 대한 응답
+     * ✅ mstId와 detailId를 사용하여 추가 데이터 전송
      */
     fun handleEphemerisTrackingDataRequest(timeAcc: UInt, requestDataLength: UShort) {
         if (trackingStatus.ephemerisStatus != true || currentTrackingPass == null) {
@@ -2105,22 +2142,24 @@ class EphemerisService(
         }
         logger.info("timeAcc :${timeAcc}.")
         logger.info("requestDataLength :${requestDataLength}.")
-        val passId = currentTrackingPass!!["No"] as UInt
+        val mstId = (currentTrackingPass!!["No"] as? Number)?.toLong() ?: throw IllegalStateException("MstId가 없습니다")
+        val detailId = (currentTrackingPass!!["DetailId"] as? Number)?.toInt() ?: 0  // ✅ UInt → Int 변경 (PassSchedule과 동일)
 
         // ✅ timeAcc를 인덱스로 변환 (timeAcc는 누적 시간 ms 단위, 인덱스는 100ms 단위)
         // timeAcc를 100으로 나눠서 데이터 포인트 인덱스를 구하고, 다시 100을 곱해서 ms 단위 startIndex 계산
         val startIndex = (timeAcc.toInt() / 100) * 100  // 100ms 단위로 정렬
         logger.info("startIndex :${startIndex} (timeAcc: ${timeAcc}ms -> 인덱스: ${timeAcc.toInt() / 100})")
         // 요청된 데이터 길이에 따라 데이터 포인트 수 계산
-        sendAdditionalTrackingData(passId, startIndex, requestDataLength.toInt())
+        sendAdditionalTrackingData(mstId, detailId, startIndex, requestDataLength.toInt())
         //dataStoreService.setEphemerisTracking(true)
     }
 
     /**
      * 위성 추적 추가 데이터 전송
      * 2.12.3 위성 추적 추가 데이터 요청에 대한 응답으로 사용
+     * ✅ mstId와 detailId를 사용하여 추가 데이터 전송
      */
-    fun sendAdditionalTrackingData(passId: UInt, startIndex: Int, requestDataLength: Int = 25) {
+    fun sendAdditionalTrackingData(mstId: Long, detailId: Int = 0, startIndex: Int, requestDataLength: Int = 25) {  // ✅ UInt → Long/Int 변경 (PassSchedule과 동일)
         try {
             if (currentTrackingPass == null || trackingStatus.ephemerisStatus != true) {
                 logger.error("위성 추적이 시작되지 않았습니다. 먼저 startSatelliteTracking을 호출하세요.")
@@ -2128,10 +2167,10 @@ class EphemerisService(
             }
             logger.info("startIndex :${startIndex}.")
             // 선택된 패스 ID에 해당하는 세부 데이터 가져오기
-            val passDetails = getEphemerisTrackDtlByMstId(passId)
+            val passDetails = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId)
 
             if (passDetails.isEmpty()) {
-                logger.error("선택된 패스 ID($passId)에 해당하는 세부 데이터를 찾을 수 없습니다.")
+                logger.error("선택된 MstId($mstId), DetailId($detailId)에 해당하는 세부 데이터를 찾을 수 없습니다.")
                 return
             }
             val indexMs = startIndex / 100
@@ -2178,10 +2217,11 @@ class EphemerisService(
             GlobalData.Offset.TimeOffset = inputTimeOffset
             udpFwICDService.writeNTPCommand()
             // 현재 추적 중인 패스가 있을 때만 초기 데이터 전송
-            currentTrackingPassId?.let { passId ->
-                logger.info("추적 중인 패스 발견, 초기 데이터 전송 시작: passId={}", passId)
-                sendInitialTrackingData(passId)
-                logger.info("초기 추적 데이터 전송 완료: passId={}", passId)
+            currentTrackingPassId?.let { mstId ->
+                val detailId = (currentTrackingPass?.get("DetailId") as? Number)?.toInt() ?: 0  // ✅ UInt → Int 변경 (PassSchedule과 동일)
+                logger.info("추적 중인 패스 발견, 초기 데이터 전송 시작: mstId={}, detailId={}", mstId, detailId)
+                sendInitialTrackingData(mstId, detailId)
+                logger.info("초기 추적 데이터 전송 완료: mstId={}, detailId={}", mstId, detailId)
             } ?: run {
                 logger.warn("현재 추적 중인 패스가 없어서 초기 데이터를 전송하지 않습니다")
             }
@@ -2196,9 +2236,9 @@ class EphemerisService(
         })
     }
 
-    fun setCurrentTrackingPassId(newPassId: UInt?) {
+    fun setCurrentTrackingPassId(newPassId: Long?) {  // ✅ UInt → Long 변경 (PassSchedule과 동일)
         // 유효성 검사
-        if (newPassId != null && newPassId <= 0u) {
+        if (newPassId != null && newPassId <= 0L) {  // ✅ 0u → 0L 변경 (Long 타입)
             throw IllegalArgumentException("패스 ID는 양수여야 합니다: $newPassId")
         }
         // 새 패스 ID 설정
@@ -2217,9 +2257,10 @@ class EphemerisService(
 
     /**
      * 패스의 첫 번째 방위각 가져오기
+     * ✅ mstId와 detailId를 사용하여 첫 번째 방위각 조회
      */
-    private fun getFirstAzimuthForPass(passId: UInt): Float {
-        val passDetails = getEphemerisTrackDtlByMstId(passId)
+    private fun getFirstAzimuthForPass(mstId: Long, detailId: Int = 0): Float {  // ✅ UInt → Long/Int 변경 (PassSchedule과 동일)
+        val passDetails = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId)
         return if (passDetails.isNotEmpty()) {
             (passDetails.first()["Azimuth"] as Double).toFloat()
         } else {
@@ -2229,9 +2270,10 @@ class EphemerisService(
 
     /**
      * 패스의 첫 번째 고도각 가져오기
+     * ✅ mstId와 detailId를 사용하여 첫 번째 고도각 조회
      */
-    private fun getFirstElevationForPass(passId: UInt): Float {
-        val passDetails = getEphemerisTrackDtlByMstId(passId)
+    private fun getFirstElevationForPass(mstId: Long, detailId: Int = 0): Float {  // ✅ UInt → Long/Int 변경 (PassSchedule과 동일)
+        val passDetails = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId)
         return if (passDetails.isNotEmpty()) {
             (passDetails.first()["Elevation"] as Double).toFloat()
         } else {
@@ -2264,9 +2306,10 @@ class EphemerisService(
 
     /**
      * 전체 데이터 길이 계산
+     * ✅ mstId와 detailId를 사용하여 데이터 바이트 크기 계산
      */
-    private fun calculateDataByteSize(passId: UInt): Int {
-        val passDetails = getEphemerisTrackDtlByMstId(passId)
+    private fun calculateDataByteSize(mstId: Long, detailId: Int = 0): Int {  // ✅ UInt → Long/Int 변경 (PassSchedule과 동일)
+        val passDetails = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId)
         return passDetails.size * 12 // 각 데이터 포인트는 12바이트 (4바이트 시간, 4바이트 방위각, 4바이트 고도각)
     }
 
@@ -2284,10 +2327,11 @@ class EphemerisService(
 
     /**
      * 전체 데이터 길이 계산
+     * ✅ mstId와 detailId를 사용하여 데이터 길이 계산
      */
-    private fun calculateDataLength(passId: UInt): Int {
-        val passDetails = getEphemerisTrackDtlByMstId(passId)
-        logger.info("전체 데이터 길이 계산 시작: 패스 ID = $passId , 사이즈 : ${passDetails.size}")
+    private fun calculateDataLength(mstId: Long, detailId: Int = 0): Int {  // ✅ UInt → Long/Int 변경 (PassSchedule과 동일)
+        val passDetails = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId)
+        logger.info("전체 데이터 길이 계산 시작: MstId = $mstId, DetailId = $detailId, 사이즈 : ${passDetails.size}")
         return passDetails.size
     }
 
@@ -2335,12 +2379,52 @@ class EphemerisService(
                 return emptyList()
             }
             
-            val mergedData = finalMst.map { final ->
-                val mstId = final["No"] as UInt
-                val original = originalMst.find { it["No"] == mstId }
-                val keyholeAxis = keyholeAxisMst.find { it["No"] == mstId }  // ✅ 추가
-                val keyhole = keyholeMst.find { it["No"] == mstId }  // ✅ Keyhole 데이터 조회 (방법 1)
-                val keyholeOptimized = keyholeOptimizedMst.find { it["No"] == mstId }  // ✅ Keyhole Optimized 데이터 조회 (방법 2)
+            // 🔍 디버깅: finalMst 데이터 확인
+            logger.info("🔍 [요청 #$requestId] finalMst 크기: ${finalMst.size}")
+            if (finalMst.isNotEmpty()) {
+                logger.info("🔍 [요청 #$requestId] 첫 번째 finalMst 항목의 키: ${finalMst[0].keys}")
+                logger.info("🔍 [요청 #$requestId] 첫 번째 finalMst 항목의 MstId 필드: ${finalMst[0]["MstId"]} (타입: ${finalMst[0]["MstId"]?.let { it::class.simpleName }})")
+            }
+            
+            val mergedData = finalMst.mapNotNull { final ->
+                // ✅ MstId 필드에서만 mstId 추출 (No 필드 제거)
+                val mstId = try {
+                    val mstIdValue = final["MstId"]
+                    when (mstIdValue) {
+                        is Number -> mstIdValue.toLong()
+                        is Long -> mstIdValue
+                        is Int -> mstIdValue.toLong()
+                        is UInt -> mstIdValue.toLong()
+                        else -> (mstIdValue as? Number)?.toLong()
+                    }
+                } catch (e: Exception) {
+                    logger.error("❌ [요청 #$requestId] mstId 추출 실패: ${e.message}, MstId=${final["MstId"]}")
+                    null
+                }
+                
+                if (mstId == null) {
+                    logger.warn("⚠️ [요청 #$requestId] MST 데이터에 MstId 필드가 없습니다: ${final.keys}")
+                    logger.warn("⚠️ [요청 #$requestId] MstId 필드 값: ${final["MstId"]} (타입: ${final["MstId"]?.let { it::class.simpleName }})")
+                    return@mapNotNull null  // ✅ null 반환하여 필터링
+                }
+                
+                // ✅ MstId 필드만 사용 (No 필드 제거)
+                val original = originalMst.find { 
+                    val originalId = (it["MstId"] as? Number)?.toLong()
+                    originalId == mstId
+                }
+                val keyholeAxis = keyholeAxisMst.find { 
+                    val axisId = (it["MstId"] as? Number)?.toLong()
+                    axisId == mstId
+                }
+                val keyhole = keyholeMst.find { 
+                    val keyholeId = (it["MstId"] as? Number)?.toLong()
+                    keyholeId == mstId
+                }
+                val keyholeOptimized = keyholeOptimizedMst.find { 
+                    val optimizedId = (it["MstId"] as? Number)?.toLong()
+                    optimizedId == mstId
+                }
                 
                 // ✅ Keyhole 판단: final_transformed (Train=0) 기준으로 판단
                 val train0MaxAzRate = final["MaxAzRate"] as? Double ?: 0.0
@@ -2374,11 +2458,19 @@ class EphemerisService(
                     logger.warn("⚠️ MST #$mstId: Keyhole 판단 불일치 (Final: $isKeyhole, Original: $isKeyholeFromOriginal)")
                 }
                 
-                // ✅ 각각 별도 계산 (합계법)
-                val originalRates = calculateOriginalSumMethodRates(mstId)
-                val finalRates = calculateFinalTransformedSumMethodRates(mstId, "final_transformed")
+                // ✅ DetailId는 final에서 가져오기 (PassSchedule과 동일)
+                val detailId = (final["DetailId"] as? Number)?.toInt() ?: 0
+                
+                // ✅ 각각 별도 계산 (합계법) - detailId 전달 (PassSchedule과 동일)
+                val originalRates = calculateOriginalSumMethodRates(mstId, detailId)
+                val finalRates = calculateFinalTransformedSumMethodRates(mstId, "final_transformed", detailId)
                 
                 final.toMutableMap().apply {
+                    // ✅ MstId와 DetailId 필드 추가 (PassSchedule과 동일한 구조)
+                    put("MstId", mstId)
+                    put("DetailId", detailId)  // ✅ final의 DetailId 사용 (PassSchedule과 동일)
+                    put("No", mstId)  // ✅ 하위 호환성을 위해 No 필드도 유지
+                    
                     // Original (2축) 메타데이터 추가
                     put("OriginalMaxElevation", original?.get("MaxElevation"))
                     put("OriginalMaxAzAccel", original?.get("MaxAzAccel"))
@@ -2394,7 +2486,7 @@ class EphemerisService(
                     
                     // ✅ Keyhole Axis Transformed 데이터 추가 (각도 제한 ❌, Train≠0)
                     if (keyholeAxis != null && isKeyhole) {
-                        val keyholeAxisRates = calculateFinalTransformedSumMethodRates(mstId, "keyhole_axis_transformed")
+                        val keyholeAxisRates = calculateFinalTransformedSumMethodRates(mstId, "keyhole_axis_transformed", detailId)  // ✅ detailId 전달
                         put("KeyholeAxisTransformedMaxAzRate", keyholeAxisRates["maxAzRate"])  // ✅ Keyhole Axis 데이터
                         put("KeyholeAxisTransformedMaxElRate", keyholeAxisRates["maxElRate"])  // ✅ Keyhole Axis 데이터
                     } else {
@@ -2406,7 +2498,7 @@ class EphemerisService(
                     // ✅ Keyhole 발생 시 KeyholeFinalTransformed 데이터로 속도 계산 (각도 제한 ✅, Train≠0)
                     // keyholeRates를 블록 밖에서 선언하여 재사용 가능하도록 함
                     val keyholeRates = if (keyhole != null && isKeyhole) {
-                        calculateFinalTransformedSumMethodRates(mstId, "keyhole_final_transformed")
+                        calculateFinalTransformedSumMethodRates(mstId, "keyhole_final_transformed", detailId)  // ✅ detailId 전달
                     } else {
                         null
                     }
@@ -2438,8 +2530,9 @@ class EphemerisService(
                     
                     // ✅ 하드웨어 제한 각도 기준으로 필터링된 데이터의 MaxElevation 재계산
                     // SelectSchedule 화면에서 필터링된 데이터 기준으로 표시하기 위함
-                    // 필터링된 데이터 조회 (getEphemerisTrackDtlByMstId는 이미 하드웨어 제한 각도 기준으로 필터링된 데이터 반환)
-                    val filteredData = getEphemerisTrackDtlByMstId(mstId)
+                    // 필터링된 데이터 조회 (getEphemerisTrackDtlByMstIdAndDetailId는 이미 하드웨어 제한 각도 기준으로 필터링된 데이터 반환)
+                    // ✅ detailId는 final에서 가져온 값 사용 (PassSchedule과 동일)
+                    val filteredData = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId)  // ✅ detailId 변수 사용
                     
                     // 필터링된 데이터 기준 MaxElevation 계산
                     val filteredMaxElevation = if (filteredData.isNotEmpty()) {
@@ -2449,8 +2542,8 @@ class EphemerisService(
                     }
                     
                     // ✅ MaxElevation 설정 (SelectSchedule에서 사용하는 필드)
-                    // 필터링된 데이터 기준으로 계산된 값 사용
-                    put("MaxElevation", filteredMaxElevation)
+                    // 필터링된 데이터 기준으로 계산된 값 사용, 없으면 final의 MaxElevation 사용
+                    put("MaxElevation", filteredMaxElevation ?: (final["MaxElevation"] as? Double))
                     
                     // ✅ 방법 2 (신규): Keyhole Optimized 데이터 추가
                     logger.info("🔍 [요청 #$requestId] MST #$mstId: Keyhole Optimized 조건 확인:")
@@ -2461,7 +2554,7 @@ class EphemerisService(
                     if (keyholeOptimized != null && isKeyhole) {
                         logger.info("✅ [요청 #$requestId] MST #$mstId: Keyhole Optimized 데이터 처리 시작")
                         // 🔍 데이터 존재 여부 확인
-                        val keyholeOptimizedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "keyhole_optimized_final_transformed")
+                        val keyholeOptimizedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "keyhole_optimized_final_transformed", detailId)  // ✅ detailId 전달
                         logger.info("   [요청 #$requestId] keyhole_optimized_final_transformed DTL 데이터 크기: ${keyholeOptimizedDtl.size}개")
                         if (keyholeOptimizedDtl.isEmpty()) {
                             logger.warn("⚠️ [요청 #$requestId] MST #$mstId: keyhole_optimized_final_transformed DTL 데이터가 없습니다!")
@@ -2469,7 +2562,8 @@ class EphemerisService(
                         
                         val keyholeOptimizedRates = calculateFinalTransformedSumMethodRates(
                             mstId, 
-                            "keyhole_optimized_final_transformed"
+                            "keyhole_optimized_final_transformed",
+                            detailId  // ✅ detailId 전달
                         )
                         logger.info("   [요청 #$requestId] 계산된 Rates: maxAzRate=${keyholeOptimizedRates["maxAzRate"]}, maxElRate=${keyholeOptimizedRates["maxElRate"]}")
                         logger.info("   [요청 #$requestId] RecommendedTrainAngle: ${keyholeOptimized["RecommendedTrainAngle"]}")
@@ -2546,7 +2640,13 @@ class EphemerisService(
             
             val filteredMergedData = mergedData.filter { item ->
                 val maxElevation = item["MaxElevation"] as? Double
-                maxElevation != null && maxElevation >= elevationMin
+                // ✅ MaxElevation이 null이면 필터링에서 제외하지 않음 (데이터가 있는 경우만 필터링)
+                if (maxElevation == null) {
+                    logger.warn("⚠️ [요청 #$requestId] MST #${item["MstId"]}: MaxElevation이 null입니다. 필터링에서 제외하지 않습니다.")
+                    true  // ✅ null인 경우도 포함
+                } else {
+                    maxElevation >= elevationMin
+                }
             }
             
             logger.info("✅ [요청 #$requestId] 병합 완료: ${mergedData.size}개 MST 레코드 (KeyholeAxis + KeyholeFinal 데이터 포함)")
@@ -2565,11 +2665,14 @@ class EphemerisService(
      * 이론치 계산용 - 시간으로 나누지 않음!
      * 
      * @param mstId 마스터 ID
+     * @param detailId 패스 인덱스 (기본값: 0)
      * @return 합계법으로 계산된 최대 속도 (도/초)
      */
-    private fun calculateOriginalSumMethodRates(mstId: UInt): Map<String, Double> {
+    private fun calculateOriginalSumMethodRates(mstId: Long, detailId: Int = 0): Map<String, Double> {  // ✅ UInt → Long/Int 변경 (PassSchedule과 동일)
         try {
-            val originalDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "original")
+            val originalDtl = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId).filter {
+                it["DataType"] == "original"
+            }
             
             if (originalDtl.size < 11) {
                 logger.warn("⚠️ MST ID $mstId: Original 속도 계산을 위한 데이터가 부족합니다 (${originalDtl.size}개)")
@@ -2649,14 +2752,19 @@ class EphemerisService(
      * 이론치 계산용 - 시간으로 나누지 않음!
      * 
      * @param mstId 마스터 ID
+     * @param dataType 데이터 타입 (기본값: "final_transformed")
+     * @param detailId 패스 인덱스 (기본값: 0)
      * @return 합계법으로 계산된 최대 속도 (도/초)
      */
     private fun calculateFinalTransformedSumMethodRates(
-        mstId: UInt,
-        dataType: String = "final_transformed"  // ✅ 파라미터 추가
+        mstId: Long,  // ✅ UInt → Long 변경 (PassSchedule과 동일)
+        dataType: String = "final_transformed",  // ✅ 파라미터 추가
+        detailId: Int = 0  // ✅ UInt → Int 변경 (PassSchedule과 동일)
     ): Map<String, Double> {
         try {
-            val finalDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, dataType)  // ✅ 파라미터 사용
+            val finalDtl = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId).filter {
+                it["DataType"] == dataType
+            }  // ✅ detailId 사용
             
             if (finalDtl.size < 11) {
                 logger.warn("⚠️ MST ID $mstId: $dataType 속도 계산 부족")
@@ -2714,7 +2822,9 @@ class EphemerisService(
     }
 
     /**
-     * 특정 마스터 ID에 해당하는 세부 추적 데이터 조회 (실제 추적 명령용)
+     * 특정 마스터 ID와 detailId에 해당하는 세부 추적 데이터 조회 (실제 추적 명령용)
+     * 
+     * ✅ mstId와 detailId를 사용하여 조회 (PassSchedule과 동일한 구조)
      * 
      * ✅ Keyhole 여부에 따라 적절한 DataType 자동 선택:
      *    - Keyhole 발생: keyhole_final_transformed (Train≠0, ±270°)
@@ -2731,19 +2841,39 @@ class EphemerisService(
      *    - 필터링 후 데이터 없음: 빈 리스트 반환 + 경고 로그
      * 
      * @param mstId 마스터 ID
+     * @param detailId 패스 인덱스 (기본값: 0)
      * @return 필터링된 세부 추적 데이터 리스트 (실제 추적 명령에 사용)
      */
-    fun getEphemerisTrackDtlByMstId(mstId: UInt): List<Map<String, Any?>> {
+    fun getEphemerisTrackDtlByMstIdAndDetailId(mstId: Long, detailId: Int = 0): List<Map<String, Any?>> {  // ✅ UInt → Long/Int 변경 (PassSchedule과 동일)
         // 1. MST에서 Keyhole 여부 확인
         // final_transformed MST에 IsKeyhole 정보가 저장되어 있음
+        // ✅ MstId 필드만 사용 (No 필드 제거)
+        logger.info("🔍 [MST 조회] MstId=${mstId}, DetailId=${detailId} - final_transformed MST 찾기 시작")
+        logger.info("   - 저장소 전체 크기: ${ephemerisTrackMstStorage.size}")
+        logger.info("   - final_transformed MST 개수: ${ephemerisTrackMstStorage.filter { it["DataType"] == "final_transformed" }.size}")
+        
         val finalMst = ephemerisTrackMstStorage.find { 
-            it["No"] == mstId && it["DataType"] == "final_transformed" 
+            val dataMstId = (it["MstId"] as? Number)?.toLong()
+            val matches = dataMstId == mstId && it["DataType"] == "final_transformed"
+            if (it["DataType"] == "final_transformed") {
+                logger.debug("   - 확인 중: MstId=${dataMstId}, 요청 MstId=${mstId}, 일치=${matches}")
+            }
+            matches
         }
         
         if (finalMst == null) {
             logger.warn("⚠️ MST ID ${mstId}에 해당하는 final_transformed MST 데이터를 찾을 수 없습니다.")
+            logger.warn("   - 저장소 전체 크기: ${ephemerisTrackMstStorage.size}")
+            val availableMstIds = ephemerisTrackMstStorage.filter { it["DataType"] == "final_transformed" }.mapNotNull { (it["MstId"] as? Number)?.toLong() }
+            logger.warn("   - 사용 가능한 MstId 목록: $availableMstIds")
+            // 🔍 추가 디버깅: 저장소의 모든 final_transformed MST 항목 확인
+            ephemerisTrackMstStorage.filter { it["DataType"] == "final_transformed" }.forEachIndexed { index, mst ->
+                logger.warn("   - final_transformed MST #$index: MstId=${mst["MstId"]}, 키=${mst.keys}")
+            }
             return emptyList()
         }
+        
+        logger.info("✅ [MST 조회] final_transformed MST 찾음: MstId=${finalMst["MstId"]}")
         
         // Keyhole 여부 확인 (final_transformed MST의 IsKeyhole 필드 사용)
         val isKeyhole = finalMst["IsKeyhole"] as? Boolean ?: false
@@ -2763,9 +2893,53 @@ class EphemerisService(
         // 순수 2축 sourceMinElevationAngle 기준으로만 판단
         val elevationMin = settingsService.angleElevationMin
         
-        // 선택된 DataType의 데이터 조회
+        // 🔍 디버깅: 저장소의 데이터 확인
+        logger.info("🔍 [DTL 조회] ephemerisTrackDtlStorage 전체 크기: ${ephemerisTrackDtlStorage.size}")
+        val mstId2Data = ephemerisTrackDtlStorage.filter {
+            val dataMstId = (it["MstId"] as? Number)?.toLong()
+            dataMstId == mstId
+        }
+        logger.info("   - MstId=${mstId}인 데이터: ${mstId2Data.size}개")
+        
+        // 🔍 추가 디버깅: MstId=3인 데이터의 DetailId 값 분포 확인
+        if (mstId2Data.isNotEmpty()) {
+            val detailIdDistribution = mstId2Data.groupBy { 
+                val dataDetailId = (it["DetailId"] as? Number)?.toInt()
+                dataDetailId ?: -1  // null이면 -1로 표시
+            }.mapValues { it.value.size }
+            logger.info("   - MstId=${mstId}인 데이터의 DetailId 분포: $detailIdDistribution")
+            
+            // 샘플 데이터 확인
+            val sampleData = mstId2Data.first()
+            logger.info("   - 샘플 데이터 키: ${sampleData.keys}")
+            logger.info("   - 샘플 데이터 DetailId: ${sampleData["DetailId"]} (타입: ${sampleData["DetailId"]?.let { it::class.simpleName }})")
+            logger.info("   - 샘플 데이터 DataType: ${sampleData["DataType"]}")
+        }
+        
+        val mstId2DetailId0Data = mstId2Data.filter {
+            val dataDetailId = (it["DetailId"] as? Number)?.toInt()
+            // 🔍 DetailId가 null이거나 없으면 기본값 0으로 처리
+            val actualDetailId = dataDetailId ?: 0
+            actualDetailId == detailId
+        }
+        logger.info("   - MstId=${mstId}, DetailId=${detailId}인 데이터: ${mstId2DetailId0Data.size}개")
+        val mstId2DetailId0DataTypeData = mstId2DetailId0Data.filter {
+            it["DataType"] == dataType
+        }
+        logger.info("   - MstId=${mstId}, DetailId=${detailId}, DataType=${dataType}인 데이터: ${mstId2DetailId0DataTypeData.size}개")
+        
+        // 🔍 추가 디버깅: 저장소의 모든 MstId 목록 확인
+        val allMstIds = ephemerisTrackDtlStorage.mapNotNull { (it["MstId"] as? Number)?.toLong() }.distinct().sorted()
+        logger.info("   - 저장소의 모든 MstId 목록: $allMstIds")
+        
+        // 선택된 DataType의 데이터 조회 (mstId와 detailId 모두 일치하는 데이터만)
+        // 🔍 DetailId가 null이거나 없으면 기본값 0으로 처리 (하위 호환성)
         val allData = ephemerisTrackDtlStorage.filter {
-            it["MstId"] == mstId && it["DataType"] == dataType
+            val dataMstId = (it["MstId"] as? Number)?.toLong()
+            val dataDetailId = (it["DetailId"] as? Number)?.toInt()
+            // ✅ DetailId가 null이거나 없으면 기본값 0으로 처리 (하위 호환성)
+            val actualDetailId = dataDetailId ?: 0
+            dataMstId == mstId && actualDetailId == detailId && it["DataType"] == dataType  // ✅ UInt → Long/Int 변경 (PassSchedule과 동일)
         }
         
         // 하드웨어 제한 각도 기준으로 필터링
@@ -2790,6 +2964,14 @@ class EphemerisService(
         
         if (filteredCount == 0) {
             logger.error("❌ MST ID ${mstId}: 필터링 후 데이터가 없어 추적을 시작할 수 없습니다.")
+            // 🔍 추가 디버깅: 저장소의 데이터 샘플 확인
+            if (ephemerisTrackDtlStorage.isNotEmpty()) {
+                val sample = ephemerisTrackDtlStorage.first()
+                logger.error("   - 저장소 데이터 샘플 키: ${sample.keys}")
+                logger.error("   - 저장소 데이터 샘플 MstId: ${sample["MstId"]} (타입: ${sample["MstId"]?.let { it::class.simpleName }})")
+                logger.error("   - 저장소 데이터 샘플 DetailId: ${sample["DetailId"]} (타입: ${sample["DetailId"]?.let { it::class.simpleName }})")
+                logger.error("   - 저장소 데이터 샘플 DataType: ${sample["DataType"]}")
+            }
         }
         
         return filteredData
@@ -2836,10 +3018,13 @@ class EphemerisService(
 
     /**
      * ✅ 특정 마스터 ID와 데이터 타입에 해당하는 세부 데이터 조회
+     * ✅ detailId 파라미터 추가 (PassSchedule과 동일한 구조)
      */
-    fun getEphemerisTrackDtlByMstIdAndDataType(mstId: UInt, dataType: String): List<Map<String, Any?>> {
+    fun getEphemerisTrackDtlByMstIdAndDataType(mstId: Long, dataType: String, detailId: Int = 0): List<Map<String, Any?>> {  // ✅ detailId 파라미터 추가
         return ephemerisTrackDtlStorage.filter {
-            it["MstId"] == mstId && it["DataType"] == dataType
+            val dataMstId = (it["MstId"] as? Number)?.toLong()
+            val dataDetailId = (it["DetailId"] as? Number)?.toInt() ?: 0
+            dataMstId == mstId && dataDetailId == detailId && it["DataType"] == dataType  // ✅ detailId 필터링 추가
         }
     }
 
@@ -2866,11 +3051,13 @@ class EphemerisService(
      * @note 이 함수는 현재 존재하지 않으며, 새로 생성해야 합니다.
      * @note DataType은 정해져 있지 않고, Keyhole 여부에 따라 동적으로 선택됩니다.
      */
-    private fun getTrackingPassMst(passId: UInt): Map<String, Any?>? {
+    private fun getTrackingPassMst(passId: Long): Map<String, Any?>? {  // ✅ UInt → Long 변경 (PassSchedule과 동일)
         // 1. final_transformed MST에서 IsKeyhole 확인
         // final_transformed MST에 IsKeyhole 정보가 저장되어 있음
+        // ✅ MstId 필드만 사용 (No 필드 제거)
         val finalMst = ephemerisTrackMstStorage.find { 
-            it["No"] == passId && it["DataType"] == "final_transformed" 
+            val dataMstId = (it["MstId"] as? Number)?.toLong()
+            dataMstId == passId && it["DataType"] == "final_transformed"  // ✅ 타입 변환 추가 (PassSchedule과 동일)
         }
         
         if (finalMst == null) {
@@ -2893,8 +3080,10 @@ class EphemerisService(
         }
         
         // 3. 선택된 DataType의 MST 반환
+        // ✅ MstId 필드만 사용 (No 필드 제거)
         val selectedMst = ephemerisTrackMstStorage.find {
-            it["No"] == passId && it["DataType"] == dataType
+            val dataMstId = (it["MstId"] as? Number)?.toLong()
+            dataMstId == passId && it["DataType"] == dataType  // ✅ 타입 변환 추가 (PassSchedule과 동일)
         }
         
         if (selectedMst == null) {
@@ -3272,7 +3461,7 @@ class EphemerisService(
             // ✅ 중복 방지: original 데이터만 사용 (11개 스케줄)
             logger.info("🔍 디버그: ephemerisTrackMstStorage 총 개수: ${ephemerisTrackMstStorage.size}")
             logger.info("🔍 디버그: original 데이터 개수: ${ephemerisTrackMstStorage.filter { it["DataType"] == "original" }.size}")
-            val allMstIds = ephemerisTrackMstStorage.filter { it["DataType"] == "original" }.map { it["No"] as UInt }.sorted()
+            val allMstIds = ephemerisTrackMstStorage.filter { it["DataType"] == "original" }.map { (it["No"] as? Number)?.toLong() ?: 0L }.sorted()  // ✅ UInt → Long 변경
             if (allMstIds.isEmpty()) {
                 logger.warn("⚠️ 추출할 MST 데이터가 없습니다")
                 return mapOf<String, Any?>("success" to false, "error" to "추출할 데이터가 없습니다")
@@ -3283,7 +3472,7 @@ class EphemerisService(
             val createdFiles = mutableListOf<String>()
             allMstIds.forEach { mstId ->
                 try {
-                    val result = exportMstDataToCsv(mstId.toInt(), outputDirectory)
+                    val result = exportMstDataToCsv(mstId.toInt(), outputDirectory)  // ✅ exportMstDataToCsv는 Int를 받으므로 toInt() 사용
                     if (result["success"] == true) {
                         successCount++
                         createdFiles.add(result["filename"] as String)
@@ -3331,7 +3520,7 @@ class EphemerisService(
                 logger.info("📁 출력 디렉토리 생성: $outputDirectory")
             }
             
-            val allMstIds = getAllEphemerisTrackMst().map { it["No"] as UInt }
+            val allMstIds = getAllEphemerisTrackMst().map { (it["No"] as? Number)?.toLong() ?: 0L }  // ✅ UInt → Long 변경
             if (allMstIds.isEmpty()) {
                 logger.warn("⚠️ 추출할 MST 데이터가 없습니다")
                 return mapOf<String, Any?>("success" to false, "error" to "추출할 데이터가 없습니다")
@@ -3366,9 +3555,9 @@ class EphemerisService(
                 
                 allMstIds.forEach { mstId ->
                     try {
-                        val originalDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "original")
-                        val axisTransformedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "axis_transformed")
-                        val finalTransformedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "final_transformed")
+                        val originalDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "original")  // ✅ Long 타입으로 전달
+                        val axisTransformedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "axis_transformed")  // ✅ Long 타입으로 전달
+                        val finalTransformedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "final_transformed")  // ✅ Long 타입으로 전달
                         
                         if (originalDtl.isEmpty()) {
                             logger.warn("⚠️ MST ID $mstId 의 원본 데이터를 찾을 수 없습니다")
@@ -3555,7 +3744,7 @@ class EphemerisService(
             
             // ✅ MST 정보 조회 및 Keyhole 여부 확인
             val finalMst = getAllEphemerisTrackMst().find { 
-                it["No"] == mstId.toUInt() && it["DataType"] == "final_transformed" 
+                (it["No"] as? Number)?.toLong() == mstId.toLong() && it["DataType"] == "final_transformed"  // ✅ Long 타입으로 비교
             }
             
             if (finalMst == null) {
@@ -3568,7 +3757,7 @@ class EphemerisService(
             // ✅ Keyhole 여부에 따라 DataType 선택
             val finalDataType = if (isKeyhole) {
                 val keyholeDataExists = ephemerisTrackDtlStorage.any {
-                    it["MstId"] == mstId.toUInt() && it["DataType"] == "keyhole_final_transformed"
+                    (it["MstId"] as? Number)?.toLong() == mstId.toLong() && it["DataType"] == "keyhole_final_transformed"  // ✅ Long 타입으로 비교
                 }
                 if (!keyholeDataExists) {
                     logger.warn("⚠️ MST ID ${mstId}: Keyhole로 판단되었으나 keyhole_final_transformed 데이터가 없습니다. final_transformed로 폴백합니다.")
@@ -3586,18 +3775,18 @@ class EphemerisService(
             val elevationMin = settingsService.angleElevationMin
             
             // 원본 데이터 조회 (필터링 없음 - 비교용)
-            val originalDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "original")
-            val axisTransformedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "axis_transformed")
+            val originalDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId.toLong(), "original")  // ✅ toUInt() → toLong() 변경
+            val axisTransformedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId.toLong(), "axis_transformed")  // ✅ toUInt() → toLong() 변경
             
             // ✅ 필터링된 final_transformed 데이터 조회
-            val finalTransformedDtlAll = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "final_transformed")
+            val finalTransformedDtlAll = getEphemerisTrackDtlByMstIdAndDataType(mstId.toLong(), "final_transformed")  // ✅ toUInt() → toLong() 변경
             val finalTransformedDtl = finalTransformedDtlAll.filter {
                 (it["Elevation"] as? Double ?: 0.0) >= elevationMin
             }
             
             // ✅ 필터링된 keyhole_final_transformed 데이터 조회 (Keyhole 발생 시만)
             val keyholeFinalDtlAll = if (isKeyhole) {
-                getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "keyhole_final_transformed")
+                getEphemerisTrackDtlByMstIdAndDataType(mstId.toLong(), "keyhole_final_transformed")  // ✅ toUInt() → toLong() 변경
             } else {
                 emptyList()
             }
@@ -3611,7 +3800,7 @@ class EphemerisService(
             
             // ✅ 필터링된 keyhole_optimized_final_transformed 데이터 조회 (Keyhole 발생 시만)
             val keyholeOptimizedFinalDtlAll = if (isKeyhole) {
-                getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "keyhole_optimized_final_transformed")
+                getEphemerisTrackDtlByMstIdAndDataType(mstId.toLong(), "keyhole_optimized_final_transformed")  // ✅ toUInt() → toLong() 변경
             } else {
                 emptyList()
             }
@@ -3626,7 +3815,7 @@ class EphemerisService(
             // ✅ Keyhole Axis 데이터 조회 (필터링 없음 - 중간 단계 데이터)
             val keyholeAxisDtl = if (isKeyhole) {
                 try {
-                    getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "keyhole_axis_transformed")
+                    getEphemerisTrackDtlByMstIdAndDataType(mstId.toLong(), "keyhole_axis_transformed")  // ✅ toUInt() → toLong() 변경
             } catch (e: Exception) {
                     logger.warn("⚠️ Keyhole Axis 데이터 조회 실패: ${e.message}")
                     emptyList()
@@ -3665,14 +3854,14 @@ class EphemerisService(
             // ✅ finalTransformedMst에서 정보 가져오기 (Keyhole 판단 기준)
             val allMst = getAllEphemerisTrackMst()
             val finalTransformedMstInfo = allMst.find { 
-                it["No"] == mstId.toUInt() && it["DataType"] == "final_transformed"
+                (it["No"] as? Number)?.toLong() == mstId.toLong() && it["DataType"] == "final_transformed"  // ✅ Long 타입으로 비교
             }
             val originalMstInfo = allMst.find { 
-                it["No"] == mstId.toUInt() && it["DataType"] == "original"
+                (it["No"] as? Number)?.toLong() == mstId.toLong() && it["DataType"] == "original"  // ✅ Long 타입으로 비교
             }
             val keyholeOptimizedMstInfo = if (isKeyhole) {
                 allMst.find { 
-                    it["No"] == mstId.toUInt() && it["DataType"] == "keyhole_optimized_final_transformed"
+                    (it["No"] as? Number)?.toLong() == mstId.toLong() && it["DataType"] == "keyhole_optimized_final_transformed"  // ✅ Long 타입으로 비교
                 }
             } else {
                 null
@@ -4146,12 +4335,12 @@ class EphemerisService(
     fun exportMstDataToSimpleCsv(mstId: Int, outputDirectory: String = "csv_exports"): Map<String, Any?> {
         try {
             logger.info("📊 MST ID $mstId 간단 CSV 파일 생성 시작")
-            val originalDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId.toUInt(), "original")
+            val originalDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId.toLong(), "original")  // ✅ toUInt() → toLong() 변경
             if (originalDtl.isEmpty()) {
                 logger.error("❌ MST ID $mstId 의 원본 데이터를 찾을 수 없습니다")
                 return mapOf<String, Any?>("success" to false, "error" to "원본 데이터를 찾을 수 없습니다")
             }
-            val mstInfo = getAllEphemerisTrackMst().find { it["No"] == mstId.toUInt() }
+            val mstInfo = getAllEphemerisTrackMst().find { (it["No"] as? Number)?.toLong() == mstId.toLong() }  // ✅ Long 타입으로 비교
             val satelliteName = mstInfo?.get("SatelliteName") as? String ?: "Unknown"
             val timestamp =
                 java.time.ZonedDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))

@@ -112,7 +112,7 @@ class EphemerisController(
             description = "추적할 위성의 Pass ID", 
             example = "1", 
             required = true
-        ) @RequestParam passId: UInt?
+        ) @RequestParam passId: Long?  // ✅ UInt → Long 변경 (PassSchedule과 동일)
     ): ResponseEntity<Map<String, String>> {
         return try {
             ephemerisService.setCurrentTrackingPassId(passId)
@@ -219,41 +219,49 @@ class EphemerisController(
 
     /**
      * 추적 데이터 상세 정보를 조회합니다.
+     * ✅ mstId와 detailId를 사용하여 조회 (PassSchedule과 동일한 구조)
      */
-    @GetMapping("/detail/{mstId}")
+    @GetMapping("/detail/{mstId}/pass/{detailId}")
     @Operation(
         operationId = "getephemerisdetail", tags = ["Mode - Ephemeris"]
     )
     fun getEphemerisTrackDtlByMstId(
         @Parameter(
             description = "추적 데이터 목록 ID", example = "1", required = true
-        ) @PathVariable mstId: UInt
+        ) @PathVariable mstId: Long,  // ✅ UInt → Long 변경 (PassSchedule과 동일)
+        @Parameter(
+            description = "패스 인덱스", example = "0", required = true
+        ) @PathVariable detailId: Int  // ✅ UInt → Int 변경 (PassSchedule과 동일)
     ): Mono<List<Map<String, Any?>>> {
         return Mono.fromCallable {
-            ephemerisService.getEphemerisTrackDtlByMstId(mstId)
+            ephemerisService.getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId)
         }
     }
 
     /**
      * 추적을 시작합니다.
+     * ✅ mstId와 detailId를 사용하여 추적 시작 (PassSchedule과 동일한 구조)
      */
-    @PostMapping("/tracking/start/{passId}")
+    @PostMapping("/tracking/start/{mstId}/pass/{detailId}")
     @Operation(
         operationId = "startephemeristrack", tags = ["Mode - Ephemeris"]
     )
     fun startEphemerisTracking(
         @Parameter(
-            description = "추적 ID", example = "1", required = true
-        ) @PathVariable passId: UInt
+            description = "추적 데이터 목록 ID", example = "1", required = true
+        ) @PathVariable mstId: Long,  // ✅ UInt → Long 변경 (PassSchedule과 동일)
+        @Parameter(
+            description = "패스 인덱스", example = "0", required = true
+        ) @PathVariable detailId: Int  // ✅ UInt → Int 변경 (PassSchedule과 동일)
     ): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             // 추적 시작 (추적 데이터 시작)
-            ephemerisService.startEphemerisTracking(passId)
+            ephemerisService.startEphemerisTracking(mstId, detailId)
             // 초기 추적 데이터 전송
-            //ephemerisService.sendInitialTrackingData(passId)
+            //ephemerisService.sendInitialTrackingData(mstId, detailId)
 
             mapOf(
-                "message" to "추적이 시작되었습니다.", "passId" to passId, "status" to "tracking"
+                "message" to "추적이 시작되었습니다.", "mstId" to mstId, "detailId" to detailId, "status" to "tracking"
             )
         }
     }
@@ -948,7 +956,12 @@ class EphemerisController(
                 mergedData.forEach { item ->
                     val isKeyhole = item["IsKeyhole"] as? Boolean ?: false
                     if (isKeyhole) {
-                        val mstId = item["No"] as? UInt
+                        // ✅ No 필드 또는 MstId 필드에서 mstId 추출 (PassSchedule과 동일한 방식)
+                        val mstId = when {
+                            item["No"] != null -> (item["No"] as? Number)?.toLong()
+                            item["MstId"] != null -> (item["MstId"] as? Number)?.toLong()
+                            else -> null
+                        }
                         logger.info("🔍 [API 응답] MST #$mstId 최적화 데이터:")
                         logger.info("   - IsKeyhole: $isKeyhole")
                         logger.info("   - KeyholeOptimizedRecommendedTrainAngle: ${item["KeyholeOptimizedRecommendedTrainAngle"]}")

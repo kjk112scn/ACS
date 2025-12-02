@@ -151,7 +151,10 @@ class SatelliteTrackingProcessor(
                  */
                 // Original MST를 Train≠0으로 업데이트
                 // ✅ mstId로 originalMst에서 찾기 (index 대신 사용하여 데이터 불일치 방지)
-                val originalMstData = originalMst.find { it["No"] == mstId }
+                // ✅ MstId 필드만 사용 (No 필드 제거)
+                val originalMstData = originalMst.find { 
+                    (it["MstId"] as? Number)?.toLong() == mstId 
+                }
                 if (originalMstData == null) {
                     logger.error("❌ Original MST를 찾을 수 없습니다: mstId=$mstId (방법 1)")
                     return@forEachIndexed  // 이 패스는 건너뛰기
@@ -706,16 +709,28 @@ class SatelliteTrackingProcessor(
 
             // DataType을 targetDataType로 변경
             // ✅ MstId, DetailId, Index 필드 보존
-            convertedDtl.forEach { dtl ->
+            convertedDtl.forEachIndexed { index, dtl ->
+                // 🔍 원본 passDtl에서 DetailId 가져오기 (limitAngleCalculator가 DetailId를 유지하지 않을 수 있음)
+                val originalDetailId = if (index < passDtl.size) {
+                    (passDtl[index]["DetailId"] as? Number)?.toInt() ?: detailId
+                } else {
+                    detailId
+                }
+                
                 finalTransformedDtl.add(
                     dtl.toMutableMap().apply {
                         put("DataType", targetDataType)
                         // ✅ MstId, DetailId, Index 필드 명시적으로 보존
                         put("MstId", mstId)
-                        put("DetailId", detailId)
+                        put("DetailId", originalDetailId)  // ✅ 원본 passDtl에서 가져온 DetailId 사용
                         // Index는 이미 있으면 유지, 없으면 0
                         if (!containsKey("Index")) {
-                            put("Index", 0)
+                            val originalIndex = if (index < passDtl.size) {
+                                (passDtl[index]["Index"] as? Number)?.toInt() ?: index
+                            } else {
+                                index
+                            }
+                            put("Index", originalIndex)
                         }
                     }
                 )

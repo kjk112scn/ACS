@@ -152,12 +152,6 @@ class PassScheduleService(
      * 너무 빈번한 상태 변경을 방지하기 위한 설정
      */
     private val MIN_STATE_CHANGE_INTERVAL = 500 // 0.5초
-    
-    /**
-     * 디버깅 로그 출력 제어 변수
-     */
-    private var lastDebugLogTime = 0L
-    private val DEBUG_LOG_INTERVAL = 10000L // 10초
 
     // ===== 기존 저장소들 (변경 없음) =====
     private val passScheduleTleCache = ConcurrentHashMap<String, Triple<String, String, String>>()
@@ -744,36 +738,13 @@ class PassScheduleService(
         val currentMstId = (currentSchedule?.get("MstId") as? Number)?.toLong()
         val currentDetailId = (currentSchedule?.get("DetailId") as? Number)?.toInt()
         
-        // ✅ 디버깅: currentSchedule의 모든 키와 DetailId 값 확인
-        if (currentSchedule != null) {
-            logger.info("🔍 [디버깅] currentSchedule 키 목록: ${currentSchedule.keys}")
-            logger.info("🔍 [디버깅] currentSchedule DetailId 값: ${currentSchedule["DetailId"]} (타입: ${currentSchedule["DetailId"]?.javaClass?.simpleName})")
-            logger.info("🔍 [디버깅] currentSchedule MstId 값: ${currentSchedule["MstId"]} (타입: ${currentSchedule["MstId"]?.javaClass?.simpleName})")
-            logger.info("🔍 [디버깅] 추출된 currentDetailId: $currentDetailId")
-            logger.info("🔍 [디버깅] 추출된 currentMstId: $currentMstId")
-        } else {
-            logger.info("🔍 [디버깅] currentSchedule이 null입니다")
-        }
-        
-        dataStoreService.setCurrentTrackingMstId(currentMstId, currentDetailId)
-
         // 다음 추적 예정 mstId와 detailId 업데이트
         val nextSchedule = getNextSelectedTrackingPassWithTime(calTime)
         // ✅ "No" → "MstId" 변경, UInt → Long 변경
         val nextMstId = (nextSchedule?.get("MstId") as? Number)?.toLong()
         val nextDetailId = (nextSchedule?.get("DetailId") as? Number)?.toInt()
         
-        // ✅ 디버깅: nextSchedule의 모든 키와 DetailId 값 확인
-        if (nextSchedule != null) {
-            logger.info("🔍 [디버깅] nextSchedule 키 목록: ${nextSchedule.keys}")
-            logger.info("🔍 [디버깅] nextSchedule DetailId 값: ${nextSchedule["DetailId"]} (타입: ${nextSchedule["DetailId"]?.javaClass?.simpleName})")
-            logger.info("🔍 [디버깅] nextSchedule MstId 값: ${nextSchedule["MstId"]} (타입: ${nextSchedule["MstId"]?.javaClass?.simpleName})")
-            logger.info("🔍 [디버깅] 추출된 nextDetailId: $nextDetailId")
-            logger.info("🔍 [디버깅] 추출된 nextMstId: $nextMstId")
-        } else {
-            logger.info("🔍 [디버깅] nextSchedule이 null입니다")
-        }
-        
+        dataStoreService.setCurrentTrackingMstId(currentMstId, currentDetailId)
         dataStoreService.setNextTrackingMstId(nextMstId, nextDetailId)
 
         // 로그 출력
@@ -1477,33 +1448,10 @@ class PassScheduleService(
 
     // ✅ 기존 메서드들 - 변경 없음 (호환성 보장)
     private fun getCurrentSelectedTrackingPassWithTime(targetTime: ZonedDateTime): Map<String, Any?>? {
-        // ✅ 디버깅: selectedTrackMstStorage 상태 확인 (10초마다만 출력)
-        val now = System.currentTimeMillis()
-        val shouldLog = (now - lastDebugLogTime) >= DEBUG_LOG_INTERVAL
-        
-        if (shouldLog) {
-            logger.info("🔍 [디버깅] getCurrentSelectedTrackingPassWithTime 시작: targetTime=$targetTime, selectedTrackMstStorage 크기=${selectedTrackMstStorage.size}")
-            selectedTrackMstStorage.forEach { (satelliteId, mstDataList) ->
-                logger.info("🔍 [디버깅] 위성 $satelliteId: ${mstDataList.size}개 스케줄")
-                mstDataList.take(3).forEach { schedule ->
-                    val mstId = (schedule["MstId"] as? Number)?.toLong()
-                    val detailId = (schedule["DetailId"] as? Number)?.toInt()
-                    val dataType = schedule["DataType"] as? String
-                    val startTime = schedule["StartTime"] as? ZonedDateTime
-                    logger.info("🔍 [디버깅] 스케줄: MstId=$mstId, DetailId=$detailId, DataType=$dataType, StartTime=$startTime")
-                }
-            }
-            lastDebugLogTime = now
-        }
-        
         // ✅ 모든 스케줄을 수집한 후 DataType별로 필터링하여 중복 제거
         val allSchedules = mutableListOf<Map<String, Any?>>()
         selectedTrackMstStorage.values.forEach { mstDataList ->
             allSchedules.addAll(mstDataList)
-        }
-        
-        if (shouldLog) {
-            logger.info("🔍 [디버깅] allSchedules 총 개수: ${allSchedules.size}")
         }
         
         // ✅ final_transformed 또는 keyhole_final_transformed만 사용하여 중복 제거
@@ -1519,57 +1467,21 @@ class PassScheduleService(
                 Pair(mstId, detailId)
             }
         
-        // ✅ 디버깅: uniqueSchedules에 MstId 52가 있는지 확인
-        val mstId52Schedule = uniqueSchedules.find { 
-            (it["MstId"] as? Number)?.toLong() == 52L 
-        }
-        if (mstId52Schedule != null) {
-            val startTime52 = mstId52Schedule["StartTime"] as? ZonedDateTime
-            val endTime52 = mstId52Schedule["EndTime"] as? ZonedDateTime
-            logger.info("🔍 [디버깅] uniqueSchedules에 MstId 52 발견: startTime=$startTime52, endTime=$endTime52, targetTime=$targetTime")
-        } else {
-            logger.warn("⚠️ [디버깅] uniqueSchedules에 MstId 52가 없음. 전체 스케줄 수: ${uniqueSchedules.size}")
-            uniqueSchedules.forEach { schedule ->
-                val mstId = (schedule["MstId"] as? Number)?.toLong()
-                val detailId = (schedule["DetailId"] as? Number)?.toInt()
-                val dataType = schedule["DataType"] as? String
-                logger.info("🔍 [디버깅] uniqueSchedules 항목: MstId=$mstId, DetailId=$detailId, DataType=$dataType")
-            }
-        }
-        
         // ✅ 현재 시간이 시작 시간과 종료 시간 사이에 있는 스케줄 찾기
         val currentPass = uniqueSchedules.find { mstRecord ->
-            val startTime = mstRecord["StartTime"] as? ZonedDateTime
-            val endTime = mstRecord["EndTime"] as? ZonedDateTime
-            val mstId = (mstRecord["MstId"] as? Number)?.toLong()
-            val detailId = (mstRecord["DetailId"] as? Number)?.toInt()
+                val startTime = mstRecord["StartTime"] as? ZonedDateTime
+                val endTime = mstRecord["EndTime"] as? ZonedDateTime
 
             if (startTime != null && endTime != null) {
                 val isAfterStart = !targetTime.isBefore(startTime)  // targetTime >= startTime
                 val isBeforeEnd = targetTime.isBefore(endTime)     // targetTime < endTime
-                val isInRange = isAfterStart && isBeforeEnd
-                
-                // ✅ 디버깅: 시간 비교 상세 로그 (MstId 52인 경우만)
-                if (mstId == 52L || mstId == 28L) {
-                    logger.info("🔍 [시간 비교] MstId=$mstId, DetailId=$detailId: targetTime=$targetTime, startTime=$startTime, endTime=$endTime")
-                    logger.info("🔍 [시간 비교] isAfterStart=$isAfterStart, isBeforeEnd=$isBeforeEnd, isInRange=$isInRange")
-                }
-                
-                isInRange
+                isAfterStart && isBeforeEnd
             } else {
                 false
             }
         }
         
-        if (currentPass != null) {
-            // ✅ 디버깅: 반환되는 데이터의 DetailId 확인
-            logger.info("🔍 [디버깅] getCurrentSelectedTrackingPassWithTime 반환 데이터 키: ${currentPass.keys}")
-            logger.info("🔍 [디버깅] getCurrentSelectedTrackingPassWithTime DetailId: ${currentPass["DetailId"]} (타입: ${currentPass["DetailId"]?.javaClass?.simpleName})")
-            logger.info("🔍 [디버깅] getCurrentSelectedTrackingPassWithTime MstId: ${currentPass["MstId"]} (타입: ${currentPass["MstId"]?.javaClass?.simpleName})")
-            return currentPass
-        }
-        
-        return null
+        return currentPass
     }
 
     private fun getNextSelectedTrackingPassWithTime(targetTime: ZonedDateTime): Map<String, Any?>? {
@@ -1579,20 +1491,6 @@ class PassScheduleService(
         val currentDetailId = (currentSchedule?.get("DetailId") as? Number)?.toInt()
         
         val allSchedules = getSelectedTrackingSchedule()
-        
-        // ✅ 디버깅: 전체 스케줄 목록 확인
-        logger.info("🔍 [디버깅] getNextSelectedTrackingPassWithTime 전체 스케줄 수: ${allSchedules.size}")
-        logger.info("🔍 [디버깅] getNextSelectedTrackingPassWithTime 현재 시간: $targetTime")
-        logger.info("🔍 [디버깅] getNextSelectedTrackingPassWithTime 현재 스케줄: MstId=$currentMstId, DetailId=$currentDetailId")
-        
-        if (allSchedules.isNotEmpty()) {
-            allSchedules.take(3).forEachIndexed { index, schedule ->
-                val startTime = schedule["StartTime"] as? ZonedDateTime
-                val mstId = schedule["MstId"]
-                val detailId = schedule["DetailId"]
-                logger.info("🔍 [디버깅] 스케줄[$index]: MstId=$mstId, DetailId=$detailId, StartTime=$startTime, isAfter=${startTime?.isAfter(targetTime)}")
-            }
-        }
         
         // ✅ DataType별로 중복 제거: final_transformed 또는 keyhole_final_transformed만 사용
         // 같은 MstId와 DetailId 조합에 대해 하나만 선택
@@ -1621,19 +1519,8 @@ class PassScheduleService(
             isAfterCurrentTime && isNotCurrentSchedule
         }
         
-        logger.info("🔍 [디버깅] getNextSelectedTrackingPassWithTime 필터링 후 스케줄 수: ${filteredSchedules.size}")
-        
         val nextSchedule = filteredSchedules.minByOrNull { mstRecord ->
             mstRecord["StartTime"] as ZonedDateTime
-        }
-        
-        // ✅ 디버깅: 반환되는 데이터의 DetailId 확인
-        if (nextSchedule != null) {
-            logger.info("🔍 [디버깅] getNextSelectedTrackingPassWithTime 반환 데이터 키: ${nextSchedule.keys}")
-            logger.info("🔍 [디버깅] getNextSelectedTrackingPassWithTime DetailId: ${nextSchedule["DetailId"]} (타입: ${nextSchedule["DetailId"]?.javaClass?.simpleName})")
-            logger.info("🔍 [디버깅] getNextSelectedTrackingPassWithTime MstId: ${nextSchedule["MstId"]} (타입: ${nextSchedule["MstId"]?.javaClass?.simpleName})")
-        } else {
-            logger.info("🔍 [디버깅] getNextSelectedTrackingPassWithTime nextSchedule이 null입니다 (필터링된 스케줄이 없음)")
         }
         
         return nextSchedule
@@ -2230,15 +2117,6 @@ class PassScheduleService(
         val currentSchedule = getCurrentSelectedTrackingPassWithTime(calTime)
         val nextSchedule = getNextSelectedTrackingPassWithTime(calTime)
         
-        // ✅ 디버깅: nextSchedule의 DetailId 확인
-        if (nextSchedule != null) {
-            logger.info("🔍 [디버깅] updateTrackingMstIdsAfterTargetSet nextSchedule 키: ${nextSchedule.keys}")
-            logger.info("🔍 [디버깅] updateTrackingMstIdsAfterTargetSet nextSchedule DetailId: ${nextSchedule["DetailId"]} (타입: ${nextSchedule["DetailId"]?.javaClass?.simpleName})")
-            logger.info("🔍 [디버깅] updateTrackingMstIdsAfterTargetSet nextSchedule MstId: ${nextSchedule["MstId"]} (타입: ${nextSchedule["MstId"]?.javaClass?.simpleName})")
-        } else {
-            logger.info("🔍 [디버깅] updateTrackingMstIdsAfterTargetSet nextSchedule이 null입니다")
-        }
-        
         // 현재 추적 중인 mstId와 detailId 설정
         // ✅ "No" → "MstId" 변경, UInt → Long 변경
         val currentMstId = (currentSchedule?.get("MstId") as? Number)?.toLong()
@@ -2250,15 +2128,7 @@ class PassScheduleService(
         val nextMstId = (nextSchedule?.get("MstId") as? Number)?.toLong()
         val nextDetailId = (nextSchedule?.get("DetailId") as? Number)?.toInt()
         
-        // ✅ 디버깅: 추출된 값 확인
-        logger.info("🔍 [디버깅] updateTrackingMstIdsAfterTargetSet 추출된 nextDetailId: $nextDetailId")
-        logger.info("🔍 [디버깅] updateTrackingMstIdsAfterTargetSet 추출된 nextMstId: $nextMstId")
-        
         dataStoreService.setNextTrackingMstId(nextMstId, nextDetailId)
-        
-        // ✅ 디버깅: DataStoreService에 저장된 값 확인
-        logger.info("🔍 [디버깅] DataStoreService 저장 후 nextDetailId: ${dataStoreService.getNextTrackingDetailId()}")
-        logger.info("🔍 [디버깅] DataStoreService 저장 후 nextMstId: ${dataStoreService.getNextTrackingMstId()}")
         
         logger.info("🎯 추적 대상 설정 후 mstId/detailId 업데이트: 현재={}/{}, 다음={}/{}", currentMstId, currentDetailId, nextMstId, nextDetailId)
     }
