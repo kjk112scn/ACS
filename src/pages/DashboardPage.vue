@@ -25,7 +25,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.azimuthSpeed)
-              }}</q-item-label>
+                }}</q-item-label>
             </div>
             <div class="axis-data-item axis-data-item--motor">
               <div class="motor-status-chip" :class="motorStateCardClassMap[azimuthMotorState]">
@@ -58,7 +58,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.elevationSpeed)
-              }}</q-item-label>
+                }}</q-item-label>
             </div>
             <div class="axis-data-item axis-data-item--motor">
               <div class="motor-status-chip" :class="motorStateCardClassMap[elevationMotorState]">
@@ -91,7 +91,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.trainSpeed)
-              }}</q-item-label>
+                }}</q-item-label>
             </div>
             <div class="axis-data-item axis-data-item--motor">
               <div class="motor-status-chip" :class="motorStateCardClassMap[trainMotorState]">
@@ -892,8 +892,21 @@ const elevationActualValue = computed((): number => {
 })
 
 const trainCmdValue = computed((): number => {
-  const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
-  const value = isTrackingActive ? icdStore.trackingCMDTrainAngle : icdStore.cmdTrainAngle
+  // ✅ 모든 추적 상태 포함 (WAITING_FOR_TRACKING, MOVING_TO_START, TRAIN_STABILIZING 등)
+  const isTrackingActive =
+    icdStore.ephemerisTrackingState !== 'IDLE' &&
+    icdStore.ephemerisTrackingState !== 'ERROR' &&
+    icdStore.ephemerisTrackingState !== 'UNKNOWN' ||
+    icdStore.passScheduleStatusInfo.isActive
+
+  const trackingValue = icdStore.trackingCMDTrainAngle
+  const hasValidTrackingValue =
+    trackingValue && trackingValue !== '' && !isNaN(Number(trackingValue))
+
+  const value =
+    isTrackingActive && hasValidTrackingValue
+      ? trackingValue
+      : icdStore.cmdTrainAngle
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
@@ -905,10 +918,11 @@ const trainActualValue = computed((): number => {
  */
 
 const azimuthCmdValue = computed((): number => {
-  // ✅ COMPLETED 상태에서도 마지막 추적 값 유지
+  // ✅ 모든 추적 상태 포함 (WAITING_FOR_TRACKING, MOVING_TO_START, TRAIN_STABILIZING 등)
   const isTrackingActive =
-    icdStore.ephemerisTrackingState === 'TRACKING' ||
-    icdStore.ephemerisTrackingState === 'COMPLETED' ||
+    icdStore.ephemerisTrackingState !== 'IDLE' &&
+    icdStore.ephemerisTrackingState !== 'ERROR' &&
+    icdStore.ephemerisTrackingState !== 'UNKNOWN' ||
     icdStore.passScheduleStatusInfo.isActive
 
   // ✅ trackingCMDAzimuthAngle이 유효한 값이면 사용, 아니면 cmdAzimuthAngle 사용
@@ -925,10 +939,11 @@ const azimuthCmdValue = computed((): number => {
 })
 
 const azimuthActualValue = computed((): number => {
-  // ✅ COMPLETED 상태에서도 마지막 추적 값 유지
+  // ✅ 모든 추적 상태 포함 (WAITING_FOR_TRACKING, MOVING_TO_START, TRAIN_STABILIZING 등)
   const isTrackingActive =
-    icdStore.ephemerisTrackingState === 'TRACKING' ||
-    icdStore.ephemerisTrackingState === 'COMPLETED' ||
+    icdStore.ephemerisTrackingState !== 'IDLE' &&
+    icdStore.ephemerisTrackingState !== 'ERROR' &&
+    icdStore.ephemerisTrackingState !== 'UNKNOWN' ||
     icdStore.passScheduleStatusInfo.isActive
 
   const trackingValue = icdStore.trackingActualAzimuthAngle
@@ -944,10 +959,11 @@ const azimuthActualValue = computed((): number => {
 })
 
 const elevationCmdValue = computed((): number => {
-  // ✅ COMPLETED 상태에서도 마지막 추적 값 유지
+  // ✅ 모든 추적 상태 포함 (WAITING_FOR_TRACKING, MOVING_TO_START, TRAIN_STABILIZING 등)
   const isTrackingActive =
-    icdStore.ephemerisTrackingState === 'TRACKING' ||
-    icdStore.ephemerisTrackingState === 'COMPLETED' ||
+    icdStore.ephemerisTrackingState !== 'IDLE' &&
+    icdStore.ephemerisTrackingState !== 'ERROR' &&
+    icdStore.ephemerisTrackingState !== 'UNKNOWN' ||
     icdStore.passScheduleStatusInfo.isActive
 
   const trackingValue = icdStore.trackingCMDElevationAngle
@@ -963,10 +979,11 @@ const elevationCmdValue = computed((): number => {
 })
 
 const elevationActualValue = computed((): number => {
-  // ✅ COMPLETED 상태에서도 마지막 추적 값 유지
+  // ✅ 모든 추적 상태 포함 (WAITING_FOR_TRACKING, MOVING_TO_START, TRAIN_STABILIZING 등)
   const isTrackingActive =
-    icdStore.ephemerisTrackingState === 'TRACKING' ||
-    icdStore.ephemerisTrackingState === 'COMPLETED' ||
+    icdStore.ephemerisTrackingState !== 'IDLE' &&
+    icdStore.ephemerisTrackingState !== 'ERROR' &&
+    icdStore.ephemerisTrackingState !== 'UNKNOWN' ||
     icdStore.passScheduleStatusInfo.isActive
 
   const trackingValue = icdStore.trackingActualElevationAngle
@@ -982,8 +999,21 @@ const elevationActualValue = computed((): number => {
 })
 
 const trainCmdValue = computed((): number => {
-  const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
-  const value = isTrackingActive ? icdStore.trackingCMDTrainAngle : icdStore.cmdTrainAngle
+  // ✅ 모든 추적 상태 포함 (WAITING_FOR_TRACKING, MOVING_TO_START, TRAIN_STABILIZING 등)
+  const isTrackingActive =
+    icdStore.ephemerisTrackingState !== 'IDLE' &&
+    icdStore.ephemerisTrackingState !== 'ERROR' &&
+    icdStore.ephemerisTrackingState !== 'UNKNOWN' ||
+    icdStore.passScheduleStatusInfo.isActive
+
+  const trackingValue = icdStore.trackingCMDTrainAngle
+  const hasValidTrackingValue =
+    trackingValue && trackingValue !== '' && !isNaN(Number(trackingValue))
+
+  const value =
+    isTrackingActive && hasValidTrackingValue
+      ? trackingValue
+      : icdStore.cmdTrainAngle
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
