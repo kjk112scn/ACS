@@ -333,7 +333,7 @@ class EphemerisController(
     ): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             try {
-                val result = ephemerisService.exportMstDataToCsv(mstId, outputDirectory)
+                val result = ephemerisService.exportMstDataToCsv(mstId, detailId = null, outputDirectory = outputDirectory)
 
                 if (result["success"] == true) {
                     mapOf(
