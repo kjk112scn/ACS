@@ -27,18 +27,31 @@ class DataStoreService {
      * - 기존 데이터 보존 (null 필드는 덮어쓰지 않음)
      */
     fun updateDataFromUdp(newData: PushData.ReadData) {
-        
-        // logger.info("🔍 [DataStore] elevationBoardStatusBits 수신: {}", newData.elevationBoardStatusBits)
-
-        // ✅ 상세 디버깅 로그 추가 (주석 처리)
-        // logger.info("🔍 [DataStore] newData.elevationBoardStatusBits 원본: '{}'", newData.elevationBoardStatusBits)
-        // logger.info("🔍 [DataStore] newData.elevationBoardStatusBits null 체크: {}", newData.elevationBoardStatusBits != null)
-        // logger.info("🔍 [DataStore] newData.elevationBoardStatusBits isEmpty 체크: {}", newData.elevationBoardStatusBits?.isEmpty() ?: true)
-        // logger.info("🔍 [DataStore] newData.elevationBoardStatusBits 길이: {}", newData.elevationBoardStatusBits?.length ?: -1)
-        
-
         val currentData = latestData.get()
-        // logger.info("🔍 [DataStore] elevationBoardStatusBits 기존: {}", currentData.elevationBoardStatusBits)
+        
+        // ✅ 추적 시작 직후에만 상세 로그 출력 (로그 스팸 방지)
+        val isTrackingActive = trackingStatus.get().ephemerisStatus == true
+        val trackingCmdChanged = 
+            newData.trackingCMDAzimuthAngle != currentData.trackingCMDAzimuthAngle ||
+            newData.trackingCMDElevationAngle != currentData.trackingCMDElevationAngle ||
+            newData.trackingCMDTrainAngle != currentData.trackingCMDTrainAngle
+        
+        // ✅ trackingCMD 값이 0.0에서 변경되거나, 추적 시작 직후에만 로깅
+        val isZeroToNonZero = 
+            (currentData.trackingCMDAzimuthAngle == 0.0f && newData.trackingCMDAzimuthAngle != null && newData.trackingCMDAzimuthAngle != 0.0f) ||
+            (currentData.trackingCMDElevationAngle == 0.0f && newData.trackingCMDElevationAngle != null && newData.trackingCMDElevationAngle != 0.0f)
+        
+        val shouldLog = trackingCmdChanged && (isTrackingActive || isZeroToNonZero)
+        
+        if (shouldLog) {
+            logger.info("🔍 [DEBUG-DataStore] updateDataFromUdp 호출 (추적 중 또는 값 변경):")
+            logger.info("  - newData.trackingCMDAzimuthAngle: ${newData.trackingCMDAzimuthAngle}")
+            logger.info("  - newData.trackingCMDElevationAngle: ${newData.trackingCMDElevationAngle}")
+            logger.info("  - newData.trackingCMDTrainAngle: ${newData.trackingCMDTrainAngle}")
+            logger.info("  - currentData.trackingCMDAzimuthAngle: ${currentData.trackingCMDAzimuthAngle}")
+            logger.info("  - currentData.trackingCMDElevationAngle: ${currentData.trackingCMDElevationAngle}")
+            logger.info("  - currentData.trackingCMDTrainAngle: ${currentData.trackingCMDTrainAngle}")
+        }
 
         //  기존 mergedData 로직 복원 (null 안전 병합)
         val mergedData = PushData.ReadData(
@@ -100,10 +113,21 @@ class DataStoreService {
             trackingActualTrainAngle = newData.trackingActualTrainAngle ?: currentData.trackingActualTrainAngle,
         )
 
+        // ✅ 병합 결과도 조건부 로깅
+        if (shouldLog) {
+            logger.info("🔍 [DEBUG-DataStore] 병합 결과:")
+            logger.info("  - mergedData.trackingCMDAzimuthAngle: ${mergedData.trackingCMDAzimuthAngle}")
+            logger.info("  - mergedData.trackingCMDElevationAngle: ${mergedData.trackingCMDElevationAngle}")
+            logger.info("  - mergedData.trackingCMDTrainAngle: ${mergedData.trackingCMDTrainAngle}")
+            logger.info("  - newData.trackingCMDAzimuthAngle is null: ${newData.trackingCMDAzimuthAngle == null}")
+            logger.info("  - newData.trackingCMDElevationAngle is null: ${newData.trackingCMDElevationAngle == null}")
+            logger.info("  - newData.trackingCMDTrainAngle is null: ${newData.trackingCMDTrainAngle == null}")
+            logger.info("  - 값 변경 여부: Az=${currentData.trackingCMDAzimuthAngle != mergedData.trackingCMDAzimuthAngle}, El=${currentData.trackingCMDElevationAngle != mergedData.trackingCMDElevationAngle}, Train=${currentData.trackingCMDTrainAngle != mergedData.trackingCMDTrainAngle}")
+        }
+
         // ⚡ 최적화: 실제로 변경된 경우에만 업데이트
        // if (!isDataEqual(currentData, mergedData)) {
             latestData.set(mergedData)
-            //logger.info("🔍 [DataStore] elevationBoardStatusBits 업데이트: {}", mergedData.elevationBoardStatusBits)
             dataVersion.incrementAndGet() // 버전 증가
 
             // 연결 상태 업데이트

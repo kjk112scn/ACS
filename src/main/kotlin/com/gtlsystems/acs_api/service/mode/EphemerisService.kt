@@ -1183,11 +1183,71 @@ class EphemerisService(
                                 executedActions.add("BEFORE_START")
                                 logger.info("📍 시작 전 처리 실행 - 시작 위치로 이동(상태머신)")
                                 
+                                // ✅ 디버깅: targetAzimuth, targetElevation 계산 전 상태 확인
+                                logger.info("🔍 [DEBUG-BEFORE_START] 계산 전 상태:")
+                                logger.info("  - targetAzimuth: $targetAzimuth")
+                                logger.info("  - targetElevation: $targetElevation")
+                                logger.info("  - mstId: $mstId, detailId: $detailId")
+                                logger.info("  - currentTime: $calTime, startTime: $startTime")
+                                logger.info("  - timeDifference: $timeDifference")
+                                
                                 // ❌ 제거: PushData.CMD 업데이트 (일반 모드용이므로 추적 중에는 사용하지 않음)
                                 // 추적 중에는 trackingCMD 값만 사용하므로 PushData.CMD는 업데이트하지 않음
                                 
                                 // ✅ DataStoreService에만 trackingCMD 값 업데이트 (프론트엔드 동기화용)
                                 val currentData = dataStoreService.getLatestData()
+                                
+                                // ✅ 디버깅: 현재 DataStoreService의 trackingCMD 값 확인
+                                logger.info("🔍 [DEBUG-BEFORE_START] DataStoreService 현재 값:")
+                                logger.info("  - trackingCMDAzimuthAngle: ${currentData.trackingCMDAzimuthAngle}")
+                                logger.info("  - trackingCMDElevationAngle: ${currentData.trackingCMDElevationAngle}")
+                                logger.info("  - trackingCMDTrainAngle: ${currentData.trackingCMDTrainAngle}")
+                                
+                                // ✅ 디버깅: targetAzimuth, targetElevation 유효성 검증 (0.0도 제외)
+                                val isValidTargetAz = targetAzimuth.isFinite() && targetAzimuth in -360f..360f && kotlin.math.abs(targetAzimuth) > 0.01f
+                                val isValidTargetEl = targetElevation.isFinite() && targetElevation in -90f..90f && kotlin.math.abs(targetElevation) > 0.01f
+                                
+                                logger.info("🔍 [DEBUG-BEFORE_START] 값 유효성 검증:")
+                                logger.info("  - isValidTargetAz: $isValidTargetAz (targetAzimuth=$targetAzimuth)")
+                                logger.info("  - isValidTargetEl: $isValidTargetEl (targetElevation=$targetElevation)")
+                                
+                                // ✅ targetAzimuth, targetElevation이 유효하지 않으면 MST에서 다시 조회하거나 현재 각도 사용
+                                var finalTargetAzimuth = targetAzimuth
+                                var finalTargetElevation = targetElevation
+                                
+                                if (!isValidTargetAz || !isValidTargetEl) {
+                                    logger.warn("⚠️ [DEBUG-BEFORE_START] 유효하지 않은 target 값 감지! MST에서 다시 조회하거나 현재 각도 사용")
+                                    
+                                    // ✅ MST에서 다시 조회 시도
+                                    val selectedPass = getTrackingPassMst(mstId)
+                                    if (selectedPass != null) {
+                                        val startAzimuth = selectedPass["StartAzimuth"] as? Double
+                                        val startElevation = selectedPass["StartElevation"] as? Double
+                                        
+                                        if (startAzimuth != null && startElevation != null) {
+                                            finalTargetAzimuth = startAzimuth.toFloat()
+                                            finalTargetElevation = startElevation.toFloat()
+                                            targetAzimuth = finalTargetAzimuth
+                                            targetElevation = finalTargetElevation
+                                            logger.info("✅ [DEBUG-BEFORE_START] MST에서 시작 위치 재조회 완료: Az=${finalTargetAzimuth}°, El=${finalTargetElevation}°")
+                                        } else {
+                                            // ✅ Fallback: 현재 각도 사용
+                                            val currentAz = currentData.azimuthAngle?.toFloat() ?: 0f
+                                            val currentEl = currentData.elevationAngle?.toFloat() ?: 0f
+                                            finalTargetAzimuth = currentAz
+                                            finalTargetElevation = currentEl
+                                            logger.warn("⚠️ [DEBUG-BEFORE_START] MST에서 시작 위치를 찾을 수 없어 현재 각도 사용: Az=${finalTargetAzimuth}°, El=${finalTargetElevation}°")
+                                        }
+                                    } else {
+                                        // ✅ Fallback: 현재 각도 사용
+                                        val currentAz = currentData.azimuthAngle?.toFloat() ?: 0f
+                                        val currentEl = currentData.elevationAngle?.toFloat() ?: 0f
+                                        finalTargetAzimuth = currentAz
+                                        finalTargetElevation = currentEl
+                                        logger.warn("⚠️ [DEBUG-BEFORE_START] MST를 찾을 수 없어 현재 각도 사용: Az=${finalTargetAzimuth}°, El=${finalTargetElevation}°")
+                                    }
+                                }
+                                
                                 val updatedData = PushData.ReadData(
                                     // 기존 데이터 유지
                                     modeStatusBits = currentData.modeStatusBits,
@@ -1236,22 +1296,42 @@ class EphemerisService(
                                     elevationMaxAcceleration = currentData.elevationMaxAcceleration,
                                     trainMaxAcceleration = currentData.trainMaxAcceleration,
                                     trackingAzimuthTime = currentData.trackingAzimuthTime,
-                                    // ✅ 시작 위치 trackingCMD 값 업데이트
-                                    trackingCMDAzimuthAngle = targetAzimuth,
+                                    // ✅ 시작 위치 trackingCMD 값 업데이트 (유효한 값 사용)
+                                    trackingCMDAzimuthAngle = finalTargetAzimuth,
                                     trackingActualAzimuthAngle = currentData.trackingActualAzimuthAngle,
                                     trackingElevationTime = currentData.trackingElevationTime,
-                                    trackingCMDElevationAngle = targetElevation,
+                                    trackingCMDElevationAngle = finalTargetElevation,
                                     trackingActualElevationAngle = currentData.trackingActualElevationAngle,
                                     trackingTrainTime = currentData.trackingTrainTime,
                                     trackingCMDTrainAngle = 0f,
                                     trackingActualTrainAngle = currentData.trackingActualTrainAngle
                                 )
+                                
+                                // ✅ 디버깅: 업데이트할 데이터 확인
+                                logger.info("🔍 [DEBUG-BEFORE_START] 업데이트할 데이터:")
+                                logger.info("  - trackingCMDAzimuthAngle: ${updatedData.trackingCMDAzimuthAngle}")
+                                logger.info("  - trackingCMDElevationAngle: ${updatedData.trackingCMDElevationAngle}")
+                                logger.info("  - trackingCMDTrainAngle: ${updatedData.trackingCMDTrainAngle}")
+                                
                                 dataStoreService.updateDataFromUdp(updatedData)
-                                logger.info("✅ [CMD 업데이트] 시작 위치 trackingCMD 값 설정: Az=${targetAzimuth}°, El=${targetElevation}°")
+                                
+                                // ✅ 디버깅: 업데이트 후 DataStoreService 값 확인
+                                val afterUpdateData = dataStoreService.getLatestData()
+                                logger.info("🔍 [DEBUG-BEFORE_START] 업데이트 후 DataStoreService 값:")
+                                logger.info("  - trackingCMDAzimuthAngle: ${afterUpdateData.trackingCMDAzimuthAngle}")
+                                logger.info("  - trackingCMDElevationAngle: ${afterUpdateData.trackingCMDElevationAngle}")
+                                logger.info("  - trackingCMDTrainAngle: ${afterUpdateData.trackingCMDTrainAngle}")
+                                
+                                logger.info("✅ [CMD 업데이트] 시작 위치 trackingCMD 값 설정: Az=${finalTargetAzimuth}°, El=${finalTargetElevation}°")
                                 
                                 // ✅ 시작 위치로 이동 명령 전송 (한 번만, 임계값 체크 없이)
-                                moveToTargetAzEl()
-                                logger.info("🔄 시작 위치로 이동 명령 전송: Az=${targetAzimuth}°, El=${targetElevation}°")
+                                // ✅ targetAzimuth, targetElevation이 업데이트되었을 수 있으므로 확인
+                                if (kotlin.math.abs(finalTargetAzimuth) > 0.01f && kotlin.math.abs(finalTargetElevation) > 0.01f) {
+                                    moveToTargetAzEl()
+                                    logger.info("🔄 시작 위치로 이동 명령 전송: Az=${finalTargetAzimuth}°, El=${finalTargetElevation}°")
+                                } else {
+                                    logger.warn("⚠️ [CMD 업데이트] 유효하지 않은 각도로 인해 이동 명령 전송 건너뜀: Az=${finalTargetAzimuth}°, El=${finalTargetElevation}°")
+                                }
                             }
                             
                             // ✅ 시작 시간 전이고 이미 명령을 전송했으면 대기 (trackingCMD는 이미 설정되었으므로 업데이트 불필요)
@@ -1282,8 +1362,29 @@ class EphemerisService(
                                     // ✅ 헤더는 이미 전송되었으므로 초기 데이터만 전송
                                     sendInitialTrackingData(mstId, detailId)
                                 }
+                                
+                                // ✅ 디버깅: saveRealtimeTrackingData 호출 전 상태 확인
+                                logger.info("🔍 [DEBUG-IN_PROGRESS] saveRealtimeTrackingData 호출 전:")
+                                logger.info("  - timeDifference: $timeDifference (양수면 시작 전, 음수면 시작 후)")
+                                logger.info("  - mstId: $mstId, detailId: $detailId")
+                                logger.info("  - calTime: $calTime, startTime: $startTime")
+                                
+                                val beforeCallData = dataStoreService.getLatestData()
+                                logger.info("  - 현재 trackingCMDAzimuthAngle: ${beforeCallData.trackingCMDAzimuthAngle}")
+                                logger.info("  - 현재 trackingCMDElevationAngle: ${beforeCallData.trackingCMDElevationAngle}")
+                                logger.info("  - 현재 trackingCMDTrainAngle: ${beforeCallData.trackingCMDTrainAngle}")
+                                
                                 logger.info("🔍 [CMD 업데이트] saveRealtimeTrackingData 호출 전: mstId=$mstId, detailId=$detailId, timeDifference=$timeDifference, calTime=$calTime, startTime=$startTime")
                                 saveRealtimeTrackingData(mstId, detailId, calTime, startTime)
+                                
+                                // ✅ 디버깅: saveRealtimeTrackingData 호출 후 상태 확인
+                                val afterCallData = dataStoreService.getLatestData()
+                                logger.info("🔍 [DEBUG-IN_PROGRESS] saveRealtimeTrackingData 호출 후:")
+                                logger.info("  - 변경된 trackingCMDAzimuthAngle: ${afterCallData.trackingCMDAzimuthAngle}")
+                                logger.info("  - 변경된 trackingCMDElevationAngle: ${afterCallData.trackingCMDElevationAngle}")
+                                logger.info("  - 변경된 trackingCMDTrainAngle: ${afterCallData.trackingCMDTrainAngle}")
+                                logger.info("  - 값 변경 여부: Az=${beforeCallData.trackingCMDAzimuthAngle != afterCallData.trackingCMDAzimuthAngle}, El=${beforeCallData.trackingCMDElevationAngle != afterCallData.trackingCMDElevationAngle}, Train=${beforeCallData.trackingCMDTrainAngle != afterCallData.trackingCMDTrainAngle}")
+                                
                                 logger.info("🔍 [CMD 업데이트] saveRealtimeTrackingData 호출 후: PushData.CMD.cmdAzimuthAngle=${PushData.CMD.cmdAzimuthAngle}, cmdElevationAngle=${PushData.CMD.cmdElevationAngle}")
                                 //moveTiltToZero(GlobalData.Offset.tiltPositionOffset+ GlobalData.Offset.trueNorthOffset)
 
@@ -2124,6 +2225,12 @@ class EphemerisService(
      * ✅ Keyhole 여부에 따라 적절한 MST의 StartAzimuth, StartElevation 사용
      */
     private fun moveToStartPosition(mstId: Long, detailId: Int = 0) {  // ✅ UInt → Long/Int 변경 (PassSchedule과 동일)
+        // ✅ 현재 targetAzimuth, targetElevation 초기값 로깅
+        val initialTargetAz = targetAzimuth
+        val initialTargetEl = targetElevation
+        logger.info("📍 [moveToStartPosition] 함수 시작: mstId=${mstId}, detailId=${detailId}")
+        logger.info("📍 [moveToStartPosition] 현재 targetAzimuth=${initialTargetAz}°, targetElevation=${initialTargetEl}°")
+        
         // ✅ currentTrackingPass에서 DetailId를 가져오기 (파라미터보다 우선)
         val actualDetailId = if (currentTrackingPass != null) {
             (currentTrackingPass?.get("DetailId") as? Number)?.toInt() ?: detailId
@@ -2135,15 +2242,19 @@ class EphemerisService(
             }
             (mst?.get("DetailId") as? Number)?.toInt() ?: detailId
         }
-        logger.info("📍 시작 위치 이동: mstId=${mstId}, detailId=${actualDetailId} (파라미터=${detailId})")
+        logger.info("📍 [moveToStartPosition] 시작 위치 이동: mstId=${mstId}, detailId=${actualDetailId} (파라미터=${detailId})")
         
         // ✅ Keyhole 여부에 따라 적절한 MST 선택 (getTrackingPassMst 사용)
         val selectedPass = getTrackingPassMst(mstId)
         
         if (selectedPass != null) {
+            logger.info("📍 [moveToStartPosition] MST 데이터 찾음: mstId=${mstId}")
+            
             // ✅ MST의 StartAzimuth, StartElevation 사용 (Keyhole 여부에 따라 올바른 MST 선택됨)
             val startAzimuth = selectedPass["StartAzimuth"] as? Double
             val startElevation = selectedPass["StartElevation"] as? Double
+            
+            logger.info("📍 [moveToStartPosition] MST에서 추출한 값: startAzimuth=${startAzimuth}, startElevation=${startElevation}")
             
             if (startAzimuth != null && startElevation != null) {
                 targetAzimuth = startAzimuth.toFloat()
@@ -2152,26 +2263,62 @@ class EphemerisService(
                 
                 val isKeyhole = selectedPass["IsKeyhole"] as? Boolean ?: false
                 val dataType = selectedPass["DataType"] as? String
-                logger.info("✅ 시작 위치 설정 완료: Az=${targetAzimuth}°, El=${targetElevation}° (MST에서 가져옴, Keyhole=${if (isKeyhole) "YES" else "NO"}, DataType=${dataType})")
+                
+                logger.info("✅ [moveToStartPosition] 시작 위치 설정 완료:")
+                logger.info("  - 이전 값: targetAzimuth=${initialTargetAz}°, targetElevation=${initialTargetEl}°")
+                logger.info("  - 새 값: targetAzimuth=${targetAzimuth}°, targetElevation=${targetElevation}°")
+                logger.info("  - 출처: MST StartAzimuth/StartElevation")
+                logger.info("  - Keyhole=${if (isKeyhole) "YES" else "NO"}, DataType=${dataType}")
             } else {
+                logger.warn("⚠️ [moveToStartPosition] MST에서 StartAzimuth 또는 StartElevation이 null입니다. DTL fallback 시도")
+                
                 // ✅ Fallback: DTL의 첫 번째 포인트 사용
                 val passDetails = getEphemerisTrackDtlByMstIdAndDetailId(mstId, actualDetailId)
-        if (passDetails.isNotEmpty()) {
-            val startPoint = passDetails.first()
-            targetAzimuth = (startPoint["Azimuth"] as Double).toFloat()
-            targetElevation = (startPoint["Elevation"] as Double).toFloat()
-            currentTrackingState = TrackingState.MOVING_TRAIN_TO_ZERO
-                    logger.info("✅ 시작 위치 설정 완료 (fallback): Az=${targetAzimuth}°, El=${targetElevation}° (DTL 첫 번째 포인트 사용)")
+                
+                logger.info("📍 [moveToStartPosition] DTL 조회 결과: passDetails.size=${passDetails.size}, mstId=${mstId}, detailId=${actualDetailId}")
+                
+                if (passDetails.isNotEmpty()) {
+                    val startPoint = passDetails.first()
+                    val dtlAzimuth = startPoint["Azimuth"] as? Double
+                    val dtlElevation = startPoint["Elevation"] as? Double
+                    
+                    logger.info("📍 [moveToStartPosition] DTL 첫 번째 포인트 값: Azimuth=${dtlAzimuth}, Elevation=${dtlElevation}")
+                    
+                    if (dtlAzimuth != null && dtlElevation != null) {
+                        targetAzimuth = dtlAzimuth.toFloat()
+                        targetElevation = dtlElevation.toFloat()
+                        currentTrackingState = TrackingState.MOVING_TRAIN_TO_ZERO
+                        
+                        logger.info("✅ [moveToStartPosition] 시작 위치 설정 완료 (DTL fallback):")
+                        logger.info("  - 이전 값: targetAzimuth=${initialTargetAz}°, targetElevation=${initialTargetEl}°")
+                        logger.info("  - 새 값: targetAzimuth=${targetAzimuth}°, targetElevation=${targetElevation}°")
+                        logger.info("  - 출처: DTL 첫 번째 포인트")
+                    } else {
+                        logger.error("❌ [moveToStartPosition] DTL 첫 번째 포인트에서 Azimuth 또는 Elevation이 null입니다!")
+                        logger.error("  - DTL 포인트 키: ${startPoint.keys}")
+                        logger.error("  - targetAzimuth, targetElevation은 ${targetAzimuth}°, ${targetElevation}°로 유지됨")
+                    }
                 } else {
-                    logger.error("❌ 시작 위치 데이터를 찾을 수 없습니다: mstId=${mstId}, detailId=${actualDetailId}")
-                    logger.error("   - 파라미터 detailId: ${detailId}")
-                    logger.error("   - currentTrackingPass DetailId: ${currentTrackingPass?.get("DetailId")}")
-                    logger.error("   - 사용된 actualDetailId: ${actualDetailId}")
+                    logger.error("❌ [moveToStartPosition] 시작 위치 데이터를 찾을 수 없습니다:")
+                    logger.error("  - mstId=${mstId}, detailId=${actualDetailId}")
+                    logger.error("  - 파라미터 detailId: ${detailId}")
+                    logger.error("  - currentTrackingPass DetailId: ${currentTrackingPass?.get("DetailId")}")
+                    logger.error("  - 사용된 actualDetailId: ${actualDetailId}")
+                    logger.error("  - ephemerisTrackMstStorage 크기: ${ephemerisTrackMstStorage.size}")
+                    logger.error("  - ephemerisTrackDtlStorage 크기: ${ephemerisTrackDtlStorage.size}")
+                    logger.error("  - targetAzimuth, targetElevation은 ${targetAzimuth}°, ${targetElevation}°로 유지됨 (0.0이면 문제!)")
                 }
             }
         } else {
-            logger.error("❌ MST 데이터를 찾을 수 없습니다: mstId=${mstId}")
+            logger.error("❌ [moveToStartPosition] MST 데이터를 찾을 수 없습니다:")
+            logger.error("  - mstId=${mstId}")
+            logger.error("  - ephemerisTrackMstStorage 크기: ${ephemerisTrackMstStorage.size}")
+            logger.error("  - 저장소의 MstId 목록: ${ephemerisTrackMstStorage.mapNotNull { (it["MstId"] as? Number)?.toLong() }.distinct()}")
+            logger.error("  - targetAzimuth, targetElevation은 ${targetAzimuth}°, ${targetElevation}°로 유지됨 (0.0이면 문제!)")
         }
+        
+        // ✅ 최종 설정된 값 로깅
+        logger.info("📍 [moveToStartPosition] 최종 설정된 값: targetAzimuth=${targetAzimuth}°, targetElevation=${targetElevation}°")
     }
 
     /**
