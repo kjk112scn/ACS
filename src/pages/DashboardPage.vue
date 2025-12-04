@@ -928,108 +928,262 @@ const trainActualValue = computed((): number => {
  */
 
 const azimuthCmdValue = computed((): number => {
-  // ✅ 모든 추적 상태 포함 (WAITING_FOR_TRACKING, MOVING_TO_START, TRAIN_STABILIZING 등)
+  // ✅ 논리 연산자 우선순위 명확화 (괄호 추가)
   const isTrackingActive =
-    icdStore.ephemerisTrackingState !== 'IDLE' &&
-    icdStore.ephemerisTrackingState !== 'ERROR' &&
-    icdStore.ephemerisTrackingState !== 'UNKNOWN' ||
-    icdStore.passScheduleStatusInfo.isActive
+    ((icdStore.ephemerisTrackingState !== 'IDLE' &&
+      icdStore.ephemerisTrackingState !== 'ERROR' &&
+      icdStore.ephemerisTrackingState !== 'UNKNOWN') ||
+     icdStore.passScheduleStatusInfo.isActive)
 
   // ✅ trackingCMDAzimuthAngle이 유효한 값이면 사용, 아니면 cmdAzimuthAngle 사용
   const trackingValue = icdStore.trackingCMDAzimuthAngle
-  const hasValidTrackingValue =
-    trackingValue && trackingValue !== '' && !isNaN(Number(trackingValue))
+  const cmdValue = icdStore.cmdAzimuthAngle
+  const actualValue = icdStore.azimuthAngle // ✅ fallback용 실제 값
 
-  const value =
-    isTrackingActive && hasValidTrackingValue
-      ? trackingValue
-      : icdStore.cmdAzimuthAngle
+  // ✅ trackingValue 유효성 검증: '0' 문자열은 초기화 값으로 간주하여 무효 처리
+  const numTrackingValue = Number(trackingValue)
+  const hasValidTrackingValue =
+    trackingValue !== null &&
+    trackingValue !== undefined &&
+    trackingValue !== '' &&
+    trackingValue !== '0' && // ✅ '0' 문자열은 무효한 값으로 처리 (초기화 상태)
+    !isNaN(numTrackingValue) &&
+    numTrackingValue !== 0 // ✅ 숫자 0도 무효한 값으로 처리 (초기화 상태)
+
+  // ✅ cmdValue 유효성 검증 (fallback용)
+  const hasValidCmdValue =
+    cmdValue !== null &&
+    cmdValue !== undefined &&
+    cmdValue !== '' &&
+    !isNaN(Number(cmdValue))
+
+  // ✅ 값 선택 로직 개선: 추적 중일 때 trackingCMD → cmd → actual 순서로 fallback
+  let value: string | number
+  if (isTrackingActive) {
+    if (hasValidTrackingValue) {
+      // ✅ 추적 중이고 trackingCMD 값이 있으면 사용
+      value = trackingValue
+    } else if (hasValidCmdValue) {
+      // ✅ trackingCMD 값이 없으면 cmd 값 사용 (추적 시작 직후 fallback)
+      value = cmdValue
+    } else {
+      // ✅ 둘 다 없으면 실제 값 사용 (최후의 fallback)
+      value = actualValue
+    }
+  } else {
+    // ✅ 추적 중이 아니면 cmd 값 사용, 없으면 실제 값 사용
+    value = hasValidCmdValue ? cmdValue : actualValue
+  }
+
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
 const azimuthActualValue = computed((): number => {
-  // ✅ 모든 추적 상태 포함 (WAITING_FOR_TRACKING, MOVING_TO_START, TRAIN_STABILIZING 등)
+  // ✅ 논리 연산자 우선순위 명확화 (괄호 추가)
   const isTrackingActive =
-    icdStore.ephemerisTrackingState !== 'IDLE' &&
-    icdStore.ephemerisTrackingState !== 'ERROR' &&
-    icdStore.ephemerisTrackingState !== 'UNKNOWN' ||
-    icdStore.passScheduleStatusInfo.isActive
+    ((icdStore.ephemerisTrackingState !== 'IDLE' &&
+      icdStore.ephemerisTrackingState !== 'ERROR' &&
+      icdStore.ephemerisTrackingState !== 'UNKNOWN') ||
+     icdStore.passScheduleStatusInfo.isActive)
 
   const trackingValue = icdStore.trackingActualAzimuthAngle
-  const hasValidTrackingValue =
-    trackingValue && trackingValue !== '' && !isNaN(Number(trackingValue))
+  const actualValue = icdStore.azimuthAngle
 
-  const value =
-    isTrackingActive && hasValidTrackingValue
-      ? trackingValue
-      : icdStore.azimuthAngle
+  // ✅ trackingValue 유효성 검증: '0' 문자열은 초기화 값으로 간주하여 무효 처리
+  const numTrackingValue = Number(trackingValue)
+  const hasValidTrackingValue =
+    trackingValue !== null &&
+    trackingValue !== undefined &&
+    trackingValue !== '' &&
+    trackingValue !== '0' && // ✅ '0' 문자열은 무효한 값으로 처리 (초기화 상태)
+    !isNaN(numTrackingValue) &&
+    numTrackingValue !== 0 // ✅ 숫자 0도 무효한 값으로 처리 (초기화 상태)
+
+  // ✅ 값 선택 로직 개선: 추적 중일 때 trackingActual → actual 순서로 fallback
+  let value: string | number
+  if (isTrackingActive) {
+    if (hasValidTrackingValue) {
+      // ✅ 추적 중이고 trackingActual 값이 있으면 사용
+      value = trackingValue
+    } else {
+      // ✅ trackingActual 값이 없으면 실제 값 사용 (추적 시작 직후 fallback)
+      value = actualValue
+    }
+  } else {
+    // ✅ 추적 중이 아니면 실제 값 사용
+    value = actualValue
+  }
+
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
 const elevationCmdValue = computed((): number => {
-  // ✅ 모든 추적 상태 포함 (WAITING_FOR_TRACKING, MOVING_TO_START, TRAIN_STABILIZING 등)
+  // ✅ 논리 연산자 우선순위 명확화 (괄호 추가)
   const isTrackingActive =
-    icdStore.ephemerisTrackingState !== 'IDLE' &&
-    icdStore.ephemerisTrackingState !== 'ERROR' &&
-    icdStore.ephemerisTrackingState !== 'UNKNOWN' ||
-    icdStore.passScheduleStatusInfo.isActive
+    ((icdStore.ephemerisTrackingState !== 'IDLE' &&
+      icdStore.ephemerisTrackingState !== 'ERROR' &&
+      icdStore.ephemerisTrackingState !== 'UNKNOWN') ||
+     icdStore.passScheduleStatusInfo.isActive)
 
   const trackingValue = icdStore.trackingCMDElevationAngle
-  const hasValidTrackingValue =
-    trackingValue && trackingValue !== '' && !isNaN(Number(trackingValue))
+  const cmdValue = icdStore.cmdElevationAngle
+  const actualValue = icdStore.elevationAngle // ✅ fallback용 실제 값
 
-  const value =
-    isTrackingActive && hasValidTrackingValue
-      ? trackingValue
-      : icdStore.cmdElevationAngle
+  // ✅ trackingValue 유효성 검증: '0' 문자열은 초기화 값으로 간주하여 무효 처리
+  const numTrackingValue = Number(trackingValue)
+  const hasValidTrackingValue =
+    trackingValue !== null &&
+    trackingValue !== undefined &&
+    trackingValue !== '' &&
+    trackingValue !== '0' && // ✅ '0' 문자열은 무효한 값으로 처리 (초기화 상태)
+    !isNaN(numTrackingValue) &&
+    numTrackingValue !== 0 // ✅ 숫자 0도 무효한 값으로 처리 (초기화 상태)
+
+  // ✅ cmdValue 유효성 검증 (fallback용)
+  const hasValidCmdValue =
+    cmdValue !== null &&
+    cmdValue !== undefined &&
+    cmdValue !== '' &&
+    !isNaN(Number(cmdValue))
+
+  // ✅ 값 선택 로직 개선: 추적 중일 때 trackingCMD → cmd → actual 순서로 fallback
+  let value: string | number
+  if (isTrackingActive) {
+    if (hasValidTrackingValue) {
+      value = trackingValue
+    } else if (hasValidCmdValue) {
+      value = cmdValue
+    } else {
+      value = actualValue
+    }
+  } else {
+    value = hasValidCmdValue ? cmdValue : actualValue
+  }
+
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
 const elevationActualValue = computed((): number => {
-  // ✅ 모든 추적 상태 포함 (WAITING_FOR_TRACKING, MOVING_TO_START, TRAIN_STABILIZING 등)
+  // ✅ 논리 연산자 우선순위 명확화 (괄호 추가)
   const isTrackingActive =
-    icdStore.ephemerisTrackingState !== 'IDLE' &&
-    icdStore.ephemerisTrackingState !== 'ERROR' &&
-    icdStore.ephemerisTrackingState !== 'UNKNOWN' ||
-    icdStore.passScheduleStatusInfo.isActive
+    ((icdStore.ephemerisTrackingState !== 'IDLE' &&
+      icdStore.ephemerisTrackingState !== 'ERROR' &&
+      icdStore.ephemerisTrackingState !== 'UNKNOWN') ||
+     icdStore.passScheduleStatusInfo.isActive)
 
   const trackingValue = icdStore.trackingActualElevationAngle
-  const hasValidTrackingValue =
-    trackingValue && trackingValue !== '' && !isNaN(Number(trackingValue))
+  const actualValue = icdStore.elevationAngle
 
-  const value =
-    isTrackingActive && hasValidTrackingValue
-      ? trackingValue
-      : icdStore.elevationAngle
+  // ✅ trackingValue 유효성 검증: '0' 문자열은 초기화 값으로 간주하여 무효 처리
+  const numTrackingValue = Number(trackingValue)
+  const hasValidTrackingValue =
+    trackingValue !== null &&
+    trackingValue !== undefined &&
+    trackingValue !== '' &&
+    trackingValue !== '0' && // ✅ '0' 문자열은 무효한 값으로 처리 (초기화 상태)
+    !isNaN(numTrackingValue) &&
+    numTrackingValue !== 0 // ✅ 숫자 0도 무효한 값으로 처리 (초기화 상태)
+
+  // ✅ 값 선택 로직 개선: 추적 중일 때 trackingActual → actual 순서로 fallback
+  let value: string | number
+  if (isTrackingActive) {
+    if (hasValidTrackingValue) {
+      value = trackingValue
+    } else {
+      value = actualValue
+    }
+  } else {
+    value = actualValue
+  }
+
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
 const trainCmdValue = computed((): number => {
-  // ✅ 모든 추적 상태 포함 (WAITING_FOR_TRACKING, MOVING_TO_START, TRAIN_STABILIZING 등)
+  // ✅ 논리 연산자 우선순위 명확화 (괄호 추가)
   const isTrackingActive =
-    icdStore.ephemerisTrackingState !== 'IDLE' &&
-    icdStore.ephemerisTrackingState !== 'ERROR' &&
-    icdStore.ephemerisTrackingState !== 'UNKNOWN' ||
-    icdStore.passScheduleStatusInfo.isActive
+    ((icdStore.ephemerisTrackingState !== 'IDLE' &&
+      icdStore.ephemerisTrackingState !== 'ERROR' &&
+      icdStore.ephemerisTrackingState !== 'UNKNOWN') ||
+     icdStore.passScheduleStatusInfo.isActive)
 
   const trackingValue = icdStore.trackingCMDTrainAngle
-  const hasValidTrackingValue =
-    trackingValue && trackingValue !== '' && !isNaN(Number(trackingValue))
+  const cmdValue = icdStore.cmdTrainAngle
+  const actualValue = icdStore.trainAngle // ✅ fallback용 실제 값
 
-  const value =
-    isTrackingActive && hasValidTrackingValue
-      ? trackingValue
-      : icdStore.cmdTrainAngle
+  // ✅ trackingValue 유효성 검증: '0' 문자열은 초기화 값으로 간주하여 무효 처리
+  const numTrackingValue = Number(trackingValue)
+  const hasValidTrackingValue =
+    trackingValue !== null &&
+    trackingValue !== undefined &&
+    trackingValue !== '' &&
+    trackingValue !== '0' && // ✅ '0' 문자열은 무효한 값으로 처리 (초기화 상태)
+    !isNaN(numTrackingValue) &&
+    numTrackingValue !== 0 // ✅ 숫자 0도 무효한 값으로 처리 (초기화 상태)
+
+  // ✅ cmdValue 유효성 검증 (fallback용)
+  const hasValidCmdValue =
+    cmdValue !== null &&
+    cmdValue !== undefined &&
+    cmdValue !== '' &&
+    !isNaN(Number(cmdValue))
+
+  // ✅ 값 선택 로직 개선: 추적 중일 때 trackingCMD → cmd → actual 순서로 fallback
+  let value: string | number
+  if (isTrackingActive) {
+    if (hasValidTrackingValue) {
+      value = trackingValue
+    } else if (hasValidCmdValue) {
+      value = cmdValue
+    } else {
+      value = actualValue
+    }
+  } else {
+    value = hasValidCmdValue ? cmdValue : actualValue
+  }
+
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
 const trainActualValue = computed((): number => {
-  const numValue = Number(icdStore.trainAngle)
+  // ✅ 논리 연산자 우선순위 명확화 (괄호 추가)
+  const isTrackingActive =
+    ((icdStore.ephemerisTrackingState !== 'IDLE' &&
+      icdStore.ephemerisTrackingState !== 'ERROR' &&
+      icdStore.ephemerisTrackingState !== 'UNKNOWN') ||
+     icdStore.passScheduleStatusInfo.isActive)
+
+  const trackingValue = icdStore.trackingActualTrainAngle
+  const actualValue = icdStore.trainAngle
+
+  // ✅ trackingValue 유효성 검증: '0' 문자열은 초기화 값으로 간주하여 무효 처리
+  const numTrackingValue = Number(trackingValue)
+  const hasValidTrackingValue =
+    trackingValue !== null &&
+    trackingValue !== undefined &&
+    trackingValue !== '' &&
+    trackingValue !== '0' && // ✅ '0' 문자열은 무효한 값으로 처리 (초기화 상태)
+    !isNaN(numTrackingValue) &&
+    numTrackingValue !== 0 // ✅ 숫자 0도 무효한 값으로 처리 (초기화 상태)
+
+  // ✅ 값 선택 로직 개선: 추적 중일 때 trackingActual → actual 순서로 fallback
+  let value: string | number
+  if (isTrackingActive) {
+    if (hasValidTrackingValue) {
+      value = trackingValue
+    } else {
+      value = actualValue
+    }
+  } else {
+    value = actualValue
+  }
+
+  const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
