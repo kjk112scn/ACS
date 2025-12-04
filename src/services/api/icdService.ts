@@ -635,12 +635,16 @@ export const icdService = {
 
   /**
    * Feed On/Off 명령 전송
-   * @param sLHCP LHCP 설정
-   * @param sRHCP RHCP 설정
-   * @param sRFSwitch RF 스위치 설정
-   * @param xLHCP X-LHCP 설정
-   * @param xRHCP X-RHCP 설정
+   * @param sLHCP S-Band LHCP 설정
+   * @param sRHCP S-Band RHCP 설정
+   * @param sRFSwitch S-Band RF 스위치 설정 (false: RHCP, true: LHCP)
+   * @param xLHCP X-Band LHCP 설정
+   * @param xRHCP X-Band RHCP 설정
    * @param fan 팬 설정
+   * @param kaLHCP Ka-Band LHCP 설정 (추가)
+   * @param kaRHCP Ka-Band RHCP 설정 (추가)
+   * @param kaSelectionRHCP Ka-Band RHCP Selection 설정 (false: Band1, true: Band2) (추가)
+   * @param kaSelectionLHCP Ka-Band LHCP Selection 설정 (false: Band1, true: Band2) (추가)
    */
   async sendFeedOnOffCommand(
     sLHCP: boolean = false,
@@ -649,10 +653,24 @@ export const icdService = {
     xLHCP: boolean = false,
     xRHCP: boolean = false,
     fan: boolean = false,
+    kaLHCP: boolean = false,
+    kaRHCP: boolean = false,
+    kaSelectionRHCP: boolean = false,
+    kaSelectionLHCP: boolean = false,
   ) {
     try {
-      // 모든 파라미터가 false인지 확인 (fan 포함)
-      const allParamsFalse = !sLHCP && !sRHCP && !sRFSwitch && !xLHCP && !xRHCP && !fan
+      // 모든 파라미터가 false인지 확인 (Ka-Band 포함)
+      const allParamsFalse =
+        !sLHCP &&
+        !sRHCP &&
+        !sRFSwitch &&
+        !xLHCP &&
+        !xRHCP &&
+        !fan &&
+        !kaLHCP &&
+        !kaRHCP &&
+        !kaSelectionRHCP &&
+        !kaSelectionLHCP
 
       let params
 
@@ -662,7 +680,7 @@ export const icdService = {
           feedCommand: 0x00,
         }
       } else {
-        // 하나라도 true면 기존 방식대로 개별 파라미터 전송
+        // 하나라도 true면 개별 파라미터 전송
         params = {
           sLHCP,
           sRHCP,
@@ -670,6 +688,10 @@ export const icdService = {
           xLHCP,
           xRHCP,
           fan,
+          kaLHCP,
+          kaRHCP,
+          kaSelectionRHCP,
+          kaSelectionLHCP,
         }
       }
 

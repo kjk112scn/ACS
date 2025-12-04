@@ -25,7 +25,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.azimuthSpeed)
-                }}</q-item-label>
+              }}</q-item-label>
             </div>
             <div class="axis-data-item axis-data-item--motor">
               <div class="motor-status-chip" :class="motorStateCardClassMap[azimuthMotorState]">
@@ -58,7 +58,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.elevationSpeed)
-                }}</q-item-label>
+              }}</q-item-label>
             </div>
             <div class="axis-data-item axis-data-item--motor">
               <div class="motor-status-chip" :class="motorStateCardClassMap[elevationMotorState]">
@@ -91,7 +91,7 @@
               <q-item-label class="adaptive-caption">Speed</q-item-label>
               <q-item-label class="adaptive-text">{{
                 displayValue(icdStore.trainSpeed)
-                }}</q-item-label>
+              }}</q-item-label>
             </div>
             <div class="axis-data-item axis-data-item--motor">
               <div class="motor-status-chip" :class="motorStateCardClassMap[trainMotorState]">
@@ -372,18 +372,28 @@ const errorPositionerActive = computed(() => {
 const errorFeedActive = computed(() => {
   // ✅ Feed X Board Error Status 체크
   const feedXError =
-    icdStore.feedXBoardStatusInfo.fanError ||
     icdStore.feedXBoardStatusInfo.xLnaRHCPError ||
     icdStore.feedXBoardStatusInfo.xLnaLHCPError
 
   // ✅ Feed S Board Error Status 체크
   const feedSError =
     icdStore.feedSBoardStatusInfo.sLnaRHCPError ||
-    icdStore.feedSBoardStatusInfo.sLnaLHCPError ||
-    icdStore.feedSBoardStatusInfo.sRFSwitchError
+    icdStore.feedSBoardStatusInfo.sLnaLHCPError
+
+  // ✅ Feed ETC Board Error Status 체크 (Fan, RF Switch)
+  const feedETCError =
+    icdStore.feedBoardETCStatusInfo.fanError ||
+    icdStore.feedBoardETCStatusInfo.rfSwitchError
+
+  // ✅ Feed Ka Board Error Status 체크
+  const feedKaError =
+    icdStore.feedKaBoardStatusInfo.kaLnaRHCPError ||
+    icdStore.feedKaBoardStatusInfo.kaLnaLHCPError ||
+    icdStore.feedKaBoardStatusInfo.kaSelectionRHCPError ||
+    icdStore.feedKaBoardStatusInfo.kaSelectionLHCPError
 
   // ✅ 하나라도 에러가 있으면 true 반환
-  return feedXError || feedSError
+  return feedXError || feedSError || feedETCError || feedKaError
 })
 
 const errorProtocolActive = computed(() => {

@@ -815,17 +815,65 @@
                   <!-- FAN ERROR -->
                   <div class="status-item">
                     <div class="status-led" :class="{
-                      'led-off': !realtimeData.feedXBoardStatusInfo.fanError,
-                      'led-error': realtimeData.feedXBoardStatusInfo.fanError,
+                      'led-off': !realtimeData.feedBoardETCStatusInfo.fanError,
+                      'led-error': realtimeData.feedBoardETCStatusInfo.fanError,
                     }"></div>
                     <span class="status-label">FAN ERROR</span>
                     <span class="status-value">
-                      {{ realtimeData.feedXBoardStatusInfo.fanError ? 'ERROR' : 'NORMAL' }}
+                      {{ realtimeData.feedBoardETCStatusInfo.fanError ? 'ERROR' : 'NORMAL' }}
+                    </span>
+                  </div>
+
+                  <!-- Ka-Band LNA RHCP Error -->
+                  <div v-if="isKaBandEnabled" class="status-item">
+                    <div class="status-led" :class="{
+                      'led-off': !realtimeData.feedKaBoardStatusInfo.kaLnaRHCPError,
+                      'led-error': realtimeData.feedKaBoardStatusInfo.kaLnaRHCPError,
+                    }"></div>
+                    <span class="status-label">Ka-Band LNA RHCP</span>
+                    <span class="status-value">
+                      {{ realtimeData.feedKaBoardStatusInfo.kaLnaRHCPError ? 'ERROR' : 'NORMAL' }}
+                    </span>
+                  </div>
+
+                  <!-- Ka-Band LNA LHCP Error -->
+                  <div v-if="isKaBandEnabled" class="status-item">
+                    <div class="status-led" :class="{
+                      'led-off': !realtimeData.feedKaBoardStatusInfo.kaLnaLHCPError,
+                      'led-error': realtimeData.feedKaBoardStatusInfo.kaLnaLHCPError,
+                    }"></div>
+                    <span class="status-label">Ka-Band LNA LHCP</span>
+                    <span class="status-value">
+                      {{ realtimeData.feedKaBoardStatusInfo.kaLnaLHCPError ? 'ERROR' : 'NORMAL' }}
+                    </span>
+                  </div>
+
+                  <!-- Ka-Band Selection RHCP Error -->
+                  <div v-if="isKaBandEnabled" class="status-item">
+                    <div class="status-led" :class="{
+                      'led-off': !realtimeData.feedKaBoardStatusInfo.kaSelectionRHCPError,
+                      'led-error': realtimeData.feedKaBoardStatusInfo.kaSelectionRHCPError,
+                    }"></div>
+                    <span class="status-label">Ka Selection RHCP</span>
+                    <span class="status-value">
+                      {{ realtimeData.feedKaBoardStatusInfo.kaSelectionRHCPError ? 'ERROR' : 'NORMAL' }}
+                    </span>
+                  </div>
+
+                  <!-- Ka-Band Selection LHCP Error -->
+                  <div v-if="isKaBandEnabled" class="status-item">
+                    <div class="status-led" :class="{
+                      'led-off': !realtimeData.feedKaBoardStatusInfo.kaSelectionLHCPError,
+                      'led-error': realtimeData.feedKaBoardStatusInfo.kaSelectionLHCPError,
+                    }"></div>
+                    <span class="status-label">Ka Selection LHCP</span>
+                    <span class="status-value">
+                      {{ realtimeData.feedKaBoardStatusInfo.kaSelectionLHCPError ? 'ERROR' : 'NORMAL' }}
                     </span>
                   </div>
 
                   <!-- X-Band LNA RHCP Error -->
-                  <div class="status-item">
+                  <div v-if="isXBandEnabled" class="status-item">
                     <div class="status-led" :class="{
                       'led-off': !realtimeData.feedXBoardStatusInfo.xLnaRHCPError,
                       'led-error': realtimeData.feedXBoardStatusInfo.xLnaRHCPError,
@@ -837,7 +885,7 @@
                   </div>
 
                   <!-- X-Band LNA LHCP Error -->
-                  <div class="status-item">
+                  <div v-if="isXBandEnabled" class="status-item">
                     <div class="status-led" :class="{
                       'led-off': !realtimeData.feedXBoardStatusInfo.xLnaLHCPError,
                       'led-error': realtimeData.feedXBoardStatusInfo.xLnaLHCPError,
@@ -849,7 +897,7 @@
                   </div>
 
                   <!-- S-Band LNA RHCP Error -->
-                  <div class="status-item">
+                  <div v-if="isSBandEnabled" class="status-item">
                     <div class="status-led" :class="{
                       'led-off': !realtimeData.feedSBoardStatusInfo.sLnaRHCPError,
                       'led-error': realtimeData.feedSBoardStatusInfo.sLnaRHCPError,
@@ -861,7 +909,7 @@
                   </div>
 
                   <!-- S-Band LNA LHCP Error -->
-                  <div class="status-item">
+                  <div v-if="isSBandEnabled" class="status-item">
                     <div class="status-led" :class="{
                       'led-off': !realtimeData.feedSBoardStatusInfo.sLnaLHCPError,
                       'led-error': realtimeData.feedSBoardStatusInfo.sLnaLHCPError,
@@ -873,14 +921,14 @@
                   </div>
 
                   <!-- S-Band RF Switch Error -->
-                  <div class="status-item">
+                  <div v-if="isSBandEnabled" class="status-item">
                     <div class="status-led" :class="{
-                      'led-off': !realtimeData.feedSBoardStatusInfo.sRFSwitchError,
-                      'led-error': realtimeData.feedSBoardStatusInfo.sRFSwitchError,
+                      'led-off': !realtimeData.feedBoardETCStatusInfo.rfSwitchError,
+                      'led-error': realtimeData.feedBoardETCStatusInfo.rfSwitchError,
                     }"></div>
                     <span class="status-label">S-Band RF Switch</span>
                     <span class="status-value">
-                      {{ realtimeData.feedSBoardStatusInfo.sRFSwitchError ? 'ERROR' : 'NORMAL' }}
+                      {{ realtimeData.feedBoardETCStatusInfo.rfSwitchError ? 'ERROR' : 'NORMAL' }}
                     </span>
                   </div>
                 </div>
@@ -892,17 +940,41 @@
                   <!-- FAN Power -->
                   <div class="status-item">
                     <div class="status-led" :class="{
-                      'led-on': realtimeData.feedXBoardStatusInfo.fanPower,
-                      'led-off': !realtimeData.feedXBoardStatusInfo.fanPower,
+                      'led-on': realtimeData.feedBoardETCStatusInfo.fanPower,
+                      'led-off': !realtimeData.feedBoardETCStatusInfo.fanPower,
                     }"></div>
                     <span class="status-label">FAN Power</span>
                     <span class="status-value">
-                      {{ realtimeData.feedXBoardStatusInfo.fanPower ? 'ON' : 'OFF' }}
+                      {{ realtimeData.feedBoardETCStatusInfo.fanPower ? 'ON' : 'OFF' }}
+                    </span>
+                  </div>
+
+                  <!-- Ka-Band LNA RHCP Power -->
+                  <div v-if="isKaBandEnabled" class="status-item">
+                    <div class="status-led" :class="{
+                      'led-on': realtimeData.feedKaBoardStatusInfo.kaLnaRHCPPower,
+                      'led-off': !realtimeData.feedKaBoardStatusInfo.kaLnaRHCPPower,
+                    }"></div>
+                    <span class="status-label">Ka-Band LNA RHCP</span>
+                    <span class="status-value">
+                      {{ realtimeData.feedKaBoardStatusInfo.kaLnaRHCPPower ? 'ON' : 'OFF' }}
+                    </span>
+                  </div>
+
+                  <!-- Ka-Band LNA LHCP Power -->
+                  <div v-if="isKaBandEnabled" class="status-item">
+                    <div class="status-led" :class="{
+                      'led-on': realtimeData.feedKaBoardStatusInfo.kaLnaLHCPPower,
+                      'led-off': !realtimeData.feedKaBoardStatusInfo.kaLnaLHCPPower,
+                    }"></div>
+                    <span class="status-label">Ka-Band LNA LHCP</span>
+                    <span class="status-value">
+                      {{ realtimeData.feedKaBoardStatusInfo.kaLnaLHCPPower ? 'ON' : 'OFF' }}
                     </span>
                   </div>
 
                   <!-- X-Band LNA RHCP Power -->
-                  <div class="status-item">
+                  <div v-if="isXBandEnabled" class="status-item">
                     <div class="status-led" :class="{
                       'led-on': realtimeData.feedXBoardStatusInfo.xLnaRHCPPower,
                       'led-off': !realtimeData.feedXBoardStatusInfo.xLnaRHCPPower,
@@ -914,7 +986,7 @@
                   </div>
 
                   <!-- X-Band LNA LHCP Power -->
-                  <div class="status-item">
+                  <div v-if="isXBandEnabled" class="status-item">
                     <div class="status-led" :class="{
                       'led-on': realtimeData.feedXBoardStatusInfo.xLnaLHCPPower,
                       'led-off': !realtimeData.feedXBoardStatusInfo.xLnaLHCPPower,
@@ -926,7 +998,7 @@
                   </div>
 
                   <!-- S-Band LNA RHCP Power -->
-                  <div class="status-item">
+                  <div v-if="isSBandEnabled" class="status-item">
                     <div class="status-led" :class="{
                       'led-on': realtimeData.feedSBoardStatusInfo.sLnaRHCPPower,
                       'led-off': !realtimeData.feedSBoardStatusInfo.sLnaRHCPPower,
@@ -938,7 +1010,7 @@
                   </div>
 
                   <!-- S-Band LNA LHCP Power -->
-                  <div class="status-item">
+                  <div v-if="isSBandEnabled" class="status-item">
                     <div class="status-led" :class="{
                       'led-on': realtimeData.feedSBoardStatusInfo.sLnaLHCPPower,
                       'led-off': !realtimeData.feedSBoardStatusInfo.sLnaLHCPPower,
@@ -950,10 +1022,10 @@
                   </div>
 
                   <!-- S-Band RF Switch Mode -->
-                  <div class="status-item">
+                  <div v-if="isSBandEnabled" class="status-item">
                     <div class="status-led" :class="{
-                      'led-on': realtimeData.feedSBoardStatusInfo.sRFSwitchMode,
-                      'led-off': !realtimeData.feedSBoardStatusInfo.sRFSwitchMode,
+                      'led-on': realtimeData.feedBoardETCStatusInfo.rfSwitchMode,
+                      'led-off': !realtimeData.feedBoardETCStatusInfo.rfSwitchMode,
                     }"></div>
                     <span class="status-label">S-Band RF Switch</span>
                     <span class="status-value">
@@ -1015,11 +1087,39 @@
   </q-dialog>
 </template>
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useSharedICDStore } from '../../composables/useSharedStore'
 import { closeWindow } from '../../utils/windowUtils'
+import { useFeedSettingsStore } from '@/stores/ui/feedSettingsStore'
 
 const icdStore = useSharedICDStore()
+const feedSettingsStore = useFeedSettingsStore()
+
+// ✅ Pinia 스토어의 반응형 값 추출 (반응형 보장)
+const { enabledBands, isSBandEnabled, isXBandEnabled, isKaBandEnabled } = storeToRefs(feedSettingsStore)
+
+// ✅ 피드 설정 변경 감지 (반응형 보장)
+watch(
+  enabledBands,
+  (newBands) => {
+    console.log('🔄 피드 설정 변경 감지:', newBands)
+    console.log('📊 밴드 상태:', {
+      s: isSBandEnabled.value,
+      x: isXBandEnabled.value,
+      ka: isKaBandEnabled.value,
+    })
+  },
+  { deep: true, immediate: true }
+)
+
+// ✅ 각 밴드별 computed 변경 감지 (추가 보장)
+watch(
+  isKaBandEnabled,
+  (isEnabled) => {
+    console.log('🔄 Ka-Band 상태 변경:', isEnabled)
+  }
+)
 // Computed for template
 const isOpen = computed({
   get: () => props.modelValue,
@@ -1104,8 +1204,6 @@ const realtimeData = ref({
 
   // Feed X Board Status
   feedXBoardStatusInfo: {
-    fanError: false,
-    fanPower: false,
     xLnaRHCPError: false,
     xLnaRHCPPower: false,
     xLnaLHCPError: false,
@@ -1120,6 +1218,26 @@ const realtimeData = ref({
     sLnaLHCPPower: false,
     sRFSwitchError: false,
     sRFSwitchMode: false,
+  },
+
+  // Feed ETC Board Status
+  feedBoardETCStatusInfo: {
+    rfSwitchMode: false,
+    rfSwitchError: false,
+    fanPower: false,
+    fanError: false,
+  },
+
+  // Feed Ka Board Status
+  feedKaBoardStatusInfo: {
+    kaLnaRHCPError: false,
+    kaLnaRHCPPower: false,
+    kaLnaLHCPError: false,
+    kaLnaLHCPPower: false,
+    kaSelectionRHCPError: false,
+    kaSelectionRHCPBand: 'Band1',
+    kaSelectionLHCPError: false,
+    kaSelectionLHCPBand: 'Band1',
   },
 })
 
@@ -1202,8 +1320,6 @@ const updateRealtimeData = () => {
 
     // Feed X Board Status
     feedXBoardStatusInfo: {
-      fanError: icdStore.feedXBoardStatusInfo.fanError,
-      fanPower: icdStore.feedXBoardStatusInfo.fanPower,
       xLnaRHCPError: icdStore.feedXBoardStatusInfo.xLnaRHCPError,
       xLnaRHCPPower: icdStore.feedXBoardStatusInfo.xLnaRHCPPower,
       xLnaLHCPError: icdStore.feedXBoardStatusInfo.xLnaLHCPError,
@@ -1216,8 +1332,28 @@ const updateRealtimeData = () => {
       sLnaRHCPPower: icdStore.feedSBoardStatusInfo.sLnaRHCPPower,
       sLnaLHCPError: icdStore.feedSBoardStatusInfo.sLnaLHCPError,
       sLnaLHCPPower: icdStore.feedSBoardStatusInfo.sLnaLHCPPower,
-      sRFSwitchError: icdStore.feedSBoardStatusInfo.sRFSwitchError,
-      sRFSwitchMode: icdStore.feedSBoardStatusInfo.sRFSwitchMode,
+      sRFSwitchError: icdStore.feedBoardETCStatusInfo.rfSwitchError,
+      sRFSwitchMode: icdStore.feedBoardETCStatusInfo.rfSwitchStatus.isLHCP,
+    },
+
+    // Feed ETC Board Status
+    feedBoardETCStatusInfo: {
+      rfSwitchMode: icdStore.feedBoardETCStatusInfo.rfSwitchStatus.isLHCP,
+      rfSwitchError: icdStore.feedBoardETCStatusInfo.rfSwitchError,
+      fanPower: icdStore.feedBoardETCStatusInfo.fanPower,
+      fanError: icdStore.feedBoardETCStatusInfo.fanError,
+    },
+
+    // Feed Ka Board Status
+    feedKaBoardStatusInfo: {
+      kaLnaRHCPError: icdStore.feedKaBoardStatusInfo.kaLnaRHCPError,
+      kaLnaRHCPPower: icdStore.feedKaBoardStatusInfo.kaLnaRHCPPower,
+      kaLnaLHCPError: icdStore.feedKaBoardStatusInfo.kaLnaLHCPError,
+      kaLnaLHCPPower: icdStore.feedKaBoardStatusInfo.kaLnaLHCPPower,
+      kaSelectionRHCPError: icdStore.feedKaBoardStatusInfo.kaSelectionRHCPError,
+      kaSelectionRHCPBand: icdStore.feedKaBoardStatusInfo.kaSelectionRHCPBand,
+      kaSelectionLHCPError: icdStore.feedKaBoardStatusInfo.kaSelectionLHCPError,
+      kaSelectionLHCPBand: icdStore.feedKaBoardStatusInfo.kaSelectionLHCPBand,
     },
   }
 } // ✅ 타이머 관리
@@ -1226,6 +1362,18 @@ let updateTimer: NodeJS.Timeout | null = null
 onMounted(() => {
   console.log('📱 AllStatusContent 마운트됨')
   console.log('🔍 실행 환경:', isPopupWindow.value ? '팝업창' : '모달')
+
+  // ✅ 피드 설정 로드 (초기화 보장)
+  feedSettingsStore.loadSettings().then(() => {
+    console.log('✅ 피드 설정 로드 완료:', enabledBands.value)
+    console.log('📊 밴드 상태 확인:', {
+      s: isSBandEnabled.value,
+      x: isXBandEnabled.value,
+      ka: isKaBandEnabled.value,
+    })
+  }).catch((error) => {
+    console.error('⚠️ 피드 설정 로드 실패:', error)
+  })
 
   // ✅ 초기 데이터 로드
   updateRealtimeData()
@@ -1241,7 +1389,44 @@ onMounted(() => {
 
   if (isPopupWindow.value) {
     document.title = 'All Status Information'
+
+    // 부모 창 통신 설정
+    window.addEventListener('message', (event) => {
+      if (event.origin !== window.location.origin) return
+
+      console.log('📨 부모 창 메시지:', event.data)
+
+      switch (event.data.type) {
+        case 'refresh':
+          refreshStatus()
+          break
+        case 'close':
+          handleClose()
+          break
+      }
+    })
+
+    // 부모 창에 준비 완료 알림
+    if (window.opener && !window.opener.closed) {
+      try {
+        window.opener.postMessage(
+          {
+            type: 'popup-ready',
+            timestamp: Date.now(),
+          },
+          window.location.origin,
+        )
+      } catch (error) {
+        console.warn('⚠️ 부모 창 통신 설정 실패:', error)
+      }
+    }
+  } else {
+    // 모달 초기화
+    console.log('📱 모달 모드로 초기화됨')
   }
+
+  // 초기 새로고침
+  setTimeout(refreshStatus, 100)
 })
 
 onUnmounted(() => {
@@ -1255,7 +1440,23 @@ onUnmounted(() => {
   }
 
   document.removeEventListener('keydown', handleKeydown)
+
+  // 팝업 창인 경우 부모 창에 종료 알림
+  if (isPopupWindow.value && window.opener && !window.opener.closed) {
+    try {
+      window.opener.postMessage(
+        {
+          type: 'popup-unmounted',
+          timestamp: Date.now(),
+        },
+        window.location.origin,
+      )
+    } catch (error) {
+      console.warn('⚠️ 부모 창 종료 알림 실패:', error)
+    }
+  }
 })
+
 // Props를 선택적으로 만들기// 🎯 Props 정의
 const props = withDefaults(
   defineProps<{
@@ -1376,80 +1577,6 @@ const refreshStatus = () => {
     document.title = `All Status - ${lastUpdateTime.value}`
   }
 }
-
-// 🎯 라이프사이클 관리
-onMounted(() => {
-  console.log('📱 AllStatusContent 마운트됨')
-  console.log('🔍 실행 환경:', displayMode.value)
-
-  // 키보드 이벤트 리스너 추가
-  document.addEventListener('keydown', handleKeydown)
-
-  // 환경별 초기화
-  if (isPopupWindow.value) {
-    // 팝업 창 초기화
-    document.title = 'All Status Information'
-
-    // 부모 창 통신 설정
-    window.addEventListener('message', (event) => {
-      if (event.origin !== window.location.origin) return
-
-      console.log('📨 부모 창 메시지:', event.data)
-
-      switch (event.data.type) {
-        case 'refresh':
-          refreshStatus()
-          break
-        case 'close':
-          handleClose()
-          break
-      }
-    })
-
-    // 부모 창에 준비 완료 알림
-    if (window.opener && !window.opener.closed) {
-      try {
-        window.opener.postMessage(
-          {
-            type: 'popup-ready',
-            timestamp: Date.now(),
-          },
-          window.location.origin,
-        )
-      } catch (error) {
-        console.warn('⚠️ 부모 창 통신 설정 실패:', error)
-      }
-    }
-  } else {
-    // 모달 초기화
-    console.log('📱 모달 모드로 초기화됨')
-  }
-
-  // 초기 새로고침
-  setTimeout(refreshStatus, 100)
-})
-
-onUnmounted(() => {
-  console.log('🧹 AllStatusContent 언마운트됨')
-
-  // 이벤트 리스너 정리
-  document.removeEventListener('keydown', handleKeydown)
-
-  // 팝업 창인 경우 부모 창에 종료 알림
-  if (isPopupWindow.value && window.opener && !window.opener.closed) {
-    try {
-      window.opener.postMessage(
-        {
-          type: 'popup-unmounted',
-          timestamp: Date.now(),
-        },
-        window.location.origin,
-      )
-    } catch (error) {
-      console.warn('⚠️ 부모 창 종료 알림 실패:', error)
-    }
-  }
-})
 </script>
 <style scoped>
 .all-status-modal {

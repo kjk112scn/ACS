@@ -47,6 +47,9 @@
 
           <!-- 스텝 사이즈 제한 설정 -->
           <StepSizeLimitSettings v-if="activeCategory === 'step-size'" />
+
+          <!-- 피드 설정 -->
+          <FeedSettings v-if="activeCategory === 'feed'" />
         </div>
       </div>
     </div>
@@ -67,6 +70,7 @@ import SpeedLimitsSettings from './SpeedLimitsSettings.vue'
 import OffsetLimitsSettings from './OffsetLimitsSettings.vue'
 import AlgorithmSettings from './AlgorithmSettings.vue'
 import StepSizeLimitSettings from './StepSizeLimitSettings.vue'
+import FeedSettings from './FeedSettings.vue'
 
 const settingsStore = useSettingsStore()
 
@@ -128,6 +132,12 @@ const settingsCategories = [
     name: '스텝 사이즈 제한',
     description: '안테나 이동 스텝 사이즈 제한',
     icon: 'straighten'
+  },
+  {
+    id: 'feed',
+    name: '피드 설정',
+    description: 'S-Band, X-Band, Ka-Band 표시 설정',
+    icon: 'tune'
   }
 ]
 

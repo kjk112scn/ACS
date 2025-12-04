@@ -70,6 +70,10 @@ export interface StepSizeLimitSettings {
   max: number
 }
 
+export interface FeedSettings {
+  enabledBands: string[]
+}
+
 class SettingsService {
   // 위치 설정
   async getLocationSettings(): Promise<LocationSettings> {
@@ -386,6 +390,69 @@ class SettingsService {
       await axios.post(`${API_BASE_URL}/settings/stepsizelimit`, settings)
     } catch (error) {
       console.error('스텝 사이즈 제한 설정 저장 실패:', error)
+      throw error
+    }
+  }
+
+  // Feed 설정
+  async getFeedSettings(): Promise<FeedSettings> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/settings/feed`)
+      const data = response.data
+
+      // 응답 데이터 구조 확인
+      console.log('📡 Feed 설정 API 응답:', data)
+
+      // JSON 문자열을 파싱하여 배열로 변환
+      const enabledBandsStr = data['feed.enabledBands'] as string
+      let enabledBands: string[] = []
+
+      if (enabledBandsStr) {
+        try {
+          enabledBands = JSON.parse(enabledBandsStr) as string[]
+        } catch (parseError) {
+          console.warn('Feed 설정 파싱 실패, 기본값 사용:', parseError)
+          enabledBands = ['s', 'x']
+        }
+      } else {
+        // feed.enabledBands가 없으면 기본값 사용
+        console.warn('Feed 설정 데이터가 없음, 기본값 사용')
+        enabledBands = ['s', 'x']
+      }
+
+      return {
+        enabledBands,
+      }
+    } catch (error) {
+      // 404 에러는 백엔드 API가 없을 때 발생 (정상적인 경우일 수 있음)
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        console.warn('⚠️ Feed 설정 API 엔드포인트를 찾을 수 없음 (404) - 로컬 스토리지 사용')
+      } else {
+        console.error('Feed 설정 조회 실패:', error)
+      }
+      // 에러 발생 시 빈 배열 반환 (로컬 스토리지에서 로드하도록)
+      throw error
+    }
+  }
+
+  async setFeedSettings(settings: FeedSettings): Promise<void> {
+    try {
+      console.log('📤 Feed 설정 저장 요청:', settings)
+      const response = await axios.post(`${API_BASE_URL}/settings/feed`, {
+        enabledBands: settings.enabledBands,
+      })
+      console.log('✅ Feed 설정 저장 성공:', response.data)
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error('❌ Feed 설정 저장 실패:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          message: error.message,
+        })
+      } else {
+        console.error('❌ Feed 설정 저장 실패:', error)
+      }
       throw error
     }
   }

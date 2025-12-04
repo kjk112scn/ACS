@@ -237,24 +237,44 @@ export const useICDStore = defineStore('icd', () => {
   const feedSBoardStatusBitsReserve2 = ref<boolean>(false)
 
   const feedXBoardStatusBits = ref('')
-  // feedXBoardStatusBits 관련 개별 상태들 (기존 feedSBoardStatusBits 관련 상태들 뒤에 추가)
-  const feedXBoardStatusLNALHCPPower = ref<boolean>(false) // X-Band LNA LHCP ON/OFF (1=ON, 0=OFF)
-  const feedXBoardStatusLNALHCPError = ref<boolean>(false) // X-Band LNA LHCP Error/Normal (1=Error, 0=Normal)
-  const feedXBoardStatusLNARHCPPower = ref<boolean>(false) // X-Band LNA RHCP ON/OFF (1=ON, 0=OFF)
-  const feedXBoardStatusLNARHCPError = ref<boolean>(false) // X-Band LNA RHCP Error/Normal (1=Error, 0=Normal)
-  const feedXBoardStatusBitsReserve1 = ref<boolean>(false)
-  const feedXBoardStatusBitsReserve2 = ref<boolean>(false)
-  const feedBoardStatusBitsFanPower = ref<boolean>(false) // Fan Power ON/OFF (1=ON, 0=OFF)
-  const feedBoardStatusBitsFanError = ref<boolean>(false) // Fan Error/Normal (1=Error, 0=Normal)
+  // feedXBoardStatusBits 관련 개별 상태들 (ICD 문서: Bits 23-16, 실제 사용: Bit 16-19)
+  const feedXBoardStatusLNALHCPPower = ref<boolean>(false) // X-Band LNA LHCP ON/OFF (Bit 16: 1=ON, 0=OFF)
+  const feedXBoardStatusLNALHCPError = ref<boolean>(false) // X-Band LNA LHCP Error/Normal (Bit 17: 1=Error, 0=Normal)
+  const feedXBoardStatusLNARHCPPower = ref<boolean>(false) // X-Band LNA RHCP ON/OFF (Bit 18: 1=ON, 0=OFF)
+  const feedXBoardStatusLNARHCPError = ref<boolean>(false) // X-Band LNA RHCP Error/Normal (Bit 19: 1=Error, 0=Normal)
+  // Bit 20-23: Reserved
+
+  const feedBoardETCStatusBits = ref('')
+  // feedBoardETCStatusBits 관련 개별 상태들 (ICD 문서: Bits 7-0)
+  const feedBoardETCStatusRFSwitchMode = ref<boolean>(false) // S-Band TX RF Switch Mode (Bit 0: 0=RHCP, 1=LHCP)
+  const feedBoardETCStatusRFSwitchError = ref<boolean>(false) // S-Band TX RF Switch Error/Normal (Bit 1: 1=Error, 0=Normal)
+  const feedBoardETCStatusFanPower = ref<boolean>(false) // Fan Power ON/OFF (Bit 2: 1=ON, 0=OFF)
+  const feedBoardETCStatusFanError = ref<boolean>(false) // Fan Error/Normal (Bit 3: 1=Error, 0=Normal)
+  // Bit 4-7: Reserved
+
+  const feedKaBoardStatusBits = ref('')
+  // feedKaBoardStatusBits 관련 개별 상태들 (ICD 문서: Bits 31-24)
+  const feedKaBoardStatusLNALHCPPower = ref<boolean>(false) // Ka-Band RX LNA LHCP ON/OFF (Bit 24: 1=ON, 0=OFF)
+  const feedKaBoardStatusLNALHCPError = ref<boolean>(false) // Ka-Band RX LNA LHCP Error/Normal (Bit 25: 1=Error, 0=Normal)
+  const feedKaBoardStatusLNARHCPPower = ref<boolean>(false) // Ka-Band RX LNA RHCP ON/OFF (Bit 26: 1=ON, 0=OFF)
+  const feedKaBoardStatusLNARHCPError = ref<boolean>(false) // Ka-Band RX LNA RHCP Error/Normal (Bit 27: 1=Error, 0=Normal)
+  const feedKaBoardStatusSelectionLHCPBand = ref<boolean>(false) // Ka-Band Selection LHCP Band (Bit 28: 0=Band1, 1=Band2)
+  const feedKaBoardStatusSelectionLHCPError = ref<boolean>(false) // Ka-Band Selection LHCP Error/Normal (Bit 29: 1=Error, 0=Normal)
+  const feedKaBoardStatusSelectionRHCPBand = ref<boolean>(false) // Ka-Band Selection RHCP Band (Bit 30: 0=Band1, 1=Band2)
+  const feedKaBoardStatusSelectionRHCPError = ref<boolean>(false) // Ka-Band Selection RHCP Error/Normal (Bit 31: 1=Error, 0=Normal)
 
   const currentSBandLNALHCP = ref('')
   const currentSBandLNARHCP = ref('')
   const currentXBandLNALHCP = ref('')
   const currentXBandLNARHCP = ref('')
+  const currentKaBandLNALHCP = ref('')
+  const currentKaBandLNARHCP = ref('')
   const rssiSBandLNALHCP = ref('')
   const rssiSBandLNARHCP = ref('')
   const rssiXBandLNALHCP = ref('')
   const rssiXBandLNARHCP = ref('')
+  const rssiKaBandLNALHCP = ref('')
+  const rssiKaBandLNARHCP = ref('')
   const azimuthAcceleration = ref('')
   const elevationAcceleration = ref('')
   const trainAcceleration = ref('')
@@ -455,33 +475,90 @@ export const useICDStore = defineStore('icd', () => {
     trainBoardStatusReserve4.value = bits[6] === '1' // 7번째 비트
     trainBoardStatusEncoder.value = bits[7] === '1' // 8번째 비트
   }
-  // 비트 문자열을 개별 boolean으로 파싱하는 헬퍼 함수 (기존 parseTrainBoardStatusBits 함수 뒤에 추가)
+  /**
+   * S-Band Status Bits 파싱 (ICD 문서: Bits 15-8, 바이트 내부: Bit 0-3 사용)
+   * Bit 0: S RX LNA LHCP Power (0=OFF, 1=ON)
+   * Bit 1: S RX LNA LHCP Error (0=정상, 1=비정상)
+   * Bit 2: S RX LNA RHCP Power (0=OFF, 1=ON)
+   * Bit 3: S RX LNA RHCP Error (0=정상, 1=비정상)
+   * Bit 4-7: Reserved
+   */
   const parseFeedSBoardStatusBits = (bitString: string) => {
-    // "00001000" -> ['0','0','0','0','1','0','0','0']
     const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
 
-    feedSBoardStatusLNALHCPPower.value = bits[0] === '1' // 1번째 비트
-    feedSBoardStatusLNALHCPError.value = bits[1] === '1' // 2번째 비트
-    feedSBoardStatusLNARHCPPower.value = bits[2] === '1' // 3번째 비트
-    feedSBoardStatusLNARHCPError.value = bits[3] === '1' // 4번째 비트
-    feedSBoardStatusRFSwitchMode.value = bits[4] === '1' // 5번째 비트
-    feedSBoardStatusRFSwitchError.value = bits[5] === '1' // 6번째 비트
-    feedSBoardStatusBitsReserve1.value = bits[6] === '1' // 7번째 비트
-    feedSBoardStatusBitsReserve2.value = bits[7] === '1' // 8번째 비트
+    feedSBoardStatusLNALHCPPower.value = bits[0] === '1' // Bit 0: LHCP Power
+    feedSBoardStatusLNALHCPError.value = bits[1] === '1' // Bit 1: LHCP Error
+    feedSBoardStatusLNARHCPPower.value = bits[2] === '1' // Bit 2: RHCP Power
+    feedSBoardStatusLNARHCPError.value = bits[3] === '1' // Bit 3: RHCP Error
+    // Bit 4-7: Reserved (사용하지 않음)
+    feedSBoardStatusBitsReserve1.value = false
+    feedSBoardStatusBitsReserve2.value = false
+    // RF Switch는 ETC 바이트에 있음
+    feedSBoardStatusRFSwitchMode.value = false
+    feedSBoardStatusRFSwitchError.value = false
   }
-  // 비트 문자열을 개별 boolean으로 파싱하는 헬퍼 함수 (기존 parseFeedSBoardStatusBits 함수 뒤에 추가)
+
+  /**
+   * X-Band Status Bits 파싱 (ICD 문서: Bits 23-16, 바이트 내부: Bit 0-3 사용)
+   * Bit 0: X RX LNA LHCP Power (0=OFF, 1=ON)
+   * Bit 1: X RX LNA LHCP Error (0=정상, 1=비정상)
+   * Bit 2: X RX LNA RHCP Power (0=OFF, 1=ON)
+   * Bit 3: X RX LNA RHCP Error (0=정상, 1=비정상)
+   * Bit 4-7: Reserved
+   */
   const parseFeedXBoardStatusBits = (bitString: string) => {
-    // "00001000" -> ['0','0','0','0','1','0','0','0']
     const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
 
-    feedXBoardStatusLNALHCPPower.value = bits[0] === '1' // 1번째 비트
-    feedXBoardStatusLNALHCPError.value = bits[1] === '1' // 2번째 비트
-    feedXBoardStatusLNARHCPPower.value = bits[2] === '1' // 3번째 비트
-    feedXBoardStatusLNARHCPError.value = bits[3] === '1' // 4번째 비트
-    feedXBoardStatusBitsReserve1.value = bits[4] === '1' // 5번째 비트
-    feedXBoardStatusBitsReserve2.value = bits[5] === '1' // 6번째 비트
-    feedBoardStatusBitsFanPower.value = bits[6] === '1' // 7번째 비트
-    feedBoardStatusBitsFanError.value = bits[7] === '1' // 8번째 비트
+    feedXBoardStatusLNALHCPPower.value = bits[0] === '1' // Bit 0: LHCP Power
+    feedXBoardStatusLNALHCPError.value = bits[1] === '1' // Bit 1: LHCP Error
+    feedXBoardStatusLNARHCPPower.value = bits[2] === '1' // Bit 2: RHCP Power
+    feedXBoardStatusLNARHCPError.value = bits[3] === '1' // Bit 3: RHCP Error
+    // Bit 4-7: Reserved (사용하지 않음)
+    // Fan은 ETC 바이트에 있음
+    feedBoardETCStatusFanPower.value = false
+    feedBoardETCStatusFanError.value = false
+  }
+
+  /**
+   * ETC Status Bits 파싱 (ICD 문서: Bits 7-0)
+   * Bit 0: S TX RF Switch Mode (0=RHCP, 1=LHCP)
+   * Bit 1: S TX RF Switch Error (0=정상, 1=비정상)
+   * Bit 2: Fan Power (0=OFF, 1=ON)
+   * Bit 3: Fan Error (0=정상, 1=비정상)
+   * Bit 4-7: Reserved
+   */
+  const parseFeedBoardETCStatusBits = (bitString: string) => {
+    const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
+
+    feedBoardETCStatusRFSwitchMode.value = bits[0] === '1' // Bit 0: RF Switch Mode (0=RHCP, 1=LHCP)
+    feedBoardETCStatusRFSwitchError.value = bits[1] === '1' // Bit 1: RF Switch Error
+    feedBoardETCStatusFanPower.value = bits[2] === '1' // Bit 2: Fan Power
+    feedBoardETCStatusFanError.value = bits[3] === '1' // Bit 3: Fan Error
+    // Bit 4-7: Reserved (사용하지 않음)
+  }
+
+  /**
+   * Ka-Band Status Bits 파싱 (ICD 문서: Bits 31-24)
+   * Bit 0: Ka RX LNA LHCP Power (0=OFF, 1=ON)
+   * Bit 1: Ka RX LNA LHCP Error (0=정상, 1=비정상)
+   * Bit 2: Ka RX LNA RHCP Power (0=OFF, 1=ON)
+   * Bit 3: Ka RX LNA RHCP Error (0=정상, 1=비정상)
+   * Bit 4: Ka Selection LHCP Band (0=Band1, 1=Band2)
+   * Bit 5: Ka Selection LHCP Error (0=정상, 1=비정상)
+   * Bit 6: Ka Selection RHCP Band (0=Band1, 1=Band2)
+   * Bit 7: Ka Selection RHCP Error (0=정상, 1=비정상)
+   */
+  const parseFeedKaBoardStatusBits = (bitString: string) => {
+    const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
+
+    feedKaBoardStatusLNALHCPPower.value = bits[0] === '1' // Bit 0: RX LNA LHCP Power
+    feedKaBoardStatusLNALHCPError.value = bits[1] === '1' // Bit 1: RX LNA LHCP Error
+    feedKaBoardStatusLNARHCPPower.value = bits[2] === '1' // Bit 2: RX LNA RHCP Power
+    feedKaBoardStatusLNARHCPError.value = bits[3] === '1' // Bit 3: RX LNA RHCP Error
+    feedKaBoardStatusSelectionLHCPBand.value = bits[4] === '1' // Bit 4: Selection LHCP Band
+    feedKaBoardStatusSelectionLHCPError.value = bits[5] === '1' // Bit 5: Selection LHCP Error
+    feedKaBoardStatusSelectionRHCPBand.value = bits[6] === '1' // Bit 6: Selection RHCP Band
+    feedKaBoardStatusSelectionRHCPError.value = bits[7] === '1' // Bit 7: Selection RHCP Error
   }
 
   // 전체 프로토콜 상태 정보를 제공하는 computed
@@ -950,17 +1027,14 @@ export const useICDStore = defineStore('icd', () => {
               : 'NORMAL',
     },
   }))
-  // 전체 Feed S-Band Board 상태 정보를 제공하는 computed (기존 trainBoardStatusInfo computed 뒤에 추가)
+  // 전체 Feed S-Band Board 상태 정보를 제공하는 computed (ICD 문서: Bits 15-8)
   const feedSBoardStatusInfo = computed(() => ({
     raw: feedSBoardStatusBits.value,
     sLnaLHCPPower: feedSBoardStatusLNALHCPPower.value,
     sLnaLHCPError: feedSBoardStatusLNALHCPError.value,
     sLnaRHCPPower: feedSBoardStatusLNARHCPPower.value,
     sLnaRHCPError: feedSBoardStatusLNARHCPError.value,
-    sRFSwitchMode: feedSBoardStatusRFSwitchMode.value,
-    sRFSwitchError: feedSBoardStatusRFSwitchError.value,
-    sReserve1: feedSBoardStatusBitsReserve1.value,
-    sReserve2: feedSBoardStatusBitsReserve2.value,
+    // RF Switch는 ETC 바이트에 있음 (feedBoardETCStatusInfo 참조)
     // LNA 상태 정보
     lnaStatus: {
       lhcp: {
@@ -976,14 +1050,6 @@ export const useICDStore = defineStore('icd', () => {
         hasError: feedSBoardStatusLNARHCPError.value,
       },
     },
-    // RF Switch 상태 정보
-    rfSwitchStatus: {
-      mode: feedSBoardStatusRFSwitchMode.value ? 'RHCP' : 'LHCP',
-      status: feedSBoardStatusRFSwitchError.value ? 'ERROR' : 'NORMAL',
-      isRHCP: feedSBoardStatusRFSwitchMode.value,
-      isLHCP: !feedSBoardStatusRFSwitchMode.value,
-      hasError: feedSBoardStatusRFSwitchError.value,
-    },
     // 활성화된 LNA 목록
     activeLNAs: [
       feedSBoardStatusLNALHCPPower.value && 'LHCP',
@@ -993,14 +1059,11 @@ export const useICDStore = defineStore('icd', () => {
     errorComponents: [
       feedSBoardStatusLNALHCPError.value && 'LNA_LHCP',
       feedSBoardStatusLNARHCPError.value && 'LNA_RHCP',
-      feedSBoardStatusRFSwitchError.value && 'RF_SWITCH',
     ].filter(Boolean),
     // 활성화된 상태 목록
     activeStatuses: [
       feedSBoardStatusLNALHCPPower.value && 'LNA_LHCP_ON',
       feedSBoardStatusLNARHCPPower.value && 'LNA_RHCP_ON',
-      feedSBoardStatusRFSwitchMode.value && 'RF_SWITCH_RHCP',
-      !feedSBoardStatusRFSwitchMode.value && 'RF_SWITCH_LHCP',
     ].filter(Boolean),
     // 전체 상태 요약
     summary: {
@@ -1008,39 +1071,28 @@ export const useICDStore = defineStore('icd', () => {
         feedSBoardStatusLNALHCPPower.value,
         feedSBoardStatusLNARHCPPower.value,
       ].filter(Boolean).length,
-      totalErrors: [
-        feedSBoardStatusLNALHCPError.value,
-        feedSBoardStatusLNARHCPError.value,
-        feedSBoardStatusRFSwitchError.value,
-      ].filter(Boolean).length,
+      totalErrors: [feedSBoardStatusLNALHCPError.value, feedSBoardStatusLNARHCPError.value].filter(
+        Boolean,
+      ).length,
       hasAnyLNAActive: feedSBoardStatusLNALHCPPower.value || feedSBoardStatusLNARHCPPower.value,
-      hasAnyError:
-        feedSBoardStatusLNALHCPError.value ||
-        feedSBoardStatusLNARHCPError.value ||
-        feedSBoardStatusRFSwitchError.value,
-      currentRFSwitchMode: feedSBoardStatusRFSwitchMode.value ? 'RHCP' : 'LHCP',
+      hasAnyError: feedSBoardStatusLNALHCPError.value || feedSBoardStatusLNARHCPError.value,
       // 전체 상태 판단
       overallStatus:
-        feedSBoardStatusLNALHCPError.value ||
-        feedSBoardStatusLNARHCPError.value ||
-        feedSBoardStatusRFSwitchError.value
+        feedSBoardStatusLNALHCPError.value || feedSBoardStatusLNARHCPError.value
           ? 'ERROR'
           : feedSBoardStatusLNALHCPPower.value || feedSBoardStatusLNARHCPPower.value
             ? 'ACTIVE'
             : 'STANDBY',
     },
   }))
-  // 전체 Feed X-Band Board 상태 정보를 제공하는 computed (기존 feedSBoardStatusInfo computed 뒤에 추가)
+  // 전체 Feed X-Band Board 상태 정보를 제공하는 computed (ICD 문서: Bits 23-16)
   const feedXBoardStatusInfo = computed(() => ({
     raw: feedXBoardStatusBits.value,
     xLnaLHCPPower: feedXBoardStatusLNALHCPPower.value,
     xLnaLHCPError: feedXBoardStatusLNALHCPError.value,
     xLnaRHCPPower: feedXBoardStatusLNARHCPPower.value,
     xLnaRHCPError: feedXBoardStatusLNARHCPError.value,
-    xReserve1: feedXBoardStatusBitsReserve1.value,
-    xReserve2: feedXBoardStatusBitsReserve2.value,
-    fanPower: feedBoardStatusBitsFanPower.value,
-    fanError: feedBoardStatusBitsFanError.value,
+    // Fan은 ETC 바이트에 있음 (feedBoardETCStatusInfo 참조)
     // LNA 상태 정보
     lnaStatus: {
       lhcp: {
@@ -1056,13 +1108,6 @@ export const useICDStore = defineStore('icd', () => {
         hasError: feedXBoardStatusLNARHCPError.value,
       },
     },
-    // Fan 상태 정보
-    fanStatus: {
-      power: feedBoardStatusBitsFanPower.value ? 'ON' : 'OFF',
-      status: feedBoardStatusBitsFanError.value ? 'ERROR' : 'NORMAL',
-      isActive: feedBoardStatusBitsFanPower.value,
-      hasError: feedBoardStatusBitsFanError.value,
-    },
     // 활성화된 LNA 목록
     activeLNAs: [
       feedXBoardStatusLNALHCPPower.value && 'LHCP',
@@ -1072,13 +1117,11 @@ export const useICDStore = defineStore('icd', () => {
     errorComponents: [
       feedXBoardStatusLNALHCPError.value && 'LNA_LHCP',
       feedXBoardStatusLNARHCPError.value && 'LNA_RHCP',
-      feedBoardStatusBitsFanError.value && 'FAN',
     ].filter(Boolean),
     // 활성화된 상태 목록
     activeStatuses: [
       feedXBoardStatusLNALHCPPower.value && 'LNA_LHCP_ON',
       feedXBoardStatusLNARHCPPower.value && 'LNA_RHCP_ON',
-      feedBoardStatusBitsFanPower.value && 'FAN_ON',
     ].filter(Boolean),
     // 전체 상태 요약
     summary: {
@@ -1086,26 +1129,130 @@ export const useICDStore = defineStore('icd', () => {
         feedXBoardStatusLNALHCPPower.value,
         feedXBoardStatusLNARHCPPower.value,
       ].filter(Boolean).length,
-      totalErrors: [
-        feedXBoardStatusLNALHCPError.value,
-        feedXBoardStatusLNARHCPError.value,
-        feedBoardStatusBitsFanError.value,
-      ].filter(Boolean).length,
+      totalErrors: [feedXBoardStatusLNALHCPError.value, feedXBoardStatusLNARHCPError.value].filter(
+        Boolean,
+      ).length,
       hasAnyLNAActive: feedXBoardStatusLNALHCPPower.value || feedXBoardStatusLNARHCPPower.value,
-      isFanActive: feedBoardStatusBitsFanPower.value,
-      hasAnyError:
-        feedXBoardStatusLNALHCPError.value ||
-        feedXBoardStatusLNARHCPError.value ||
-        feedBoardStatusBitsFanError.value,
+      hasAnyError: feedXBoardStatusLNALHCPError.value || feedXBoardStatusLNARHCPError.value,
       // 전체 상태 판단
       overallStatus:
-        feedXBoardStatusLNALHCPError.value ||
-        feedXBoardStatusLNARHCPError.value ||
-        feedBoardStatusBitsFanError.value
+        feedXBoardStatusLNALHCPError.value || feedXBoardStatusLNARHCPError.value
           ? 'ERROR'
-          : feedXBoardStatusLNALHCPPower.value ||
-              feedXBoardStatusLNARHCPPower.value ||
-              feedBoardStatusBitsFanPower.value
+          : feedXBoardStatusLNALHCPPower.value || feedXBoardStatusLNARHCPPower.value
+            ? 'ACTIVE'
+            : 'STANDBY',
+    },
+  }))
+  // 전체 Feed ETC Board 상태 정보를 제공하는 computed (ICD 문서: Bits 7-0)
+  const feedBoardETCStatusInfo = computed(() => ({
+    raw: feedBoardETCStatusBits.value,
+    rfSwitchMode: feedBoardETCStatusRFSwitchMode.value, // 0=RHCP, 1=LHCP
+    rfSwitchError: feedBoardETCStatusRFSwitchError.value,
+    fanPower: feedBoardETCStatusFanPower.value,
+    fanError: feedBoardETCStatusFanError.value,
+    // RF Switch 상태 정보
+    rfSwitchStatus: {
+      mode: feedBoardETCStatusRFSwitchMode.value ? 'LHCP' : 'RHCP',
+      status: feedBoardETCStatusRFSwitchError.value ? 'ERROR' : 'NORMAL',
+      isRHCP: !feedBoardETCStatusRFSwitchMode.value,
+      isLHCP: feedBoardETCStatusRFSwitchMode.value,
+      hasError: feedBoardETCStatusRFSwitchError.value,
+    },
+    // Fan 상태 정보
+    fanStatus: {
+      power: feedBoardETCStatusFanPower.value ? 'ON' : 'OFF',
+      status: feedBoardETCStatusFanError.value ? 'ERROR' : 'NORMAL',
+      isActive: feedBoardETCStatusFanPower.value,
+      hasError: feedBoardETCStatusFanError.value,
+    },
+    // 전체 상태 요약
+    summary: {
+      hasFanActive: feedBoardETCStatusFanPower.value,
+      hasAnyError: feedBoardETCStatusRFSwitchError.value || feedBoardETCStatusFanError.value,
+      currentRFSwitchMode: feedBoardETCStatusRFSwitchMode.value ? 'LHCP' : 'RHCP',
+      overallStatus:
+        feedBoardETCStatusRFSwitchError.value || feedBoardETCStatusFanError.value
+          ? 'ERROR'
+          : feedBoardETCStatusFanPower.value
+            ? 'ACTIVE'
+            : 'STANDBY',
+    },
+  }))
+  // 전체 Feed Ka-Band Board 상태 정보를 제공하는 computed (ICD 문서: Bits 31-24)
+  const feedKaBoardStatusInfo = computed(() => ({
+    raw: feedKaBoardStatusBits.value,
+    kaLnaLHCPPower: feedKaBoardStatusLNALHCPPower.value,
+    kaLnaLHCPError: feedKaBoardStatusLNALHCPError.value,
+    kaLnaRHCPPower: feedKaBoardStatusLNARHCPPower.value,
+    kaLnaRHCPError: feedKaBoardStatusLNARHCPError.value,
+    kaSelectionLHCPBand: feedKaBoardStatusSelectionLHCPBand.value ? 'Band2' : 'Band1',
+    kaSelectionLHCPError: feedKaBoardStatusSelectionLHCPError.value,
+    kaSelectionRHCPBand: feedKaBoardStatusSelectionRHCPBand.value ? 'Band2' : 'Band1',
+    kaSelectionRHCPError: feedKaBoardStatusSelectionRHCPError.value,
+    // LNA 상태 정보
+    lnaStatus: {
+      lhcp: {
+        power: feedKaBoardStatusLNALHCPPower.value ? 'ON' : 'OFF',
+        status: feedKaBoardStatusLNALHCPError.value ? 'ERROR' : 'NORMAL',
+        isActive: feedKaBoardStatusLNALHCPPower.value,
+        hasError: feedKaBoardStatusLNALHCPError.value,
+      },
+      rhcp: {
+        power: feedKaBoardStatusLNARHCPPower.value ? 'ON' : 'OFF',
+        status: feedKaBoardStatusLNARHCPError.value ? 'ERROR' : 'NORMAL',
+        isActive: feedKaBoardStatusLNARHCPPower.value,
+        hasError: feedKaBoardStatusLNARHCPError.value,
+      },
+    },
+    // Selection 상태 정보
+    selectionStatus: {
+      lhcp: {
+        band: feedKaBoardStatusSelectionLHCPBand.value ? 'Band2' : 'Band1',
+        error: feedKaBoardStatusSelectionLHCPError.value,
+      },
+      rhcp: {
+        band: feedKaBoardStatusSelectionRHCPBand.value ? 'Band2' : 'Band1',
+        error: feedKaBoardStatusSelectionRHCPError.value,
+      },
+    },
+    // 활성화된 LNA 목록
+    activeLNAs: [
+      feedKaBoardStatusLNALHCPPower.value && 'LHCP',
+      feedKaBoardStatusLNARHCPPower.value && 'RHCP',
+    ].filter(Boolean),
+    // 에러가 있는 컴포넌트 목록
+    errorComponents: [
+      feedKaBoardStatusLNALHCPError.value && 'LNA_LHCP',
+      feedKaBoardStatusLNARHCPError.value && 'LNA_RHCP',
+      feedKaBoardStatusSelectionLHCPError.value && 'SELECTION_LHCP',
+      feedKaBoardStatusSelectionRHCPError.value && 'SELECTION_RHCP',
+    ].filter(Boolean),
+    // 전체 상태 요약
+    summary: {
+      totalActiveLNAs: [
+        feedKaBoardStatusLNALHCPPower.value,
+        feedKaBoardStatusLNARHCPPower.value,
+      ].filter(Boolean).length,
+      totalErrors: [
+        feedKaBoardStatusLNALHCPError.value,
+        feedKaBoardStatusLNARHCPError.value,
+        feedKaBoardStatusSelectionLHCPError.value,
+        feedKaBoardStatusSelectionRHCPError.value,
+      ].filter(Boolean).length,
+      hasAnyLNAActive: feedKaBoardStatusLNALHCPPower.value || feedKaBoardStatusLNARHCPPower.value,
+      hasAnyError:
+        feedKaBoardStatusLNALHCPError.value ||
+        feedKaBoardStatusLNARHCPError.value ||
+        feedKaBoardStatusSelectionLHCPError.value ||
+        feedKaBoardStatusSelectionRHCPError.value,
+      // 전체 상태 판단
+      overallStatus:
+        feedKaBoardStatusLNALHCPError.value ||
+        feedKaBoardStatusLNARHCPError.value ||
+        feedKaBoardStatusSelectionLHCPError.value ||
+        feedKaBoardStatusSelectionRHCPError.value
+          ? 'ERROR'
+          : feedKaBoardStatusLNALHCPPower.value || feedKaBoardStatusLNARHCPPower.value
             ? 'ACTIVE'
             : 'STANDBY',
     },
@@ -1910,7 +2057,15 @@ export const useICDStore = defineStore('icd', () => {
         parseTrainBoardStatusBits(newBitString)
       }
 
-      // Feed 보드 상태
+      // Feed 보드 상태 (ICD 문서: 4바이트 Unsigned Long으로 전송, 백엔드에서 8비트씩 분리하여 전송)
+      if (
+        antennaData.feedBoardETCStatusBits !== undefined &&
+        antennaData.feedBoardETCStatusBits !== null
+      ) {
+        const newBitString = safeToString(antennaData.feedBoardETCStatusBits)
+        feedBoardETCStatusBits.value = newBitString
+        parseFeedBoardETCStatusBits(newBitString)
+      }
       if (
         antennaData.feedSBoardStatusBits !== undefined &&
         antennaData.feedSBoardStatusBits !== null
@@ -1926,6 +2081,14 @@ export const useICDStore = defineStore('icd', () => {
         const newBitString = safeToString(antennaData.feedXBoardStatusBits)
         feedXBoardStatusBits.value = newBitString
         parseFeedXBoardStatusBits(newBitString)
+      }
+      if (
+        antennaData.feedKaBoardStatusBits !== undefined &&
+        antennaData.feedKaBoardStatusBits !== null
+      ) {
+        const newBitString = safeToString(antennaData.feedKaBoardStatusBits)
+        feedKaBoardStatusBits.value = newBitString
+        parseFeedKaBoardStatusBits(newBitString)
       }
 
       // LNA 전류 데이터
@@ -1953,6 +2116,18 @@ export const useICDStore = defineStore('icd', () => {
       ) {
         currentXBandLNARHCP.value = safeToString(antennaData.currentXBandLNARHCP)
       }
+      if (
+        antennaData.currentKaBandLNALHCP !== undefined &&
+        antennaData.currentKaBandLNALHCP !== null
+      ) {
+        currentKaBandLNALHCP.value = safeToString(antennaData.currentKaBandLNALHCP)
+      }
+      if (
+        antennaData.currentKaBandLNARHCP !== undefined &&
+        antennaData.currentKaBandLNARHCP !== null
+      ) {
+        currentKaBandLNARHCP.value = safeToString(antennaData.currentKaBandLNARHCP)
+      }
 
       // RSSI 데이터
       if (antennaData.rssiSBandLNALHCP !== undefined && antennaData.rssiSBandLNALHCP !== null) {
@@ -1966,6 +2141,12 @@ export const useICDStore = defineStore('icd', () => {
       }
       if (antennaData.rssiXBandLNARHCP !== undefined && antennaData.rssiXBandLNARHCP !== null) {
         rssiXBandLNARHCP.value = safeToString(antennaData.rssiXBandLNARHCP)
+      }
+      if (antennaData.rssiKaBandLNALHCP !== undefined && antennaData.rssiKaBandLNALHCP !== null) {
+        rssiKaBandLNALHCP.value = safeToString(antennaData.rssiKaBandLNALHCP)
+      }
+      if (antennaData.rssiKaBandLNARHCP !== undefined && antennaData.rssiKaBandLNARHCP !== null) {
+        rssiKaBandLNARHCP.value = safeToString(antennaData.rssiKaBandLNARHCP)
       }
 
       // 가속도 데이터
@@ -2492,6 +2673,10 @@ export const useICDStore = defineStore('icd', () => {
     xLHCP = false,
     xRHCP = false,
     fan = false,
+    kaLHCP = false,
+    kaRHCP = false,
+    kaSelectionRHCP = false,
+    kaSelectionLHCP = false,
   ) => {
     try {
       const response = await icdService.sendFeedOnOffCommand(
@@ -2501,6 +2686,10 @@ export const useICDStore = defineStore('icd', () => {
         xLHCP,
         xRHCP,
         fan,
+        kaLHCP,
+        kaRHCP,
+        kaSelectionRHCP,
+        kaSelectionLHCP,
       )
       return { success: true, data: response, message: 'Feed On/Off 명령이 전송되었습니다.' }
     } catch (error) {
@@ -2653,18 +2842,24 @@ export const useICDStore = defineStore('icd', () => {
     elevationBoardStatusBits,
     trainBoardServoStatusBits: trainBoardServoStatusBits,
     trainBoardStatusBits: trainBoardStatusBits,
+    feedBoardETCStatusBits,
     feedSBoardStatusBits,
     feedXBoardStatusBits,
+    feedKaBoardStatusBits,
 
     // LNA 및 RSSI 데이터
     currentSBandLNALHCP,
     currentSBandLNARHCP,
     currentXBandLNALHCP,
     currentXBandLNARHCP,
+    currentKaBandLNALHCP,
+    currentKaBandLNARHCP,
     rssiSBandLNALHCP,
     rssiSBandLNARHCP,
     rssiXBandLNALHCP,
     rssiXBandLNARHCP,
+    rssiKaBandLNALHCP,
+    rssiKaBandLNARHCP,
 
     // 가속도 데이터
     azimuthAcceleration,
@@ -2708,8 +2903,10 @@ export const useICDStore = defineStore('icd', () => {
     elevationBoardStatusInfo,
     trainBoardServoStatusInfo: trainBoardServoStatusInfo,
     trainBoardStatusInfo: trainBoardStatusInfo,
+    feedBoardETCStatusInfo,
     feedSBoardStatusInfo,
     feedXBoardStatusInfo,
+    feedKaBoardStatusInfo,
 
     // 모드 상태 정보
     ephemerisStatus,

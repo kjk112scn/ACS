@@ -28,6 +28,9 @@ export { useStepStore } from './mode/stepStore'
 export { useICDStore } from './icd/icdStore'
 export { useModeStore as useICDModeStore } from './icd/modeStore'
 
+// === UI 관련 Store ===
+export { useFeedSettingsStore } from './ui/feedSettingsStore'
+
 // 타입들도 export
 export type { ScheduleItem } from './mode/passScheduleStore'
 
