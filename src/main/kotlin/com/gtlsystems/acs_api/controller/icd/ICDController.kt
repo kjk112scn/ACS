@@ -288,27 +288,75 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
     fun feedOnOffCommand(
         @RequestParam sLHCP: Boolean = false,
         @RequestParam sRHCP: Boolean = false,
-        @RequestParam sRFSwitch: Boolean = false,
+        @RequestParam sRFSwitch: Boolean = false, // false: RHCP, true: LHCP
         @RequestParam xLHCP: Boolean = false,
         @RequestParam xRHCP: Boolean = false,
-        @RequestParam fan: Boolean = false
+        @RequestParam fan: Boolean = false,
+        // Ka-Band 파라미터 추가
+        @RequestParam kaLHCP: Boolean = false,
+        @RequestParam kaRHCP: Boolean = false,
+        @RequestParam kaSelectionRHCP: Boolean = false, // false: Band1, true: Band2
+        @RequestParam kaSelectionLHCP: Boolean = false  // false: Band1, true: Band2
     ): ResponseEntity<Map<String, String>> {
         return try {
-            val bitFeedOnoff = BitSet()
+            /**
+             * 프로토콜 명세에 따른 비트 매핑 (2바이트 Unsigned Short):
+             * Bit 15-12: Reserved
+             * Bit 11: Ka-Band RHCP Selection (0: Band1, 1: Band2)
+             * Bit 10: Ka-Band LHCP Selection (0: Band1, 1: Band2)
+             * Bit 9: Ka-Band RHCP (0: Off, 1: On)
+             * Bit 8: Ka-Band LHCP (0: Off, 1: On)
+             * Bit 7-6: Reserved
+             * Bit 5: Fan (0: Off, 1: On)
+             * Bit 4: S Band RF Switch (0: RHCP, 1: LHCP)
+             * Bit 3: X-Band RHCP (0: Off, 1: On)
+             * Bit 2: X-Band LHCP (0: Off, 1: On)
+             * Bit 1: S-Band RHCP (0: Off, 1: On)
+             * Bit 0: S-Band LHCP (0: Off, 1: On)
+             */
+            val bitFeedOnoff = BitSet(16) // 16비트(2바이트) BitSet 생성
+            
+            // Bit 0: S-Band LHCP
             if (sLHCP) bitFeedOnoff.set(0)
+            
+            // Bit 1: S-Band RHCP
             if (sRHCP) bitFeedOnoff.set(1)
-            if (sRFSwitch) bitFeedOnoff.set(2)
-            if (xLHCP) bitFeedOnoff.set(4)
-            if (xRHCP) bitFeedOnoff.set(5)
-            if (fan) bitFeedOnoff.set(7)
+            
+            // Bit 2: X-Band LHCP
+            if (xLHCP) bitFeedOnoff.set(2)
+            
+            // Bit 3: X-Band RHCP
+            if (xRHCP) bitFeedOnoff.set(3)
+            
+            // Bit 4: S Band RF Switch (false: RHCP, true: LHCP)
+            if (sRFSwitch) bitFeedOnoff.set(4)
+            
+            // Bit 5: Fan
+            if (fan) bitFeedOnoff.set(5)
+            
+            // Bit 8: Ka-Band LHCP
+            if (kaLHCP) bitFeedOnoff.set(8)
+            
+            // Bit 9: Ka-Band RHCP
+            if (kaRHCP) bitFeedOnoff.set(9)
+            
+            // Bit 10: Ka-Band LHCP Selection (false: Band1, true: Band2)
+            if (kaSelectionLHCP) bitFeedOnoff.set(10)
+            
+            // Bit 11: Ka-Band RHCP Selection (false: Band1, true: Band2)
+            if (kaSelectionRHCP) bitFeedOnoff.set(11)
 
             val bitStr = listOfNotNull(
                 if (sLHCP) "S-Band LHCP" else null,
                 if (sRHCP) "S-Band RHCP" else null,
-                if (sRFSwitch) "S-RFSwitch" else null,
+                if (sRFSwitch) "S-RFSwitch(LHCP)" else if (sLHCP || sRHCP) "S-RFSwitch(RHCP)" else null,
                 if (xLHCP) "X-Band LHCP" else null,
                 if (xRHCP) "X-Band RHCP" else null,
-                if (fan) "FAN" else null
+                if (fan) "FAN" else null,
+                if (kaLHCP) "Ka-Band LHCP" else null,
+                if (kaRHCP) "Ka-Band RHCP" else null,
+                if (kaSelectionLHCP) "Ka-Selection LHCP(Band2)" else if (kaLHCP) "Ka-Selection LHCP(Band1)" else null,
+                if (kaSelectionRHCP) "Ka-Selection RHCP(Band2)" else if (kaRHCP) "Ka-Selection RHCP(Band1)" else null
             ).joinToString(",")
 
             udpFwICDService.feedOnOffCommand(bitFeedOnoff)

@@ -53,8 +53,10 @@ class HardwareErrorLogService {
                 "elevationBoardStatusBits",
                 "trainBoardServoStatusBits",
                 "trainBoardStatusBits",
+                "feedBoardETCStatusBits",
                 "feedSBoardStatusBits",
-                "feedXBoardStatusBits"
+                "feedXBoardStatusBits",
+                "feedKaBoardStatusBits"
             )
             
             // 각 비트 타입별로 처리
@@ -105,8 +107,10 @@ class HardwareErrorLogService {
             "elevationBoardStatusBits" -> data.elevationBoardStatusBits
             "trainBoardServoStatusBits" -> data.trainBoardServoStatusBits
             "trainBoardStatusBits" -> data.trainBoardStatusBits
+            "feedBoardETCStatusBits" -> data.feedBoardETCStatusBits
             "feedSBoardStatusBits" -> data.feedSBoardStatusBits
             "feedXBoardStatusBits" -> data.feedXBoardStatusBits
+            "feedKaBoardStatusBits" -> data.feedKaBoardStatusBits
             else -> null
         }
     }

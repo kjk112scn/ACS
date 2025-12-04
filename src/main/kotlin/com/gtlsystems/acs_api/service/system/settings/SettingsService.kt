@@ -104,6 +104,9 @@ class SettingsService(
         // StepSizeLimit 설정
         "stepsizelimit.min" to SettingDefinition("stepsizelimit.min", 50, SettingType.DOUBLE, "스텝 사이즈 최소값"),
         "stepsizelimit.max" to SettingDefinition("stepsizelimit.max", 50, SettingType.DOUBLE, "스텝 사이즈 최대값"),
+        
+        // Feed 설정
+        "feed.enabledBands" to SettingDefinition("feed.enabledBands", "[\"s\",\"x\"]", SettingType.STRING, "피드 밴드 표시 설정 (S-Band, X-Band, Ka-Band)"),
 
         // 기존 설정들 뒤에 추가할 시스템 설정들
         // === ConfigurationService에서 가져올 시스템 설정 ===
@@ -704,6 +707,42 @@ class SettingsService(
      */
     var systemJvmParallelThreads: Long by createSettingProperty("system.jvm.parallelThreads", "병렬 스레드 수")
 
+    // === Feed 설정 프로퍼티 ===
+    /**
+     * 활성화된 피드 밴드 목록
+     * 기본값: ["s", "x"]
+     * S-Band, X-Band, Ka-Band 중 표시할 밴드를 선택합니다.
+     * JSON 문자열로 저장되므로 커스텀 getter/setter 사용
+     */
+    var feedEnabledBands: List<String>
+        get() {
+            val value = settings["feed.enabledBands"] as? String ?: "[\"s\",\"x\"]"
+            return try {
+                // JSON 문자열 파싱: ["s","x"] -> ["s", "x"]
+                value.removePrefix("[").removeSuffix("]")
+                    .split(",")
+                    .map { it.trim().removeSurrounding("\"") }
+                    .filter { it.isNotEmpty() }
+            } catch (e: Exception) {
+                logger.warn("피드 설정 파싱 실패, 기본값 사용: $value, ${e.message}")
+                listOf("s", "x")
+            }
+        }
+        set(value) {
+            // 유효성 검사: 최소 하나의 밴드는 활성화되어 있어야 함
+            if (value.isEmpty()) {
+                throw IllegalArgumentException("최소 하나의 밴드는 선택되어 있어야 합니다.")
+            }
+            // 유효성 검사: 허용된 밴드만 포함
+            val validBands = value.filter { it in listOf("s", "x", "ka") }
+            if (validBands.isEmpty()) {
+                throw IllegalArgumentException("유효한 밴드를 선택해주세요. (s, x, ka)")
+            }
+            // JSON 문자열로 변환하여 저장: ["s", "x"] -> ["s","x"]
+            val jsonValue = validBands.joinToString(",", "[", "]") { "\"$it\"" }
+            updateSetting("feed.enabledBands", jsonValue)
+        }
+
     // LocationData 객체 제공
     val locationData: LocationData
         get() = LocationData(
@@ -928,6 +967,27 @@ class SettingsService(
         )
     }
 
+    // Feed 설정 일괄 변경
+    fun setFeed(enabledBands: List<String>) {
+        logger.info("🔄 Feed 설정 변경 시작: enabledBands = $enabledBands")
+        // 유효성 검사: 최소 하나의 밴드는 활성화되어 있어야 함
+        if (enabledBands.isEmpty()) {
+            logger.error("❌ Feed 설정 변경 실패: 최소 하나의 밴드는 선택되어 있어야 합니다.")
+            throw IllegalArgumentException("최소 하나의 밴드는 선택되어 있어야 합니다.")
+        }
+        // 유효성 검사: 허용된 밴드만 포함
+        val validBands = enabledBands.filter { it in listOf("s", "x", "ka") }
+        if (validBands.isEmpty()) {
+            logger.error("❌ Feed 설정 변경 실패: 유효한 밴드를 선택해주세요. (s, x, ka)")
+            throw IllegalArgumentException("유효한 밴드를 선택해주세요. (s, x, ka)")
+        }
+        // JSON 문자열로 변환하여 저장
+        val jsonValue = validBands.joinToString(",", "[", "]") { "\"$it\"" }
+        logger.info("💾 Feed 설정 저장: feed.enabledBands = $jsonValue")
+        updateSetting("feed.enabledBands", jsonValue)
+        logger.info("✅ Feed 설정 변경 완료: enabledBands = $validBands")
+    }
+
     // 모든 설정 조회
     fun getAll(): Map<String, Any> = settings.toMap()
 
@@ -945,6 +1005,7 @@ class SettingsService(
     fun getTimeOffsetLimitsSettings(): Map<String, Any> = settings.filterKeys { it.startsWith("timeoffsetlimits.") }
     fun getAlgorithmSettings(): Map<String, Any> = settings.filterKeys { it.startsWith("algorithm.") }
     fun getStepSizeLimitSettings(): Map<String, Any> = settings.filterKeys { it.startsWith("stepsizelimit.") }
+    fun getFeedSettings(): Map<String, Any> = settings.filterKeys { it.startsWith("feed.") }
 
     // === 시스템 설정 그룹별 조회 메서드들 ===
     /**
@@ -1034,6 +1095,9 @@ class SettingsService(
             }
             event.key.startsWith("stepsizelimit.") -> {
                 // StepSizeLimit 설정 변경 시 처리 로직
+            }
+            event.key.startsWith("feed.") -> {
+                logger.info("Feed 설정 변경: ${event.key} = ${event.value}")
             }
             // === 시스템 설정 그룹들 추가 ===
             event.key.startsWith("system.udp.") -> {

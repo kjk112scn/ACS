@@ -86,18 +86,24 @@ class ICDService {
                                 elevationBoardStatusBits = it.elevationBoardStatusBits,
                                 trainBoardServoStatusBits = it.tiltBoardServoStatusBits,
                                 trainBoardStatusBits = it.tiltBoardStatusBits,
+                                feedBoardETCStatusBits = it.feedBoardETCStatusBits,
                                 feedSBoardStatusBits = it.feedSBoardStatusBits,
                                 feedXBoardStatusBits = it.feedXBoardStatusBits,
+                                feedKaBoardStatusBits = it.feedKaBoardStatusBits,
 
                                 // Current and RSSI data
                                 currentSBandLNALHCP = it.currentSBandLNALHCP,
                                 currentSBandLNARHCP = it.currentSBandLNARHCP,
                                 currentXBandLNALHCP = it.currentXBandLNALHCP,
                                 currentXBandLNARHCP = it.currentXBandLNARHCP,
+                                currentKaBandLNALHCP = it.currentKaBandLNALHCP,
+                                currentKaBandLNARHCP = it.currentKaBandLNARHCP,
                                 rssiSBandLNALHCP = it.rssiSBandLNALHCP,
                                 rssiSBandLNARHCP = it.rssiSBandLNARHCP,
                                 rssiXBandLNALHCP = it.rssiXBandLNALHCP,
                                 rssiXBandLNARHCP = it.rssiXBandLNARHCP,
+                                rssiKaBandLNALHCP = it.rssiKaBandLNALHCP,
+                                rssiKaBandLNARHCP = it.rssiKaBandLNARHCP,
 
                                 //각가속도, 최대 각가속도
                                 azimuthAcceleration = it.azimuthAcceleration,
@@ -1220,18 +1226,24 @@ class ICDService {
             var etx: Byte = ICD_ETX
         ) {
             fun setDataFrame(): ByteArray {
-                val dataFrame = ByteArray(6)
+                /**
+                 * 프로토콜 명세: Command Field는 2바이트(Unsigned Short)
+                 * 프레임 구조: STX(1) + CMD(1) + Data(2) + CRC16(2) + ETX(1) = 7바이트
+                 */
+                val dataFrame = ByteArray(7)
                 val byteCrc16Target = ByteArray(dataFrame.size - 4)
 
-                 // BitSet을 바이트 배열로 변환 (안전한 방식)
+                // BitSet을 2바이트(Unsigned Short)로 변환
                 val byteArray = feedOnOff.toByteArray()
-                val byteFeedOnOff = if (byteArray.isNotEmpty()) byteArray[0] else 0x00
+                val byteFeedOnOffLow = if (byteArray.isNotEmpty()) byteArray[0] else 0x00
+                val byteFeedOnOffHigh = if (byteArray.size > 1) byteArray[1] else 0x00
 
                 dataFrame[0] = ICD_STX
                 dataFrame[1] = cmdOne.code.toByte()
-                dataFrame[2] = byteFeedOnOff
+                dataFrame[2] = byteFeedOnOffLow  // Low byte (Bits 7-0)
+                dataFrame[3] = byteFeedOnOffHigh // High byte (Bits 15-8)
 
-                // CRC 대상 복사
+                // CRC 대상 복사 (CMD부터 Data까지)
                 dataFrame.copyInto(byteCrc16Target, 0, 1, 1 + byteCrc16Target.size)
 
                 // CRC16 계산 및 엔디안 변환
@@ -1240,9 +1252,9 @@ class ICDService {
                 val crc16Check = crc16Buffer
 
                 // CRC16 값 설정
-                dataFrame[3] = crc16Check[0]
-                dataFrame[4] = crc16Check[1]
-                dataFrame[5] = ICD_ETX
+                dataFrame[4] = crc16Check[0]
+                dataFrame[5] = crc16Check[1]
+                dataFrame[6] = ICD_ETX
 
                 return dataFrame
             }
@@ -1767,16 +1779,22 @@ class ICDService {
             var elevationBoardStatusBits: String = "00000000",  // BitSet에서 String으로 변경
             var tiltBoardServoStatusBits: String = "00000000",  // BitSet에서 String으로 변경
             var tiltBoardStatusBits: String = "00000000",  // BitSet에서 String으로 변경
-            var feedSBoardStatusBits: String = "00000000",  // BitSet에서 String으로 변경
-            var feedXBoardStatusBits: String = "00000000",  // BitSet에서 String으로 변경
+            var feedBoardETCStatusBits: String = "00000000",  // BitSet에서 String으로 변경 (Bits 7-0)
+            var feedSBoardStatusBits: String = "00000000",  // BitSet에서 String으로 변경 (Bits 15-8)
+            var feedXBoardStatusBits: String = "00000000",  // BitSet에서 String으로 변경 (Bits 23-16)
+            var feedKaBoardStatusBits: String = "00000000",  // BitSet에서 String으로 변경 (Bits 31-24)
             var currentSBandLNALHCP: Float = 0f,
             var currentSBandLNARHCP: Float = 0f,
             var currentXBandLNALHCP: Float = 0f,
             var currentXBandLNARHCP: Float = 0f,
+            var currentKaBandLNALHCP: Float = 0f,
+            var currentKaBandLNARHCP: Float = 0f,
             var rssiSBandLNALHCP: Float = 0f,
             var rssiSBandLNARHCP: Float = 0f,
             var rssiXBandLNALHCP: Float = 0f,
             var rssiXBandLNARHCP: Float = 0f,
+            var rssiKaBandLNALHCP: Float = 0f,
+            var rssiKaBandLNARHCP: Float = 0f,
             var azimuthAcceleration: Float = 0f,
             var elevationAcceleration: Float = 0f,
             var tiltAcceleration: Float = 0f,
@@ -1915,43 +1933,102 @@ class ICDService {
                 reserve_Six,
                 encoder_Error
             }
-
+            enum class FeedBoardETCStatus {
+                s_Band_RF_LHCP_OR_RHCP_ON,
+                s_Band_RF_LHCP_OR_RHCP_ON_Error,
+                FAN_ON,
+                FAN_ERROR,
+                reserve_Four,
+                reserve_Five,
+                reserve_Six,
+                reserve_Seven
+            }
             enum class FeedBoardSBandStatus {
                 s_Band_LHCP_ON,
                 s_Band_LHCP_Error,
                 s_Band_RHCP_ON,
                 s_Band_RHCP_Error,
-                s_Band_RF_ON,
-                s_Band_RF_Error
+                reserve_Four,
+                reserve_Five,
+                reserve_Six,
+                reserve_Seven
             }
-
-            enum class FeedBoardXBandStatus(val value: Int) {
-                X_BAND_LHCP_ON(0),
-                X_BAND_LHCP_ERROR(1),
-                X_BAND_RHCP_ON(2),
-                X_BAND_RHCP_ERROR(3),
-                RESERVE1(4),
-                RESERVE2(5),
-                FAN_ON(6),
-                FAN_ERROR(7);
+            enum class FeedBoardXBandStatus {
+                x_Band_LHCP_ON,
+                x_Band_LHCP_Error,
+                x_Band_RHCP_ON,
+                x_Band_RHCP_Error,
+                reserve_Four,
+                reserve_Five,
+                reserve_Six,
+                reserve_Seven
+            }
+            enum class FeedBoardKaBandStatus {
+                ka_Band_LHCP_ON,
+                ka_Band_LHCP_Error,
+                ka_Band_RHCP_ON,
+                ka_Band_RHCP_Error,
+                ka_Band_LHCP_BAND1_OR_BAND2_Selection,
+                ka_Band_LHCP_Selection_Error,
+                ka_Band_RHCP_BAND1_OR_BAND2_Selection,
+                ka_Band_RHCP_BAND1_OR_BAND2_Selection_Error,
             }
 
             companion object {
-                const val FRAME_LENGTH = 172
+                // FRAME_LENGTH: ETX를 제외한 프레임 길이 (실제 수신: 191바이트 = 190 + ETX 1바이트)
+                const val FRAME_LENGTH = 190
 
                 fun fromByteArray(data: ByteArray): GetDataFrame? {
-                    if (data.size < FRAME_LENGTH) {
-                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                    // 최소 길이 체크 (STX + CMD + 최소 데이터 + CRC + ETX)
+                    if (data.size < 10) {
+                        println("수신 데이터 길이가 너무 짧습니다: ${data.size}")
                         return null
                     }
 
-                    val rxChecksum = ByteBuffer.wrap(byteArrayOf(data[FRAME_LENGTH - 2], data[FRAME_LENGTH - 1]))
-                        .short.toUShort()
+                    // ETX 확인 (마지막 바이트)
+                    val etxByte = data.last()
+                    val expectedEtx = ICD_ETX
+                    if (etxByte != expectedEtx) {
+                        println("ETX 불일치: 수신=0x${etxByte.toUByte().toString(16)}, 예상=0x${expectedEtx.toUByte().toString(16)}")
+                        return null
+                    }
 
-                    val crc16Target = data.copyOfRange(1, FRAME_LENGTH - 2)
+                    // 실제 프레임 길이 계산 (ETX 제외)
+                    val actualFrameLength = data.size - 1 // ETX 제외
+                    
+                    // CRC 위치: ETX 직전 2바이트 (빅 엔디안 - 다른 클래스들과 동일)
+                    // data[actualFrameLength - 2], data[actualFrameLength - 1] = CRC
+                    // data[actualFrameLength] = ETX
+                    val rxChecksum = ByteBuffer.wrap(byteArrayOf(data[actualFrameLength - 2], data[actualFrameLength - 1]))
+                        .short.toUShort()  // 기본값 BIG_ENDIAN 사용 (다른 클래스들과 동일)
+
+                    // CRC 타겟: STX 다음부터 CRC 직전까지
+                    val crc16Target = data.copyOfRange(1, actualFrameLength - 2)
                     val crc16Check = Crc16.computeCrc(crc16Target).toUShort()
 
-                    if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
+                    // CRC 검증
+                    if (rxChecksum != crc16Check) {
+                        println("ReadStatus CRC 체크 실패:")
+                        println("  수신 데이터 길이: ${data.size} (ETX 제외: $actualFrameLength)")
+                        println("  STX: 0x${data[0].toUByte().toString(16)} (예상: 0x${ICD_STX.toUByte().toString(16)})")
+                        println("  CMD1: 0x${data[1].toUByte().toString(16)} (예상: 'R'=0x${'R'.code.toString(16)})")
+                        if (data.size > 2) {
+                            println("  CMD2: 0x${data[2].toUByte().toString(16)} (예상: 'R'=0x${'R'.code.toString(16)})")
+                        }
+                        println("  수신 CRC 위치: data[${actualFrameLength - 2}], data[${actualFrameLength - 1}]")
+                        println("  수신 CRC 바이트: 0x${data[actualFrameLength - 2].toUByte().toString(16)}, 0x${data[actualFrameLength - 1].toUByte().toString(16)}")
+                        println("  수신 CRC (빅 엔디안): 0x${rxChecksum.toString(16)}")
+                        println("  계산 CRC: 0x${crc16Check.toString(16)}")
+                        println("  CRC 타겟 범위: data[1] ~ data[${actualFrameLength - 2}] (${actualFrameLength - 2}바이트)")
+                        println("  CRC 타겟 HEX: ${JKUtil.JKConvert.Companion.byteArrayToHexString(crc16Target.take(20).toByteArray())}...")
+                        println("  ETX: 0x${etxByte.toUByte().toString(16)} (예상: 0x${expectedEtx.toUByte().toString(16)})")
+                        println("  전체 데이터 HEX (처음 50바이트): ${JKUtil.JKConvert.Companion.byteArrayToHexString(data.take(50).toByteArray())}...")
+                        println("  전체 데이터 HEX (마지막 10바이트): ...${JKUtil.JKConvert.Companion.byteArrayToHexString(data.takeLast(10).toByteArray())}")
+                        return null
+                    }
+                    
+                    // CRC 검증 통과 시 프레임 파싱
+                    if (true) {
                         val buffer = ByteBuffer.wrap(data).order(ByteOrder.BIG_ENDIAN)
 
                         val frame = GetDataFrame()
@@ -2008,22 +2085,44 @@ class ICDService {
                         frame.tiltBoardServoStatusBits =
                             JKUtil.JKConvert.Companion.byteToBinaryString(tiltBoardServoStatusByte)
 
-                        // Feed Board Status (2 bytes)
-                        val feedXBoardStatusByte = buffer.get()
-                        frame.feedXBoardStatusBits = JKUtil.JKConvert.Companion.byteToBinaryString(feedXBoardStatusByte)
+                        // Feed Board Status (4 bytes - Unsigned Long)
+                        // ICD 문서: 32비트 Unsigned Long으로 전송
+                        // Bit 31-24: Ka-Band Status
+                        // Bit 23-16: X-Band Status
+                        // Bit 15-8: S-Band Status
+                        // Bit 7-0: ETC Status (Fan, S-Band TX RF Switch)
+                        val feedBoardStatusLong = buffer.int.toLong() and 0xFFFFFFFFL // Unsigned Long 처리
 
-                        val feedSBoardStatusByte = buffer.get()
-                        frame.feedSBoardStatusBits = JKUtil.JKConvert.Companion.byteToBinaryString(feedSBoardStatusByte)
+                        // 각 8비트로 분리하여 저장
+                        frame.feedBoardETCStatusBits = ((feedBoardStatusLong and 0xFF).toInt()).let {
+                            JKUtil.JKConvert.Companion.byteToBinaryString(it.toByte())
+                        } // Bits 7-0
+
+                        frame.feedSBoardStatusBits = ((feedBoardStatusLong shr 8 and 0xFF).toInt()).let {
+                            JKUtil.JKConvert.Companion.byteToBinaryString(it.toByte())
+                        } // Bits 15-8
+
+                        frame.feedXBoardStatusBits = ((feedBoardStatusLong shr 16 and 0xFF).toInt()).let {
+                            JKUtil.JKConvert.Companion.byteToBinaryString(it.toByte())
+                        } // Bits 23-16
+
+                        frame.feedKaBoardStatusBits = ((feedBoardStatusLong shr 24 and 0xFF).toInt()).let {
+                            JKUtil.JKConvert.Companion.byteToBinaryString(it.toByte())
+                        } // Bits 31-24
 
                         // 나머지 필드들 처리...
                         frame.currentSBandLNALHCP = buffer.float
                         frame.currentSBandLNARHCP = buffer.float
                         frame.currentXBandLNALHCP = buffer.float
                         frame.currentXBandLNARHCP = buffer.float
+                        frame.currentKaBandLNALHCP = buffer.float
+                        frame.currentKaBandLNARHCP = buffer.float
                         frame.rssiSBandLNALHCP = buffer.float
                         frame.rssiSBandLNARHCP = buffer.float
                         frame.rssiXBandLNALHCP = buffer.float
                         frame.rssiXBandLNARHCP = buffer.float
+                        frame.rssiKaBandLNALHCP = buffer.float
+                        frame.rssiKaBandLNARHCP = buffer.float
                         frame.servoDriverAzimuthAngle = buffer.float
                         frame.servoDriverElevationAngle = buffer.float
                         frame.servoDriverTiltAngle = buffer.float
@@ -2056,7 +2155,22 @@ class ICDService {
 
 
                     } else {
-                        println("CRC 체크 실패 또는 ETX 불일치")
+                        // 상세한 디버깅 정보 출력 (ReadStatus CRC 체크 실패 시)
+                        println("ReadStatus CRC 체크 실패 또는 ETX 불일치:")
+                        println("  수신 데이터 길이: ${data.size} (예상: $FRAME_LENGTH)")
+                        println("  STX: 0x${data[0].toUByte().toString(16)} (예상: 0x${ICD_STX.toUByte().toString(16)})")
+                        println("  CMD1: 0x${data[1].toUByte().toString(16)} (예상: 'R'=0x${'R'.code.toString(16)})")
+                        if (data.size > 2) {
+                            println("  CMD2: 0x${data[2].toUByte().toString(16)} (예상: 'R'=0x${'R'.code.toString(16)})")
+                        }
+                        println("  수신 CRC 위치: data[${FRAME_LENGTH - 2}], data[${FRAME_LENGTH - 1}]")
+                        println("  수신 CRC: 0x${rxChecksum.toString(16)}")
+                        println("  계산 CRC: 0x${crc16Check.toString(16)}")
+                        println("  CRC 타겟 범위: data[1] ~ data[${FRAME_LENGTH - 2}] (${FRAME_LENGTH - 3}바이트)")
+                        println("  CRC 타겟 HEX: ${JKUtil.JKConvert.Companion.byteArrayToHexString(crc16Target.take(20).toByteArray())}...")
+                        println("  ETX: 0x${etxByte.toUByte().toString(16)} (예상: 0x${expectedEtx.toUByte().toString(16)})")
+                        println("  전체 데이터 HEX (처음 50바이트): ${JKUtil.JKConvert.Companion.byteArrayToHexString(data.take(50).toByteArray())}...")
+                        println("  전체 데이터 HEX (마지막 10바이트): ...${JKUtil.JKConvert.Companion.byteArrayToHexString(data.takeLast(10).toByteArray())}")
                         return null
                     }
                 }

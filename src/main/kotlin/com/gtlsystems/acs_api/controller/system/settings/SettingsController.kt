@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 import org.springframework.http.ResponseEntity
 import org.springframework.transaction.annotation.Transactional
+import org.slf4j.LoggerFactory
 import jakarta.validation.constraints.DecimalMax
 import jakarta.validation.constraints.DecimalMin
 import jakarta.validation.constraints.NotNull
@@ -20,6 +21,7 @@ import jakarta.validation.constraints.NotNull
 class SettingsController(
     private val settingsService: SettingsService
 ) {
+    private val logger = LoggerFactory.getLogger(SettingsController::class.java)
 
     /**
      * 위치 설정 조회
@@ -597,6 +599,54 @@ class SettingsController(
     }
 
     /**
+     * Feed 설정 조회
+     */
+    @GetMapping("/feed")
+    @Operation(
+        operationId = "getFeed",
+        tags = ["System - Settings"]
+    )
+    fun getFeed(): Map<String, Any> {
+        return settingsService.getFeedSettings()
+    }
+
+    /**
+     * Feed 설정 변경
+     */
+    @PostMapping("/feed")
+    @Operation(
+        operationId = "setFeed",
+        tags = ["System - Settings"]
+    )
+    fun setFeed(
+        @Parameter(
+            description = "Feed 설정 변경 요청 데이터",
+            required = true
+        )
+        @RequestBody request: FeedRequest
+    ): ResponseEntity<Map<String, Any>> {
+        return try {
+            logger.info("📥 Feed 설정 변경 요청 수신: enabledBands = ${request.enabledBands}")
+            settingsService.setFeed(request.enabledBands)
+            val updatedBands = settingsService.getFeedSettings()["feed.enabledBands"]
+            logger.info("✅ Feed 설정 변경 완료: enabledBands = $updatedBands")
+            ResponseEntity.ok(mapOf(
+                "status" to "success",
+                "message" to "Feed 설정이 성공적으로 변경되었습니다.",
+                "data" to mapOf(
+                    "enabledBands" to updatedBands
+                )
+            ))
+        } catch (e: Exception) {
+            logger.error("❌ Feed 설정 변경 실패: ${e.message}", e)
+            ResponseEntity.badRequest().body(mapOf(
+                "status" to "error",
+                "message" to "Feed 설정 변경 실패: ${e.message}"
+            ))
+        }
+    }
+
+    /**
      * 전체 설정 조회
      */
     @GetMapping
@@ -729,4 +779,11 @@ data class AlgorithmRequest(
 data class StepSizeLimitRequest(
     val min: Double,
     val max: Double
+)
+
+/**
+ * Feed 설정 요청 데이터
+ */
+data class FeedRequest(
+    val enabledBands: List<String>
 )
