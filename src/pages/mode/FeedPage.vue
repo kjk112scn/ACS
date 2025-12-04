@@ -134,7 +134,7 @@
           </q-card>
         </div>
 
-          <!-- X-Band 섹션 -->
+        <!-- X-Band 섹션 -->
         <div v-if="feedSettingsStore.isBandEnabled('x')" class="col-12" :class="getXBandColumnClass()">
           <q-card class="control-section">
             <q-card-section>
@@ -582,24 +582,24 @@ const getKaBandColumnClass = (): string => {
 
 /**
  * FAN 섹션의 컬럼 클래스를 반환합니다.
- * FAN 너비를 넓힙니다.
+ * FAN 너비를 조정합니다.
  */
 const getFanColumnClass = (): string => {
   const count = feedSettingsStore.enabledBandCount
-  if (count === 1) return 'col-md-2' // 1개: FAN 2 (1 → 2로 증가)
-  if (count === 2) return 'col-md-2' // 2개: FAN 2 (1 → 2로 증가)
-  return 'col-md-2'                   // 3개: FAN 2 (1 → 2로 증가)
+  if (count === 1) return 'col-md-1' // 1개: FAN 1 - S-Band 6, FAN 1, Legend 3 = 10 (여유 있음)
+  if (count === 2) return 'col-md-1' // 2개: FAN 1 - S-Band 4, X-Band 4, FAN 1, Legend 3 = 12
+  return 'col-md-1'                   // 3개: FAN 1 - S-Band 3, X-Band 3, Ka-Band 3, FAN 1, Legend 2 = 12
 }
 
 /**
  * Legend 섹션의 컬럼 클래스를 반환합니다.
- * Legend 너비를 줄입니다.
+ * Legend 너비를 조정합니다.
  */
 const getLegendColumnClass = (): string => {
   const count = feedSettingsStore.enabledBandCount
-  if (count === 1) return 'col-md-2' // 1개: Legend 2 (3 → 2로 감소) - S-Band 6, FAN 2, Legend 2 = 10 (여유 있음)
-  if (count === 2) return 'col-md-2' // 2개: Legend 2 (3 → 2로 감소) - S-Band 4, X-Band 4, FAN 2, Legend 2 = 12
-  return 'col-md-1'                   // 3개: Legend 1 (2 → 1로 감소) - S-Band 3, X-Band 3, Ka-Band 3, FAN 2, Legend 1 = 12
+  if (count === 1) return 'col-md-3' // 1개: Legend 3 - S-Band 6, FAN 1, Legend 3 = 10 (여유 있음)
+  if (count === 2) return 'col-md-3' // 2개: Legend 3 - S-Band 4, X-Band 4, FAN 1, Legend 3 = 12
+  return 'col-md-2'                   // 3개: Legend 2 - S-Band 3, X-Band 3, Ka-Band 3, FAN 1, Legend 2 = 12
 }
 
 /**
@@ -2167,18 +2167,18 @@ q-page-container .feed-mode {
   cursor: pointer;
   transition: transform 0.2s ease, opacity 0.2s ease;
   user-select: none;
-  /* ✅ 버튼 너비 증가 */
-  min-width: 180px !important;
-  max-width: 180px !important;
-  width: 180px !important;
-  padding: 0.5rem 1rem !important;
-  /* ✅ 상하 패딩 증가 (0.25rem → 0.5rem) - 버튼 크기 증가 */
-  /* ✅ 좌우 패딩 증가 (0.75rem → 1rem) - 버튼 크기 증가 */
+  /* ✅ 버튼 너비 조정 - FEED 테두리 내부에 맞게 */
+  min-width: 120px !important;
+  max-width: 120px !important;
+  width: 120px !important;
+  padding: 0.5rem 0.5rem !important;
+  /* ✅ 상하 패딩 유지 (0.5rem) */
+  /* ✅ 좌우 패딩 감소 (0.75rem → 0.5rem) - 버튼 너비 감소에 맞춤 */
   font-weight: 500;
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
-  /* ✅ FAN 버튼 높이 증가 (30px → 50px) */
+  /* ✅ FAN 버튼 높이 유지 (50px) */
   height: 50px !important;
   min-height: 50px !important;
   max-height: 50px !important;
