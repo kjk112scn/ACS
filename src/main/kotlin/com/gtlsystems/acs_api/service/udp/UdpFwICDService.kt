@@ -897,7 +897,7 @@ class UdpFwICDService(
     private fun waitForTrainStabilization(targetAngle: Float): Mono<String> {
         return Mono.create { sink ->
             val startTime = System.currentTimeMillis()
-            val maxWaitTime = 30000L // 30초 최대 대기
+            val maxWaitTime = 110000L // 30초 최대 대기
 
             val checkStabilization =
                 object : Runnable {

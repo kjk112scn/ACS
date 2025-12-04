@@ -1652,15 +1652,18 @@ class EphemerisService(
         val finalTransformedAltitude =
             (theoreticalFinalPoint["Altitude"] as? Double)?.toFloat() ?: axisTransformedAltitude
 
-        // ✅ 필터링 기준 확인 (하드웨어 제한 각도)
-        val filterThreshold = settingsService.angleElevationMin
+        // ✅ 필터링 제거: 3축 변환 후 Elevation 음수 허용
+        // 필터링 기준 확인 (하드웨어 제한 각도)
+        // val filterThreshold = settingsService.angleElevationMin
+        // 
+        // logger.info("🔍 [createRealtimeTrackingData] 필터링 체크: finalTransformedElevation=$finalTransformedElevation, filterThreshold=$filterThreshold")
+        // 
+        // if (finalTransformedElevation < filterThreshold) {
+        //     logger.warn("⚠️ [createRealtimeTrackingData] 실시간 추적 데이터: Elevation(${finalTransformedElevation}°) < 필터 기준(${filterThreshold}°) - 빈 Map 반환")
+        //     return emptyMap()
+        // }
         
-        logger.info("🔍 [createRealtimeTrackingData] 필터링 체크: finalTransformedElevation=$finalTransformedElevation, filterThreshold=$filterThreshold")
-        
-        if (finalTransformedElevation < filterThreshold) {
-            logger.warn("⚠️ [createRealtimeTrackingData] 실시간 추적 데이터: Elevation(${finalTransformedElevation}°) < 필터 기준(${filterThreshold}°) - 빈 Map 반환")
-            return emptyMap()
-        }
+        logger.info("🔍 [createRealtimeTrackingData] 필터링 제거: finalTransformedElevation=$finalTransformedElevation")
 
         // ✅ 성능 최적화: Keyhole Final 변환 데이터를 한 번만 조회하고 재사용
         val keyholeFinalPassDetails = if (isKeyhole) {
@@ -2995,22 +2998,23 @@ class EphemerisService(
             }
             
             // ✅ Step 2: Select Schedule 목록에서 스케줄 필터링 (하드웨어 제한 각도 기준)
-            val elevationMin = settingsService.angleElevationMin
-            
-            val filteredMergedData = mergedData.filter { item ->
-                val maxElevation = item["MaxElevation"] as? Double
-                // ✅ MaxElevation이 null이면 필터링에서 제외하지 않음 (데이터가 있는 경우만 필터링)
-                if (maxElevation == null) {
-                    logger.warn("⚠️ [요청 #$requestId] MST #${item["MstId"]}: MaxElevation이 null입니다. 필터링에서 제외하지 않습니다.")
-                    true  // ✅ null인 경우도 포함
-                } else {
-                    maxElevation >= elevationMin
-                }
-            }
+            // ✅ 필터링 제거: 3축 변환 후 Elevation 음수 허용
+            // val elevationMin = settingsService.angleElevationMin
+            // 
+            // val filteredMergedData = mergedData.filter { item ->
+            //     val maxElevation = item["MaxElevation"] as? Double
+            //     // ✅ MaxElevation이 null이면 필터링에서 제외하지 않음 (데이터가 있는 경우만 필터링)
+            //     if (maxElevation == null) {
+            //         logger.warn("⚠️ [요청 #$requestId] MST #${item["MstId"]}: MaxElevation이 null입니다. 필터링에서 제외하지 않습니다.")
+            //         true  // ✅ null인 경우도 포함
+            //     } else {
+            //         maxElevation >= elevationMin
+            //     }
+            // }
             
             logger.info("✅ [요청 #$requestId] 병합 완료: ${mergedData.size}개 MST 레코드 (KeyholeAxis + KeyholeFinal 데이터 포함)")
-            logger.info("✅ [요청 #$requestId] 필터링 완료: ${mergedData.size}개 → ${filteredMergedData.size}개 (elevationMin=${elevationMin}° 기준)")
-            return filteredMergedData
+            logger.info("✅ [요청 #$requestId] 필터링 제거: 모든 데이터 반환")
+            return mergedData
             
         } catch (error: Exception) {
             logger.error("❌ 데이터 병합 실패: ${error.message}", error)
@@ -3230,7 +3234,8 @@ class EphemerisService(
         }
         
         // 3. 하드웨어 제한 각도 기준으로 필터링
-        val elevationMin = settingsService.angleElevationMin
+        // ✅ 필터링 제거: 3축 변환 후 Elevation 음수 허용
+        // val elevationMin = settingsService.angleElevationMin
         
         // 선택된 DataType의 데이터 조회 (mstId와 detailId 모두 일치하는 데이터만)
         // ✅ DetailId가 null이거나 없으면 기본값 0으로 처리 (하위 호환성)
@@ -3241,21 +3246,75 @@ class EphemerisService(
             dataMstId == mstId && actualDetailId == detailId && it["DataType"] == dataType
         }
         
+        // ✅ 필터링 제거: 3축 변환 후 Elevation 음수 허용
         // 하드웨어 제한 각도 기준으로 필터링
-        val filteredData = allData.filter {
-            (it["Elevation"] as? Double ?: 0.0) >= elevationMin
-        }
+        // val filteredData = allData.filter {
+        //     (it["Elevation"] as? Double ?: 0.0) >= elevationMin
+        // }
+        // 
+        // // ✅ 디버깅: 필터링 실패 시 Elevation 값 상세 분석
+        // if (filteredData.isEmpty() && allData.isNotEmpty()) {
+        //     // Elevation 값 샘플 확인 (처음 10개)
+        //     val elevationSamples = allData.take(10).mapIndexed { index, item ->
+        //         val elevation = item["Elevation"]
+        //         val elevationType = elevation?.javaClass?.simpleName ?: "null"
+        //         val elevationValue = when (elevation) {
+        //             is Double -> elevation
+        //             is Float -> elevation.toDouble()
+        //             is Number -> elevation.toDouble()
+        //             is String -> elevation.toDoubleOrNull()
+        //             else -> null
+        //         }
+        //         mapOf(
+        //             "index" to index,
+        //             "type" to elevationType,
+        //             "raw" to elevation,
+        //             "converted" to elevationValue,
+        //             "meetsCriteria" to (elevationValue != null && elevationValue >= elevationMin)
+        //         )
+        //     }
+        //     
+        //     // Elevation 통계
+        //     val elevationValues = allData.mapNotNull { 
+        //         when (val el = it["Elevation"]) {
+        //             is Double -> el
+        //             is Float -> el.toDouble()
+        //             is Number -> el.toDouble()
+        //             is String -> el.toDoubleOrNull()
+        //             else -> null
+        //         }
+        //     }
+        //     
+        //     val minElevation = elevationValues.minOrNull()
+        //     val maxElevation = elevationValues.maxOrNull()
+        //     val avgElevation = if (elevationValues.isNotEmpty()) elevationValues.average() else null
+        //     
+        //     // Elevation 타입 분포
+        //     val typeDistribution = allData.groupingBy { 
+        //         it["Elevation"]?.javaClass?.simpleName ?: "null" 
+        //     }.eachCount()
+        //     
+        //     logger.warn("⚠️ MST ID ${mstId}, DetailId=${detailId}: 필터링 결과 데이터가 없습니다.")
+        //     logger.warn("   - 필터 기준: ${elevationMin}°")
+        //     logger.warn("   - 전체 데이터: ${allData.size}개")
+        //     logger.warn("   - Elevation 샘플 (처음 10개):")
+        //     elevationSamples.forEach { sample ->
+        //         logger.warn("     [${sample["index"]}] type=${sample["type"]}, raw=${sample["raw"]}, converted=${sample["converted"]}, meetsCriteria=${sample["meetsCriteria"]}")
+        //     }
+        //     logger.warn("   - Elevation 통계: min=${minElevation}°, max=${maxElevation}°, avg=${avgElevation}°")
+        //     logger.warn("   - Elevation 타입 분포: $typeDistribution")
+        // }
+        // 
+        // if (filteredData.isEmpty() && allData.isEmpty()) {
+        //     logger.error("❌ MST ID ${mstId}, DetailId=${detailId}: 데이터가 없습니다.")
+        // }
         
-        // ✅ 로그 최소화: 에러 발생 시에만 로그 출력
-        if (filteredData.isEmpty() && allData.isNotEmpty()) {
-            logger.warn("⚠️ MST ID ${mstId}, DetailId=${detailId}: 필터링 결과 데이터가 없습니다. 필터 기준(${elevationMin}°)가 너무 높을 수 있습니다.")
-        }
-        
-        if (filteredData.isEmpty() && allData.isEmpty()) {
+        // 필터링 없이 모든 데이터 반환
+        if (allData.isEmpty()) {
             logger.error("❌ MST ID ${mstId}, DetailId=${detailId}: 데이터가 없습니다.")
         }
         
-        return filteredData
+        return allData
     }
 
     /**
