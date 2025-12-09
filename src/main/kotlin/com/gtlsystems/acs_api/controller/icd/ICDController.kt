@@ -349,7 +349,7 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
             val bitStr = listOfNotNull(
                 if (sLHCP) "S-Band LHCP" else null,
                 if (sRHCP) "S-Band RHCP" else null,
-                if (sRFSwitch) "S-RFSwitch(LHCP)" else if (sLHCP || sRHCP) "S-RFSwitch(RHCP)" else null,
+                if (sRFSwitch) "S-Band RF Switch(LHCP)" else null,
                 if (xLHCP) "X-Band LHCP" else null,
                 if (xRHCP) "X-Band RHCP" else null,
                 if (fan) "FAN" else null,

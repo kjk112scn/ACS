@@ -571,8 +571,8 @@ class UdpFwICDService(
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
             logger.info("FeedOnOff 명령 전송 완료")
-            logger.debug(
-                "FeedOnOff 전송 데이터: {}",
+            logger.info(
+                "FeedOnOff 전송 데이터 (HEX): {}",
                 JKUtil.JKConvert.Companion.byteArrayToHexString(dataToSend)
             )
         }

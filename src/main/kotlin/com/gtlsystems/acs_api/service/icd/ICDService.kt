@@ -1233,27 +1233,29 @@ class ICDService {
                 val dataFrame = ByteArray(7)
                 val byteCrc16Target = ByteArray(dataFrame.size - 4)
 
-                // BitSet을 2바이트(Unsigned Short)로 변환
+                // BitSet을 2바이트(Unsigned Short)로 변환 - 빅 엔디안 방식
+                // BitSet.toByteArray()는 설정된 비트가 있는 만큼만 반환하므로, 항상 2바이트로 확장
                 val byteArray = feedOnOff.toByteArray()
-                val byteFeedOnOffLow = if (byteArray.isNotEmpty()) byteArray[0] else 0x00
-                val byteFeedOnOffHigh = if (byteArray.size > 1) byteArray[1] else 0x00
+                val bytes = ByteArray(2) { 0x00 }  // 2바이트 배열 초기화
+                byteArray.forEachIndexed { index, byte ->
+                    if (index < 2) bytes[index] = byte
+                }
 
                 dataFrame[0] = ICD_STX
                 dataFrame[1] = cmdOne.code.toByte()
-                dataFrame[2] = byteFeedOnOffLow  // Low byte (Bits 7-0)
-                dataFrame[3] = byteFeedOnOffHigh // High byte (Bits 15-8)
+                dataFrame[2] = bytes[1]  // High byte (Bits 15-8) - 빅 엔디안
+                dataFrame[3] = bytes[0]  // Low byte (Bits 7-0) - 빅 엔디안
 
                 // CRC 대상 복사 (CMD부터 Data까지)
                 dataFrame.copyInto(byteCrc16Target, 0, 1, 1 + byteCrc16Target.size)
 
-                // CRC16 계산 및 엔디안 변환
+                // CRC16 계산 및 빅 엔디안 변환
                 val crc16s = Crc16.computeCrc(byteCrc16Target)
                 val crc16Buffer = JKUtil.JKConvert.Companion.shortToByteArray(crc16s, false)
-                val crc16Check = crc16Buffer
 
                 // CRC16 값 설정
-                dataFrame[4] = crc16Check[0]
-                dataFrame[5] = crc16Check[1]
+                dataFrame[4] = crc16Buffer[0]
+                dataFrame[5] = crc16Buffer[1]
                 dataFrame[6] = ICD_ETX
 
                 return dataFrame

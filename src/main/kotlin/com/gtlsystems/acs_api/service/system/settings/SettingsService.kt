@@ -36,12 +36,16 @@ data class SettingDefinition(
 /**
  * 설정 관리 서비스
  * 프론트엔드에서 관리 가능한 설정값들을 관리
+ *
+ * DB 사용 여부:
+ * - no-db 프로필: RAM만 사용, Repository는 null
+ * - with-db 프로필: DB 사용, Repository 활성화
  */
 @Service
 @Transactional
 class SettingsService(
-    private val settingsRepository: SettingsRepository,
-    private val settingsHistoryRepository: SettingsHistoryRepository,
+    private val settingsRepository: SettingsRepository?,
+    private val settingsHistoryRepository: SettingsHistoryRepository?,
     private val eventPublisher: ApplicationEventPublisher
 ) {
     private val logger = LoggerFactory.getLogger(SettingsService::class.java)
@@ -168,18 +172,26 @@ class SettingsService(
         // 1. 기본값으로 메모리 초기화
         settings.putAll(defaultSettings)
 
-        // 2. DB에서 설정값 조회하여 메모리 업데이트
-        //loadSettingsFromDatabase()
-
-        logger.info("설정 초기화 완료")
+        // 2. DB에서 설정값 조회하여 메모리 업데이트 (DB 사용 시에만)
+        if (settingsRepository != null) {
+            loadSettingsFromDatabase()
+            logger.info("설정 초기화 완료 (DB 모드)")
+        } else {
+            logger.info("설정 초기화 완료 (RAM 전용 모드)")
+        }
     }
 
     /**
      * DB에서 설정값을 조회하여 메모리에 로드
      */
     private fun loadSettingsFromDatabase() {
+        val repo = settingsRepository ?: run {
+            logger.warn("DB 미사용 모드: 기본값 사용")
+            return
+        }
+
         try {
-            val dbSettings = settingsRepository.findAll()
+            val dbSettings = repo.findAll()
             dbSettings.forEach { setting ->
                 val value = convertStringToValue(setting.value, setting.type)
                 settings[setting.key] = value
@@ -194,14 +206,19 @@ class SettingsService(
      * 설정값을 DB에 저장
      */
     private fun saveSettingToDatabase(key: String, value: Any) {
+        val repo = settingsRepository ?: run {
+            logger.debug("DB 미사용 모드: 설정은 RAM에만 저장됨")
+            return
+        }
+
         try {
             val type = settingTypes[key] ?: SettingType.STRING
-            val existingSetting = settingsRepository.findByKey(key)
+            val existingSetting = repo.findByKey(key)
             val stringValue = value.toString()
 
             if (existingSetting != null) {
                 existingSetting.value = stringValue
-                settingsRepository.save(existingSetting)
+                repo.save(existingSetting)
             } else {
                 val newSetting = Setting(
                     key = key,
@@ -209,7 +226,7 @@ class SettingsService(
                     type = type,
                     isSystemSetting = false
                 )
-                settingsRepository.save(newSetting)
+                repo.save(newSetting)
             }
             logger.info("DB에 설정 저장: $key = $stringValue")
         } catch (e: Exception) {
@@ -230,7 +247,7 @@ class SettingsService(
 
         logger.info("설정값 변경됨: $key = $oldValue → $newValue")
         settings[key] = newValue
-        //saveSettingToDatabase(key, newValue)
+        saveSettingToDatabase(key, newValue)
         publishSettingChangedEvent(key, oldValue, newValue)
     }
 
