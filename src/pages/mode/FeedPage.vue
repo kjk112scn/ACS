@@ -22,7 +22,7 @@
                       <div class="lna-wrapper">
                         <div class="lna-label">LNA</div>
                         <div class="lna-container">
-                          <div class="lna-icon" :class="getLNAStatusClass('s', 'rhcp')" @click="toggleLNA('s', 'rhcp')">
+                          <div class="lna-icon" :class="[getLNAStatusClass('s', 'rhcp'), { 'lna-disabled': isLoading }]" @click="!isLoading && toggleLNA('s', 'rhcp')">
                             <svg viewBox="0 0 24 24" width="60" height="60">
                               <polygon points="22,12 2,2 2,22" :fill="getLNAFillColor('s', 'rhcp')"
                                 :stroke="getLNAStrokeColor('s', 'rhcp')" stroke-width="2" />
@@ -48,7 +48,7 @@
                       <div class="lna-wrapper">
                         <div class="lna-label">LNA</div>
                         <div class="lna-container">
-                          <div class="lna-icon" :class="getLNAStatusClass('s', 'lhcp')" @click="toggleLNA('s', 'lhcp')">
+                          <div class="lna-icon" :class="[getLNAStatusClass('s', 'lhcp'), { 'lna-disabled': isLoading }]" @click="!isLoading && toggleLNA('s', 'lhcp')">
                             <svg viewBox="0 0 24 24" width="60" height="60">
                               <polygon points="22,12 2,2 2,22" :fill="getLNAFillColor('s', 'lhcp')"
                                 :stroke="getLNAStrokeColor('s', 'lhcp')" stroke-width="2" />
@@ -86,7 +86,7 @@
                         </div>
                         <!-- 중앙: 하나의 스위치 -->
                         <div class="rf-switch-container">
-                          <div class="rf-switch-icon" :class="getRFSwitchStatusClass()" @click="toggleRFSwitch()">
+                          <div class="rf-switch-icon" :class="[getRFSwitchStatusClass(), { 'lna-disabled': isLoading }]" @click="!isLoading && toggleRFSwitch()">
                             <svg viewBox="0 0 24 24" width="80" height="80">
                               <rect x="2" y="2" width="20" height="20" rx="2" :fill="getRFSwitchFillColor()"
                                 :stroke="getRFSwitchStrokeColor()" stroke-width="2" />
@@ -153,7 +153,7 @@
                       <div class="lna-wrapper">
                         <div class="lna-label">LNA</div>
                         <div class="lna-container">
-                          <div class="lna-icon" :class="getLNAStatusClass('x', 'rhcp')" @click="toggleLNA('x', 'rhcp')">
+                          <div class="lna-icon" :class="[getLNAStatusClass('x', 'rhcp'), { 'lna-disabled': isLoading }]" @click="!isLoading && toggleLNA('x', 'rhcp')">
                             <svg viewBox="0 0 24 24" width="60" height="60">
                               <polygon points="22,12 2,2 2,22" :fill="getLNAFillColor('x', 'rhcp')"
                                 :stroke="getLNAStrokeColor('x', 'rhcp')" stroke-width="2" />
@@ -179,7 +179,7 @@
                       <div class="lna-wrapper">
                         <div class="lna-label">LNA</div>
                         <div class="lna-container">
-                          <div class="lna-icon" :class="getLNAStatusClass('x', 'lhcp')" @click="toggleLNA('x', 'lhcp')">
+                          <div class="lna-icon" :class="[getLNAStatusClass('x', 'lhcp'), { 'lna-disabled': isLoading }]" @click="!isLoading && toggleLNA('x', 'lhcp')">
                             <svg viewBox="0 0 24 24" width="60" height="60">
                               <polygon points="22,12 2,2 2,22" :fill="getLNAFillColor('x', 'lhcp')"
                                 :stroke="getLNAStrokeColor('x', 'lhcp')" stroke-width="2" />
@@ -218,8 +218,8 @@
                       <div class="lna-wrapper">
                         <div class="lna-label">LNA</div>
                         <div class="lna-container">
-                          <div class="lna-icon" :class="getLNAStatusClass('ka', 'rhcp')"
-                            @click="toggleLNA('ka', 'rhcp')">
+                          <div class="lna-icon" :class="[getLNAStatusClass('ka', 'rhcp'), { 'lna-disabled': isLoading }]"
+                            @click="!isLoading && toggleLNA('ka', 'rhcp')">
                             <svg viewBox="0 0 24 24" width="60" height="60">
                               <polygon points="22,12 2,2 2,22" :fill="getLNAFillColor('ka', 'rhcp')"
                                 :stroke="getLNAStrokeColor('ka', 'rhcp')" stroke-width="2" />
@@ -245,8 +245,8 @@
                       <div class="lna-wrapper">
                         <div class="lna-label">LNA</div>
                         <div class="lna-container">
-                          <div class="lna-icon" :class="getLNAStatusClass('ka', 'lhcp')"
-                            @click="toggleLNA('ka', 'lhcp')">
+                          <div class="lna-icon" :class="[getLNAStatusClass('ka', 'lhcp'), { 'lna-disabled': isLoading }]"
+                            @click="!isLoading && toggleLNA('ka', 'lhcp')">
                             <svg viewBox="0 0 24 24" width="60" height="60">
                               <polygon points="22,12 2,2 2,22" :fill="getLNAFillColor('ka', 'lhcp')"
                                 :stroke="getLNAStrokeColor('ka', 'lhcp')" stroke-width="2" />
@@ -284,8 +284,8 @@
                         </div>
                         <!-- 중앙: 스위치 (Band1/Band2 선택) -->
                         <div class="rf-switch-container">
-                          <div class="rf-switch-icon" :class="getKaSelectionRHCPStatusClass()"
-                            @click="toggleKaSelectionRHCP()">
+                          <div class="rf-switch-icon" :class="[getKaSelectionRHCPStatusClass(), { 'lna-disabled': isLoading }]"
+                            @click="!isLoading && toggleKaSelectionRHCP()">
                             <svg viewBox="0 0 24 24" width="80" height="80">
                               <rect x="2" y="2" width="20" height="20" rx="2" :fill="getKaSelectionRHCPFillColor()"
                                 :stroke="getKaSelectionRHCPStrokeColor()" stroke-width="2" />
@@ -350,8 +350,8 @@
                         </div>
                         <!-- 중앙: 스위치 (Band1/Band2 선택) -->
                         <div class="rf-switch-container">
-                          <div class="rf-switch-icon" :class="getKaSelectionLHCPStatusClass()"
-                            @click="toggleKaSelectionLHCP()">
+                          <div class="rf-switch-icon" :class="[getKaSelectionLHCPStatusClass(), { 'lna-disabled': isLoading }]"
+                            @click="!isLoading && toggleKaSelectionLHCP()">
                             <svg viewBox="0 0 24 24" width="80" height="80">
                               <rect x="2" y="2" width="20" height="20" rx="2" :fill="getKaSelectionLHCPFillColor()"
                                 :stroke="getKaSelectionLHCPStrokeColor()" stroke-width="2" />
@@ -407,7 +407,7 @@
                 <div class="fan-button-container">
                   <q-btn :class="getFanStatusClass()" class="fan-button" :color="getFanButtonColor()"
                     :outline="!icdStore.feedBoardETCStatusInfo.fanStatus.isActive && !icdStore.feedBoardETCStatusInfo.fanStatus.hasError"
-                    :flat="false" @click="toggleFan()">
+                    :flat="false" :disable="isLoading" @click="toggleFan()">
                     <svg class="fan-icon q-mr-sm" viewBox="0 0 24 24" width="20" height="20">
                       <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5" />
                       <path d="M12 12 L12 2 A10 10 0 0 1 19 7 L12 12 Z" fill="currentColor" opacity="0.6" />
@@ -970,27 +970,61 @@ const toggleLNA = async (band: 's' | 'x' | 'ka', type: 'lhcp' | 'rhcp') => {
     const kaSelectionRHCP = kaStatus.selectionStatus.rhcp.band === 'Band2'
     const kaSelectionLHCP = kaStatus.selectionStatus.lhcp.band === 'Band2'
 
+    // 디버깅: 토글 전 현재 상태 출력
+    console.log('=== 토글 전 현재 상태 ===')
+    console.log(`클릭한 항목: ${band.toUpperCase()}-Band ${type.toUpperCase()}`)
+    console.log('Store에서 읽은 상태:', {
+      'S-LHCP': sLHCP,
+      'S-RHCP': sRHCP,
+      'X-LHCP': xLHCP,
+      'X-RHCP': xRHCP,
+      'Ka-LHCP': kaLHCP,
+      'Ka-RHCP': kaRHCP,
+    })
+
     // 클릭한 항목만 토글
     if (band === 's') {
       if (type === 'lhcp') {
+        console.log(`S-LHCP 토글: ${sLHCP} → ${!sLHCP}`)
         sLHCP = !sLHCP
       } else {
+        console.log(`S-RHCP 토글: ${sRHCP} → ${!sRHCP}`)
         sRHCP = !sRHCP
       }
     } else if (band === 'x') {
       if (type === 'lhcp') {
+        console.log(`X-LHCP 토글: ${xLHCP} → ${!xLHCP}`)
         xLHCP = !xLHCP
       } else {
+        console.log(`X-RHCP 토글: ${xRHCP} → ${!xRHCP}`)
         xRHCP = !xRHCP
       }
     } else if (band === 'ka') {
       // Ka-Band LNA 토글 지원
       if (type === 'lhcp') {
+        console.log(`Ka-LHCP 토글: ${kaLHCP} → ${!kaLHCP}`)
         kaLHCP = !kaLHCP
       } else {
+        console.log(`Ka-RHCP 토글: ${kaRHCP} → ${!kaRHCP}`)
         kaRHCP = !kaRHCP
       }
     }
+
+    // 현재 상태를 콘솔에 출력 (디버깅용)
+    console.log('=== Feed On/Off 명령 전송 ===')
+    console.log(`토글 대상: ${band.toUpperCase()}-Band ${type.toUpperCase()}`)
+    console.log('전송할 상태:', {
+      'S-Band LHCP': sLHCP,
+      'S-Band RHCP': sRHCP,
+      'S-Band RF Switch': sRFSwitch,
+      'X-Band LHCP': xLHCP,
+      'X-Band RHCP': xRHCP,
+      'FAN': fan,
+      'Ka-Band LHCP': kaLHCP,
+      'Ka-Band RHCP': kaRHCP,
+      'Ka-Band Selection RHCP': kaSelectionRHCP,
+      'Ka-Band Selection LHCP': kaSelectionLHCP,
+    })
 
     // 즉시 명령 전송
     const result = await icdStore.sendFeedOnOffCommand(
@@ -1006,9 +1040,17 @@ const toggleLNA = async (band: 's' | 'x' | 'ka', type: 'lhcp' | 'rhcp') => {
       kaSelectionLHCP,
     )
 
+    // 토글된 값 확인
+    const toggledValue = band === 's'
+      ? (type === 'lhcp' ? sLHCP : sRHCP)
+      : band === 'x'
+        ? (type === 'lhcp' ? xLHCP : xRHCP)
+        : (type === 'lhcp' ? kaLHCP : kaRHCP)
+    const toggledState = toggledValue ? 'ON' : 'OFF'
+
     if (result.success) {
-      success(`${band.toUpperCase()}-Band ${type.toUpperCase()} LNA 명령이 전송되었습니다.`)
-      statusMessage.value = `${band.toUpperCase()}-Band ${type.toUpperCase()} LNA 명령이 성공적으로 전송되었습니다.`
+      success(`${band.toUpperCase()}-Band ${type.toUpperCase()} LNA ${toggledState} 명령이 전송되었습니다.`)
+      statusMessage.value = `${band.toUpperCase()}-Band ${type.toUpperCase()} LNA ${toggledState} 명령이 성공적으로 전송되었습니다.`
       statusSuccess.value = true
     } else {
       notifyError(result.message || '명령 전송에 실패했습니다.')
@@ -2219,6 +2261,14 @@ q-page-container .feed-mode {
 .rf-switch-icon:hover,
 .fan-button:hover {
   opacity: 0.8;
+}
+
+/* 로딩 중 비활성화 스타일 */
+.lna-icon.lna-disabled,
+.rf-switch-icon.lna-disabled {
+  cursor: not-allowed !important;
+  opacity: 0.5 !important;
+  pointer-events: none !important;
 }
 
 .lna-icon:hover {

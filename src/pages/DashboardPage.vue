@@ -940,15 +940,13 @@ const azimuthCmdValue = computed((): number => {
   const cmdValue = icdStore.cmdAzimuthAngle
   const actualValue = icdStore.azimuthAngle // ✅ fallback용 실제 값
 
-  // ✅ trackingValue 유효성 검증: '0' 문자열은 초기화 값으로 간주하여 무효 처리
+  // ✅ trackingValue 유효성 검증: 0은 유효한 값임 (위성 추적 시작 위치가 0도일 수 있음)
   const numTrackingValue = Number(trackingValue)
   const hasValidTrackingValue =
     trackingValue !== null &&
     trackingValue !== undefined &&
     trackingValue !== '' &&
-    trackingValue !== '0' && // ✅ '0' 문자열은 무효한 값으로 처리 (초기화 상태)
-    !isNaN(numTrackingValue) &&
-    numTrackingValue !== 0 // ✅ 숫자 0도 무효한 값으로 처리 (초기화 상태)
+    !isNaN(numTrackingValue)
 
   // ✅ cmdValue 유효성 검증 (fallback용)
   const hasValidCmdValue =
@@ -990,15 +988,13 @@ const azimuthActualValue = computed((): number => {
   const trackingValue = icdStore.trackingActualAzimuthAngle
   const actualValue = icdStore.azimuthAngle
 
-  // ✅ trackingValue 유효성 검증: '0' 문자열은 초기화 값으로 간주하여 무효 처리
+  // ✅ trackingValue 유효성 검증: 0은 유효한 값임 (위성 추적 시작 위치가 0도일 수 있음)
   const numTrackingValue = Number(trackingValue)
   const hasValidTrackingValue =
     trackingValue !== null &&
     trackingValue !== undefined &&
     trackingValue !== '' &&
-    trackingValue !== '0' && // ✅ '0' 문자열은 무효한 값으로 처리 (초기화 상태)
-    !isNaN(numTrackingValue) &&
-    numTrackingValue !== 0 // ✅ 숫자 0도 무효한 값으로 처리 (초기화 상태)
+    !isNaN(numTrackingValue)
 
   // ✅ 값 선택 로직 개선: 추적 중일 때 trackingActual → actual 순서로 fallback
   let value: string | number
@@ -1031,15 +1027,13 @@ const elevationCmdValue = computed((): number => {
   const cmdValue = icdStore.cmdElevationAngle
   const actualValue = icdStore.elevationAngle // ✅ fallback용 실제 값
 
-  // ✅ trackingValue 유효성 검증: '0' 문자열은 초기화 값으로 간주하여 무효 처리
+  // ✅ trackingValue 유효성 검증: 0은 유효한 값임 (위성 추적 시작 위치가 0도일 수 있음)
   const numTrackingValue = Number(trackingValue)
   const hasValidTrackingValue =
     trackingValue !== null &&
     trackingValue !== undefined &&
     trackingValue !== '' &&
-    trackingValue !== '0' && // ✅ '0' 문자열은 무효한 값으로 처리 (초기화 상태)
-    !isNaN(numTrackingValue) &&
-    numTrackingValue !== 0 // ✅ 숫자 0도 무효한 값으로 처리 (초기화 상태)
+    !isNaN(numTrackingValue)
 
   // ✅ cmdValue 유효성 검증 (fallback용)
   const hasValidCmdValue =
@@ -1077,15 +1071,13 @@ const elevationActualValue = computed((): number => {
   const trackingValue = icdStore.trackingActualElevationAngle
   const actualValue = icdStore.elevationAngle
 
-  // ✅ trackingValue 유효성 검증: '0' 문자열은 초기화 값으로 간주하여 무효 처리
+  // ✅ trackingValue 유효성 검증: 0은 유효한 값임 (위성 추적 시작 위치가 0도일 수 있음)
   const numTrackingValue = Number(trackingValue)
   const hasValidTrackingValue =
     trackingValue !== null &&
     trackingValue !== undefined &&
     trackingValue !== '' &&
-    trackingValue !== '0' && // ✅ '0' 문자열은 무효한 값으로 처리 (초기화 상태)
-    !isNaN(numTrackingValue) &&
-    numTrackingValue !== 0 // ✅ 숫자 0도 무효한 값으로 처리 (초기화 상태)
+    !isNaN(numTrackingValue)
 
   // ✅ 값 선택 로직 개선: 추적 중일 때 trackingActual → actual 순서로 fallback
   let value: string | number
@@ -1115,15 +1107,13 @@ const trainCmdValue = computed((): number => {
   const cmdValue = icdStore.cmdTrainAngle
   const actualValue = icdStore.trainAngle // ✅ fallback용 실제 값
 
-  // ✅ trackingValue 유효성 검증: '0' 문자열은 초기화 값으로 간주하여 무효 처리
+  // ✅ trackingValue 유효성 검증: 0은 유효한 값임 (위성 추적 시작 위치가 0도일 수 있음)
   const numTrackingValue = Number(trackingValue)
   const hasValidTrackingValue =
     trackingValue !== null &&
     trackingValue !== undefined &&
     trackingValue !== '' &&
-    trackingValue !== '0' && // ✅ '0' 문자열은 무효한 값으로 처리 (초기화 상태)
-    !isNaN(numTrackingValue) &&
-    numTrackingValue !== 0 // ✅ 숫자 0도 무효한 값으로 처리 (초기화 상태)
+    !isNaN(numTrackingValue)
 
   // ✅ cmdValue 유효성 검증 (fallback용)
   const hasValidCmdValue =
@@ -1161,15 +1151,13 @@ const trainActualValue = computed((): number => {
   const trackingValue = icdStore.trackingActualTrainAngle
   const actualValue = icdStore.trainAngle
 
-  // ✅ trackingValue 유효성 검증: '0' 문자열은 초기화 값으로 간주하여 무효 처리
+  // ✅ trackingValue 유효성 검증: 0은 유효한 값임 (위성 추적 시작 위치가 0도일 수 있음)
   const numTrackingValue = Number(trackingValue)
   const hasValidTrackingValue =
     trackingValue !== null &&
     trackingValue !== undefined &&
     trackingValue !== '' &&
-    trackingValue !== '0' && // ✅ '0' 문자열은 무효한 값으로 처리 (초기화 상태)
-    !isNaN(numTrackingValue) &&
-    numTrackingValue !== 0 // ✅ 숫자 0도 무효한 값으로 처리 (초기화 상태)
+    !isNaN(numTrackingValue)
 
   // ✅ 값 선택 로직 개선: 추적 중일 때 trackingActual → actual 순서로 fallback
   let value: string | number

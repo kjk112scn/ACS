@@ -2071,6 +2071,7 @@ export const useICDStore = defineStore('icd', () => {
         antennaData.feedSBoardStatusBits !== null
       ) {
         const newBitString = safeToString(antennaData.feedSBoardStatusBits)
+        console.log('🔍 [WebSocket] feedSBoardStatusBits 수신:', newBitString, '(binary:', newBitString.padStart(8, '0'), ')')
         feedSBoardStatusBits.value = newBitString
         parseFeedSBoardStatusBits(newBitString)
       }
@@ -2691,6 +2692,22 @@ export const useICDStore = defineStore('icd', () => {
         kaSelectionRHCP,
         kaSelectionLHCP,
       )
+
+      // 명령 전송 성공 시 즉시 상태 업데이트 (Optimistic Update)
+      // WebSocket으로 실제 상태가 돌아올 때까지 UI가 즉시 반영되도록 함
+      feedSBoardStatusLNALHCPPower.value = sLHCP
+      feedSBoardStatusLNARHCPPower.value = sRHCP
+      feedBoardETCStatusRFSwitchMode.value = sRFSwitch
+      feedXBoardStatusLNALHCPPower.value = xLHCP
+      feedXBoardStatusLNARHCPPower.value = xRHCP
+      feedBoardETCStatusFanPower.value = fan
+      feedKaBoardStatusLNALHCPPower.value = kaLHCP
+      feedKaBoardStatusLNARHCPPower.value = kaRHCP
+      feedKaBoardStatusSelectionRHCPBand.value = kaSelectionRHCP
+      feedKaBoardStatusSelectionLHCPBand.value = kaSelectionLHCP
+
+      console.log('✅ Feed 상태 Optimistic Update 완료')
+
       return { success: true, data: response, message: 'Feed On/Off 명령이 전송되었습니다.' }
     } catch (error) {
       console.error('Feed On/Off 명령 전송 실패:', error)

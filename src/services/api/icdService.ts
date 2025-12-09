@@ -659,41 +659,23 @@ export const icdService = {
     kaSelectionLHCP: boolean = false,
   ) {
     try {
-      // 모든 파라미터가 false인지 확인 (Ka-Band 포함)
-      const allParamsFalse =
-        !sLHCP &&
-        !sRHCP &&
-        !sRFSwitch &&
-        !xLHCP &&
-        !xRHCP &&
-        !fan &&
-        !kaLHCP &&
-        !kaRHCP &&
-        !kaSelectionRHCP &&
-        !kaSelectionLHCP
-
-      let params
-
-      if (allParamsFalse) {
-        // 모든 파라미터가 false면 0x00 전송
-        params = {
-          feedCommand: 0x00,
-        }
-      } else {
-        // 하나라도 true면 개별 파라미터 전송
-        params = {
-          sLHCP,
-          sRHCP,
-          sRFSwitch,
-          xLHCP,
-          xRHCP,
-          fan,
-          kaLHCP,
-          kaRHCP,
-          kaSelectionRHCP,
-          kaSelectionLHCP,
-        }
+      // 항상 개별 파라미터를 전송 (백엔드 컨트롤러는 개별 boolean 파라미터만 받음)
+      // 모든 파라미터가 false여도 백엔드에서 BitSet(16)으로 0x0000을 생성함
+      const params = {
+        sLHCP,
+        sRHCP,
+        sRFSwitch,
+        xLHCP,
+        xRHCP,
+        fan,
+        kaLHCP,
+        kaRHCP,
+        kaSelectionRHCP,
+        kaSelectionLHCP,
       }
+
+      console.log('=== Feed On/Off API 호출 ===')
+      console.log('전송 파라미터:', params)
 
       const response = await api.post('/icd/feed-on-off-command', null, {
         params,
