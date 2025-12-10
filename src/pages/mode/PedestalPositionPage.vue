@@ -116,16 +116,6 @@ import { useICDStore } from '../../stores/icd/icdStore'
 import { usePedestalPositionModeStore } from '@/stores'
 import { useQuasar } from 'quasar'
 
-interface CommandParams {
-  azimuthAngle?: number
-  azimuthSpeed?: number
-  elevationAngle?: number
-  elevationSpeed?: number
-  trainAngle?: number
-  trainSpeed?: number
-  [key: string]: number | undefined
-}
-
 const $q = useQuasar()
 const icdStore = useICDStore()
 const pedestalStore = usePedestalPositionModeStore()
@@ -208,33 +198,60 @@ const handleGoCommand = async () => {
   try {
     isGoLoading.value = true
 
-    const command: CommandParams = {}
+    // ✅ 각 축별로 체크 여부에 따라 각도와 속도 설정
+    let azAngle: number
+    let azSpeed: number
+    let elAngle: number
+    let elSpeed: number
+    let trainAngle: number
+    let trainSpeed: number
 
     if (pedestalStore.selectedAxes.azimuth) {
-      command.azimuthAngle = parseFloat(pedestalStore.targetPositions.azimuth)
-      command.azimuthSpeed = parseFloat(pedestalStore.targetSpeeds.azimuth)
+      // ✅ 체크된 경우: 입력한 목표 각도와 속도 사용
+      azAngle = parseFloat(pedestalStore.targetPositions.azimuth)
+      azSpeed = parseFloat(pedestalStore.targetSpeeds.azimuth)
+      console.log(`Azimuth 체크됨 - 목표 각도: ${azAngle}, 속도: ${azSpeed}`)
+    } else {
+      // ✅ 체크되지 않은 경우: 현재 CMD 각도 유지, 속도는 0
+      azAngle = parseFloat(icdStore.cmdAzimuthAngle) || 0
+      azSpeed = 0
+      console.log(`Azimuth 체크 해제 - 현재 CMD 값 유지: ${azAngle}, 속도: 0`)
     }
 
     if (pedestalStore.selectedAxes.elevation) {
-      command.elevationAngle = parseFloat(pedestalStore.targetPositions.elevation)
-      command.elevationSpeed = parseFloat(pedestalStore.targetSpeeds.elevation)
+      // ✅ 체크된 경우: 입력한 목표 각도와 속도 사용
+      elAngle = parseFloat(pedestalStore.targetPositions.elevation)
+      elSpeed = parseFloat(pedestalStore.targetSpeeds.elevation)
+      console.log(`Elevation 체크됨 - 목표 각도: ${elAngle}, 속도: ${elSpeed}`)
+    } else {
+      // ✅ 체크되지 않은 경우: 현재 CMD 각도 유지, 속도는 0
+      elAngle = parseFloat(icdStore.cmdElevationAngle) || 0
+      elSpeed = 0
+      console.log(`Elevation 체크 해제 - 현재 CMD 값 유지: ${elAngle}, 속도: 0`)
     }
 
     if (pedestalStore.selectedAxes.train) {
-      command.trainAngle = parseFloat(pedestalStore.targetPositions.train)
-      command.trainSpeed = parseFloat(pedestalStore.targetSpeeds.train)
+      // ✅ 체크된 경우: 입력한 목표 각도와 속도 사용
+      trainAngle = parseFloat(pedestalStore.targetPositions.train)
+      trainSpeed = parseFloat(pedestalStore.targetSpeeds.train)
+      console.log(`Train 체크됨 - 목표 각도: ${trainAngle}, 속도: ${trainSpeed}`)
+    } else {
+      // ✅ 체크되지 않은 경우: 현재 CMD 각도 유지, 속도는 0
+      trainAngle = parseFloat(icdStore.cmdTrainAngle) || 0
+      trainSpeed = 0
+      console.log(`Train 체크 해제 - 현재 CMD 값 유지: ${trainAngle}, 속도: 0`)
     }
 
     await icdStore.sendMultiControlCommand({
       azimuth: pedestalStore.selectedAxes.azimuth,
       elevation: pedestalStore.selectedAxes.elevation,
       train: pedestalStore.selectedAxes.train,
-      azAngle: command.azimuthAngle ?? 0,
-      azSpeed: command.azimuthSpeed ?? 0,
-      elAngle: command.elevationAngle ?? 0,
-      elSpeed: command.elevationSpeed ?? 0,
-      trainAngle: command.trainAngle ?? 0,
-      trainSpeed: command.trainSpeed ?? 0,
+      azAngle,
+      azSpeed,
+      elAngle,
+      elSpeed,
+      trainAngle,
+      trainSpeed,
     })
 
     statusMessage.value = '위치 명령이 성공적으로 전송되었습니다.'

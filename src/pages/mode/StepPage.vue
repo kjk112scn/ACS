@@ -117,9 +117,11 @@ const stepStore = useStepStore()
 const handleGo = async () => {
   try {
     // azAngle 계산 로직
-    let calculatedAzAngle = parseFloat(stepStore.angles.azimuth)
+    let calculatedAzAngle: number
+    let calculatedAzSpeed: number
 
     if (stepStore.selectedAxes.azimuth) {
+      // ✅ 체크된 경우: 현재 CMD 값 + 입력한 증분값으로 계산
       // azimuthBoardServoStatusInfo의 servoMotor 값 확인
       if (icdStore.azimuthBoardServoStatusInfo.servoMotor) {
         // servoMotor가 true이면 cmdAzimuthAngle 값에 stepStore.angles.azimuth 값을 더함
@@ -136,12 +138,20 @@ const handleGo = async () => {
           `Azimuth 계산 (ServoMotor=false): ${azimuthValue} + ${parseFloat(stepStore.angles.azimuth)} = ${calculatedAzAngle}`,
         )
       }
+      calculatedAzSpeed = parseFloat(stepStore.speeds.azimuth)
+    } else {
+      // ✅ 체크되지 않은 경우: 현재 CMD 각도 유지, 속도는 0
+      calculatedAzAngle = parseFloat(icdStore.cmdAzimuthAngle) || 0
+      calculatedAzSpeed = 0
+      console.log(`Azimuth 체크 해제 - 현재 CMD 값 유지: ${calculatedAzAngle}, 속도: 0`)
     }
 
     // elAngle 계산 로직
-    let calculatedElAngle = parseFloat(stepStore.angles.elevation)
+    let calculatedElAngle: number
+    let calculatedElSpeed: number
 
     if (stepStore.selectedAxes.elevation) {
+      // ✅ 체크된 경우: 현재 CMD 값 + 입력한 증분값으로 계산
       // elevationBoardServoStatusInfo의 servoMotor 값 확인
       if (icdStore.elevationBoardServoStatusInfo.servoMotor) {
         // servoMotor가 true이면 cmdElevationAngle 값에 stepStore.angles.elevation 값을 더함
@@ -158,15 +168,23 @@ const handleGo = async () => {
           `Elevation 계산 (ServoMotor=false): ${elevationValue} + ${parseFloat(stepStore.angles.elevation)} = ${calculatedElAngle}`,
         )
       }
+      calculatedElSpeed = parseFloat(stepStore.speeds.elevation)
+    } else {
+      // ✅ 체크되지 않은 경우: 현재 CMD 각도 유지, 속도는 0
+      calculatedElAngle = parseFloat(icdStore.cmdElevationAngle) || 0
+      calculatedElSpeed = 0
+      console.log(`Elevation 체크 해제 - 현재 CMD 값 유지: ${calculatedElAngle}, 속도: 0`)
     }
 
     // tiAngle 계산 로직
-    let calculatedTrainAngle = parseFloat(stepStore.angles.train)
+    let calculatedTrainAngle: number
+    let calculatedTrainSpeed: number
 
     if (stepStore.selectedAxes.train) {
+      // ✅ 체크된 경우: 현재 CMD 값 + 입력한 증분값으로 계산
       // trainBoardServoStatusInfo의 servoMotor 값 확인
       if (icdStore.trainBoardServoStatusInfo.servoMotor) {
-        // servoMotor가 true이면 cmdTrainngle 값에 stepStore.angles.train 값을 더함
+        // servoMotor가 true이면 cmdTrainAngle 값에 stepStore.angles.train 값을 더함
         const cmdTrainValue = parseFloat(icdStore.cmdTrainAngle) || 0
         calculatedTrainAngle = cmdTrainValue + parseFloat(stepStore.angles.train)
         console.log(
@@ -180,6 +198,12 @@ const handleGo = async () => {
           `Train 계산 (ServoMotor=false): ${trainValue} + ${parseFloat(stepStore.angles.train)} = ${calculatedTrainAngle}`,
         )
       }
+      calculatedTrainSpeed = parseFloat(stepStore.speeds.train)
+    } else {
+      // ✅ 체크되지 않은 경우: 현재 CMD 각도 유지, 속도는 0
+      calculatedTrainAngle = parseFloat(icdStore.cmdTrainAngle) || 0
+      calculatedTrainSpeed = 0
+      console.log(`Train 체크 해제 - 현재 CMD 값 유지: ${calculatedTrainAngle}, 속도: 0`)
     }
 
     await icdStore.sendMultiControlCommand({
@@ -189,9 +213,9 @@ const handleGo = async () => {
       azAngle: calculatedAzAngle,
       elAngle: calculatedElAngle,
       trainAngle: calculatedTrainAngle,
-      azSpeed: parseFloat(stepStore.speeds.azimuth),
-      elSpeed: parseFloat(stepStore.speeds.elevation),
-      trainSpeed: parseFloat(stepStore.speeds.train),
+      azSpeed: calculatedAzSpeed,
+      elSpeed: calculatedElSpeed,
+      trainSpeed: calculatedTrainSpeed,
     })
     console.log('Step 명령 전송 성공')
   } catch (error) {
