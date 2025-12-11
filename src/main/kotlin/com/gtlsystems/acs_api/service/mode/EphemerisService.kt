@@ -69,30 +69,39 @@ class EphemerisService(
     private var currentTrackingPassId: Long? = null  // ✅ UInt → Long 변경 (PassSchedule과 동일)
     private var subscriptions: MutableList<Disposable> = mutableListOf()
 
-    // ✅ 간단한 실행 완료 플래그 (Set 사용)
-    private val executedActions = mutableSetOf<String>()
-    // ✅ Timer 사용 (간단함)
-
     private val trackingStatus = PushData.TRACKING_STATUS
 
     // ✅ 통합 쓰레드 관리자 사용
     private var trackingExecutor: ScheduledExecutorService? = null
     private var modeTask: ScheduledFuture<*>? = null
 
-    // ✅ 정지궤도 추적 상태 관리
+    // ✅ 통합 상태 관리 (단순화: 6개 상태)
     enum class TrackingState {
-        IDLE,
-        MOVING_TRAIN_TO_ZERO,
-        WAITING_FOR_TRAIN_STABILIZATION,
-        MOVING_TO_TARGET,
-        TRACKING_ACTIVE
+        IDLE,           // 대기 (추적 비활성)
+        PREPARING,      // 준비 중 (Train 이동 + 안정화 + Az/El 이동)
+        WAITING,        // 시작 대기 (시작 시간 전, 12.1 헤더 전송 완료)
+        TRACKING,       // 추적 중 (12.2 초기 데이터 전송, 실시간 추적)
+        COMPLETED,      // 완료
+        ERROR           // 오류
+    }
+
+    // ✅ 준비 단계 세부 상태 (PREPARING 내부에서만 사용)
+    enum class PreparingPhase {
+        TRAIN_MOVING,           // Train 각도 이동 중
+        TRAIN_STABILIZING,      // Train 안정화 대기 중
+        MOVING_TO_TARGET        // 목표 Az/El로 이동 중
     }
 
     private var currentTrackingState = TrackingState.IDLE
+    private var currentPreparingPhase = PreparingPhase.TRAIN_MOVING
     private var stabilizationStartTime: Long = 0
     private var targetAzimuth: Float = 0f
     private var targetElevation: Float = 0f
-    
+
+    // ✅ 일회성 동작 플래그 (상태와 분리된 단순 플래그)
+    private var headerSent: Boolean = false       // 12.1 헤더 전송 완료
+    private var initialDataSent: Boolean = false  // 12.2 초기 데이터 전송 완료
+
     // ✅ 명령 전송 시간 기록 (도달 여부 확인 시 최소 대기 시간 보장)
     private var trainMoveCommandTime: Long = 0
     private var azElMoveCommandTime: Long = 0
@@ -121,9 +130,13 @@ class EphemerisService(
         // 위성 추적 헤더 이벤트 구독
         val headerSubscription =
             acsEventBus.subscribeToType<ACSEvent.ICDEvent.SatelliteTrackHeaderReceived>().subscribe { event ->
-                // 위성 추적 헤더가 수신되면 초기 추적 데이터 전송
-                currentTrackingPassId?.let { passId ->
-                    sendInitialTrackingData(passId)
+                // ✅ 상태 기반: TRACKING 상태일 때만 초기 데이터 전송
+                if (currentTrackingState == TrackingState.TRACKING) {
+                    currentTrackingPassId?.let { passId ->
+                        sendInitialTrackingData(passId)
+                    }
+                } else {
+                    logger.info("⏳ 헤더 수신 완료, 시작 시간 대기 중 (초기 데이터는 TRACKING 상태에서 전송)")
                 }
             }
 
@@ -227,8 +240,9 @@ class EphemerisService(
             // ✅ 정지궤도 추적 상태 설정
             trackingStatus.geostationaryStatus = true
 
-            // ✅ 공통 상태머신 진입
-            currentTrackingState = TrackingState.MOVING_TRAIN_TO_ZERO
+            // ✅ 상태 단순화: PREPARING 상태로 진입
+            currentTrackingState = TrackingState.PREPARING
+            currentPreparingPhase = PreparingPhase.TRAIN_MOVING
 
             // ✅ 모드 타이머 시작 (공통 상태머신 체크용)
             startModeTimer()
@@ -790,13 +804,18 @@ class EphemerisService(
     private fun moveToTargetAzEl() {
         GlobalData.EphemerisTrakingAngle.azimuthAngle = targetAzimuth
         GlobalData.EphemerisTrakingAngle.elevationAngle = targetElevation
+
+        // ✅ PushData.CMD에 목표 위치 설정 (Dashboard 표시용)
+        PushData.CMD.cmdAzimuthAngle = targetAzimuth + GlobalData.Offset.azimuthPositionOffset
+        PushData.CMD.cmdElevationAngle = targetElevation + GlobalData.Offset.elevationPositionOffset
+
         val multiAxis = BitSet()
         multiAxis.set(0)  // Azimuth
         multiAxis.set(1)  // Elevation
         udpFwICDService.multiManualCommand(
             multiAxis, targetAzimuth, 5f, targetElevation, 5f, 0f, 0f
         )
-        logger.info("🔄 목표 Az/El로 이동: Az=${targetAzimuth}°, El=${targetElevation}°")
+        logger.info("🔄 목표 Az/El로 이동: Az=${targetAzimuth}°, El=${targetElevation}° (CMD: Az=${PushData.CMD.cmdAzimuthAngle}°, El=${PushData.CMD.cmdElevationAngle}°)")
     }
 
     // Train가 0에 도달했는지 확인
@@ -845,8 +864,23 @@ class EphemerisService(
     fun startEphemerisTracking(mstId: Long, detailId: Int = 0) {  // ✅ UInt → Long/Int 변경 (PassSchedule과 동일)
         logger.info("🚀 위성 추적 시작: mstId = {}, detailId = {}", mstId, detailId)
         stopModeTimer()
-        executedActions.clear()
-        logger.info("🔄 실행 플래그 초기화 완료")
+
+        // ✅ 상태 초기화 (executedActions 대신 상태 기반 관리)
+        currentTrackingState = TrackingState.IDLE
+        currentPreparingPhase = PreparingPhase.TRAIN_MOVING
+        headerSent = false
+        initialDataSent = false
+        trainMoveCommandTime = 0  // ✅ Train 이동 명령 시간 초기화
+        azElMoveCommandTime = 0   // ✅ Az/El 이동 명령 시간 초기화
+
+        // ✅ 이전 추적의 tracking 각도 값 초기화 (TRACKING 전환 시 이전 값으로 점프 방지)
+        dataStoreService.clearTrackingAngles()
+
+        // ✅ 이전 추적의 실시간 데이터 초기화 (새 추적 시작 시 이전 데이터 제거)
+        clearRealtimeTrackingData()
+
+        logger.info("🔄 상태 초기화 완료: state=${currentTrackingState}, phase=${currentPreparingPhase}")
+
         currentTrackingPassId = mstId
         
         // ✅ Keyhole 여부에 따라 적절한 MST 선택
@@ -913,11 +947,12 @@ class EphemerisService(
         }
 
         // ✅ ephemeris 상태도 초기화 (내부 상태 + 프론트엔드 전달)
-        if (trackingStatus.ephemerisStatus == true) {
-            trackingStatus.ephemerisStatus = false
-            trackingStatus.ephemerisTrackingState = "IDLE"  // ✅ 추가
-        }
+        trackingStatus.ephemerisStatus = false
+        trackingStatus.ephemerisTrackingState = "IDLE"
+        // ✅ DataStoreService에 상태 동기화 (중요!)
+        dataStoreService.updateTrackingStatus(trackingStatus)
         dataStoreService.setEphemerisTracking(false) // ✅ 프론트엔드에 추적 종료 알림
+        logger.info("✅ 추적 상태 초기화: ephemerisStatus=false, ephemerisTrackingState=IDLE")
 
         // ✅ 안전한 배치 종료 처리
         safeBatchShutdown()
@@ -1031,384 +1066,281 @@ class EphemerisService(
 
     /**
      * 100ms 주기 상태 체크 (핵심 로직)
+     * ✅ 리팩토링: executedActions 제거, 상태 기반 관리로 단순화
      */
     private fun trackingSatelliteStateCheck() {
         try {
-            // ✅ Offset 값 변경 감지 및 CMD 값 업데이트 로직 추가
-            //checkAndApplyPositionOffsets()
             if (trackingStatus.ephemerisStatus != true) {
                 return
             }
+
             when (currentTrackingState) {
-                TrackingState.MOVING_TRAIN_TO_ZERO -> {
-                    // ✅ Tilt 시작 위치로 이동 상태 표시
-                    trackingStatus.ephemerisTrackingState = "TRAIN_MOVING_TO_ZERO"
-                    
-                    // ✅ Train 이동 명령은 한 번만 전송 (중복 방지)
-                    if (!executedActions.contains("TRAIN_MOVING_STARTED")) {
-                    // ✅ Keyhole 여부에 따라 Train 각도 설정
-                    // currentTrackingPass는 getTrackingPassMst()를 통해 설정되었으므로
-                    // Keyhole 여부에 따라 적절한 MST를 가리킴
-                    val recommendedTrainAngle = currentTrackingPass?.get("RecommendedTrainAngle") as? Double ?: 0.0
-                    val isKeyhole = currentTrackingPass?.get("IsKeyhole") as? Boolean ?: false
-                    
-                    // Keyhole 여부에 따라 Train 각도 설정
-                    // Keyhole 발생: RecommendedTrainAngle 사용 (Train≠0)
-                    // Keyhole 미발생: 0 사용 (Train=0)
-                    val trainAngle = if (isKeyhole) {
-                        recommendedTrainAngle.toFloat()
-                    } else {
-                        0f
-                    }
-                    
-                    // GlobalData에 Train 각도 설정
-                    GlobalData.EphemerisTrakingAngle.trainAngle = trainAngle
-                    
-                        // Train 각도 이동 명령 전송 (한 번만)
-                    moveTrainToZero(trainAngle)
-                        trainMoveCommandTime = System.currentTimeMillis()  // ✅ 명령 전송 시간 기록
-                        executedActions.add("TRAIN_MOVING_STARTED")
-                    
-                    // Train 각도 설정 정보 로깅
-                    logger.info("🔄 Train 각도 설정: Keyhole=${if (isKeyhole) "YES" else "NO"}, Train=${trainAngle}°")
-                    if (isKeyhole) {
-                        logger.info("   - RecommendedTrainAngle: ${recommendedTrainAngle}°")
-                        }
-                    }
-                    
-                    // Train 각도 도달 확인
-                    // ✅ 디버깅: Train 각도 상태 확인
-                    val cmdTilt = PushData.CMD.cmdTrainAngle ?: 0f
-                    val currentTilt = dataStoreService.getLatestData().trainAngle ?: 0.0
-                    val tiltDiff = kotlin.math.abs(cmdTilt - currentTilt.toFloat())
-                    
-                    // ✅ 명령 전송 후 최소 500ms 경과 후에만 도달 여부 확인
-                    val timeSinceTrainCommand = System.currentTimeMillis() - trainMoveCommandTime
-                    if (timeSinceTrainCommand >= 500 && isTrainAtZero()) {
-                        currentTrackingState = TrackingState.WAITING_FOR_TRAIN_STABILIZATION
-                        stabilizationStartTime = System.currentTimeMillis()
-                        // ✅ Tilt 이동 완료, 안정화 대기 상태로 업데이트
-                        trackingStatus.ephemerisTrackingState = "TRAIN_STABILIZING"
-                        logger.info("✅ Train가 목표 각도에 도달, 안정화 대기 시작 (cmdTilt=${cmdTilt}°, currentTilt=${currentTilt}°)")
-                    } else {
-                        // ✅ Train 각도 도달 실패 시 로깅 (5초마다)
-                        val now = System.currentTimeMillis()
-                        if (!executedActions.contains("TRAIN_MOVING_LOGGED") || (now % 5000 < 100)) {
-                            logger.info("⏳ Train 각도 이동 중: 목표=${cmdTilt}°, 현재=${currentTilt}°, 차이=${tiltDiff}°")
-                            if (!executedActions.contains("TRAIN_MOVING_LOGGED")) {
-                                executedActions.add("TRAIN_MOVING_LOGGED")
-                            }
-                        }
-                    }
-                }
-
-                TrackingState.WAITING_FOR_TRAIN_STABILIZATION -> {
-                    // ✅ Tilt 안정화 대기 상태 표시
-                    trackingStatus.ephemerisTrackingState = "TRAIN_STABILIZING"
-
-                    val elapsedTime = System.currentTimeMillis() - stabilizationStartTime
-                    
-                    // ✅ 3초 대기 후 목표 Az/El로 이동 (원래 로직)
-                    if (elapsedTime >= TRAIN_STABILIZATION_TIMEOUT * 1000) {
-                        if (!executedActions.contains("TRAIN_STABILIZED")) {
-                        moveToTargetAzEl()
-                        currentTrackingState = TrackingState.MOVING_TO_TARGET
-                            executedActions.add("TRAIN_STABILIZED")
-                            logger.info("✅ 목표 Az/El로 이동 명령 전송 완료: Az=${targetAzimuth}°, El=${targetElevation}°")
-                        }
-                    }
-                }
-
-                TrackingState.MOVING_TO_TARGET -> {
-                    // ✅ 목표 Az/El로 이동 명령 전송 (한 번만)
-                    if (!executedActions.contains("AZEL_MOVING_STARTED")) {
-                        moveToTargetAzEl()
-                        azElMoveCommandTime = System.currentTimeMillis()  // ✅ 명령 전송 시간 기록
-                        executedActions.add("AZEL_MOVING_STARTED")
-                        logger.info("🔄 목표 Az/El로 이동 명령 전송: Az=${targetAzimuth}°, El=${targetElevation}°")
-                        
-                        // ✅ 명령 전송 후 바로 TRACKING_ACTIVE 상태로 전환 (임계값 체크 제거)
-                        currentTrackingState = TrackingState.TRACKING_ACTIVE
-                        trackingStatus.ephemerisTrackingState = "MOVING_TO_START"
-                        logger.info("✅ 시작 위치 이동 명령 전송 완료, 추적 대기 상태로 전환")
-                    }
-                }
-
-                TrackingState.TRACKING_ACTIVE -> {
-                    // ✅ 정지궤도와 저궤도 구분 처리
-                    if (trackingStatus.geostationaryStatus == true) {
-                        // 정지궤도: 현재시간 1포인트 추적 (추가 동작 없음)
-                        logger.debug("🔄 정지궤도 추적 활성 상태 유지")
-                    } else {
-                        // 저궤도: 시간 기반 스케줄 추적
-                        // ✅ mstId와 detailId 사용
-                        val mstId = currentTrackingPassId
-                        if (mstId == null) {
-                            logger.warn("현재 추적 중인 MstId가 설정되지 않았습니다.")
-                            return
-                        }
-                        val detailId = (currentTrackingPass?.get("DetailId") as? Number)?.toInt() ?: 0  // ✅ UInt → Int 변경 (PassSchedule과 동일)
-                        val (startTime, endTime) = getCurrentTrackingPassTimes()
-                        val calTime = GlobalData.Time.calUtcTimeOffsetTime
-                        val timeDifference = Duration.between(startTime, calTime).seconds
-                        
-                        // ✅ 현재 위치 정보 가져오기 (로깅용)
-                        val currentAz = (dataStoreService.getLatestData().azimuthAngle ?: 0.0f).toDouble()
-                        val currentEl = (dataStoreService.getLatestData().elevationAngle ?: 0.0f).toDouble()
-                        
-                        logger.debug("⏰ 상태체크 - 시간차: {}초, 실행완료: {}, 현재 위치: Az={}°, El={}°", timeDifference, executedActions, currentAz, currentEl)
-
-                        // ✅ 헤더가 전송되지 않았으면 즉시 전송 (ACU F/W가 데이터 요청을 시작하도록) - 원래 로직
-                        if (!executedActions.contains("HEADER_SENT")) {
-                            logger.info("📡 추적 헤더 전송 시작 (TRACKING_ACTIVE 상태 진입 시)")
-                            sendHeaderTrackingData(mstId, detailId)
-                            executedActions.add("HEADER_SENT")
-                        }
-                        
-                        // ✅ 초기 데이터 전송 (원래 로직)
-                        if (!executedActions.contains("INITIAL_DATA_SENT")) {
-                            sendInitialTrackingData(mstId, detailId)
-                            executedActions.add("INITIAL_DATA_SENT")
-                        }
-
-                        // ✅ 추적 대기 상태 표시 (실제 추적 시작 전)
-                        if (!executedActions.contains("WAITING_FOR_TRACKING")) {
-                            trackingStatus.ephemerisTrackingState = "WAITING_FOR_TRACKING"
-                            logger.info("⏳ 위성 추적 대기 상태 (추적 시작 시간까지 대기)")
-                            executedActions.add("WAITING_FOR_TRACKING") // ✅ 중복 방지
-                        }
-
-                        when {
-                            timeDifference <= 0 && !executedActions.contains("BEFORE_START") -> {
-                                executedActions.add("BEFORE_START")
-                                logger.info("📍 시작 전 처리 실행 - 시작 위치로 이동(상태머신)")
-                                
-                                // ✅ 디버깅: targetAzimuth, targetElevation 계산 전 상태 확인
-                                logger.info("🔍 [DEBUG-BEFORE_START] 계산 전 상태:")
-                                logger.info("  - targetAzimuth: $targetAzimuth")
-                                logger.info("  - targetElevation: $targetElevation")
-                                logger.info("  - mstId: $mstId, detailId: $detailId")
-                                logger.info("  - currentTime: $calTime, startTime: $startTime")
-                                logger.info("  - timeDifference: $timeDifference")
-                                
-                                // ❌ 제거: PushData.CMD 업데이트 (일반 모드용이므로 추적 중에는 사용하지 않음)
-                                // 추적 중에는 trackingCMD 값만 사용하므로 PushData.CMD는 업데이트하지 않음
-                                
-                                // ✅ DataStoreService에만 trackingCMD 값 업데이트 (프론트엔드 동기화용)
-                                val currentData = dataStoreService.getLatestData()
-                                
-                                // ✅ 디버깅: 현재 DataStoreService의 trackingCMD 값 확인
-                                logger.info("🔍 [DEBUG-BEFORE_START] DataStoreService 현재 값:")
-                                logger.info("  - trackingCMDAzimuthAngle: ${currentData.trackingCMDAzimuthAngle}")
-                                logger.info("  - trackingCMDElevationAngle: ${currentData.trackingCMDElevationAngle}")
-                                logger.info("  - trackingCMDTrainAngle: ${currentData.trackingCMDTrainAngle}")
-                                
-                                // ✅ 디버깅: targetAzimuth, targetElevation 유효성 검증 (0.0도 제외)
-                                val isValidTargetAz = targetAzimuth.isFinite() && targetAzimuth in -360f..360f && kotlin.math.abs(targetAzimuth) > 0.01f
-                                val isValidTargetEl = targetElevation.isFinite() && targetElevation in -90f..90f && kotlin.math.abs(targetElevation) > 0.01f
-                                
-                                logger.info("🔍 [DEBUG-BEFORE_START] 값 유효성 검증:")
-                                logger.info("  - isValidTargetAz: $isValidTargetAz (targetAzimuth=$targetAzimuth)")
-                                logger.info("  - isValidTargetEl: $isValidTargetEl (targetElevation=$targetElevation)")
-                                
-                                // ✅ targetAzimuth, targetElevation이 유효하지 않으면 MST에서 다시 조회하거나 현재 각도 사용
-                                var finalTargetAzimuth = targetAzimuth
-                                var finalTargetElevation = targetElevation
-                                
-                                if (!isValidTargetAz || !isValidTargetEl) {
-                                    logger.warn("⚠️ [DEBUG-BEFORE_START] 유효하지 않은 target 값 감지! MST에서 다시 조회하거나 현재 각도 사용")
-                                    
-                                    // ✅ MST에서 다시 조회 시도
-                                    val selectedPass = getTrackingPassMst(mstId)
-                                    if (selectedPass != null) {
-                                        val startAzimuth = selectedPass["StartAzimuth"] as? Double
-                                        val startElevation = selectedPass["StartElevation"] as? Double
-                                        
-                                        if (startAzimuth != null && startElevation != null) {
-                                            finalTargetAzimuth = startAzimuth.toFloat()
-                                            finalTargetElevation = startElevation.toFloat()
-                                            targetAzimuth = finalTargetAzimuth
-                                            targetElevation = finalTargetElevation
-                                            logger.info("✅ [DEBUG-BEFORE_START] MST에서 시작 위치 재조회 완료: Az=${finalTargetAzimuth}°, El=${finalTargetElevation}°")
-                                        } else {
-                                            // ✅ Fallback: 현재 각도 사용
-                                            val currentAz = currentData.azimuthAngle?.toFloat() ?: 0f
-                                            val currentEl = currentData.elevationAngle?.toFloat() ?: 0f
-                                            finalTargetAzimuth = currentAz
-                                            finalTargetElevation = currentEl
-                                            logger.warn("⚠️ [DEBUG-BEFORE_START] MST에서 시작 위치를 찾을 수 없어 현재 각도 사용: Az=${finalTargetAzimuth}°, El=${finalTargetElevation}°")
-                                        }
-                                    } else {
-                                        // ✅ Fallback: 현재 각도 사용
-                                        val currentAz = currentData.azimuthAngle?.toFloat() ?: 0f
-                                        val currentEl = currentData.elevationAngle?.toFloat() ?: 0f
-                                        finalTargetAzimuth = currentAz
-                                        finalTargetElevation = currentEl
-                                        logger.warn("⚠️ [DEBUG-BEFORE_START] MST를 찾을 수 없어 현재 각도 사용: Az=${finalTargetAzimuth}°, El=${finalTargetElevation}°")
-                                    }
-                                }
-                                
-                                val updatedData = PushData.ReadData(
-                                    // 기존 데이터 유지
-                                    modeStatusBits = currentData.modeStatusBits,
-                                    azimuthAngle = currentData.azimuthAngle,
-                                    elevationAngle = currentData.elevationAngle,
-                                    trainAngle = currentData.trainAngle,
-                                    azimuthSpeed = currentData.azimuthSpeed,
-                                    elevationSpeed = currentData.elevationSpeed,
-                                    trainSpeed = currentData.trainSpeed,
-                                    servoDriverAzimuthAngle = currentData.servoDriverAzimuthAngle,
-                                    servoDriverElevationAngle = currentData.servoDriverElevationAngle,
-                                    servoDriverTrainAngle = currentData.servoDriverTrainAngle,
-                                    torqueAzimuth = currentData.torqueAzimuth,
-                                    torqueElevation = currentData.torqueElevation,
-                                    torqueTrain = currentData.torqueTrain,
-                                    windSpeed = currentData.windSpeed,
-                                    windDirection = currentData.windDirection,
-                                    rtdOne = currentData.rtdOne,
-                                    rtdTwo = currentData.rtdTwo,
-                                    mainBoardProtocolStatusBits = currentData.mainBoardProtocolStatusBits,
-                                    mainBoardStatusBits = currentData.mainBoardStatusBits,
-                                    mainBoardMCOnOffBits = currentData.mainBoardMCOnOffBits,
-                                    mainBoardReserveBits = currentData.mainBoardReserveBits,
-                                    azimuthBoardServoStatusBits = currentData.azimuthBoardServoStatusBits,
-                                    azimuthBoardStatusBits = currentData.azimuthBoardStatusBits,
-                                    elevationBoardServoStatusBits = currentData.elevationBoardServoStatusBits,
-                                    elevationBoardStatusBits = currentData.elevationBoardStatusBits,
-                                    trainBoardServoStatusBits = currentData.trainBoardServoStatusBits,
-                                    trainBoardStatusBits = currentData.trainBoardStatusBits,
-                                    feedBoardETCStatusBits = currentData.feedBoardETCStatusBits,
-                                    feedSBoardStatusBits = currentData.feedSBoardStatusBits,
-                                    feedXBoardStatusBits = currentData.feedXBoardStatusBits,
-                                    feedKaBoardStatusBits = currentData.feedKaBoardStatusBits,
-                                    currentSBandLNALHCP = currentData.currentSBandLNALHCP,
-                                    currentSBandLNARHCP = currentData.currentSBandLNARHCP,
-                                    currentXBandLNALHCP = currentData.currentXBandLNALHCP,
-                                    currentXBandLNARHCP = currentData.currentXBandLNARHCP,
-                                    rssiSBandLNALHCP = currentData.rssiSBandLNALHCP,
-                                    rssiSBandLNARHCP = currentData.rssiSBandLNARHCP,
-                                    rssiXBandLNALHCP = currentData.rssiXBandLNALHCP,
-                                    rssiXBandLNARHCP = currentData.rssiXBandLNARHCP,
-                                    azimuthAcceleration = currentData.azimuthAcceleration,
-                                    elevationAcceleration = currentData.elevationAcceleration,
-                                    trainAcceleration = currentData.trainAcceleration,
-                                    azimuthMaxAcceleration = currentData.azimuthMaxAcceleration,
-                                    elevationMaxAcceleration = currentData.elevationMaxAcceleration,
-                                    trainMaxAcceleration = currentData.trainMaxAcceleration,
-                                    trackingAzimuthTime = currentData.trackingAzimuthTime,
-                                    // ✅ 시작 위치 trackingCMD 값 업데이트 (유효한 값 사용)
-                                    trackingCMDAzimuthAngle = finalTargetAzimuth,
-                                    trackingActualAzimuthAngle = currentData.trackingActualAzimuthAngle,
-                                    trackingElevationTime = currentData.trackingElevationTime,
-                                    trackingCMDElevationAngle = finalTargetElevation,
-                                    trackingActualElevationAngle = currentData.trackingActualElevationAngle,
-                                    trackingTrainTime = currentData.trackingTrainTime,
-                                    trackingCMDTrainAngle = 0f,
-                                    trackingActualTrainAngle = currentData.trackingActualTrainAngle
-                                )
-                                
-                                // ✅ 디버깅: 업데이트할 데이터 확인
-                                logger.info("🔍 [DEBUG-BEFORE_START] 업데이트할 데이터:")
-                                logger.info("  - trackingCMDAzimuthAngle: ${updatedData.trackingCMDAzimuthAngle}")
-                                logger.info("  - trackingCMDElevationAngle: ${updatedData.trackingCMDElevationAngle}")
-                                logger.info("  - trackingCMDTrainAngle: ${updatedData.trackingCMDTrainAngle}")
-                                
-                                dataStoreService.updateDataFromUdp(updatedData)
-                                
-                                // ✅ 디버깅: 업데이트 후 DataStoreService 값 확인
-                                val afterUpdateData = dataStoreService.getLatestData()
-                                logger.info("🔍 [DEBUG-BEFORE_START] 업데이트 후 DataStoreService 값:")
-                                logger.info("  - trackingCMDAzimuthAngle: ${afterUpdateData.trackingCMDAzimuthAngle}")
-                                logger.info("  - trackingCMDElevationAngle: ${afterUpdateData.trackingCMDElevationAngle}")
-                                logger.info("  - trackingCMDTrainAngle: ${afterUpdateData.trackingCMDTrainAngle}")
-                                
-                                logger.info("✅ [CMD 업데이트] 시작 위치 trackingCMD 값 설정: Az=${finalTargetAzimuth}°, El=${finalTargetElevation}°")
-                                
-                                // ✅ 시작 위치로 이동 명령 전송 (한 번만, 임계값 체크 없이)
-                                // ✅ targetAzimuth, targetElevation이 업데이트되었을 수 있으므로 확인
-                                if (kotlin.math.abs(finalTargetAzimuth) > 0.01f && kotlin.math.abs(finalTargetElevation) > 0.01f) {
-                                    moveToTargetAzEl()
-                                    logger.info("🔄 시작 위치로 이동 명령 전송: Az=${finalTargetAzimuth}°, El=${finalTargetElevation}°")
-                                } else {
-                                    logger.warn("⚠️ [CMD 업데이트] 유효하지 않은 각도로 인해 이동 명령 전송 건너뜀: Az=${finalTargetAzimuth}°, El=${finalTargetElevation}°")
-                                }
-                            }
-                            
-                            // ✅ 시작 시간 전이고 이미 명령을 전송했으면 대기 (trackingCMD는 이미 설정되었으므로 업데이트 불필요)
-                            timeDifference <= 0 && executedActions.contains("BEFORE_START") -> {
-                                // ✅ trackingCMD 값은 첫 번째 BEFORE_START 블록에서 이미 설정되었으므로 업데이트 불필요
-                                // ✅ 로그 출력만 제한적으로 수행
-                                
-                                // ✅ 로그 출력 제한: 변경사항이 있거나 5초마다만 출력
-                                val now = System.currentTimeMillis()
-                                val timeDiffChanged = timeDifference != lastWaitingTimeDifference
-                                val azChanged = kotlin.math.abs(currentAz - lastWaitingAzimuth) > 0.1
-                                val elChanged = kotlin.math.abs(currentEl - lastWaitingElevation) > 0.1
-                                val timeElapsed = now - lastWaitingLogTime >= WAITING_LOG_INTERVAL_MS
-                                
-                                if (timeDiffChanged || azChanged || elChanged || timeElapsed) {
-                                    logger.info("✅ 추적 시작 전 대기: 시작까지 ${-timeDifference}초 남음 (현재 위치: Az=${currentAz}°, El=${currentEl}°)")
-                                    lastWaitingLogTime = now
-                                    lastWaitingTimeDifference = timeDifference
-                                    lastWaitingAzimuth = currentAz
-                                    lastWaitingElevation = currentEl
-                                }
-                            }
-
-                            timeDifference > 0 && calTime.isBefore(endTime) -> {
-                                if (!executedActions.contains("IN_PROGRESS")) {
-                                    executedActions.add("IN_PROGRESS")
-                                    logger.info("📡 추적 진행 중 처리 실행 - 초기 데이터 전송 시작")
-                                    // ✅ 헤더는 이미 전송되었으므로 초기 데이터만 전송
-                                    sendInitialTrackingData(mstId, detailId)
-                                }
-                                
-                                // ✅ 디버깅: saveRealtimeTrackingData 호출 전 상태 확인
-                                logger.info("🔍 [DEBUG-IN_PROGRESS] saveRealtimeTrackingData 호출 전:")
-                                logger.info("  - timeDifference: $timeDifference (양수면 시작 전, 음수면 시작 후)")
-                                logger.info("  - mstId: $mstId, detailId: $detailId")
-                                logger.info("  - calTime: $calTime, startTime: $startTime")
-                                
-                                val beforeCallData = dataStoreService.getLatestData()
-                                logger.info("  - 현재 trackingCMDAzimuthAngle: ${beforeCallData.trackingCMDAzimuthAngle}")
-                                logger.info("  - 현재 trackingCMDElevationAngle: ${beforeCallData.trackingCMDElevationAngle}")
-                                logger.info("  - 현재 trackingCMDTrainAngle: ${beforeCallData.trackingCMDTrainAngle}")
-                                
-                                logger.info("🔍 [CMD 업데이트] saveRealtimeTrackingData 호출 전: mstId=$mstId, detailId=$detailId, timeDifference=$timeDifference, calTime=$calTime, startTime=$startTime")
-                                saveRealtimeTrackingData(mstId, detailId, calTime, startTime)
-                                
-                                // ✅ 디버깅: saveRealtimeTrackingData 호출 후 상태 확인
-                                val afterCallData = dataStoreService.getLatestData()
-                                logger.info("🔍 [DEBUG-IN_PROGRESS] saveRealtimeTrackingData 호출 후:")
-                                logger.info("  - 변경된 trackingCMDAzimuthAngle: ${afterCallData.trackingCMDAzimuthAngle}")
-                                logger.info("  - 변경된 trackingCMDElevationAngle: ${afterCallData.trackingCMDElevationAngle}")
-                                logger.info("  - 변경된 trackingCMDTrainAngle: ${afterCallData.trackingCMDTrainAngle}")
-                                logger.info("  - 값 변경 여부: Az=${beforeCallData.trackingCMDAzimuthAngle != afterCallData.trackingCMDAzimuthAngle}, El=${beforeCallData.trackingCMDElevationAngle != afterCallData.trackingCMDElevationAngle}, Train=${beforeCallData.trackingCMDTrainAngle != afterCallData.trackingCMDTrainAngle}")
-                                
-                                logger.info("🔍 [CMD 업데이트] saveRealtimeTrackingData 호출 후: PushData.CMD.cmdAzimuthAngle=${PushData.CMD.cmdAzimuthAngle}, cmdElevationAngle=${PushData.CMD.cmdElevationAngle}")
-                                //moveTiltToZero(GlobalData.Offset.tiltPositionOffset+ GlobalData.Offset.trueNorthOffset)
-
-                            }
-
-                            calTime.isAfter(endTime) && !executedActions.contains("COMPLETED") -> {
-                                executedActions.add("COMPLETED")
-                                logger.info("✅ 추적 완료 처리 실행")
-                                handleCompleted()
-                            }
-
-                            else -> {
-                                logger.debug("⏸️ 대기 중 또는 이미 처리됨")
-                            }
-                        }
-                    }
-                }
-
-                else -> {}
+                TrackingState.PREPARING -> handlePreparingState()
+                TrackingState.WAITING -> handleWaitingState()
+                TrackingState.TRACKING -> handleTrackingState()
+                TrackingState.COMPLETED -> { /* 완료 상태 - 추가 처리 없음 */ }
+                TrackingState.ERROR -> { /* 오류 상태 - 추가 처리 없음 */ }
+                TrackingState.IDLE -> { /* 대기 상태 - 추가 처리 없음 */ }
             }
         } catch (e: Exception) {
             logger.error("추적 상태 체크 오류: ${e.message}", e)
+            currentTrackingState = TrackingState.ERROR
+            trackingStatus.ephemerisTrackingState = "ERROR"
         }
     }
+
+    /**
+     * PREPARING 상태 처리 (Train 이동 → 안정화 → Az/El 이동)
+     */
+    private fun handlePreparingState() {
+        trackingStatus.ephemerisTrackingState = "PREPARING"
+        dataStoreService.updateTrackingStatus(trackingStatus)
+
+        when (currentPreparingPhase) {
+            PreparingPhase.TRAIN_MOVING -> {
+                // Train 각도 이동 (한 번만 명령 전송 - trainMoveCommandTime으로 판단)
+                if (trainMoveCommandTime == 0L) {
+                    val recommendedTrainAngle = currentTrackingPass?.get("RecommendedTrainAngle") as? Double ?: 0.0
+                    val isKeyhole = currentTrackingPass?.get("IsKeyhole") as? Boolean ?: false
+                    val trainAngle = if (isKeyhole) recommendedTrainAngle.toFloat() else 0f
+
+                    GlobalData.EphemerisTrakingAngle.trainAngle = trainAngle
+                    moveTrainToZero(trainAngle)
+                    trainMoveCommandTime = System.currentTimeMillis()
+                    logger.info("🔄 Train 각도 설정: Keyhole=${if (isKeyhole) "YES" else "NO"}, Train=${trainAngle}°")
+                }
+
+                // Train 각도 도달 확인
+                val cmdTilt = PushData.CMD.cmdTrainAngle ?: 0f
+                val currentTilt = dataStoreService.getLatestData().trainAngle ?: 0.0
+                val timeSinceCommand = System.currentTimeMillis() - trainMoveCommandTime
+
+                if (timeSinceCommand >= 500 && isTrainAtZero()) {
+                    currentPreparingPhase = PreparingPhase.TRAIN_STABILIZING
+                    stabilizationStartTime = System.currentTimeMillis()
+                    logger.info("✅ Train 목표 도달, 안정화 대기 시작 (cmd=${cmdTilt}°, current=${currentTilt}°)")
+                } else if (timeSinceCommand % 5000 < 100) {
+                    logger.info("⏳ Train 이동 중: 목표=${cmdTilt}°, 현재=${currentTilt}°")
+                }
+            }
+
+            PreparingPhase.TRAIN_STABILIZING -> {
+                val elapsedTime = System.currentTimeMillis() - stabilizationStartTime
+                if (elapsedTime >= TRAIN_STABILIZATION_TIMEOUT * 1000) {
+                    currentPreparingPhase = PreparingPhase.MOVING_TO_TARGET
+                    logger.info("✅ Train 안정화 완료, 목표 위치로 이동 시작")
+                }
+            }
+
+            PreparingPhase.MOVING_TO_TARGET -> {
+                // Az/El 이동 명령 (한 번만 - azElMoveCommandTime으로 판단)
+                if (azElMoveCommandTime == 0L) {
+                    moveToTargetAzEl()
+                    azElMoveCommandTime = System.currentTimeMillis()
+                    logger.info("🔄 목표 Az/El 이동 명령: Az=${targetAzimuth}°, El=${targetElevation}°")
+                }
+
+                // ✅ 목표 위치 도달 확인 (±0.2° 허용 오차, 2분 타임아웃)
+                val currentAz = dataStoreService.getLatestData().azimuthAngle ?: 0.0f
+                val currentEl = dataStoreService.getLatestData().elevationAngle ?: 0.0f
+                val azDiff = kotlin.math.abs(currentAz - targetAzimuth)
+                val elDiff = kotlin.math.abs(currentEl - targetElevation)
+                val timeSinceCommand = System.currentTimeMillis() - azElMoveCommandTime
+
+                val isAtTarget = azDiff < 0.2f && elDiff < 0.2f
+                val isTimeout = timeSinceCommand > 120_000  // 2분 타임아웃
+
+                // 5초마다 진행 상황 로깅
+                if (timeSinceCommand % 5000 < 100) {
+                    logger.info("⏳ 목표 위치 이동 중: 현재 Az=${currentAz}°, El=${currentEl}° → 목표 Az=${targetAzimuth}°, El=${targetElevation}° (차이: Az=${azDiff}°, El=${elDiff}°)")
+                }
+
+                // 목표 도달 또는 타임아웃 시 WAITING 상태로 전환
+                if (isAtTarget || isTimeout) {
+                    if (isTimeout && !isAtTarget) {
+                        logger.warn("⚠️ 목표 위치 이동 타임아웃 (2분). 현재 위치: Az=${currentAz}°, El=${currentEl}°")
+                    } else {
+                        logger.info("✅ 목표 위치 도달: Az=${currentAz}°, El=${currentEl}°")
+                    }
+
+                    currentTrackingState = TrackingState.WAITING
+                    trackingStatus.ephemerisTrackingState = "WAITING"
+                    dataStoreService.updateTrackingStatus(trackingStatus)
+
+                    // 12.1 헤더 전송 (WAITING 진입 시)
+                    if (!headerSent) {
+                        val mstId = currentTrackingPassId ?: return
+                        val detailId = (currentTrackingPass?.get("DetailId") as? Number)?.toInt() ?: 0
+                        logger.info("📡 12.1 헤더 전송 시작")
+                        sendHeaderTrackingData(mstId, detailId)
+                        headerSent = true
+                        logger.info("✅ 12.1 헤더 전송 완료")
+                    }
+
+                    logger.info("✅ 시작 위치 이동 완료, WAITING 상태로 전환")
+                }
+            }
+        }
+    }
+
+    /**
+     * WAITING 상태 처리 (시작 시간 대기)
+     */
+    private fun handleWaitingState() {
+        val mstId = currentTrackingPassId ?: return
+        val detailId = (currentTrackingPass?.get("DetailId") as? Number)?.toInt() ?: 0
+        val (startTime, endTime) = getCurrentTrackingPassTimes()
+        val calTime = GlobalData.Time.calUtcTimeOffsetTime
+        val timeDifference = Duration.between(startTime, calTime).seconds
+
+        val currentAz = (dataStoreService.getLatestData().azimuthAngle ?: 0.0f).toDouble()
+        val currentEl = (dataStoreService.getLatestData().elevationAngle ?: 0.0f).toDouble()
+
+        logger.debug("⏰ WAITING 상태 - 시간차: {}초, 현재: Az={}°, El={}°", timeDifference, currentAz, currentEl)
+
+        when {
+            // 시작 시간 도달 → TRACKING으로 전환
+            timeDifference > 0 && calTime.isBefore(endTime) -> {
+                // ✅ TRACKING 전환 전에 먼저 첫 번째 CMD 값 설정 (0으로 점프 방지)
+                val firstTrackingData = createRealtimeTrackingData(mstId, detailId, calTime, startTime)
+                if (firstTrackingData.isNotEmpty()) {
+                    val cmdAz = (firstTrackingData["axisTransformedAzimuth"] as? Number)?.toFloat()
+                        ?: (firstTrackingData["finalTransformedAzimuth"] as? Number)?.toFloat()
+                    val cmdEl = (firstTrackingData["axisTransformedElevation"] as? Number)?.toFloat()
+                        ?: (firstTrackingData["finalTransformedElevation"] as? Number)?.toFloat()
+                    val cmdTrain = GlobalData.EphemerisTrakingAngle.trainAngle
+
+                    if (cmdAz != null && cmdEl != null) {
+                        PushData.CMD.cmdAzimuthAngle = cmdAz
+                        PushData.CMD.cmdElevationAngle = cmdEl
+                        PushData.CMD.cmdTrainAngle = cmdTrain
+                        logger.info("📡 TRACKING 전환 - 첫 CMD 설정: Az=${cmdAz}°, El=${cmdEl}°, Train=${cmdTrain}°")
+
+                        // ✅ DataStore의 trackingCMD 값도 즉시 설정 (0,0 점프 방지)
+                        val currentData = dataStoreService.getLatestData()
+                        val initialTrackingData = currentData.copy(
+                            trackingCMDAzimuthAngle = cmdAz,
+                            trackingCMDElevationAngle = cmdEl,
+                            trackingCMDTrainAngle = cmdTrain
+                        )
+                        dataStoreService.updateDataFromUdp(initialTrackingData, forceUpdate = true)
+                        logger.info("📡 TRACKING 전환 - trackingCMD 값 DataStore에 설정 완료")
+                    }
+                }
+
+                currentTrackingState = TrackingState.TRACKING
+                trackingStatus.ephemerisTrackingState = "TRACKING"
+                dataStoreService.updateTrackingStatus(trackingStatus)
+
+                logger.info("📡 추적 시작 - TRACKING 상태로 전환")
+                logger.info("  - timeDifference: ${timeDifference}초 (시작 시간 도달)")
+
+                // 12.1 헤더가 전송되지 않았다면 전송
+                if (!headerSent) {
+                    logger.info("📡 12.1 헤더 전송 (TRACKING 진입 시)")
+                    sendHeaderTrackingData(mstId, detailId)
+                    headerSent = true
+                }
+
+                // 12.2 초기 데이터 전송
+                if (!initialDataSent) {
+                    logger.info("📡 12.2 초기 데이터 전송")
+                    sendInitialTrackingData(mstId, detailId)
+                    initialDataSent = true
+                    logger.info("✅ 12.2 초기 데이터 전송 완료")
+                }
+            }
+
+            // 종료 시간 경과 → COMPLETED
+            calTime.isAfter(endTime) -> {
+                currentTrackingState = TrackingState.COMPLETED
+                trackingStatus.ephemerisTrackingState = "COMPLETED"
+                logger.info("✅ 추적 완료 (WAITING에서 종료 시간 경과)")
+                handleCompleted()
+            }
+
+            // 대기 중 - 로그 출력 (5초마다)
+            else -> {
+                val now = System.currentTimeMillis()
+                val shouldLog = now - lastWaitingLogTime >= WAITING_LOG_INTERVAL_MS ||
+                        timeDifference != lastWaitingTimeDifference ||
+                        abs(currentAz - lastWaitingAzimuth) > 0.1 ||
+                        abs(currentEl - lastWaitingElevation) > 0.1
+
+                if (shouldLog) {
+                    logger.info("⏳ 추적 대기: 시작까지 ${-timeDifference}초 (Az=${currentAz}°, El=${currentEl}°)")
+                    lastWaitingLogTime = now
+                    lastWaitingTimeDifference = timeDifference
+                    lastWaitingAzimuth = currentAz
+                    lastWaitingElevation = currentEl
+                }
+            }
+        }
+    }
+
+    /**
+     * TRACKING 상태 처리 (실시간 추적)
+     */
+    private fun handleTrackingState() {
+        // 정지궤도 처리
+        if (trackingStatus.geostationaryStatus == true) {
+            logger.debug("🔄 정지궤도 추적 활성 상태 유지")
+            return
+        }
+
+        val mstId = currentTrackingPassId ?: run {
+            logger.warn("현재 추적 중인 MstId가 설정되지 않았습니다.")
+            return
+        }
+        val detailId = (currentTrackingPass?.get("DetailId") as? Number)?.toInt() ?: 0
+        val (startTime, endTime) = getCurrentTrackingPassTimes()
+        val calTime = GlobalData.Time.calUtcTimeOffsetTime
+
+        // 종료 시간 체크
+        if (calTime.isAfter(endTime)) {
+            currentTrackingState = TrackingState.COMPLETED
+            trackingStatus.ephemerisTrackingState = "COMPLETED"
+            dataStoreService.updateTrackingStatus(trackingStatus)
+            logger.info("✅ 추적 완료 처리")
+            handleCompleted()
+            return
+        }
+
+        // 실시간 추적 데이터 저장
+        saveRealtimeTrackingData(mstId, detailId, calTime, startTime)
+    }
+
+    // ✅ 이전 TRACKING_ACTIVE 블록 호환을 위한 헬퍼 (제거 예정)
+    @Deprecated("상태 기반으로 대체됨", ReplaceWith("currentTrackingState == TrackingState.TRACKING"))
+    private fun isInProgress(): Boolean = currentTrackingState == TrackingState.TRACKING
+
+    /**
+     * [레거시 호환] 이전 상태 처리 - 삭제 예정
+     * 아래는 기존 TRACKING_ACTIVE 블록의 복잡한 로직을 참고용으로 남겨둠
+     */
+    private fun legacyTrackingActiveHandler() {
+        // 이 함수는 사용되지 않음 - 참고용으로만 보존
+        /*
+        // 정지궤도와 저궤도 구분 처리
+        if (trackingStatus.geostationaryStatus == true) {
+            logger.debug("🔄 정지궤도 추적 활성 상태 유지")
+        } else {
+            // 저궤도: 시간 기반 스케줄 추적
+            val mstId = currentTrackingPassId ?: return
+            val detailId = (currentTrackingPass?.get("DetailId") as? Number)?.toInt() ?: 0
+            val (startTime, endTime) = getCurrentTrackingPassTimes()
+            val calTime = GlobalData.Time.calUtcTimeOffsetTime
+            val timeDifference = Duration.between(startTime, calTime).seconds
+
+            when {
+                timeDifference <= 0 -> { /* WAITING 상태와 동일 */ }
+                timeDifference > 0 && calTime.isBefore(endTime) -> { /* TRACKING 상태와 동일 */ }
+                calTime.isAfter(endTime) -> { handleCompleted() }
+            }
+        }
+        */
+    }
+
 
     /**
      * 추적 시작 전 처리
@@ -1466,12 +1398,12 @@ class EphemerisService(
      */
     private fun saveRealtimeTrackingData(mstId: Long, detailId: Int, currentTime: ZonedDateTime, startTime: ZonedDateTime) {  // ✅ UInt → Long/Int 변경 (PassSchedule과 동일)
         try {
-            logger.info("🔍 [CMD 업데이트] saveRealtimeTrackingData 호출: mstId=$mstId, detailId=$detailId, currentTime=$currentTime")
-            
+            // logger.info("🔍 [CMD 업데이트] saveRealtimeTrackingData 호출: mstId=$mstId, detailId=$detailId, currentTime=$currentTime")
+
             // ✅ 실시간 추적 데이터 생성
             val realtimeData = createRealtimeTrackingData(mstId, detailId, currentTime, startTime)
-            
-            logger.info("🔍 [CMD 업데이트] createRealtimeTrackingData 결과: isEmpty=${realtimeData.isEmpty()}, keys=${realtimeData.keys.take(10)}")
+
+            // logger.info("🔍 [CMD 업데이트] createRealtimeTrackingData 결과: isEmpty=${realtimeData.isEmpty()}, keys=${realtimeData.keys.take(10)}")
 
             // ✅ CMD 값 업데이트 (DashboardPage에서 표시하기 위해)
             val cmdAz = (realtimeData["cmdAz"] as? Number)?.toFloat()
@@ -1485,7 +1417,7 @@ class EphemerisService(
             val trackingActualEl = (realtimeData["trackingActualElevationAngle"] as? Number)?.toFloat()
             val trackingActualTrain = (realtimeData["trackingActualTrainAngle"] as? Number)?.toFloat()
             
-            logger.info("🔍 [CMD 업데이트] 추출된 값: cmdAz=$cmdAz, cmdEl=$cmdEl, cmdTrain=$cmdTrain")
+            // logger.info("🔍 [CMD 업데이트] 추출된 값: cmdAz=$cmdAz, cmdEl=$cmdEl, cmdTrain=$cmdTrain")
             
             // ✅ PushData.CMD에 설정 (WebSocket 전송용 - PushDataService에서 직접 읽음)
             if (cmdAz != null) {
@@ -1552,15 +1484,17 @@ class EphemerisService(
                 trackingAzimuthTime = currentData.trackingAzimuthTime,
                 // ✅ trackingCMD 값 업데이트 (프론트엔드 동기화)
                 trackingCMDAzimuthAngle = trackingCmdAz ?: cmdAz,
-                trackingActualAzimuthAngle = trackingActualAz ?: currentData.trackingActualAzimuthAngle,
+                // ✅ Actual 값은 null로 설정하여 UDP에서 받은 값이 보존되도록 함
+                // (tracking 스레드가 이전 값으로 덮어쓰기하는 문제 방지)
+                trackingActualAzimuthAngle = null,
                 trackingElevationTime = currentData.trackingElevationTime,
                 trackingCMDElevationAngle = trackingCmdEl ?: cmdEl,
-                trackingActualElevationAngle = trackingActualEl ?: currentData.trackingActualElevationAngle,
+                trackingActualElevationAngle = null,
                 trackingTrainTime = currentData.trackingTrainTime,
                 trackingCMDTrainAngle = cmdTrain,
-                trackingActualTrainAngle = trackingActualTrain ?: currentData.trackingActualTrainAngle
+                trackingActualTrainAngle = null
             )
-            dataStoreService.updateDataFromUdp(updatedData)
+            dataStoreService.updateDataFromUdp(updatedData, forceUpdate = true)
 
             // ✅ 배치 처리로 변경
             batchStorageManager.addToBatch(realtimeData)
@@ -1612,7 +1546,7 @@ class EphemerisService(
     ): Map<String, Any?> {
         val elapsedTimeSeconds = Duration.between(startTime, currentTime).toMillis() / 1000.0f
 
-        logger.info("🔍 [createRealtimeTrackingData] 시작: mstId=$mstId, detailId=$detailId, currentTime=$currentTime, startTime=$startTime, elapsedTimeSeconds=$elapsedTimeSeconds")
+        // logger.info("🔍 [createRealtimeTrackingData] 시작: mstId=$mstId, detailId=$detailId, currentTime=$currentTime, startTime=$startTime, elapsedTimeSeconds=$elapsedTimeSeconds")
 
         // ✅ original과 axis_transformed 데이터는 별도로 조회해야 함
         // getEphemerisTrackDtlByMstIdAndDetailId는 final_transformed만 반환하므로
@@ -1622,7 +1556,7 @@ class EphemerisService(
         // ✅ final_transformed 데이터는 getEphemerisTrackDtlByMstIdAndDetailId 사용 (하드웨어 제한 각도 필터링 포함)
         val allPassDetails = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId)
         
-        logger.info("🔍 [createRealtimeTrackingData] originalPassDetails 크기: ${originalPassDetails.size}, axisTransformedPassDetails 크기: ${axisTransformedPassDetails.size}, allPassDetails 크기: ${allPassDetails.size}")
+        // logger.info("🔍 [createRealtimeTrackingData] originalPassDetails 크기: ${originalPassDetails.size}, axisTransformedPassDetails 크기: ${axisTransformedPassDetails.size}, allPassDetails 크기: ${allPassDetails.size}")
 
         // ✅ original 데이터가 없으면 에러 (모든 변환을 거쳐야 하므로 original은 반드시 있어야 함)
         if (originalPassDetails.isEmpty()) {
@@ -1638,7 +1572,7 @@ class EphemerisService(
         
         // ✅ Keyhole 여부 확인 (final_transformed MST에서)
         // ✅ MstId 필드만 사용 (No 필드 제거)
-        logger.info("🔍 [createRealtimeTrackingData] MST 저장소 크기: ${ephemerisTrackMstStorage.size}")
+        // logger.info("🔍 [createRealtimeTrackingData] MST 저장소 크기: ${ephemerisTrackMstStorage.size}")
         val finalMst = ephemerisTrackMstStorage.find { 
             val dataMstId = (it["MstId"] as? Number)?.toLong()
             dataMstId == mstId && it["DataType"] == "final_transformed" 
@@ -1651,7 +1585,7 @@ class EphemerisService(
             return emptyMap()
         }
         
-        logger.info("🔍 [createRealtimeTrackingData] finalMst 찾음: MstId=$mstId, IsKeyhole=${finalMst["IsKeyhole"]}")
+        // logger.info("🔍 [createRealtimeTrackingData] finalMst 찾음: MstId=$mstId, IsKeyhole=${finalMst["IsKeyhole"]}")
         
         val isKeyhole = finalMst["IsKeyhole"] as? Boolean ?: false
         
@@ -1669,7 +1603,7 @@ class EphemerisService(
         // 그리고 하드웨어 제한 각도 기준으로 이미 필터링되어 있음
         val filteredFinalTransformed = allPassDetails
         
-        logger.info("🔍 [createRealtimeTrackingData] filteredFinalTransformed 크기: ${filteredFinalTransformed.size}")
+        // logger.info("🔍 [createRealtimeTrackingData] filteredFinalTransformed 크기: ${filteredFinalTransformed.size}")
         
         // 필터링된 데이터가 비어있으면 로깅
         if (filteredFinalTransformed.isEmpty()) {
@@ -1764,7 +1698,7 @@ class EphemerisService(
         //     return emptyMap()
         // }
         
-        logger.info("🔍 [createRealtimeTrackingData] 필터링 제거: finalTransformedElevation=$finalTransformedElevation")
+        // logger.info("🔍 [createRealtimeTrackingData] 필터링 제거: finalTransformedElevation=$finalTransformedElevation")
 
         // ✅ 성능 최적화: Keyhole Final 변환 데이터를 한 번만 조회하고 재사용
         val keyholeFinalPassDetails = if (isKeyhole) {
@@ -2228,8 +2162,8 @@ class EphemerisService(
         // ✅ 현재 targetAzimuth, targetElevation 초기값 로깅
         val initialTargetAz = targetAzimuth
         val initialTargetEl = targetElevation
-        logger.info("📍 [moveToStartPosition] 함수 시작: mstId=${mstId}, detailId=${detailId}")
-        logger.info("📍 [moveToStartPosition] 현재 targetAzimuth=${initialTargetAz}°, targetElevation=${initialTargetEl}°")
+        // logger.info("📍 [moveToStartPosition] 함수 시작: mstId=${mstId}, detailId=${detailId}")
+        // logger.info("📍 [moveToStartPosition] 현재 targetAzimuth=${initialTargetAz}°, targetElevation=${initialTargetEl}°")
         
         // ✅ currentTrackingPass에서 DetailId를 가져오기 (파라미터보다 우선)
         val actualDetailId = if (currentTrackingPass != null) {
@@ -2242,57 +2176,61 @@ class EphemerisService(
             }
             (mst?.get("DetailId") as? Number)?.toInt() ?: detailId
         }
-        logger.info("📍 [moveToStartPosition] 시작 위치 이동: mstId=${mstId}, detailId=${actualDetailId} (파라미터=${detailId})")
-        
+        // logger.info("📍 [moveToStartPosition] 시작 위치 이동: mstId=${mstId}, detailId=${actualDetailId} (파라미터=${detailId})")
+
         // ✅ Keyhole 여부에 따라 적절한 MST 선택 (getTrackingPassMst 사용)
         val selectedPass = getTrackingPassMst(mstId)
-        
+
         if (selectedPass != null) {
-            logger.info("📍 [moveToStartPosition] MST 데이터 찾음: mstId=${mstId}")
-            
+            // logger.info("📍 [moveToStartPosition] MST 데이터 찾음: mstId=${mstId}")
+
             // ✅ MST의 StartAzimuth, StartElevation 사용 (Keyhole 여부에 따라 올바른 MST 선택됨)
             val startAzimuth = selectedPass["StartAzimuth"] as? Double
             val startElevation = selectedPass["StartElevation"] as? Double
-            
-            logger.info("📍 [moveToStartPosition] MST에서 추출한 값: startAzimuth=${startAzimuth}, startElevation=${startElevation}")
+
+            // logger.info("📍 [moveToStartPosition] MST에서 추출한 값: startAzimuth=${startAzimuth}, startElevation=${startElevation}")
             
             if (startAzimuth != null && startElevation != null) {
                 targetAzimuth = startAzimuth.toFloat()
                 targetElevation = startElevation.toFloat()
-                currentTrackingState = TrackingState.MOVING_TRAIN_TO_ZERO
+                // ✅ 상태 단순화: PREPARING 상태로 진입, 세부 단계는 PreparingPhase로 관리
+                currentTrackingState = TrackingState.PREPARING
+                currentPreparingPhase = PreparingPhase.TRAIN_MOVING
                 
                 val isKeyhole = selectedPass["IsKeyhole"] as? Boolean ?: false
                 val dataType = selectedPass["DataType"] as? String
                 
-                logger.info("✅ [moveToStartPosition] 시작 위치 설정 완료:")
-                logger.info("  - 이전 값: targetAzimuth=${initialTargetAz}°, targetElevation=${initialTargetEl}°")
-                logger.info("  - 새 값: targetAzimuth=${targetAzimuth}°, targetElevation=${targetElevation}°")
-                logger.info("  - 출처: MST StartAzimuth/StartElevation")
-                logger.info("  - Keyhole=${if (isKeyhole) "YES" else "NO"}, DataType=${dataType}")
+                // logger.info("✅ [moveToStartPosition] 시작 위치 설정 완료:")
+                // logger.info("  - 이전 값: targetAzimuth=${initialTargetAz}°, targetElevation=${initialTargetEl}°")
+                // logger.info("  - 새 값: targetAzimuth=${targetAzimuth}°, targetElevation=${targetElevation}°")
+                // logger.info("  - 출처: MST StartAzimuth/StartElevation")
+                // logger.info("  - Keyhole=${if (isKeyhole) "YES" else "NO"}, DataType=${dataType}")
             } else {
                 logger.warn("⚠️ [moveToStartPosition] MST에서 StartAzimuth 또는 StartElevation이 null입니다. DTL fallback 시도")
                 
                 // ✅ Fallback: DTL의 첫 번째 포인트 사용
                 val passDetails = getEphemerisTrackDtlByMstIdAndDetailId(mstId, actualDetailId)
                 
-                logger.info("📍 [moveToStartPosition] DTL 조회 결과: passDetails.size=${passDetails.size}, mstId=${mstId}, detailId=${actualDetailId}")
+                // logger.info("📍 [moveToStartPosition] DTL 조회 결과: passDetails.size=${passDetails.size}, mstId=${mstId}, detailId=${actualDetailId}")
                 
                 if (passDetails.isNotEmpty()) {
                     val startPoint = passDetails.first()
                     val dtlAzimuth = startPoint["Azimuth"] as? Double
                     val dtlElevation = startPoint["Elevation"] as? Double
                     
-                    logger.info("📍 [moveToStartPosition] DTL 첫 번째 포인트 값: Azimuth=${dtlAzimuth}, Elevation=${dtlElevation}")
+                    // logger.info("📍 [moveToStartPosition] DTL 첫 번째 포인트 값: Azimuth=${dtlAzimuth}, Elevation=${dtlElevation}")
                     
                     if (dtlAzimuth != null && dtlElevation != null) {
                         targetAzimuth = dtlAzimuth.toFloat()
                         targetElevation = dtlElevation.toFloat()
-                        currentTrackingState = TrackingState.MOVING_TRAIN_TO_ZERO
+                        // ✅ 상태 단순화: PREPARING 상태로 진입
+                        currentTrackingState = TrackingState.PREPARING
+                        currentPreparingPhase = PreparingPhase.TRAIN_MOVING
                         
-                        logger.info("✅ [moveToStartPosition] 시작 위치 설정 완료 (DTL fallback):")
-                        logger.info("  - 이전 값: targetAzimuth=${initialTargetAz}°, targetElevation=${initialTargetEl}°")
-                        logger.info("  - 새 값: targetAzimuth=${targetAzimuth}°, targetElevation=${targetElevation}°")
-                        logger.info("  - 출처: DTL 첫 번째 포인트")
+                        // logger.info("✅ [moveToStartPosition] 시작 위치 설정 완료 (DTL fallback):")
+                        // logger.info("  - 이전 값: targetAzimuth=${initialTargetAz}°, targetElevation=${initialTargetEl}°")
+                        // logger.info("  - 새 값: targetAzimuth=${targetAzimuth}°, targetElevation=${targetElevation}°")
+                        // logger.info("  - 출처: DTL 첫 번째 포인트")
                     } else {
                         logger.error("❌ [moveToStartPosition] DTL 첫 번째 포인트에서 Azimuth 또는 Elevation이 null입니다!")
                         logger.error("  - DTL 포인트 키: ${startPoint.keys}")
@@ -2318,7 +2256,7 @@ class EphemerisService(
         }
         
         // ✅ 최종 설정된 값 로깅
-        logger.info("📍 [moveToStartPosition] 최종 설정된 값: targetAzimuth=${targetAzimuth}°, targetElevation=${targetElevation}°")
+        // logger.info("📍 [moveToStartPosition] 최종 설정된 값: targetAzimuth=${targetAzimuth}°, targetElevation=${targetElevation}°")
     }
 
     /**
@@ -2725,14 +2663,18 @@ class EphemerisService(
         Mono.fromCallable {
             GlobalData.Offset.TimeOffset = inputTimeOffset
             udpFwICDService.writeNTPCommand()
-            // 현재 추적 중인 패스가 있을 때만 초기 데이터 전송
-            currentTrackingPassId?.let { mstId ->
-                val detailId = (currentTrackingPass?.get("DetailId") as? Number)?.toInt() ?: 0  // ✅ UInt → Int 변경 (PassSchedule과 동일)
-                logger.info("추적 중인 패스 발견, 초기 데이터 전송 시작: mstId={}, detailId={}", mstId, detailId)
-                sendInitialTrackingData(mstId, detailId)
-                logger.info("초기 추적 데이터 전송 완료: mstId={}, detailId={}", mstId, detailId)
-            } ?: run {
-                logger.warn("현재 추적 중인 패스가 없어서 초기 데이터를 전송하지 않습니다")
+            // ✅ 상태 기반: TRACKING 상태일 때만 초기 데이터 전송
+            if (currentTrackingState == TrackingState.TRACKING) {
+                currentTrackingPassId?.let { mstId ->
+                    val detailId = (currentTrackingPass?.get("DetailId") as? Number)?.toInt() ?: 0
+                    logger.info("추적 중인 패스 발견 (TRACKING 상태), 초기 데이터 전송 시작: mstId={}, detailId={}", mstId, detailId)
+                    sendInitialTrackingData(mstId, detailId)
+                    logger.info("초기 추적 데이터 전송 완료: mstId={}, detailId={}", mstId, detailId)
+                } ?: run {
+                    logger.warn("현재 추적 중인 패스가 없어서 초기 데이터를 전송하지 않습니다")
+                }
+            } else {
+                logger.info("⏳ Time Offset 설정 완료, 시작 시간 대기 중 (초기 데이터는 TRACKING 상태에서 전송)")
             }
             //Time Offset 전달
             udpFwICDService.timeOffsetCommand(inputTimeOffset)
@@ -2875,7 +2817,7 @@ class EphemerisService(
         try {
             // ✅ 요청 ID (디버깅용) - 함수 전체에서 재사용
             val requestId = System.currentTimeMillis() % 10000
-            logger.info("📊 [요청 #$requestId] Original, FinalTransformed, KeyholeAxisTransformed, KeyholeFinalTransformed, KeyholeOptimized 데이터 병합 시작")
+            // logger.info("📊 [요청 #$requestId] Original, FinalTransformed, KeyholeAxisTransformed, KeyholeFinalTransformed, KeyholeOptimized 데이터 병합 시작")
             
             val originalMst = ephemerisTrackMstStorage.filter { it["DataType"] == "original" }
             val finalMst = ephemerisTrackMstStorage.filter { it["DataType"] == "final_transformed" }
@@ -2889,11 +2831,11 @@ class EphemerisService(
             }
             
             // 🔍 디버깅: finalMst 데이터 확인
-            logger.info("🔍 [요청 #$requestId] finalMst 크기: ${finalMst.size}")
-            if (finalMst.isNotEmpty()) {
-                logger.info("🔍 [요청 #$requestId] 첫 번째 finalMst 항목의 키: ${finalMst[0].keys}")
-                logger.info("🔍 [요청 #$requestId] 첫 번째 finalMst 항목의 MstId 필드: ${finalMst[0]["MstId"]} (타입: ${finalMst[0]["MstId"]?.let { it::class.simpleName }})")
-            }
+            // logger.info("🔍 [요청 #$requestId] finalMst 크기: ${finalMst.size}")
+            // if (finalMst.isNotEmpty()) {
+            //     logger.info("🔍 [요청 #$requestId] 첫 번째 finalMst 항목의 키: ${finalMst[0].keys}")
+            //     logger.info("🔍 [요청 #$requestId] 첫 번째 finalMst 항목의 MstId 필드: ${finalMst[0]["MstId"]} (타입: ${finalMst[0]["MstId"]?.let { it::class.simpleName }})")
+            // }
             
             val mergedData = finalMst.mapNotNull { final ->
                 // ✅ MstId 필드에서만 mstId 추출 (No 필드 제거)
@@ -2940,26 +2882,26 @@ class EphemerisService(
                 val threshold = settingsService.keyholeAzimuthVelocityThreshold
                 val isKeyhole = train0MaxAzRate >= threshold
                 
-                // 🔍 디버깅: Keyhole Optimized 데이터 확인
-                if (isKeyhole) {
-                    logger.info("🔍 [요청 #$requestId] MST #$mstId Keyhole Optimized 디버깅:")
-                    logger.info("   [요청 #$requestId] keyholeOptimizedMst 전체 크기: ${keyholeOptimizedMst.size}")
-                    logger.info("   [요청 #$requestId] keyholeOptimizedMst의 No 필드들: ${keyholeOptimizedMst.map { it["No"] }}")
-                    logger.info("   [요청 #$requestId] 찾는 mstId: $mstId (타입: ${mstId::class.simpleName})")
-                    logger.info("   [요청 #$requestId] keyholeOptimized 찾음: ${keyholeOptimized != null}")
-                    logger.info("   [요청 #$requestId] isKeyhole: $isKeyhole")
-                    if (keyholeOptimized != null) {
-                        logger.info("   [요청 #$requestId] keyholeOptimized의 RecommendedTrainAngle: ${keyholeOptimized["RecommendedTrainAngle"]}")
-                        logger.info("   [요청 #$requestId] keyholeOptimized의 MaxAzRate: ${keyholeOptimized["MaxAzRate"]}")
-                    } else {
-                        logger.warn("⚠️ [요청 #$requestId] MST #$mstId: Keyhole 발생했으나 keyholeOptimized 데이터를 찾을 수 없습니다.")
-                        // 🔍 추가 디버깅: 타입 불일치 확인
-                        keyholeOptimizedMst.forEach { mst ->
-                            val mstNo = mst["No"]
-                            logger.info("   [요청 #$requestId] keyholeOptimizedMst 항목 - No: $mstNo (타입: ${mstNo?.let { it::class.simpleName }}), 일치 여부: ${mstNo == mstId}")
-                        }
-                    }
-                }
+                // 🔍 디버깅: Keyhole Optimized 데이터 확인 (비활성화)
+                // if (isKeyhole) {
+                //     logger.info("🔍 [요청 #$requestId] MST #$mstId Keyhole Optimized 디버깅:")
+                //     logger.info("   [요청 #$requestId] keyholeOptimizedMst 전체 크기: ${keyholeOptimizedMst.size}")
+                //     logger.info("   [요청 #$requestId] keyholeOptimizedMst의 No 필드들: ${keyholeOptimizedMst.map { it["No"] }}")
+                //     logger.info("   [요청 #$requestId] 찾는 mstId: $mstId (타입: ${mstId::class.simpleName})")
+                //     logger.info("   [요청 #$requestId] keyholeOptimized 찾음: ${keyholeOptimized != null}")
+                //     logger.info("   [요청 #$requestId] isKeyhole: $isKeyhole")
+                //     if (keyholeOptimized != null) {
+                //         logger.info("   [요청 #$requestId] keyholeOptimized의 RecommendedTrainAngle: ${keyholeOptimized["RecommendedTrainAngle"]}")
+                //         logger.info("   [요청 #$requestId] keyholeOptimized의 MaxAzRate: ${keyholeOptimized["MaxAzRate"]}")
+                //     } else {
+                //         logger.warn("⚠️ [요청 #$requestId] MST #$mstId: Keyhole 발생했으나 keyholeOptimized 데이터를 찾을 수 없습니다.")
+                //         // 🔍 추가 디버깅: 타입 불일치 확인
+                //         keyholeOptimizedMst.forEach { mst ->
+                //             val mstNo = mst["No"]
+                //             logger.info("   [요청 #$requestId] keyholeOptimizedMst 항목 - No: $mstNo (타입: ${mstNo?.let { it::class.simpleName }}), 일치 여부: ${mstNo == mstId}")
+                //         }
+                //     }
+                // }
                 
                 // 백업: Original MST의 IsKeyhole도 확인 (데이터 정합성)
                 val isKeyholeFromOriginal = original?.get("IsKeyhole") as? Boolean ?: false
@@ -3055,39 +2997,39 @@ class EphemerisService(
                     put("MaxElevation", filteredMaxElevation ?: (final["MaxElevation"] as? Double))
                     
                     // ✅ 방법 2 (신규): Keyhole Optimized 데이터 추가
-                    logger.info("🔍 [요청 #$requestId] MST #$mstId: Keyhole Optimized 조건 확인:")
-                    logger.info("   - keyholeOptimized != null: ${keyholeOptimized != null}")
-                    logger.info("   - isKeyhole: $isKeyhole")
-                    logger.info("   - 조건 결과 (keyholeOptimized != null && isKeyhole): ${keyholeOptimized != null && isKeyhole}")
+                    // logger.info("🔍 [요청 #$requestId] MST #$mstId: Keyhole Optimized 조건 확인:")
+                    // logger.info("   - keyholeOptimized != null: ${keyholeOptimized != null}")
+                    // logger.info("   - isKeyhole: $isKeyhole")
+                    // logger.info("   - 조건 결과 (keyholeOptimized != null && isKeyhole): ${keyholeOptimized != null && isKeyhole}")
                     
                     if (keyholeOptimized != null && isKeyhole) {
-                        logger.info("✅ [요청 #$requestId] MST #$mstId: Keyhole Optimized 데이터 처리 시작")
+                        // logger.info("✅ [요청 #$requestId] MST #$mstId: Keyhole Optimized 데이터 처리 시작")
                         // 🔍 데이터 존재 여부 확인
                         val keyholeOptimizedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "keyhole_optimized_final_transformed", detailId)  // ✅ detailId 전달
-                        logger.info("   [요청 #$requestId] keyhole_optimized_final_transformed DTL 데이터 크기: ${keyholeOptimizedDtl.size}개")
+                        // logger.info("   [요청 #$requestId] keyhole_optimized_final_transformed DTL 데이터 크기: ${keyholeOptimizedDtl.size}개")
                         if (keyholeOptimizedDtl.isEmpty()) {
                             logger.warn("⚠️ [요청 #$requestId] MST #$mstId: keyhole_optimized_final_transformed DTL 데이터가 없습니다!")
                         }
-                        
+
                         val keyholeOptimizedRates = calculateFinalTransformedSumMethodRates(
-                            mstId, 
+                            mstId,
                             "keyhole_optimized_final_transformed",
                             detailId  // ✅ detailId 전달
                         )
-                        logger.info("   [요청 #$requestId] 계산된 Rates: maxAzRate=${keyholeOptimizedRates["maxAzRate"]}, maxElRate=${keyholeOptimizedRates["maxElRate"]}")
-                        logger.info("   [요청 #$requestId] RecommendedTrainAngle: ${keyholeOptimized["RecommendedTrainAngle"]}")
-                        logger.info("   [요청 #$requestId] API 응답에 설정되는 값들:")
-                        logger.info("      - KeyholeOptimizedRecommendedTrainAngle: ${keyholeOptimized["RecommendedTrainAngle"]}")
-                        logger.info("      - KeyholeOptimizedFinalTransformedMaxAzRate: ${keyholeOptimizedRates["maxAzRate"]}")
-                        logger.info("      - KeyholeOptimizedFinalTransformedMaxElRate: ${keyholeOptimizedRates["maxElRate"]}")
+                        // logger.info("   [요청 #$requestId] 계산된 Rates: maxAzRate=${keyholeOptimizedRates["maxAzRate"]}, maxElRate=${keyholeOptimizedRates["maxElRate"]}")
+                        // logger.info("   [요청 #$requestId] RecommendedTrainAngle: ${keyholeOptimized["RecommendedTrainAngle"]}")
+                        // logger.info("   [요청 #$requestId] API 응답에 설정되는 값들:")
+                        // logger.info("      - KeyholeOptimizedRecommendedTrainAngle: ${keyholeOptimized["RecommendedTrainAngle"]}")
+                        // logger.info("      - KeyholeOptimizedFinalTransformedMaxAzRate: ${keyholeOptimizedRates["maxAzRate"]}")
+                        // logger.info("      - KeyholeOptimizedFinalTransformedMaxElRate: ${keyholeOptimizedRates["maxElRate"]}")
                         val recommendedTrainAngleValue = keyholeOptimized["RecommendedTrainAngle"] as? Double ?: 0.0
                         val maxAzRateValue = keyholeOptimizedRates["maxAzRate"] as? Double ?: 0.0
                         val maxElRateValue = keyholeOptimizedRates["maxElRate"] as? Double ?: 0.0
-                        
-                        logger.info("   [요청 #$requestId] 실제 API 응답에 설정되는 값들:")
-                        logger.info("      - KeyholeOptimizedRecommendedTrainAngle: $recommendedTrainAngleValue")
-                        logger.info("      - KeyholeOptimizedFinalTransformedMaxAzRate: $maxAzRateValue")
-                        logger.info("      - KeyholeOptimizedFinalTransformedMaxElRate: $maxElRateValue")
+
+                        // logger.info("   [요청 #$requestId] 실제 API 응답에 설정되는 값들:")
+                        // logger.info("      - KeyholeOptimizedRecommendedTrainAngle: $recommendedTrainAngleValue")
+                        // logger.info("      - KeyholeOptimizedFinalTransformedMaxAzRate: $maxAzRateValue")
+                        // logger.info("      - KeyholeOptimizedFinalTransformedMaxElRate: $maxElRateValue")
                         
                         put("KeyholeOptimizedFinalTransformedMaxAzRate", maxAzRateValue)
                         put("KeyholeOptimizedFinalTransformedMaxElRate", maxElRateValue)

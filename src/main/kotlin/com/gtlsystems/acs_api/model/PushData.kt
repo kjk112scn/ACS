@@ -19,24 +19,28 @@ object PushData {
         var geostationaryStatus: Boolean? = null
     )
 
-    // 추적 상태 enum 추가
+    /**
+     * 추적 상태 enum (단순화됨 - 6개 상태)
+     *
+     * 상태 흐름: IDLE → PREPARING → WAITING → TRACKING → COMPLETED
+     *                                              ↘ ERROR
+     */
     enum class EphemerisTrackingState {
-        IDLE,                    // 대기 (추적 정지 상태)
-        TRAIN_MOVING_TO_ZERO,    // Tilt 시작 위치로 이동
-        TRAIN_STABILIZING,       // Tilt 안정화 대기
-        MOVING_TO_START,        // 시작 위치 이동 중
-        WAITING_FOR_TRACKING,   // 위성 추적 대기
-        TRACKING,               // 실제 추적 중
-        COMPLETED,              // 추적 완료
-        ERROR                   // 오류
+        IDLE,           // 대기 (추적 비활성)
+        PREPARING,      // 준비 중 (Train 이동 + 안정화 + Az/El 이동)
+        WAITING,        // 시작 대기 (시작 시간 전, 12.1 헤더 전송 완료)
+        TRACKING,       // 추적 중 (12.2 초기 데이터 전송, 실시간 추적)
+        COMPLETED,      // 완료
+        ERROR           // 오류
     }
 
-    // 태양 추적 상태 enum 추가
+    /**
+     * 태양 추적 상태 enum (단순화됨)
+     */
     enum class SunTrackTrackingState {
-        IDLE,                    // 대기 (태양 추적 정지 상태)
-        TRAIN_MOVING_TO_ZERO,    // Tilt 시작 위치로 이동
-        TRAIN_STABILIZING,       // Tilt 안정화 대기
-        TRACKING               // 실제 추적 중
+        IDLE,           // 대기 (태양 추적 정지 상태)
+        PREPARING,      // 준비 중 (Train 이동 + 안정화)
+        TRACKING        // 실제 추적 중
     }
     data class ReadData(
         val modeStatusBits: String? = null,

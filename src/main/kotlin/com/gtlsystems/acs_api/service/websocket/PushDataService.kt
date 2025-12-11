@@ -30,42 +30,35 @@ class PushDataService(
 			val currentData = dataStoreService.getLatestData()
 			val isUdpConnected = dataStoreService.isUdpConnected()
 
-			// ✅ Sun Track 상태 로깅 추가
 			val trackingStatus = PushData.TRACKING_STATUS
-			if (trackingStatus.sunTrackTrackingState != null) {
-				logger.debug("☀️ WebSocket 전송 - Sun Track 추적 상태: {}", trackingStatus.sunTrackTrackingState)
-			}
 
 			// ✅ 하드웨어 에러 로그 처리 및 클라이언트별 데이터 생성
 			val errorData = try {
-				val errorUpdateResult = hardwareErrorLogService.processAntennaData(currentData)
-				val clientErrorData = hardwareErrorLogService.getClientData(clientId)
-				
-				logger.debug("🔍 에러 데이터 생성 - 클라이언트: {}, 상태변경: {}", clientId, errorUpdateResult.hasStateChanged)
-				clientErrorData
+				hardwareErrorLogService.processAntennaData(currentData)
+				hardwareErrorLogService.getClientData(clientId)
 			} catch (e: Exception) {
 				logger.warn("하드웨어 에러 로그 처리 실패: {}", e.message)
 				null
 			}
 
-			// ✅ 디버깅: DataStoreService에서 가져온 값 확인
 			val currentMstId = dataStoreService.getCurrentTrackingMstId()
 			val currentDetailId = dataStoreService.getCurrentTrackingDetailId()
 			val nextMstId = dataStoreService.getNextTrackingMstId()
 			val nextDetailId = dataStoreService.getNextTrackingDetailId()
-			
-			logger.info("🔍 [디버깅] WebSocket 전송 - currentTrackingMstId: $currentMstId, currentTrackingDetailId: $currentDetailId")
-			logger.info("🔍 [디버깅] WebSocket 전송 - nextTrackingMstId: $nextMstId, nextTrackingDetailId: $nextDetailId")
-			
+
+			val cmdAz = PushData.CMD.cmdAzimuthAngle
+			val cmdEl = PushData.CMD.cmdElevationAngle
+			val cmdTrain = PushData.CMD.cmdTrainAngle
+
 			// 필수 데이터만 포함하여 처리 시간 최소화
 			val dataWithInfo = mapOf(
 				"data" to currentData,
 				"trackingStatus" to trackingStatus,
 				"serverTime" to GlobalData.Time.serverTime,
 				"resultTimeOffsetCalTime" to GlobalData.Time.resultTimeOffsetCalTime,
-				"cmdAzimuthAngle" to PushData.CMD.cmdAzimuthAngle,
-				"cmdElevationAngle" to PushData.CMD.cmdElevationAngle,
-				"cmdTrainAngle" to PushData.CMD.cmdTrainAngle,
+				"cmdAzimuthAngle" to cmdAz,
+				"cmdElevationAngle" to cmdEl,
+				"cmdTrainAngle" to cmdTrain,
 				"udpConnected" to isUdpConnected,
 				"lastUdpUpdateTime" to dataStoreService.getLastUdpUpdateTime().toString(),
 				// ✅ mstId와 detailId 정보 추가

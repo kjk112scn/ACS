@@ -25,32 +25,108 @@ class DataStoreService {
      * ✅ UDP에서 데이터 업데이트 (mergedData 로직 복원)
      * - 새 데이터의 null이 아닌 필드만 업데이트
      * - 기존 데이터 보존 (null 필드는 덮어쓰지 않음)
+     * @param forceUpdate true이면 보존 로직을 우회하고 서버 계산값으로 강제 업데이트
      */
-    fun updateDataFromUdp(newData: PushData.ReadData) {
+    fun updateDataFromUdp(newData: PushData.ReadData, forceUpdate: Boolean = false) {
         val currentData = latestData.get()
         
-        // ✅ 추적 시작 직후에만 상세 로그 출력 (로그 스팸 방지)
-        val isTrackingActive = trackingStatus.get().ephemerisStatus == true
-        val trackingCmdChanged = 
-            newData.trackingCMDAzimuthAngle != currentData.trackingCMDAzimuthAngle ||
-            newData.trackingCMDElevationAngle != currentData.trackingCMDElevationAngle ||
-            newData.trackingCMDTrainAngle != currentData.trackingCMDTrainAngle
-        
-        // ✅ trackingCMD 값이 0.0에서 변경되거나, 추적 시작 직후에만 로깅
-        val isZeroToNonZero = 
-            (currentData.trackingCMDAzimuthAngle == 0.0f && newData.trackingCMDAzimuthAngle != null && newData.trackingCMDAzimuthAngle != 0.0f) ||
-            (currentData.trackingCMDElevationAngle == 0.0f && newData.trackingCMDElevationAngle != null && newData.trackingCMDElevationAngle != 0.0f)
-        
-        val shouldLog = trackingCmdChanged && (isTrackingActive || isZeroToNonZero)
-        
-        if (shouldLog) {
-            logger.info("🔍 [DEBUG-DataStore] updateDataFromUdp 호출 (추적 중 또는 값 변경):")
-            logger.info("  - newData.trackingCMDAzimuthAngle: ${newData.trackingCMDAzimuthAngle}")
-            logger.info("  - newData.trackingCMDElevationAngle: ${newData.trackingCMDElevationAngle}")
-            logger.info("  - newData.trackingCMDTrainAngle: ${newData.trackingCMDTrainAngle}")
-            logger.info("  - currentData.trackingCMDAzimuthAngle: ${currentData.trackingCMDAzimuthAngle}")
-            logger.info("  - currentData.trackingCMDElevationAngle: ${currentData.trackingCMDElevationAngle}")
-            logger.info("  - currentData.trackingCMDTrainAngle: ${currentData.trackingCMDTrainAngle}")
+        // ✅ 디버깅 로그 관련 변수 (필요시 활성화)
+        // val isTrackingActive = trackingStatus.get().ephemerisStatus == true
+        // val trackingCmdChanged =
+        //     newData.trackingCMDAzimuthAngle != currentData.trackingCMDAzimuthAngle ||
+        //     newData.trackingCMDElevationAngle != currentData.trackingCMDElevationAngle ||
+        //     newData.trackingCMDTrainAngle != currentData.trackingCMDTrainAngle
+        // val isZeroToNonZero =
+        //     (currentData.trackingCMDAzimuthAngle == 0.0f && newData.trackingCMDAzimuthAngle != null && newData.trackingCMDAzimuthAngle != 0.0f) ||
+        //     (currentData.trackingCMDElevationAngle == 0.0f && newData.trackingCMDElevationAngle != null && newData.trackingCMDElevationAngle != 0.0f)
+        // val shouldLog = trackingCmdChanged && (isTrackingActive || isZeroToNonZero)
+        // if (shouldLog) {
+        //     logger.debug("🔍 [DataStore] trackingCMD 변경: Az=${newData.trackingCMDAzimuthAngle}, El=${newData.trackingCMDElevationAngle}")
+        // }
+
+        // ✅ UDP 응답 수신 시 현재 추적 상태 즉시 확인
+        val ephemerisState = trackingStatus.get().ephemerisTrackingState
+
+        // 디버깅 로그 제거 (필요시 debug 레벨로 활성화)
+
+        // ✅ 추적 상태 확인 (단순화된 상태: PREPARING, WAITING, TRACKING)
+        // IDLE, COMPLETED, ERROR가 아닌 모든 상태에서 trackingCMD 값 보존
+        val shouldPreserveTrackingCmd =
+            ephemerisState != null && (
+                ephemerisState == "PREPARING" ||   // 준비 중 (Train 이동, 안정화, Az/El 이동)
+                ephemerisState == "WAITING" ||     // 시작 대기
+                ephemerisState == "TRACKING"       // 추적 중
+            )
+
+        // ✅ 실제 추적 중 상태인지 확인 (TRACKING일 때 서버 계산값 우선)
+        val isActiveTracking = ephemerisState == "TRACKING"
+
+        // ✅ 추적 CMD 값 병합 로직:
+        // - forceUpdate=true이면 보존 로직 우회 (서버 계산값 강제 업데이트)
+        // - 실제 추적 중(TRACKING/IN_PROGRESS)일 때: 현재 값이 유효하면 UDP 값 무시 (서버가 계산한 값 유지)
+        // - 그 외 추적 준비 상태일 때: UDP가 0.0을 보내면 현재 값 유지
+        val mergedTrackingCMDAzimuth = when {
+            // UDP 데이터가 null이면 현재 값 유지
+            newData.trackingCMDAzimuthAngle == null -> currentData.trackingCMDAzimuthAngle
+            // ✅ forceUpdate=true이면 서버 계산값으로 강제 업데이트 (tracking 스레드에서 호출 시)
+            forceUpdate -> newData.trackingCMDAzimuthAngle
+            // ✅ 실제 추적 중이고 현재 값이 유효하면 UDP 값 무시 (ACU F/W의 잘못된 값 덮어쓰기 방지)
+            isActiveTracking && currentData.trackingCMDAzimuthAngle != null && currentData.trackingCMDAzimuthAngle != 0.0f -> {
+                currentData.trackingCMDAzimuthAngle
+            }
+            // 추적 준비 상태이고, 현재 값이 0이 아니며, UDP가 0.0을 보내면 현재 값 유지
+            shouldPreserveTrackingCmd && currentData.trackingCMDAzimuthAngle != 0.0f && newData.trackingCMDAzimuthAngle == 0.0f -> {
+                currentData.trackingCMDAzimuthAngle
+            }
+            // 그 외에는 UDP 값 사용
+            else -> newData.trackingCMDAzimuthAngle
+        }
+
+        val mergedTrackingCMDElevation = when {
+            newData.trackingCMDElevationAngle == null -> currentData.trackingCMDElevationAngle
+            // ✅ forceUpdate=true이면 서버 계산값으로 강제 업데이트
+            forceUpdate -> newData.trackingCMDElevationAngle
+            // ✅ 실제 추적 중이고 현재 값이 유효하면 UDP 값 무시
+            isActiveTracking && currentData.trackingCMDElevationAngle != null && currentData.trackingCMDElevationAngle != 0.0f -> {
+                currentData.trackingCMDElevationAngle
+            }
+            shouldPreserveTrackingCmd && currentData.trackingCMDElevationAngle != 0.0f && newData.trackingCMDElevationAngle == 0.0f -> {
+                currentData.trackingCMDElevationAngle
+            }
+            else -> newData.trackingCMDElevationAngle
+        }
+
+        val mergedTrackingCMDTrain = when {
+            newData.trackingCMDTrainAngle == null -> currentData.trackingCMDTrainAngle
+            // ✅ forceUpdate=true이면 서버 계산값으로 강제 업데이트
+            forceUpdate -> newData.trackingCMDTrainAngle
+            // ✅ 실제 추적 중이고 현재 값이 유효하면 UDP 값 무시
+            isActiveTracking && currentData.trackingCMDTrainAngle != null && currentData.trackingCMDTrainAngle != 0.0f -> {
+                currentData.trackingCMDTrainAngle
+            }
+            shouldPreserveTrackingCmd && currentData.trackingCMDTrainAngle != 0.0f && newData.trackingCMDTrainAngle == 0.0f -> {
+                currentData.trackingCMDTrainAngle
+            }
+            else -> newData.trackingCMDTrainAngle
+        }
+
+        // ✅ 추적 Actual 값 병합 로직: UDP가 0.0을 보내도 이전 값 유지 (trackingCMD와 동일한 로직)
+        val mergedTrackingActualAzimuth = when {
+            newData.trackingActualAzimuthAngle == null -> currentData.trackingActualAzimuthAngle
+            shouldPreserveTrackingCmd && currentData.trackingActualAzimuthAngle != 0.0f && newData.trackingActualAzimuthAngle == 0.0f -> currentData.trackingActualAzimuthAngle
+            else -> newData.trackingActualAzimuthAngle
+        }
+
+        val mergedTrackingActualElevation = when {
+            newData.trackingActualElevationAngle == null -> currentData.trackingActualElevationAngle
+            shouldPreserveTrackingCmd && currentData.trackingActualElevationAngle != 0.0f && newData.trackingActualElevationAngle == 0.0f -> currentData.trackingActualElevationAngle
+            else -> newData.trackingActualElevationAngle
+        }
+
+        val mergedTrackingActualTrain = when {
+            newData.trackingActualTrainAngle == null -> currentData.trackingActualTrainAngle
+            shouldPreserveTrackingCmd && currentData.trackingActualTrainAngle != 0.0f && newData.trackingActualTrainAngle == 0.0f -> currentData.trackingActualTrainAngle
+            else -> newData.trackingActualTrainAngle
         }
 
         //  기존 mergedData 로직 복원 (null 안전 병합)
@@ -103,27 +179,16 @@ class DataStoreService {
             elevationMaxAcceleration = newData.elevationMaxAcceleration ?: currentData.elevationMaxAcceleration,
             trainMaxAcceleration = newData.trainMaxAcceleration ?: currentData.trainMaxAcceleration,
             trackingAzimuthTime = newData.trackingAzimuthTime ?: currentData.trackingAzimuthTime,
-            trackingCMDAzimuthAngle = newData.trackingCMDAzimuthAngle ?: currentData.trackingCMDAzimuthAngle,
-            trackingActualAzimuthAngle = newData.trackingActualAzimuthAngle ?: currentData.trackingActualAzimuthAngle,
+            trackingCMDAzimuthAngle = mergedTrackingCMDAzimuth,
+            trackingActualAzimuthAngle = mergedTrackingActualAzimuth,
             trackingElevationTime = newData.trackingElevationTime ?: currentData.trackingElevationTime,
-            trackingCMDElevationAngle = newData.trackingCMDElevationAngle ?: currentData.trackingCMDElevationAngle,
-            trackingActualElevationAngle = newData.trackingActualElevationAngle ?: currentData.trackingActualElevationAngle,
+            trackingCMDElevationAngle = mergedTrackingCMDElevation,
+            trackingActualElevationAngle = mergedTrackingActualElevation,
             trackingTrainTime = newData.trackingTrainTime ?: currentData.trackingTrainTime,
-            trackingCMDTrainAngle = newData.trackingCMDTrainAngle ?: currentData.trackingCMDTrainAngle,
-            trackingActualTrainAngle = newData.trackingActualTrainAngle ?: currentData.trackingActualTrainAngle,
+            trackingCMDTrainAngle = mergedTrackingCMDTrain,
+            trackingActualTrainAngle = mergedTrackingActualTrain,
         )
 
-        // ✅ 병합 결과도 조건부 로깅
-        if (shouldLog) {
-            logger.info("🔍 [DEBUG-DataStore] 병합 결과:")
-            logger.info("  - mergedData.trackingCMDAzimuthAngle: ${mergedData.trackingCMDAzimuthAngle}")
-            logger.info("  - mergedData.trackingCMDElevationAngle: ${mergedData.trackingCMDElevationAngle}")
-            logger.info("  - mergedData.trackingCMDTrainAngle: ${mergedData.trackingCMDTrainAngle}")
-            logger.info("  - newData.trackingCMDAzimuthAngle is null: ${newData.trackingCMDAzimuthAngle == null}")
-            logger.info("  - newData.trackingCMDElevationAngle is null: ${newData.trackingCMDElevationAngle == null}")
-            logger.info("  - newData.trackingCMDTrainAngle is null: ${newData.trackingCMDTrainAngle == null}")
-            logger.info("  - 값 변경 여부: Az=${currentData.trackingCMDAzimuthAngle != mergedData.trackingCMDAzimuthAngle}, El=${currentData.trackingCMDElevationAngle != mergedData.trackingCMDElevationAngle}, Train=${currentData.trackingCMDTrainAngle != mergedData.trackingCMDTrainAngle}")
-        }
 
         // ⚡ 최적화: 실제로 변경된 경우에만 업데이트
        // if (!isDataEqual(currentData, mergedData)) {
@@ -308,6 +373,27 @@ class DataStoreService {
         nextTrackingDetailId.set(null)
         dataVersion.incrementAndGet()
     }
+
+    /**
+     * ✅ 추적 각도 값 초기화 (새 추적 시작 시 이전 값으로 점프 방지)
+     */
+    fun clearTrackingAngles() {
+        val currentData = latestData.get()
+        val clearedData = currentData.copy(
+            trackingCMDAzimuthAngle = null,
+            trackingCMDElevationAngle = null,
+            trackingCMDTrainAngle = null,
+            trackingActualAzimuthAngle = null,
+            trackingActualElevationAngle = null,
+            trackingActualTrainAngle = null,
+            trackingAzimuthTime = null,
+            trackingElevationTime = null,
+            trackingTrainTime = null
+        )
+        latestData.set(clearedData)
+        dataVersion.incrementAndGet()
+        logger.info("🔄 추적 각도 값 초기화 완료")
+    }
     /**
      * ✅ TrackingStatus 업데이트
      */
@@ -315,18 +401,28 @@ class DataStoreService {
     fun updateTrackingStatus(newStatus: PushData.TrackingStatus) {
         val currentStatus = trackingStatus.get()
 
+        // ✅ 모든 필드를 병합 (ephemerisTrackingState 포함!)
         val mergedStatus = PushData.TrackingStatus(
             ephemerisStatus = newStatus.ephemerisStatus ?: currentStatus.ephemerisStatus,
+            ephemerisTrackingState = newStatus.ephemerisTrackingState ?: currentStatus.ephemerisTrackingState,  // ✅ 핵심 수정!
             passScheduleStatus = newStatus.passScheduleStatus ?: currentStatus.passScheduleStatus,
-            sunTrackStatus = newStatus.sunTrackStatus ?: currentStatus.sunTrackStatus
+            sunTrackStatus = newStatus.sunTrackStatus ?: currentStatus.sunTrackStatus,
+            sunTrackTrackingState = newStatus.sunTrackTrackingState ?: currentStatus.sunTrackTrackingState,
+            manualControlStatus = newStatus.manualControlStatus ?: currentStatus.manualControlStatus,
+            geostationaryStatus = newStatus.geostationaryStatus ?: currentStatus.geostationaryStatus
         )
 
         trackingStatus.set(mergedStatus)
 
         // PushData 전역 객체와 동기화
         PushData.TRACKING_STATUS.ephemerisStatus = mergedStatus.ephemerisStatus
+        PushData.TRACKING_STATUS.ephemerisTrackingState = mergedStatus.ephemerisTrackingState  // ✅ 핵심 수정!
         PushData.TRACKING_STATUS.passScheduleStatus = mergedStatus.passScheduleStatus
         PushData.TRACKING_STATUS.sunTrackStatus = mergedStatus.sunTrackStatus
+        PushData.TRACKING_STATUS.sunTrackTrackingState = mergedStatus.sunTrackTrackingState
+        PushData.TRACKING_STATUS.manualControlStatus = mergedStatus.manualControlStatus
+        PushData.TRACKING_STATUS.geostationaryStatus = mergedStatus.geostationaryStatus
+
 
         dataVersion.incrementAndGet()
     }
@@ -337,7 +433,9 @@ class DataStoreService {
         val currentStatus = trackingStatus.get()
         val newStatus = PushData.TrackingStatus(
             ephemerisStatus = active,
-            ephemerisTrackingState = if (active) "TRACKING" else currentStatus.ephemerisTrackingState, // ✅ 기존 상태 유지
+            // ✅ ephemerisTrackingState는 EphemerisService에서 직접 관리하므로 여기서는 기존 상태 유지
+            // PREPARING, WAITING, TRACKING 등의 상태는 EphemerisService가 updateTrackingStatus로 직접 설정
+            ephemerisTrackingState = currentStatus.ephemerisTrackingState,
             passScheduleStatus = false,
             sunTrackStatus = false,
             manualControlStatus = currentStatus.manualControlStatus,

@@ -441,30 +441,23 @@ class UdpFwICDService(
                 )
 
             val dataToSend = setDataFrameInstance.setDataFrame()
+
+            // ✅ CMD 값 설정 (오프셋 적용)
+            val calcCmdAz = azAngle + GlobalData.Offset.azimuthPositionOffset
+            val calcCmdEl = elAngle + GlobalData.Offset.elevationPositionOffset
+            val calcCmdTrain = trainAngle + GlobalData.Offset.trainPositionOffset + GlobalData.Offset.trueNorthOffset
+
             PushData.CMD.apply {
-                cmdAzimuthAngle = azAngle + GlobalData.Offset.azimuthPositionOffset
-                cmdElevationAngle = elAngle + GlobalData.Offset.elevationPositionOffset
-                cmdTrainAngle =
-                    trainAngle +
-                            GlobalData.Offset.trainPositionOffset +
-                            GlobalData.Offset.trueNorthOffset
+                cmdAzimuthAngle = calcCmdAz
+                cmdElevationAngle = calcCmdEl
+                cmdTrainAngle = calcCmdTrain
             }
-            /*
-            if(PushData.TRACKING_STATUS.sunTrackTrackingState == "TRACKING") {
-                PushData.CMD.apply {
-                    cmdAzimuthAngle = azAngle + GlobalData.Offset.azimuthPositionOffset
-                    cmdElevationAngle = elAngle + GlobalData.Offset.elevationPositionOffset
-                    cmdTrainAngle = trainAngle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
-                }
-            }
-            else{
-                PushData.CMD.apply {
-                    cmdAzimuthAngle = azAngle + GlobalData.Offset.azimuthPositionOffset
-                    cmdElevationAngle = elAngle + GlobalData.Offset.elevationPositionOffset
-                    cmdTrainAngle = trainAngle + GlobalData.Offset.tiltPositionOffset + GlobalData.Offset.trueNorthOffset
-                }
-            }
-            */
+
+            // ✅ 디버깅: CMD 값 설정 확인
+            logger.info("📝 [CMD 설정] PushData.CMD에 값 설정: Az={}, El={}, Train={}", calcCmdAz, calcCmdEl, calcCmdTrain)
+            logger.info("📝 [CMD 확인] PushData.CMD 현재값: Az={}, El={}, Train={}",
+                PushData.CMD.cmdAzimuthAngle, PushData.CMD.cmdElevationAngle, PushData.CMD.cmdTrainAngle)
+
             channel.send(ByteBuffer.wrap(dataToSend), firmwareAddress)
 
             logger.info(

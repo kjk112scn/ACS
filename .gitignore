@@ -53,3 +53,7 @@ gradle.properties.local
 ### ETL Files ###
 *.etl
 udp_capture.etl
+
+### Windows special files ###
+nul
+NUL
