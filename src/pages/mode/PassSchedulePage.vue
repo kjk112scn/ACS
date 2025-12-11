@@ -352,6 +352,11 @@
 </template>
 
 <script setup lang="ts">
+// ✅ keep-alive의 include에서 사용할 컴포넌트 이름 정의
+defineOptions({
+  name: 'PassSchedulePage'
+})
+
 import { ref, onMounted, onUnmounted, computed, watch, onActivated, onDeactivated, nextTick } from 'vue'
 import { useQuasar } from 'quasar'
 import { usePassScheduleModeStore, type ScheduleItem } from '@/stores'

@@ -1352,39 +1352,40 @@ export const useICDStore = defineStore('icd', () => {
       // ✅ 디버깅: WebSocket 메시지 수신 확인 (100번마다)
       wsMessageCount.value++
 
-      if (wsMessageCount.value % 100 === 0) {
-        console.log('🔍 [디버깅] WebSocket 메시지 수신 (handleWebSocketMessage):', {
-          messageCount: wsMessageCount.value,
-          hasData: !!message.data,
-          dataType: typeof message.data,
-          dataKeys:
-            message.data && typeof message.data === 'object'
-              ? Object.keys(message.data)
-              : 'no data',
-          hasCurrentTrackingMstId:
-            message.data &&
-            typeof message.data === 'object' &&
-            'currentTrackingMstId' in message.data,
-          hasNextTrackingMstId:
-            message.data && typeof message.data === 'object' && 'nextTrackingMstId' in message.data,
-          currentTrackingMstId:
-            message.data && typeof message.data === 'object'
-              ? (message.data as Record<string, unknown>).currentTrackingMstId
-              : undefined,
-          currentTrackingDetailId:
-            message.data && typeof message.data === 'object'
-              ? (message.data as Record<string, unknown>).currentTrackingDetailId
-              : undefined,
-          nextTrackingMstId:
-            message.data && typeof message.data === 'object'
-              ? (message.data as Record<string, unknown>).nextTrackingMstId
-              : undefined,
-          nextTrackingDetailId:
-            message.data && typeof message.data === 'object'
-              ? (message.data as Record<string, unknown>).nextTrackingDetailId
-              : undefined,
-        })
-      }
+      // ✅ 디버깅 로그 비활성화 (Position View 점프 문제 디버깅 시에만 활성화)
+      // if (wsMessageCount.value % 100 === 0) {
+      //   console.log('🔍 [디버깅] WebSocket 메시지 수신 (handleWebSocketMessage):', {
+      //     messageCount: wsMessageCount.value,
+      //     hasData: !!message.data,
+      //     dataType: typeof message.data,
+      //     dataKeys:
+      //       message.data && typeof message.data === 'object'
+      //         ? Object.keys(message.data)
+      //         : 'no data',
+      //     hasCurrentTrackingMstId:
+      //       message.data &&
+      //       typeof message.data === 'object' &&
+      //       'currentTrackingMstId' in message.data,
+      //     hasNextTrackingMstId:
+      //       message.data && typeof message.data === 'object' && 'nextTrackingMstId' in message.data,
+      //     currentTrackingMstId:
+      //       message.data && typeof message.data === 'object'
+      //         ? (message.data as Record<string, unknown>).currentTrackingMstId
+      //         : undefined,
+      //     currentTrackingDetailId:
+      //       message.data && typeof message.data === 'object'
+      //         ? (message.data as Record<string, unknown>).currentTrackingDetailId
+      //         : undefined,
+      //     nextTrackingMstId:
+      //       message.data && typeof message.data === 'object'
+      //         ? (message.data as Record<string, unknown>).nextTrackingMstId
+      //         : undefined,
+      //     nextTrackingDetailId:
+      //       message.data && typeof message.data === 'object'
+      //         ? (message.data as Record<string, unknown>).nextTrackingDetailId
+      //         : undefined,
+      //   })
+      // }
 
       // 받은 데이터를 버퍼에 저장만 하고 즉시 UI 업데이트하지 않음
       latestDataBuffer.value = message
@@ -1580,24 +1581,23 @@ export const useICDStore = defineStore('icd', () => {
       adaptiveInterval.value = Math.max(targetInterval, adaptiveInterval.value - 1)
     }
 
-    // 디버깅 로그 (가끔씩만)
-    if (Math.random() < 0.1) {
-      // 10% 확률
-      console.log(
-        `🔧 간격 조정: 평균처리시간 ${avgProcessingTime.toFixed(2)}ms, 목표 ${targetInterval}ms, 적응간격 ${adaptiveInterval.value}ms`,
-      )
-    }
+    // ✅ 디버깅 로그 비활성화
+    // if (Math.random() < 0.1) {
+    //   console.log(
+    //     `🔧 간격 조정: 평균처리시간 ${avgProcessingTime.toFixed(2)}ms, 목표 ${targetInterval}ms, 적응간격 ${adaptiveInterval.value}ms`,
+    //   )
+    // }
   }
 
-  // ✅ 디버깅: 마지막 로그 출력 시간 (10초당 1개씩만 출력)
-  const lastDebugLogTime = ref(0)
-  const DEBUG_LOG_INTERVAL = 10000 // 10초
+  // ✅ 디버깅 로그 비활성화
+  // const lastDebugLogTime = ref(0)
+  // const DEBUG_LOG_INTERVAL = 10000 // 10초
 
   // 30ms 타이머로 실행되는 UI 업데이트 함수
   const updateUIFromBuffer = () => {
     try {
       const startTime = performance.now()
-      const currentTime = Date.now()
+      // const currentTime = Date.now() // 디버깅 로그용 (비활성화)
 
       // 업데이트 간격 측정 (더 정확하게)
       if (lastUpdateTimestamp.value > 0) {
@@ -1640,21 +1640,21 @@ export const useICDStore = defineStore('icd', () => {
       if (message.data && typeof message.data === 'object' && 'serverTime' in message.data) {
         const dataServerTime = (message.data as Record<string, unknown>).serverTime
         if (dataServerTime !== undefined && dataServerTime !== null) {
-          const oldTime = serverTime.value
+          // ✅ 디버깅 로그 비활성화
+          // const oldTime = serverTime.value
           serverTime.value = safeToString(dataServerTime)
-
-          // 100번마다 로그
-          if (updateCount.value % 100 === 0) {
-            console.log(`🕐 [${updateCount.value}] serverTime: ${oldTime} → ${serverTime.value}`)
-          }
+          // if (updateCount.value % 100 === 0) {
+          //   console.log(`🕐 [${updateCount.value}] serverTime: ${oldTime} → ${serverTime.value}`)
+          // }
         }
       } else {
-        console.log('❌ [Frontend] serverTime을 찾을 수 없습니다:', {
-          messageServerTime: message.serverTime,
-          messageData: message.data,
-          hasData: !!message.data,
-          dataKeys: message.data ? Object.keys(message.data) : 'no data',
-        })
+        // ✅ 디버깅 로그 비활성화
+        // console.log('❌ [Frontend] serverTime을 찾을 수 없습니다:', {
+        //   messageServerTime: message.serverTime,
+        //   messageData: message.data,
+        //   hasData: !!message.data,
+        //   dataKeys: message.data ? Object.keys(message.data) : 'no data',
+        // })
       }
 
       // resultTimeOffsetCalTime 업데이트 - data 객체 안에서 찾기
@@ -1691,39 +1691,10 @@ export const useICDStore = defineStore('icd', () => {
         }
       }
 
-      // ✅ 디버깅: 메시지 구조 전체 확인 (10초당 1개씩만 출력)
-      if (currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
-        console.log('🔍 [디버깅] WebSocket 메시지 구조 확인:', {
-          hasData: !!message.data,
-          dataType: typeof message.data,
-          dataKeys:
-            message.data && typeof message.data === 'object'
-              ? Object.keys(message.data)
-              : 'no data',
-          hasCurrentTrackingMstId:
-            message.data &&
-            typeof message.data === 'object' &&
-            'currentTrackingMstId' in message.data,
-          hasNextTrackingMstId:
-            message.data && typeof message.data === 'object' && 'nextTrackingMstId' in message.data,
-          currentTrackingMstId:
-            message.data && typeof message.data === 'object'
-              ? (message.data as Record<string, unknown>).currentTrackingMstId
-              : undefined,
-          currentTrackingDetailId:
-            message.data && typeof message.data === 'object'
-              ? (message.data as Record<string, unknown>).currentTrackingDetailId
-              : undefined,
-          nextTrackingMstId:
-            message.data && typeof message.data === 'object'
-              ? (message.data as Record<string, unknown>).nextTrackingMstId
-              : undefined,
-          nextTrackingDetailId:
-            message.data && typeof message.data === 'object'
-              ? (message.data as Record<string, unknown>).nextTrackingDetailId
-              : undefined,
-        })
-      }
+      // ✅ 디버깅 로그 비활성화
+      // if (currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
+      //   console.log('🔍 [디버깅] WebSocket 메시지 구조 확인:', { ... })
+      // }
 
       // 🆕 추적 스케줄 정보 업데이트 - data 객체 안에서 찾기 (mstId와 detailId)
       if (
@@ -1735,17 +1706,11 @@ export const useICDStore = defineStore('icd', () => {
         const dataCurrentDetailId = (message.data as Record<string, unknown>)
           .currentTrackingDetailId
 
-        // ✅ 디버깅: WebSocket 메시지의 DetailId 확인 (10초당 1개씩만 출력)
-        if (currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
-          console.log('🔍 [디버깅] WebSocket currentTrackingDetailId:', {
-            value: dataCurrentDetailId,
-            type: typeof dataCurrentDetailId,
-            isNull: dataCurrentDetailId === null,
-            isUndefined: dataCurrentDetailId === undefined,
-            rawMessage: message.data,
-          })
-          lastDebugLogTime.value = currentTime
-        }
+        // ✅ 디버깅 로그 비활성화
+        // if (currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
+        //   console.log('🔍 [디버깅] WebSocket currentTrackingDetailId:', { ... })
+        //   lastDebugLogTime.value = currentTime
+        // }
 
         if (dataCurrentMstId !== undefined) {
           const newCurrentMstId = dataCurrentMstId as number | null
@@ -1755,9 +1720,10 @@ export const useICDStore = defineStore('icd', () => {
             currentTrackingMstId.value !== newCurrentMstId ||
             currentTrackingDetailId.value !== newCurrentDetailId
           ) {
-            console.log(
-              `📋 현재 추적 MstId/DetailId 변경: ${currentTrackingMstId.value}/${currentTrackingDetailId.value} → ${newCurrentMstId}/${newCurrentDetailId}`,
-            )
+            // ✅ 디버깅 로그 비활성화
+            // console.log(
+            //   `📋 현재 추적 MstId/DetailId 변경: ${currentTrackingMstId.value}/${currentTrackingDetailId.value} → ${newCurrentMstId}/${newCurrentDetailId}`,
+            // )
             currentTrackingMstId.value = newCurrentMstId
             currentTrackingDetailId.value = newCurrentDetailId
           }
@@ -1768,18 +1734,11 @@ export const useICDStore = defineStore('icd', () => {
         const dataNextMstId = (message.data as Record<string, unknown>).nextTrackingMstId
         const dataNextDetailId = (message.data as Record<string, unknown>).nextTrackingDetailId
 
-        // ✅ 디버깅: WebSocket 메시지의 DetailId 확인 (10초당 1개씩만 출력)
-        if (currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
-          console.log('🔍 [디버깅] WebSocket nextTrackingDetailId:', {
-            value: dataNextDetailId,
-            type: typeof dataNextDetailId,
-            isNull: dataNextDetailId === null,
-            isUndefined: dataNextDetailId === undefined,
-            rawMessage: message.data,
-            updateCount: updateCount.value,
-          })
-          lastDebugLogTime.value = currentTime
-        }
+        // ✅ 디버깅 로그 비활성화
+        // if (currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
+        //   console.log('🔍 [디버깅] WebSocket nextTrackingDetailId:', { ... })
+        //   lastDebugLogTime.value = currentTime
+        // }
 
         if (dataNextMstId !== undefined) {
           const newNextMstId = dataNextMstId as number | null
@@ -1789,9 +1748,10 @@ export const useICDStore = defineStore('icd', () => {
             nextTrackingMstId.value !== newNextMstId ||
             nextTrackingDetailId.value !== newNextDetailId
           ) {
-            console.log(
-              `📋 다음 추적 MstId/DetailId 변경: ${nextTrackingMstId.value}/${nextTrackingDetailId.value} → ${newNextMstId}/${newNextDetailId}`,
-            )
+            // ✅ 디버깅 로그 비활성화
+            // console.log(
+            //   `📋 다음 추적 MstId/DetailId 변경: ${nextTrackingMstId.value}/${nextTrackingDetailId.value} → ${newNextMstId}/${newNextDetailId}`,
+            // )
             nextTrackingMstId.value = newNextMstId
             nextTrackingDetailId.value = newNextDetailId
           }
@@ -1839,12 +1799,12 @@ export const useICDStore = defineStore('icd', () => {
         adjustInterval()
       }
 
-      // 성능 통계 (1초마다)
-      if (updateCount.value % Math.floor(1000 / UPDATE_INTERVAL) === 0) {
-        console.log(
-          `📊 UI 업데이트 통계: ${updateCount.value}회, 처리시간: ${messageDelay.value.toFixed(2)}ms, 간격: ${updateInterval.value.toFixed(2)}ms, 적응간격: ${adaptiveInterval.value}ms`,
-        )
-      }
+      // ✅ 디버깅 로그 비활성화
+      // if (updateCount.value % Math.floor(1000 / UPDATE_INTERVAL) === 0) {
+      //   console.log(
+      //     `📊 UI 업데이트 통계: ${updateCount.value}회, 처리시간: ${messageDelay.value.toFixed(2)}ms, 간격: ${updateInterval.value.toFixed(2)}ms, 적응간격: ${adaptiveInterval.value}ms`,
+      //   )
+      // }
     } catch (e) {
       console.error('❌ UI 업데이트 오류:', e)
     }
@@ -1856,7 +1816,8 @@ export const useICDStore = defineStore('icd', () => {
       if (trackingStatusData.ephemerisStatus !== undefined) {
         const newStatus = trackingStatusData.ephemerisStatus as boolean | null
         if (ephemerisStatus.value !== newStatus) {
-          console.log(`📡 Ephemeris 상태 변경: ${ephemerisStatus.value} → ${newStatus}`)
+          // ✅ 디버깅 로그 비활성화
+          // console.log(`📡 Ephemeris 상태 변경: ${ephemerisStatus.value} → ${newStatus}`)
           ephemerisStatus.value = newStatus
         }
       }
@@ -1866,7 +1827,8 @@ export const useICDStore = defineStore('icd', () => {
         const newState = trackingStatusData.ephemerisTrackingState as string | null
         if (ephemerisTrackingState.value !== newState) {
           ephemerisTrackingState.value = newState
-          console.log(' Ephemeris 추적 상태 업데이트:', newState)
+          // ✅ 디버깅 로그 비활성화
+          // console.log(' Ephemeris 추적 상태 업데이트:', newState)
         }
       }
 
@@ -1874,7 +1836,8 @@ export const useICDStore = defineStore('icd', () => {
       if (trackingStatusData.passScheduleStatus !== undefined) {
         const newStatus = trackingStatusData.passScheduleStatus as boolean | null
         if (passScheduleStatus.value !== newStatus) {
-          console.log(`📅 Pass Schedule 상태 변경: ${passScheduleStatus.value} → ${newStatus}`)
+          // ✅ 디버깅 로그 비활성화
+          // console.log(`📅 Pass Schedule 상태 변경: ${passScheduleStatus.value} → ${newStatus}`)
           passScheduleStatus.value = newStatus
         }
       }
@@ -1883,7 +1846,8 @@ export const useICDStore = defineStore('icd', () => {
       if (trackingStatusData.sunTrackStatus !== undefined) {
         const newStatus = trackingStatusData.sunTrackStatus as boolean | null
         if (sunTrackStatus.value !== newStatus) {
-          console.log(`☀️ Sun Track 상태 변경: ${sunTrackStatus.value} → ${newStatus}`)
+          // ✅ 디버깅 로그 비활성화
+          // console.log(`☀️ Sun Track 상태 변경: ${sunTrackStatus.value} → ${newStatus}`)
           sunTrackStatus.value = newStatus
         }
       }
@@ -1892,13 +1856,10 @@ export const useICDStore = defineStore('icd', () => {
       if (trackingStatusData.sunTrackTrackingState !== undefined) {
         const newState = trackingStatusData.sunTrackTrackingState as string | null
         if (sunTrackTrackingState.value !== newState) {
-          console.log('☀️ Sun Track 추적 상태 변경 감지:', {
-            이전상태: sunTrackTrackingState.value,
-            새상태: newState,
-            전체데이터: trackingStatusData,
-          })
+          // ✅ 디버깅 로그 비활성화
+          // console.log('☀️ Sun Track 추적 상태 변경 감지:', { ... })
           sunTrackTrackingState.value = newState
-          console.log('☀️ Sun Track 추적 상태 업데이트 완료:', newState)
+          // console.log('☀️ Sun Track 추적 상태 업데이트 완료:', newState)
         }
       }
     } catch (e) {
@@ -2071,7 +2032,8 @@ export const useICDStore = defineStore('icd', () => {
         antennaData.feedSBoardStatusBits !== null
       ) {
         const newBitString = safeToString(antennaData.feedSBoardStatusBits)
-        console.log('🔍 [WebSocket] feedSBoardStatusBits 수신:', newBitString, '(binary:', newBitString.padStart(8, '0'), ')')
+        // ✅ 디버깅 로그 비활성화
+        // console.log('🔍 [WebSocket] feedSBoardStatusBits 수신:', newBitString, '(binary:', newBitString.padStart(8, '0'), ')')
         feedSBoardStatusBits.value = newBitString
         parseFeedSBoardStatusBits(newBitString)
       }
@@ -2192,6 +2154,7 @@ export const useICDStore = defineStore('icd', () => {
       ) {
         trackingAzimuthTime.value = safeToString(antennaData.trackingAzimuthTime)
       }
+      // ✅ 추적 데이터 수신 (디버깅 로그 비활성화)
       if (
         antennaData.trackingCMDAzimuthAngle !== undefined &&
         antennaData.trackingCMDAzimuthAngle !== null
@@ -2480,21 +2443,29 @@ export const useICDStore = defineStore('icd', () => {
     const state = ephemerisTrackingState.value
     switch (state) {
       case 'IDLE':
-        return { displayLabel: '대기(위성 추적 정지)', displayColor: 'grey' }
-      case 'TRAIN_MOVING_TO_ZERO':
-        return { displayLabel: 'Train 시작 위치로 이동', displayColor: 'deep-orange' }
-      case 'TRAIN_STABILIZING':
-        return { displayLabel: 'Train 안정화 대기', displayColor: 'amber-7' }
-      case 'MOVING_TO_START':
-        return { displayLabel: '시작 위치 이동', displayColor: 'blue' }
-      case 'WAITING_FOR_TRACKING':
-        return { displayLabel: '위성 추적 대기', displayColor: 'cyan' }
+        return { displayLabel: '대기', displayColor: 'grey' }
+      // ✅ 새로운 상태 (6개 상태 체계)
+      case 'PREPARING':
+        return { displayLabel: '준비 중', displayColor: 'orange' }
+      case 'WAITING':
+        return { displayLabel: '대기 중', displayColor: 'cyan' }
       case 'TRACKING':
         return { displayLabel: '추적 중', displayColor: 'green' }
       case 'COMPLETED':
         return { displayLabel: '완료', displayColor: 'purple' }
       case 'ERROR':
         return { displayLabel: '오류', displayColor: 'red' }
+      // ✅ 기존 상태 (호환성 유지)
+      case 'TRAIN_MOVING_TO_ZERO':
+        return { displayLabel: 'Train 이동 중', displayColor: 'deep-orange' }
+      case 'TRAIN_STABILIZING':
+        return { displayLabel: 'Train 안정화', displayColor: 'amber-7' }
+      case 'MOVING_TO_START':
+        return { displayLabel: '시작 위치 이동', displayColor: 'blue' }
+      case 'WAITING_FOR_TRACKING':
+        return { displayLabel: '추적 대기', displayColor: 'cyan' }
+      case 'IN_PROGRESS':
+        return { displayLabel: '추적 중', displayColor: 'green' }
       default:
         return { displayLabel: '알 수 없음', displayColor: 'grey' }
     }

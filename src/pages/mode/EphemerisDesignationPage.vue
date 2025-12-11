@@ -650,6 +650,11 @@ ISS (ZARYA)
   </q-dialog>
 </template>
 <script setup lang="ts">
+// ✅ keep-alive의 include에서 사용할 컴포넌트 이름 정의
+defineOptions({
+  name: 'EphemerisDesignationPage'
+})
+
 import { ref, onMounted, onUnmounted, onActivated, onDeactivated, computed, watch, nextTick } from 'vue'
 import { date } from 'quasar'
 
@@ -1200,13 +1205,42 @@ watch(() => icdStore.ephemerisTrackingState, (newState, oldState) => {
   // ✅ 추적 시작 시에만 경로 초기화 (TRACKING으로 전환될 때)
   if (newState === 'TRACKING' && oldState !== 'TRACKING') {
     // ✅ 현재 위치를 기준으로 경로 초기화 (0도에서 시작하는 문제 해결)
-    const currentAzimuth = parseFloat(icdStore.azimuthAngle) || 0
-    const currentElevation = parseFloat(icdStore.elevationAngle) || 0
+    // ✅ 수정: trackingCMD 값을 우선 사용 (백엔드에서 즉시 설정됨)
+    // trackingActual 값은 이전 세션 값일 수 있으므로, CMD 값이나 일반 값 사용
+    const trackingCmdAz = parseFloat(icdStore.trackingCMDAzimuthAngle)
+    const trackingCmdEl = parseFloat(icdStore.trackingCMDElevationAngle)
+    const normalAz = parseFloat(icdStore.azimuthAngle)
+    const normalEl = parseFloat(icdStore.elevationAngle)
+
+    // ✅ 우선순위: trackingCMD(0이 아닌 경우) > 일반 값(0이 아닌 경우) > 스케줄 시작 위치
+    // trackingActual은 이전 세션 값일 수 있어 TRACKING 시작 시점에서 제외
+    let currentAzimuth = 0
+    let currentElevation = 0
+
+    if (!isNaN(trackingCmdAz) && trackingCmdAz !== 0) {
+      currentAzimuth = trackingCmdAz
+    } else if (!isNaN(normalAz) && normalAz !== 0) {
+      currentAzimuth = normalAz
+    } else if (selectedScheduleInfo.value.startAzimuth) {
+      // 스케줄의 시작 위치 사용 (fallback)
+      currentAzimuth = selectedScheduleInfo.value.startAzimuth
+    }
+
+    if (!isNaN(trackingCmdEl) && trackingCmdEl !== 0) {
+      currentElevation = trackingCmdEl
+    } else if (!isNaN(normalEl) && normalEl !== 0) {
+      currentElevation = normalEl
+    } else if (selectedScheduleInfo.value.startElevation) {
+      // 스케줄의 시작 위치 사용 (fallback)
+      currentElevation = selectedScheduleInfo.value.startElevation
+    }
 
     ephemerisStore.clearTrackingPath(currentAzimuth, currentElevation)
     console.log('🧹 추적 시작 - 경로 초기화 완료 - 현재 위치 기준:', {
       azimuth: currentAzimuth,
-      elevation: currentElevation
+      elevation: currentElevation,
+      source: (!isNaN(trackingCmdAz) && trackingCmdAz !== 0) ? 'trackingCMD' :
+              (!isNaN(normalAz) && normalAz !== 0) ? 'normal' : 'schedule'
     })
   }
   // ✅ COMPLETED 상태에서는 경로 유지 (삭제하지 않음)
@@ -1542,22 +1576,60 @@ const updateChart = () => {
   perfMonitor.measureFrame(() => {
     try {
       // ✅ 추적 상태에 따라 다른 데이터 소스 사용
-      const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
+      const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" ||
+                                 icdStore.ephemerisTrackingState === "IN_PROGRESS" ||
+                                 icdStore.passScheduleStatusInfo.isActive
 
       // ✅ 추적 시작 직후 tracking 값이 없으면 일반 값 사용 (0으로 이동하는 문제 해결)
-      let azimuth = parseFloat(icdStore.azimuthAngle) || 0
-      let elevation = parseFloat(icdStore.elevationAngle) || 0
+      const normalAz = parseFloat(icdStore.azimuthAngle)
+      const normalEl = parseFloat(icdStore.elevationAngle)
+      const trackingAz = parseFloat(icdStore.trackingActualAzimuthAngle)
+      const trackingEl = parseFloat(icdStore.trackingActualElevationAngle)
+      // ✅ trackingCMD 값 추가 (백엔드에서 즉시 설정됨, 이전 세션 값 방지)
+      const trackingCmdAz = parseFloat(icdStore.trackingCMDAzimuthAngle)
+      const trackingCmdEl = parseFloat(icdStore.trackingCMDElevationAngle)
+
+      // ✅ 유효한 값 선택 (0이 아닌 값 우선)
+      // 우선순위: trackingActual(CMD와 근접한 경우) > trackingCMD > 일반 값 > 이전 위치 > 스케줄 시작 위치
+      let azimuth = 0
+      let elevation = 0
 
       if (isTrackingActive) {
-        const trackingAz = parseFloat(icdStore.trackingActualAzimuthAngle) || 0
-        const trackingEl = parseFloat(icdStore.trackingActualElevationAngle) || 0
-        // ✅ tracking 값이 유효하면 사용, 아니면 일반 값 유지
-        if (trackingAz !== 0 || azimuth === 0) {
+        // ✅ trackingActual이 유효하고 CMD 값과 근접한지 확인 (이전 세션 값 방지)
+        // CMD 값과 5도 이상 차이나면 이전 세션 값일 가능성이 높음
+        const isTrackingAzValid = !isNaN(trackingAz) && trackingAz !== 0 &&
+          (!isNaN(trackingCmdAz) && trackingCmdAz !== 0 ? Math.abs(trackingAz - trackingCmdAz) < 5 : true)
+        const isTrackingElValid = !isNaN(trackingEl) && trackingEl !== 0 &&
+          (!isNaN(trackingCmdEl) && trackingCmdEl !== 0 ? Math.abs(trackingEl - trackingCmdEl) < 5 : true)
+
+        // 추적 중일 때: trackingActual(검증된) → trackingCMD → 일반 값 → 이전 위치 → 스케줄 시작 위치
+        if (isTrackingAzValid) {
           azimuth = trackingAz
+        } else if (!isNaN(trackingCmdAz) && trackingCmdAz !== 0) {
+          azimuth = trackingCmdAz
+        } else if (!isNaN(normalAz) && normalAz !== 0) {
+          azimuth = normalAz
+        } else if (currentPosition.value?.azimuth && currentPosition.value.azimuth !== 0) {
+          azimuth = currentPosition.value.azimuth  // 이전 유효 값 유지
+        } else if (selectedScheduleInfo.value.startAzimuth) {
+          azimuth = selectedScheduleInfo.value.startAzimuth
         }
-        if (trackingEl !== 0 || elevation === 0) {
+
+        if (isTrackingElValid) {
           elevation = trackingEl
+        } else if (!isNaN(trackingCmdEl) && trackingCmdEl !== 0) {
+          elevation = trackingCmdEl
+        } else if (!isNaN(normalEl) && normalEl !== 0) {
+          elevation = normalEl
+        } else if (currentPosition.value?.elevation && currentPosition.value.elevation !== 0) {
+          elevation = currentPosition.value.elevation  // 이전 유효 값 유지
+        } else if (selectedScheduleInfo.value.startElevation) {
+          elevation = selectedScheduleInfo.value.startElevation
         }
+      } else {
+        // 추적 중이 아닐 때: 일반 값 사용
+        azimuth = !isNaN(normalAz) ? normalAz : 0
+        elevation = !isNaN(normalEl) ? normalEl : 0
       }
 
       const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
@@ -1572,7 +1644,7 @@ const updateChart = () => {
       }
 
       // ✅ 안전한 상태 체크 (실제 추적 상태 확인)
-      if (icdStore.ephemerisTrackingState === "TRACKING") {
+      if (icdStore.ephemerisTrackingState === "TRACKING" || icdStore.ephemerisTrackingState === "IN_PROGRESS") {
         void ephemerisStore.updateTrackingPath(azimuth, elevation)
       }
 
@@ -1620,19 +1692,36 @@ const applyLastKnownPosition = () => {
   try {
     const isTrackingActive =
       icdStore.ephemerisTrackingState === 'TRACKING' ||
+      icdStore.ephemerisTrackingState === 'IN_PROGRESS' ||
       icdStore.passScheduleStatusInfo.isActive
 
     let azimuth = parseFloat(icdStore.azimuthAngle) || 0
     let elevation = parseFloat(icdStore.elevationAngle) || 0
 
     if (isTrackingActive) {
-      const trackingAz = parseFloat(icdStore.trackingActualAzimuthAngle) || 0
-      const trackingEl = parseFloat(icdStore.trackingActualElevationAngle) || 0
-      if (trackingAz !== 0 || azimuth === 0) {
+      const trackingAz = parseFloat(icdStore.trackingActualAzimuthAngle)
+      const trackingEl = parseFloat(icdStore.trackingActualElevationAngle)
+      // ✅ trackingCMD 값 추가 (이전 세션 값 검증용)
+      const trackingCmdAz = parseFloat(icdStore.trackingCMDAzimuthAngle)
+      const trackingCmdEl = parseFloat(icdStore.trackingCMDElevationAngle)
+
+      // ✅ trackingActual이 CMD 값과 근접한지 확인 (이전 세션 값 방지)
+      const isTrackingAzValid = !isNaN(trackingAz) && trackingAz !== 0 &&
+        (!isNaN(trackingCmdAz) && trackingCmdAz !== 0 ? Math.abs(trackingAz - trackingCmdAz) < 5 : true)
+      const isTrackingElValid = !isNaN(trackingEl) && trackingEl !== 0 &&
+        (!isNaN(trackingCmdEl) && trackingCmdEl !== 0 ? Math.abs(trackingEl - trackingCmdEl) < 5 : true)
+
+      // ✅ 검증된 trackingActual → trackingCMD → 일반 값
+      if (isTrackingAzValid) {
         azimuth = trackingAz
+      } else if (!isNaN(trackingCmdAz) && trackingCmdAz !== 0) {
+        azimuth = trackingCmdAz
       }
-      if (trackingEl !== 0 || elevation === 0) {
+
+      if (isTrackingElValid) {
         elevation = trackingEl
+      } else if (!isNaN(trackingCmdEl) && trackingCmdEl !== 0) {
+        elevation = trackingCmdEl
       }
     }
 
@@ -1908,7 +1997,9 @@ const initChart = () => {
     let elevation = 0
 
     // ✅ 추적 상태에 따라 다른 데이터 소스 사용
-    const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
+    const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" ||
+                             icdStore.ephemerisTrackingState === "IN_PROGRESS" ||
+                             icdStore.passScheduleStatusInfo.isActive
 
     azimuth = isTrackingActive
       ? parseFloat(icdStore.trackingActualAzimuthAngle) || 0
@@ -1927,7 +2018,7 @@ const initChart = () => {
     currentPosition.value.time = date.formatDate(new Date(), 'HH:mm:ss')
 
     // ✅ 추적 중일 때 Worker를 통한 비동기 경로 처리
-    if (icdStore.ephemerisTrackingState === "TRACKING") {
+    if (icdStore.ephemerisTrackingState === "TRACKING" || icdStore.ephemerisTrackingState === "IN_PROGRESS") {
       // ✅ 비동기 호출이지만 결과를 기다리지 않음 (성능 최적화)
       void ephemerisStore.updateTrackingPath(azimuth, elevation)
     }
@@ -1998,13 +2089,17 @@ const updateChartWithTrajectory = (data: TrajectoryPoint[]) => {
 }
 
 // ✅ 차트 데이터 복원 함수 (이론 경로 + 실시간 경로 한 번에)
-const restoreChartData = () => {
+const restoreChartData = (forceRestoreTrackingPath = false) => {
   if (!chart || chart.isDisposed()) {
     console.warn('⚠️ 차트가 없거나 disposed되어 데이터 복원 불가')
     return
   }
 
-  const hasTrackingPath = ephemerisStore.trackingPath?.sampledPath &&
+  // ✅ TRACKING 상태에서도 forceRestoreTrackingPath=true면 복원 (페이지 복귀 시)
+  // forceRestoreTrackingPath=false면 TRACKING 상태에서 스킵 (watch에서 반복 호출 방지)
+  const isTracking = icdStore.ephemerisTrackingState === 'TRACKING'
+  const hasTrackingPath = (forceRestoreTrackingPath || !isTracking) &&
+    ephemerisStore.trackingPath?.sampledPath &&
     ephemerisStore.trackingPath.sampledPath.length > 0
   const hasTrajectory = ephemerisStore.selectedSchedule &&
     ephemerisStore.detailData.length > 0
@@ -2012,6 +2107,7 @@ const restoreChartData = () => {
   console.log('📊 차트 데이터 복원 시도:', {
     hasTrackingPath,
     hasTrajectory,
+    isTracking,
     trackingPathLength: ephemerisStore.trackingPath?.sampledPath?.length || 0,
     detailDataLength: ephemerisStore.detailData.length,
     selectedSchedule: !!ephemerisStore.selectedSchedule
@@ -2089,12 +2185,14 @@ const updateTimeRemaining = () => {
   if (selectedScheduleInfo.value.startTimeMs > 0) {
     try {
       const currentCalTime = getCalTimeTimestamp(icdStore.resultTimeOffsetCalTime)
-      const isTracking = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
+      const isTracking = icdStore.ephemerisTrackingState === "TRACKING" ||
+                         icdStore.ephemerisTrackingState === "IN_PROGRESS" ||
+                         icdStore.passScheduleStatusInfo.isActive
 
-      if (isTracking && selectedScheduleInfo.value.endTimeMs > 0) {
-        // ✅ 추적 진행 중: 종료 시간까지 남은 시간 계산
-        const remainingMs = selectedScheduleInfo.value.endTimeMs - currentCalTime
-        timeRemaining.value = remainingMs
+      if (isTracking) {
+        // ✅ 추적 진행 중: 시작 시간으로부터 경과한 시간 계산 (음수로 표시하여 formatTimeRemaining에서 +형식으로 변환)
+        const elapsedMs = currentCalTime - selectedScheduleInfo.value.startTimeMs
+        timeRemaining.value = -elapsedMs  // 음수로 저장하여 formatTimeRemaining에서 +HH:MM:SS 형식으로 표시
       } else {
         // ✅ 추적 전: 시작 시간까지 남은 시간 계산
         const remainingMs = selectedScheduleInfo.value.startTimeMs - currentCalTime
@@ -2103,10 +2201,14 @@ const updateTimeRemaining = () => {
     } catch (error) {
       console.error('시간 계산 오류:', error)
       const clientTime = Date.now()
-      const isTracking = icdStore.ephemerisTrackingState === "TRACKING" || icdStore.passScheduleStatusInfo.isActive
+      const isTracking = icdStore.ephemerisTrackingState === "TRACKING" ||
+                         icdStore.ephemerisTrackingState === "IN_PROGRESS" ||
+                         icdStore.passScheduleStatusInfo.isActive
 
-      if (isTracking && selectedScheduleInfo.value.endTimeMs > 0) {
-        timeRemaining.value = selectedScheduleInfo.value.endTimeMs - clientTime
+      if (isTracking) {
+        // ✅ 추적 진행 중: 시작 시간으로부터 경과한 시간 계산
+        const elapsedMs = clientTime - selectedScheduleInfo.value.startTimeMs
+        timeRemaining.value = -elapsedMs
       } else {
         timeRemaining.value = Math.max(0, selectedScheduleInfo.value.startTimeMs - clientTime)
       }
@@ -2617,32 +2719,30 @@ const exportAllMstDataToCsv = async () => {
 // ✅ 메인 스레드 블로킹 감지
 let mainThreadBlockingDetector: number | null = null
 
+// ✅ 메인 스레드 블로킹 모니터링 비활성화
 const startMainThreadMonitoring = () => {
-  let lastCheck = performance.now()
+  // let lastCheck = performance.now()
 
   const checkMainThread = () => {
-    const currentTime = performance.now()
-    const timeDiff = currentTime - lastCheck
-
-    // ✅ 예상보다 오래 걸렸다면 메인 스레드가 블로킹되었음
-    if (timeDiff > 50) {
-      // 10ms 체크 간격에서 50ms 이상이면 블로킹
-      console.warn(`🚫 메인 스레드 블로킹 감지: ${timeDiff.toFixed(2)}ms`)
-    }
-
-    lastCheck = currentTime
+    // const currentTime = performance.now()
+    // const timeDiff = currentTime - lastCheck
+    // if (timeDiff > 50) {
+    //   console.warn(`🚫 메인 스레드 블로킹 감지: ${timeDiff.toFixed(2)}ms`)
+    // }
+    // lastCheck = currentTime
     mainThreadBlockingDetector = requestAnimationFrame(checkMainThread)
   }
 
   mainThreadBlockingDetector = requestAnimationFrame(checkMainThread)
 }
-let lastTimerExecution = 0
-const timerIntervalStats = {
-  totalExecutions: 0,
-  totalInterval: 0,
-  maxInterval: 0,
-  minInterval: Infinity,
-}
+// ✅ 디버깅용 변수 비활성화
+// let lastTimerExecution = 0
+// const timerIntervalStats = {
+//   totalExecutions: 0,
+//   totalInterval: 0,
+//   maxInterval: 0,
+//   minInterval: Infinity,
+// }
 
 // ===== 라이프사이클 훅 =====
 
@@ -2658,26 +2758,18 @@ const handleActivated = () => {
       initChart()
       console.log('✅ 차트 재초기화 완료')
 
-      // ✅ 차트 초기화 후 데이터 복원
+      // ✅ 차트 초기화 후 데이터 복원 (페이지 복귀 시 TRACKING 중이어도 trackingPath 복원)
       void nextTick(() => {
         if (chart && !chart.isDisposed()) {
-          restoreChartData()
+          restoreChartData(true) // forceRestoreTrackingPath=true
           applyLastKnownPosition()
         }
       })
     }, 100)
   } else {
-    // ✅ 차트가 이미 존재하면 그대로 유지 (추가 리사이즈/스타일 변경 없음)
-    //    초기 마운트 시 initChart + adjustChartSize에서 한 번만 리사이즈함
-    console.log('✅ 차트가 이미 존재함 - 그대로 유지 (리사이즈/스타일 변경 없음)')
-
-    // ✅ 차트가 이미 존재하면 데이터만 복원
-    void nextTick(() => {
-      if (chart && !chart.isDisposed()) {
-        restoreChartData()
-        applyLastKnownPosition()
-      }
-    })
+    // ✅ keep-alive로 인해 차트 인스턴스가 그대로 유지됨
+    // 차트 데이터도 그대로 유지되므로 restoreChartData 호출 불필요
+    console.log('✅ 차트가 이미 존재함 - 그대로 유지 (keep-alive)')
   }
 
   // ✅ 타이머 재시작
@@ -2689,16 +2781,23 @@ const handleActivated = () => {
   }
 }
 
-// ✅ 컴포넌트 비활성화 시 타이머만 정리 (차트와 데이터는 유지)
+// ✅ 컴포넌트 비활성화 시 타이머만 정리 (keep-alive로 차트와 데이터는 그대로 유지됨)
 const handleDeactivated = () => {
-  console.log('🔄 EphemerisDesignationPage 비활성화됨')
+  console.log('🔄 EphemerisDesignationPage 비활성화됨 (keep-alive)')
 
-  // ✅ 타이머만 정리 (차트와 추적 경로는 유지)
+  // ✅ 타이머만 정리 (차트와 추적 경로는 keep-alive로 그대로 유지)
   if (updateTimer) {
     clearInterval(updateTimer)
     updateTimer = null
     console.log('✅ 차트 업데이트 타이머 정리됨')
   }
+
+  // ✅ 브라우저 새로고침 대비용 localStorage 저장 (페이지 간 이동에는 불필요하지만 안전을 위해 유지)
+  if (saveTimeout) {
+    clearTimeout(saveTimeout)
+    saveTimeout = null
+  }
+  ephemerisStore.saveToLocalStorage()
 }
 
 // ✅ localStorage 자동 저장을 위한 watch 설정
@@ -2729,12 +2828,20 @@ let lastRestoredDetailCount = 0
 let lastRestoredTrackingCount = 0
 
 // ✅ detailData 혹은 trackingPath가 복구되면 차트 선을 다시 반영
+// ⚠️ TRACKING 상태에서는 호출하지 않음 (trackingPath가 계속 증가하므로)
 watch(
   () => ({
     detailCount: ephemerisStore.detailData.length,
     trackingCount: ephemerisStore.trackingPath.sampledPath.length,
   }),
   ({ detailCount, trackingCount }) => {
+    // ✅ TRACKING 상태에서는 restoreChartData 호출 스킵
+    // trackingPath는 실시간으로 증가하므로 매번 복원하면 차트가 깜빡임
+    const isTracking = icdStore.ephemerisTrackingState === 'TRACKING'
+    if (isTracking) {
+      return
+    }
+
     const hasNewDetail = detailCount > 0 && detailCount !== lastRestoredDetailCount
     const hasNewTracking = trackingCount > 0 && trackingCount !== lastRestoredTrackingCount
 
@@ -2789,11 +2896,11 @@ onMounted(() => {
         // ✅ 복원된 데이터가 있으면 차트에 반영
         // 차트가 완전히 렌더링된 후 복원하도록 추가 대기
         if (restored) {
-          // ✅ 차트 크기 조정 완료 후 데이터 복원
+          // ✅ 차트 크기 조정 완료 후 데이터 복원 (새로고침 시 TRACKING 중이어도 trackingPath 복원)
           void nextTick(() => {
             setTimeout(() => {
               if (chart && !chart.isDisposed()) {
-                restoreChartData()
+                restoreChartData(true) // forceRestoreTrackingPath=true
                 console.log('✅ 새로고침 후 차트 데이터 복원 완료')
               }
             }, 200) // 차트 렌더링 완료 대기
@@ -2809,33 +2916,11 @@ onMounted(() => {
         }
         updateTimer = window.setInterval(() => {
           try {
-            const currentTime = performance.now()
+            // ✅ 타이머 통계 로그 비활성화
+            // const currentTime = performance.now()
+            // if (lastTimerExecution > 0) { ... }
+            // lastTimerExecution = currentTime
 
-            if (lastTimerExecution > 0) {
-              const interval = currentTime - lastTimerExecution
-              timerIntervalStats.totalExecutions++
-              timerIntervalStats.totalInterval += interval
-              timerIntervalStats.maxInterval = Math.max(timerIntervalStats.maxInterval, interval)
-              timerIntervalStats.minInterval = Math.min(timerIntervalStats.minInterval, interval)
-
-              // ✅ 타이머 간격이 150ms 이상이면 경고
-              if (interval > 150) {
-                console.warn(`⏰ 타이머 지연 감지: ${interval.toFixed(2)}ms (목표: 100ms)`)
-              }
-
-              // ✅ 100번마다 타이머 통계 출력
-              if (timerIntervalStats.totalExecutions % 100 === 0) {
-                const avgInterval = timerIntervalStats.totalInterval / timerIntervalStats.totalExecutions
-                console.log(`⏰ 타이머 통계:`, {
-                  평균간격: avgInterval.toFixed(2) + 'ms',
-                  최대간격: timerIntervalStats.maxInterval.toFixed(2) + 'ms',
-                  최소간격: timerIntervalStats.minInterval.toFixed(2) + 'ms',
-                  목표간격: '100ms',
-                })
-              }
-            }
-
-            lastTimerExecution = currentTime
             void updateChart()
             updateTimeRemaining()
           } catch (timerError) {
@@ -3050,6 +3135,9 @@ q-page-container .ephemeris-mode {
 .ephemeris-mode .offset-control-row {
   margin-bottom: 0.5rem !important;
   /* ✅ 기본 q-mb-sm (0.5rem) 유지하되 명시적으로 설정 */
+  position: relative;
+  z-index: 100;
+  /* ✅ 차트가 넘쳐나와도 offset 컨트롤이 클릭 가능하도록 z-index 설정 */
 }
 
 /* ✅ ephemeris-mode 내부의 모든 직접 자식 요소 하단 여백 제거 - PassSchedulePage.vue와 동일한 순서 */

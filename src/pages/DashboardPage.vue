@@ -288,7 +288,12 @@
     <q-card class="mode-content-section">
       <q-card-section>
         <!-- 라우터 뷰를 사용하여 현재 모드에 맞는 컴포넌트 표시 -->
-        <router-view />
+        <!-- keep-alive: 모든 모드 페이지 캐시 (페이지 이동 시 상태 유지) -->
+        <router-view v-slot="{ Component }">
+          <keep-alive>
+            <component :is="Component" />
+          </keep-alive>
+        </router-view>
       </q-card-section>
     </q-card>
   </q-page>
@@ -754,36 +759,22 @@ onMounted(async () => {
   }
   window.addEventListener('resize', handleResize)
 
-  // 7. 디버그 타이머 시작 (5초마다 전체 상태 요약)
-  debugTimer = window.setInterval(() => {
-    console.log('📋 === 전체 상태 요약 ===')
-    console.log('🔄 Ephemeris 활성화:', icdStore.ephemerisStatusInfo.isActive)
-    console.log('📊 현재 표시 값들:')
-    console.log('  - Azimuth Actual:', azimuthActualValue.value)
-    console.log('  - Elevation Actual:', elevationActualValue.value)
-    console.log('  - Train Actual:', trainActualValue.value)
-    console.log('  - Azimuth CMD:', azimuthCmdValue.value)
-    console.log('  - Elevation CMD:', elevationCmdValue.value)
-    console.log('  - Train CMD:', trainCmdValue.value)
-    console.log('📊 원본 데이터:')
-    console.log('  일반 모드:', {
-      azimuth: icdStore.azimuthAngle,
-      elevation: icdStore.elevationAngle,
-      train: icdStore.trainAngle,
-      cmdAzimuth: icdStore.cmdAzimuthAngle,
-      cmdElevation: icdStore.cmdElevationAngle,
-      cmdTrain: icdStore.cmdTrainAngle,
-    })
-    console.log('  추적 모드:', {
-      azimuth: icdStore.trackingActualAzimuthAngle,
-      elevation: icdStore.trackingActualElevationAngle,
-      train: icdStore.trackingActualTrainAngle,
-      cmdAzimuth: icdStore.trackingCMDAzimuthAngle,
-      cmdElevation: icdStore.trackingCMDElevationAngle,
-      cmdTrain: icdStore.trackingCMDTrainAngle,
-    })
-    console.log('========================')
-  }, 5000)
+  // ✅ 디버그 타이머 비활성화 (Position View 점프 문제 디버깅 시에만 활성화)
+  // debugTimer = window.setInterval(() => {
+  //   console.log('📋 === 전체 상태 요약 ===')
+  //   console.log('🔄 Ephemeris 활성화:', icdStore.ephemerisStatusInfo.isActive)
+  //   console.log('📊 현재 표시 값들:')
+  //   console.log('  - Azimuth Actual:', azimuthActualValue.value)
+  //   console.log('  - Elevation Actual:', elevationActualValue.value)
+  //   console.log('  - Train Actual:', trainActualValue.value)
+  //   console.log('  - Azimuth CMD:', azimuthCmdValue.value)
+  //   console.log('  - Elevation CMD:', elevationCmdValue.value)
+  //   console.log('  - Train CMD:', trainCmdValue.value)
+  //   console.log('📊 원본 데이터:')
+  //   console.log('  일반 모드:', { ... })
+  //   console.log('  추적 모드:', { ... })
+  //   console.log('========================')
+  // }, 5000)
 })
 
 onUnmounted(() => {
@@ -928,186 +919,121 @@ const trainActualValue = computed((): number => {
  */
 
 const azimuthCmdValue = computed((): number => {
-  // ✅ 논리 연산자 우선순위 명확화 (괄호 추가)
-  const isTrackingActive =
-    ((icdStore.ephemerisTrackingState !== 'IDLE' &&
-      icdStore.ephemerisTrackingState !== 'ERROR' &&
-      icdStore.ephemerisTrackingState !== 'UNKNOWN') ||
-     icdStore.passScheduleStatusInfo.isActive)
+  // ✅ 실제 추적 중일 때만 trackingCMD 사용 (TRACKING 상태)
+  // PREPARING/WAITING은 시작 위치로 이동 중이므로 일반 cmd 값 사용
+  const isActuallyTracking =
+    icdStore.ephemerisTrackingState === 'TRACKING' ||
+    icdStore.ephemerisTrackingState === 'IN_PROGRESS' ||
+    icdStore.passScheduleStatusInfo.isActive
 
-  // ✅ trackingCMDAzimuthAngle이 유효한 값이면 사용, 아니면 cmdAzimuthAngle 사용
   const trackingValue = icdStore.trackingCMDAzimuthAngle
   const cmdValue = icdStore.cmdAzimuthAngle
-  const actualValue = icdStore.azimuthAngle // ✅ fallback용 실제 값
 
-  // ✅ trackingValue 유효성 검증: 0은 유효한 값임 (위성 추적 시작 위치가 0도일 수 있음)
+  // ✅ trackingValue 유효성 검증
   const numTrackingValue = Number(trackingValue)
   const hasValidTrackingValue =
     trackingValue !== null &&
     trackingValue !== undefined &&
     trackingValue !== '' &&
-    !isNaN(numTrackingValue)
+    !isNaN(numTrackingValue) &&
+    numTrackingValue !== 0
 
-  // ✅ cmdValue 유효성 검증 (fallback용)
-  const hasValidCmdValue =
-    cmdValue !== null &&
-    cmdValue !== undefined &&
-    cmdValue !== '' &&
-    !isNaN(Number(cmdValue))
-
-  // ✅ 값 선택 로직 개선: 추적 중일 때 trackingCMD → cmd → actual 순서로 fallback
-  let value: string | number
-  if (isTrackingActive) {
-    if (hasValidTrackingValue) {
-      // ✅ 추적 중이고 trackingCMD 값이 있으면 사용
-      value = trackingValue
-    } else if (hasValidCmdValue) {
-      // ✅ trackingCMD 값이 없으면 cmd 값 사용 (추적 시작 직후 fallback)
-      value = cmdValue
-    } else {
-      // ✅ 둘 다 없으면 실제 값 사용 (최후의 fallback)
-      value = actualValue
-    }
-  } else {
-    // ✅ 추적 중이 아니면 cmd 값 사용, 없으면 실제 값 사용
-    value = hasValidCmdValue ? cmdValue : actualValue
-  }
-
+  // ✅ 실제 추적 중이고 tracking 값이 유효하면 사용, 아니면 cmd 값 사용
+  const value = isActuallyTracking && hasValidTrackingValue ? trackingValue : cmdValue
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
 const azimuthActualValue = computed((): number => {
-  // ✅ 논리 연산자 우선순위 명확화 (괄호 추가)
-  const isTrackingActive =
-    ((icdStore.ephemerisTrackingState !== 'IDLE' &&
-      icdStore.ephemerisTrackingState !== 'ERROR' &&
-      icdStore.ephemerisTrackingState !== 'UNKNOWN') ||
-     icdStore.passScheduleStatusInfo.isActive)
+  // ✅ 실제 추적 중일 때만 trackingActual 사용 (TRACKING 상태)
+  // PREPARING/WAITING은 시작 위치로 이동 중이므로 일반 actual 값 사용
+  const isActuallyTracking =
+    icdStore.ephemerisTrackingState === 'TRACKING' ||
+    icdStore.ephemerisTrackingState === 'IN_PROGRESS' ||
+    icdStore.passScheduleStatusInfo.isActive
 
   const trackingValue = icdStore.trackingActualAzimuthAngle
   const actualValue = icdStore.azimuthAngle
 
-  // ✅ trackingValue 유효성 검증: 0은 유효한 값임 (위성 추적 시작 위치가 0도일 수 있음)
+  // ✅ trackingValue 유효성 검증
   const numTrackingValue = Number(trackingValue)
   const hasValidTrackingValue =
     trackingValue !== null &&
     trackingValue !== undefined &&
     trackingValue !== '' &&
-    !isNaN(numTrackingValue)
+    !isNaN(numTrackingValue) &&
+    numTrackingValue !== 0
 
-  // ✅ 값 선택 로직 개선: 추적 중일 때 trackingActual → actual 순서로 fallback
-  let value: string | number
-  if (isTrackingActive) {
-    if (hasValidTrackingValue) {
-      // ✅ 추적 중이고 trackingActual 값이 있으면 사용
-      value = trackingValue
-    } else {
-      // ✅ trackingActual 값이 없으면 실제 값 사용 (추적 시작 직후 fallback)
-      value = actualValue
-    }
-  } else {
-    // ✅ 추적 중이 아니면 실제 값 사용
-    value = actualValue
-  }
-
+  // ✅ 실제 추적 중이고 tracking 값이 유효하면 사용, 아니면 actual 값 사용
+  const value = isActuallyTracking && hasValidTrackingValue ? trackingValue : actualValue
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
 const elevationCmdValue = computed((): number => {
-  // ✅ 논리 연산자 우선순위 명확화 (괄호 추가)
-  const isTrackingActive =
-    ((icdStore.ephemerisTrackingState !== 'IDLE' &&
-      icdStore.ephemerisTrackingState !== 'ERROR' &&
-      icdStore.ephemerisTrackingState !== 'UNKNOWN') ||
-     icdStore.passScheduleStatusInfo.isActive)
+  // ✅ 실제 추적 중일 때만 trackingCMD 사용 (TRACKING 상태)
+  // PREPARING/WAITING은 시작 위치로 이동 중이므로 일반 cmd 값 사용
+  const isActuallyTracking =
+    icdStore.ephemerisTrackingState === 'TRACKING' ||
+    icdStore.ephemerisTrackingState === 'IN_PROGRESS' ||
+    icdStore.passScheduleStatusInfo.isActive
 
   const trackingValue = icdStore.trackingCMDElevationAngle
   const cmdValue = icdStore.cmdElevationAngle
-  const actualValue = icdStore.elevationAngle // ✅ fallback용 실제 값
 
-  // ✅ trackingValue 유효성 검증: 0은 유효한 값임 (위성 추적 시작 위치가 0도일 수 있음)
+  // ✅ trackingValue 유효성 검증
   const numTrackingValue = Number(trackingValue)
   const hasValidTrackingValue =
     trackingValue !== null &&
     trackingValue !== undefined &&
     trackingValue !== '' &&
-    !isNaN(numTrackingValue)
+    !isNaN(numTrackingValue) &&
+    numTrackingValue !== 0
 
-  // ✅ cmdValue 유효성 검증 (fallback용)
-  const hasValidCmdValue =
-    cmdValue !== null &&
-    cmdValue !== undefined &&
-    cmdValue !== '' &&
-    !isNaN(Number(cmdValue))
-
-  // ✅ 값 선택 로직 개선: 추적 중일 때 trackingCMD → cmd → actual 순서로 fallback
-  let value: string | number
-  if (isTrackingActive) {
-    if (hasValidTrackingValue) {
-      value = trackingValue
-    } else if (hasValidCmdValue) {
-      value = cmdValue
-    } else {
-      value = actualValue
-    }
-  } else {
-    value = hasValidCmdValue ? cmdValue : actualValue
-  }
-
+  // ✅ 실제 추적 중이고 tracking 값이 유효하면 사용, 아니면 cmd 값 사용
+  const value = isActuallyTracking && hasValidTrackingValue ? trackingValue : cmdValue
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
 const elevationActualValue = computed((): number => {
-  // ✅ 논리 연산자 우선순위 명확화 (괄호 추가)
-  const isTrackingActive =
-    ((icdStore.ephemerisTrackingState !== 'IDLE' &&
-      icdStore.ephemerisTrackingState !== 'ERROR' &&
-      icdStore.ephemerisTrackingState !== 'UNKNOWN') ||
-     icdStore.passScheduleStatusInfo.isActive)
+  // ✅ 실제 추적 중일 때만 trackingActual 사용 (TRACKING 상태)
+  // PREPARING/WAITING은 시작 위치로 이동 중이므로 일반 actual 값 사용
+  const isActuallyTracking =
+    icdStore.ephemerisTrackingState === 'TRACKING' ||
+    icdStore.ephemerisTrackingState === 'IN_PROGRESS' ||
+    icdStore.passScheduleStatusInfo.isActive
 
   const trackingValue = icdStore.trackingActualElevationAngle
   const actualValue = icdStore.elevationAngle
 
-  // ✅ trackingValue 유효성 검증: 0은 유효한 값임 (위성 추적 시작 위치가 0도일 수 있음)
+  // ✅ trackingValue 유효성 검증
   const numTrackingValue = Number(trackingValue)
   const hasValidTrackingValue =
     trackingValue !== null &&
     trackingValue !== undefined &&
     trackingValue !== '' &&
-    !isNaN(numTrackingValue)
+    !isNaN(numTrackingValue) &&
+    numTrackingValue !== 0
 
-  // ✅ 값 선택 로직 개선: 추적 중일 때 trackingActual → actual 순서로 fallback
-  let value: string | number
-  if (isTrackingActive) {
-    if (hasValidTrackingValue) {
-      value = trackingValue
-    } else {
-      value = actualValue
-    }
-  } else {
-    value = actualValue
-  }
-
+  // ✅ 실제 추적 중이고 tracking 값이 유효하면 사용, 아니면 actual 값 사용
+  const value = isActuallyTracking && hasValidTrackingValue ? trackingValue : actualValue
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
 const trainCmdValue = computed((): number => {
-  // ✅ 논리 연산자 우선순위 명확화 (괄호 추가)
-  const isTrackingActive =
-    ((icdStore.ephemerisTrackingState !== 'IDLE' &&
-      icdStore.ephemerisTrackingState !== 'ERROR' &&
-      icdStore.ephemerisTrackingState !== 'UNKNOWN') ||
-     icdStore.passScheduleStatusInfo.isActive)
+  // ✅ 실제 추적 중일 때만 trackingCMD 사용 (TRACKING 상태)
+  // PREPARING/WAITING은 시작 위치로 이동 중이므로 일반 cmd 값 사용
+  const isActuallyTracking =
+    icdStore.ephemerisTrackingState === 'TRACKING' ||
+    icdStore.ephemerisTrackingState === 'IN_PROGRESS' ||
+    icdStore.passScheduleStatusInfo.isActive
 
   const trackingValue = icdStore.trackingCMDTrainAngle
   const cmdValue = icdStore.cmdTrainAngle
-  const actualValue = icdStore.trainAngle // ✅ fallback용 실제 값
 
-  // ✅ trackingValue 유효성 검증: 0은 유효한 값임 (위성 추적 시작 위치가 0도일 수 있음)
+  // ✅ trackingValue 유효성 검증 (Train은 0이 유효한 값일 수 있음)
   const numTrackingValue = Number(trackingValue)
   const hasValidTrackingValue =
     trackingValue !== null &&
@@ -1115,43 +1041,24 @@ const trainCmdValue = computed((): number => {
     trackingValue !== '' &&
     !isNaN(numTrackingValue)
 
-  // ✅ cmdValue 유효성 검증 (fallback용)
-  const hasValidCmdValue =
-    cmdValue !== null &&
-    cmdValue !== undefined &&
-    cmdValue !== '' &&
-    !isNaN(Number(cmdValue))
-
-  // ✅ 값 선택 로직 개선: 추적 중일 때 trackingCMD → cmd → actual 순서로 fallback
-  let value: string | number
-  if (isTrackingActive) {
-    if (hasValidTrackingValue) {
-      value = trackingValue
-    } else if (hasValidCmdValue) {
-      value = cmdValue
-    } else {
-      value = actualValue
-    }
-  } else {
-    value = hasValidCmdValue ? cmdValue : actualValue
-  }
-
+  // ✅ 실제 추적 중이고 tracking 값이 유효하면 사용, 아니면 cmd 값 사용
+  const value = isActuallyTracking && hasValidTrackingValue ? trackingValue : cmdValue
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
 const trainActualValue = computed((): number => {
-  // ✅ 논리 연산자 우선순위 명확화 (괄호 추가)
-  const isTrackingActive =
-    ((icdStore.ephemerisTrackingState !== 'IDLE' &&
-      icdStore.ephemerisTrackingState !== 'ERROR' &&
-      icdStore.ephemerisTrackingState !== 'UNKNOWN') ||
-     icdStore.passScheduleStatusInfo.isActive)
+  // ✅ 실제 추적 중일 때만 trackingActual 사용 (TRACKING 상태)
+  // PREPARING/WAITING은 시작 위치로 이동 중이므로 일반 actual 값 사용
+  const isActuallyTracking =
+    icdStore.ephemerisTrackingState === 'TRACKING' ||
+    icdStore.ephemerisTrackingState === 'IN_PROGRESS' ||
+    icdStore.passScheduleStatusInfo.isActive
 
   const trackingValue = icdStore.trackingActualTrainAngle
   const actualValue = icdStore.trainAngle
 
-  // ✅ trackingValue 유효성 검증: 0은 유효한 값임 (위성 추적 시작 위치가 0도일 수 있음)
+  // ✅ trackingValue 유효성 검증 (Train은 0이 유효한 값일 수 있음)
   const numTrackingValue = Number(trackingValue)
   const hasValidTrackingValue =
     trackingValue !== null &&
@@ -1159,18 +1066,8 @@ const trainActualValue = computed((): number => {
     trackingValue !== '' &&
     !isNaN(numTrackingValue)
 
-  // ✅ 값 선택 로직 개선: 추적 중일 때 trackingActual → actual 순서로 fallback
-  let value: string | number
-  if (isTrackingActive) {
-    if (hasValidTrackingValue) {
-      value = trackingValue
-    } else {
-      value = actualValue
-    }
-  } else {
-    value = actualValue
-  }
-
+  // ✅ 실제 추적 중이고 tracking 값이 유효하면 사용, 아니면 actual 값 사용
+  const value = isActuallyTracking && hasValidTrackingValue ? trackingValue : actualValue
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })

@@ -298,7 +298,8 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
           if (!isInitialized) {
             clearTimeout(initTimeout)
             isInitialized = true
-            console.log('✅ 인라인 Worker 초기화 완료')
+            // ✅ 디버깅 로그 비활성화
+            // console.log('✅ 인라인 Worker 초기화 완료')
             resolve()
           }
 
@@ -326,18 +327,10 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
           workerStats.value.currentPathPoints = totalPoints
           workerStats.value.lastUpdateTime = Date.now()
 
-          // 100번마다 통계 출력
-          if (workerStats.value.totalUpdates % 100 === 0) {
-            console.log('📊 Worker 성능 통계:', {
-              평균처리시간: workerStats.value.averageProcessingTime.toFixed(2) + 'ms',
-              총업데이트: workerStats.value.totalUpdates,
-              추가된포인트: workerStats.value.pointsAdded,
-
-              현재포인트수: totalPoints,
-              대기중업데이트: pendingUpdates,
-              오류수: workerStats.value.errors,
-            })
-          }
+          // ✅ 디버깅 로그 비활성화
+          // if (workerStats.value.totalUpdates % 100 === 0) {
+          //   console.log('📊 Worker 성능 통계:', { ... })
+          // }
         }
 
         trackingWorker.onerror = (error: ErrorEvent) => {
@@ -361,8 +354,8 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
       })
 
       workerInitialized = true
-
-      console.log('✅ 인라인 Worker 초기화 완료')
+      // ✅ 디버깅 로그 비활성화
+      // console.log('✅ 인라인 Worker 초기화 완료')
     } catch (error) {
       console.error('🚫 Worker 생성 실패:', error)
       workerInitialized = false
@@ -385,6 +378,11 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     if (isNaN(azimuth) || isNaN(elevation)) {
       console.warn('🚫 NaN 값 감지:', { azimuth, elevation })
       return
+    }
+
+    // ✅ (0,0) 체크 추가 - 잘못된 경로 시작점 방지
+    if (azimuth === 0 && elevation === 0) {
+      return // (0,0)은 무시 - 경로에 추가하지 않음
     }
 
     // ✅ 추적 시작 후 5초 지연 체크
@@ -475,6 +473,11 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
    */
   const fallbackUpdatePath = (azimuth: number, elevation: number): void => {
     try {
+      // ✅ (0,0) 체크 추가 - 잘못된 경로 시작점 방지
+      if (azimuth === 0 && elevation === 0) {
+        return // (0,0)은 무시 - 경로에 추가하지 않음
+      }
+
       const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
       const normalizedEl = Math.max(0, Math.min(90, elevation))
       const currentPoint: [number, number] = [normalizedEl, normalizedAz]
@@ -569,10 +572,11 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
       errors: 0,
     }
 
-    console.log('🧹 추적 경로 초기화 완료 - 현재 위치 기준:', {
-      azimuth: normalizedAz,
-      elevation: normalizedEl,
-    })
+    // ✅ 디버깅 로그 비활성화
+    // console.log('🧹 추적 경로 초기화 완료 - 현재 위치 기준:', {
+    //   azimuth: normalizedAz,
+    //   elevation: normalizedEl,
+    // })
   }
 
   // ===== 기존 액션 메서드들 =====
@@ -678,7 +682,8 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
       return
     }
 
-    console.log('🔄 Ephemeris Store 레벨 추적 경로 업데이트 시작')
+    // ✅ 디버깅 로그 비활성화
+    // console.log('🔄 Ephemeris Store 레벨 추적 경로 업데이트 시작')
 
     storeTrackingTimer = window.setInterval(() => {
       try {
@@ -691,11 +696,45 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
           return // 추적 중이 아니면 업데이트하지 않음
         }
 
-        // 현재 위치 가져오기
-        const azimuth =
-          parseFloat(icdStore.trackingActualAzimuthAngle || icdStore.azimuthAngle) || 0
-        const elevation =
-          parseFloat(icdStore.trackingActualElevationAngle || icdStore.elevationAngle) || 0
+        // ✅ 현재 위치 가져오기 (0,0 점프 방지)
+        // trackingActual → trackingCMD → 일반 값 순으로 유효한 값 사용
+        const trackingAz = parseFloat(icdStore.trackingActualAzimuthAngle)
+        const trackingEl = parseFloat(icdStore.trackingActualElevationAngle)
+        const trackingCmdAz = parseFloat(icdStore.trackingCMDAzimuthAngle)
+        const trackingCmdEl = parseFloat(icdStore.trackingCMDElevationAngle)
+        const normalAz = parseFloat(icdStore.azimuthAngle)
+        const normalEl = parseFloat(icdStore.elevationAngle)
+
+        // ✅ trackingActual이 CMD와 근접한지 확인 (이전 세션 값 방지)
+        const isTrackingAzValid = !isNaN(trackingAz) && trackingAz !== 0 &&
+          (!isNaN(trackingCmdAz) && trackingCmdAz !== 0 ? Math.abs(trackingAz - trackingCmdAz) < 5 : true)
+        const isTrackingElValid = !isNaN(trackingEl) && trackingEl !== 0 &&
+          (!isNaN(trackingCmdEl) && trackingCmdEl !== 0 ? Math.abs(trackingEl - trackingCmdEl) < 5 : true)
+
+        // ✅ 유효한 값 선택 (0,0 방지)
+        let azimuth = 0
+        let elevation = 0
+
+        if (isTrackingAzValid) {
+          azimuth = trackingAz
+        } else if (!isNaN(trackingCmdAz) && trackingCmdAz !== 0) {
+          azimuth = trackingCmdAz
+        } else if (!isNaN(normalAz) && normalAz !== 0) {
+          azimuth = normalAz
+        }
+
+        if (isTrackingElValid) {
+          elevation = trackingEl
+        } else if (!isNaN(trackingCmdEl) && trackingCmdEl !== 0) {
+          elevation = trackingCmdEl
+        } else if (!isNaN(normalEl) && normalEl !== 0) {
+          elevation = normalEl
+        }
+
+        // ✅ (0,0)인 경우 업데이트 스킵 (잘못된 경로 방지)
+        if (azimuth === 0 && elevation === 0) {
+          return
+        }
 
         // Store의 추적 경로 업데이트 (차트와 무관하게 계속 업데이트)
         void updateTrackingPath(azimuth, elevation)
@@ -712,7 +751,8 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     if (storeTrackingTimer !== null) {
       clearInterval(storeTrackingTimer)
       storeTrackingTimer = null
-      console.log('🛑 Ephemeris Store 레벨 추적 경로 업데이트 중지')
+      // ✅ 디버깅 로그 비활성화
+      // console.log('🛑 Ephemeris Store 레벨 추적 경로 업데이트 중지')
     }
   }
 
@@ -1068,12 +1108,8 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
       }
 
       localStorage.setItem(storageKey, JSON.stringify(dataToSave))
-      console.log('✅ Ephemeris 데이터 localStorage 저장 완료:', {
-        trajectoryPoints: trajectoryPoints.length,
-        trackingPath: trackingPath.value.sampledPath.length,
-        hasSchedule: !!selectedSchedule.value,
-        hasTLE: !!tleDisplayData.value.displayText,
-      })
+      // ✅ 디버깅 로그 비활성화
+      // console.log('✅ Ephemeris 데이터 localStorage 저장 완료:', { ... })
     } catch (error) {
       console.error('❌ localStorage 저장 실패:', error)
     }
@@ -1091,7 +1127,8 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
       const savedData = localStorage.getItem(storageKey)
 
       if (!savedData) {
-        console.log('⚠️ 저장된 Ephemeris 데이터 없음')
+        // ✅ 디버깅 로그 비활성화
+        // console.log('⚠️ 저장된 Ephemeris 데이터 없음')
         return false
       }
 
@@ -1110,12 +1147,18 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
         !parsed.selectedSchedule &&
         !parsed.tleDisplayData
       ) {
-        console.log('⚠️ 복원할 유효한 데이터 없음')
+        // ✅ 디버깅 로그 비활성화
+        // console.log('⚠️ 복원할 유효한 데이터 없음')
         return false
       }
 
-      // ✅ 추적 경로 복원
+      // ✅ 추적 경로 복원 (TRACKING 상태가 아닐 때만)
+      // TRACKING 중에는 clearTrackingPath()로 이미 현재 위치 기준으로 초기화됨
+      const icdStore = useICDStore()
+      const isTracking = icdStore.ephemerisTrackingState === 'TRACKING'
+
       if (
+        !isTracking &&
         parsed.trackingPath &&
         Array.isArray(parsed.trackingPath) &&
         parsed.trackingPath.length > 0
@@ -1131,7 +1174,11 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
         trackingPath.value.sampledPath = safeTrackingPath
         trackingPath.value.rawPath = safeTrackingPath
         trackingPath.value.lastUpdateTime = parsed.savedAt || Date.now()
-        console.log('✅ 추적 경로 복원:', safeTrackingPath.length, '개 포인트')
+        // ✅ 디버깅 로그 비활성화
+        // console.log('✅ 추적 경로 복원:', safeTrackingPath.length, '개 포인트')
+      } else if (isTracking) {
+        // ✅ 디버깅 로그 비활성화
+        // console.log('⏭️ TRACKING 상태 - 추적 경로 복원 스킵 (현재 위치 기준으로 이미 초기화됨)')
       }
 
       // ✅ 궤적(trajectory) 데이터 복원 → detailData/ rawDetailData 에 직접 주입
@@ -1155,13 +1202,15 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
 
         detailData.value = restoredDetail
         rawDetailData.value = restoredDetail
-        console.log('✅ 궤적 데이터 복원:', restoredDetail.length, '개 포인트')
+        // ✅ 디버깅 로그 비활성화
+        // console.log('✅ 궤적 데이터 복원:', restoredDetail.length, '개 포인트')
       }
 
       // ✅ TLE Data 복원
       if (parsed.tleDisplayData) {
         tleDisplayData.value = parsed.tleDisplayData
-        console.log('✅ TLE Data 복원 완료')
+        // ✅ 디버깅 로그 비활성화
+        // console.log('✅ TLE Data 복원 완료')
       }
 
       // ✅ 선택된 스케줄 복원 (trajectoryPath가 있으면 detailData도 복원 필요)
@@ -1176,26 +1225,20 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
         if (mstId && typeof mstId === 'number') {
           currentTrackingMstId.value = mstId
           currentTrackingDetailId.value = detailId
-          console.log('✅ currentTrackingMstId/detailId 복원:', {
-            mstId: currentTrackingMstId.value,
-            detailId: currentTrackingDetailId.value,
-          })
+          // ✅ 디버깅 로그 비활성화
+          // console.log('✅ currentTrackingMstId/detailId 복원:', { ... })
         }
 
-        // ✅ ScheduleItem 타입 확인: satelliteName 또는 satelliteId 사용
-        const scheduleName =
-          (parsed.selectedSchedule as Record<string, unknown>).satelliteName ||
-          (parsed.selectedSchedule as Record<string, unknown>).SatelliteName ||
-          (parsed.selectedSchedule as Record<string, unknown>).satelliteId ||
-          (parsed.selectedSchedule as Record<string, unknown>).SatelliteID ||
-          'Unknown'
-        console.log('✅ 선택된 스케줄 복원:', scheduleName)
+        // ✅ ScheduleItem 타입 확인: satelliteName 또는 satelliteId 사용 (디버깅용 변수)
+        // const scheduleName = ...
+        // console.log('✅ 선택된 스케줄 복원:', scheduleName)
       }
 
       // ✅ trajectoryPath는 차트 복원 시 사용 (컴포넌트에서 처리)
       // detailData는 selectSchedule 호출 시 자동으로 로드되므로 여기서는 저장만
 
-      console.log('✅ Ephemeris 데이터 localStorage 복원 완료')
+      // ✅ 디버깅 로그 비활성화
+      // console.log('✅ Ephemeris 데이터 localStorage 복원 완료')
       return true
     } catch (error) {
       console.error('❌ localStorage 복원 실패:', error)
@@ -1210,7 +1253,8 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     try {
       const storageKey = 'ephemeris-designation-data'
       localStorage.removeItem(storageKey)
-      console.log('✅ Ephemeris localStorage 데이터 삭제 완료')
+      // ✅ 디버깅 로그 비활성화
+      // console.log('✅ Ephemeris localStorage 데이터 삭제 완료')
     } catch (error) {
       console.error('❌ localStorage 삭제 실패:', error)
     }
