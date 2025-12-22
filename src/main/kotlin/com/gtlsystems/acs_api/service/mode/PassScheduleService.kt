@@ -432,6 +432,13 @@ class PassScheduleService(
         nextSchedule: Map<String, Any?>?,
         calTime: ZonedDateTime
     ) {
+        // ✅ PREPARING 상태는 내부 단계 처리를 위해 항상 액션 실행
+        if (newState == TrackingState.PREPARING && currentTrackingState == TrackingState.PREPARING) {
+            // PREPARING 상태 유지 중 - 내부 PreparingStep 단계 처리 계속
+            executeStateAction(newState, currentSchedule, nextSchedule, calTime)
+            return
+        }
+
         // 상태가 변경되지 않았거나 최소 간격이 지나지 않은 경우 액션 실행하지 않음
         if (currentTrackingState == newState || !canChangeState()) {
             return
@@ -441,11 +448,13 @@ class PassScheduleService(
         currentTrackingState = newState
         lastStateChangeTime = System.currentTimeMillis()
 
-        logger.info("[STATE] 상태 전환: $oldState -> $newState")
+        // ✅ PushData에 passScheduleTrackingState 업데이트 (프론트엔드로 상태 전송)
+        PushData.TRACKING_STATUS.passScheduleTrackingState = newState.name
+        logger.info("[STATE] 상태 전환: $oldState -> $newState (passScheduleTrackingState=${newState.name})")
 
         // ✅ 상태별 액션만 실행 (중복 제거)
         executeStateAction(newState, currentSchedule, nextSchedule, calTime)
-        
+
         // ✅ handleTrackingStateChange는 별도로 호출하지 않음
         // (상태 머신이 모든 액션을 관리하므로)
     }
@@ -480,7 +489,10 @@ class PassScheduleService(
                     // ✅ "No" → "MstId" 변경, UInt → Long 변경
                     val mstId = (currentSchedule["MstId"] as? Number)?.toLong()
                     logger.info("[ACTION] TRACKING 상태 - 추적 중: $satelliteName (ID: $mstId)")
-                    
+
+                    // ✅ 이전 추적의 tracking 각도 값 초기화 (TRACKING 전환 시 이전 값으로 점프 방지)
+                    dataStoreService.clearTrackingAngles()
+
                     // ✅ 추적 시작 처리 (캐시 로딩 + 헤더 전송)
                     prepareTrackingStart(mstId)
                 }
@@ -622,7 +634,9 @@ class PassScheduleService(
         currentTrackingState = TrackingState.IDLE
         lastStateChangeTime = 0L
         trackingCheckCount = 0
-        logger.debug("[STATE] 추적 상태 초기화 완료")
+        // ✅ PushData에 passScheduleTrackingState 초기화
+        PushData.TRACKING_STATUS.passScheduleTrackingState = TrackingState.IDLE.name
+        logger.debug("[STATE] 추적 상태 초기화 완료 (passScheduleTrackingState=IDLE)")
     }
 
     /**
@@ -1940,12 +1954,13 @@ class PassScheduleService(
         try {
             logger.info("📊 Original, FinalTransformed, KeyholeAxisTransformed, KeyholeFinalTransformed 데이터 병합 시작")
             
-            // 5가지 DataType 모두 조회 (위성별 그룹화된 구조에서 flatten)
+            // 6가지 DataType 모두 조회 (위성별 그룹화된 구조에서 flatten)
             val allMstData = passScheduleTrackMstStorage.values.flatten()
             val originalMst = allMstData.filter { it["DataType"] == "original" }
             val finalMst = allMstData.filter { it["DataType"] == "final_transformed" }
             val keyholeAxisMst = allMstData.filter { it["DataType"] == "keyhole_axis_transformed" }
             val keyholeMst = allMstData.filter { it["DataType"] == "keyhole_final_transformed" }
+            val keyholeOptimizedMst = allMstData.filter { it["DataType"] == "keyhole_optimized_final_transformed" }
             
             if (finalMst.isEmpty()) {
                 logger.warn("⚠️ FinalTransformed 데이터가 없습니다")
@@ -1960,6 +1975,7 @@ class PassScheduleService(
                 val original = originalMst.find { (it["MstId"] as? Number)?.toLong() == mstId }
                 val keyholeAxis = keyholeAxisMst.find { (it["MstId"] as? Number)?.toLong() == mstId }
                 val keyhole = keyholeMst.find { (it["MstId"] as? Number)?.toLong() == mstId }
+                val keyholeOptimized = keyholeOptimizedMst.find { (it["MstId"] as? Number)?.toLong() == mstId }
                 
                 // Keyhole 판단: final_transformed (Train=0) 기준으로 판단
                 val train0MaxAzRate = final["MaxAzRate"] as? Double ?: 0.0
@@ -2006,7 +2022,31 @@ class PassScheduleService(
                     put("KeyholeFinalTransformedStartElevation", keyhole?.get("StartElevation"))
                     put("KeyholeFinalTransformedEndElevation", keyhole?.get("EndElevation"))
                     put("KeyholeFinalTransformedMaxElevation", keyhole?.get("MaxElevation"))
-                    
+
+                    // ✅ KeyholeOptimizedFinalTransformed 시작/종료 각도 및 최대 고도 (최적화된 Train 각도, ±270°)
+                    val optimizedStartAz = keyholeOptimized?.get("StartAzimuth") as? Double
+                    val optimizedEndAz = keyholeOptimized?.get("EndAzimuth") as? Double
+                    val optimizedStartEl = keyholeOptimized?.get("StartElevation") as? Double
+                    val optimizedEndEl = keyholeOptimized?.get("EndElevation") as? Double
+                    val optimizedMaxEl = keyholeOptimized?.get("MaxElevation") as? Double
+
+                    put("KeyholeOptimizedFinalTransformedStartAzimuth", optimizedStartAz)
+                    put("KeyholeOptimizedFinalTransformedEndAzimuth", optimizedEndAz)
+                    put("KeyholeOptimizedFinalTransformedStartElevation", optimizedStartEl)
+                    put("KeyholeOptimizedFinalTransformedEndElevation", optimizedEndEl)
+                    put("KeyholeOptimizedFinalTransformedMaxElevation", optimizedMaxEl)
+                    put("KeyholeOptimizedFinalTransformedMaxAzRate", keyholeOptimized?.get("MaxAzRate"))
+                    put("KeyholeOptimizedFinalTransformedMaxElRate", keyholeOptimized?.get("MaxElRate"))
+
+                    // ✅ 키홀일 때 기본 필드들도 keyhole_optimized_final_transformed 값으로 덮어쓰기
+                    if (isKeyhole && keyholeOptimized != null) {
+                        if (optimizedStartAz != null) put("StartAzimuth", optimizedStartAz)
+                        if (optimizedEndAz != null) put("EndAzimuth", optimizedEndAz)
+                        if (optimizedStartEl != null) put("StartElevation", optimizedStartEl)
+                        if (optimizedEndEl != null) put("EndElevation", optimizedEndEl)
+                        if (optimizedMaxEl != null) put("MaxElevation", optimizedMaxEl)
+                    }
+
                     // ✅ 하드웨어 제한 각도 기준으로 필터링된 데이터의 MaxElevation 재계산
                     // 전체 저장소에서 해당 MST ID의 DTL 데이터 조회 (Keyhole-aware)
                     val satelliteId = final["SatelliteID"] as? String
@@ -2041,7 +2081,8 @@ class PassScheduleService(
                     
                     // Keyhole 정보
                     put("IsKeyhole", isKeyhole)
-                    put("RecommendedTrainAngle", final.get("RecommendedTrainAngle") as? Double ?: 0.0)
+                    // ✅ RecommendedTrainAngle은 keyhole_optimized_final_transformed에서 가져오기 (없으면 0.0)
+                    put("RecommendedTrainAngle", keyholeOptimized?.get("RecommendedTrainAngle") as? Double ?: 0.0)
                 }
             }
             
@@ -2599,19 +2640,19 @@ class PassScheduleService(
             allSelectedPasses.addAll(mstDataList)
         }
         
-        // ✅ 디버깅: 선택된 스케줄 정보 확인
-        logger.info("🔍 [디버깅] getSelectedTrackingSchedule 전체 스케줄 수: ${allSelectedPasses.size}")
-        logger.info("🔍 [디버깅] getSelectedTrackingSchedule 위성 수: ${selectedTrackMstStorage.size}")
-        
-        if (allSelectedPasses.isNotEmpty()) {
-            allSelectedPasses.take(3).forEachIndexed { index, schedule ->
-                val mstId = schedule["MstId"]
-                val detailId = schedule["DetailId"]
-                val startTime = schedule["StartTime"] as? ZonedDateTime
-                val dataType = schedule["DataType"]
-                logger.info("🔍 [디버깅] getSelectedTrackingSchedule[$index]: MstId=$mstId, DetailId=$detailId, StartTime=$startTime, DataType=$dataType")
-            }
-        }
+        // ✅ 디버깅 로그 주석 처리 (100ms마다 호출되어 과도한 로그 발생)
+        // logger.debug("🔍 [디버깅] getSelectedTrackingSchedule 전체 스케줄 수: ${allSelectedPasses.size}")
+        // logger.debug("🔍 [디버깅] getSelectedTrackingSchedule 위성 수: ${selectedTrackMstStorage.size}")
+        //
+        // if (allSelectedPasses.isNotEmpty()) {
+        //     allSelectedPasses.take(3).forEachIndexed { index, schedule ->
+        //         val mstId = schedule["MstId"]
+        //         val detailId = schedule["DetailId"]
+        //         val startTime = schedule["StartTime"] as? ZonedDateTime
+        //         val dataType = schedule["DataType"]
+        //         logger.debug("🔍 [디버깅] getSelectedTrackingSchedule[$index]: MstId=$mstId, DetailId=$detailId, StartTime=$startTime, DataType=$dataType")
+        //     }
+        // }
 
         return allSelectedPasses.sortedBy { mstRecord ->
             mstRecord["StartTime"] as? ZonedDateTime

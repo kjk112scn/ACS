@@ -297,11 +297,14 @@ class SatelliteTrackingProcessor(
                     logger.info("🔍 [저장 직전] MST #$optimizedMstId - applyAngleLimitTransformation 반환값:")
                     logger.info("   RecommendedTrainAngle: ${mst["RecommendedTrainAngle"]}")
                     logger.info("   MaxAzRate: ${mst["MaxAzRate"]}")
+                    logger.info("   StartAzimuth: ${mst["StartAzimuth"]}")
+                    logger.info("   StartElevation: ${mst["StartElevation"]}")
                     logger.info("   optimalTrainAngle: $optimalTrainAngle")
                     logger.info("   optimalMaxAzRate: $optimalMaxAzRate")
                     
                     keyholeOptimizedFinalTransformedMst.add(mst.toMutableMap().apply {
                         put("DataType", "keyhole_optimized_final_transformed")
+                        put("IsKeyhole", true)  // ✅ 키홀 위성임을 명시 (Train 각도 설정에 필요)
                         // ✅ 이미 계산된 결과를 본인의 정보로 명시적으로 설정
                         // optimalTrainAngle은 findOptimalTrainAngle()로 계산한 결과이므로, 이를 본인의 정보로 저장
                         put("RecommendedTrainAngle", optimalTrainAngle)  // ✅ 계산된 결과를 본인의 정보로 저장

@@ -33,9 +33,19 @@ tasks.withType<org.springframework.boot.gradle.tasks.run.BootRun> {
 	jvmArgs = listOf(
 		"-Djava.version=17",
 		"-Dfile.encoding=UTF-8",
+		"-Dsun.stdout.encoding=UTF-8",
+		"-Dsun.stderr.encoding=UTF-8",
+		"-Dconsole.encoding=UTF-8",
+		"-Djansi.passthrough=true",
+		"-Djansi.force=true",
+		"-Dorg.jline.terminal.dumb=true",
 		"-Duser.language=ko",
 		"-Duser.country=KR"
 	)
+
+	// 콘솔 출력을 UTF-8로 강제 설정
+	standardOutput = System.out
+	errorOutput = System.err
 }
 
 repositories {
@@ -57,6 +67,9 @@ dependencies {
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+	// Jansi for UTF-8 console output on Windows
+	implementation("org.fusesource.jansi:jansi:2.4.1")
 
 	//Sun Track Algorithm
 	implementation("net.e175.klaus:solarpositioning:2.0.3")

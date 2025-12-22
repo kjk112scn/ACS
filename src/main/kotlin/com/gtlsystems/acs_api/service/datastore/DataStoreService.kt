@@ -61,17 +61,20 @@ class DataStoreService {
         // ✅ 실제 추적 중 상태인지 확인 (TRACKING일 때 서버 계산값 우선)
         val isActiveTracking = ephemerisState == "TRACKING"
 
+        // ✅ PREPARING 또는 TRACKING 상태일 때 서버가 설정한 CMD 값 보존
+        val shouldPreserveCmdValue = ephemerisState == "PREPARING" || ephemerisState == "TRACKING"
+
         // ✅ 추적 CMD 값 병합 로직:
         // - forceUpdate=true이면 보존 로직 우회 (서버 계산값 강제 업데이트)
-        // - 실제 추적 중(TRACKING/IN_PROGRESS)일 때: 현재 값이 유효하면 UDP 값 무시 (서버가 계산한 값 유지)
+        // - PREPARING 또는 TRACKING 상태일 때: 현재 값이 유효하면 UDP 값 무시 (서버가 설정한 값 유지)
         // - 그 외 추적 준비 상태일 때: UDP가 0.0을 보내면 현재 값 유지
         val mergedTrackingCMDAzimuth = when {
             // UDP 데이터가 null이면 현재 값 유지
             newData.trackingCMDAzimuthAngle == null -> currentData.trackingCMDAzimuthAngle
             // ✅ forceUpdate=true이면 서버 계산값으로 강제 업데이트 (tracking 스레드에서 호출 시)
             forceUpdate -> newData.trackingCMDAzimuthAngle
-            // ✅ 실제 추적 중이고 현재 값이 유효하면 UDP 값 무시 (ACU F/W의 잘못된 값 덮어쓰기 방지)
-            isActiveTracking && currentData.trackingCMDAzimuthAngle != null && currentData.trackingCMDAzimuthAngle != 0.0f -> {
+            // ✅ PREPARING 또는 TRACKING 상태이고 현재 값이 유효하면 UDP 값 무시 (서버가 설정한 값 보존)
+            shouldPreserveCmdValue && currentData.trackingCMDAzimuthAngle != null && currentData.trackingCMDAzimuthAngle != 0.0f -> {
                 currentData.trackingCMDAzimuthAngle
             }
             // 추적 준비 상태이고, 현재 값이 0이 아니며, UDP가 0.0을 보내면 현재 값 유지
@@ -86,8 +89,8 @@ class DataStoreService {
             newData.trackingCMDElevationAngle == null -> currentData.trackingCMDElevationAngle
             // ✅ forceUpdate=true이면 서버 계산값으로 강제 업데이트
             forceUpdate -> newData.trackingCMDElevationAngle
-            // ✅ 실제 추적 중이고 현재 값이 유효하면 UDP 값 무시
-            isActiveTracking && currentData.trackingCMDElevationAngle != null && currentData.trackingCMDElevationAngle != 0.0f -> {
+            // ✅ PREPARING 또는 TRACKING 상태이고 현재 값이 유효하면 UDP 값 무시
+            shouldPreserveCmdValue && currentData.trackingCMDElevationAngle != null && currentData.trackingCMDElevationAngle != 0.0f -> {
                 currentData.trackingCMDElevationAngle
             }
             shouldPreserveTrackingCmd && currentData.trackingCMDElevationAngle != 0.0f && newData.trackingCMDElevationAngle == 0.0f -> {
@@ -100,8 +103,8 @@ class DataStoreService {
             newData.trackingCMDTrainAngle == null -> currentData.trackingCMDTrainAngle
             // ✅ forceUpdate=true이면 서버 계산값으로 강제 업데이트
             forceUpdate -> newData.trackingCMDTrainAngle
-            // ✅ 실제 추적 중이고 현재 값이 유효하면 UDP 값 무시
-            isActiveTracking && currentData.trackingCMDTrainAngle != null && currentData.trackingCMDTrainAngle != 0.0f -> {
+            // ✅ PREPARING 또는 TRACKING 상태이고 현재 값이 유효하면 UDP 값 무시
+            shouldPreserveCmdValue && currentData.trackingCMDTrainAngle != null && currentData.trackingCMDTrainAngle != 0.0f -> {
                 currentData.trackingCMDTrainAngle
             }
             shouldPreserveTrackingCmd && currentData.trackingCMDTrainAngle != 0.0f && newData.trackingCMDTrainAngle == 0.0f -> {
@@ -393,6 +396,26 @@ class DataStoreService {
         latestData.set(clearedData)
         dataVersion.incrementAndGet()
         logger.info("🔄 추적 각도 값 초기화 완료")
+    }
+
+    /**
+     * ✅ CMD 각도 값만 초기화 (Actual 값은 유지)
+     * 위성 추적 재시작 시 대시보드에서 현재 안테나 위치를 계속 확인할 수 있도록 함
+     */
+    fun clearTrackingCmdAngles() {
+        val currentData = latestData.get()
+        val clearedData = currentData.copy(
+            trackingCMDAzimuthAngle = null,
+            trackingCMDElevationAngle = null,
+            trackingCMDTrainAngle = null,
+            trackingAzimuthTime = null,
+            trackingElevationTime = null,
+            trackingTrainTime = null
+            // Actual 값은 유지: trackingActualAzimuthAngle, trackingActualElevationAngle, trackingActualTrainAngle
+        )
+        latestData.set(clearedData)
+        dataVersion.incrementAndGet()
+        logger.info("🔄 추적 CMD 각도 값만 초기화 완료 (Actual 값 유지)")
     }
     /**
      * ✅ TrackingStatus 업데이트

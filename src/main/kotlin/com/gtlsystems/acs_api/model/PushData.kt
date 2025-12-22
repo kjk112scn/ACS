@@ -13,6 +13,7 @@ object PushData {
         var ephemerisStatus: Boolean? = null,           // 기존 (버튼 상태)
         var ephemerisTrackingState: String? = null,     // 신규 (상세 추적 상태)
         var passScheduleStatus: Boolean? = null,
+        var passScheduleTrackingState: String? = null,  // 신규 (상세 패스 스케줄 추적 상태)
         var sunTrackStatus: Boolean? = null,
         var sunTrackTrackingState: String? = null,      // 신규 (상세 태양 추적 상태)
         var manualControlStatus: Boolean? = null,
@@ -104,6 +105,6 @@ object PushData {
     )
     // ✅ 인스턴스 객체
     val CMD = CMDValue()
-    val TRACKING_STATUS = TrackingStatus(ephemerisTrackingState = "IDLE") // ✅ 초기 상태 설정
+    val TRACKING_STATUS = TrackingStatus(ephemerisTrackingState = "IDLE", passScheduleTrackingState = "IDLE") // ✅ 초기 상태 설정
     val READ_DATA = ReadData() // ✅ 추가 필요!
 }

@@ -112,6 +112,9 @@ class EphemerisService(
     private var lastWaitingAzimuth: Double = 0.0
     private var lastWaitingElevation: Double = 0.0
 
+    // ✅ Keyhole 경고 로그 출력 제한 (추적당 한 번만)
+    private var keyholeWarningLogged: Boolean = false
+
     // ✅ Train 축 안정화 대기 시간
     companion object {
         const val TRAIN_STABILIZATION_TIMEOUT = 3L // Tilt 안정화: 10분
@@ -872,6 +875,7 @@ class EphemerisService(
         initialDataSent = false
         trainMoveCommandTime = 0  // ✅ Train 이동 명령 시간 초기화
         azElMoveCommandTime = 0   // ✅ Az/El 이동 명령 시간 초기화
+        keyholeWarningLogged = false  // ✅ Keyhole 경고 로그 플래그 초기화
 
         // ✅ 이전 추적의 tracking 각도 값 초기화 (TRACKING 전환 시 이전 값으로 점프 방지)
         dataStoreService.clearTrackingAngles()
@@ -1140,27 +1144,69 @@ class EphemerisService(
                     logger.info("🔄 목표 Az/El 이동 명령: Az=${targetAzimuth}°, El=${targetElevation}°")
                 }
 
-                // ✅ 목표 위치 도달 확인 (±0.2° 허용 오차, 2분 타임아웃)
-                val currentAz = dataStoreService.getLatestData().azimuthAngle ?: 0.0f
-                val currentEl = dataStoreService.getLatestData().elevationAngle ?: 0.0f
+                // ✅ 목표 위치 도달 확인 (±0.05° 허용 오차, 2분 타임아웃)
+                val latestData = dataStoreService.getLatestData()
+                val currentAz = latestData.azimuthAngle ?: 0.0f
+                val currentEl = latestData.elevationAngle ?: 0.0f
                 val azDiff = kotlin.math.abs(currentAz - targetAzimuth)
                 val elDiff = kotlin.math.abs(currentEl - targetElevation)
                 val timeSinceCommand = System.currentTimeMillis() - azElMoveCommandTime
 
-                val isAtTarget = azDiff < 0.2f && elDiff < 0.2f
-                val isTimeout = timeSinceCommand > 120_000  // 2분 타임아웃
+                // ✅ CRITICAL: 모터 정지 상태 확인
+                val azStatusBits = latestData.azimuthBoardServoStatusBits
+                val elStatusBits = latestData.elevationBoardServoStatusBits
+
+                // 비트 7 체크: 0 = 정지, 1 = 움직이는 중
+                val isAzMoving = azStatusBits?.get(7) == '1'
+                val isElMoving = elStatusBits?.get(7) == '1'
+                val isMotorStopped = !isAzMoving && !isElMoving
+
+                // 🔧 FIX: 목표 El이 0 이하일 때 현재 El이 0 근처면 도달한 것으로 처리
+                // (안테나가 물리적으로 0° 이하로 내려갈 수 없음)
+                val isElAtTarget = if (targetElevation <= 0f) {
+                    currentEl <= 0.5f  // El 0° 근처면 도달
+                } else {
+                    elDiff < 0.05f
+                }
+
+                // 각도가 범위 내인지 확인
+                val isAngleClose = azDiff < 0.05f && isElAtTarget
+
+                // ✅ 도달 조건:
+                // 1) 각도 차이 < 0.05° AND 모터 정지 AND 3초 안정화 대기 → 도달
+                // 2) 각도 차이 < 0.05° AND 모터가 계속 움직이는 중 → 10초 타임아웃 후 도달
+                val isAtTarget = if (isAngleClose) {
+                    if (isMotorStopped) {
+                        // 모터 정지 상태여도 3초 안정화 대기
+                        timeSinceCommand >= 3_000
+                    } else {
+                        // 모터가 움직이는 중이면 10초 타임아웃 후 강제 도달
+                        timeSinceCommand >= 10_000
+                    }
+                } else {
+                    false
+                }
+
+                val isTimeout = timeSinceCommand > 120_000  // 2분 전체 타임아웃
 
                 // 5초마다 진행 상황 로깅
                 if (timeSinceCommand % 5000 < 100) {
-                    logger.info("⏳ 목표 위치 이동 중: 현재 Az=${currentAz}°, El=${currentEl}° → 목표 Az=${targetAzimuth}°, El=${targetElevation}° (차이: Az=${azDiff}°, El=${elDiff}°)")
+                    val statusMsg = when {
+                        isAngleClose && isMotorStopped -> "목표 각도 도달 및 모터 정지, 안정화 대기 중 (${timeSinceCommand/1000}초/3초)"
+                        isAngleClose && !isMotorStopped -> "목표 각도 도달, 모터 정지 대기 중 (${timeSinceCommand/1000}초/10초)"
+                        else -> "목표 위치 이동 중"
+                    }
+                    logger.info("⏳ ${statusMsg}: 현재 Az=${currentAz}°, El=${currentEl}° → 목표 Az=${targetAzimuth}°, El=${targetElevation}° (차이: Az=${azDiff}°, El=${elDiff}°, Az모터=${if(isAzMoving) "이동중" else "정지"}, El모터=${if(isElMoving) "이동중" else "정지"})")
                 }
 
                 // 목표 도달 또는 타임아웃 시 WAITING 상태로 전환
                 if (isAtTarget || isTimeout) {
                     if (isTimeout && !isAtTarget) {
                         logger.warn("⚠️ 목표 위치 이동 타임아웃 (2분). 현재 위치: Az=${currentAz}°, El=${currentEl}°")
+                    } else if (isAngleClose && !isMotorStopped) {
+                        logger.warn("⚠️ 목표 각도 도달했으나 모터 정지 확인 타임아웃 (10초). 강제로 WAITING 상태로 전환")
                     } else {
-                        logger.info("✅ 목표 위치 도달: Az=${currentAz}°, El=${currentEl}°")
+                        logger.info("✅ 목표 위치 도달 및 모터 정지 후 3초 안정화 완료: Az=${currentAz}°, El=${currentEl}°")
                     }
 
                     currentTrackingState = TrackingState.WAITING
@@ -1204,17 +1250,35 @@ class EphemerisService(
                 // ✅ TRACKING 전환 전에 먼저 첫 번째 CMD 값 설정 (0으로 점프 방지)
                 val firstTrackingData = createRealtimeTrackingData(mstId, detailId, calTime, startTime)
                 if (firstTrackingData.isNotEmpty()) {
-                    val cmdAz = (firstTrackingData["axisTransformedAzimuth"] as? Number)?.toFloat()
-                        ?: (firstTrackingData["finalTransformedAzimuth"] as? Number)?.toFloat()
-                    val cmdEl = (firstTrackingData["axisTransformedElevation"] as? Number)?.toFloat()
-                        ?: (firstTrackingData["finalTransformedElevation"] as? Number)?.toFloat()
+                    // ✅ Keyhole 여부 확인
+                    val isKeyhole = currentTrackingPass?.get("IsKeyhole") as? Boolean ?: false
+
+                    // ✅ Keyhole이면 keyholeFinalTransformed 값 우선 사용
+                    val cmdAz = if (isKeyhole) {
+                        (firstTrackingData["keyholeFinalTransformedAzimuth"] as? Number)?.toFloat()
+                            ?: (firstTrackingData["axisTransformedAzimuth"] as? Number)?.toFloat()
+                            ?: (firstTrackingData["finalTransformedAzimuth"] as? Number)?.toFloat()
+                    } else {
+                        (firstTrackingData["axisTransformedAzimuth"] as? Number)?.toFloat()
+                            ?: (firstTrackingData["finalTransformedAzimuth"] as? Number)?.toFloat()
+                    }
+
+                    val cmdEl = if (isKeyhole) {
+                        (firstTrackingData["keyholeFinalTransformedElevation"] as? Number)?.toFloat()
+                            ?: (firstTrackingData["axisTransformedElevation"] as? Number)?.toFloat()
+                            ?: (firstTrackingData["finalTransformedElevation"] as? Number)?.toFloat()
+                    } else {
+                        (firstTrackingData["axisTransformedElevation"] as? Number)?.toFloat()
+                            ?: (firstTrackingData["finalTransformedElevation"] as? Number)?.toFloat()
+                    }
+
                     val cmdTrain = GlobalData.EphemerisTrakingAngle.trainAngle
 
                     if (cmdAz != null && cmdEl != null) {
                         PushData.CMD.cmdAzimuthAngle = cmdAz
                         PushData.CMD.cmdElevationAngle = cmdEl
                         PushData.CMD.cmdTrainAngle = cmdTrain
-                        logger.info("📡 TRACKING 전환 - 첫 CMD 설정: Az=${cmdAz}°, El=${cmdEl}°, Train=${cmdTrain}°")
+                        logger.info("📡 TRACKING 전환 - 첫 CMD 설정 (Keyhole=${isKeyhole}): Az=${cmdAz}°, El=${cmdEl}°, Train=${cmdTrain}°")
 
                         // ✅ DataStore의 trackingCMD 값도 즉시 설정 (0,0 점프 방지)
                         val currentData = dataStoreService.getLatestData()
@@ -1484,15 +1548,14 @@ class EphemerisService(
                 trackingAzimuthTime = currentData.trackingAzimuthTime,
                 // ✅ trackingCMD 값 업데이트 (프론트엔드 동기화)
                 trackingCMDAzimuthAngle = trackingCmdAz ?: cmdAz,
-                // ✅ Actual 값은 null로 설정하여 UDP에서 받은 값이 보존되도록 함
-                // (tracking 스레드가 이전 값으로 덮어쓰기하는 문제 방지)
-                trackingActualAzimuthAngle = null,
+                // ✅ Actual 값은 UDP에서 받은 값 유지 (덮어쓰지 않음)
+                trackingActualAzimuthAngle = currentData.trackingActualAzimuthAngle,  // ✅ UDP 값 유지
                 trackingElevationTime = currentData.trackingElevationTime,
                 trackingCMDElevationAngle = trackingCmdEl ?: cmdEl,
-                trackingActualElevationAngle = null,
+                trackingActualElevationAngle = currentData.trackingActualElevationAngle,  // ✅ UDP 값 유지
                 trackingTrainTime = currentData.trackingTrainTime,
                 trackingCMDTrainAngle = cmdTrain,
-                trackingActualTrainAngle = null
+                trackingActualTrainAngle = currentData.trackingActualTrainAngle  // ✅ UDP 값 유지
             )
             dataStoreService.updateDataFromUdp(updatedData, forceUpdate = true)
 
@@ -1723,8 +1786,9 @@ class EphemerisService(
         val keyholeFinalTransformedAzimuth = if (isKeyhole && keyholeFinalPoint != null) {
             (keyholeFinalPoint.get("Azimuth") as? Double)?.toFloat()
                 } else {
-            if (isKeyhole && keyholeFinalPassDetails.isEmpty()) {
+            if (isKeyhole && keyholeFinalPassDetails.isEmpty() && !keyholeWarningLogged) {
                 logger.warn("⚠️ MstId(${mstId}), DetailId(${detailId}): Keyhole 발생 시 keyhole_final_transformed 데이터가 없습니다.")
+                keyholeWarningLogged = true  // ✅ 한 번만 로그 출력
                 }
                 null
             }
@@ -1801,18 +1865,18 @@ class EphemerisService(
             "keyholeFinalTransformedRange" to keyholeFinalTransformedRange,
             "keyholeFinalTransformedAltitude" to keyholeFinalTransformedAltitude,
 
-            // ✅ 실제 추적 명령 데이터 (Keyhole 여부에 따라 선택)
-            "cmdAz" to (if (isKeyhole && keyholeFinalTransformedAzimuth != null) keyholeFinalTransformedAzimuth else finalTransformedAzimuth),  // Keyhole이면 keyhole_final_transformed 사용
-            "cmdEl" to (if (isKeyhole && keyholeFinalTransformedElevation != null) keyholeFinalTransformedElevation else finalTransformedElevation),  // Keyhole이면 keyhole_final_transformed 사용
+            // ✅ 실제 추적 명령 데이터 (Keyhole 여부에 따라 선택) + Offset 적용
+            "cmdAz" to ((if (isKeyhole && keyholeFinalTransformedAzimuth != null) keyholeFinalTransformedAzimuth else finalTransformedAzimuth) + GlobalData.Offset.azimuthPositionOffset),
+            "cmdEl" to ((if (isKeyhole && keyholeFinalTransformedElevation != null) keyholeFinalTransformedElevation else finalTransformedElevation) + GlobalData.Offset.elevationPositionOffset),
             "actualAz" to currentData.azimuthAngle,
             "actualEl" to currentData.elevationAngle,
 
             "elapsedTimeSeconds" to elapsedTimeSeconds,
             "trackingAzimuthTime" to trackingCmdAzimuthTime,
-            "trackingCMDAzimuthAngle" to (if (isKeyhole && keyholeFinalTransformedAzimuth != null) keyholeFinalTransformedAzimuth else finalTransformedAzimuth),  // ✅ Keyhole이면 keyhole_final_transformed 사용
+            "trackingCMDAzimuthAngle" to ((if (isKeyhole && keyholeFinalTransformedAzimuth != null) keyholeFinalTransformedAzimuth else finalTransformedAzimuth) + GlobalData.Offset.azimuthPositionOffset),  // ✅ Offset 적용
             "trackingActualAzimuthAngle" to trackingActualAzimuth,
             "trackingElevationTime" to trackingCmdElevationTime,
-            "trackingCMDElevationAngle" to (if (isKeyhole && keyholeFinalTransformedElevation != null) keyholeFinalTransformedElevation else finalTransformedElevation),  // ✅ Keyhole이면 keyhole_final_transformed 사용
+            "trackingCMDElevationAngle" to ((if (isKeyhole && keyholeFinalTransformedElevation != null) keyholeFinalTransformedElevation else finalTransformedElevation) + GlobalData.Offset.elevationPositionOffset),  // ✅ Offset 적용
             "trackingActualElevationAngle" to trackingActualElevation,
             "trackingTrainTime" to trackingCmdTrainTime,
             "trackingCMDTrainAngle" to trackingCmdTrain,

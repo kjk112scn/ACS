@@ -40,7 +40,9 @@ class SunTrackService(
 
     // ✅ SunTrack 상태 관리 (핵심 변수만)
     private var sunTrackState = SunTrackState.IDLE
-    private var targetTrainAngle: Double? = null
+    private var targetTrainAngle: Double? = null  // 계산된 기준 Train 각도 (Offset 제외)
+    private var lastAppliedTrainPosOffset: Float = 0f  // 마지막으로 적용된 Train Position Offset
+    private var lastAppliedTrueNorthOffset: Float = 0f  // 마지막으로 적용된 True North Offset
     private var trainStabilizationStartTime: Long? = null
     private var isInitialTrainMovementCompleted = false
 
@@ -377,60 +379,73 @@ class SunTrackService(
     private fun processInitialTrainMovement() {
         try {
             if (targetTrainAngle == null) {
+                logger.info("🔧 [TRAIN_INIT] Train 초기화 시작")
+                
                 // ✅ 통합된 범용 Train 각도 계산 사용
                 val trainResult = calculateOptimalTrainAngleUniversal()
                 
                 if (trainResult.angle.isNaN()) {
                     // 극야 등으로 Train 계산 불가능
-                    logger.warn("Train 각도 계산 불가능: {}", trainResult.calculationMethod)
+                    logger.warn("❌ [TRAIN_INIT] Train 각도 계산 불가능: {}", trainResult.calculationMethod)
                     sunTrackState = SunTrackState.IDLE
                     return
                 }
                 
                 targetTrainAngle = trainResult.angle
-                CMD.cmdTrainAngle = getTrainOffsetCalculator()!!.toFloat()
-                logger.info("개선된 Train 각도 설정 완료: {}° ({})", 
+                logger.info("📐 [TRAIN_INIT] 계산된 Train 기준 각도: {}° ({})", 
                     String.format("%.3f", trainResult.angle),
                     trainResult.calculationMethod)
                 
+                // ✅ offset 적용된 각도 계산
+                val offsetAppliedAngle = getTrainOffsetCalculator()!!.toFloat()
+
+                logger.info("🎯 [TRAIN_INIT] Offset 적용 완료:")
+                logger.info("  - 기준 각도: {}°", String.format("%.3f", targetTrainAngle))
+                logger.info("  - Train Position Offset: {}°", String.format("%.3f", GlobalData.Offset.trainPositionOffset))
+                logger.info("  - True North Offset: {}°", String.format("%.3f", GlobalData.Offset.trueNorthOffset))
+                logger.info("  - 최종 명령 각도: {}°", String.format("%.3f", offsetAppliedAngle))
+
                 // ✅ Train 이동 명령 전송
-                GlobalData.SunTrackingData.trainAngle = targetTrainAngle?.toFloat()!!
-                sendTrainMovementCommand(targetTrainAngle?.toFloat()!!, trainSpeed)
+                // 🔧 FIX: 원본값 전송 (펌웨어가 내부적으로 Offset 적용함)
+                GlobalData.SunTrackingData.trainAngle = targetTrainAngle!!.toFloat()
+                sendTrainMovementCommand(targetTrainAngle!!.toFloat(), trainSpeed)
                     
                 // ✅ 안정화 단계로 전환
                 sunTrackState = SunTrackState.STABILIZING
                 trainStabilizationStartTime = System.currentTimeMillis()
                 
-                logger.info("Train 이동 명령 전송 완료, 안정화 단계 진입")
+                logger.info("✅ [TRAIN_INIT] Train 이동 명령 전송 완료, 안정화 단계 진입")
             } else {
                 // ✅ targetTrainAngle이 이미 설정되어 있으면 매번 목표 각도 도달 확인
                 val currentTrainAngle = dataStoreService.getLatestData().trainAngle
                 val moveTolerance = 1.0 // ±1.0도 허용
                 
                 if (currentTrainAngle != null && targetTrainAngle != null) {
-                    val angleDifference = Math.abs(currentTrainAngle - getTrainOffsetCalculator()!!.toFloat())
+                    val offsetAppliedAngle = getTrainOffsetCalculator()!!.toFloat()
+                    val angleDifference = Math.abs(currentTrainAngle - offsetAppliedAngle)
                     
-                    logger.debug("Train 목표 각도 확인 중: 현재={}°, 목표={}°, 차이={}°",
-                        String.format("%.3f", currentTrainAngle),
-                        String.format("%.3f", targetTrainAngle),
-                        String.format("%.3f", angleDifference))
+                    logger.debug("📊 [TRAIN_MOVING] Train 목표 각도 확인 중:")
+                    logger.debug("  - 현재 각도: {}°", String.format("%.3f", currentTrainAngle))
+                    logger.debug("  - 목표 각도 (offset 적용): {}°", String.format("%.3f", offsetAppliedAngle))
+                    logger.debug("  - 각도 차이: {}°", String.format("%.3f", angleDifference))
                     
                     // ✅ 목표 각도 도달 시 STABILIZING 상태로 전환
                     if (angleDifference <= moveTolerance) {
-                        logger.info("Train 목표 각도 도달: 현재={}°, 목표={}°, 차이={}° (허용오차: ±{}°)",
-                            String.format("%.3f", currentTrainAngle),
-                            String.format("%.3f", targetTrainAngle),
+                        logger.info("🎯 [TRAIN_ARRIVED] Train 목표 각도 도달:")
+                        logger.info("  - 현재 각도: {}°", String.format("%.3f", currentTrainAngle))
+                        logger.info("  - 목표 각도: {}°", String.format("%.3f", offsetAppliedAngle))
+                        logger.info("  - 각도 차이: {}° (허용오차: ±{}°)", 
                             String.format("%.3f", angleDifference),
                             moveTolerance)
                         
                         sunTrackState = SunTrackState.STABILIZING
                         trainStabilizationStartTime = System.currentTimeMillis()
-                        logger.info("Train 안정화 단계 시작")
+                        logger.info("⏱️ [TRAIN_STABILIZING] Train 안정화 단계 시작")
                     }
                 }
             }
         } catch (e: Exception) {
-            logger.error("초기 Train 이동 처리 중 오류: {}", e.message, e)
+            logger.error("❌ [TRAIN_INIT_ERROR] 초기 Train 이동 처리 중 오류: {}", e.message, e)
             sunTrackState = SunTrackState.IDLE
         }
     }
@@ -444,7 +459,13 @@ class SunTrackService(
             val stabilizationTolerance = 0.5 // ±0.5도 허용
 
             if (currentTrainAngle != null && targetTrainAngle != null) {
-                val angleDifference = Math.abs(currentTrainAngle - getTrainOffsetCalculator()!!.toFloat())
+                val offsetAppliedAngle = getTrainOffsetCalculator()!!.toFloat()
+                val angleDifference = Math.abs(currentTrainAngle - offsetAppliedAngle)
+                
+                logger.debug("⏱️ [TRAIN_STABILIZING] 안정화 체크:")
+                logger.debug("  - 현재 각도: {}°", String.format("%.3f", currentTrainAngle))
+                logger.debug("  - 목표 각도 (offset 적용): {}°", String.format("%.3f", offsetAppliedAngle))
+                logger.debug("  - 각도 차이: {}° (허용오차: ±{}°)", String.format("%.3f", angleDifference), stabilizationTolerance)
                 
                 if (sunTrackState == SunTrackState.STABILIZING) {
                     if (trainStabilizationStartTime == null) {
@@ -510,20 +531,48 @@ class SunTrackService(
      */
     private fun processRealTimeSunTracking() {
         val totalStartTime = System.currentTimeMillis()
-        
+
         try {
             if (targetTrainAngle?.toFloat() != null) {
+                // 0단계: Offset 변경 감지 및 Train 축 즉시 조정
+                val currentTrainPosOffset = GlobalData.Offset.trainPositionOffset
+                val currentTrueNorthOffset = GlobalData.Offset.trueNorthOffset
+
+                if (currentTrainPosOffset != lastAppliedTrainPosOffset || currentTrueNorthOffset != lastAppliedTrueNorthOffset) {
+                    logger.info("⚠️ [OFFSET_CHANGED] Train Offset 변경 감지!")
+                    logger.info("  - Train Position Offset: {}° → {}°",
+                        String.format("%.3f", lastAppliedTrainPosOffset),
+                        String.format("%.3f", currentTrainPosOffset))
+                    logger.info("  - True North Offset: {}° → {}°",
+                        String.format("%.3f", lastAppliedTrueNorthOffset),
+                        String.format("%.3f", currentTrueNorthOffset))
+
+                    // ✅ 새로운 Offset 적용된 Train 각도 계산
+                    val newTrainAngle = getTrainOffsetCalculator()!!.toFloat()
+
+                    // ✅ Train 축 즉시 이동
+                    // 🔧 FIX: 원본값 전송 (펌웨어가 내부적으로 Offset 적용함)
+                    sendTrainMovementCommand(targetTrainAngle!!.toFloat(), trainSpeed)
+                    GlobalData.SunTrackingData.trainAngle = targetTrainAngle!!.toFloat()
+
+                    // ✅ 적용된 Offset 저장
+                    lastAppliedTrainPosOffset = currentTrainPosOffset
+                    lastAppliedTrueNorthOffset = currentTrueNorthOffset
+
+                    logger.info("✅ [OFFSET_APPLIED] Train 각도 즉시 조정: {}°", String.format("%.3f", newTrainAngle))
+                }
+
                 // 1단계: Cal Time 계산
                 val calTimeStart = System.currentTimeMillis()
                 val calTime = GlobalData.Time.resultTimeOffsetCalTime
                 val utcLocalDateTime = calTime.withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime()
                 val calTimeDuration = System.currentTimeMillis() - calTimeStart
-                
+
                 // 2단계: 태양 위치 계산
                 val sunCalcStart = System.currentTimeMillis()
                 val sunPosition = solarOrekitCalculator.getSunPositionAt(utcLocalDateTime)
                 val sunCalcDuration = System.currentTimeMillis() - sunCalcStart
-                
+
                 // 3단계: 3축 좌표 변환
                 val transformStart = System.currentTimeMillis()
                 val (transformedAz, transformedEl) = CoordinateTransformer.transformCoordinatesWithTrain(
@@ -533,18 +582,20 @@ class SunTrackService(
                     trainAngle = targetTrainAngle!!
                 )
                 val transformDuration = System.currentTimeMillis() - transformStart
-                
+
                 // ✅ 4단계: 연속 추적을 위한 Azimuth 경로 조정 (핵심 수정!)
                 val pathAdjustedAzimuth = calculateAzimuthBySunPath(transformedAz)
-                
+
                 // 5단계: 명령 전송
                 val commandStart = System.currentTimeMillis()
+                // 🔧 FIX: multiManualCommand에서 Offset을 적용하므로 원본값 전달
+                // multiManualCommand가 CMD.cmdTrainAngle = trainAngle + Offset 으로 설정함
                 sendAzimuthAndElevationAxisCommand(
-                    pathAdjustedAzimuth.toFloat(), 
+                    pathAdjustedAzimuth.toFloat(),
                     azimuthSpeed,
-                    transformedEl.toFloat(), 
+                    transformedEl.toFloat(),
                     elevationSpeed,
-                    targetTrainAngle!!.toFloat(),
+                    targetTrainAngle!!.toFloat(),  // 원본값 (multiManualCommand에서 Offset 적용)
                     trainSpeed
                 )
                 val commandDuration = System.currentTimeMillis() - commandStart
@@ -601,13 +652,25 @@ class SunTrackService(
 
   fun getTrainOffsetCalculator(): Double? {
         val offsetAppliedAngle = targetTrainAngle?.let { targetAngle ->
-            targetAngle.toFloat() + GlobalData.Offset.trainPositionOffset + GlobalData.Offset.trueNorthOffset
+            // ✅ 현재 실시간 Offset 값 사용 (추적 중 변경 반영)
+            val currentTrainPosOffset = GlobalData.Offset.trainPositionOffset
+            val currentTrueNorthOffset = GlobalData.Offset.trueNorthOffset
+            val calculatedAngle = targetAngle.toFloat() + currentTrainPosOffset + currentTrueNorthOffset
+
+            logger.debug("🧮 [OFFSET_CALC] Train Offset 계산 (실시간 Offset 사용):")
+            logger.debug("  - 기준 각도: {}°", String.format("%.3f", targetAngle))
+            logger.debug("  - Train Position Offset: {}°", String.format("%.3f", currentTrainPosOffset))
+            logger.debug("  - True North Offset: {}°", String.format("%.3f", currentTrueNorthOffset))
+            logger.debug("  - 최종 계산 각도: {}°", String.format("%.3f", calculatedAngle))
+
+            calculatedAngle
         }
-        
+
         return if (offsetAppliedAngle != null) {
             //CMD.cmdTrainAngle = offsetAppliedAngle
             offsetAppliedAngle.toDouble()
         } else {
+            logger.warn("⚠️ [OFFSET_CALC] targetTrainAngle이 null입니다")
             null
         }
     }
@@ -616,15 +679,17 @@ class SunTrackService(
      * ✅ Azimuth와 Elevation 축 명령 전송
      */
     fun sendAzimuthAndElevationAxisCommand(cmdAzimuthAngle: Float, cmdAzimuthSpeed: Float, cmdElevationAngle: Float, cmdElevationSpeed: Float, cmdTrainAngle: Float, cmdTrainSpeed: Float) {
-        //CMD.cmdTiltAngle = targetTrainAngle!!.toFloat()
-        //CMD.cmdAzimuthAngle = cmdAzimuthAngle
-        //CMD.cmdElevationAngle = cmdElevationAngle
+        // ⚠️ CMD 값은 UdpFwICDService.multiManualCommand에서 offset 적용하여 설정
+        // 여기서 설정하면 offset이 적용되지 않은 값으로 덮어써서 중복 적용 방지
+
         val multiAxis = BitSet()
         multiAxis.set(0) // azimuth
         multiAxis.set(1) // elevation
-        //multiAxis.set(2) // train
+        //multiAxis.set(2) // train (추적 중에는 고정)
+
         GlobalData.SunTrackingData.azimuthSpeed = cmdAzimuthSpeed
         GlobalData.SunTrackingData.elevationSpeed = cmdElevationSpeed
+
         udpFwICDService.multiManualCommand(
             multiAxis,
             cmdAzimuthAngle,
@@ -641,17 +706,23 @@ class SunTrackService(
      */
     private fun sendTrainMovementCommand(targetAngle: Float, trainSpeed: Float) {
         try {
+            // 🔧 FIX: CMD 설정 (Offset 적용된 값 = 프론트엔드 표시용)
+            // targetAngle은 원본값, CMD는 Offset 적용된 값 표시
+            val offsetAppliedCmd = targetAngle + GlobalData.Offset.trainPositionOffset + GlobalData.Offset.trueNorthOffset
+            CMD.cmdTrainAngle = offsetAppliedCmd
+
             val multiAxis = BitSet()
             multiAxis.set(2) // Train만 이동
             GlobalData.SunTrackingData.trainSpeed = trainSpeed
+            // 🔧 FIX: 원본값 전송 (펌웨어가 내부적으로 Offset 적용)
             udpFwICDService.singleManualCommand(
                 multiAxis,
-                targetAngle, // 목표 Train 각도
+                targetAngle, // 원본 Train 각도 (펌웨어가 Offset 적용)
                 trainSpeed // Train 속도
             )
 
-            logger.info("Train 이동 명령 전송: {}도", String.format("%.6f", targetAngle))
-            
+            logger.info("Train 이동 명령 전송: 원본={}도, CMD(Offset적용)={}도", String.format("%.3f", targetAngle), String.format("%.3f", offsetAppliedCmd))
+
         } catch (e: Exception) {
             logger.error("Train 이동 명령 전송 실패: {}", e.message, e)
             throw e
@@ -675,8 +746,14 @@ class SunTrackService(
         
         // ✅ 속도 설정
         setSpeeds(azimuthSpeed, elevationSpeed, trainSpeed)
-        
-            
+
+            // ✅ 추적 시작 시점의 Offset 값 저장 (변경 감지용)
+            lastAppliedTrainPosOffset = GlobalData.Offset.trainPositionOffset
+            lastAppliedTrueNorthOffset = GlobalData.Offset.trueNorthOffset
+            logger.info("🔧 Sun Track 시작 시 Offset 저장: TrainPos={}°, TrueNorth={}°",
+                String.format("%.3f", lastAppliedTrainPosOffset),
+                String.format("%.3f", lastAppliedTrueNorthOffset))
+
             // ✅ 상태 초기화
             sunTrackState = SunTrackState.INITIAL_Train
             targetTrainAngle = null
