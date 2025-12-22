@@ -680,6 +680,55 @@ watch([() => icdStore.nextTrackingMstId, () => icdStore.nextTrackingDetailId], (
   void nextTick(() => {
     applyRowColors()
   })
+
+  // ✅ currentTrackingMstId가 null이고 nextTrackingMstId가 설정된 경우 (대기 중 상태)
+  // 다음 스케줄의 예측 경로를 미리 로드
+  if (icdStore.currentTrackingMstId === null && newMstId !== null && newMstId !== oldMstId) {
+    void nextTick(async () => {
+      try {
+        const nextSchedule = sortedScheduleList.value.find(s => Number(s.mstId) === Number(newMstId))
+        if (nextSchedule) {
+          console.log('🔮 대기 중 - 다음 스케줄 예측 경로 로드 시작:', nextSchedule.satelliteName, nextSchedule.mstId, nextSchedule.detailId)
+
+          const mstId = nextSchedule.mstId
+          const detailId = nextSchedule.detailId
+
+          if (!mstId || detailId == null) {
+            console.warn('⚠️ MstId 또는 DetailId가 없음:', {
+              mstId: nextSchedule.mstId,
+              detailId: nextSchedule.detailId,
+              satelliteName: nextSchedule.satelliteName
+            })
+            return
+          }
+
+          // ✅ 스케줄의 keyhole 여부에 따라 DataType 결정
+          const isKeyhole = nextSchedule.isKeyhole || nextSchedule.IsKeyhole || false
+          const dataType = isKeyhole ? 'keyhole_optimized_final_transformed' : 'final_transformed'
+
+          const success = await passScheduleStore.loadTrackingDetailData(
+            mstId,
+            detailId,
+            dataType
+          )
+
+          if (success) {
+            console.log('✅ 대기 중 - 다음 스케줄 예측 경로 로드 완료')
+            // ✅ 차트 업데이트
+            if (passChart && !passChart.isDisposed()) {
+              updateChart()
+            }
+          } else {
+            console.warn('⚠️ 대기 중 - 다음 스케줄 예측 경로 로드 실패')
+          }
+        } else {
+          console.warn('⚠️ 대기 중 - 다음 스케줄을 찾을 수 없음:', newMstId)
+        }
+      } catch (error) {
+        console.error('❌ 대기 중 - 다음 스케줄 예측 경로 로드 중 오류:', error)
+      }
+    })
+  }
 }, { immediate: true })
 
 const highlightedRows = computed(() => {
@@ -1236,50 +1285,9 @@ const handleActivated = () => {
         }
       }, 100)
     } else {
-      // ✅ 차트가 이미 있으면 정상 상태로 복원 (DOM 스타일 먼저 설정)
-      console.log('✅ 차트가 이미 존재함 - 정상 상태로 복원')
-
-      // ✅ 1단계: DOM 스타일을 동기적으로 먼저 설정 (리사이즈 전에!)
-      // 이렇게 하면 차트가 처음부터 올바른 크기로 렌더링됨
-      const chartSize = 500
-      const chartElement = chartRef.value?.querySelector('div') as HTMLElement | null
-      if (chartElement && passChart && !passChart.isDisposed()) {
-        // ✅ 스타일을 먼저 설정하여 차트가 올바른 위치에서 렌더링되도록 함
-        chartElement.style.width = `${chartSize}px`
-        chartElement.style.height = `${chartSize}px`
-        chartElement.style.maxWidth = `${chartSize}px`
-        chartElement.style.maxHeight = `${chartSize}px`
-        chartElement.style.minWidth = `${chartSize}px`
-        chartElement.style.minHeight = `${chartSize}px`
-        chartElement.style.position = 'absolute'
-        chartElement.style.top = '50%'
-        chartElement.style.left = '50%'
-        chartElement.style.transform = 'translate(-50%, -50%)'
-      }
-
-      // ✅ 2단계: Vue 렌더링 사이클과 동기화하여 리사이즈
-      void nextTick(() => {
-        // ✅ 컴포넌트가 여전히 마운트되어 있는지 확인
-        if (!chartRef.value) {
-          console.warn('⚠️ 차트 컨테이너가 없어 복원을 건너뜁니다')
-          return
-        }
-
-        if (passChart && !passChart.isDisposed()) {
-          try {
-            passChart.resize({
-              width: chartSize,
-              height: chartSize
-            })
-            console.log('✅ 차트 정상 상태 복원 완료')
-
-            // ✅ 차트 복원 후 데이터 복원
-            restoreChartData()
-          } catch (error) {
-            console.error('❌ 차트 리사이즈 중 오류:', error)
-          }
-        }
-      })
+      // ✅ keep-alive로 인해 차트 인스턴스가 그대로 유지됨
+      // 차트 데이터도 그대로 유지되므로 restoreChartData 호출 불필요
+      console.log('✅ 차트가 이미 존재함 - 그대로 유지 (keep-alive)')
     }
 
     // 🆕 타이머 재시작
@@ -1310,16 +1318,23 @@ const handleActivated = () => {
   }
 }
 
-// 🆕 컴포넌트 비활성화 시 정리
+// ✅ 컴포넌트 비활성화 시 타이머만 정리 (keep-alive로 차트와 데이터는 그대로 유지됨)
 const handleDeactivated = () => {
-  console.log('🔄 PassSchedulePage 비활성화됨')
+  console.log('🔄 PassSchedulePage 비활성화됨 (keep-alive)')
 
-  // 🆕 타이머만 정리 (차트는 유지)
+  // ✅ 타이머만 정리 (차트와 추적 경로는 keep-alive로 그대로 유지)
   if (updateTimer) {
     clearInterval(updateTimer)
     updateTimer = null
     console.log('✅ 차트 업데이트 타이머 정리됨')
   }
+
+  // ✅ 브라우저 새로고침 대비용 localStorage 저장 (페이지 간 이동에는 불필요하지만 안전을 위해 유지)
+  if (saveTimeout) {
+    clearTimeout(saveTimeout)
+    saveTimeout = null
+  }
+  passScheduleStore.saveToLocalStorage()
 }
 
 // ✅ localStorage 자동 저장을 위한 watch 설정
@@ -1362,11 +1377,14 @@ const autoSelectedSchedule = computed(() => {
 
     // 1순위: current 스케줄 찾기
     if (current !== null) {
-      // ✅ mstId와 detailId 기준으로 매칭 (전역 고유 ID + 패스 인덱스, detailId가 항상 존재한다고 가정)
-      const currentSchedule = schedules.find(s =>
-        Number(s.mstId) === Number(current) &&
-        (currentDetailId !== null && s.detailId !== null && Number(s.detailId) === Number(currentDetailId))
-      )
+      // ✅ mstId와 detailId 기준으로 매칭 (detailId가 있으면 함께 비교, 없으면 mstId만으로 매칭)
+      const currentSchedule = schedules.find(s => {
+        const mstIdMatch = Number(s.mstId) === Number(current)
+        // detailId가 둘 다 있으면 함께 비교, 아니면 mstId만으로 매칭
+        const detailIdMatch = currentDetailId === null || s.detailId === null ||
+                              Number(s.detailId) === Number(currentDetailId)
+        return mstIdMatch && detailIdMatch
+      })
       if (currentSchedule) {
         console.log('🎯 current 기준 자동 선택:', currentSchedule.satelliteName, currentSchedule.mstId, currentSchedule.detailId)
         return currentSchedule
@@ -1375,11 +1393,14 @@ const autoSelectedSchedule = computed(() => {
 
     // 2순위: next 스케줄 찾기 (current가 없을 때)
     if (next !== null) {
-      // ✅ mstId와 detailId 기준으로 매칭 (전역 고유 ID + 패스 인덱스, detailId가 항상 존재한다고 가정)
-      const nextSchedule = schedules.find(s =>
-        Number(s.mstId) === Number(next) &&
-        (nextDetailId !== null && s.detailId !== null && Number(s.detailId) === Number(nextDetailId))
-      )
+      // ✅ mstId와 detailId 기준으로 매칭 (detailId가 있으면 함께 비교, 없으면 mstId만으로 매칭)
+      const nextSchedule = schedules.find(s => {
+        const mstIdMatch = Number(s.mstId) === Number(next)
+        // detailId가 둘 다 있으면 함께 비교, 아니면 mstId만으로 매칭
+        const detailIdMatch = nextDetailId === null || s.detailId === null ||
+                              Number(s.detailId) === Number(nextDetailId)
+        return mstIdMatch && detailIdMatch
+      })
       if (nextSchedule) {
         console.log('🎯 next 기준 자동 선택:', nextSchedule.satelliteName, nextSchedule.mstId, nextSchedule.detailId)
         return nextSchedule
@@ -2109,10 +2130,51 @@ const updateChartWithPerformanceMonitoring = () => {
       return
     }
 
-    const azimuth = parseFloat(icdStore.azimuthAngle) || 0
-    const elevation = parseFloat(icdStore.elevationAngle) || 0
+    // ✅ 추적 상태 확인 (TRACKING 상태에서만 trackingActual 사용)
+    // PassSchedule은 passScheduleTrackingState를 사용 (ephemerisTrackingState가 아님)
+    // COMPLETED, IDLE, WAITING, PREPARING 상태에서는 일반 각도 값 사용
+    const trackingState = icdStore.passScheduleTrackingState
+    const isActuallyTracking = trackingState === 'TRACKING'
 
-    const normalizedAz = azimuth
+    // ✅ 기본값: 일반 각도 값 (안테나 실제 위치)
+    let azimuth = parseFloat(icdStore.azimuthAngle) || 0
+    let elevation = parseFloat(icdStore.elevationAngle) || 0
+
+    // ✅ 실제 추적 중일 때만 trackingActual 값 사용 (점프 현상 방지)
+    if (isActuallyTracking) {
+      const trackingAz = parseFloat(icdStore.trackingActualAzimuthAngle)
+      const trackingEl = parseFloat(icdStore.trackingActualElevationAngle)
+      // ✅ trackingCMD 값 추가 (이전 세션 값 검증용)
+      const trackingCmdAz = parseFloat(icdStore.trackingCMDAzimuthAngle)
+      const trackingCmdEl = parseFloat(icdStore.trackingCMDElevationAngle)
+
+      // ✅ trackingActual이 CMD 값과 근접한지 확인 (이전 세션 값 방지)
+      // CMD 값이 유효하지 않으면 trackingActual도 사용하지 않음 (추적 시작 직후 점프 방지)
+      const hasCmdAz = !isNaN(trackingCmdAz) && trackingCmdAz !== 0
+      const hasCmdEl = !isNaN(trackingCmdEl) && trackingCmdEl !== 0
+      const isTrackingAzValid = !isNaN(trackingAz) && trackingAz !== 0 &&
+        hasCmdAz && Math.abs(trackingAz - trackingCmdAz) < 5
+      const isTrackingElValid = !isNaN(trackingEl) && trackingEl !== 0 &&
+        hasCmdEl && Math.abs(trackingEl - trackingCmdEl) < 5
+
+      // ✅ 검증된 trackingActual → trackingCMD → 일반 값
+      if (isTrackingAzValid) {
+        azimuth = trackingAz
+      } else if (hasCmdAz) {
+        azimuth = trackingCmdAz
+      }
+      // else: 일반 azimuthAngle 값 유지
+
+      if (isTrackingElValid) {
+        elevation = trackingEl
+      } else if (hasCmdEl) {
+        elevation = trackingCmdEl
+      }
+      // else: 일반 elevationAngle 값 유지
+    }
+    // ✅ isActuallyTracking === false일 때는 일반 azimuthAngle/elevationAngle 값 그대로 사용
+
+    const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
     const normalizedEl = Math.max(0, Math.min(90, elevation))
 
     // 🆕 위치 변경 감지 (실제 변경이 있을 때만 업데이트)
@@ -2269,11 +2331,13 @@ const updateChartWithPerformanceMonitoring = () => {
     const hasDisplayPathChanged = displayPath.length !== lastTrackingPathLength.value
 
     // 🆕 실제 변경이 있을 때만 차트 업데이트
-    // 이론치만 표시: 경로 정보(mstId, detailId) 변경 시만 업데이트
-    // 추적 중: 위치 변경이나 실제 경로 변경 시만 업데이트
-    const shouldUpdateChart = shouldShowTrackingPath
-      ? (hasPositionChanged || hasDisplayPathChanged) // ✅ 추적 중: 위치나 실제 경로 변경 시만
-      : (hasPathInfoChanged || hasPredictedPathLengthChanged) // ✅ 이론치만: 경로 정보 변경 시만
+    // ✅ 현재 위치는 항상 업데이트 (hasPositionChanged)
+    // 추적 중: 위치 변경이나 실제 경로 변경 시 업데이트
+    // 이론치만 표시: 위치 변경이나 경로 정보 변경 시 업데이트
+    const shouldUpdateChart = hasPositionChanged || // ✅ 현재 위치 변경 시 항상 업데이트
+      (shouldShowTrackingPath
+        ? hasDisplayPathChanged // 추적 중: 실제 경로 변경 시
+        : (hasPathInfoChanged || hasPredictedPathLengthChanged)) // 이론치만: 경로 정보 변경 시
 
     // ✅ PassChartUpdatePool을 사용한 차트 업데이트 (기존 방식으로 복원)
     try {
@@ -2434,7 +2498,7 @@ const updateScheduleChart = async () => {
     if (mstId && detailId != null) {
       // ✅ 스케줄의 keyhole 여부에 따라 DataType 결정
       const isKeyhole = selectedSchedule.value.isKeyhole || selectedSchedule.value.IsKeyhole || false
-      const dataType = isKeyhole ? 'keyhole_final_transformed' : 'final_transformed'
+      const dataType = isKeyhole ? 'keyhole_optimized_final_transformed' : 'final_transformed'
 
       console.log(`🛰️ 스케줄 선택 - 추적 경로 조회: mstId=${mstId}, detailId=${detailId}, DataType: ${dataType}`)
 

@@ -3,6 +3,7 @@ import { ref, computed, onScopeDispose, readonly } from 'vue'
 import { icdService, type MessageData, type MultiControlCommand } from '@/services'
 import type { HardwareErrorLog } from '@/types/hardwareError'
 import { useI18n } from 'vue-i18n'
+import { getWebSocketUrl } from '@/utils/api-config'
 
 // 값을 안전하게 문자열로 변환하는 헬퍼 함수
 const safeToString = (value: unknown): string => {
@@ -39,8 +40,7 @@ const safeToString = (value: unknown): string => {
   return `[${typeof value}]`
 }
 
-// WebSocket 서버 URL
-const WEBSOCKET_URL = 'ws://localhost:8080/ws'
+const WEBSOCKET_URL = getWebSocketUrl()
 
 const UPDATE_INTERVAL = 30 // 30ms 주기
 
@@ -294,6 +294,7 @@ export const useICDStore = defineStore('icd', () => {
   const ephemerisStatus = ref<boolean | null>(null)
   const ephemerisTrackingState = ref<string | null>(null) // ✅ 추가
   const passScheduleStatus = ref<boolean | null>(null)
+  const passScheduleTrackingState = ref<string | null>(null) // ✅ 추가 (패스 스케줄 상세 상태)
   const sunTrackStatus = ref<boolean | null>(null)
   const sunTrackTrackingState = ref<string | null>(null) // ✅ 추가
   const communicationStatus = ref('')
@@ -1842,6 +1843,15 @@ export const useICDStore = defineStore('icd', () => {
         }
       }
 
+      // ✅ 새로 추가: Pass Schedule 추적 상태 업데이트 (상세 상태)
+      if (trackingStatusData.passScheduleTrackingState !== undefined) {
+        const newState = trackingStatusData.passScheduleTrackingState as string | null
+        if (passScheduleTrackingState.value !== newState) {
+          // console.log('📅 Pass Schedule 추적 상태 변경:', passScheduleTrackingState.value, '→', newState)
+          passScheduleTrackingState.value = newState
+        }
+      }
+
       // Sun Track 상태 업데이트 (Boolean)
       if (trackingStatusData.sunTrackStatus !== undefined) {
         const newStatus = trackingStatusData.sunTrackStatus as boolean | null
@@ -2443,12 +2453,12 @@ export const useICDStore = defineStore('icd', () => {
     const state = ephemerisTrackingState.value
     switch (state) {
       case 'IDLE':
-        return { displayLabel: '대기', displayColor: 'grey' }
+        return { displayLabel: '정지', displayColor: 'grey' }
       // ✅ 새로운 상태 (6개 상태 체계)
       case 'PREPARING':
         return { displayLabel: '준비 중', displayColor: 'orange' }
       case 'WAITING':
-        return { displayLabel: '대기 중', displayColor: 'cyan' }
+        return { displayLabel: '시작 대기', displayColor: 'cyan' }
       case 'TRACKING':
         return { displayLabel: '추적 중', displayColor: 'green' }
       case 'COMPLETED':
@@ -2485,7 +2495,7 @@ export const useICDStore = defineStore('icd', () => {
 
     switch (state) {
       case 'IDLE':
-        return { displayLabel: '대기', displayColor: 'grey' }
+        return { displayLabel: '정지', displayColor: 'grey' }
       case 'TRAIN_MOVING_TO_ZERO':
         return { displayLabel: 'Train 이동', displayColor: 'deep-orange' }
       case 'TRAIN_STABILIZING':
@@ -2903,6 +2913,7 @@ export const useICDStore = defineStore('icd', () => {
     ephemerisTrackingStateInfo,
     passScheduleStatus,
     passScheduleStatusInfo,
+    passScheduleTrackingState,
     sunTrackStatus,
     sunTrackStatusInfo,
     sunTrackTrackingState,

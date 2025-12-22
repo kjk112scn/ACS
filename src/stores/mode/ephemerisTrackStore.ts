@@ -110,7 +110,11 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
   // ✅ 추적 시작 지연을 위한 상태
   const trackingStartTime = ref<number | null>(null)
   const isInitialDelayActive = ref(false)
-  const INITIAL_DELAY_MS = 10000 // 5초 지연
+  const INITIAL_DELAY_MS = 10000 // 10초 지연
+
+  // ✅ 점프 방지를 위한 이전 값 저장
+  const lastValidPoint = ref<{ azimuth: number; elevation: number } | null>(null)
+  const MAX_JUMP_THRESHOLD = 10 // 한 번에 10° 이상 점프하면 무시
 
   // ✅ Store 레벨 추적 경로 업데이트 타이머 (컴포넌트와 무관하게 계속 업데이트)
   let storeTrackingTimer: number | null = null
@@ -385,18 +389,37 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
       return // (0,0)은 무시 - 경로에 추가하지 않음
     }
 
-    // ✅ 추적 시작 후 5초 지연 체크
+    // ✅ 추적 시작 후 10초 지연 체크
     if (isInitialDelayActive.value && trackingStartTime.value) {
       const elapsedTime = Date.now() - trackingStartTime.value
       if (elapsedTime < INITIAL_DELAY_MS) {
         // console.log(`⏸️ 추적 시작 지연 중... (${elapsedTime}ms / ${INITIAL_DELAY_MS}ms)`)
         return // 경로 업데이트 무시
       } else {
-        // ✅ 지연 시간 완료
+        // ✅ 지연 시간 완료 - 현재 값을 첫 유효 포인트로 저장
         isInitialDelayActive.value = false
-        console.log('✅ 추적 시작 지연 완료 - 경로 그리기 시작')
+        lastValidPoint.value = { azimuth, elevation }
+        console.log('✅ 추적 시작 지연 완료 - 경로 그리기 시작:', { azimuth, elevation })
       }
     }
+
+    // ✅ 점프 방지: 이전 유효 값과 비교하여 급격한 변화 감지
+    if (lastValidPoint.value) {
+      const azDiff = Math.abs(azimuth - lastValidPoint.value.azimuth)
+      const elDiff = Math.abs(elevation - lastValidPoint.value.elevation)
+
+      // Azimuth 360° 경계 처리 (예: 359° → 1° 변화는 정상)
+      const azDiffNormalized = azDiff > 180 ? 360 - azDiff : azDiff
+
+      // 한 번에 MAX_JUMP_THRESHOLD 이상 점프하면 무시
+      if (azDiffNormalized > MAX_JUMP_THRESHOLD || elDiff > MAX_JUMP_THRESHOLD) {
+        console.warn(`🚫 점프 감지 - 무시: Az ${lastValidPoint.value.azimuth.toFixed(2)}° → ${azimuth.toFixed(2)}° (diff: ${azDiffNormalized.toFixed(2)}°), El ${lastValidPoint.value.elevation.toFixed(2)}° → ${elevation.toFixed(2)}° (diff: ${elDiff.toFixed(2)}°)`)
+        return // 점프하는 값은 무시
+      }
+    }
+
+    // ✅ 유효한 값으로 업데이트
+    lastValidPoint.value = { azimuth, elevation }
 
     // ✅ Worker 초기화 (비동기)
     if (!workerInitialized) {
@@ -560,6 +583,9 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     // ✅ 지연 관련 상태 초기화
     trackingStartTime.value = null
     isInitialDelayActive.value = false
+
+    // ✅ 점프 방지용 이전 값 초기화
+    lastValidPoint.value = null
 
     // ✅ 통계 초기화
     workerStats.value = {
@@ -1008,6 +1034,9 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     // ✅ 지연 관련 상태 초기화
     trackingStartTime.value = null
     isInitialDelayActive.value = false
+
+    // ✅ 점프 방지용 이전 값 초기화
+    lastValidPoint.value = null
 
     // ✅ 오프셋 값 초기화
     offsetValues.value = {

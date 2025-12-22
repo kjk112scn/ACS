@@ -920,11 +920,11 @@ const trainActualValue = computed((): number => {
 
 const azimuthCmdValue = computed((): number => {
   // ✅ 실제 추적 중일 때만 trackingCMD 사용 (TRACKING 상태)
-  // PREPARING/WAITING은 시작 위치로 이동 중이므로 일반 cmd 값 사용
+  // Ephemeris 또는 PassSchedule 중 하나라도 TRACKING이면 tracking 값 사용
   const isActuallyTracking =
     icdStore.ephemerisTrackingState === 'TRACKING' ||
     icdStore.ephemerisTrackingState === 'IN_PROGRESS' ||
-    icdStore.passScheduleStatusInfo.isActive
+    icdStore.passScheduleTrackingState === 'TRACKING'
 
   const trackingValue = icdStore.trackingCMDAzimuthAngle
   const cmdValue = icdStore.cmdAzimuthAngle
@@ -946,11 +946,11 @@ const azimuthCmdValue = computed((): number => {
 
 const azimuthActualValue = computed((): number => {
   // ✅ 실제 추적 중일 때만 trackingActual 사용 (TRACKING 상태)
-  // PREPARING/WAITING은 시작 위치로 이동 중이므로 일반 actual 값 사용
+  // Ephemeris 또는 PassSchedule 중 하나라도 TRACKING이면 tracking 값 사용
   const isActuallyTracking =
     icdStore.ephemerisTrackingState === 'TRACKING' ||
     icdStore.ephemerisTrackingState === 'IN_PROGRESS' ||
-    icdStore.passScheduleStatusInfo.isActive
+    icdStore.passScheduleTrackingState === 'TRACKING'
 
   const trackingValue = icdStore.trackingActualAzimuthAngle
   const actualValue = icdStore.azimuthAngle
@@ -972,11 +972,11 @@ const azimuthActualValue = computed((): number => {
 
 const elevationCmdValue = computed((): number => {
   // ✅ 실제 추적 중일 때만 trackingCMD 사용 (TRACKING 상태)
-  // PREPARING/WAITING은 시작 위치로 이동 중이므로 일반 cmd 값 사용
+  // Ephemeris 또는 PassSchedule 중 하나라도 TRACKING이면 tracking 값 사용
   const isActuallyTracking =
     icdStore.ephemerisTrackingState === 'TRACKING' ||
     icdStore.ephemerisTrackingState === 'IN_PROGRESS' ||
-    icdStore.passScheduleStatusInfo.isActive
+    icdStore.passScheduleTrackingState === 'TRACKING'
 
   const trackingValue = icdStore.trackingCMDElevationAngle
   const cmdValue = icdStore.cmdElevationAngle
@@ -998,11 +998,11 @@ const elevationCmdValue = computed((): number => {
 
 const elevationActualValue = computed((): number => {
   // ✅ 실제 추적 중일 때만 trackingActual 사용 (TRACKING 상태)
-  // PREPARING/WAITING은 시작 위치로 이동 중이므로 일반 actual 값 사용
+  // Ephemeris 또는 PassSchedule 중 하나라도 TRACKING이면 tracking 값 사용
   const isActuallyTracking =
     icdStore.ephemerisTrackingState === 'TRACKING' ||
     icdStore.ephemerisTrackingState === 'IN_PROGRESS' ||
-    icdStore.passScheduleStatusInfo.isActive
+    icdStore.passScheduleTrackingState === 'TRACKING'
 
   const trackingValue = icdStore.trackingActualElevationAngle
   const actualValue = icdStore.elevationAngle
@@ -1024,11 +1024,12 @@ const elevationActualValue = computed((): number => {
 
 const trainCmdValue = computed((): number => {
   // ✅ 실제 추적 중일 때만 trackingCMD 사용 (TRACKING 상태)
-  // PREPARING/WAITING은 시작 위치로 이동 중이므로 일반 cmd 값 사용
+  // Ephemeris 또는 PassSchedule 중 하나라도 TRACKING이면 tracking 값 사용
+  // SunTrack은 수동 제어 방식이므로 cmd 값 사용
   const isActuallyTracking =
     icdStore.ephemerisTrackingState === 'TRACKING' ||
     icdStore.ephemerisTrackingState === 'IN_PROGRESS' ||
-    icdStore.passScheduleStatusInfo.isActive
+    icdStore.passScheduleTrackingState === 'TRACKING'
 
   const trackingValue = icdStore.trackingCMDTrainAngle
   const cmdValue = icdStore.cmdTrainAngle
@@ -1049,22 +1050,25 @@ const trainCmdValue = computed((): number => {
 
 const trainActualValue = computed((): number => {
   // ✅ 실제 추적 중일 때만 trackingActual 사용 (TRACKING 상태)
-  // PREPARING/WAITING은 시작 위치로 이동 중이므로 일반 actual 값 사용
+  // Ephemeris 또는 PassSchedule 중 하나라도 TRACKING이면 tracking 값 사용
   const isActuallyTracking =
     icdStore.ephemerisTrackingState === 'TRACKING' ||
     icdStore.ephemerisTrackingState === 'IN_PROGRESS' ||
-    icdStore.passScheduleStatusInfo.isActive
+    icdStore.passScheduleTrackingState === 'TRACKING'
 
   const trackingValue = icdStore.trackingActualTrainAngle
   const actualValue = icdStore.trainAngle
 
-  // ✅ trackingValue 유효성 검증 (Train은 0이 유효한 값일 수 있음)
+  // ✅ trackingValue 유효성 검증
+  // 🔧 FIX: Train 축은 Ephemeris 추적에서 사용하지 않아 펌웨어가 0을 보낼 수 있음
+  // trackingActualTrainAngle이 0이면 일반 trainAngle 사용
   const numTrackingValue = Number(trackingValue)
   const hasValidTrackingValue =
     trackingValue !== null &&
     trackingValue !== undefined &&
     trackingValue !== '' &&
-    !isNaN(numTrackingValue)
+    !isNaN(numTrackingValue) &&
+    numTrackingValue !== 0  // 0이면 무효로 처리
 
   // ✅ 실제 추적 중이고 tracking 값이 유효하면 사용, 아니면 actual 값 사용
   const value = isActuallyTracking && hasValidTrackingValue ? trackingValue : actualValue
@@ -1073,23 +1077,33 @@ const trainActualValue = computed((): number => {
 })
 
 // ✅ 차트에서 사용할 실제 값들을 computed로 변경 (실제 추적 상태 확인)
+// TRACKING 상태에서만 trackingActual 사용, 그 외에는 일반 값 사용
+// Ephemeris 또는 PassSchedule 중 하나라도 TRACKING이면 tracking 값 사용
 const getCurrentAzimuthActualValue = computed((): number => {
-  const isTrackingActive = icdStore.ephemerisStatusInfo.isActive || icdStore.passScheduleStatusInfo.isActive
-  const value = isTrackingActive ? icdStore.trackingActualAzimuthAngle : icdStore.azimuthAngle
+  const isActuallyTracking =
+    icdStore.ephemerisTrackingState === 'TRACKING' ||
+    icdStore.ephemerisTrackingState === 'IN_PROGRESS' ||
+    icdStore.passScheduleTrackingState === 'TRACKING'
+  const value = isActuallyTracking ? icdStore.trackingActualAzimuthAngle : icdStore.azimuthAngle
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
 const getCurrentElevationActualValue = computed((): number => {
-  const isTrackingActive = icdStore.ephemerisStatusInfo.isActive || icdStore.passScheduleStatusInfo.isActive
-  const value = isTrackingActive ? icdStore.trackingActualElevationAngle : icdStore.elevationAngle
+  const isActuallyTracking =
+    icdStore.ephemerisTrackingState === 'TRACKING' ||
+    icdStore.ephemerisTrackingState === 'IN_PROGRESS' ||
+    icdStore.passScheduleTrackingState === 'TRACKING'
+  const value = isActuallyTracking ? icdStore.trackingActualElevationAngle : icdStore.elevationAngle
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })
 
 const getCurrentTrainActualValue = computed((): number => {
-  const isTrackingActive = icdStore.ephemerisStatusInfo.isActive || icdStore.passScheduleStatusInfo.isActive
-  const value = isTrackingActive ? icdStore.trackingActualTrainAngle : icdStore.trainAngle
+  // 추적 중일 때는 trackingActualTrainAngle 사용, 아니면 trainAngle 사용
+  // 이유: 하드웨어가 추적 중에는 trainAngle을 0으로 보내지만, trackingActualTrainAngle에는 실제 값을 보냄
+  const isTracking = icdStore.ephemerisTrackingState !== null && icdStore.ephemerisTrackingState !== 'IDLE'
+  const value = isTracking ? icdStore.trackingActualTrainAngle : icdStore.trainAngle
   const numValue = Number(value)
   return isNaN(numValue) ? 0 : numValue
 })

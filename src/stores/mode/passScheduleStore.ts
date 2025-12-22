@@ -83,6 +83,15 @@ export interface ScheduleItem {
   KeyholeFinalTransformedStartElevation?: number
   KeyholeFinalTransformedEndElevation?: number
   KeyholeFinalTransformedMaxElevation?: number
+
+  // ✅ KeyholeOptimizedFinalTransformed (최적화된 Train 각도, ±270°) 메타데이터 추가
+  KeyholeOptimizedFinalTransformedMaxAzRate?: number
+  KeyholeOptimizedFinalTransformedMaxElRate?: number
+  KeyholeOptimizedFinalTransformedStartAzimuth?: number
+  KeyholeOptimizedFinalTransformedEndAzimuth?: number
+  KeyholeOptimizedFinalTransformedStartElevation?: number
+  KeyholeOptimizedFinalTransformedEndElevation?: number
+  KeyholeOptimizedFinalTransformedMaxElevation?: number
 }
 
 // 🔧 타입들을 export하여 다른 파일에서 사용 가능하게 함
@@ -207,6 +216,10 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
 
   // ✅ Store 레벨 추적 경로 업데이트 타이머 (컴포넌트와 무관하게 계속 업데이트)
   let storeTrackingTimer: number | null = null
+
+  // ✅ 점프 방지를 위한 이전 값 저장
+  const lastValidPoint = ref<{ azimuth: number; elevation: number } | null>(null)
+  const MAX_JUMP_THRESHOLD = 10 // 한 번에 10° 이상 점프하면 무시
 
   // 🆕 추적 경로 통계
   const trackingPath = computed(() => ({
@@ -1352,6 +1365,15 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
                 KeyholeFinalTransformedStartElevation: pass.KeyholeFinalTransformedStartElevation,
                 KeyholeFinalTransformedEndElevation: pass.KeyholeFinalTransformedEndElevation,
                 KeyholeFinalTransformedMaxElevation: pass.KeyholeFinalTransformedMaxElevation,
+
+                // ✅ KeyholeOptimizedFinalTransformed (최적화된 Train 각도, ±270°) 메타데이터 매핑
+                KeyholeOptimizedFinalTransformedMaxAzRate: pass.KeyholeOptimizedFinalTransformedMaxAzRate,
+                KeyholeOptimizedFinalTransformedMaxElRate: pass.KeyholeOptimizedFinalTransformedMaxElRate,
+                KeyholeOptimizedFinalTransformedStartAzimuth: pass.KeyholeOptimizedFinalTransformedStartAzimuth,
+                KeyholeOptimizedFinalTransformedEndAzimuth: pass.KeyholeOptimizedFinalTransformedEndAzimuth,
+                KeyholeOptimizedFinalTransformedStartElevation: pass.KeyholeOptimizedFinalTransformedStartElevation,
+                KeyholeOptimizedFinalTransformedEndElevation: pass.KeyholeOptimizedFinalTransformedEndElevation,
+                KeyholeOptimizedFinalTransformedMaxElevation: pass.KeyholeOptimizedFinalTransformedMaxElevation,
               }
 
               allSchedules.push(scheduleItem)
@@ -1720,6 +1742,8 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
   // ✅ 실시간 추적 경로만 초기화 (스케줄 전환 시 사용)
   const clearActualTrackingPath = () => {
     actualTrackingPath.value = []
+    // ✅ 점프 방지용 이전 값 초기화
+    lastValidPoint.value = null
     console.log('✅ 실시간 추적 경로만 초기화 완료')
   }
 
@@ -2105,8 +2129,31 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
         const elevation =
           parseFloat(icdStore.trackingActualElevationAngle || icdStore.elevationAngle) || 0
 
+        // ✅ (0,0) 체크 - 잘못된 경로 시작점 방지
+        if (azimuth === 0 && elevation === 0) {
+          return
+        }
+
         const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
         const normalizedEl = Math.max(0, Math.min(90, elevation))
+
+        // ✅ 점프 방지: 이전 유효 값과 비교하여 급격한 변화 감지
+        if (lastValidPoint.value) {
+          const azDiff = Math.abs(normalizedAz - lastValidPoint.value.azimuth)
+          const elDiff = Math.abs(normalizedEl - lastValidPoint.value.elevation)
+
+          // Azimuth 360° 경계 처리 (예: 359° → 1° 변화는 정상)
+          const azDiffNormalized = azDiff > 180 ? 360 - azDiff : azDiff
+
+          // 한 번에 MAX_JUMP_THRESHOLD 이상 점프하면 무시
+          if (azDiffNormalized > MAX_JUMP_THRESHOLD || elDiff > MAX_JUMP_THRESHOLD) {
+            console.warn(`🚫 PassSchedule 점프 감지 - 무시: Az ${lastValidPoint.value.azimuth.toFixed(2)}° → ${normalizedAz.toFixed(2)}° (diff: ${azDiffNormalized.toFixed(2)}°), El ${lastValidPoint.value.elevation.toFixed(2)}° → ${normalizedEl.toFixed(2)}° (diff: ${elDiff.toFixed(2)}°)`)
+            return // 점프하는 값은 무시
+          }
+        }
+
+        // ✅ 유효한 값으로 업데이트
+        lastValidPoint.value = { azimuth: normalizedAz, elevation: normalizedEl }
 
         // Store의 추적 경로 업데이트 (차트와 무관하게 계속 업데이트)
         void updateActualTrackingPath(normalizedAz, normalizedEl)
@@ -2191,6 +2238,9 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
 
       // ✅ Store 레벨 추적 경로 업데이트 중지
       stopStoreTrackingUpdate()
+
+      // ✅ 점프 방지용 이전 값 초기화
+      lastValidPoint.value = null
 
       // Worker 정리
       await new Promise((resolve) => setTimeout(resolve, 10)) // 임시 대기

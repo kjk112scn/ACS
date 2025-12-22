@@ -176,12 +176,12 @@
 
                   <div class="info-row">
                     <span class="info-label">방위각:</span>
-                    <span class="info-value">{{ selectedScheduleInfo.startAzimuth.toFixed(2) }}°</span>
+                    <span class="info-value">{{ safeToFixed(selectedScheduleInfo.startAzimuth, 2) }}°</span>
                   </div>
 
                   <div class="info-row">
                     <span class="info-label">고도:</span>
-                    <span class="info-value">{{ selectedScheduleInfo.startElevation.toFixed(2) }}°</span>
+                    <span class="info-value">{{ safeToFixed(selectedScheduleInfo.startElevation, 2) }}°</span>
                   </div>
                 </div>
 
@@ -212,14 +212,14 @@
 
                   <div class="info-row">
                     <span class="info-label">시작/종료 방위각/고도:</span>
-                    <span class="info-value">{{ selectedScheduleInfo.startAzimuth.toFixed(6) }}° / {{
-                      selectedScheduleInfo.endAzimuth.toFixed(6) }}° / {{
-                        selectedScheduleInfo.startElevation.toFixed(6) }}°</span>
+                    <span class="info-value">{{ safeToFixed(selectedScheduleInfo.startAzimuth, 6) }}° / {{
+                      safeToFixed(selectedScheduleInfo.endAzimuth, 6) }}° / {{
+                        safeToFixed(selectedScheduleInfo.startElevation, 6) }}°</span>
                   </div>
 
                   <div class="info-row">
                     <span class="info-label">최대 고도:</span>
-                    <span class="info-value">{{ selectedScheduleInfo.maxElevation.toFixed(6) }}°</span>
+                    <span class="info-value">{{ safeToFixed(selectedScheduleInfo.maxElevation, 6) }}°</span>
                   </div>
 
                   <!-- KEYHOLE 정보 표시 -->
@@ -233,27 +233,19 @@
                         }}°</span>
                     </div>
                     <div class="info-row">
-                      <span class="info-label">최대 Azimuth 속도:</span>
+                      <span class="info-label">2축/3축/최적화 Azimuth 속도:</span>
                       <span class="info-value text-red">
-                        {{ safeToFixed(
-                          selectedScheduleInfo.isKeyhole
-                            ? (selectedScheduleInfo.KeyholeFinalTransformedMaxAzRate ??
-                              selectedScheduleInfo.FinalTransformedMaxAzRate ?? 0)
-                            : (selectedScheduleInfo.FinalTransformedMaxAzRate ?? 0),
-                          6
-                        ) }}°/s
+                        {{ safeToFixed(selectedScheduleInfo.OriginalMaxAzRate ?? 0, 2) }} /
+                        {{ safeToFixed(selectedScheduleInfo.FinalTransformedMaxAzRate ?? 0, 2) }} /
+                        {{ safeToFixed(selectedScheduleInfo.KeyholeOptimizedFinalTransformedMaxAzRate ?? 0, 2) }}°/s
                       </span>
                     </div>
                     <div class="info-row">
-                      <span class="info-label">최대 Elevation 속도:</span>
+                      <span class="info-label">2축/3축/최적화 Elevation 속도:</span>
                       <span class="info-value text-red">
-                        {{ safeToFixed(
-                          selectedScheduleInfo.isKeyhole
-                            ? (selectedScheduleInfo.KeyholeFinalTransformedMaxElRate ??
-                              selectedScheduleInfo.FinalTransformedMaxElRate ?? 0)
-                            : (selectedScheduleInfo.FinalTransformedMaxElRate ?? 0),
-                          6
-                        ) }}°/s
+                        {{ safeToFixed(selectedScheduleInfo.OriginalMaxElRate ?? 0, 2) }} /
+                        {{ safeToFixed(selectedScheduleInfo.FinalTransformedMaxElRate ?? 0, 2) }} /
+                        {{ safeToFixed(selectedScheduleInfo.KeyholeOptimizedFinalTransformedMaxElRate ?? 0, 2) }}°/s
                       </span>
                     </div>
                   </div>
@@ -1106,6 +1098,9 @@ const selectedScheduleInfo = computed(() => {
       KeyholeOptimizedFinalTransformedMaxElRate: 0,
       OptimizationImprovement: 0,
       OptimizationImprovementRate: 0,
+      // ✅ 2축 원본 데이터 (정지궤도는 0)
+      OriginalMaxAzRate: 0,
+      OriginalMaxElRate: 0,
     }
   }
 
@@ -1116,6 +1111,18 @@ const selectedScheduleInfo = computed(() => {
     const mstId = selected.mstId ?? selected.No
     const detailId = selected.detailId ?? 0
 
+    // 🔍 디버깅: Keyhole Optimized 값 확인
+    if (selected.IsKeyhole) {
+      console.log('🔍 [Keyhole Optimized 디버깅] MstId:', mstId)
+      console.log('   IsKeyhole:', selected.IsKeyhole)
+      console.log('   KeyholeOptimizedFinalTransformedStartAzimuth:', selected.KeyholeOptimizedFinalTransformedStartAzimuth)
+      console.log('   KeyholeFinalTransformedStartAzimuth:', selected.KeyholeFinalTransformedStartAzimuth)
+      console.log('   FinalTransformedStartAzimuth:', selected.FinalTransformedStartAzimuth)
+      console.log('   StartAzimuth:', selected.StartAzimuth)
+      console.log('   KeyholeOptimizedFinalTransformedStartElevation:', selected.KeyholeOptimizedFinalTransformedStartElevation)
+      console.log('   FinalTransformedStartElevation:', selected.FinalTransformedStartElevation)
+    }
+
     return {
       passId: selected.No, // 하위 호환성을 위해 유지
       mstId: mstId, // ✅ mstId 추가
@@ -1125,30 +1132,39 @@ const selectedScheduleInfo = computed(() => {
       startTime: selected.StartTime,
       endTime: selected.EndTime,
       duration: selected.Duration,
-      maxElevation: selected.isKeyhole
-        ? (selected.KeyholeFinalTransformedMaxElevation ?? selected.FinalTransformedMaxElevation ?? (typeof selected.MaxElevation === 'number' ? selected.MaxElevation : 0))
-        : (selected.FinalTransformedMaxElevation ?? (typeof selected.MaxElevation === 'number' ? selected.MaxElevation : 0)),
+      // ✅ 키홀일 때는 백엔드에서 MaxElevation을 keyhole_optimized_final_transformed 값으로 덮어씀
+      maxElevation: Number(selected.IsKeyhole
+        ? (selected.MaxElevation ?? 0)
+        : (selected.FinalTransformedMaxElevation ?? selected.MaxElevation ?? 0)),
       startTimeMs: new Date(selected.StartTime).getTime(),
       endTimeMs: new Date(selected.EndTime).getTime(), // ✅ 종료 시간 추가
       timeRemaining: 0,
-      startAzimuth: selected.isKeyhole
-        ? (selected.KeyholeFinalTransformedStartAzimuth ?? selected.FinalTransformedStartAzimuth ?? (typeof selected.StartAzimuth === 'number' ? selected.StartAzimuth : 0))
-        : (selected.FinalTransformedStartAzimuth ?? (typeof selected.StartAzimuth === 'number' ? selected.StartAzimuth : 0)),
-      endAzimuth: selected.isKeyhole
-        ? (selected.KeyholeFinalTransformedEndAzimuth ?? selected.FinalTransformedEndAzimuth ?? (typeof selected.EndAzimuth === 'number' ? selected.EndAzimuth : 0))
-        : (selected.FinalTransformedEndAzimuth ?? (typeof selected.EndAzimuth === 'number' ? selected.EndAzimuth : 0)),
-      startElevation: selected.isKeyhole
-        ? (selected.KeyholeFinalTransformedStartElevation ?? selected.FinalTransformedStartElevation ?? (typeof selected.StartElevation === 'number' ? selected.StartElevation : 0))
-        : (selected.FinalTransformedStartElevation ?? (typeof selected.StartElevation === 'number' ? selected.StartElevation : 0)),
-      endElevation: selected.isKeyhole
-        ? (selected.KeyholeFinalTransformedEndElevation ?? selected.FinalTransformedEndElevation ?? (typeof selected.EndElevation === 'number' ? selected.EndElevation : 0))
-        : (selected.FinalTransformedEndElevation ?? (typeof selected.EndElevation === 'number' ? selected.EndElevation : 0)),
+      // ✅ 키홀일 때는 백엔드에서 StartAzimuth를 keyhole_optimized_final_transformed 값으로 덮어씀
+      // 따라서 키홀일 때는 StartAzimuth를 직접 사용
+      startAzimuth: Number(selected.IsKeyhole
+        ? (selected.StartAzimuth ?? 0)
+        : (selected.FinalTransformedStartAzimuth ?? selected.StartAzimuth ?? 0)),
+      endAzimuth: Number(selected.IsKeyhole
+        ? (selected.EndAzimuth ?? 0)
+        : (selected.FinalTransformedEndAzimuth ?? selected.EndAzimuth ?? 0)),
+      startElevation: Number(selected.IsKeyhole
+        ? (selected.StartElevation ?? 0)
+        : (selected.FinalTransformedStartElevation ?? selected.StartElevation ?? 0)),
+      endElevation: Number(selected.IsKeyhole
+        ? (selected.EndElevation ?? 0)
+        : (selected.FinalTransformedEndElevation ?? selected.EndElevation ?? 0)),
       isGeostationary: false,
-      // KEYHOLE 정보 추가
+      // KEYHOLE 정보 추가 - 키홀일 때는 최적화 값(방법2) 사용
       isKeyhole: selected.IsKeyhole || false,
-      recommendedTrainAngle: selected.RecommendedTrainAngle || 0,
-      FinalTransformedMaxAzRate: selected.FinalTransformedMaxAzRate || 0,
-      FinalTransformedMaxElRate: selected.FinalTransformedMaxElRate || 0,
+      recommendedTrainAngle: selected.IsKeyhole
+        ? (selected.KeyholeOptimizedRecommendedTrainAngle || selected.RecommendedTrainAngle || 0)
+        : (selected.RecommendedTrainAngle || 0),
+      FinalTransformedMaxAzRate: selected.IsKeyhole
+        ? (selected.KeyholeOptimizedFinalTransformedMaxAzRate || selected.FinalTransformedMaxAzRate || 0)
+        : (selected.FinalTransformedMaxAzRate || 0),
+      FinalTransformedMaxElRate: selected.IsKeyhole
+        ? (selected.KeyholeOptimizedFinalTransformedMaxElRate || selected.FinalTransformedMaxElRate || 0)
+        : (selected.FinalTransformedMaxElRate || 0),
       KeyholeAxisTransformedMaxAzRate: selected.KeyholeAxisTransformedMaxAzRate,
       KeyholeAxisTransformedMaxElRate: selected.KeyholeAxisTransformedMaxElRate,
       KeyholeFinalTransformedMaxAzRate: selected.KeyholeFinalTransformedMaxAzRate,
@@ -1159,6 +1175,9 @@ const selectedScheduleInfo = computed(() => {
       KeyholeOptimizedFinalTransformedMaxElRate: selected.KeyholeOptimizedFinalTransformedMaxElRate || 0,
       OptimizationImprovement: selected.OptimizationImprovement || 0,
       OptimizationImprovementRate: selected.OptimizationImprovementRate || 0,
+      // ✅ 2축 원본 데이터
+      OriginalMaxAzRate: selected.OriginalMaxAzRate || 0,
+      OriginalMaxElRate: selected.OriginalMaxElRate || 0,
     }
   }
 
@@ -1195,6 +1214,9 @@ const selectedScheduleInfo = computed(() => {
     KeyholeOptimizedFinalTransformedMaxElRate: 0,
     OptimizationImprovement: 0,
     OptimizationImprovementRate: 0,
+    // ✅ 2축 원본 데이터 기본값
+    OriginalMaxAzRate: 0,
+    OriginalMaxElRate: 0,
   }
 })
 
@@ -1204,43 +1226,35 @@ watch(() => icdStore.ephemerisTrackingState, (newState, oldState) => {
 
   // ✅ 추적 시작 시에만 경로 초기화 (TRACKING으로 전환될 때)
   if (newState === 'TRACKING' && oldState !== 'TRACKING') {
-    // ✅ 현재 위치를 기준으로 경로 초기화 (0도에서 시작하는 문제 해결)
-    // ✅ 수정: trackingCMD 값을 우선 사용 (백엔드에서 즉시 설정됨)
-    // trackingActual 값은 이전 세션 값일 수 있으므로, CMD 값이나 일반 값 사용
-    const trackingCmdAz = parseFloat(icdStore.trackingCMDAzimuthAngle)
-    const trackingCmdEl = parseFloat(icdStore.trackingCMDElevationAngle)
+    // ✅ WAITING → TRACKING 전환 시 실제 안테나 위치를 사용 (점프 방지)
+    // WAITING 상태에서 이미 목표 위치에 도달해 있으므로 현재 안테나 위치가 가장 정확함
     const normalAz = parseFloat(icdStore.azimuthAngle)
     const normalEl = parseFloat(icdStore.elevationAngle)
 
-    // ✅ 우선순위: trackingCMD(0이 아닌 경우) > 일반 값(0이 아닌 경우) > 스케줄 시작 위치
-    // trackingActual은 이전 세션 값일 수 있어 TRACKING 시작 시점에서 제외
     let currentAzimuth = 0
     let currentElevation = 0
 
-    if (!isNaN(trackingCmdAz) && trackingCmdAz !== 0) {
-      currentAzimuth = trackingCmdAz
-    } else if (!isNaN(normalAz) && normalAz !== 0) {
+    // ✅ 실제 안테나 위치 우선 사용
+    if (!isNaN(normalAz) && normalAz !== 0) {
       currentAzimuth = normalAz
     } else if (selectedScheduleInfo.value.startAzimuth) {
       // 스케줄의 시작 위치 사용 (fallback)
-      currentAzimuth = selectedScheduleInfo.value.startAzimuth
+      currentAzimuth = Number(selectedScheduleInfo.value.startAzimuth)
     }
 
-    if (!isNaN(trackingCmdEl) && trackingCmdEl !== 0) {
-      currentElevation = trackingCmdEl
-    } else if (!isNaN(normalEl) && normalEl !== 0) {
+    if (!isNaN(normalEl) && normalEl !== 0) {
       currentElevation = normalEl
     } else if (selectedScheduleInfo.value.startElevation) {
       // 스케줄의 시작 위치 사용 (fallback)
-      currentElevation = selectedScheduleInfo.value.startElevation
+      currentElevation = Number(selectedScheduleInfo.value.startElevation)
     }
 
     ephemerisStore.clearTrackingPath(currentAzimuth, currentElevation)
-    console.log('🧹 추적 시작 - 경로 초기화 완료 - 현재 위치 기준:', {
+    console.log('🧹 추적 시작 - 경로 초기화 완료 - 현재 안테나 위치 기준:', {
       azimuth: currentAzimuth,
       elevation: currentElevation,
-      source: (!isNaN(trackingCmdAz) && trackingCmdAz !== 0) ? 'trackingCMD' :
-              (!isNaN(normalAz) && normalAz !== 0) ? 'normal' : 'schedule'
+      normalAz: normalAz,
+      normalEl: normalEl
     })
   }
   // ✅ COMPLETED 상태에서는 경로 유지 (삭제하지 않음)
@@ -1596,11 +1610,14 @@ const updateChart = () => {
 
       if (isTrackingActive) {
         // ✅ trackingActual이 유효하고 CMD 값과 근접한지 확인 (이전 세션 값 방지)
+        // CMD 값이 유효하지 않으면 trackingActual도 사용하지 않음 (추적 시작 직후 점프 방지)
         // CMD 값과 5도 이상 차이나면 이전 세션 값일 가능성이 높음
+        const hasCmdAz = !isNaN(trackingCmdAz) && trackingCmdAz !== 0
+        const hasCmdEl = !isNaN(trackingCmdEl) && trackingCmdEl !== 0
         const isTrackingAzValid = !isNaN(trackingAz) && trackingAz !== 0 &&
-          (!isNaN(trackingCmdAz) && trackingCmdAz !== 0 ? Math.abs(trackingAz - trackingCmdAz) < 5 : true)
+          hasCmdAz && Math.abs(trackingAz - trackingCmdAz) < 5
         const isTrackingElValid = !isNaN(trackingEl) && trackingEl !== 0 &&
-          (!isNaN(trackingCmdEl) && trackingCmdEl !== 0 ? Math.abs(trackingEl - trackingCmdEl) < 5 : true)
+          hasCmdEl && Math.abs(trackingEl - trackingCmdEl) < 5
 
         // 추적 중일 때: trackingActual(검증된) → trackingCMD → 일반 값 → 이전 위치 → 스케줄 시작 위치
         if (isTrackingAzValid) {
@@ -1612,7 +1629,7 @@ const updateChart = () => {
         } else if (currentPosition.value?.azimuth && currentPosition.value.azimuth !== 0) {
           azimuth = currentPosition.value.azimuth  // 이전 유효 값 유지
         } else if (selectedScheduleInfo.value.startAzimuth) {
-          azimuth = selectedScheduleInfo.value.startAzimuth
+          azimuth = Number(selectedScheduleInfo.value.startAzimuth)
         }
 
         if (isTrackingElValid) {
@@ -1624,7 +1641,7 @@ const updateChart = () => {
         } else if (currentPosition.value?.elevation && currentPosition.value.elevation !== 0) {
           elevation = currentPosition.value.elevation  // 이전 유효 값 유지
         } else if (selectedScheduleInfo.value.startElevation) {
-          elevation = selectedScheduleInfo.value.startElevation
+          elevation = Number(selectedScheduleInfo.value.startElevation)
         }
       } else {
         // 추적 중이 아닐 때: 일반 값 사용
@@ -1706,21 +1723,24 @@ const applyLastKnownPosition = () => {
       const trackingCmdEl = parseFloat(icdStore.trackingCMDElevationAngle)
 
       // ✅ trackingActual이 CMD 값과 근접한지 확인 (이전 세션 값 방지)
+      // CMD 값이 유효하지 않으면 trackingActual도 사용하지 않음 (추적 시작 직후 점프 방지)
+      const hasCmdAz = !isNaN(trackingCmdAz) && trackingCmdAz !== 0
+      const hasCmdEl = !isNaN(trackingCmdEl) && trackingCmdEl !== 0
       const isTrackingAzValid = !isNaN(trackingAz) && trackingAz !== 0 &&
-        (!isNaN(trackingCmdAz) && trackingCmdAz !== 0 ? Math.abs(trackingAz - trackingCmdAz) < 5 : true)
+        hasCmdAz && Math.abs(trackingAz - trackingCmdAz) < 5
       const isTrackingElValid = !isNaN(trackingEl) && trackingEl !== 0 &&
-        (!isNaN(trackingCmdEl) && trackingCmdEl !== 0 ? Math.abs(trackingEl - trackingCmdEl) < 5 : true)
+        hasCmdEl && Math.abs(trackingEl - trackingCmdEl) < 5
 
       // ✅ 검증된 trackingActual → trackingCMD → 일반 값
       if (isTrackingAzValid) {
         azimuth = trackingAz
-      } else if (!isNaN(trackingCmdAz) && trackingCmdAz !== 0) {
+      } else if (hasCmdAz) {
         azimuth = trackingCmdAz
       }
 
       if (isTrackingElValid) {
         elevation = trackingEl
-      } else if (!isNaN(trackingCmdEl) && trackingCmdEl !== 0) {
+      } else if (hasCmdEl) {
         elevation = trackingCmdEl
       }
     }

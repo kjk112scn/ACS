@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import type { HardwareErrorLog } from '@/types/hardwareError'
 import { useI18n } from 'vue-i18n'
+import { getApiBaseUrl } from '@/utils/api-config'
 
 export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
   // 상태
@@ -202,7 +203,7 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
         console.log('🔍 팝업 열기 요청 - 클라이언트 ID:', clientId)
 
         const response = await fetch(
-          `http://localhost:8080/api/hardware-error-logs/popup-state?clientId=${encodeURIComponent(clientId)}&isOpen=true`,
+          `${getApiBaseUrl()}/hardware-error-logs/popup-state?clientId=${encodeURIComponent(clientId)}&isOpen=true`,
           {
             method: 'POST',
           },
@@ -232,7 +233,7 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
         console.log('🔍 팝업 닫기 요청 - 클라이언트 ID:', clientId)
 
         await fetch(
-          `http://localhost:8080/api/hardware-error-logs/popup-state?clientId=${encodeURIComponent(clientId)}&isOpen=false`,
+          `${getApiBaseUrl()}/hardware-error-logs/popup-state?clientId=${encodeURIComponent(clientId)}&isOpen=false`,
           {
             method: 'POST',
           },
@@ -331,7 +332,7 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
   // 백엔드에서 히스토리 로드
   const loadHistoryFromBackend = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/hardware-error-logs')
+      const response = await fetch(`${getApiBaseUrl()}/hardware-error-logs`)
       if (response.ok) {
         const data = await response.json()
         console.log('🔍 loadHistoryFromBackend - 원본 데이터:', data)

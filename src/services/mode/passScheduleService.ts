@@ -166,6 +166,15 @@ export interface PassScheduleMasterData {
   KeyholeFinalTransformedStartElevation?: number
   KeyholeFinalTransformedEndElevation?: number
   KeyholeFinalTransformedMaxElevation?: number
+
+  // ✅ KeyholeOptimizedFinalTransformed (최적화된 Train 각도, ±270°) 메타데이터 추가
+  KeyholeOptimizedFinalTransformedMaxAzRate?: number
+  KeyholeOptimizedFinalTransformedMaxElRate?: number
+  KeyholeOptimizedFinalTransformedStartAzimuth?: number
+  KeyholeOptimizedFinalTransformedEndAzimuth?: number
+  KeyholeOptimizedFinalTransformedStartElevation?: number
+  KeyholeOptimizedFinalTransformedEndElevation?: number
+  KeyholeOptimizedFinalTransformedMaxElevation?: number
 }
 export interface TrackingTarget {
   no: number

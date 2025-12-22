@@ -26,7 +26,14 @@
       "Bash(./gradlew.bat build:*)",
       "Bash(git add:*)",
       "Bash(git commit -m \"$(cat <<''EOF''\n위성 추적 데이터 관리 개선 및 디버깅 로그 정리\n\n- EphemerisService에서 추적 시작 시 이전 실시간 데이터 초기화 추가\n- DataStoreService에서 디버깅 로그 주석 처리로 성능 개선\n- PushDataService에서 불필요한 로그 제거\n- UdpFwICDService에서 과도한 로그 정리\n- .gitignore에 Windows nul 파일 무시 규칙 추가\nEOF\n)\")",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(npm run build:*)",
+      "Bash(./gradlew.bat clean build:*)",
+      "Bash(./gradlew.bat clean:*)",
+      "Bash(./gradlew.bat --stop)",
+      "Bash(code --list-extensions:*)",
+      "Bash(git checkout:*)",
+      "Bash(dir \"c:\\\\Users\\\\NG2\\\\source\\\\repos\\\\VueQuasar\" /AD)"
     ],
     "deny": [],
     "ask": []

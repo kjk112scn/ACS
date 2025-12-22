@@ -116,6 +116,7 @@ import { useHardwareErrorLogStore } from '@/stores/hardwareErrorLogStore'
 import { useTheme } from '@/composables/useTheme'
 import { useI18n } from 'vue-i18n'
 import type { HardwareErrorLog } from '@/types/hardwareError'
+import { getApiBaseUrl } from '@/utils/api-config'
 
 const hardwareErrorLogStore = useHardwareErrorLogStore()
 const { initializeTheme } = useTheme()
@@ -265,8 +266,8 @@ const loadErrorLogsPage = async (page: number, reset: boolean = false) => {
     if (startDate.value) params.append('startDate', startDate.value)
     if (endDate.value) params.append('endDate', endDate.value)
 
-    console.log('📄 API 요청 URL:', `http://localhost:8080/api/hardware-error-logs/paginated?${params}`)
-    const response = await fetch(`http://localhost:8080/api/hardware-error-logs/paginated?${params}`)
+    console.log('📄 API 요청 URL:', `${getApiBaseUrl()}/hardware-error-logs/paginated?${params}`)
+    const response = await fetch(`${getApiBaseUrl()}/hardware-error-logs/paginated?${params}`)
 
     if (response.ok) {
       const data = await response.json()
