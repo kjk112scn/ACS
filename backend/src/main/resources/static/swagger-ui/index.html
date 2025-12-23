@@ -1,0 +1,127 @@
+<!-- HTML for static distribution bundle build -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ACS API Documentation</title>
+  <link rel="stylesheet" type="text/css" href="./swagger-ui.css" />
+  <link rel="icon" type="image/png" href="./favicon-32x32.png" sizes="32x32" />
+  <link rel="icon" type="image/png" href="./favicon-16x16.png" sizes="16x16" />
+  <style>
+    html {
+      box-sizing: border-box;
+      overflow: -moz-scrollbars-vertical;
+      overflow-y: scroll;
+    }
+
+    *,
+    *:before,
+    *:after {
+      box-sizing: inherit;
+    }
+
+    body {
+      margin: 0;
+      background: #fafafa;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .language-selector {
+      display: flex;
+      align-items: center;
+      margin-right: 20px;
+    }
+
+    .language-selector select {
+      padding: 5px 10px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      background-color: #fff;
+      font-size: 14px;
+      margin-left: 10px;
+    }
+
+    .language-selector label {
+      font-weight: bold;
+      font-size: 14px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="swagger-ui"></div>
+
+  <script src="./swagger-ui-bundle.js" charset="UTF-8"> </script>
+  <script src="./swagger-ui-standalone-preset.js" charset="UTF-8"> </script>
+  <script>
+    window.onload = function () {
+      // 사용 가능한 API 그룹 정의
+      const apiGroups = [
+        { url: "/v3/api-docs/korean", name: "한국어" },
+        { url: "/v3/api-docs/english", name: "English" }
+      ];
+
+      // URL 파라미터에서 현재 선택된 API 그룹 가져오기
+      const urlParams = new URLSearchParams(window.location.search);
+      const selectedUrl = urlParams.get("url") || "/v3/api-docs/korean"; // 기본값은 한국어
+
+      // Swagger UI 초기화
+      const ui = SwaggerUIBundle({
+        urls: apiGroups,
+        "urls.primaryName": "한국어",
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        plugins: [
+          SwaggerUIBundle.plugins.DownloadUrl
+        ],
+        layout: "BaseLayout",
+        docExpansion: "none",
+        tagsSorter: "none",
+        operationsSorter: "method",
+        defaultModelsExpandDepth: 1
+      });
+
+      // 커스텀 언어 선택기 추가
+      const topbarElement = document.querySelector('.topbar');
+      if (topbarElement) {
+        const languageSelector = document.createElement('div');
+        languageSelector.className = 'language-selector';
+        
+        const label = document.createElement('label');
+        label.textContent = '언어 / Language:';
+        
+        const select = document.createElement('select');
+        
+        apiGroups.forEach(group => {
+          const option = document.createElement('option');
+          option.value = group.url;
+          option.textContent = group.name;
+          if (group.url === selectedUrl) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        });
+        
+        select.addEventListener('change', function() {
+          window.location.href = `?url=${this.value}`;
+        });
+        
+        languageSelector.appendChild(label);
+        languageSelector.appendChild(select);
+        topbarElement.appendChild(languageSelector);
+      }
+
+      window.ui = ui;
+    }
+  </script>
+</body>
+</html> 

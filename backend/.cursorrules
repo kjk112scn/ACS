@@ -1,0 +1,173 @@
+﻿# ACS API 프로젝트 규칙
+
+## 📄 프로젝트 개요
+**ACS (Antenna Control System) API** - 위성 및 태양 추적을 위한 안테나 제어 시스템 백엔드
+
+**기술 스택**: Kotlin 1.9 + Spring Boot 3.2 + WebFlux + Orekit
+
+---
+
+## 🎯 핵심 원칙
+
+### 1. 코딩 목표
+- **가독성 우선**: 코드는 읽기 쉽고 이해하기 쉽게 작성
+- **일관성**: 동일한 패턴으로 일관되게 구현
+- **유지보수성**: 나중에 수정하기 쉽게 구조화
+
+### 2. 아키텍처
+- **계층 분리**: Controller → Service → Algorithm → Repository
+- **의존성 역전**: 인터페이스 우선 설계
+- **단일 책임**: 각 클래스는 하나의 책임만
+- **순수 함수**: Algorithm 계층은 외부 의존성 최소화
+
+### 3. 코딩 스타일
+- **Kotlin 베스트 프랙티스** 준수
+- **WebFlux** 리액티브 프로그래밍
+- **함수형 프로그래밍** 스타일 선호
+- **KDoc** 주석: 모든 public API에 작성
+
+---
+
+## 📁 문서 관리 시스템
+
+### 폴더 구조
+```
+docs/
+├── Development_Guide.md       # ⭐ 시작점: 전체 개발 가이드
+├── README.md                  # 문서 시스템 설명
+├── plans/                     # 계획 단계 (협의 중)
+├── completed/                 # 완료 단계 (구현 완료)
+└── references/                # 세부 참조 (상세 문서)
+```
+
+### AI 협의 명령어
+
+#### 1. 계획 작성
+```
+"docs/plans/ 폴더에 {기능} 계획 만들어줘"
+→ docs/plans/{기능}_Plan.md 생성
+```
+
+#### 2. 완료 문서 생성 (자동 워크플로우)
+
+**완료 판단 키워드**:
+사용자가 다음 중 하나의 키워드를 사용하면 자동으로 완료 처리:
+- "이 계획은 완료되었어"
+- "계획을 완료처리해"
+- "이 플랜 완료해줘"
+- "{기능명} 플랜 완료"
+
+**자동 처리 프로세스**:
+1. `docs/plans/{기능명}_Plan.md` 파일 읽기
+2. 완료 문서 생성: `docs/completed/{기능명}_Completed.md`
+   - 파일명 변환 규칙: `{기능명}_Plan.md` → `{기능명}_Completed.md`
+   - 예: `Train_Algorithm_Plan.md` → `Train_Algorithm_Completed.md`
+3. 원본 플랜 파일 삭제 (`docs/plans/`에서 제거)
+4. 완료 문서에 메타데이터 추가:
+   - 완료일 추가
+   - 상태: ✅ 구현 완료
+   - 원본 플랜 내용을 기반으로 완료 문서 템플릿 적용
+5. `docs/plans/README.md` 업데이트 (진행 중 목록에서 제거)
+6. `docs/completed/README.md` 업데이트 (완료 목록에 추가)
+
+**파일 경로 규칙**:
+- 플랜 작성 시: `@plans/` 또는 `docs/plans/` 경로 사용
+- 완료 문서: `@completed/` 또는 `docs/completed/` 경로 사용
+
+#### 3. 개발 가이드 통합
+```
+"@docs/completed/{기능}_Completed.md Development_Guide에 통합해줘"
+→ Development_Guide.md 업데이트 (핵심만)
+→ references/{카테고리}/{기능}_Design.md 생성 (세부)
+→ 버전 및 변경 이력 업데이트
+```
+
+### 문서 작성 원칙
+- **plans/**: Step by Step 형태, 코드 예시 포함
+- **completed/**: 다이어그램/표 중심, 구현 완료 상태
+- **references/**: 설계 문서, 기술 상세
+- **Development_Guide.md**: 전체 개요, 핵심만 (3-5문단)
+
+### 버전 관리
+```
+Semantic Versioning: MAJOR.MINOR.PATCH
+
+- MAJOR: 아키텍처 대규모 변경
+- MINOR: 새 기능 추가
+- PATCH: 버그 수정
+```
+
+---
+
+## 🌏 다국어 API 문서
+
+### 구현 방식
+- `{Feature}ApiDescriptions.kt` + `OpenApiUtils.kt` 패턴
+- `operationId` 기반 자동 적용
+- 한국어 우선 작성 → 영어 번역
+
+### 필수 사항
+- 모든 API에 고유한 `operationId` 지정
+- `EphemerisApiDescriptions.kt` 등에 설명 작성
+- Swagger UI에서 한국어/영어 그룹 분리
+
+---
+
+## 📝 파일 수정 안내 규칙
+
+### 경로 표시
+파일 수정 시 **전체 경로**를 명시하고 **클릭 가능**하게 작성:
+
+```markdown
+**파일**: `src/main/kotlin/com/gtlsystems/acs_api/service/EphemerisService.kt`
+**라인**: 100-120 (선택사항)
+**수정 내용**: {구체적인 수정 사항}
+```
+
+### 코드 블록
+````markdown
+```kotlin
+// 수정 코드
+fun calculateAngles() {
+    // ...
+}
+```
+````
+
+---
+
+## 📄 상세 문서 참조
+
+### 프로젝트 구조 및 폴더 설명
+→ **`docs/Development_Guide.md`** 참조
+
+### 개발 프로세스 및 코딩 표준
+→ **`docs/references/development/`** 참조
+
+### API 문서 및 사용법
+→ **`docs/references/api/`** 참조
+
+### 배포 및 운영
+→ **`docs/references/deployment/`** 참조
+
+---
+
+## ⚠️ 주의사항
+
+### 필수 검토 사항
+1. **유니코드**: 한글 주석이 깨졌을 경우 다시 수정
+2. **컴파일**: 수정 후 반드시 `gradlew compileKotlin` 실행
+3. **린팅**: 코드 스타일 규칙 준수
+4. **문서 동기화**: 코드 변경 시 문서도 함께 업데이트
+
+### 금지 사항
+- 하드코딩된 값 (설정 파일 사용)
+- 비즈니스 로직을 Controller에 작성
+- 데이터 액세스를 Service에 작성
+- public API에 KDoc 주석 누락
+
+---
+
+**규칙 버전**: 2.0.0 (최적화)  
+**최종 업데이트**: 2024-12  
+**상세 문서**: `docs/Development_Guide.md`
