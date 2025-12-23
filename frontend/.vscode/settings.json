@@ -1,0 +1,23 @@
+{
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": true,
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": ["source.fixAll.eslint"],
+  "eslint.validate": ["javascript", "javascriptreact", "typescript", "vue"],
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "i18n-ally.localesPaths": ["src/i18n"],
+  "i18n-ally.keystyle": "nested",
+  "i18n-ally.display.only": ["ko-KR", "en-US"],
+  "i18n-ally.extract.keygenStyle": "camelCase",
+  "i18n-ally.namespace": true,
+  "i18n-ally.defaultNamespace": "common",
+  "i18n-ally.sortKeys": true,
+  "i18n-ally.enabledParsers": ["ts"],
+  "i18n-ally.sourceLanguage": "ko-KR",
+  "i18n-ally.display.languageTagStyle": "standard",
+  "[vue]": {
+    "editor.defaultFormatter": "Vue.volar"
+  },
+  "cody.chat.preInstruction": "Please reply in Korean. Please write only the parts that need to be corrected. Please write them separately by Script, Template, and Style."
+}

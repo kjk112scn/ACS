@@ -1,0 +1,74 @@
+// 사진 기반 테마 변수 정의
+:root {
+  // 기본 색상 변수들
+  --theme-primary: #091d24;
+  --theme-secondary: #26a69a;
+  --theme-accent: #9c27b0;
+  --theme-positive: #00e676;
+  --theme-negative: #f44336;
+  --theme-info: #00bcd4;
+  --theme-warning: #ffc107;
+
+  // 사진 기반 배경 색상
+  --theme-background: #15282f;
+  --theme-surface: #091d24;
+  --theme-surface-elevated: #243447;
+  --theme-card-background: #091d24;
+  --theme-dark: #15282f;
+  --theme-dark-page: #0a0e13;
+
+  // 텍스트 색상
+  --theme-text: #ffffff;
+  --theme-text-secondary: #b0bec5;
+  --theme-text-muted: #78909c;
+
+  // 테두리 및 구분선 (사진의 밝은 회색 라인)
+  --theme-border: #37474f; // 카드 테두리 (밝은 회색)
+  --theme-border-light: #455a64; // 밝은 테두리
+  --theme-divider: #263238; // 구분선
+
+  // 그림자
+  --theme-shadow: rgba(0, 0, 0, 0.3);
+  --theme-shadow-light: rgba(0, 0, 0, 0.1);
+
+  // DashboardPage 전용 색상
+  --theme-azimuth-color: #ff5722;
+  --theme-elevation-color: #2196f3;
+  --theme-tilt-color: #4caf50;
+
+  // LED 색상
+  --theme-led-normal: #00e676;
+  --theme-led-error: #f44336;
+  --theme-led-stow-active: #00e676;
+  --theme-led-inactive: #78909c;
+
+  // 버튼 색상
+  --theme-button-primary: #1976d2;
+  --theme-button-secondary: #455a64;
+  --theme-button-warning: #ffc107;
+  --theme-button-success: #00e676;
+  --theme-button-danger: #f44336;
+
+  // 상태 색상
+  --theme-status-active: #00e676;
+  --theme-status-inactive: #78909c;
+  --theme-status-warning: #ffc107;
+  --theme-status-error: #f44336;
+}
+
+// 라이트 모드 변수 오버라이드
+.body--light {
+  --theme-background: #ffffff;
+  --theme-surface: #f5f5f5;
+  --theme-surface-elevated: #ffffff;
+  --theme-card-background: #ffffff;
+  --theme-primary: #1976d2; // 라이트 모드용 primary 색상 추가
+  --theme-text: #212121;
+  --theme-text-secondary: rgba(0, 0, 0, 0.6);
+  --theme-text-muted: rgba(0, 0, 0, 0.4);
+  --theme-border: #e0e0e0;
+  --theme-border-light: #f0f0f0;
+  --theme-divider: #e0e0e0;
+  --theme-shadow: rgba(0, 0, 0, 0.1);
+  --theme-shadow-light: rgba(0, 0, 0, 0.05);
+}
