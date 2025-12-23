@@ -79,7 +79,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, onBeforeUnmount } from 'vue'
 import EssentialLink, { type EssentialLinkProps } from '@/components/common/EssentialLink.vue'
-import SettingsModal from '@/components/settings/SettingsModal.vue'
+import SettingsModal from '@/components/Settings/SettingsModal.vue'
 import { openComponent } from '@/utils/windowUtils' // ✅ 기존 함수 사용
 import { useQuasar } from 'quasar'
 import { useICDStore } from '@/stores/icd/icdStore' // ICD Store import 추가

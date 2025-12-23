@@ -1,0 +1,17 @@
+# Windows system files
+nul
+Thumbs.db
+Desktop.ini
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS generated files
+.DS_Store
+*.swp
+*.swo
+
+# Logs
+*.log
