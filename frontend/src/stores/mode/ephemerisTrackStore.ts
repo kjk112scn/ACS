@@ -107,14 +107,8 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
   let pendingUpdates = 0
   const maxPendingUpdates = 5
 
-  // ✅ 추적 시작 지연을 위한 상태
-  const trackingStartTime = ref<number | null>(null)
-  const isInitialDelayActive = ref(false)
-  const INITIAL_DELAY_MS = 10000 // 10초 지연
-
-  // ✅ 점프 방지를 위한 이전 값 저장
+  // ✅ 마지막 유효 포인트 저장
   const lastValidPoint = ref<{ azimuth: number; elevation: number } | null>(null)
-  const MAX_JUMP_THRESHOLD = 10 // 한 번에 10° 이상 점프하면 무시
 
   // ✅ Store 레벨 추적 경로 업데이트 타이머 (컴포넌트와 무관하게 계속 업데이트)
   let storeTrackingTimer: number | null = null
@@ -368,54 +362,22 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
   }
 
   /**
-
-   * ✅ 추적 경로 업데이트 (비동기 최적화의 핵심) - 수정된 버전
+   * ✅ 추적 경로 업데이트 (단순화된 버전)
    */
   const updateTrackingPath = async (azimuth: number, elevation: number): Promise<void> => {
     // ✅ 입력 검증
     if (typeof azimuth !== 'number' || typeof elevation !== 'number') {
-      console.warn('🚫 잘못된 입력 타입:', { azimuth, elevation })
       return
     }
 
-    // ✅ NaN 체크 추가
+    // ✅ NaN 체크
     if (isNaN(azimuth) || isNaN(elevation)) {
-      console.warn('🚫 NaN 값 감지:', { azimuth, elevation })
       return
     }
 
-    // ✅ (0,0) 체크 추가 - 잘못된 경로 시작점 방지
+    // ✅ (0,0) 체크 - 유효하지 않은 값 방지
     if (azimuth === 0 && elevation === 0) {
-      return // (0,0)은 무시 - 경로에 추가하지 않음
-    }
-
-    // ✅ 추적 시작 후 10초 지연 체크
-    if (isInitialDelayActive.value && trackingStartTime.value) {
-      const elapsedTime = Date.now() - trackingStartTime.value
-      if (elapsedTime < INITIAL_DELAY_MS) {
-        // console.log(`⏸️ 추적 시작 지연 중... (${elapsedTime}ms / ${INITIAL_DELAY_MS}ms)`)
-        return // 경로 업데이트 무시
-      } else {
-        // ✅ 지연 시간 완료 - 현재 값을 첫 유효 포인트로 저장
-        isInitialDelayActive.value = false
-        lastValidPoint.value = { azimuth, elevation }
-        console.log('✅ 추적 시작 지연 완료 - 경로 그리기 시작:', { azimuth, elevation })
-      }
-    }
-
-    // ✅ 점프 방지: 이전 유효 값과 비교하여 급격한 변화 감지
-    if (lastValidPoint.value) {
-      const azDiff = Math.abs(azimuth - lastValidPoint.value.azimuth)
-      const elDiff = Math.abs(elevation - lastValidPoint.value.elevation)
-
-      // Azimuth 360° 경계 처리 (예: 359° → 1° 변화는 정상)
-      const azDiffNormalized = azDiff > 180 ? 360 - azDiff : azDiff
-
-      // 한 번에 MAX_JUMP_THRESHOLD 이상 점프하면 무시
-      if (azDiffNormalized > MAX_JUMP_THRESHOLD || elDiff > MAX_JUMP_THRESHOLD) {
-        console.warn(`🚫 점프 감지 - 무시: Az ${lastValidPoint.value.azimuth.toFixed(2)}° → ${azimuth.toFixed(2)}° (diff: ${azDiffNormalized.toFixed(2)}°), El ${lastValidPoint.value.elevation.toFixed(2)}° → ${elevation.toFixed(2)}° (diff: ${elDiff.toFixed(2)}°)`)
-        return // 점프하는 값은 무시
-      }
+      return
     }
 
     // ✅ 유효한 값으로 업데이트
@@ -580,11 +542,7 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     trackingPath.value.lastUpdateTime = Date.now()
     pendingUpdates = 0
 
-    // ✅ 지연 관련 상태 초기화
-    trackingStartTime.value = null
-    isInitialDelayActive.value = false
-
-    // ✅ 점프 방지용 이전 값 초기화
+    // ✅ 이전 값 초기화
     lastValidPoint.value = null
 
     // ✅ 통계 초기화
@@ -715,54 +673,35 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
       try {
         const icdStore = useICDStore()
 
-        // 추적 중인지 확인
+        // ✅ 추적 중인지 확인
         const isTrackingActive = icdStore.ephemerisTrackingState === 'TRACKING'
 
         if (!isTrackingActive) {
           return // 추적 중이 아니면 업데이트하지 않음
         }
 
-        // ✅ 현재 위치 가져오기 (0,0 점프 방지)
-        // trackingActual → trackingCMD → 일반 값 순으로 유효한 값 사용
-        const trackingAz = parseFloat(icdStore.trackingActualAzimuthAngle)
-        const trackingEl = parseFloat(icdStore.trackingActualElevationAngle)
+        // ✅ 추적 값 (Page와 동일한 로직)
+        const trackingActualAz = parseFloat(icdStore.trackingActualAzimuthAngle)
+        const trackingActualEl = parseFloat(icdStore.trackingActualElevationAngle)
         const trackingCmdAz = parseFloat(icdStore.trackingCMDAzimuthAngle)
         const trackingCmdEl = parseFloat(icdStore.trackingCMDElevationAngle)
         const normalAz = parseFloat(icdStore.azimuthAngle)
         const normalEl = parseFloat(icdStore.elevationAngle)
 
-        // ✅ trackingActual이 CMD와 근접한지 확인 (이전 세션 값 방지)
-        const isTrackingAzValid = !isNaN(trackingAz) && trackingAz !== 0 &&
-          (!isNaN(trackingCmdAz) && trackingCmdAz !== 0 ? Math.abs(trackingAz - trackingCmdAz) < 5 : true)
-        const isTrackingElValid = !isNaN(trackingEl) && trackingEl !== 0 &&
-          (!isNaN(trackingCmdEl) && trackingCmdEl !== 0 ? Math.abs(trackingEl - trackingCmdEl) < 5 : true)
+        // ✅ 추적 중: trackingActual 우선, 없으면 trackingCMD, 없으면 normal
+        let azimuth = !isNaN(trackingActualAz) ? trackingActualAz : (!isNaN(trackingCmdAz) ? trackingCmdAz : normalAz)
+        let elevation = !isNaN(trackingActualEl) ? trackingActualEl : (!isNaN(trackingCmdEl) ? trackingCmdEl : normalEl)
 
-        // ✅ 유효한 값 선택 (0,0 방지)
-        let azimuth = 0
-        let elevation = 0
+        // ✅ NaN 방지
+        if (isNaN(azimuth)) azimuth = 0
+        if (isNaN(elevation)) elevation = 0
 
-        if (isTrackingAzValid) {
-          azimuth = trackingAz
-        } else if (!isNaN(trackingCmdAz) && trackingCmdAz !== 0) {
-          azimuth = trackingCmdAz
-        } else if (!isNaN(normalAz) && normalAz !== 0) {
-          azimuth = normalAz
-        }
-
-        if (isTrackingElValid) {
-          elevation = trackingEl
-        } else if (!isNaN(trackingCmdEl) && trackingCmdEl !== 0) {
-          elevation = trackingCmdEl
-        } else if (!isNaN(normalEl) && normalEl !== 0) {
-          elevation = normalEl
-        }
-
-        // ✅ (0,0)인 경우 업데이트 스킵 (잘못된 경로 방지)
+        // ✅ (0,0)인 경우 업데이트 스킵
         if (azimuth === 0 && elevation === 0) {
           return
         }
 
-        // Store의 추적 경로 업데이트 (차트와 무관하게 계속 업데이트)
+        // Store의 추적 경로 업데이트
         void updateTrackingPath(azimuth, elevation)
       } catch (error) {
         console.error('❌ Ephemeris Store 레벨 추적 경로 업데이트 오류:', error)
@@ -798,8 +737,6 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
 
       await ephemerisTrackService.startEphemerisTracking(mstId, detailId)
       trackingStatus.value = 'active'
-      trackingStartTime.value = Date.now() // 추적 시작 시간 기록
-      isInitialDelayActive.value = true // 지연 시작 활성화
 
       // ✅ Store 레벨 추적 경로 업데이트 시작
       startStoreTrackingUpdate()
@@ -1031,11 +968,7 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
       lastUpdateTime: 0,
     }
 
-    // ✅ 지연 관련 상태 초기화
-    trackingStartTime.value = null
-    isInitialDelayActive.value = false
-
-    // ✅ 점프 방지용 이전 값 초기화
+    // ✅ 이전 값 초기화
     lastValidPoint.value = null
 
     // ✅ 오프셋 값 초기화

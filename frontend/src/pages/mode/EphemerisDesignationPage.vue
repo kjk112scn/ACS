@@ -1159,12 +1159,9 @@ const selectedScheduleInfo = computed(() => {
       recommendedTrainAngle: selected.IsKeyhole
         ? (selected.KeyholeOptimizedRecommendedTrainAngle || selected.RecommendedTrainAngle || 0)
         : (selected.RecommendedTrainAngle || 0),
-      FinalTransformedMaxAzRate: selected.IsKeyhole
-        ? (selected.KeyholeOptimizedFinalTransformedMaxAzRate || selected.FinalTransformedMaxAzRate || 0)
-        : (selected.FinalTransformedMaxAzRate || 0),
-      FinalTransformedMaxElRate: selected.IsKeyhole
-        ? (selected.KeyholeOptimizedFinalTransformedMaxElRate || selected.FinalTransformedMaxElRate || 0)
-        : (selected.FinalTransformedMaxElRate || 0),
+      // ✅ 3축 속도 (Train=0, ±270°) - 항상 FinalTransformed 값 사용
+      FinalTransformedMaxAzRate: selected.FinalTransformedMaxAzRate || 0,
+      FinalTransformedMaxElRate: selected.FinalTransformedMaxElRate || 0,
       KeyholeAxisTransformedMaxAzRate: selected.KeyholeAxisTransformedMaxAzRate,
       KeyholeAxisTransformedMaxElRate: selected.KeyholeAxisTransformedMaxElRate,
       KeyholeFinalTransformedMaxAzRate: selected.KeyholeFinalTransformedMaxAzRate,
@@ -1589,65 +1586,37 @@ const updateChart = () => {
 
   perfMonitor.measureFrame(() => {
     try {
-      // ✅ 추적 상태에 따라 다른 데이터 소스 사용
+      // ✅ 추적 상태 확인
       const isTrackingActive = icdStore.ephemerisTrackingState === "TRACKING" ||
                                  icdStore.ephemerisTrackingState === "IN_PROGRESS" ||
                                  icdStore.passScheduleStatusInfo.isActive
 
-      // ✅ 추적 시작 직후 tracking 값이 없으면 일반 값 사용 (0으로 이동하는 문제 해결)
+      // ✅ 일반 값 (비추적 시 사용)
       const normalAz = parseFloat(icdStore.azimuthAngle)
       const normalEl = parseFloat(icdStore.elevationAngle)
-      const trackingAz = parseFloat(icdStore.trackingActualAzimuthAngle)
-      const trackingEl = parseFloat(icdStore.trackingActualElevationAngle)
-      // ✅ trackingCMD 값 추가 (백엔드에서 즉시 설정됨, 이전 세션 값 방지)
+
+      // ✅ 추적 값 (추적 시 사용)
+      const trackingActualAz = parseFloat(icdStore.trackingActualAzimuthAngle)
+      const trackingActualEl = parseFloat(icdStore.trackingActualElevationAngle)
       const trackingCmdAz = parseFloat(icdStore.trackingCMDAzimuthAngle)
       const trackingCmdEl = parseFloat(icdStore.trackingCMDElevationAngle)
 
-      // ✅ 유효한 값 선택 (0이 아닌 값 우선)
-      // 우선순위: trackingActual(CMD와 근접한 경우) > trackingCMD > 일반 값 > 이전 위치 > 스케줄 시작 위치
-      let azimuth = 0
-      let elevation = 0
+      let azimuth: number
+      let elevation: number
 
       if (isTrackingActive) {
-        // ✅ trackingActual이 유효하고 CMD 값과 근접한지 확인 (이전 세션 값 방지)
-        // CMD 값이 유효하지 않으면 trackingActual도 사용하지 않음 (추적 시작 직후 점프 방지)
-        // CMD 값과 5도 이상 차이나면 이전 세션 값일 가능성이 높음
-        const hasCmdAz = !isNaN(trackingCmdAz) && trackingCmdAz !== 0
-        const hasCmdEl = !isNaN(trackingCmdEl) && trackingCmdEl !== 0
-        const isTrackingAzValid = !isNaN(trackingAz) && trackingAz !== 0 &&
-          hasCmdAz && Math.abs(trackingAz - trackingCmdAz) < 5
-        const isTrackingElValid = !isNaN(trackingEl) && trackingEl !== 0 &&
-          hasCmdEl && Math.abs(trackingEl - trackingCmdEl) < 5
-
-        // 추적 중일 때: trackingActual(검증된) → trackingCMD → 일반 값 → 이전 위치 → 스케줄 시작 위치
-        if (isTrackingAzValid) {
-          azimuth = trackingAz
-        } else if (!isNaN(trackingCmdAz) && trackingCmdAz !== 0) {
-          azimuth = trackingCmdAz
-        } else if (!isNaN(normalAz) && normalAz !== 0) {
-          azimuth = normalAz
-        } else if (currentPosition.value?.azimuth && currentPosition.value.azimuth !== 0) {
-          azimuth = currentPosition.value.azimuth  // 이전 유효 값 유지
-        } else if (selectedScheduleInfo.value.startAzimuth) {
-          azimuth = Number(selectedScheduleInfo.value.startAzimuth)
-        }
-
-        if (isTrackingElValid) {
-          elevation = trackingEl
-        } else if (!isNaN(trackingCmdEl) && trackingCmdEl !== 0) {
-          elevation = trackingCmdEl
-        } else if (!isNaN(normalEl) && normalEl !== 0) {
-          elevation = normalEl
-        } else if (currentPosition.value?.elevation && currentPosition.value.elevation !== 0) {
-          elevation = currentPosition.value.elevation  // 이전 유효 값 유지
-        } else if (selectedScheduleInfo.value.startElevation) {
-          elevation = Number(selectedScheduleInfo.value.startElevation)
-        }
+        // ✅ 추적 중: trackingActual 우선, 없으면 trackingCMD
+        azimuth = !isNaN(trackingActualAz) ? trackingActualAz : (!isNaN(trackingCmdAz) ? trackingCmdAz : normalAz)
+        elevation = !isNaN(trackingActualEl) ? trackingActualEl : (!isNaN(trackingCmdEl) ? trackingCmdEl : normalEl)
       } else {
-        // 추적 중이 아닐 때: 일반 값 사용
-        azimuth = !isNaN(normalAz) ? normalAz : 0
-        elevation = !isNaN(normalEl) ? normalEl : 0
+        // ✅ 비추적: 일반 값 사용
+        azimuth = normalAz
+        elevation = normalEl
       }
+
+      // ✅ NaN 방지 (최종 fallback)
+      if (isNaN(azimuth)) azimuth = 0
+      if (isNaN(elevation)) elevation = 0
 
       const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
       const normalizedEl = Math.max(0, Math.min(90, elevation))
@@ -1707,43 +1676,38 @@ const applyLastKnownPosition = () => {
   }
 
   try {
+    // ✅ 추적 상태 확인
     const isTrackingActive =
       icdStore.ephemerisTrackingState === 'TRACKING' ||
       icdStore.ephemerisTrackingState === 'IN_PROGRESS' ||
       icdStore.passScheduleStatusInfo.isActive
 
-    let azimuth = parseFloat(icdStore.azimuthAngle) || 0
-    let elevation = parseFloat(icdStore.elevationAngle) || 0
+    // ✅ 일반 값 (비추적 시 사용)
+    const normalAz = parseFloat(icdStore.azimuthAngle)
+    const normalEl = parseFloat(icdStore.elevationAngle)
+
+    // ✅ 추적 값 (추적 시 사용)
+    const trackingActualAz = parseFloat(icdStore.trackingActualAzimuthAngle)
+    const trackingActualEl = parseFloat(icdStore.trackingActualElevationAngle)
+    const trackingCmdAz = parseFloat(icdStore.trackingCMDAzimuthAngle)
+    const trackingCmdEl = parseFloat(icdStore.trackingCMDElevationAngle)
+
+    let azimuth: number
+    let elevation: number
 
     if (isTrackingActive) {
-      const trackingAz = parseFloat(icdStore.trackingActualAzimuthAngle)
-      const trackingEl = parseFloat(icdStore.trackingActualElevationAngle)
-      // ✅ trackingCMD 값 추가 (이전 세션 값 검증용)
-      const trackingCmdAz = parseFloat(icdStore.trackingCMDAzimuthAngle)
-      const trackingCmdEl = parseFloat(icdStore.trackingCMDElevationAngle)
-
-      // ✅ trackingActual이 CMD 값과 근접한지 확인 (이전 세션 값 방지)
-      // CMD 값이 유효하지 않으면 trackingActual도 사용하지 않음 (추적 시작 직후 점프 방지)
-      const hasCmdAz = !isNaN(trackingCmdAz) && trackingCmdAz !== 0
-      const hasCmdEl = !isNaN(trackingCmdEl) && trackingCmdEl !== 0
-      const isTrackingAzValid = !isNaN(trackingAz) && trackingAz !== 0 &&
-        hasCmdAz && Math.abs(trackingAz - trackingCmdAz) < 5
-      const isTrackingElValid = !isNaN(trackingEl) && trackingEl !== 0 &&
-        hasCmdEl && Math.abs(trackingEl - trackingCmdEl) < 5
-
-      // ✅ 검증된 trackingActual → trackingCMD → 일반 값
-      if (isTrackingAzValid) {
-        azimuth = trackingAz
-      } else if (hasCmdAz) {
-        azimuth = trackingCmdAz
-      }
-
-      if (isTrackingElValid) {
-        elevation = trackingEl
-      } else if (hasCmdEl) {
-        elevation = trackingCmdEl
-      }
+      // ✅ 추적 중: trackingActual 우선, 없으면 trackingCMD
+      azimuth = !isNaN(trackingActualAz) ? trackingActualAz : (!isNaN(trackingCmdAz) ? trackingCmdAz : normalAz)
+      elevation = !isNaN(trackingActualEl) ? trackingActualEl : (!isNaN(trackingCmdEl) ? trackingCmdEl : normalEl)
+    } else {
+      // ✅ 비추적: 일반 값 사용
+      azimuth = normalAz
+      elevation = normalEl
     }
+
+    // ✅ NaN 방지 (최종 fallback)
+    if (isNaN(azimuth)) azimuth = 0
+    if (isNaN(elevation)) elevation = 0
 
     const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
     const normalizedEl = Math.max(0, Math.min(90, elevation))

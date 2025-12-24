@@ -442,19 +442,22 @@ class UdpFwICDService(
 
             val dataToSend = setDataFrameInstance.setDataFrame()
 
-            // ✅ CMD 값 설정 (오프셋 적용)
-            val calcCmdAz = azAngle + GlobalData.Offset.azimuthPositionOffset
-            val calcCmdEl = elAngle + GlobalData.Offset.elevationPositionOffset
-            val calcCmdTrain = trainAngle + GlobalData.Offset.trainPositionOffset + GlobalData.Offset.trueNorthOffset
-
+            // ✅ CMD 값 설정 (오프셋 적용) - multiAxis에 따라 활성화된 축만 업데이트
             PushData.CMD.apply {
-                cmdAzimuthAngle = calcCmdAz
-                cmdElevationAngle = calcCmdEl
-                cmdTrainAngle = calcCmdTrain
+                if (multiAxis.get(0)) {  // Azimuth 활성화 시
+                    cmdAzimuthAngle = azAngle + GlobalData.Offset.azimuthPositionOffset
+                }
+                if (multiAxis.get(1)) {  // Elevation 활성화 시
+                    cmdElevationAngle = elAngle + GlobalData.Offset.elevationPositionOffset
+                }
+                if (multiAxis.get(2)) {  // Train 활성화 시
+                    cmdTrainAngle = trainAngle + GlobalData.Offset.trainPositionOffset + GlobalData.Offset.trueNorthOffset
+                }
             }
 
             // ✅ 디버깅: CMD 값 설정 확인
-            logger.info("📝 [CMD 설정] PushData.CMD에 값 설정: Az={}, El={}, Train={}", calcCmdAz, calcCmdEl, calcCmdTrain)
+            logger.info("📝 [CMD 설정] multiAxis={}, Az활성={}, El활성={}, Train활성={}",
+                multiAxis, multiAxis.get(0), multiAxis.get(1), multiAxis.get(2))
             logger.info("📝 [CMD 확인] PushData.CMD 현재값: Az={}, El={}, Train={}",
                 PushData.CMD.cmdAzimuthAngle, PushData.CMD.cmdElevationAngle, PushData.CMD.cmdTrainAngle)
 
