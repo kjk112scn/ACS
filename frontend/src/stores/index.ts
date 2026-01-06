@@ -33,6 +33,7 @@ export { useFeedSettingsStore } from './ui/feedSettingsStore'
 
 // 타입들도 export
 export type { ScheduleItem } from './mode/passScheduleStore'
+export type { AxisKey, LoopDirection, LoopAxisState, LoopState } from './mode/slewStore'
 
 // Pinia store instance를 default export
 export default createPinia()

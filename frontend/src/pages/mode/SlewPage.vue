@@ -4,6 +4,15 @@
       <q-card class="mode-card slew-card">
         <!-- 축별 제어 패널 (Step 모드와 동일한 구조) -->
         <div class="slew-container">
+          <!-- Loop 체크박스 -->
+          <div class="loop-checkbox-section">
+            <q-checkbox
+              v-model="slewStore.loopEnabled"
+              color="primary"
+              label="Loop"
+              class="loop-checkbox"
+            />
+          </div>
           <div class="row q-col-gutter-md justify-center">
             <!-- Azimuth 패널 -->
             <div class="col-12 col-md-4">
@@ -82,9 +91,10 @@
 </template>
 
 <script setup lang="ts">
-import { defineComponent } from 'vue'
+import { defineComponent, onUnmounted } from 'vue'
 import { useICDStore } from '../../stores/icd/icdStore'
-import { useSlewModeStore } from '@/stores'
+import { useSlewModeStore, type AxisKey } from '@/stores'
+import { useAngleLimitsSettingsStore } from '@/stores/api/settings/angleLimitsSettingsStore'
 
 // 컴포넌트 이름 정의
 defineComponent({
@@ -94,10 +104,23 @@ defineComponent({
 // 스토어 인스턴스 생성
 const icdStore = useICDStore()
 const slewStore = useSlewModeStore()
+const angleLimitsStore = useAngleLimitsSettingsStore()
+
+// Loop 도달 판정 상수
+const ARRIVAL_THRESHOLD = 0.5 // ±0.5°
+const STABLE_COUNT_REQUIRED = 3 // 3초 연속 (1초 간격 체크)
+const DIRECTION_CHANGE_COOLDOWN = 5000 // 방향 전환 후 5초 쿨다운 (ms)
 
 // Go 버튼 핸들러
 const handleGo = async () => {
   try {
+    // Loop 모드 체크
+    if (slewStore.loopEnabled) {
+      await startLoop()
+      return
+    }
+
+    // 일반 Slew 모드
     // 속도 값에 따라 각도 계산
     const azSpeed = parseFloat(slewStore.speeds.azimuth)
     const elSpeed = parseFloat(slewStore.speeds.elevation)
@@ -136,6 +159,11 @@ const handleGo = async () => {
 // Stop 버튼 핸들러
 const handleStop = async () => {
   try {
+    // Loop 실행 중이면 먼저 Loop 정지
+    if (slewStore.loopRunning) {
+      stopLoop()
+    }
+
     await icdStore.stopCommand(
       slewStore.selectedAxes.azimuth,
       slewStore.selectedAxes.elevation,
@@ -183,6 +211,210 @@ const handleBlur = (axis: 'azimuth' | 'elevation' | 'train') => {
     slewStore.updateSpeed(axis, numValue.toFixed(2))
   }
 }
+
+// === Loop 관련 함수 ===
+
+// 축별 각도 제한 가져오기
+const getAxisLimits = (axis: AxisKey) => {
+  const limits = angleLimitsStore.angleLimitsSettings
+  switch (axis) {
+    case 'azimuth':
+      return { min: limits.azimuthMin, max: limits.azimuthMax }
+    case 'elevation':
+      return { min: limits.elevationMin, max: limits.elevationMax }
+    case 'train':
+      return { min: limits.trainMin, max: limits.trainMax }
+  }
+}
+
+// 축별 현재 각도 가져오기 (Slew 모드는 일반 각도 사용, tracking각도는 EPHEMERIS/PASS Schedule만)
+const getActualAngle = (axis: AxisKey): number => {
+  switch (axis) {
+    case 'azimuth':
+      return parseFloat(icdStore.azimuthAngle) || 0
+    case 'elevation':
+      return parseFloat(icdStore.elevationAngle) || 0
+    case 'train':
+      return parseFloat(icdStore.trainAngle) || 0
+  }
+}
+
+// 축별 모터 상태 가져오기 (ServoMotor 비트)
+const isMotorOff = (axis: AxisKey): boolean => {
+  switch (axis) {
+    case 'azimuth':
+      return !icdStore.azimuthBoardServoStatusInfo.servoMotor
+    case 'elevation':
+      return !icdStore.elevationBoardServoStatusInfo.servoMotor
+    case 'train':
+      return !icdStore.trainBoardServoStatusInfo.servoMotor
+  }
+}
+
+// 도달 판정: ±0.5° 이내인지 확인
+const isArrived = (actual: number, target: number): boolean => {
+  return Math.abs(actual - target) <= ARRIVAL_THRESHOLD
+}
+
+// 축별 이동 명령 전송
+const sendAxisCommand = async (axis: AxisKey, targetAngle: number) => {
+  const speed = Math.abs(parseFloat(slewStore.speeds[axis]))
+
+  await icdStore.sendMultiControlCommand({
+    azimuth: axis === 'azimuth',
+    elevation: axis === 'elevation',
+    train: axis === 'train',
+    azAngle: axis === 'azimuth' ? targetAngle : 0,
+    elAngle: axis === 'elevation' ? targetAngle : 0,
+    trainAngle: axis === 'train' ? targetAngle : 0,
+    azSpeed: axis === 'azimuth' ? speed : 0,
+    elSpeed: axis === 'elevation' ? speed : 0,
+    trainSpeed: axis === 'train' ? speed : 0,
+  })
+}
+
+// Loop 시작
+const startLoop = async () => {
+  if (slewStore.loopRunning) return
+
+  slewStore.setLoopRunning(true)
+  slewStore.resetLoopState()
+
+  const axes: AxisKey[] = ['azimuth', 'elevation', 'train']
+
+  // 각 축별 초기 방향 설정 및 첫 이동 명령
+  for (const axis of axes) {
+    if (!slewStore.selectedAxes[axis]) continue
+
+    const speed = parseFloat(slewStore.speeds[axis])
+    if (speed === 0) continue
+
+    const limits = getAxisLimits(axis)
+    const currentAngle = getActualAngle(axis)
+
+    // 속도 음수 → Min부터 시작, 속도 양수 → Max부터 시작
+    let initialDirection: 'toMin' | 'toMax' = speed < 0 ? 'toMin' : 'toMax'
+    let initialTarget = initialDirection === 'toMin' ? limits.min : limits.max
+
+    // 이미 목표 근처에 있으면 반대 방향으로 시작
+    if (isArrived(currentAngle, initialTarget)) {
+      initialDirection = initialDirection === 'toMin' ? 'toMax' : 'toMin'
+      initialTarget = initialDirection === 'toMin' ? limits.min : limits.max
+      console.log(`${axis} 이미 목표(${currentAngle.toFixed(2)}°) 근처 → 반대 방향(${initialTarget}°)으로 시작`)
+    }
+
+    slewStore.updateLoopAxisState(axis, {
+      direction: initialDirection,
+      currentTarget: initialTarget,
+      stableCount: 0,
+      lastDirectionChangeTime: Date.now(), // 시작 시 쿨다운 적용
+    })
+
+    // 첫 이동 명령 전송
+    await sendAxisCommand(axis, initialTarget)
+  }
+
+  // 모니터링 interval 시작 (1초 간격)
+  const intervalId = setInterval(() => {
+    void monitorLoopProgress()
+  }, 1000)
+
+  slewStore.setLoopInterval(intervalId)
+  console.log('Loop 시작')
+}
+
+// Loop 진행 모니터링
+const monitorLoopProgress = async () => {
+  if (!slewStore.loopRunning) return
+
+  const axes: AxisKey[] = ['azimuth', 'elevation', 'train']
+
+  for (const axis of axes) {
+    if (!slewStore.selectedAxes[axis]) continue
+
+    const loopAxisState = slewStore.loopState[axis]
+    if (loopAxisState.currentTarget === null) continue
+
+    // 쿨다운 체크: 방향 전환 후 일정 시간 동안은 다음 전환 불가
+    const now = Date.now()
+    const timeSinceLastChange = now - loopAxisState.lastDirectionChangeTime
+    if (timeSinceLastChange < DIRECTION_CHANGE_COOLDOWN) {
+      continue // 쿨다운 중이면 스킵
+    }
+
+    const actualAngle = getActualAngle(axis)
+    const targetAngle = loopAxisState.currentTarget
+    const motorOff = isMotorOff(axis)
+    const arrived = isArrived(actualAngle, targetAngle)
+
+    // 도달 판정: ±0.5° 이내 도달 필수
+    if (arrived) {
+      // Case 1: 도달 + 모터 OFF → 즉시 방향 전환
+      if (motorOff) {
+        const limits = getAxisLimits(axis)
+        const newDirection = loopAxisState.direction === 'toMin' ? 'toMax' : 'toMin'
+        const newTarget = newDirection === 'toMin' ? limits.min : limits.max
+
+        slewStore.updateLoopAxisState(axis, {
+          direction: newDirection,
+          currentTarget: newTarget,
+          stableCount: 0,
+          lastDirectionChangeTime: now,
+        })
+
+        await sendAxisCommand(axis, newTarget)
+        console.log(`${axis} 방향 전환 (모터OFF): ${newDirection}, 목표: ${newTarget}°`)
+      } else {
+        // Case 2: 도달 + 모터 ON → 3초 카운트
+        const newStableCount = loopAxisState.stableCount + 1
+
+        if (newStableCount >= STABLE_COUNT_REQUIRED) {
+          // 3초 경과 → 방향 전환
+          const limits = getAxisLimits(axis)
+          const newDirection = loopAxisState.direction === 'toMin' ? 'toMax' : 'toMin'
+          const newTarget = newDirection === 'toMin' ? limits.min : limits.max
+
+          slewStore.updateLoopAxisState(axis, {
+            direction: newDirection,
+            currentTarget: newTarget,
+            stableCount: 0,
+            lastDirectionChangeTime: now,
+          })
+
+          await sendAxisCommand(axis, newTarget)
+          console.log(`${axis} 방향 전환 (3초경과): ${newDirection}, 목표: ${newTarget}°`)
+        } else {
+          // 아직 3초 미만 → 카운트만 증가
+          slewStore.updateLoopAxisState(axis, {
+            stableCount: newStableCount,
+          })
+        }
+      }
+    } else {
+      // 목표에 도달하지 않음 → 카운트 리셋
+      if (loopAxisState.stableCount > 0) {
+        slewStore.updateLoopAxisState(axis, {
+          stableCount: 0,
+        })
+      }
+    }
+  }
+}
+
+// Loop 정지
+const stopLoop = () => {
+  slewStore.clearLoopInterval()
+  slewStore.setLoopRunning(false)
+  slewStore.resetLoopState()
+  console.log('Loop 정지')
+}
+
+// 컴포넌트 언마운트 시 Loop 정리
+onUnmounted(() => {
+  if (slewStore.loopRunning) {
+    stopLoop()
+  }
+})
 </script>
 
 <style scoped>
@@ -318,6 +550,19 @@ input[type='number']::-webkit-outer-spin-button {
 
 input[type='number'] {
   -moz-appearance: textfield;
+}
+
+/* Loop 체크박스 섹션 스타일 */
+.loop-checkbox-section {
+  display: flex;
+  justify-content: flex-start;
+  padding: 0.5rem 0 0.75rem 0;
+  margin-bottom: 0.5rem;
+}
+
+.loop-checkbox {
+  font-size: 1rem;
+  font-weight: 500;
 }
 
 /* 제어 버튼 섹션 스타일 - 배경색과 테두리 제거 */
