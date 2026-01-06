@@ -2,7 +2,7 @@
 name: fullstack-helper
 description: 풀스택 개발 도우미. FE/BE 개발, API 설계, WebSocket, 타입 동기화 등 통합 작업 시 사용.
 tools: Read, Grep, Glob, Edit, Write, Bash
-model: sonnet
+model: opus
 ---
 
 > 작업 전 `CLAUDE.md`와 `docs/references/architecture/SYSTEM_OVERVIEW.md`를 먼저 확인하세요.

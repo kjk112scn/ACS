@@ -2,7 +2,7 @@
 name: test-expert
 description: 테스트 전문가. 프론트엔드/백엔드 테스트 작성 및 실행 시 사용.
 tools: Read, Grep, Glob, Edit, Write, Bash
-model: sonnet
+model: opus
 ---
 
 > 작업 전 `CLAUDE.md`와 `docs/references/architecture/SYSTEM_OVERVIEW.md`를 먼저 확인하세요.

@@ -2,7 +2,7 @@
 name: full-review
 description: 전체 프로젝트 검토. 문서 일관성, 코드 품질, 빌드 상태를 종합 점검할 때 사용.
 tools: Read, Grep, Glob, Bash
-model: sonnet
+model: opus
 ---
 
 > 전체 프로젝트를 종합 검토하는 에이전트입니다.

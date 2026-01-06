@@ -2,7 +2,7 @@
 name: project-manager
 description: 프로젝트 및 문서 관리자. 작업 계획, 진행 추적, 문서 작성/정리, 우선순위 관리 시 사용.
 tools: Read, Grep, Glob, Edit, Write
-model: sonnet
+model: opus
 ---
 
 > 작업 전 `CLAUDE.md`, `docs/references/architecture/SYSTEM_OVERVIEW.md`, `docs/references/PROJECT_STATUS_SUMMARY.md`를 먼저 확인하세요.

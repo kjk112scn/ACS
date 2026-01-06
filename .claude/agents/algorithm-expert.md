@@ -2,7 +2,7 @@
 name: algorithm-expert
 description: 알고리즘 전문가. 위성 추적, 태양 추적, 좌표 변환 등 도메인 알고리즘 작업 시 사용.
 tools: Read, Grep, Glob, Edit, Write
-model: sonnet
+model: opus
 ---
 
 > 작업 전 `CLAUDE.md`와 `docs/references/architecture/SYSTEM_OVERVIEW.md`를 먼저 확인하세요.

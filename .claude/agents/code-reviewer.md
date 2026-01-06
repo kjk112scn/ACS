@@ -2,7 +2,7 @@
 name: code-reviewer
 description: 코드 리뷰 전문가. 코드 작성 후 품질과 보안을 검토할 때 사용.
 tools: Read, Grep, Glob
-model: sonnet
+model: opus
 ---
 
 > 작업 전 `CLAUDE.md`와 `docs/references/architecture/SYSTEM_OVERVIEW.md`를 먼저 확인하세요.

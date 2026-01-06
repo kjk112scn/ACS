@@ -197,8 +197,8 @@ class HardwareErrorLogService {
                     3 to ErrorConfig("SERVO_POWER", "ERROR", "AZIMUTH_SERVO_ALARM_CODE4", "Azimuth Servo Alarm Code 4"), // SERVO_ALARM_CODE4(3)
                     4 to ErrorConfig("SERVO_POWER", "ERROR", "AZIMUTH_SERVO_ALARM_CODE5", "Azimuth Servo Alarm Code 5"), // SERVO_ALARM_CODE5(4)
                     5 to ErrorConfig("SERVO_POWER", "ERROR", "AZIMUTH_SERVO_ALARM", "Azimuth Servo Alarm"), // SERVO_ALARM_ERROR(5)
-                    6 to ErrorConfig("SERVO_POWER", "INFO", "AZIMUTH_SERVO_BRAKE_ENGAGED", "Azimuth Servo Brake"), // SERVO_BRAKE(6)
-                    7 to ErrorConfig("SERVO_POWER", "INFO", "AZIMUTH_SERVO_MOTOR_ON", "Azimuth Servo Motor") // SERVO_MOTOR_MOVE(7)
+                    6 to ErrorConfig("SERVO_POWER", "INFO", "AZIMUTH_SERVO_BRAKE_ENGAGED", "Azimuth Servo Brake") // SERVO_BRAKE(6)
+                    // 7 to ErrorConfig("SERVO_POWER", "INFO", "AZIMUTH_SERVO_MOTOR_ON", "Azimuth Servo Motor") // SERVO_MOTOR_MOVE(7) - 알림 비활성화
                 )
             }
             
@@ -220,8 +220,8 @@ class HardwareErrorLogService {
                     3 to ErrorConfig("SERVO_POWER", "ERROR", "ELEVATION_SERVO_ALARM_CODE4", "Elevation Servo Alarm Code 4"), // SERVO_ALARM_CODE4(3)
                     4 to ErrorConfig("SERVO_POWER", "ERROR", "ELEVATION_SERVO_ALARM_CODE5", "Elevation Servo Alarm Code 5"), // SERVO_ALARM_CODE5(4)
                     5 to ErrorConfig("SERVO_POWER", "ERROR", "ELEVATION_SERVO_ALARM", "Elevation Servo Alarm"), // SERVO_ALARM_ERROR(5)
-                    6 to ErrorConfig("SERVO_POWER", "INFO", "ELEVATION_SERVO_BRAKE_ENGAGED", "Elevation Servo Brake"), // SERVO_BRAKE(6)
-                    7 to ErrorConfig("SERVO_POWER", "INFO", "ELEVATION_SERVO_MOTOR_ON", "Elevation Servo Motor") // SERVO_MOTOR_MOVE(7)
+                    6 to ErrorConfig("SERVO_POWER", "INFO", "ELEVATION_SERVO_BRAKE_ENGAGED", "Elevation Servo Brake") // SERVO_BRAKE(6)
+                    // 7 to ErrorConfig("SERVO_POWER", "INFO", "ELEVATION_SERVO_MOTOR_ON", "Elevation Servo Motor") // SERVO_MOTOR_MOVE(7) - 알림 비활성화
                 )
             }
             
@@ -248,8 +248,8 @@ class HardwareErrorLogService {
                     3 to ErrorConfig("SERVO_POWER", "ERROR", "TRAIN_SERVO_ALARM_CODE4", "Train Servo Alarm Code 4"), // SERVO_ALARM_CODE4(3)
                     4 to ErrorConfig("SERVO_POWER", "ERROR", "TRAIN_SERVO_ALARM_CODE5", "Train Servo Alarm Code 5"), // SERVO_ALARM_CODE5(4)
                     5 to ErrorConfig("SERVO_POWER", "ERROR", "TRAIN_SERVO_ALARM", "Train Servo Alarm"), // SERVO_ALARM_ERROR(5)
-                    6 to ErrorConfig("SERVO_POWER", "INFO", "TRAIN_SERVO_BRAKE_ENGAGED", "Train Servo Brake"), // SERVO_BRAKE(6)
-                    7 to ErrorConfig("SERVO_POWER", "INFO", "TRAIN_SERVO_MOTOR_ON", "Train Servo Motor") // SERVO_MOTOR_MOVE(7)
+                    6 to ErrorConfig("SERVO_POWER", "INFO", "TRAIN_SERVO_BRAKE_ENGAGED", "Train Servo Brake") // SERVO_BRAKE(6)
+                    // 7 to ErrorConfig("SERVO_POWER", "INFO", "TRAIN_SERVO_MOTOR_ON", "Train Servo Motor") // SERVO_MOTOR_MOVE(7) - 알림 비활성화
                 )
             }
             

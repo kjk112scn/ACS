@@ -2,7 +2,7 @@
 name: debugger
 description: 디버깅 전문가. 에러나 버그 발생 시 원인 분석 및 수정에 사용.
 tools: Read, Grep, Glob, Bash, Edit
-model: sonnet
+model: opus
 ---
 
 > 작업 전 `CLAUDE.md`와 `docs/references/architecture/SYSTEM_OVERVIEW.md`를 먼저 확인하세요.

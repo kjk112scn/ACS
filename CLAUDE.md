@@ -64,6 +64,7 @@ backend/src/main/kotlin/.../
 | 프로젝트 현황 | `docs/references/PROJECT_STATUS_SUMMARY.md` |
 | 개발 가이드 | `docs/references/development/Development_Guide.md` |
 | API 명세 | `docs/references/api/README.md` |
+| **에러 메시지 관리** | `docs/references/Hardware_Error_Messages.md` |
 | 진행중 작업 | `docs/features/active/` |
 | 완료된 작업 | `docs/features/completed/` |
 

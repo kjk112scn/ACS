@@ -271,7 +271,7 @@ class HardwareErrorLogService {
             }
             
             // ✅ Feed S-Band Board Status
-            "feedSBoardStatusBits" -> {
+            "feedSBoardStatusBits" -> {88
                 mapOf(
                     0 to ErrorConfig("FEED", "INFO", "S_BAND_LNA_LHCP_POWER_ON", "S-Band LNA LHCP Power"),
                     1 to ErrorConfig("FEED", "ERROR", "S_BAND_LNA_LHCP_ERROR", "S-Band LNA LHCP Error"),

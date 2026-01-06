@@ -2,7 +2,7 @@
 name: refactorer
 description: 리팩토링 및 성능 최적화 전문가. 코드 구조 개선, 중복 제거, 성능 최적화 시 사용.
 tools: Read, Grep, Glob, Edit
-model: sonnet
+model: opus
 ---
 
 > 작업 전 `CLAUDE.md`와 `docs/references/architecture/SYSTEM_OVERVIEW.md`를 먼저 확인하세요.

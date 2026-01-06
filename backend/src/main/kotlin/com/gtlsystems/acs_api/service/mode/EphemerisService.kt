@@ -790,17 +790,17 @@ class EphemerisService(
     }
 
 
-    // Tilt만 0으로 이동
+    // Tilt만 특정 각도로 이동
     private fun moveTrainToZero(TrainAngle: Float) {
         val multiAxis = BitSet()
         multiAxis.set(2)  // Tilt 축만 활성화
-        // ✅ 전송하는 TrainAngle과 동일한 값으로 설정 (isTrainAtZero() 체크를 위해)
-        PushData.CMD.cmdTrainAngle = TrainAngle + GlobalData.Offset.trainPositionOffset
+        // ✅ CMD에 offset 적용 (trainPositionOffset + trueNorthOffset)
+        PushData.CMD.cmdTrainAngle = TrainAngle + GlobalData.Offset.trainPositionOffset + GlobalData.Offset.trueNorthOffset
         udpFwICDService.singleManualCommand(
             multiAxis, TrainAngle, 5f
         )
 
-        logger.info("🔄 TrainAngle를 ${TrainAngle} 도로 이동 시작 (cmdTrainAngle=${PushData.CMD.cmdTrainAngle})")
+        logger.info("🔄 TrainAngle를 ${TrainAngle}° 로 이동 시작 (cmdTrainAngle=${PushData.CMD.cmdTrainAngle}°, trainPosOffset=${GlobalData.Offset.trainPositionOffset}°, trueNorthOffset=${GlobalData.Offset.trueNorthOffset}°)")
     }
 
     // 목표 Az/El로 이동
@@ -815,8 +815,10 @@ class EphemerisService(
         val multiAxis = BitSet()
         multiAxis.set(0)  // Azimuth
         multiAxis.set(1)  // Elevation
+        // Train은 현재 CMD 값 그대로 유지
+        val currentTrainCmd = PushData.CMD.cmdTrainAngle ?: 0f
         udpFwICDService.multiManualCommand(
-            multiAxis, targetAzimuth, 5f, targetElevation, 5f, 0f, 0f
+            multiAxis, targetAzimuth, 5f, targetElevation, 5f, currentTrainCmd, 0f
         )
         logger.info("🔄 목표 Az/El로 이동: Az=${targetAzimuth}°, El=${targetElevation}° (CMD: Az=${PushData.CMD.cmdAzimuthAngle}°, El=${PushData.CMD.cmdElevationAngle}°)")
     }
@@ -911,10 +913,66 @@ class EphemerisService(
         val isKeyhole = selectedPass["IsKeyhole"] as? Boolean ?: false
         val recommendedTrainAngle = selectedPass["RecommendedTrainAngle"] as? Double ?: 0.0
         logger.info("📊 추적 패스 정보: Keyhole=${if (isKeyhole) "YES" else "NO"}, RecommendedTrainAngle=${recommendedTrainAngle}°, DetailId=${actualDetailId}")
-        
-        logger.info("✅ ephemeris 추적 준비 완료 (실제 추적 시작 전)")
-        // 상태머신 진입
-        moveToStartPosition(mstId, actualDetailId)
+
+        // ✅ 추적 시간 확인 - 추적 중이면 시작 위치 건너뛰고 바로 TRACKING
+        val startTime = try {
+            (selectedPass["StartTime"] as ZonedDateTime).withZoneSameInstant(ZoneOffset.UTC)
+        } catch (e: Exception) {
+            logger.error("StartTime 추출 실패: {}", e.message, e)
+            null
+        }
+
+        val endTime = try {
+            (selectedPass["EndTime"] as ZonedDateTime).withZoneSameInstant(ZoneOffset.UTC)
+        } catch (e: Exception) {
+            logger.error("EndTime 추출 실패: {}", e.message, e)
+            null
+        }
+
+        val calTime = GlobalData.Time.calUtcTimeOffsetTime
+        val isInTrackingTime = if (startTime != null && endTime != null) {
+            calTime.isAfter(startTime) && calTime.isBefore(endTime)
+        } else {
+            false
+        }
+
+        logger.info("⏰ 추적 시간 확인: 현재=${calTime}, 시작=${startTime}, 종료=${endTime}, 추적중=${isInTrackingTime}")
+
+        if (isInTrackingTime) {
+            // ✅ 추적 시간 중 → 시작 위치 건너뛰고 바로 TRACKING 상태로 전환
+            logger.info("🎯 추적 시간 중! 시작 위치 건너뛰고 현재 위치에서 즉시 TRACKING 시작")
+
+            // ✅ Train 각도는 현재 위치 유지 (이동 명령 생략하여 이동 중 멈춤 방지)
+            // Train 이동 명령을 보내지 않고 현재 Train 위치에서 바로 추적 시작
+            val currentTrainAngle = dataStoreService.getLatestData().trainAngle?.toFloat() ?: 0f
+            GlobalData.EphemerisTrakingAngle.trainAngle = currentTrainAngle
+            logger.info("🔧 Train 현재 위치 유지: {}° (이동 명령 생략)", currentTrainAngle)
+
+            // ✅ 상태를 먼저 설정 (sendInitialTrackingData에서 ephemerisStatus 체크하므로)
+            currentTrackingState = TrackingState.TRACKING
+            trackingStatus.ephemerisStatus = true
+            trackingStatus.ephemerisTrackingState = "TRACKING"
+            dataStoreService.setEphemerisTracking(true)
+            dataStoreService.updateTrackingStatus(trackingStatus)  // ✅ WebSocket 전송용 상태 동기화
+            logger.info("✅ TRACKING 상태 먼저 설정 (12.2 전송 전)")
+
+            // ✅ 12.1 헤더 전송
+            sendHeaderTrackingData(mstId, actualDetailId)
+            headerSent = true
+            logger.info("📡 12.1 헤더 전송 완료 (재추적)")
+
+            // ✅ 12.2 초기 데이터 전송 (펌웨어 제어 시작에 필수!)
+            sendInitialTrackingData(mstId, actualDetailId)
+            initialDataSent = true
+            logger.info("📡 12.2 초기 데이터 전송 완료 (재추적)")
+
+            logger.info("✅ 즉시 TRACKING 상태로 전환 완료 (Train 이동 없이)")
+        } else {
+            // ✅ 추적 시간 이전 → 정상 플로우 (시작 위치로 이동 → WAITING)
+            logger.info("⏰ 추적 시작 시간 이전 - 시작 위치로 이동 후 WAITING")
+            moveToStartPosition(mstId, actualDetailId)
+        }
+
         startModeTimer()
         logger.info("✅ 위성 추적 및 통합 모드 타이머 시작 완료")
     }
@@ -996,10 +1054,14 @@ class EphemerisService(
         // 기존 타이머가 있다면 정리
         stopModeTimer()
 
-        // ✅ 위성 추적 시작 상태 설정
+        // ✅ 위성 추적 시작 상태 설정 (이미 TRACKING 상태면 덮어쓰지 않음)
         trackingStatus.ephemerisStatus = true
-        trackingStatus.ephemerisTrackingState = "TRAIN_MOVING_TO_ZERO"
-        logger.info("🚀 위성 추적 시작 - Tilt 시작 위치로 이동")
+        if (currentTrackingState != TrackingState.TRACKING) {
+            trackingStatus.ephemerisTrackingState = "TRAIN_MOVING_TO_ZERO"
+            logger.info("🚀 위성 추적 시작 - Tilt 시작 위치로 이동")
+        } else {
+            logger.info("🚀 위성 추적 시작 - 이미 TRACKING 상태, 상태 유지")
+        }
 
         // ✅ 통합 추적 실행기 사용 (NORMAL 우선순위)
         trackingExecutor = threadManager.getTrackingExecutor()
@@ -1272,13 +1334,14 @@ class EphemerisService(
                             ?: (firstTrackingData["finalTransformedElevation"] as? Number)?.toFloat()
                     }
 
-                    val cmdTrain = GlobalData.EphemerisTrakingAngle.trainAngle
+                    // ✅ Train CMD는 moveTrainToZero()에서 이미 설정됨 - 덮어쓰지 않음
+                    val cmdTrain = PushData.CMD.cmdTrainAngle ?: 0f
 
                     if (cmdAz != null && cmdEl != null) {
                         PushData.CMD.cmdAzimuthAngle = cmdAz
                         PushData.CMD.cmdElevationAngle = cmdEl
-                        PushData.CMD.cmdTrainAngle = cmdTrain
-                        logger.info("📡 TRACKING 전환 - 첫 CMD 설정 (Keyhole=${isKeyhole}): Az=${cmdAz}°, El=${cmdEl}°, Train=${cmdTrain}°")
+                        // Train CMD는 덮어쓰지 않음 (moveTrainToZero에서 설정한 값 유지)
+                        logger.info("📡 TRACKING 전환 - 첫 CMD 설정 (Keyhole=${isKeyhole}): Az=${cmdAz}°, El=${cmdEl}°, Train=${cmdTrain}° (유지)")
 
                         // ✅ DataStore의 trackingCMD 값도 즉시 설정 (0,0 점프 방지)
                         val currentData = dataStoreService.getLatestData()
@@ -1346,6 +1409,10 @@ class EphemerisService(
      * TRACKING 상태 처리 (실시간 추적)
      */
     private fun handleTrackingState() {
+        // ✅ TRACKING 상태 업데이트 (프론트엔드 표시 및 펌웨어 제어용)
+        trackingStatus.ephemerisTrackingState = "TRACKING"
+        dataStoreService.updateTrackingStatus(trackingStatus)
+
         // 정지궤도 처리
         if (trackingStatus.geostationaryStatus == true) {
             logger.debug("🔄 정지궤도 추적 활성 상태 유지")
@@ -1482,19 +1549,21 @@ class EphemerisService(
             val trackingActualTrain = (realtimeData["trackingActualTrainAngle"] as? Number)?.toFloat()
             
             // logger.info("🔍 [CMD 업데이트] 추출된 값: cmdAz=$cmdAz, cmdEl=$cmdEl, cmdTrain=$cmdTrain")
-            
+
             // ✅ PushData.CMD에 설정 (WebSocket 전송용 - PushDataService에서 직접 읽음)
             if (cmdAz != null) {
                 PushData.CMD.cmdAzimuthAngle = cmdAz
             }
-            
+
             if (cmdEl != null) {
                 PushData.CMD.cmdElevationAngle = cmdEl
             }
-            
-            if (cmdTrain != null) {
-                PushData.CMD.cmdTrainAngle = cmdTrain
-            }
+
+            // ✅ Train CMD는 덮어쓰지 않음 - moveTrainToZero()에서 설정한 값 유지
+            // offset 변경 시에만 UdpFwICDService.positionOffsetCommand()에서 업데이트됨
+            // if (cmdTrain != null) {
+            //     PushData.CMD.cmdTrainAngle = cmdTrain
+            // }
             
             // ✅ DataStoreService에도 trackingCMD 값 업데이트 (프론트엔드 동기화용)
             val currentData = dataStoreService.getLatestData()
@@ -1764,11 +1833,12 @@ class EphemerisService(
         // logger.info("🔍 [createRealtimeTrackingData] 필터링 제거: finalTransformedElevation=$finalTransformedElevation")
 
         // ✅ 성능 최적화: Keyhole Final 변환 데이터를 한 번만 조회하고 재사용
+        // ✅ 수정: keyhole_final_transformed → keyhole_optimized_final_transformed (DataType 통일)
         val keyholeFinalPassDetails = if (isKeyhole) {
             allPassDetails.filter {
-                it["DataType"] == "keyhole_final_transformed"
+                it["DataType"] == "keyhole_optimized_final_transformed"
             }
-            } else {
+        } else {
             emptyList()
         }
         
@@ -1785,13 +1855,13 @@ class EphemerisService(
         
         val keyholeFinalTransformedAzimuth = if (isKeyhole && keyholeFinalPoint != null) {
             (keyholeFinalPoint.get("Azimuth") as? Double)?.toFloat()
-                } else {
+        } else {
             if (isKeyhole && keyholeFinalPassDetails.isEmpty() && !keyholeWarningLogged) {
-                logger.warn("⚠️ MstId(${mstId}), DetailId(${detailId}): Keyhole 발생 시 keyhole_final_transformed 데이터가 없습니다.")
+                logger.warn("⚠️ MstId(${mstId}), DetailId(${detailId}): Keyhole 발생 시 keyhole_optimized_final_transformed 데이터가 없습니다. final_transformed로 fallback합니다.")
                 keyholeWarningLogged = true  // ✅ 한 번만 로그 출력
-                }
-                null
             }
+            null
+        }
         
         val keyholeFinalTransformedElevation = if (isKeyhole && keyholeFinalPoint != null) {
             (keyholeFinalPoint.get("Elevation") as? Double)?.toFloat()
@@ -1879,7 +1949,11 @@ class EphemerisService(
             "trackingCMDElevationAngle" to ((if (isKeyhole && keyholeFinalTransformedElevation != null) keyholeFinalTransformedElevation else finalTransformedElevation) + GlobalData.Offset.elevationPositionOffset),  // ✅ Offset 적용
             "trackingActualElevationAngle" to trackingActualElevation,
             "trackingTrainTime" to trackingCmdTrainTime,
-            "trackingCMDTrainAngle" to trackingCmdTrain,
+            // ✅ Train CMD = 이론치(GlobalData.EphemerisTrakingAngle.trainAngle) + offset
+            // 추적 중에는 moveTrainToZero()에서 설정한 trainAngle 값 사용
+            "trackingCMDTrainAngle" to (GlobalData.EphemerisTrakingAngle.trainAngle +
+                GlobalData.Offset.trainPositionOffset +
+                GlobalData.Offset.trueNorthOffset),
             "trackingActualTrainAngle" to trackingActualTrain,
             "passId" to mstId, // 하위 호환성을 위해 유지
             "mstId" to mstId, // ✅ mstId 추가
@@ -3013,7 +3087,7 @@ class EphemerisService(
                     // ✅ Keyhole 발생 시 KeyholeFinalTransformed 데이터로 속도 계산 (각도 제한 ✅, Train≠0)
                     // keyholeRates를 블록 밖에서 선언하여 재사용 가능하도록 함
                     val keyholeRates = if (keyhole != null && isKeyhole) {
-                        calculateFinalTransformedSumMethodRates(mstId, "keyhole_final_transformed", detailId)  // ✅ detailId 전달
+                        calculateFinalTransformedSumMethodRates(mstId, "keyhole_optimized_final_transformed", detailId)
                     } else {
                         null
                     }
@@ -4301,19 +4375,19 @@ class EphemerisService(
             
             val isKeyhole = finalMst["IsKeyhole"] as? Boolean ?: false
             
-            // ✅ Keyhole 여부에 따라 DataType 선택
+            // ✅ Keyhole 여부에 따라 DataType 선택 (keyhole_optimized_final_transformed 사용)
             val finalDataType = if (isKeyhole) {
                 val keyholeDataExists = ephemerisTrackDtlStorage.any {
                     val dataMstId = (it["MstId"] as? Number)?.toLong()
                     val dataDetailId = (it["DetailId"] as? Number)?.toInt() ?: 0
-                    dataMstId == mstId.toLong() && dataDetailId == actualDetailId && it["DataType"] == "keyhole_final_transformed"  // ✅ detailId 필터링 추가
+                    dataMstId == mstId.toLong() && dataDetailId == actualDetailId && it["DataType"] == "keyhole_optimized_final_transformed"
                 }
                 if (!keyholeDataExists) {
-                    logger.warn("⚠️ MST ID ${mstId}, DetailId=${actualDetailId}: Keyhole로 판단되었으나 keyhole_final_transformed 데이터가 없습니다. final_transformed로 폴백합니다.")
+                    logger.warn("⚠️ MST ID ${mstId}, DetailId=${actualDetailId}: Keyhole로 판단되었으나 keyhole_optimized_final_transformed 데이터가 없습니다. final_transformed로 폴백합니다.")
                     "final_transformed"
                 } else {
-                    logger.info("🔑 MST ID ${mstId}, DetailId=${actualDetailId}: Keyhole 발생 → keyhole_final_transformed 사용")
-                    "keyhole_final_transformed"
+                    logger.info("🔑 MST ID ${mstId}, DetailId=${actualDetailId}: Keyhole 발생 → keyhole_optimized_final_transformed 사용")
+                    "keyhole_optimized_final_transformed"
                 }
             } else {
                 logger.info("✅ MST ID ${mstId}, DetailId=${actualDetailId}: Keyhole 미발생 → final_transformed 사용")
@@ -4333,9 +4407,9 @@ class EphemerisService(
                 (it["Elevation"] as? Double ?: 0.0) >= elevationMin
             }
             
-            // ✅ 필터링된 keyhole_final_transformed 데이터 조회 (Keyhole 발생 시만, detailId 전달)
+            // ✅ 필터링된 keyhole_optimized_final_transformed 데이터 조회 (Keyhole 발생 시만, detailId 전달)
             val keyholeFinalDtlAll = if (isKeyhole) {
-                getEphemerisTrackDtlByMstIdAndDataType(mstId.toLong(), "keyhole_final_transformed", actualDetailId)  // ✅ detailId 전달
+                getEphemerisTrackDtlByMstIdAndDataType(mstId.toLong(), "keyhole_optimized_final_transformed", actualDetailId)
             } else {
                 emptyList()
             }
