@@ -1,29 +1,54 @@
-# PassSchedule 차트 최적화 리팩토링
+# Active Features (진행 중 작업)
 
-## 개요
+> **최종 수정**: 2026-01-07
 
-PassSchedulePage의 Position View 차트를 최적화하여 성능을 개선하고, keyhole 여부에 따라 올바른 경로를 표시하며, 스케줄 전환 시 메모리 누적 문제를 해결합니다.
+현재 진행 중인 기능 개발 및 리팩토링 작업 목록입니다.
 
-## 목표
+---
 
-1. **차트 업데이트 최적화**: ECharts의 `appendData` API 활용으로 증분 업데이트 구현
-2. **메모리 누적 문제 해결**: 스케줄 전환 시 이전 스케줄의 경로만 초기화
-3. **경로 데이터 정확성**: keyhole 여부에 따라 올바른 경로 데이터 사용
-4. **차트 시리즈 구조 일치**: PassChartUpdatePool을 차트 시리즈 구조와 일치하도록 수정
+## 1. Architecture Refactoring (아키텍처 리팩토링)
 
-## 주요 개선 사항
+> **우선순위**: P0 (핵심) | **상태**: 진행 중
 
-- 실시간 추적 경로 증분 업데이트 (appendData 활용)
-- 스케줄 전환 시 경로 초기화 로직 추가
-- 차트 시리즈 구조 일치 (4개 시리즈 관리)
-- 메모리 보호 (50,000개 포인트 초과 시 자동 정리)
+위성 추적 시스템(Ephemeris, PassSchedule) 중심의 전체 아키텍처 리팩토링
 
-## 관련 문서
+**핵심 목표**:
+- BE: SatelliteTrackingEngine 추출 (코드 중복 40% → 10%)
+- FE: trackingStateStore 통합, 차트 컴포넌트 분리
+- 실시간 성능 최적화 (블로킹 코드 제거)
 
-- [상세 계획서](./PassSchedule_Chart_Optimization_plan.md)
-- [관련 기능: PassSchedule Keyhole 표시 개선](../PassSchedule_Keyhole_Display_Enhancement/PassSchedule_Keyhole_Display_Enhancement_plan.md)
+**문서**: [Architecture_Refactoring/](./Architecture_Refactoring/)
 
-## 상태
+---
 
-🔄 진행 중
+## 2. PassSchedule 개선 (추후 정리 예정)
 
+> **상태**: 분류 대기 | Architecture_Refactoring 완료 후 정리
+
+PassSchedule 관련 개별 작업들. 아키텍처 리팩토링과 일부 중복되므로 추후 통합/정리 필요.
+
+| 작업 | 상태 | 비고 |
+|------|------|------|
+| [PassSchedule_Chart_Optimization](./PassSchedule_Chart_Optimization_plan.md) | 보류 | Architecture_Refactoring 차트 분리와 중복 |
+| [PassSchedule_Data_Structure_Refactoring](./PassSchedule_Data_Structure_Refactoring/) | 진행중 | MST/DTL 데이터 구조 재설계 |
+| [PassSchedule_Keyhole_Display_Enhancement](./PassSchedule_Keyhole_Display_Enhancement/) | 진행중 | Keyhole 표시 개선 (독립 기능) |
+| [PassSchedule_Workflow](./PassSchedule_Workflow/) | 진행중 | 워크플로우 문서화 |
+
+---
+
+## 분류 기준
+
+| 분류 | 설명 | 예시 |
+|------|------|------|
+| **Architecture** | 코드 구조, 패턴, 성능 개선 | Architecture_Refactoring |
+| **Feature** | 새로운 기능 추가 | Keyhole_Display_Enhancement |
+| **Documentation** | 문서화 작업 | PassSchedule_Workflow |
+| **Bugfix** | 버그 수정 | → `docs/bugfixes/active/` 이동 |
+
+---
+
+## 작업 완료 시
+
+1. 해당 폴더를 `docs/features/completed/`로 이동
+2. `completed/` 하위에 결과 요약 문서 작성
+3. 이 README에서 해당 항목 제거

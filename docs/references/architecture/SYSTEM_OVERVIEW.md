@@ -73,6 +73,8 @@ backend/.../
 └── model/PushData.kt                  # 데이터 모델
 ```
 
+**관련 문서**: [ICDService 상세](../protocols/ICDService.md)
+
 ---
 
 ## 2. 백엔드 ↔ 프론트엔드 (WebSocket)
@@ -276,5 +278,65 @@ cmdTrainAngle: number
 
 ---
 
-**문서 버전**: 1.0.0
-**최종 업데이트**: 2024-12
+## 9. 관련 문서
+
+### 핵심 서비스 문서
+
+| 서비스 | 문서 | 설명 |
+|--------|------|------|
+| EphemerisService | [EphemerisService.md](../algorithms/EphemerisService.md) | 위성 궤도 추적 (5,000줄) |
+| ICDService | [ICDService.md](../protocols/ICDService.md) | ICD 프로토콜 처리 (2,800줄) |
+
+### 참조 문서
+
+- [알고리즘 문서](../algorithms/README.md)
+- [프로토콜 문서](../protocols/README.md)
+- [참조 문서 인덱스](../README.md)
+
+---
+
+## 10. Claude Code 확장 시스템 (v2.0.0)
+
+### 개요
+
+ACS 프로젝트는 Claude Code v2.0.0 확장 시스템을 활용하여 개발 생산성을 극대화합니다.
+
+### 에이전트 (15개)
+
+| 분류 | 에이전트 | 역할 |
+|------|---------|------|
+| 조율 | tech-lead | 기술 총괄, 에이전트 조율 |
+| 설계 | architect, database-architect, project-manager | 시스템 설계, DB 설계, 작업 관리 |
+| 개발 | backend-dev, frontend-dev, algorithm-expert, fullstack-helper | 각 영역별 개발 지원 |
+| 개발 | api-contract-manager, design-system-builder | API 계약, 디자인 시스템 |
+| 품질 | code-reviewer, test-expert, debugger, refactorer, performance-analyzer | 코드 품질 관리 |
+| 문서 | doc-syncer | 문서 관리 총괄 |
+
+### 스킬 (12개)
+
+| 스킬 | 역할 |
+|------|------|
+| `/sync` | 코드-문서 동기화 |
+| `/feature` | 신규 기능 개발 |
+| `/bugfix` | 버그 수정 |
+| `/done` | 작업 마무리 |
+| `/adr` | ADR 생성 |
+| `/plan` | 작업 계획 |
+| `/status` | 현황 보고 |
+| `/docs` | 문서화 |
+| `/health` | 건강 상태 점검 |
+| `/guide` | 사용법 안내 |
+| `/migrate` | 마이그레이션 관리 (v2.0) |
+| `/api-sync` | API 자동 동기화 (v2.0) |
+
+### 참조
+
+- [.claude/README.md](../../../.claude/README.md) - Claude Code 전체 구성
+- [QUICK_START.md](../../../.claude/QUICK_START.md) - 빠른 시작 가이드
+- [AGENT_COLLABORATION_GUIDE.md](../../../.claude/AGENT_COLLABORATION_GUIDE.md) - 에이전트 협업 가이드
+
+---
+
+**문서 버전**: 1.2.0
+**최종 업데이트**: 2026-01-07
+**변경사항**: Claude Code v2.0.0 섹션 추가

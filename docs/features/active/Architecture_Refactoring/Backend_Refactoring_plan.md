@@ -4,6 +4,19 @@
 
 ---
 
+> ⚠️ **Phase 역할 분리 안내**
+>
+> 이 문서의 Phase 0-3은 **BE 세부 작업 순서**입니다.
+> 메인 계획서의 Phase 1-4와는 다른 역할입니다.
+>
+> | 메인 계획서 | 이 문서 |
+> |------------|---------|
+> | Phase 2: BE 리팩토링 | Phase 0-3 전체가 해당 |
+>
+> 핵심 리팩토링(SatelliteTrackingEngine)은 [RFC_SatelliteTrackingEngine.md](./RFC_SatelliteTrackingEngine.md) 참조
+
+---
+
 ## 현황 분석
 
 ### 통계
@@ -209,7 +222,7 @@ openapi/
 
 | 파일 | 줄 수 | 분해 방향 |
 |------|-------|----------|
-| `EphemerisService.kt` | 4,986 | 추적/계산/명령/상태 분리 |
+| `EphemerisService.kt` | 5,060 | 추적/계산/명령/상태 분리 |
 | `PassScheduleService.kt` | 2,896 | 상태머신/스케줄러/계산 분리 |
 | `ICDService.kt` | 2,788 | 명령별 분리 |
 | `UdpFwICDService.kt` | 1,294 | 송신/수신/파싱 분리 |
@@ -785,7 +798,10 @@ object StorageConfig {
 
 ---
 
-**문서 버전**: 2.1.0
+---
+
+**문서 버전**: 2.2.0
+**최종 수정**: 2026-01-07
 **작성일**: 2024-12
 
 ---
@@ -797,4 +813,5 @@ object StorageConfig {
 | 1.0.0 | 2024-12 | 최초 작성 |
 | 2.0.0 | 2024-12 | 구조적 문제점, Phase별 상세 계획 추가 |
 | 2.1.0 | 2024-12 | 실시간 DB 저장 전략 섹션 추가 (13장) |
+| **2.2.0** | **2026-01-07** | **Phase 역할 분리 안내 추가, EphemerisService 줄 수 수정 (4,986→5,060)** |
 

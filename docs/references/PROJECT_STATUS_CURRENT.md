@@ -1,17 +1,67 @@
-# ACS 프로젝트 현황 (2026-01-06)
+# ACS 프로젝트 현황 (2026-01-07)
 
-> **자동 생성 문서** - 과거 문서 vs 현재 코드 비교 분석 결과
+> **자동 생성 문서** - 코드 ↔ 문서 동기화 상태 추적
+>
+> **Claude Code 버전**: v2.0.0
 
 ---
 
-## 📊 비교 요약
+## 코드 통계
 
-| 항목 | 과거 문서 (2024-12) | 현재 코드 (2026-01) | 차이 |
-|------|-------------------|-------------------|------|
-| **Controller** | 6개 예상 | **9개 구현** | ✅ +3개 |
-| **Service** | 7개 예상 | **13개 구현** | ✅ +6개 |
-| **완료 단계** | 3단계 | **현재 운영 중** | ✅ 크게 발전 |
-| **문서 최신화** | 2024-12 작성 | **1년 이상 경과** | ⚠️ 업데이트 필요 |
+| 항목 | 수량 | 상태 |
+|------|------|------|
+| **Controller** | 9개 | OK |
+| **Service** | 11개 | OK |
+| **Algorithm** | 10개+ | OK |
+| **Vue 컴포넌트** | 43개 | OK |
+| **Pinia 스토어** | 25개 | OK |
+
+---
+
+## Claude Code v2.0.0 현황
+
+### 에이전트 (15개)
+
+| 분류 | 에이전트 | 버전 |
+|------|---------|------|
+| 조율 | tech-lead | 1.x |
+| 설계 | architect, **database-architect**, project-manager | 1.x, **2.0**, 1.x |
+| 개발 | backend-dev, frontend-dev, algorithm-expert, fullstack-helper, **api-contract-manager**, **design-system-builder** | 1.x, **2.0**, **2.0** |
+| 품질 | code-reviewer, test-expert, debugger, refactorer, performance-analyzer | 1.x |
+| 문서 | doc-syncer | 2.0 |
+
+**v2.0 신규 에이전트:**
+- `database-architect`: DB 설계, ERD, 마이그레이션
+- `api-contract-manager`: OpenAPI, FE-BE 타입 동기화
+- `design-system-builder`: Storybook, Design Token
+
+### 스킬 (12개)
+
+| 스킬 | 역할 | 버전 |
+|------|------|------|
+| `/sync` | 코드-문서 동기화 | 2.0 |
+| `/feature` | 신규 기능 개발 | 1.x |
+| `/bugfix` | 버그 수정 | 1.x |
+| `/done` | 작업 마무리 | 1.x |
+| `/adr` | ADR 생성 | 1.x |
+| `/plan` | 작업 계획 | 1.x |
+| `/status` | 현황 보고 | 1.x |
+| `/docs` | 문서화 | 1.x |
+| `/health` | 건강 상태 점검 | 1.x |
+| `/guide` | 사용법 안내 | 1.x |
+| **`/migrate`** | **마이그레이션 관리** | **2.0** |
+| **`/api-sync`** | **API 자동 동기화** | **2.0** |
+
+**v2.0 신규 스킬:**
+- `/migrate`: Feature Flag, Canary Release 관리
+- `/api-sync`: OpenAPI -> TypeScript 자동 생성
+
+### 가이드 (v2.0 신규)
+
+| 가이드 | 설명 |
+|--------|------|
+| QUICK_START.md | 3단계 실전 예시 |
+| AGENT_COLLABORATION_GUIDE.md | 에이전트 조합 패턴 |
 
 ---
 
@@ -302,9 +352,10 @@ docs/
 
 ---
 
-**문서 버전:** 2.1.0 (현황 비교 분석)
-**생성 방식:** 과거 문서 vs 현재 코드 자동 비교
-**생성 일시:** 2026-01-06 KST
+**문서 버전:** 2.2.0 (Claude Code v2.0.0 반영)
+**생성 방식:** 코드 실시간 스캔 + Claude Code 상태 반영
+**생성 일시:** 2026-01-07 KST
+**담당:** doc-syncer 에이전트
 **참조 문서:**
-- 과거: `docs/references/PROJECT_STATUS_SUMMARY.md` (2024-12)
-- 현재: 코드 실시간 스캔 결과
+- [.claude/README.md](../../.claude/README.md) - Claude Code 전체 구성
+- [SYSTEM_OVERVIEW.md](architecture/SYSTEM_OVERVIEW.md) - 시스템 통합 개요

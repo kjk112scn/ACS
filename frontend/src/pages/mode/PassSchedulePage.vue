@@ -973,20 +973,42 @@ const getRowClass = (props: { row: ScheduleItem }) => {
 
 
 // 🔧 DOM 직접 조작으로 색상 적용
+// ✅ 이전 상태 저장 (값 변경 시에만 실행하기 위함)
+let lastAppliedColorState = {
+  current: null as number | null,
+  currentDetailId: null as number | null,
+  next: null as number | null,
+  nextDetailId: null as number | null
+}
+
 const applyRowColors = () => {
   try {
-    console.log('🎨 DOM 직접 조작으로 색상 적용 시작')
-
     const current = icdStore.currentTrackingMstId
-    const currentDetailId = icdStore.currentTrackingDetailId // ✅ detailId 추가
+    const currentDetailId = icdStore.currentTrackingDetailId
     const next = icdStore.nextTrackingMstId
-    const nextDetailId = icdStore.nextTrackingDetailId // ✅ detailId 추가
+    const nextDetailId = icdStore.nextTrackingDetailId
 
-    console.log('현재 Store 상태:', { current, currentDetailId, next, nextDetailId })
+    // ✅ 값이 변경되지 않았으면 스킵
+    if (
+      lastAppliedColorState.current === current &&
+      lastAppliedColorState.currentDetailId === currentDetailId &&
+      lastAppliedColorState.next === next &&
+      lastAppliedColorState.nextDetailId === nextDetailId
+    ) {
+      return // 변경 없음 - 스킵
+    }
+
+    // ✅ 값이 변경되었을 때만 로그 출력
+    console.log('🎨 스케줄 하이라이트 변경:', {
+      이전: { ...lastAppliedColorState },
+      현재: { current, currentDetailId, next, nextDetailId }
+    })
+
+    // ✅ 상태 저장
+    lastAppliedColorState = { current, currentDetailId, next, nextDetailId }
 
     setTimeout(() => {
       const rows = document.querySelectorAll('.schedule-table tbody tr')
-      console.log(`총 ${rows.length}개 행 처리`)
 
       // ✅ sortedScheduleList를 사용하여 정확한 매칭
       const schedules = sortedScheduleList.value
@@ -1034,14 +1056,12 @@ const applyRowColors = () => {
           bgColor = '#c8e6c9'
           borderColor = '#4caf50'
           textColor = '#2e7d32'
-          console.log(`✅ 현재 스케줄 매칭 - mstId ${scheduleMstId}/detailId ${scheduleDetailId}를 녹색으로 적용`)
         } else if (next !== null && nextMatch) {
-          // 다음 스케줄 - 파란색 (현재 추적 중인 스케줄이 있든 없든 항상 파란색)
+          // 다음 스케줄 - 파란색
           shouldHighlight = true
           bgColor = '#e3f2fd'
           borderColor = '#2196f3'
           textColor = '#1565c0'
-          console.log(`✅ 다음 스케줄 매칭 - mstId ${scheduleMstId}/detailId ${scheduleDetailId}를 파란색으로 적용`)
         }
 
         if (shouldHighlight) {
@@ -1058,8 +1078,6 @@ const applyRowColors = () => {
           })
         }
       })
-
-      console.log('✅ DOM 직접 조작 완료')
     }, 100)
 
   } catch (error) {
@@ -1159,31 +1177,10 @@ const forceTableUpdate = () => {
   console.log('🔄 테이블 강제 업데이트:', tableKey.value)
 } */
 
-// 🔧 Store 값 변경 시 DOM 직접 조작
-watch(
-  [() => icdStore?.currentTrackingMstId, () => icdStore?.currentTrackingDetailId, () => icdStore?.nextTrackingMstId, () => icdStore?.nextTrackingDetailId],
-  (newValues, oldValues) => {
-    try {
-      console.log('🔄 Store 상태 변경 감지:', {
-        이전값: oldValues,
-        새값: newValues,
-        current: icdStore.currentTrackingMstId,
-        currentDetailId: icdStore.currentTrackingDetailId,
-        next: icdStore.nextTrackingMstId,
-        nextDetailId: icdStore.nextTrackingDetailId
-      })
-
-      // 🆕 지연된 DOM 직접 조작으로 색상 적용
-      setTimeout(() => {
-        applyRowColors()
-      }, 100)
-
-    } catch (error) {
-      console.error('❌ Store watch 에러:', error)
-    }
-  },
-  { immediate: true, deep: true }
-)
+// ✅ 중복 Watch 삭제됨 (Watch #1, #2가 이미 동일한 값을 감시하고 있음)
+// - Watch #1 (Line 528): currentTrackingMstId, currentTrackingDetailId
+// - Watch #2 (Line 675): nextTrackingMstId, nextTrackingDetailId
+// - 이 Watch는 위 두 개와 완전히 중복 + deep: true로 인해 무한 루프 발생
 
 // 🆕 Store 데이터 변경 감지 개선
 watch(

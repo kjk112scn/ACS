@@ -44,18 +44,22 @@ docs/
     └── ...
 ```
 
-## 스킬 명령어
+## 스킬 명령어 (12개)
 
-| 스킬 | 명령어 | 역할 |
-|------|--------|------|
-| `/feature` | 기능 추가 | 신규 기능 개발 워크플로우 |
-| `/bugfix` | 버그 수정 | 버그 수정 워크플로우 |
-| `/done` | 완료 | 작업 마무리 + 문서화 |
-| `/sync` | 동기화 | 코드↔문서 동기화 |
-| `/adr` | ADR | 아키텍처 결정 기록 |
-| `/plan` | 계획 | 작업 계획 수립 |
-| `/status` | 현황 | 프로젝트 현황 보고 |
-| `/docs` | 문서화 | 코드 분석 기반 협의형 문서화 |
+| 스킬 | 역할 | 버전 |
+|------|------|------|
+| `/feature` | 신규 기능 개발 워크플로우 | 1.x |
+| `/bugfix` | 버그 수정 워크플로우 | 1.x |
+| `/done` | 작업 마무리 + 문서화 | 1.x |
+| `/sync` | 코드↔문서 동기화, 구조 점검 | 2.0 |
+| `/adr` | 아키텍처 결정 기록 | 1.x |
+| `/plan` | 작업 계획 수립 | 1.x |
+| `/status` | 프로젝트 현황 보고 | 1.x |
+| `/docs` | 코드 분석 기반 협의형 문서화 | 1.x |
+| `/health` | 빌드, 타입체크, 기술부채 점검 | 1.x |
+| `/guide` | 에이전트/스킬 사용법 빠른 안내 | 1.x |
+| **`/migrate`** | **마이그레이션 관리 (Feature Flag, Canary)** | **2.0** |
+| **`/api-sync`** | **API 자동 동기화 (OpenAPI -> TypeScript)** | **2.0** |
 
 ## 핵심 원칙
 
@@ -153,3 +157,6 @@ docs/
 - [개발 라이프사이클 시스템 설계](references/development/ACS_Development_Lifecycle_System.md)
 - [프로젝트 현황](status/PROJECT_STATUS.md)
 - [ADR 목록](decisions/README.md)
+- [일일 작업 로그](daily/README.md)
+- [에이전트/스킬 사용 가이드](guides/AGENT_SKILL_USAGE_GUIDE.md)
+- [참조 문서](references/README.md)

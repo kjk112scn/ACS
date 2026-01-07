@@ -1,26 +1,77 @@
 ---
-name: syncing-docs
-description: 코드와 문서 자동 동기화. 과거 문서와 현재 코드를 비교하여 차이점 분석, 문서 최신화 제안. "문서 업데이트", "sync", "동기화", "최신화", "문서 정리" 키워드에 반응.
+name: sync
+description: 문서 관리 총괄 스킬. 코드↔문서 동기화, 문서 구조/링크 점검, README 유지. "문서 업데이트", "sync", "동기화", "최신화", "문서 정리", "링크 점검" 키워드에 반응.
 ---
 
-# Syncing Docs - 문서 자동 동기화 스킬
+# Sync - 문서 관리 총괄 스킬
 
 ## 역할
 
-코드 변경사항을 분석하여 관련 문서를 자동으로 검증하고 업데이트합니다.
+코드 변경사항을 분석하고, **문서 구조와 링크 무결성**을 점검하여 문서를 자동으로 관리합니다.
 
 **핵심 가치:**
 - 과거 문서 vs 현재 코드 차이점 자동 분석
 - 누락된 기능/파일 자동 감지
 - 문서 드리프트(drift) 방지
+- **문서 구조/링크 건강 상태 점검**
+- **README 파일 유지 관리**
 
 ## 워크플로우
 
 ```
-[1. 스캔] → [2. 비교] → [3. 분석] → [4. 제안] → [5. 적용]
-    │           │           │           │           │
-코드 구조     과거 문서    차이점      업데이트    사용자
-  파악        로드        식별        제안       승인
+[1. 스캔] → [2. 비교] → [3. 분석] → [4. 구조점검] → [5. 제안] → [6. 적용]
+    │           │           │           │              │           │
+코드 구조     과거 문서    차이점      README/링크    업데이트    사용자
+  파악        로드        식별        무결성 검증     제안       승인
+```
+
+## 문서 구조 점검 (Step 4)
+
+### README 파일 존재 확인
+
+```bash
+# 필수 README 파일 점검
+ls docs/README.md
+ls docs/references/README.md
+ls docs/references/algorithms/README.md
+ls docs/references/protocols/README.md
+ls docs/references/architecture/README.md
+ls docs/guides/README.md
+ls docs/daily/README.md
+ls docs/decisions/README.md
+```
+
+### 링크 무결성 검증
+
+```bash
+# 마크다운 링크 추출 및 검증
+grep -r "\[.*\](.*\.md)" docs/ --include="*.md"
+```
+
+**점검 항목:**
+- 상대 경로 링크 유효성
+- 상호 참조 (A→B일 때 B→A 존재 여부)
+- 관련 문서 섹션 존재 여부
+
+### 구조 점검 결과 형식
+
+```markdown
+## 문서 구조 점검 결과
+
+### README 파일 상태
+| 폴더 | README | 상태 |
+|------|--------|------|
+| docs/references/ | ✅ 있음 | OK |
+| docs/guides/ | ❌ 없음 | 생성 필요 |
+
+### 링크 무결성
+| 문서 | 깨진 링크 | 조치 |
+|------|----------|------|
+| SYSTEM_OVERVIEW.md | 0개 | OK |
+| EphemerisService.md | 1개 | 수정 필요 |
+
+### 누락된 역링크
+- ICDService.md → SYSTEM_OVERVIEW.md (추가 권장)
 ```
 
 ## 동기화 규칙
@@ -136,8 +187,8 @@ find docs -name "*.md" -type f
 
 | 에이전트 | 역할 | 모델 |
 |---------|------|------|
-| `project-manager` | 문서 구조 관리 | sonnet |
-| `fullstack-helper` | 코드 분석 | sonnet |
+| `doc-syncer` | **문서 관리 총괄** (코드↔문서 + 구조/링크) | opus |
+| `fullstack-helper` | 코드 분석 지원 | sonnet |
 
 ## 사용 예시
 
@@ -216,8 +267,20 @@ A: `<!-- AUTO-GENERATED: -->` 마커 내부만 수정됨. 틀린 부분을 `<!--
 ### Q: 특정 파일만 동기화하고 싶음
 A: `/sync {파일명}` 또는 "SYSTEM_OVERVIEW.md만 업데이트해줘"
 
+### 예시 4: 문서 구조만 점검
+
+```
+사용자: "/sync structure" 또는 "문서 링크 점검해줘"
+
+→ README 파일 존재 확인
+→ 링크 무결성 검증
+→ 누락된 역링크 감지
+→ 수정 제안
+```
+
 ---
 
-**스킬 버전:** 1.0.0
-**작성일:** 2026-01-05
+**스킬 버전:** 2.0.0
+**작성일:** 2026-01-07
 **호환:** ACS 프로젝트 전용
+**담당:** doc-syncer 에이전트
