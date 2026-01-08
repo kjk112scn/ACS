@@ -1350,7 +1350,7 @@ class EphemerisService(
                             trackingCMDElevationAngle = cmdEl,
                             trackingCMDTrainAngle = cmdTrain
                         )
-                        dataStoreService.updateDataFromUdp(initialTrackingData, forceUpdate = true)
+                        dataStoreService.updateDataFromUdp(initialTrackingData)
                         logger.info("📡 TRACKING 전환 - trackingCMD 값 DataStore에 설정 완료")
                     }
                 }
@@ -1626,7 +1626,7 @@ class EphemerisService(
                 trackingCMDTrainAngle = cmdTrain,
                 trackingActualTrainAngle = currentData.trackingActualTrainAngle  // ✅ UDP 값 유지
             )
-            dataStoreService.updateDataFromUdp(updatedData, forceUpdate = true)
+            dataStoreService.updateDataFromUdp(updatedData)
 
             // ✅ 배치 처리로 변경
             batchStorageManager.addToBatch(realtimeData)
@@ -1943,17 +1943,14 @@ class EphemerisService(
 
             "elapsedTimeSeconds" to elapsedTimeSeconds,
             "trackingAzimuthTime" to trackingCmdAzimuthTime,
-            "trackingCMDAzimuthAngle" to ((if (isKeyhole && keyholeFinalTransformedAzimuth != null) keyholeFinalTransformedAzimuth else finalTransformedAzimuth) + GlobalData.Offset.azimuthPositionOffset),  // ✅ Offset 적용
+            // ✅ 하드웨어에서 받은 CMD/Actual 값 그대로 저장 (이론치 아님)
+            "trackingCMDAzimuthAngle" to trackingCmdAzimuth,
             "trackingActualAzimuthAngle" to trackingActualAzimuth,
             "trackingElevationTime" to trackingCmdElevationTime,
-            "trackingCMDElevationAngle" to ((if (isKeyhole && keyholeFinalTransformedElevation != null) keyholeFinalTransformedElevation else finalTransformedElevation) + GlobalData.Offset.elevationPositionOffset),  // ✅ Offset 적용
+            "trackingCMDElevationAngle" to trackingCmdElevation,
             "trackingActualElevationAngle" to trackingActualElevation,
             "trackingTrainTime" to trackingCmdTrainTime,
-            // ✅ Train CMD = 이론치(GlobalData.EphemerisTrakingAngle.trainAngle) + offset
-            // 추적 중에는 moveTrainToZero()에서 설정한 trainAngle 값 사용
-            "trackingCMDTrainAngle" to (GlobalData.EphemerisTrakingAngle.trainAngle +
-                GlobalData.Offset.trainPositionOffset +
-                GlobalData.Offset.trueNorthOffset),
+            "trackingCMDTrainAngle" to trackingCmdTrain,
             "trackingActualTrainAngle" to trackingActualTrain,
             "passId" to mstId, // 하위 호환성을 위해 유지
             "mstId" to mstId, // ✅ mstId 추가

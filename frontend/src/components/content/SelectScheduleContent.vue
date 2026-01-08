@@ -19,7 +19,7 @@
       <!-- 스케줄 테이블 -->
       <!-- ✅ PassSchedule 데이터 구조 리팩토링: row-key를 mstId와 detailId 조합으로 변경 -->
       <q-table flat bordered dark :rows="scheduleData" :columns="scheduleColumns" :row-key="(row) => `${row.mstId}-${row.detailId}`" :loading="loading"
-        v-model:selected="selectedRows" selection="multiple" class="schedule-table"
+        :selected="selectedRows" @update:selected="handleSelectionUpdate" selection="multiple" class="schedule-table"
         style="height: 500px; background-color: var(--theme-card-background);" virtual-scroll
         :virtual-scroll-sticky-size-start="48" hide-pagination :rows-per-page-options="[0]" :row-class="getRowClass"
         :grid="false" :selected-rows-label="getSelectedLabel" dense>
@@ -47,7 +47,7 @@
         <template v-slot:body-cell-selection="props">
           <q-td>
             <q-checkbox :model-value="isScheduleSelected(props.row)" :disable="!canSelectSchedule(props.row)"
-              :color="isScheduleOverlapping(props.row.no) ? 'warning' : 'primary'"
+              :color="isScheduleOverlapping(props.row.mstId) ? 'warning' : 'primary'"
               @update:model-value="(val) => handleCheckboxChange(props.row, val)" class="schedule-checkbox" />
             <q-tooltip v-if="!canSelectSchedule(props.row)" class="bg-warning text-black">
               시간이 겹치는 다른 스케줄이 이미 선택되어 있습니다
@@ -58,7 +58,7 @@
         <template v-slot:body-cell-startTime="props">
           <q-td :props="props">
             {{ formatDateTime(props.value) }}
-            <q-icon v-if="isScheduleOverlapping(props.row.no)" name="warning" color="warning" size="xs" class="q-ml-xs">
+            <q-icon v-if="isScheduleOverlapping(props.row.mstId)" name="warning" color="warning" size="xs" class="q-ml-xs">
               <q-tooltip class="bg-warning text-black">
                 시간이 겹치는 스케줄입니다
               </q-tooltip>
@@ -456,7 +456,7 @@ const checkTimeOverlap = (schedule1: ScheduleItem, schedule2: ScheduleItem): boo
   }
 }
 
-// ✅ 겹치는 스케줄 그룹 계산 - 디버깅 강화
+// ✅ 겹치는 스케줄 그룹 계산 - mstId 기준으로 변경 (no는 정렬 후 재할당되므로 사용 불가)
 const overlappingGroups = computed(() => {
   const data = scheduleData.value
   const groups: number[][] = []
@@ -465,17 +465,17 @@ const overlappingGroups = computed(() => {
   console.log('🔍 겹침 검사 시작 - 총', data.length, '개 스케줄')
 
   data.forEach((schedule, index) => {
-    if (processed.has(schedule.no)) return
+    if (processed.has(schedule.mstId)) return
 
-    const overlappingSchedules = [schedule.no]
+    const overlappingSchedules = [schedule.mstId]
 
     data.forEach((otherSchedule, otherIndex) => {
-      if (index !== otherIndex && !processed.has(otherSchedule.no)) {
+      if (index !== otherIndex && !processed.has(otherSchedule.mstId)) {
         if (checkTimeOverlap(schedule, otherSchedule)) {
-          overlappingSchedules.push(otherSchedule.no)
+          overlappingSchedules.push(otherSchedule.mstId)
           console.log('🔍 겹침 발견:', {
-            schedule1: `${schedule.satelliteName} (${schedule.startTime} ~ ${schedule.endTime})`,
-            schedule2: `${otherSchedule.satelliteName} (${otherSchedule.startTime} ~ ${otherSchedule.endTime})`
+            schedule1: `${schedule.satelliteName} (mstId=${schedule.mstId}, ${schedule.startTime} ~ ${schedule.endTime})`,
+            schedule2: `${otherSchedule.satelliteName} (mstId=${otherSchedule.mstId}, ${otherSchedule.startTime} ~ ${otherSchedule.endTime})`
           })
         }
       }
@@ -483,10 +483,10 @@ const overlappingGroups = computed(() => {
 
     if (overlappingSchedules.length > 1) {
       groups.push(overlappingSchedules)
-      overlappingSchedules.forEach(no => processed.add(no))
-      console.log('✅ 겹침 그룹 생성:', overlappingSchedules.map(no => {
-        const item = data.find(s => s.no === no)
-        return `${item?.satelliteName}(${no})`
+      overlappingSchedules.forEach(mstId => processed.add(mstId))
+      console.log('✅ 겹침 그룹 생성:', overlappingSchedules.map(mstId => {
+        const item = data.find(s => s.mstId === mstId)
+        return `${item?.satelliteName}(mstId=${mstId})`
       }))
     }
   })
@@ -495,36 +495,31 @@ const overlappingGroups = computed(() => {
   return groups
 })
 
-// ✅ 특정 스케줄이 겹치는지 확인
-const isScheduleOverlapping = (scheduleNo: number): boolean => {
-  return overlappingGroups.value.some(group => group.includes(scheduleNo))
+// ✅ 특정 스케줄이 겹치는지 확인 (mstId 기준)
+const isScheduleOverlapping = (mstId: number): boolean => {
+  return overlappingGroups.value.some(group => group.includes(mstId))
 }
 
-// ✅ 특정 스케줄의 겹치는 그룹 가져오기
-const getOverlappingGroup = (scheduleNo: number): number[] => {
-  const group = overlappingGroups.value.find(group => group.includes(scheduleNo))
+// ✅ 특정 스케줄의 겹치는 그룹 가져오기 (mstId 기준)
+const getOverlappingGroup = (mstId: number): number[] => {
+  const group = overlappingGroups.value.find(group => group.includes(mstId))
   return group || []
 }
 
-// ✅ 선택 가능 여부 확인 함수 - no 기준으로 수정
+// ✅ 선택 가능 여부 확인 함수 - mstId 기준으로 수정
 const canSelectSchedule = (schedule: ScheduleItem): boolean => {
   // 겹치지 않는 스케줄은 항상 선택 가능
-  if (!isScheduleOverlapping(schedule.no)) {
+  if (!isScheduleOverlapping(schedule.mstId)) {
     return true
   }
 
   // 겹치는 스케줄인 경우, 같은 그룹의 다른 스케줄이 선택되어 있는지 확인
-  const overlappingGroup = getOverlappingGroup(schedule.no)
+  const overlappingGroup = getOverlappingGroup(schedule.mstId)
 
-  // ✅ selectedRows에서 같은 그룹에 속하는 다른 스케줄이 선택되어 있는지 확인 (mstId와 detailId 조합 기준)
+  // ✅ selectedRows에서 같은 그룹에 속하는 다른 스케줄이 선택되어 있는지 확인 (mstId 기준)
   const otherSelectedInGroup = selectedRows.value.filter(selected => {
-    // ✅ mstId와 detailId 조합으로 매칭
-    const selectedSchedule = scheduleData.value.find(s =>
-      s.mstId === selected.mstId && s.detailId === selected.detailId
-    )
-    // 같은 그룹에 있고, 다른 스케줄인지 확인
-    return selectedSchedule &&
-      overlappingGroup.includes(selectedSchedule.no) &&
+    // 같은 그룹에 있고, 다른 스케줄인지 확인 (mstId 기준)
+    return overlappingGroup.includes(selected.mstId) &&
       (selected.mstId !== schedule.mstId || selected.detailId !== schedule.detailId)
   })
 
@@ -544,6 +539,74 @@ const isScheduleSelected = (schedule: ScheduleItem): boolean => {
   return selectedRows.value.some(selected =>
     selected.mstId === schedule.mstId && selected.detailId === schedule.detailId
   )
+}
+
+// ✅ q-table 선택 변경 핸들러 (행 클릭 시에도 검증 수행)
+const handleSelectionUpdate = (newSelection: ScheduleItem[]) => {
+  // 새로 추가된 항목 찾기
+  const newItems = newSelection.filter(newItem =>
+    !selectedRows.value.some(existing =>
+      existing.mstId === newItem.mstId && existing.detailId === newItem.detailId
+    )
+  )
+
+  // 제거된 항목 찾기
+  const removedItems = selectedRows.value.filter(existing =>
+    !newSelection.some(newItem =>
+      newItem.mstId === existing.mstId && newItem.detailId === existing.detailId
+    )
+  )
+
+  console.log('🔄 선택 변경 감지:', {
+    새로추가: newItems.map(i => ({ name: i.satelliteName, mstId: i.mstId })),
+    제거됨: removedItems.map(i => ({ name: i.satelliteName, mstId: i.mstId }))
+  })
+
+  // 새로 추가된 항목 각각에 대해 검증
+  for (const item of newItems) {
+    // canSelectSchedule 검증
+    if (!canSelectSchedule(item)) {
+      console.log('❌ 선택 불가 (겹침 그룹에서 이미 선택됨):', item.satelliteName)
+      showOverlapWarning(item)
+      continue // 건너뜀 - selectedRows에 추가하지 않음
+    }
+
+    // 현재까지 selectedRows + 이미 추가된 항목들과의 겹침 검증
+    const wouldOverlap = selectedRows.value.some(selected => {
+      const selectedSchedule = scheduleData.value.find(s =>
+        s.mstId === selected.mstId && s.detailId === selected.detailId
+      )
+      return selectedSchedule && checkTimeOverlap(item, selectedSchedule)
+    })
+
+    if (wouldOverlap) {
+      console.log('❌ 시간 겹침으로 선택 불가:', item.satelliteName)
+      showOverlapWarning(item)
+      continue // 건너뜀
+    }
+
+    // 검증 통과 - 추가
+    if (!selectedRows.value.some(s => s.mstId === item.mstId && s.detailId === item.detailId)) {
+      selectedRows.value.push({ ...item })
+      console.log('✅ 스케줄 선택 추가:', item.satelliteName, `mstId=${item.mstId}`)
+    }
+  }
+
+  // 제거된 항목 처리
+  for (const item of removedItems) {
+    const idx = selectedRows.value.findIndex(s =>
+      s.mstId === item.mstId && s.detailId === item.detailId
+    )
+    if (idx >= 0) {
+      selectedRows.value.splice(idx, 1)
+      console.log('✅ 스케줄 선택 해제:', item.satelliteName)
+    }
+  }
+
+  console.log('📋 현재 선택된 항목들:', selectedRows.value.map(s => ({
+    mstId: s.mstId,
+    name: s.satelliteName
+  })))
 }
 
 // ✅ 체크박스 변경 핸들러
@@ -606,9 +669,9 @@ const isAllSelected = computed(() => {
   if (scheduleData.value.length === 0) return false
   if (selectedRows.value.length === 0) return false
 
-  // 겹치지 않고 선택 가능한 스케줄만 카운트
+  // 겹치지 않고 선택 가능한 스케줄만 카운트 (mstId 기준)
   const selectableSchedules = scheduleData.value.filter(schedule =>
-    !isScheduleOverlapping(schedule.no)
+    !isScheduleOverlapping(schedule.mstId)
   )
 
   if (selectableSchedules.length === 0) return false
@@ -634,9 +697,9 @@ const isIndeterminate = computed(() => {
   if (scheduleData.value.length === 0) return false
   if (selectedRows.value.length === 0) return false
 
-  // 겹치지 않고 선택 가능한 스케줄만 카운트
+  // 겹치지 않고 선택 가능한 스케줄만 카운트 (mstId 기준)
   const selectableSchedules = scheduleData.value.filter(schedule =>
-    !isScheduleOverlapping(schedule.no)
+    !isScheduleOverlapping(schedule.mstId)
   )
 
   if (selectableSchedules.length === 0) return false
@@ -675,8 +738,8 @@ const toggleSelectAll = (value: boolean) => {
         return false
       }
 
-      // 겹치는 스케줄은 제외
-      if (isScheduleOverlapping(schedule.no)) {
+      // 겹치는 스케줄은 제외 (mstId 기준)
+      if (isScheduleOverlapping(schedule.mstId)) {
         console.log('⚠️ 겹침으로 제외:', schedule.mstId, schedule.satelliteName)
         return false
       }
@@ -715,19 +778,18 @@ const toggleSelectAll = (value: boolean) => {
 }
 
 
-// ✅ 겹침 경고 메시지 표시 함수 - no 기준으로 수정
+// ✅ 겹침 경고 메시지 표시 함수 - mstId 기준으로 수정
 const showOverlapWarning = (row: ScheduleItem) => {
-  const overlappingGroup = getOverlappingGroup(row.no)
+  const overlappingGroup = getOverlappingGroup(row.mstId)
 
-  // ✅ selectedRows의 스케줄이 scheduleData에서 어떤 스케줄인지 찾아서 비교 (mstId 기준)
+  // ✅ selectedRows에서 같은 그룹에 속하는 스케줄 찾기 (mstId 기준)
   const selectedInGroup = selectedRows.value.filter(selected => {
-    const selectedSchedule = scheduleData.value.find(s => s.mstId === selected.mstId)
-    return selectedSchedule && overlappingGroup.includes(selectedSchedule.no)
+    return overlappingGroup.includes(selected.mstId)
   })
 
-  // 🔧 겹치는 다른 스케줄들의 시간 정보도 표시
+  // 🔧 겹치는 다른 스케줄들의 시간 정보도 표시 (mstId 기준)
   const overlappingSchedules = scheduleData.value.filter(s =>
-    overlappingGroup.includes(s.no) && s.no !== row.no
+    overlappingGroup.includes(s.mstId) && s.mstId !== row.mstId
   )
 
   let message = `시간이 겹치는 스케줄이 이미 선택되어 있습니다.\n\n`
@@ -1009,7 +1071,7 @@ const clearSelection = () => {
 const getRowClass = (row: ScheduleItem): string => {
   const classes = []
 
-  if (isScheduleOverlapping(row.no)) {
+  if (isScheduleOverlapping(row.mstId)) {
     classes.push('overlapping-row')
   }
 
@@ -1393,19 +1455,15 @@ onMounted(async () => {
 
             if (alreadySelected) return
 
-            // 겹침이 없는 경우
-            if (!isScheduleOverlapping(schedule.no)) {
+            // 겹침이 없는 경우 (mstId 기준)
+            if (!isScheduleOverlapping(schedule.mstId)) {
               validSchedules.push(schedule)
             } else {
-              // 겹치는 항목은 같은 그룹에 다른 선택이 없을 때만 추가
-              const overlappingGroup = getOverlappingGroup(schedule.no)
+              // 겹치는 항목은 같은 그룹에 다른 선택이 없을 때만 추가 (mstId 기준)
+              const overlappingGroup = getOverlappingGroup(schedule.mstId)
               const hasOtherSelected = selectedRows.value.some(selected => {
-                // ✅ mstId와 detailId 조합으로 매칭
-                const selectedSchedule = scheduleData.value.find(s =>
-                  s.mstId === selected.mstId && s.detailId === selected.detailId
-                )
-                return selectedSchedule &&
-                  overlappingGroup.includes(selectedSchedule.no) &&
+                // 같은 그룹에 있고, 다른 스케줄인지 확인 (mstId 기준)
+                return overlappingGroup.includes(selected.mstId) &&
                   (selected.mstId !== schedule.mstId || selected.detailId !== schedule.detailId)
               })
 
@@ -1504,19 +1562,15 @@ onMounted(async () => {
 
               if (alreadySelected) return
 
-              // 겹침이 없는 경우
-              if (!isScheduleOverlapping(schedule.no)) {
+              // 겹침이 없는 경우 (mstId 기준)
+              if (!isScheduleOverlapping(schedule.mstId)) {
                 validSchedules.push(schedule)
               } else {
-                // 겹치는 항목은 같은 그룹에 다른 선택이 없을 때만 추가
-                const overlappingGroup = getOverlappingGroup(schedule.no)
+                // 겹치는 항목은 같은 그룹에 다른 선택이 없을 때만 추가 (mstId 기준)
+                const overlappingGroup = getOverlappingGroup(schedule.mstId)
                 const hasOtherSelected = selectedRows.value.some(selected => {
-                  // ✅ mstId와 detailId 조합으로 매칭
-                  const selectedSchedule = scheduleData.value.find(s =>
-                    s.mstId === selected.mstId && s.detailId === selected.detailId
-                  )
-                  return selectedSchedule &&
-                    overlappingGroup.includes(selectedSchedule.no) &&
+                  // 같은 그룹에 있고, 다른 스케줄인지 확인 (mstId 기준)
+                  return overlappingGroup.includes(selected.mstId) &&
                     (selected.mstId !== schedule.mstId || selected.detailId !== schedule.detailId)
                 })
 

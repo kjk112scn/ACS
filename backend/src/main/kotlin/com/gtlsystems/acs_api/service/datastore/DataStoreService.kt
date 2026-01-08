@@ -22,12 +22,12 @@ class DataStoreService {
     private val udpConnected = AtomicReference(false)
 
     /**
-     * ✅ UDP에서 데이터 업데이트 (mergedData 로직 복원)
+     * ✅ UDP에서 데이터 업데이트
+     * - 하드웨어 실시간 값 우선 사용
      * - 새 데이터의 null이 아닌 필드만 업데이트
      * - 기존 데이터 보존 (null 필드는 덮어쓰지 않음)
-     * @param forceUpdate true이면 보존 로직을 우회하고 서버 계산값으로 강제 업데이트
      */
-    fun updateDataFromUdp(newData: PushData.ReadData, forceUpdate: Boolean = false) {
+    fun updateDataFromUdp(newData: PushData.ReadData) {
         val currentData = latestData.get()
         
         // ✅ 디버깅 로그 관련 변수 (필요시 활성화)
@@ -58,41 +58,22 @@ class DataStoreService {
                 ephemerisState == "TRACKING"       // 추적 중
             )
 
-        // ✅ 실제 추적 중 상태인지 확인 (TRACKING일 때 서버 계산값 우선)
-        val isActiveTracking = ephemerisState == "TRACKING"
-
-        // ✅ PREPARING 또는 TRACKING 상태일 때 서버가 설정한 CMD 값 보존
-        val shouldPreserveCmdValue = ephemerisState == "PREPARING" || ephemerisState == "TRACKING"
-
-        // ✅ 추적 CMD 값 병합 로직:
-        // - forceUpdate=true이면 보존 로직 우회 (서버 계산값 강제 업데이트)
-        // - PREPARING 또는 TRACKING 상태일 때: 현재 값이 유효하면 UDP 값 무시 (서버가 설정한 값 유지)
-        // - 그 외 추적 준비 상태일 때: UDP가 0.0을 보내면 현재 값 유지
+        // ✅ 추적 CMD 값 병합 로직 (간소화):
+        // - 하드웨어 실시간 값 우선 사용
+        // - UDP가 0.0을 보내면 이전 값 유지 (추적 준비 상태에서만)
         val mergedTrackingCMDAzimuth = when {
             // UDP 데이터가 null이면 현재 값 유지
             newData.trackingCMDAzimuthAngle == null -> currentData.trackingCMDAzimuthAngle
-            // ✅ forceUpdate=true이면 서버 계산값으로 강제 업데이트 (tracking 스레드에서 호출 시)
-            forceUpdate -> newData.trackingCMDAzimuthAngle
-            // ✅ PREPARING 또는 TRACKING 상태이고 현재 값이 유효하면 UDP 값 무시 (서버가 설정한 값 보존)
-            shouldPreserveCmdValue && currentData.trackingCMDAzimuthAngle != null && currentData.trackingCMDAzimuthAngle != 0.0f -> {
-                currentData.trackingCMDAzimuthAngle
-            }
             // 추적 준비 상태이고, 현재 값이 0이 아니며, UDP가 0.0을 보내면 현재 값 유지
             shouldPreserveTrackingCmd && currentData.trackingCMDAzimuthAngle != 0.0f && newData.trackingCMDAzimuthAngle == 0.0f -> {
                 currentData.trackingCMDAzimuthAngle
             }
-            // 그 외에는 UDP 값 사용
+            // 그 외에는 UDP 하드웨어 실시간 값 사용
             else -> newData.trackingCMDAzimuthAngle
         }
 
         val mergedTrackingCMDElevation = when {
             newData.trackingCMDElevationAngle == null -> currentData.trackingCMDElevationAngle
-            // ✅ forceUpdate=true이면 서버 계산값으로 강제 업데이트
-            forceUpdate -> newData.trackingCMDElevationAngle
-            // ✅ PREPARING 또는 TRACKING 상태이고 현재 값이 유효하면 UDP 값 무시
-            shouldPreserveCmdValue && currentData.trackingCMDElevationAngle != null && currentData.trackingCMDElevationAngle != 0.0f -> {
-                currentData.trackingCMDElevationAngle
-            }
             shouldPreserveTrackingCmd && currentData.trackingCMDElevationAngle != 0.0f && newData.trackingCMDElevationAngle == 0.0f -> {
                 currentData.trackingCMDElevationAngle
             }
@@ -101,12 +82,6 @@ class DataStoreService {
 
         val mergedTrackingCMDTrain = when {
             newData.trackingCMDTrainAngle == null -> currentData.trackingCMDTrainAngle
-            // ✅ forceUpdate=true이면 서버 계산값으로 강제 업데이트
-            forceUpdate -> newData.trackingCMDTrainAngle
-            // ✅ PREPARING 또는 TRACKING 상태이고 현재 값이 유효하면 UDP 값 무시
-            shouldPreserveCmdValue && currentData.trackingCMDTrainAngle != null && currentData.trackingCMDTrainAngle != 0.0f -> {
-                currentData.trackingCMDTrainAngle
-            }
             shouldPreserveTrackingCmd && currentData.trackingCMDTrainAngle != 0.0f && newData.trackingCMDTrainAngle == 0.0f -> {
                 currentData.trackingCMDTrainAngle
             }

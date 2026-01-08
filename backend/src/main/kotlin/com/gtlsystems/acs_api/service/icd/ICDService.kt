@@ -113,15 +113,15 @@ class ICDService {
                                 elevationMaxAcceleration = it.elevationMaxAcceleration,
                                 trainMaxAcceleration = it.tiltMaxAcceleration,
 
-                                //traking 정보
+                                //traking 정보 (하드웨어 원본 값 유지 - offset 미적용)
                                 trackingAzimuthTime = it.trackingAzimuthTime,
-                                trackingCMDAzimuthAngle = it.trackingCMDAzimuthAngle + GlobalData.Offset.azimuthPositionOffset,
+                                trackingCMDAzimuthAngle = it.trackingCMDAzimuthAngle,
                                 trackingActualAzimuthAngle = it.trackingActualAzimuthAngle,
                                 trackingElevationTime = it.trackingElevationTime,
-                                trackingCMDElevationAngle = it.trackingCMDElevationAngle + GlobalData.Offset.elevationPositionOffset,
+                                trackingCMDElevationAngle = it.trackingCMDElevationAngle,
                                 trackingActualElevationAngle = it.trackingActualElevationAngle,
                                 trackingTrainTime = it.trackingTiltTime,
-                                trackingCMDTrainAngle = it.trackingCMDTiltAngle + GlobalData.Offset.trainPositionOffset + GlobalData.Offset.trueNorthOffset,
+                                trackingCMDTrainAngle = it.trackingCMDTiltAngle,
                                 trackingActualTrainAngle = it.trackingActualTiltAngle,
 
                             )
