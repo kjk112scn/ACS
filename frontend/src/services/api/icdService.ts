@@ -756,47 +756,6 @@ export const icdService = {
     }
   },
 
-  /**
-   * 위치 설정 명령 전송
-   * @param command 위치 설정 명령 객체
-   */
-  async setPosition(command: {
-    azimuthAngle: number
-    elevationAngle: number
-    trainAngle: number
-    timestamp: string
-  }) {
-    try {
-      const response = await api.post('/icd/set-position', command)
-      console.log('위치 지정 명령 전송 성공:', response.data)
-      return response.data
-    } catch (error) {
-      console.error('위치 지정 명령 전송 실패:', error)
-      throw error
-    }
-  },
-
-  // 실시간 데이터 요청 메서드 추가
-  async getRealtimeData() {
-    try {
-      const response = await api.get('/icd/realtime-data', {
-        timeout: 25, // 30ms 주기보다 짧게 설정
-      })
-
-      return {
-        data: response.data,
-        timestamp: Date.now(),
-      }
-    } catch (error) {
-      // 타이머 방식에서는 에러를 던지지 않고 로그만
-      if (Math.random() < 0.01) {
-        // 1% 확률로만 로그 (너무 많은 로그 방지)
-        console.warn('실시간 데이터 요청 실패:', error)
-      }
-      return null
-    }
-  },
-
   async sendMCOnOffCommand(onOff: boolean = true) {
     try {
       const response = await api.post('/icd/mc-on-off-command', null, {
@@ -831,24 +790,6 @@ export const icdService = {
       return response.data
     } catch (error) {
       console.error('Servo Alarm Reset 명령 오류:', error)
-      throw error
-    }
-  },
-
-  /**
-   * 2.3 Read Positioner Status
-   * 3-Axis의 각도 정보를 수신 받기 위한 프로토콜이다.
-   * 주요 정보: 3-Axis 각도 정보(Azimuth / Elevation / Tilt)
-   * 주요 사용처: 상시
-   */
-  async sendReadPositionerStatusCommand() {
-    try {
-      const response = await api.post('/icd/read-positioner-status')
-
-      console.log('Read Positioner Status 명령 성공:', response.data)
-      return response.data
-    } catch (error) {
-      console.error('Read Positioner Status 명령 오류:', error)
       throw error
     }
   },

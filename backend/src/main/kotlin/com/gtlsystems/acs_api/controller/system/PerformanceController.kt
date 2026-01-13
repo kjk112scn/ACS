@@ -1,6 +1,8 @@
 package com.gtlsystems.acs_api.controller.system
 
-import com.gtlsystems.acs_api.util.ApiDescriptions
+import com.gtlsystems.acs_api.config.ThreadManager
+import com.gtlsystems.acs_api.service.udp.UdpFwICDService
+import com.gtlsystems.acs_api.service.websocket.PushDataService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.ResponseEntity
@@ -8,9 +10,6 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import java.lang.management.ManagementFactory
-import java.lang.management.MemoryMXBean
-import java.lang.management.ThreadMXBean
-import java.lang.management.OperatingSystemMXBean
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
@@ -18,7 +17,11 @@ import java.util.concurrent.atomic.AtomicLong
 @RestController
 @RequestMapping("/api/system/performance")
 @Tag(name = "System - Performance", description = "시스템 성능 모니터링 API - 응답 시간, 메모리 사용량, 성능 메트릭")
-class PerformanceController {
+class PerformanceController(
+    private val udpFwICDService: UdpFwICDService,
+    private val pushDataService: PushDataService,
+    private val threadManager: ThreadManager
+) {
 
     // 성능 메트릭 저장소
     private val apiResponseTimes = ConcurrentHashMap<String, MutableList<Long>>()
@@ -288,17 +291,184 @@ class PerformanceController {
     // 성능 메트릭 기록 메서드들 (다른 컨트롤러에서 사용)
     fun recordApiCall(endpoint: String, responseTime: Long, isError: Boolean = false) {
         apiCallCounts.computeIfAbsent(endpoint) { AtomicLong(0) }.incrementAndGet()
-        
+
         if (isError) {
             apiErrorCounts.computeIfAbsent(endpoint) { AtomicLong(0) }.incrementAndGet()
         }
-        
+
         apiResponseTimes.computeIfAbsent(endpoint) { mutableListOf() }.add(responseTime)
-        
+
         // 응답 시간 기록을 1000개로 제한
         val responseTimes = apiResponseTimes[endpoint]
         if (responseTimes != null && responseTimes.size > 1000) {
             responseTimes.removeAt(0)
+        }
+    }
+
+    // === 통합 헬스체크 API ===
+
+    @GetMapping("/health/summary")
+    @Operation(
+        summary = "전체 시스템 상태 요약 조회",
+        description = """
+            UDP, WebSocket, 스레드 풀, 시스템 메모리의 상태를 한눈에 조회합니다.
+
+            ## 응답 필드
+            - **udp**: UDP 통신 상태 (true/false)
+            - **websocket**: WebSocket 브로드캐스트 상태 (true/false)
+            - **threads**: 스레드 풀 상태 (true/false)
+            - **memory**: 메모리 상태 (true/false)
+            - **overall**: 종합 상태 (healthy/warning/critical)
+
+            ## 사용 시나리오
+            - 주기적 폴링으로 전체 상태 모니터링
+            - 문제 발생 시 개별 상세 API 호출
+        """,
+        tags = ["System - Performance"]
+    )
+    fun getHealthSummary(): ResponseEntity<Map<String, Any>> {
+        val memoryBean = ManagementFactory.getMemoryMXBean()
+        val heapMemory = memoryBean.heapMemoryUsage
+        val memoryUsage = (heapMemory.used * 100 / heapMemory.max)
+
+        // 개별 상태 조회 (장애 격리를 위해 try-catch)
+        val udpHealthy = try {
+            udpFwICDService.isCommunicationHealthy()
+        } catch (e: Exception) {
+            false
+        }
+
+        val websocketHealthy = try {
+            pushDataService.getActiveClientCount() >= 0 // 음수가 아니면 정상
+        } catch (e: Exception) {
+            false
+        }
+
+        val threadsHealthy = try {
+            threadManager.getThreadPoolStats().isNotEmpty()
+        } catch (e: Exception) {
+            false
+        }
+
+        val memoryHealthy = memoryUsage < 85
+
+        // 종합 상태 판정
+        val overall = when {
+            !udpHealthy || !websocketHealthy || !threadsHealthy || !memoryHealthy -> "critical"
+            memoryUsage > 70 -> "warning"
+            else -> "healthy"
+        }
+
+        return ResponseEntity.ok(
+            mapOf(
+                "udp" to udpHealthy,
+                "websocket" to websocketHealthy,
+                "threads" to threadsHealthy,
+                "memory" to memoryHealthy,
+                "overall" to overall,
+                "timestamp" to System.currentTimeMillis()
+            )
+        )
+    }
+
+    @GetMapping("/thread-stats")
+    @Operation(
+        summary = "스레드 풀 상태 조회",
+        description = """
+            ThreadManager가 관리하는 모든 스레드 풀의 상태를 조회합니다.
+
+            ## 조회 항목
+            - **UDP 스레드**: 실시간 UDP 통신용 (CRITICAL 우선순위)
+            - **WebSocket 스레드**: 브로드캐스트용 (HIGH 우선순위)
+            - **Tracking 스레드**: 위성 추적 계산용 (NORMAL 우선순위)
+            - **Batch 스레드**: 배치 저장용 (LOW 우선순위)
+
+            ## 상태 필드
+            - **poolSize**: 현재 스레드 수
+            - **activeCount**: 활성 스레드 수
+            - **queueSize**: 대기 작업 수
+            - **completedTasks**: 완료 작업 수
+        """,
+        tags = ["System - Performance"]
+    )
+    fun getThreadStats(): ResponseEntity<Map<String, Any>> {
+        return try {
+            val stats = threadManager.getThreadPoolStats()
+            val specs = threadManager.detectSystemSpecs()
+            val systemSpecs = mapOf(
+                "performanceTier" to threadManager.classifyPerformanceTier(specs).name,
+                "cpuCores" to specs.cpuCores,
+                "totalMemory" to specs.totalMemory,
+                "osName" to specs.osName
+            )
+
+            ResponseEntity.ok(
+                mapOf(
+                    "status" to "success",
+                    "system" to systemSpecs,
+                    "pools" to stats,
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        } catch (e: Exception) {
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "스레드 풀 상태 조회 실패: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    @GetMapping("/websocket-stats")
+    @Operation(
+        summary = "WebSocket 상태 조회",
+        description = """
+            WebSocket 브로드캐스트 서비스의 상태를 조회합니다.
+
+            ## 조회 항목
+            - **activeClients**: 현재 연결된 클라이언트 수
+            - **dataStoreConnected**: DataStore 연결 상태
+            - **lastUdpUpdateTime**: 마지막 UDP 데이터 수신 시간
+
+            ## 상태 판정
+            - **healthy**: 클라이언트 연결 가능, DataStore 연결됨
+            - **warning**: 클라이언트 없음 또는 DataStore 연결 끊김
+            - **critical**: 서비스 오류
+        """,
+        tags = ["System - Performance"]
+    )
+    fun getWebSocketStats(): ResponseEntity<Map<String, Any>> {
+        return try {
+            val stats = pushDataService.getServiceStats()
+            val activeClients = stats["activeClients"] as? Int ?: 0
+            val dataStoreConnected = stats["dataStoreConnected"] as? Boolean ?: false
+
+            val status = when {
+                !dataStoreConnected -> "warning"
+                activeClients == 0 -> "warning"
+                else -> "healthy"
+            }
+
+            ResponseEntity.ok(
+                mapOf(
+                    "status" to status,
+                    "activeClients" to activeClients,
+                    "dataStoreConnected" to dataStoreConnected,
+                    "lastUdpUpdateTime" to (stats["lastUdpUpdateTime"] ?: "N/A"),
+                    "serviceRole" to (stats["serviceRole"] ?: "Unknown"),
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+        } catch (e: Exception) {
+            ResponseEntity.internalServerError().body(
+                mapOf(
+                    "status" to "critical",
+                    "message" to "WebSocket 상태 조회 실패: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
         }
     }
 } 

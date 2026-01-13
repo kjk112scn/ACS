@@ -1050,45 +1050,6 @@ class UdpFwICDService(
         return isUdpRunning.get() && ::channel.isInitialized && channel.isOpen
     }
 
-    /** 통신 상태 리포트 */
-    fun getCommunicationStatusReport(): String {
-        val stats = getUdpPerformanceStats()
-        return buildString {
-            appendLine("=== UDP 단순 Mono 통신 상태 ===")
-            appendLine("실행 상태: ${if (isUdpRunning.get()) "실행 중" else "중지됨"}")
-            appendLine("송신 횟수: ${stats["sendCount"]}")
-            appendLine("수신 횟수: ${stats["receiveCount"]}")
-            appendLine("펌웨어 주소: ${stats["firmwareAddress"]}")
-            appendLine("서버 주소: ${stats["serverAddress"]}")
-            appendLine("아키텍처: ${stats["architecture"]}")
-            appendLine("건강 상태: ${if (isCommunicationHealthy()) "양호" else "문제 있음"}")
-        }
-    }
-
-    /** 실시간 통신 상태 체크 */
-    fun checkRealtimeCommunication(): Map<String, Any> {
-        val currentSendCount = sendCount.get()
-        val currentReceiveCount = receiveCount.get()
-
-        // 1초 후 다시 체크하여 증가율 확인
-        Thread.sleep(1000)
-
-        val newSendCount = sendCount.get()
-        val newReceiveCount = receiveCount.get()
-
-        val sendRate = newSendCount - currentSendCount
-        val receiveRate = newReceiveCount - currentReceiveCount
-
-        return mapOf(
-            "sendRate" to "${sendRate}/sec (예상: ~100/sec)",
-            "receiveRate" to "${receiveRate}/sec (예상: ~50/sec)",
-            "sendHealth" to (sendRate > 50), // 50% 이상이면 건강
-            "receiveHealth" to (receiveRate > 25), // 50% 이상이면 건강
-            "channelOpen" to (::channel.isInitialized && channel.isOpen),
-            "executorsRunning" to (udpExecutor != null)
-        )
-    }
-
     // === 리소스 정리 및 종료 처리 ===
 
     @PreDestroy
@@ -1157,36 +1118,6 @@ class UdpFwICDService(
                 { /* 성공 */ },
                 { error -> logger.error("강제 재연결 실패: {}", error.message, error) }
             )
-    }
-
-    /** 아키텍처 정보 */
-    fun getArchitectureInfo(): String {
-        return """
-        UDP 단순 Mono 비동기 통신 아키텍처
-        
-        실시간 통신 (Thread 기반):
-        ├── UDP Receive: 20ms 간격, MAX_PRIORITY (우선순위 10)
-        ├── UDP Send: 10ms 간격, MAX_PRIORITY-1 (우선순위 9)
-        └── 목적: 펌웨어와의 실시간 상태 송수신
-        
-        제어 명령 (Mono 기반):
-        ├── 비동기 처리: Mono.fromCallable()
-        ├── 스케줄러: Schedulers.boundedElastic()
-        ├── 오류 처리: subscribe() 에러 핸들링
-        └── 목적: 사용자 명령의 단순한 비동기 처리
-        
-        처리 흐름:
-        1. 사용자 API 호출 → Mono로 비동기 처리 (즉시 반환)
-        2. 각 명령은 독립적으로 비동기 실행
-        3. 실시간 Thread는 지속적으로 상태 송수신
-        4. WebSocket은 별도 스레드에서 프론트엔드에 스트리밍
-        
-        장점:
-        - 단순성: 복잡한 큐나 스트림 없이 직접적인 비동기 처리
-        - 실시간성: Thread 기반 고정 주기 통신
-        - 안정성: 각 명령의 독립적 처리로 상호 영향 최소화
-        - 가독성: 명확하고 이해하기 쉬운 코드 구조
-        """.trimIndent()
     }
 
     /**

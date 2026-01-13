@@ -6,7 +6,8 @@
       "Bash(npm run build:*)",
       "Bash(./gradlew clean build:*)",
       "Bash(npx vue-tsc --noEmit)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(wc:*)"
     ]
   }
 }
