@@ -27,9 +27,16 @@ ACS v2.0 고도화를 위한 체계적 리팩토링 프로젝트입니다.
 | [RFC-004](./RFC-004_API_Standardization.md) | API 표준화 | 응답 형식, 동기/비동기, Critical 버그 | **P1** | v1.6.0 |
 | RFC-005 | 테스트 전략 | 테스트 커버리지 | P2 | 작성 필요 |
 | RFC-006 | CI/CD 파이프라인 | 빌드 자동화 | P1 | 작성 필요 |
-| [RFC-007](./RFC-007_BE_Infrastructure.md) | BE 인프라 개선 | 입력 검증, Repository 추상화, 예외 처리 | P2 | v1.1.0 |
+| [RFC-007](./RFC-007_BE_Infrastructure.md) | BE 인프라 개선 | 입력 검증, Repository 추상화, 예외 처리 | **P0** | v1.1.0 |
 | [RFC-008](./RFC-008_Frontend_Restructuring.md) | 프론트엔드 구조화 | FE 전체 (Composable, 성능, icdStore, Dead Code) | P2 | v1.4.0 |
 | [RFC-009](./RFC-009_Accessibility.md) | 접근성 개선 | WCAG 준수, aria 속성, 키보드 네비게이션 | P2 | v1.0.0 |
+| [RFC-010](./RFC-010_Deep_Analysis_Report.md) | 심층 분석 보고서 | 기존 RFC 누락 사항 (CORS, XSS, 입력검증, shallowRef) | **P0** | v1.0.0 |
+
+### 검토 문서
+
+| 문서 | 역할 |
+|------|------|
+| [Quality_Review_Report.md](./Quality_Review_Report.md) | 문서 품질 검토 (일관성, 타당성, 추적 가능성) |
 
 ## 실행 순서
 
@@ -91,6 +98,7 @@ Phase 3: RFC-003, 005, 008                   ← 점진적 개선
 | RFC-007 | v1.1.0 | BE 인프라 (입력 검증, Repository 추상화, 예외 처리 180+건) |
 | RFC-008 | v1.4.0 | FE 전체 구조화 (Composable, 성능, icdStore 175개 ref, Dead Code) |
 | RFC-009 | v1.0.0 | 접근성 (aria 0개, WCAG 준수 계획) |
+| RFC-010 | v1.0.0 | 심층 분석 (CORS, XSS, 입력검증, shallowRef 0건, 인증 가드 부재) |
 
 ### 전수조사 결과 (2026-01-13)
 

@@ -16,3 +16,6 @@ Desktop.ini
 
 # Logs
 *.log
+
+# Claude Code temp folders
+tmpclaude-*
