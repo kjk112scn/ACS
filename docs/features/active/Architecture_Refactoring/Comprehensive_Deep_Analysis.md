@@ -108,7 +108,7 @@ PassSchedulePage.vue (4,838줄)
 | modeStore.ts (common) | 150 | 5 | **중복** |
 | modeStore.ts (icd) | 180 | 6 | **중복** |
 
-**modeStore 중복**: 2개 파일이 동일 기능 → 통합 필요
+**modeStore 중복**: 2개 파일이 동일 ID 'mode' 사용 → **미사용 확인됨 (통합 보류)**
 
 ### 2.5 CSS/스타일링
 
@@ -136,29 +136,27 @@ PassSchedulePage.vue (4,838줄)
 | PassScheduleService.kt | 700+ | 8 | 12 | 2 |
 | ICDService.kt | 600+ | 7 | 20 | 4 |
 
-### 3.2 companion object 문제 (Critical)
+### 3.2 companion object 분석 (2026-01-14 검증 완료)
+
+> **✅ 전문가 분석 결과**: 29개 전수조사 완료 - **모두 안전**
 
 ```kotlin
-// 현재 (위험) - ICDService.kt 등
+// 실제 코드 분석 결과
 companion object {
-    var lastReceivedTime: Long = 0  // 전역 가변 상태!
-    var connectionStatus: String = ""
+    val logger = LoggerFactory.getLogger(...)  // val - 불변
+    const val TIMEOUT = 1000L                   // const - 상수
 }
 ```
 
-**문제**: 여러 스레드가 동시 접근 → 경쟁 조건 발생 가능
+**검증 결과**:
+- var 사용: **0개** (모두 val 또는 const)
+- 동시성 위험: **없음**
+- 조치 필요: **없음**
 
-**권장**:
-```kotlin
-// 옵션 1: Atomic 사용
-companion object {
-    val lastReceivedTime = AtomicLong(0)
-}
-
-// 옵션 2: 인스턴스 변수로 전환
-@Volatile
-private var lastReceivedTime: Long = 0
-```
+| 파일 | companion 수 | var 수 | 상태 |
+|------|:-----------:|:------:|:----:|
+| ICDService.kt | 19 | 0 | ✅ 안전 |
+| 기타 8개 파일 | 10 | 0 | ✅ 안전 |
 
 ### 3.3 블로킹 코드 (Critical)
 
@@ -253,22 +251,28 @@ someFlux.subscribe(
 
 ## 6. 우선순위별 액션 플랜
 
-### 6.1 즉시 (1주)
+> **⚠️ 2026-01-14 전문가 분석 반영**: 우선순위 재조정
 
-| # | 작업 | 파일 | 예상 효과 |
-|---|------|------|----------|
-| 1 | shallowRef 그룹화 | icdStore.ts | CPU 80% 감소 |
-| 2 | Thread.sleep → delay | UdpFwICDService.kt | 블로킹 제거 |
-| 3 | modeStore 통합 | stores/ | 중복 제거 |
+### 6.1 즉시 (3일 - Day 1~3)
+
+| # | 작업 | 파일 | 예상 효과 | 상태 |
+|---|------|------|----------|:----:|
+| 1 | **!! 연산자 P0** (4건) | EphemerisService, SunTrackService, PassScheduleService | Null 안전성 | Day 1 |
+| 2 | **.subscribe() Critical** (2건) | UdpFwICDService.kt | 에러 가시성 | Day 1 |
+| 3 | Thread.sleep → Mono.delay | UdpFwICDService.kt | 블로킹 제거 | Day 1 |
+| 4 | Dead Code 삭제 | 586줄 | 코드 정리 | Day 1 |
+| 5 | **shallowRef Phase 1** (36개) | icdStore.ts | CPU ~40% 감소 | Day 2 |
+| 6 | ~~modeStore 통합~~ | ~~stores/~~ | 미사용 확인 | **보류** |
 
 ### 6.2 단기 (1개월)
 
-| # | 작업 | 대상 | 예상 효과 |
-|---|------|------|----------|
-| 1 | deep watch 최적화 | 34개 위치 | 렌더링 최적화 |
-| 2 | companion object 정리 | 29개 | 동시성 안정성 |
-| 3 | .subscribe() 에러 처리 | 19개 | 에러 가시성 |
-| 4 | handleApiError 공통화 | services/ | 92줄 중복 제거 |
+| # | 작업 | 대상 | 예상 효과 | 비고 |
+|---|------|------|----------|------|
+| 1 | **shallowRef Phase 2-4** (43개) | icdStore.ts | CPU 추가 감소 | 복잡한 ref |
+| 2 | deep watch 최적화 | 34개 위치 | 렌더링 최적화 | |
+| 3 | ~~companion object 정리~~ | ~~29개~~ | ✅ **모두 안전** | 조치 불필요 |
+| 4 | .subscribe() 에러 처리 | 나머지 17개 | 에러 가시성 | |
+| 5 | handleApiError 공통화 | services/ | 92줄 중복 제거 | |
 
 ### 6.3 중기 (3개월)
 
@@ -281,43 +285,57 @@ someFlux.subscribe(
 
 ---
 
-## 7. RFC 업데이트 권장
+## 7. RFC 업데이트 권장 (2026-01-14 수정)
 
 ### RFC-003 추가 항목
-- [ ] companion object 정리 (29개)
+- [X] ~~companion object 정리 (29개)~~ → **조치 불필요** (var 0개)
 - [ ] synchronized 패턴 통일 (18개)
+- [ ] **!! 연산자 P0 4건** 우선 수정 (EphemerisService:2717, SunTrackService:636, PassScheduleService:3729,3803)
 
 ### RFC-007 추가 항목
-- [ ] Thread.sleep → delay 변환 (2개)
+- [ ] Thread.sleep → Mono.delay 변환 (forceReconnect)
 - [ ] runBlocking 제거 (1개)
-- [ ] .subscribe() 에러 처리 (19개)
+- [ ] **.subscribe() Critical 2건** 우선 (UdpFwICDService:933,195)
+- [ ] .subscribe() 나머지 17건 (Day 3)
 
 ### RFC-008 추가 항목
-- [ ] shallowRef 적용 (233개 ref 대상)
+- [ ] **shallowRef Phase 1** (36개 안전한 ref)
+- [ ] shallowRef Phase 2-4 (43개 - 다음 주)
 - [ ] deep watch 최적화 (34개)
 - [ ] watchEffect 도입 검토
-- [ ] modeStore 통합 (2개 → 1개)
+- [X] ~~modeStore 통합~~ → **보류** (미사용 확인)
 
 ---
 
 ## 8. 결론
 
-### 8.1 핵심 메시지
+### 8.1 핵심 메시지 (2026-01-14 수정)
 
 1. **FE 성능의 근본 원인**: shallowRef 0개 + deep watch 34개
-2. **BE 안정성 위험**: companion object 29개 + .subscribe() 19개
-3. **즉시 조치 필요**: Thread.sleep/runBlocking (WebFlux 블로킹)
+2. ~~**BE 안정성 위험**: companion object 29개~~ → **✅ 검증 완료: 모두 안전**
+3. **즉시 조치 필요**: !! P0 4건 + .subscribe() Critical 2건
+4. **블로킹 제거**: Thread.sleep → Mono.delay, runBlocking 제거
 
-### 8.2 예상 개선 효과
+### 8.2 예상 개선 효과 (3일 기준)
 
-| 영역 | 현재 | 개선 후 | 효과 |
-|------|------|---------|------|
-| FE CPU 사용률 | 높음 | 낮음 | **~80% 감소** |
-| FE 번들 크기 | ~2MB | ~1.4MB | **~30% 감소** |
-| BE 동시성 안정성 | 위험 | 안전 | 버그 예방 |
-| 코드 유지보수성 | 낮음 | 높음 | 개발 생산성 |
+| 영역 | 현재 | 3일 후 | 효과 | 비고 |
+|------|------|---------|------|------|
+| FE CPU 사용률 | 높음 | 중간 | **~40% 감소** | Phase 1만 |
+| Dead Code | 586줄 | 0줄 | **100% 제거** | |
+| !! P0 Critical | 4건 | 0건 | **100%** | Null 안전성 |
+| .subscribe() Critical | 2건 | 0건 | **100%** | 에러 가시성 |
+| BE 동시성 | ✅ 안전 | ✅ 안전 | - | companion object 검증 |
+
+### 8.3 후속 작업 (다음 주)
+
+| 작업 | 예상 효과 |
+|------|----------|
+| shallowRef Phase 2-4 (43개) | CPU 추가 40% 감소 |
+| !! 연산자 나머지 (42개) | 전체 Null 안전성 |
+| .subscribe() 나머지 (17개) | 전체 에러 가시성 |
 
 ---
 
 **작성자**: Claude (10개 전문가 에이전트 + 직접 검증)
-**검토일**: 2026-01-14
+**최초 작성**: 2026-01-14
+**수정**: 2026-01-14 (전문가 분석 결과 반영)

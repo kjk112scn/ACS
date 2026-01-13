@@ -1,6 +1,6 @@
 # Architecture Refactoring (아키텍처 리팩토링)
 
-> **버전**: 7.2.0 | **최종 수정**: 2026-01-13
+> **버전**: 7.3.0 | **최종 수정**: 2026-01-14
 
 ## 개요
 
@@ -37,6 +37,9 @@ ACS v2.0 고도화를 위한 체계적 리팩토링 프로젝트입니다.
 | 문서 | 역할 |
 |------|------|
 | [Quality_Review_Report.md](./Quality_Review_Report.md) | 문서 품질 검토 (일관성, 타당성, 추적 가능성) |
+| [Comprehensive_Deep_Analysis.md](./Comprehensive_Deep_Analysis.md) | **종합 심층 분석** (2026-01-14 전문가 검증) |
+| [Deep_Code_Analysis_Report.md](./Deep_Code_Analysis_Report.md) | 코드 레벨 상세 분석 |
+| [Weekly_Execution_Schedule.md](./Weekly_Execution_Schedule.md) | **3일 실행 일정** (Day 1~3 계획) |
 
 ## 실행 순서
 
@@ -85,7 +88,9 @@ Phase 3: RFC-003, 005, 008                   ← 점진적 개선
 
 ## 상태
 
-진행 중 - Phase B (깊은 분석) 완료, Phase C (실행 준비) 대기
+**진행 중** - Phase C (3일 실행) 준비 완료
+
+> **2026-01-14**: 전문가 에이전트 10개 병렬 분석 완료, Weekly_Execution_Schedule 수정
 
 ### 작성 완료 RFC
 
@@ -96,29 +101,31 @@ Phase 3: RFC-003, 005, 008                   ← 점진적 개선
 | RFC-003 | v1.2.0 | BE 코드 품질 (!! 46건, 매직넘버 40+, 동시성 3건) |
 | RFC-004 | v1.6.0 | API 표준화 (응답 형식, 동기/비동기, Critical 버그) |
 | RFC-007 | v1.1.0 | BE 인프라 (입력 검증, Repository 추상화, 예외 처리 180+건) |
-| RFC-008 | v1.4.0 | FE 전체 구조화 (Composable, 성능, icdStore 175개 ref, Dead Code) |
+| RFC-008 | v1.4.0 | FE 전체 구조화 (Composable, 성능, icdStore **81개** ref, Dead Code) |
 | RFC-009 | v1.0.0 | 접근성 (aria 0개, WCAG 준수 계획) |
 | RFC-010 | v1.0.0 | 심층 분석 (CORS, XSS, 입력검증, shallowRef 0건, 인증 가드 부재) |
 
-### 전수조사 결과 (2026-01-13)
+### 전수조사 결과 (2026-01-14 전문가 검증)
 
-> **조사 완료**: FE 103개 파일, BE 66개 파일 전수조사
+> **조사 완료**: FE 103개 파일, BE 66개 파일 전수조사 + 전문가 에이전트 검증
 
-| 영역 | 발견 사항 | 건수 | 심각도 | RFC |
-|------|----------|------|--------|-----|
-| **FE 접근성** | aria 속성 | **0개** | Critical | RFC-009 |
-| FE 미사용 코드 | ExampleComponent, example-store | 3건 | Critical | RFC-008 |
-| FE 코드 품질 | 하드코딩 색상 | **520건** | High | RFC-008 |
-| FE 코드 품질 | as 타입 단언 | **280건** | High | RFC-008 |
-| FE 코드 품질 | !important 과다 | **1,690개** | Medium | RFC-008 |
-| FE 디버깅 | console.log | **1,513개** | Medium | RFC-008 |
-| FE 성능 | icdStore 개별 ref | **175개** | Critical | RFC-008 |
-| FE 메모리 | 이벤트 리스너 미정리 | 2건 | High | RFC-008 |
-| FE 구조 | modeStore 중복 | 2개 파일 | High | RFC-008 |
-| **BE 테스트** | 테스트 코드 main 혼재 | 595줄 | High | 즉시 정리 |
-| BE 코드 품질 | !! 연산자 | 46건 | High | RFC-003 |
-| BE 코드 품질 | 매직 넘버 | 40+건 | Medium | RFC-003 |
-| BE 인프라 | 입력 검증 전무 | Critical | Critical | RFC-007 |
-| BE 인프라 | print/println | 102건 | High | RFC-007 |
-| BE 예외 처리 | 광범위 catch | **180+건** | High | RFC-007 |
-| BE 리소스 | 누수 가능성 | 2건 | Medium | RFC-007 |
+| 영역 | 발견 사항 | 건수 | 심각도 | RFC | 상태 |
+|------|----------|------|--------|-----|:----:|
+| **FE 접근성** | aria 속성 | **0개** | Critical | RFC-009 | |
+| FE 미사용 코드 | ExampleComponent, example-store, models.ts | **586줄** | Critical | RFC-008 | Day 1 |
+| FE 코드 품질 | 하드코딩 색상 | **520건** | High | RFC-008 | |
+| FE 코드 품질 | as 타입 단언 | **280건** | High | RFC-008 | |
+| FE 코드 품질 | !important 과다 | **1,690개** | Medium | RFC-008 | |
+| FE 디버깅 | console.log | **1,513개** | Medium | RFC-008 | |
+| FE 성능 | icdStore 개별 ref | **81개** | Critical | RFC-008 | Day 2 |
+| FE 메모리 | 이벤트 리스너 미정리 | 2건 | High | RFC-008 | |
+| FE 구조 | ~~modeStore 중복~~ | 2개 파일 | ~~High~~ | RFC-008 | **보류** |
+| **BE 테스트** | 테스트 코드 main 혼재 | 595줄 | High | 즉시 정리 | Day 1 |
+| BE 코드 품질 | !! 연산자 | 46건 (**P0: 4건**) | High | RFC-003 | Day 1 |
+| BE 코드 품질 | 매직 넘버 | 40+건 | Medium | RFC-003 | |
+| BE 인프라 | 입력 검증 전무 | Critical | Critical | RFC-007 | |
+| BE 인프라 | print/println | 102건 | High | RFC-007 | |
+| BE 예외 처리 | 광범위 catch | **180+건** | High | RFC-007 | |
+| BE 리소스 | 누수 가능성 | 2건 | Medium | RFC-007 | |
+| BE 동시성 | companion object | 29개 | ~~High~~ | RFC-003 | **✅ 안전** |
+| BE 리액티브 | .subscribe() | 19개 (**Critical: 2건**) | High | RFC-007 | Day 1 |

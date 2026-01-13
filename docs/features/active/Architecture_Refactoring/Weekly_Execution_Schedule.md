@@ -21,19 +21,22 @@
 
 ## Day 1 (수요일) - Critical 버그 + 즉시 정리
 
+> **⚠️ 2026-01-14 전문가 분석 반영**: modeStore 미사용 확인 → 통합 보류, !! P0 추가
+
 ### 오전/업무시간 (4시간)
 
 | 시간 | 작업 | 파일 | 예상 |
 |:----:|------|------|:----:|
 | 1 | BE 테스트 코드 이동 | `OrekitCalculatorTest.kt` → test/ | 10분 |
 | 2 | 주석 처리된 코드 정리 | `EphemerisController.kt`, `DataStoreService.kt` | 10분 |
-| 3 | FE Dead Code 삭제 | `ExampleComponent.vue`, `example-store.ts` | 10분 |
-| 4 | **modeStore 중복 통합** | `stores/common/` + `stores/icd/` | 1시간 |
-| 5 | Thread.sleep → delay | `UdpFwICDService.kt` (2곳) | 30분 |
-| 6 | runBlocking 제거 | `ElevationCalculator.kt` | 30분 |
-| 7 | 빌드 확인 (BE + FE) | - | 30분 |
+| 3 | FE Dead Code 삭제 | `ExampleComponent.vue`, `example-store.ts`, `models.ts` | 10분 |
+| 4 | **!! 연산자 P0 수정** | `EphemerisService.kt:2717`, `SunTrackService.kt:636`, `PassScheduleService.kt:3729,3803` | 30분 |
+| 5 | **.subscribe() 에러 핸들러** | `UdpFwICDService.kt:933,195` | 20분 |
+| 6 | Thread.sleep → Mono.delay | `UdpFwICDService.kt` (forceReconnect) | 30분 |
+| 7 | runBlocking 제거 | `ElevationCalculator.kt` | 30분 |
+| 8 | 빌드 확인 (BE + FE) | - | 30분 |
 
-**체크포인트**: 빌드 성공, Critical 블로킹 제거
+**체크포인트**: 빌드 성공, Critical 블로킹 제거, P0 Null 안전성 확보
 
 ### 저녁/퇴근 후 (3-4시간)
 
@@ -46,42 +49,47 @@
 
 **Day 1 완료 기준**:
 - [ ] 테스트 코드 main → test 이동
-- [ ] Dead Code 3건 삭제
-- [ ] modeStore 통합 (2개 → 1개)
-- [ ] Thread.sleep/runBlocking 제거
+- [ ] Dead Code 586줄 삭제 (ExampleComponent, example-store, models.ts, EphemerisController 주석)
+- [ ] ~~modeStore 통합~~ (미사용 확인 → **보류**)
+- [ ] **!! 연산자 P0 4건 수정** (EphemerisService, SunTrackService, PassScheduleService)
+- [ ] **.subscribe() 2건 에러 핸들러 추가**
+- [ ] Thread.sleep → Mono.delay (forceReconnect)
+- [ ] runBlocking 제거
 - [ ] devLog 유틸 생성 + 일부 적용
 - [ ] 빌드 성공
 
 ---
 
-## Day 2 (목요일) - FE 성능 최적화 (핵심!)
+## Day 2 (목요일) - FE 성능 최적화 (Phase 1)
+
+> **⚠️ 2026-01-14 전문가 분석 반영**: shallowRef Phase 1만 진행 (36개 안전한 ref)
 
 ### 오전/업무시간 (4시간)
 
 | 시간 | 작업 | 상세 | 예상 |
 |:----:|------|------|:----:|
-| 1 | **AntennaState 인터페이스 정의** | angles, speeds, status 그룹화 | 30분 |
-| 2 | **shallowRef 적용 (기본 상태)** | icdStore L49-57 (9개 ref) | 30분 |
-| 3 | **shallowRef 적용 (안테나 데이터)** | icdStore L109-284 (81개 → 5개 그룹) | 2시간 |
-| 4 | updateAntennaData 리팩토링 | 338줄 → ~100줄 | 1시간 |
+| 1 | **Phase 1: 기본 상태** (9개) | icdStore L49-57: isModeSwitching, isCommutating 등 | 30분 |
+| 2 | **Phase 1: 단순 상태** (27개) | icdStore: 문자열/숫자 단독 ref (참조 파일 3개 미만) | 1.5시간 |
+| 3 | 단위 테스트 | Phase 1 변경 파일 동작 확인 | 30분 |
+| 4 | updateAntennaData 부분 리팩토링 | Phase 1 영역만 정리 | 1시간 |
 
-**체크포인트**: icdStore ref 81개 → 10개 미만
+**체크포인트**: Phase 1 완료 (36개 ref → shallowRef), 참조 파일 정상 동작
 
 ### 저녁/퇴근 후 (3-4시간)
 
 | 시간 | 작업 | 상세 | 예상 |
 |:----:|------|------|:----:|
-| 5 | **비트 파싱 배치 처리** | 13개 함수 → 1개 통합 | 1.5시간 |
-| 6 | deep watch 최적화 | 34개 중 상위 10개 | 1시간 |
-| 7 | computed 최적화 | 대형 computed 분리 | 30분 |
-| 8 | 통합 테스트 | 실시간 추적 동작 확인 | 30분 |
+| 5 | deep watch 최적화 | 34개 중 상위 10개 (DashboardPage 0개로 안전) | 1시간 |
+| 6 | computed 최적화 | 대형 computed 분리 | 30분 |
+| 7 | 통합 테스트 | 실시간 추적 동작 확인 | 30분 |
+| 8 | Phase 2 준비 | 복잡한 43개 ref 분석 문서화 | 1시간 |
 
 **Day 2 완료 기준**:
-- [ ] icdStore shallowRef 적용
-- [ ] ref 업데이트 81회 → 10회 미만
-- [ ] 비트 파싱 배치 처리
+- [ ] **Phase 1 shallowRef 적용 (36개)**
+- [ ] Phase 1 참조 파일 전체 테스트 통과
 - [ ] deep watch 상위 10개 최적화
 - [ ] **실시간 추적 정상 동작 확인**
+- [ ] Phase 2-4 계획 문서화 (다음 주 진행)
 
 ---
 
@@ -118,43 +126,49 @@
 
 ## 작업 우선순위 매트릭스
 
+> **⚠️ 2026-01-14 전문가 분석 반영**: 위험도 재평가, 작업 항목 수정
+
 ### P0 - 즉시 (Day 1)
 
 | # | 작업 | 효과 | 위험도 |
 |---|------|------|:------:|
-| 1 | 테스트 코드 이동 | 코드 정리 | 낮음 |
-| 2 | Dead Code 삭제 | 혼란 제거 | 낮음 |
-| 3 | modeStore 통합 | 중복 제거 | 중간 |
-| 4 | Thread.sleep 제거 | 블로킹 해소 | 중간 |
-| 5 | devLog 유틸 | 기반 마련 | 낮음 |
+| 1 | **!! 연산자 P0 4건** | Null 안전성 | **높음** |
+| 2 | **.subscribe() 2건** | 에러 가시성 | 중간 |
+| 3 | 테스트 코드 이동 | 코드 정리 | 낮음 |
+| 4 | Dead Code 삭제 (586줄) | 혼란 제거 | 낮음 |
+| 5 | Thread.sleep → Mono.delay | 블로킹 해소 | 중간 |
+| 6 | devLog 유틸 | 기반 마련 | 낮음 |
 
 ### P1 - 핵심 (Day 2)
 
 | # | 작업 | 효과 | 위험도 |
 |---|------|------|:------:|
-| 1 | **shallowRef 적용** | **CPU 80% 감소** | **높음** |
-| 2 | 비트 파싱 배치 | 함수 호출 감소 | 중간 |
-| 3 | deep watch 최적화 | 재렌더링 감소 | 중간 |
+| 1 | **shallowRef Phase 1** (36개) | CPU 감소 | **중간** (안전한 ref만) |
+| 2 | deep watch 최적화 | 재렌더링 감소 | 중간 |
+| 3 | Phase 2-4 계획 수립 | 다음 주 준비 | 낮음 |
 
 ### P2 - 안정성 (Day 3)
 
 | # | 작업 | 효과 | 위험도 |
 |---|------|------|:------:|
-| 1 | .subscribe() 에러 | 에러 가시성 | 낮음 |
-| 2 | companion object | 동시성 안정 | 중간 |
+| 1 | .subscribe() 나머지 17건 | 에러 가시성 | 낮음 |
+| 2 | ~~companion object~~ | ~~동시성 안정~~ | ✅ **모두 안전** (var 0개) |
 | 3 | console.log 정리 | 번들 감소 | 낮음 |
 
 ---
 
 ## 위험 관리
 
+> **⚠️ 2026-01-14 전문가 분석 반영**: 위험 재평가
+
 ### 높은 위험 작업
 
-| 작업 | 위험 | 대응 |
-|------|------|------|
-| **shallowRef 적용** | 전체 동작 영향 | 단계별 적용, 즉시 테스트 |
-| modeStore 통합 | import 오류 | IDE 리팩토링 기능 활용 |
-| updateAntennaData | 데이터 누락 | 기존 로직 백업 |
+| 작업 | 위험 | 대응 | 상태 |
+|------|------|------|:----:|
+| **shallowRef Phase 1** (36개) | 참조 파일 영향 | 안전한 ref만 우선 | Day 2 |
+| **shallowRef Phase 2-4** (43개) | 20개 파일 동시 영향 | **다음 주로 연기** | 보류 |
+| **!! 연산자 P0** (4건) | 런타임 NPE | Elvis 연산자로 변환 | Day 1 |
+| ~~modeStore 통합~~ | ~~import 오류~~ | 미사용 확인됨 | **보류** |
 
 ### 롤백 전략
 
@@ -183,69 +197,77 @@ git reset --hard v2.0-day2-start
 
 ## 완료 후 예상 개선
 
+> **⚠️ 2026-01-14 전문가 분석 반영**: 예상치 수정
+
 ### 정량적 효과
 
-| 지표 | 현재 | 3일 후 | 개선율 |
-|------|:----:|:------:|:------:|
-| icdStore ref | 81개 | ~10개 | **88% 감소** |
-| CPU 사용률 | 높음 | 낮음 | **~80% 감소** |
-| deep watch | 34개 | ~20개 | 40% 감소 |
-| console.log | 1,513개 | ~800개 | 47% 감소 |
-| Dead Code | 3건 | 0건 | 100% |
+| 지표 | 현재 | 3일 후 | 개선율 | 비고 |
+|------|:----:|:------:|:------:|------|
+| icdStore ref | 81개 | ~45개 | **44% 감소** | Phase 1만 (36개) |
+| CPU 사용률 | 높음 | 중간 | **~40% 감소** | Phase 1 효과 |
+| deep watch | 34개 | ~24개 | 29% 감소 | 상위 10개 |
+| console.log | 1,513개 | ~1,100개 | 27% 감소 | 주요 파일만 |
+| Dead Code | 586줄 | 0줄 | **100%** | 전체 삭제 |
+| !! P0 | 4건 | 0건 | **100%** | Critical 완료 |
 
 ### 남은 작업 (다음 주)
 
-| 작업 | 우선순위 |
-|------|:--------:|
-| 대형 페이지 분리 | P2 |
-| !important 정리 (1,690개) | P3 |
-| 하드코딩 색상 (520건) | P3 |
-| @Valid 입력 검증 | P2 |
-| 나머지 console.log | P3 |
+| 작업 | 우선순위 | 비고 |
+|------|:--------:|------|
+| **shallowRef Phase 2-4** (43개) | **P1** | 복잡한 ref |
+| 대형 페이지 분리 | P2 | |
+| !important 정리 (1,690개) | P3 | |
+| 하드코딩 색상 (520건) | P3 | |
+| @Valid 입력 검증 | P2 | |
+| 나머지 console.log (~400개) | P3 | |
+| !! 연산자 나머지 (42개) | P2 | P0 제외 |
 
 ---
 
 ## 일별 체크리스트
 
-### Day 1 체크리스트
+### Day 1 체크리스트 (2026-01-14 수정)
 
 ```
 [ ] BE 테스트 코드 이동
-[ ] 주석 처리 코드 정리 (2건)
-[ ] ExampleComponent.vue 삭제
-[ ] example-store.ts 삭제
-[ ] modeStore 통합
-[ ] Thread.sleep → delay (2곳)
+[ ] 주석 처리 코드 정리 (EphemerisController.kt 490줄)
+[ ] ExampleComponent.vue 삭제 (37줄)
+[ ] example-store.ts 삭제 (22줄)
+[ ] models.ts 삭제 (9줄)
+[ ] !! 연산자 P0 수정 (4건: EphemerisService:2717, SunTrackService:636, PassScheduleService:3729,3803)
+[ ] .subscribe() 에러 핸들러 추가 (2건: UdpFwICDService:933,195)
+[X] modeStore 통합 → 보류 (미사용 확인)
+[ ] Thread.sleep → Mono.delay (forceReconnect)
 [ ] runBlocking 제거
 [ ] devLog 유틸 생성
 [ ] DashboardPage console.log 정리
 [ ] 빌드 성공 확인
-[ ] 커밋: "refactor: Day 1 - Critical fixes"
+[ ] 커밋: "refactor: Day 1 - Critical fixes + P0 null safety"
 ```
 
-### Day 2 체크리스트
+### Day 2 체크리스트 (2026-01-14 수정)
 
 ```
-[ ] AntennaState 인터페이스 정의
-[ ] icdStore shallowRef 적용
-[ ] updateAntennaData 리팩토링
-[ ] 비트 파싱 배치 처리
-[ ] deep watch 최적화 (10개)
+[ ] Phase 1 기본 상태 shallowRef (9개: isModeSwitching, isCommutating 등)
+[ ] Phase 1 단순 상태 shallowRef (27개: 참조 파일 3개 미만)
+[ ] 참조 파일 동작 테스트
+[ ] deep watch 최적화 (상위 10개)
 [ ] 실시간 추적 테스트
+[ ] Phase 2-4 계획 문서화
 [ ] 빌드 성공 확인
-[ ] 커밋: "perf: Day 2 - icdStore optimization"
+[ ] 커밋: "perf: Day 2 - shallowRef Phase 1 (36 refs)"
 ```
 
-### Day 3 체크리스트
+### Day 3 체크리스트 (2026-01-14 수정)
 
 ```
-[ ] .subscribe() 에러 처리 (19개)
-[ ] companion object 정리
-[ ] print/println 정리
-[ ] PassSchedulePage console.log
-[ ] passScheduleStore console.log
+[ ] .subscribe() 에러 처리 (나머지 17개 - 2개는 Day 1에서 완료)
+[X] companion object 정리 → 불필요 (var 사용 0개, 모두 안전)
+[ ] print/println 정리 (102개 중 상위 파일)
+[ ] PassSchedulePage console.log (128개)
+[ ] passScheduleStore console.log (103개)
 [ ] 전체 기능 테스트
-[ ] 문서 업데이트
+[ ] 문서 업데이트 (완료 항목 체크)
 [ ] 커밋: "refactor: Day 3 - BE stability + cleanup"
 ```
 
