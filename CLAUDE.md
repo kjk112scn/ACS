@@ -60,13 +60,18 @@ backend/src/main/kotlin/.../
 
 | 문서 | 경로 |
 |-----|-----|
-| **시스템 통합** | `docs/references/architecture/SYSTEM_OVERVIEW.md` |
-| 프로젝트 현황 | `docs/references/PROJECT_STATUS_SUMMARY.md` |
-| 개발 가이드 | `docs/references/development/Development_Guide.md` |
-| API 명세 | `docs/references/api/README.md` |
-| **에러 메시지 관리** | `docs/references/Hardware_Error_Messages.md` |
-| 진행중 작업 | `docs/features/active/` |
-| 완료된 작업 | `docs/features/completed/` |
+| **시스템 통합** | `docs/architecture/SYSTEM_OVERVIEW.md` |
+| 개발 가이드 | `docs/guides/Development_Guide.md` |
+| API 명세 | `docs/api/README.md` |
+| 진행중 작업 | `docs/work/active/` |
+| 완료된 작업 | `docs/work/archive/` |
+| **컨텍스트 문서** | `docs/architecture/context/_INDEX.md` |
+
+<!-- 필요 시 로드 (에이전트가 자동 참조) -->
+<!-- @docs/architecture/context/domain/satellite-tracking.md -->
+<!-- @docs/architecture/context/domain/icd-protocol.md -->
+<!-- @docs/architecture/context/architecture/frontend.md -->
+<!-- @docs/architecture/context/architecture/backend.md -->
 
 ## 모드 시스템
 
@@ -79,9 +84,85 @@ backend/src/main/kotlin/.../
 | PassSchedule | 패스 스케줄 |
 | SunTrack | 태양 추적 |
 
+## 테스트
+
+```bash
+# Frontend
+cd frontend && npm run test           # Vitest 단위 테스트
+cd frontend && npx vue-tsc --noEmit   # 타입 체크
+
+# Backend
+cd backend && ./gradlew test          # JUnit 테스트
+```
+
+- 새 기능: 테스트 작성 권장
+- 버그 수정: 회귀 테스트 추가
+
+## 에러 처리
+
+### Frontend
+- `useErrorHandler` composable 사용
+- try-catch 시 사용자 알림 필수
+
+### Backend
+- `GlobalExceptionHandler` 활용
+- 광범위 `catch (Exception)` 금지 → 구체적 예외
+- `.subscribe()` 에러 핸들러 필수
+
+## 보안
+
+- 입력 검증: `@Valid`, `@NotNull` 사용
+- Path Traversal 주의 (파일 경로 검증)
+- 하드코딩 비밀번호/키 금지
+
 ## 주의사항
 
 - 각도 단위: 내부 라디안, 표시 도(°)
 - 시간: 내부 UTC, 표시 로컬
 - Orekit 초기화 필요 (orekit-data 경로)
 - **Train/Tilt 구분**: 변수명은 `train`, UI 표시는 `Tilt`
+
+## 작업 방식 (대화 종료 시 가이드 표시)
+
+**중요**: 모든 작업 완료 후, 대화 마지막에 아래 가이드 블록을 표시합니다.
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 다음에 쓸 수 있는 명령어
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔧 워크플로우
+  /feature   새 기능 개발
+  /bugfix    버그 수정
+  /refactor  리팩토링 (파일 분리)
+  /optimize  성능 최적화
+  /cleanup   코드 정리 (console.log 등)
+  /done      작업 완료 + 커밋
+
+📊 상태 확인
+  /health    빌드/품질 점검
+  /status    프로젝트 현황
+  /sync      문서 동기화
+
+📝 문서화
+  /plan      계획 수립
+  /adr       아키텍처 결정 기록
+  /docs      코드 → 문서 생성
+  /api-sync  FE-BE 타입 동기화
+
+💡 /guide 로 상세 안내
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+### 에이전트 (자동 호출)
+
+| 에이전트 | 역할 | 모델 |
+|---------|------|------|
+| `fe-expert` | Vue/TS/Pinia 전문가 | Opus |
+| `be-expert` | Kotlin/Spring 전문가 | Opus |
+| `tech-lead` | 복잡한 요청 분석 | Opus |
+| `architect` | 설계/ADR | Opus |
+| `algorithm-expert` | Orekit/좌표 | Opus |
+| `code-reviewer` | 품질 검증 | Opus |
+| `code-counter` | 카운팅 | Haiku |
+| `doc-syncer` | 문서 동기화 | Haiku |

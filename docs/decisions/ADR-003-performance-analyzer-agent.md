@@ -125,7 +125,7 @@ model: opus
 
 - [refactorer 에이전트](.claude/agents/refactorer.md)
 - [/health 스킬](.claude/skills/health/SKILL.md)
-- [SYSTEM_OVERVIEW.md](../references/architecture/SYSTEM_OVERVIEW.md)
+- [SYSTEM_OVERVIEW.md](../architecture/SYSTEM_OVERVIEW.md)
 
 ---
 

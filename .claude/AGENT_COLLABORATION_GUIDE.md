@@ -360,7 +360,7 @@ Doc Syncer 에이전트:
 2. 해결 방법 문서화
 3. Known Issues 업데이트
 
-→ Output: docs/bugfixes/active/passschedule-crash.md
+→ Output: docs/work/active/passschedule-crash.md
 ```
 
 **수정 시간**: 30분 (수동: 4시간) → **시간 단축 87%**
@@ -785,9 +785,9 @@ git checkout main
 
 ## 참고 문서
 
-- [Architecture_Refactoring_plan.md](../docs/features/active/Architecture_Refactoring/Architecture_Refactoring_plan.md)
-- [RFC_Configuration_Management.md](../docs/features/active/Architecture_Refactoring/RFC_Configuration_Management.md)
-- [RFC_UIUX_Consistency.md](../docs/features/active/Architecture_Refactoring/RFC_UIUX_Consistency.md)
+- [Architecture_Refactoring_plan.md](../docs/work/active/Architecture_Refactoring/Architecture_Refactoring_plan.md)
+- [RFC_Configuration_Management.md](../docs/work/active/Architecture_Refactoring/RFC_Configuration_Management.md)
+- [RFC_UIUX_Consistency.md](../docs/work/active/Architecture_Refactoring/RFC_UIUX_Consistency.md)
 
 ---
 

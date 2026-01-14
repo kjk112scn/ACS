@@ -6,24 +6,24 @@
 
 | 코드 경로 | 문서 경로 | 동기화 내용 |
 |----------|----------|------------|
-| `controller/icd/` | `docs/references/api/ICD_API.md` | ICD 통신 API |
-| `controller/mode/` | `docs/references/api/Mode_API.md` | 모드 제어 API |
-| `controller/system/` | `docs/references/api/System_API.md` | 시스템 API |
-| `controller/websocket/` | `docs/references/api/WebSocket_API.md` | WebSocket API |
-| `service/mode/EphemerisService.kt` | `docs/references/algorithms/Satellite_Tracking_Overview.md` | 위성 추적 알고리즘 |
-| `service/mode/PassScheduleService.kt` | `docs/references/algorithms/Pass_Schedule_Logic.md` | 패스 스케줄 로직 |
-| `service/mode/SunTrackService.kt` | `docs/references/algorithms/Sun_Tracking_Overview.md` | 태양 추적 알고리즘 |
-| `service/hardware/` | `docs/references/Hardware_Error_Messages.md` | 에러 메시지 |
-| `algorithm/**/*.kt` | `docs/references/algorithms/*.md` | 계산 알고리즘 |
+| `controller/icd/` | `docs/api/ICD_API.md` | ICD 통신 API |
+| `controller/mode/` | `docs/api/Mode_API.md` | 모드 제어 API |
+| `controller/system/` | `docs/api/System_API.md` | 시스템 API |
+| `controller/websocket/` | `docs/api/WebSocket_API.md` | WebSocket API |
+| `service/mode/EphemerisService.kt` | `docs/architecture/algorithms/Satellite_Tracking_Overview.md` | 위성 추적 알고리즘 |
+| `service/mode/PassScheduleService.kt` | `docs/architecture/algorithms/Pass_Schedule_Logic.md` | 패스 스케줄 로직 |
+| `service/mode/SunTrackService.kt` | `docs/architecture/algorithms/Sun_Tracking_Overview.md` | 태양 추적 알고리즘 |
+| `service/hardware/` | `docs/guides/Hardware_Error_Messages.md` | 에러 메시지 |
+| `algorithm/**/*.kt` | `docs/architecture/algorithms/*.md` | 계산 알고리즘 |
 
 ### Frontend 매핑
 
 | 코드 경로 | 문서 경로 | 동기화 내용 |
 |----------|----------|------------|
-| `pages/mode/*.vue` | `docs/references/architecture/UI_Architecture.md` | 모드별 페이지 |
-| `stores/**/*.ts` | `docs/references/architecture/Store_Architecture.md` | Pinia 스토어 |
-| `composables/**/*.ts` | `docs/references/development/Composables_Guide.md` | Vue Composables |
-| `components/**/*.vue` | `docs/references/architecture/Component_Structure.md` | 컴포넌트 구조 |
+| `pages/mode/*.vue` | `docs/architecture/UI_Architecture.md` | 모드별 페이지 |
+| `stores/**/*.ts` | `docs/architecture/Store_Architecture.md` | Pinia 스토어 |
+| `composables/**/*.ts` | `docs/guides/Composables_Guide.md` | Vue Composables |
+| `components/**/*.vue` | `docs/architecture/Component_Structure.md` | 컴포넌트 구조 |
 
 ### 상태 문서 매핑
 
@@ -31,7 +31,7 @@
 |-------|---------|------|
 | Controller 추가/삭제 | `PROJECT_STATUS_CURRENT.md` | 통계 업데이트 |
 | Service 추가/삭제 | `PROJECT_STATUS_CURRENT.md` | 통계 업데이트 |
-| 기능 완료 | `docs/features/active/` → `completed/` | 폴더 이동 |
+| 기능 완료 | `docs/work/active/` → `archive/` | 폴더 이동 |
 | 아키텍처 변경 | `SYSTEM_OVERVIEW.md` | 구조 업데이트 |
 
 ---
@@ -178,7 +178,7 @@ done
 
 ```bash
 # 문서의 통계와 실제 파일 수 비교
-doc_controllers=$(grep -c "Controller" docs/references/PROJECT_STATUS_CURRENT.md)
+doc_controllers=$(grep -c "Controller" docs/PROJECT_STATUS_SUMMARY.md)
 actual_controllers=$(find backend -name "*Controller.kt" | wc -l)
 ```
 

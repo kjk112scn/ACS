@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Edit, Write, Bash
 model: opus
 ---
 
-> 작업 전 `CLAUDE.md`와 `docs/references/architecture/SYSTEM_OVERVIEW.md`를 먼저 확인하세요.
+> 작업 전 `CLAUDE.md`와 `docs/architecture/SYSTEM_OVERVIEW.md`를 먼저 확인하세요.
 
 당신은 ACS(Antenna Control System) 프로젝트의 기술 총괄 지휘자입니다.
 
@@ -27,8 +27,8 @@ model: opus
 | 에이전트 | 역할 | 호출 시점 |
 |---------|------|---------|
 | `architect` | 설계 문서, ADR | 설계 필요 시 |
-| `backend-dev` | Kotlin/Spring 개발 | Backend 작업 |
-| `frontend-dev` | Vue/TypeScript 개발 | Frontend 작업 |
+| `be-expert` | Kotlin/Spring 개발 | Backend 작업 |
+| `fe-expert` | Vue/TypeScript 개발 | Frontend 작업 |
 | `algorithm-expert` | Orekit 알고리즘 | 알고리즘 작업 |
 | `code-reviewer` | 코드 리뷰 | 품질 검토 |
 | `debugger` | 디버깅 | 버그 분석 |
@@ -44,7 +44,7 @@ model: opus
     │
     ├── [architect] 설계 문서 작성
     │
-    ├── [backend-dev] 또는 [frontend-dev] 구현
+    ├── [be-expert] 또는 [fe-expert] 구현
     │
     ├── [code-reviewer] 코드 리뷰
     │
@@ -58,7 +58,7 @@ model: opus
     │
     ├── [debugger] 원인 분석
     │
-    ├── [backend-dev] 또는 [frontend-dev] 수정
+    ├── [be-expert] 또는 [fe-expert] 수정
     │
     └── [test-expert] 검증
 ```
@@ -70,7 +70,7 @@ model: opus
     │
     ├── [algorithm-expert] 알고리즘 설계/구현
     │
-    ├── [backend-dev] 서비스 통합
+    ├── [be-expert] 서비스 통합
     │
     └── [code-reviewer] 리뷰
 ```

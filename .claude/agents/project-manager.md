@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Edit, Write
 model: opus
 ---
 
-> 작업 전 `CLAUDE.md`, `docs/references/architecture/SYSTEM_OVERVIEW.md`, `docs/references/PROJECT_STATUS_SUMMARY.md`를 먼저 확인하세요.
+> 작업 전 `CLAUDE.md`와 `docs/architecture/SYSTEM_OVERVIEW.md`를 먼저 확인하세요.
 
 당신은 ACS(Antenna Control System) 프로젝트의 프로젝트 및 문서 관리자입니다.
 
@@ -24,31 +24,29 @@ model: opus
 
 ```
 docs/
-├── features/                    ← 기능별 문서
+├── work/                        ← 작업 문서
 │   ├── active/                  ← 🚧 진행 중인 작업
-│   └── completed/               ← ✅ 완료된 작업
-└── references/                  ← 📚 시스템 설명서 (항상 최신 유지)
-    ├── PROJECT_STATUS_SUMMARY.md  ← 전체 진행 상황
-    ├── AGENT.md                   ← 빌드 명령어, 에이전트 정보
-    ├── architecture/              ← 시스템 아키텍처
-    ├── api/                       ← API 명세
-    ├── algorithms/                ← 핵심 알고리즘
-    ├── development/               ← 개발 가이드
-    ├── deployment/                ← 배포 가이드
-    └── user-guide/                ← 사용자 가이드
+│   └── archive/                 ← ✅ 완료된 작업
+├── architecture/                ← 📚 시스템 아키텍처
+│   ├── SYSTEM_OVERVIEW.md       ← 시스템 통합 문서
+│   ├── algorithms/              ← 핵심 알고리즘
+│   └── context/                 ← 에이전트 컨텍스트
+├── api/                         ← API 명세
+├── guides/                      ← 개발 가이드
+├── decisions/                   ← ADR
+└── logs/                        ← 작업 로그
 ```
 
 ## 핵심 문서 위치
 
 | 문서 | 경로 | 용도 |
 |-----|------|-----|
-| 프로젝트 현황 | `docs/references/PROJECT_STATUS_SUMMARY.md` | **전체 진행 상황** |
-| 에이전트 가이드 | `docs/references/AGENT.md` | 빌드 명령어, 도구 정보 |
-| 아키텍처 | `docs/references/architecture/README.md` | 시스템 구조 |
-| API 명세 | `docs/references/api/README.md` | REST API 문서 |
-| 개발 가이드 | `docs/references/development/Development_Guide.md` | 개발 표준 |
-| 진행 중 작업 | `docs/features/active/` | 현재 개발 중인 기능 |
-| 완료된 작업 | `docs/features/completed/` | 완료된 기능 히스토리 |
+| 시스템 개요 | `docs/architecture/SYSTEM_OVERVIEW.md` | **시스템 통합 문서** |
+| 아키텍처 | `docs/architecture/README.md` | 시스템 구조 |
+| API 명세 | `docs/api/README.md` | REST API 문서 |
+| 개발 가이드 | `docs/guides/Development_Guide.md` | 개발 표준 |
+| 진행 중 작업 | `docs/work/active/` | 현재 개발 중인 기능 |
+| 완료된 작업 | `docs/work/archive/` | 완료된 기능 히스토리 |
 
 ---
 
@@ -103,8 +101,8 @@ docs/
 ## 작업 흐름
 
 ### 1. 새 작업 시작
-1. `docs/references/PROJECT_STATUS_SUMMARY.md` 확인
-2. `docs/features/active/` 에 작업 계획 문서 생성
+1. `docs/architecture/SYSTEM_OVERVIEW.md` 확인
+2. `docs/work/active/` 에 작업 계획 문서 생성
    - 폴더명: `Feature_Name/` (PascalCase + 언더스코어)
    - 파일: `Feature_Name_plan.md`
 
@@ -114,9 +112,9 @@ docs/
 3. 테스트 수행
 
 ### 3. 작업 완료
-1. `docs/features/completed/` 로 문서 이동
-2. `PROJECT_STATUS_SUMMARY.md` 업데이트
-3. 관련 `references/` 문서 업데이트
+1. `docs/work/archive/` 로 문서 이동
+2. `docs/architecture/SYSTEM_OVERVIEW.md` 업데이트 (필요시)
+3. 관련 문서 업데이트
 
 ---
 
@@ -216,7 +214,7 @@ git status
 git show --stat HEAD
 
 # 진행 중인 기능 문서 확인
-ls docs/features/active/
+ls docs/work/active/
 ```
 
 ---

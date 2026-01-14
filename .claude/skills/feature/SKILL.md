@@ -50,15 +50,15 @@ description: 신규 기능 개발 워크플로우. RFC 작성, ADR 생성, DESIG
 
 ```bash
 # 폴더 생성
-mkdir -p docs/features/active/{기능명}/
+mkdir -p docs/work/active/{기능명}/
 
 # 필수 문서 생성
-touch docs/features/active/{기능명}/README.md
-touch docs/features/active/{기능명}/DESIGN.md
-touch docs/features/active/{기능명}/PROGRESS.md
+touch docs/work/active/{기능명}/README.md
+touch docs/work/active/{기능명}/DESIGN.md
+touch docs/work/active/{기능명}/PROGRESS.md
 
 # 선택: RFC 필요시
-touch docs/features/active/{기능명}/RFC.md
+touch docs/work/active/{기능명}/RFC.md
 ```
 
 ### Step 3: README.md 작성
@@ -179,8 +179,8 @@ touch docs/features/active/{기능명}/RFC.md
 
 ```yaml
 호출 에이전트:
-  - backend-dev: Backend 구현
-  - frontend-dev: Frontend 구현
+  - be-expert: Backend 구현
+  - fe-expert: Frontend 구현
   - algorithm-expert: 알고리즘 구현
 
 진행 상황:
@@ -195,9 +195,9 @@ touch docs/features/active/{기능명}/RFC.md
 ```yaml
 수행 작업:
   1. PROGRESS.md → IMPLEMENTATION.md 변환
-  2. features/active/ → completed/ 이동
-  3. concepts/ 문서 업데이트 (해당시)
-  4. daily/ 로그 기록
+  2. work/active/ → work/archive/ 이동
+  3. architecture/context/ 문서 업데이트 (해당시)
+  4. logs/ 로그 기록
 ```
 
 ## 참조 파일
@@ -211,8 +211,8 @@ touch docs/features/active/{기능명}/RFC.md
 |---------|------|---------|
 | `project-manager` | 문서 구조 관리 | 폴더/문서 생성 |
 | `architect` | 설계 문서 작성 | DESIGN.md 작성 |
-| `backend-dev` | Backend 코드 | 구현 단계 |
-| `frontend-dev` | Frontend 코드 | 구현 단계 |
+| `be-expert` | Backend 코드 | 구현 단계 |
+| `fe-expert` | Frontend 코드 | 구현 단계 |
 | `algorithm-expert` | 알고리즘 | 알고리즘 관련 시 |
 
 ## 사용 예시
@@ -228,7 +228,7 @@ touch docs/features/active/{기능명}/RFC.md
        영향 범위: Frontend (PassSchedulePage.vue)
        RFC 필요: 아니오
 
-[폴더 생성] docs/features/active/PassSchedule_Chart_Zoom/
+[폴더 생성] docs/work/active/PassSchedule_Chart_Zoom/
             - README.md
             - DESIGN.md
             - PROGRESS.md
@@ -237,12 +237,12 @@ touch docs/features/active/{기능명}/RFC.md
        - Why: 사용자가 특정 시간대를 자세히 보고 싶음
        - How: Quasar Q-Chart 확대 옵션 활용
 
-[구현] frontend-dev 에이전트 호출
+[구현] fe-expert 에이전트 호출
        - PassSchedulePage.vue 수정
 
 [완료] /done 자동 호출
-       - active/ → completed/ 이동
-       - daily/ 로그 기록
+       - work/active/ → work/archive/ 이동
+       - logs/ 로그 기록
 ```
 
 ### 예시 2: 복잡한 기능 (RFC 필요)
@@ -256,7 +256,7 @@ touch docs/features/active/{기능명}/RFC.md
        영향 범위: Backend + Frontend + 새 컴포넌트
        RFC 필요: 예
 
-[RFC 작성] docs/features/active/Realtime_Alarm_System/RFC.md
+[RFC 작성] docs/work/active/Realtime_Alarm_System/RFC.md
            - 제안 내용
            - 대안 비교
            - 영향 분석

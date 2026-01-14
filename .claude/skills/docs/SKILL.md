@@ -45,13 +45,13 @@ description: 문서화 스킬. 기존 코드 분석, 협의, 문서 자동 생�
 
 ```bash
 # 폴더 생성
-mkdir -p docs/documentation/active/{주제명}/
+mkdir -p docs/work/active/documentation/{주제명}/
 
 # 문서 생성
-touch docs/documentation/active/{주제명}/README.md      # 문서화 목표
-touch docs/documentation/active/{주제명}/ANALYSIS.md    # 코드 분석 결과
-touch docs/documentation/active/{주제명}/DISCUSSION.md  # 협의 내용 기록
-touch docs/documentation/active/{주제명}/DRAFT.md       # 문서 초안
+touch docs/work/active/documentation/{주제명}/README.md      # 문서화 목표
+touch docs/work/active/documentation/{주제명}/ANALYSIS.md    # 코드 분석 결과
+touch docs/work/active/documentation/{주제명}/DISCUSSION.md  # 협의 내용 기록
+touch docs/work/active/documentation/{주제명}/DRAFT.md       # 문서 초안
 ```
 
 ### Step 3: README.md 작성
@@ -81,7 +81,7 @@ touch docs/documentation/active/{주제명}/DRAFT.md       # 문서 초안
 
 ## 최종 문서 위치 (예정)
 
-- `docs/concepts/{카테고리}/{문서명}.md`
+- `docs/architecture/{카테고리}/{문서명}.md`
 ```
 
 ### Step 4: 코드 분석 (ANALYSIS.md)
@@ -213,10 +213,10 @@ touch docs/documentation/active/{주제명}/DRAFT.md       # 문서 초안
   - 최종 승인
 
 적용:
-  1. DRAFT.md → docs/concepts/{카테고리}/{문서명}.md 복사
-  2. documentation/active/ → completed/ 이동
+  1. DRAFT.md → docs/architecture/{카테고리}/{문서명}.md 복사
+  2. work/active/documentation/ → work/archive/ 이동
   3. /sync 호출 (PROJECT_STATUS.md 업데이트)
-  4. daily/ 로그 기록
+  4. logs/ 로그 기록
 ```
 
 ## 문서화 유형별 가이드
@@ -231,7 +231,7 @@ touch docs/documentation/active/{주제명}/DRAFT.md       # 문서 초안
   - 통신 방식
 
 출력 문서:
-  - docs/concepts/architecture/SYSTEM_OVERVIEW.md
+  - docs/architecture/SYSTEM_OVERVIEW.md
 ```
 
 ### 유형 2: 특정 모듈
@@ -243,7 +243,7 @@ touch docs/documentation/active/{주제명}/DRAFT.md       # 문서 초안
   - 의존성
 
 출력 문서:
-  - docs/concepts/{카테고리}/{모듈명}.md
+  - docs/architecture/{카테고리}/{모듈명}.md
 ```
 
 ### 유형 3: 알고리즘
@@ -255,7 +255,7 @@ touch docs/documentation/active/{주제명}/DRAFT.md       # 문서 초안
   - Orekit 활용 코드
 
 출력 문서:
-  - docs/concepts/algorithms/{알고리즘명}.md
+  - docs/architecture/algorithms/{알고리즘명}.md
 ```
 
 ### 유형 4: API 명세
@@ -267,7 +267,7 @@ touch docs/documentation/active/{주제명}/DRAFT.md       # 문서 초안
   - WebSocket 핸들러
 
 출력 문서:
-  - docs/concepts/api/{API그룹}.md
+  - docs/api/{API그룹}.md
 ```
 
 ## 참조 파일
@@ -297,7 +297,7 @@ touch docs/documentation/active/{주제명}/DRAFT.md       # 문서 초안
   범위: 전체 시스템 구조
 
 [폴더 생성]
-  docs/documentation/active/System_Architecture/
+  docs/work/active/documentation/System_Architecture/
   - README.md
   - ANALYSIS.md
   - DISCUSSION.md
@@ -324,7 +324,7 @@ touch docs/documentation/active/{주제명}/DRAFT.md       # 문서 초안
   사용자: "좋아, 이대로 적용해"
 
 [적용]
-  DRAFT.md → docs/concepts/architecture/SYSTEM_OVERVIEW.md
+  DRAFT.md → docs/architecture/SYSTEM_OVERVIEW.md
   active/ → completed/ 이동
 ```
 
@@ -350,7 +350,7 @@ touch docs/documentation/active/{주제명}/DRAFT.md       # 문서 초안
   A: "내부는 Train, UI 표시만 Tilt로 변환합니다"
 
 [초안 → 승인 → 적용]
-  → docs/concepts/algorithms/Ephemeris_Calculation.md
+  → docs/architecture/algorithms/Ephemeris_Calculation.md
 ```
 
 ## 협의 가이드라인

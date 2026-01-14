@@ -70,8 +70,8 @@ description: 프로젝트 현황 보고 스킬. 코드 메트릭스, 진행 상�
 ### 진행 중 작업
 | 작업 | 위치 | 진행률 | 담당 |
 |------|------|--------|------|
-| {작업1} | features/active/ | N% | |
-| {작업2} | bugfixes/active/ | N% | |
+| {작업1} | work/active/ | N% | |
+| {작업2} | work/active/ | N% | |
 
 ### 최근 완료 (7일)
 | 작업 | 완료일 | 유형 |
@@ -166,12 +166,10 @@ find frontend/src \( -name "*.vue" -o -name "*.ts" \) | xargs wc -l | tail -1
 
 ```bash
 # 진행 중 작업
-ls docs/features/active/
-ls docs/bugfixes/active/
+ls docs/work/active/
 
 # 완료 작업 (최근 7일)
-find docs/features/completed -mtime -7 -type d
-find docs/bugfixes/completed -mtime -7 -type d
+find docs/work/archive -mtime -7 -type d
 ```
 
 ### 문서 상태
@@ -259,7 +257,7 @@ Frontend: 5 Pages, 43 Components, 25 Stores
 ```yaml
 일일 보고서:
   - 시간: 매일 18:00
-  - 저장: docs/daily/YYYY-MM-DD.md
+  - 저장: docs/logs/YYYY-MM-DD.md
   - 내용: 간략 현황 + 당일 작업
 
 주간 보고서:

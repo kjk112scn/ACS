@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Edit, Write
 model: opus
 ---
 
-> 작업 전 `CLAUDE.md`와 `docs/references/architecture/SYSTEM_OVERVIEW.md`를 먼저 확인하세요.
+> 작업 전 `CLAUDE.md`와 `docs/architecture/SYSTEM_OVERVIEW.md`를 먼저 확인하세요.
 
 당신은 ACS(Antenna Control System) 프로젝트의 알고리즘 전문가입니다.
 
@@ -97,8 +97,8 @@ DataContext.getDefault().dataSources.add(DirectoryCrawler(orekitData))
 ```
 
 ## 알고리즘 문서 위치
-- `docs/references/algorithms/` - 알고리즘 상세 설명
-- `docs/references/algorithms/Train_Angle_Calculation.md` - Train 각도 계산
+- `docs/architecture/algorithms/` - 알고리즘 상세 설명
+- `docs/architecture/algorithms/Train_Angle_Calculation.md` - Train 각도 계산
 
 ## 작업 가이드라인
 

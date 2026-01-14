@@ -33,7 +33,7 @@
 사용자: /feature PassSchedule에 위성 필터링 기능 추가
 
 → 자동으로:
-  1. docs/features/active/PassSchedule_Satellite_Filtering/ 폴더 생성
+  1. docs/work/active/PassSchedule_Satellite_Filtering/ 폴더 생성
   2. README.md (개요) 생성
   3. 계획 문서 생성
   4. 구현 시작
@@ -48,7 +48,7 @@ Claude: 좋습니다! /feature 스킬로 기능 개발을 시작하겠습니다.
 [자동으로 폴더/문서 생성 후]
 
 기능 폴더가 생성되었습니다:
-- docs/features/active/PassSchedule_Satellite_Filtering/
+- docs/work/active/PassSchedule_Satellite_Filtering/
 
 요구사항을 정리해볼게요:
 1. 위성 이름으로 필터링
@@ -71,7 +71,7 @@ Claude: 좋습니다! /feature 스킬로 기능 개발을 시작하겠습니다.
 사용자: /bugfix 차트가 무한 루프 돌아
 
 → 자동으로:
-  1. docs/bugfixes/active/Chart_Infinite_Loop/ 폴더 생성
+  1. docs/work/active/Chart_Infinite_Loop/ 폴더 생성
   2. README.md (버그 정보) 생성
   3. ANALYSIS.md (원인 분석) 생성
   4. FIX.md (수정 계획) 생성
@@ -83,7 +83,7 @@ Claude: 좋습니다! /feature 스킬로 기능 개발을 시작하겠습니다.
 
 Claude: 버그 수정 워크플로우를 시작합니다.
 
-[bugfixes/active/ 폴더에 문서 생성]
+[work/active/ 폴더에 문서 생성]
 
 증상 분석:
 - 콘솔에서 반복 호출 로그 확인
@@ -113,8 +113,8 @@ Claude: 버그 수정 워크플로우를 시작합니다.
 → 자동으로:
   1. 변경사항 분석
   2. IMPLEMENTATION.md 생성
-  3. active/ → completed/ 폴더 이동
-  4. daily/ 로그 기록
+  3. work/active/ → work/archive/ 폴더 이동
+  4. logs/ 로그 기록
   5. 커밋 메시지 제안
 ```
 
@@ -133,7 +133,7 @@ Claude: 작업 마무리를 시작합니다.
 - Summary.md (요약)
 
 폴더 이동:
-- features/active/ → features/completed/
+- work/active/ → work/archive/
 
 커밋 메시지:
 feat(pass-schedule): 위성 필터링 기능 추가

@@ -17,10 +17,11 @@ model: opus
   2. 관련 문서 자동 식별
   3. 문서 업데이트 제안/실행
   4. 불일치 항목 해결
-  5. concepts/ 문서 유지
+  5. architecture/context/ 문서 유지
   6. 📁 문서 구조 관리 (README 파일 유지)
   7. 🔗 문서 간 링크 무결성 보장
   8. 🏥 문서 건강 상태 점검
+  9. 📚 docs/architecture/context/ 참조 문서 관리 (통합)
 ```
 
 ## 문서 구조 관리 (신규)
@@ -32,14 +33,17 @@ model: opus
 ```
 docs/
 ├── README.md                    ← 문서 시스템 개요
-├── references/
-│   ├── README.md                ← 참조 문서 인덱스
+├── architecture/
+│   ├── README.md                ← 아키텍처 문서 인덱스
 │   ├── algorithms/README.md     ← 알고리즘 문서 목록
-│   ├── protocols/README.md      ← 프로토콜 문서 목록
-│   └── architecture/README.md   ← 아키텍처 문서 목록
+│   └── context/                 ← 에이전트 컨텍스트
+├── api/
+│   └── README.md                ← API 문서 목록
 ├── guides/
 │   └── README.md                ← 가이드 목록
-├── daily/
+├── work/
+│   └── README.md                ← 작업 문서 인덱스
+├── logs/
 │   └── README.md                ← 일일 로그 인덱스
 └── decisions/
     └── README.md                ← ADR 목록
@@ -84,16 +88,16 @@ docs/
 |----------|----------|
 | `controller/icd/` | `docs/api/ICD_API.md` |
 | `controller/mode/` | `docs/api/Mode_API.md` |
-| `service/mode/` | `docs/concepts/algorithms/` |
-| `algorithm/**/*.kt` | `docs/concepts/algorithms/` |
+| `service/mode/` | `docs/architecture/algorithms/` |
+| `algorithm/**/*.kt` | `docs/architecture/algorithms/` |
 
 ### Frontend 매핑
 
 | 코드 경로 | 문서 경로 |
 |----------|----------|
-| `pages/mode/*.vue` | `docs/concepts/architecture/UI_Architecture.md` |
-| `stores/**/*.ts` | `docs/concepts/architecture/Store_Architecture.md` |
-| `composables/**/*.ts` | `docs/guides/development/Composables_Guide.md` |
+| `pages/mode/*.vue` | `docs/architecture/UI_Architecture.md` |
+| `stores/**/*.ts` | `docs/architecture/Store_Architecture.md` |
+| `composables/**/*.ts` | `docs/guides/Composables_Guide.md` |
 
 ## 스캔 명령어
 
@@ -239,41 +243,88 @@ MANUAL 영역:
 ```yaml
 감지: algorithm/*.kt 변경
 작업:
-  - concepts/algorithms/ 업데이트
+  - architecture/algorithms/ 업데이트
   - 관련 ADR 확인
   - 알고리즘 문서 동기화
 ```
 
-## concepts/ 관리
+## docs/architecture/ 관리
 
 ### 문서 구조
 
 ```
-docs/concepts/
-├── architecture/          # 시스템 구조
-│   ├── SYSTEM_OVERVIEW.md
-│   ├── UI_Architecture.md
-│   └── Data_Flow.md
+docs/architecture/
+├── SYSTEM_OVERVIEW.md     # 시스템 개요
+├── UI_Architecture.md     # UI 아키텍처
 ├── algorithms/            # 알고리즘
 │   ├── Satellite_Tracking.md
 │   ├── Sun_Tracking.md
 │   └── Train_Angle.md
-├── protocols/             # 프로토콜
-│   ├── ICD_Protocol.md
-│   └── WebSocket_Protocol.md
-└── domain/                # 도메인 지식
-    ├── Antenna_Control.md
-    └── Coordinate_Systems.md
+└── context/               # 에이전트 컨텍스트
+    ├── _INDEX.md          # 전체 맵
+    ├── domain/            # 도메인 지식
+    ├── architecture/      # 아키텍처 상세
+    └── codebase/          # 코드베이스 현황
 ```
 
 ### 업데이트 기준
 
-| 변경 유형 | concepts/ 업데이트 |
-|----------|-------------------|
-| 새 알고리즘 | algorithms/ |
+| 변경 유형 | 업데이트 대상 |
+|----------|--------------|
+| 새 알고리즘 | architecture/algorithms/ |
 | 아키텍처 변경 | architecture/ |
-| 프로토콜 변경 | protocols/ |
-| 도메인 개념 추가 | domain/ |
+| 프로토콜 변경 | api/ |
+| 도메인 개념 추가 | architecture/context/domain/ |
+
+## docs/architecture/context/ 관리 (에이전트 참조 문서)
+
+### 구조
+
+```
+docs/architecture/context/
+├── _INDEX.md              # 전체 맵
+├── domain/                # 도메인 지식
+│   ├── satellite-tracking.md
+│   ├── antenna-control.md
+│   ├── mode-system.md
+│   └── icd-protocol.md
+├── architecture/          # 아키텍처
+│   ├── frontend.md
+│   ├── backend.md
+│   └── data-flow.md
+└── codebase/              # 코드베이스 현황
+    ├── file-structure.md
+    └── key-components.md
+```
+
+### 품질 점검
+
+```yaml
+점검 항목:
+  - 일관성: 문서 간 중복/상충 정보
+  - 최신성: 삭제된 파일/클래스 참조
+  - 링크: 깨진 참조 탐지
+
+업데이트 트리거:
+  - Controller 추가 → codebase/file-structure.md
+  - 새 모드 추가 → domain/mode-system.md
+  - 스토어 변경 → architecture/frontend.md
+  - 서비스 변경 → architecture/backend.md
+```
+
+### 업데이트 제안 형식
+
+```markdown
+📝 컨텍스트 업데이트 제안:
+
+1. codebase/file-structure.md
+   - 추가: NewController.kt (controller/)
+
+2. domain/mode-system.md
+   - 추가: NewMode 설명
+
+적용하시겠습니까? (y/n)
+```
 
 ## 주의사항
 

@@ -30,12 +30,12 @@ description: 버그 수정 워크플로우. 원인 분석, 수정 계획, 회귀
 
 ```bash
 # 폴더 생성
-mkdir -p docs/bugfixes/active/{버그명}/
+mkdir -p docs/work/active/{버그명}/
 
 # 필수 문서 생성
-touch docs/bugfixes/active/{버그명}/README.md
-touch docs/bugfixes/active/{버그명}/ANALYSIS.md
-touch docs/bugfixes/active/{버그명}/FIX.md
+touch docs/work/active/{버그명}/README.md
+touch docs/work/active/{버그명}/ANALYSIS.md
+touch docs/work/active/{버그명}/FIX.md
 ```
 
 **버그명 규칙:** `{영역}_{증상}` (예: `PassSchedule_Chart_Slow`)
@@ -189,7 +189,7 @@ touch docs/bugfixes/active/{버그명}/FIX.md
 
 ```yaml
 구현:
-  - 호출 에이전트: debugger, backend-dev, frontend-dev
+  - 호출 에이전트: debugger, be-expert, fe-expert
   - FIX.md에 따라 코드 수정
 
 검증:
@@ -204,9 +204,9 @@ touch docs/bugfixes/active/{버그명}/FIX.md
 ```yaml
 수행 작업:
   1. ANALYSIS.md + FIX.md 최종 정리
-  2. bugfixes/active/ → completed/ 이동
-  3. 관련 concepts/ 문서 업데이트 (해당시)
-  4. daily/ 로그 기록
+  2. work/active/ → work/archive/ 이동
+  3. 관련 architecture/context/ 문서 업데이트 (해당시)
+  4. logs/ 로그 기록
   5. 재발 방지 대책 적용 확인
 ```
 
@@ -220,8 +220,8 @@ touch docs/bugfixes/active/{버그명}/FIX.md
 | 에이전트 | 역할 | 호출 시점 |
 |---------|------|---------|
 | `debugger` | 원인 분석 | ANALYSIS.md 작성 |
-| `backend-dev` | Backend 수정 | 구현 단계 |
-| `frontend-dev` | Frontend 수정 | 구현 단계 |
+| `be-expert` | Backend 수정 | 구현 단계 |
+| `fe-expert` | Frontend 수정 | 구현 단계 |
 | `test-expert` | 테스트 실행 | 검증 단계 |
 | `doc-syncer` | 문서 동기화 | 완료 시 |
 
@@ -243,7 +243,7 @@ touch docs/bugfixes/active/{버그명}/FIX.md
 
 → /bugfix 워크플로우 시작:
 
-[폴더 생성] docs/bugfixes/active/PassSchedule_Chart_Slow/
+[폴더 생성] docs/work/active/PassSchedule_Chart_Slow/
             - README.md (심각도: 🟠 High)
             - ANALYSIS.md
             - FIX.md
@@ -257,7 +257,7 @@ touch docs/bugfixes/active/{버그명}/FIX.md
             - 방안: computed 결과 캐싱
             - 테스트: 렌더링 시간 1초 이하
 
-[구현] frontend-dev 에이전트 호출
+[구현] fe-expert 에이전트 호출
        - watchEffect → computed + shallowRef 변경
 
 [검증] test-expert 에이전트 호출
@@ -265,7 +265,7 @@ touch docs/bugfixes/active/{버그명}/FIX.md
        - 회귀 테스트 통과 ✅
 
 [완료] /done 자동 호출
-       - completed/ 이동
+       - work/archive/ 이동
        - 재발 방지: 성능 가이드라인 문서화
 ```
 
@@ -284,7 +284,7 @@ touch docs/bugfixes/active/{버그명}/FIX.md
        - Math.toDegrees() 호출 위치 수정
        - 단위 테스트 추가
 
-[완료] completed/로 이동
+[완료] work/archive/로 이동
 ```
 
 ## 트러블슈팅

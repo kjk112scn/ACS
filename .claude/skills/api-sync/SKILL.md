@@ -478,8 +478,8 @@ console.log('✅ Zod schemas generated')
 
 ## 참고 문서
 
-- [RFC_Configuration_Management.md](../../docs/features/active/Architecture_Refactoring/RFC_Configuration_Management.md)
-- [api-contract-manager 에이전트](.claude/agents/api-contract-manager.md)
+- [RFC_Configuration_Management.md](../../docs/work/active/Architecture_Refactoring/RFC_Configuration_Management.md)
+- [api-contract-manager 에이전트](../../.claude/agents/api-contract-manager.md)
 - [OpenAPI Specification](https://swagger.io/specification/)
 - [openapi-typescript](https://github.com/drwpow/openapi-typescript)
 

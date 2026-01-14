@@ -52,8 +52,8 @@ Claude Code 확장 시스템 사용법은 아래 문서를 참고하세요:
 ## 관련 문서
 
 - [docs/README.md](../README.md) - 문서 시스템 개요
-- [docs/references/](../references/README.md) - 참조 문서
-- [docs/daily/](../daily/README.md) - 일일 작업 로그
+- [docs/architecture/](../architecture/README.md) - 아키텍처 문서
+- [docs/logs/](../logs/README.md) - 일일 작업 로그
 
 ---
 

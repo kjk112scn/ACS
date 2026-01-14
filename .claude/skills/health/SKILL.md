@@ -80,11 +80,8 @@ cd frontend && npx vue-tsc --noEmit
 ### 5. 진행 중 작업 (Progress)
 
 ```bash
-# 진행 중 기능
-ls docs/features/active/
-
-# 진행 중 버그 수정
-ls docs/bugfixes/active/
+# 진행 중 작업
+ls docs/work/active/
 ```
 
 ## 출력 형식

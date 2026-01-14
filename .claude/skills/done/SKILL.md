@@ -14,19 +14,39 @@ description: 작업 마무리 및 문서화 스킬. 변경사항 분석, 문서 
 - 문서 자동 업데이트
 - Why 기록 자동화
 - 일관된 완료 처리
+- **컨텍스트 문서 자동 갱신**
 
 ## 워크플로우
 
 ```
-[1. 변경 분석] → [2. 문서 업데이트] → [3. 폴더 이동] → [4. 동기화] → [5. 로그 기록] → [6. 커밋]
-       │              │                │              │            │              │
-   git diff      IMPLEMENTATION     active/ →      /sync        daily/        모든 변경
-    분석          .md 생성        completed/      호출          기록          포함 커밋
+[0. /sync] → [1. 변경 분석] → [2. 문서 업데이트] → [3. 폴더 이동] → [4. 컨텍스트] → [5. 로그] → [6. 커밋]
+     │              │              │                │              │            │           │
+ 품질 점검      git diff      IMPLEMENTATION     active/ →     context/     daily/      모든 변경
+ 선행 실행       분석          .md 생성        completed/      제안          기록       포함 커밋
 ```
 
-**중요:** `/sync`는 커밋 **전에** 실행되어 모든 문서 변경이 단일 커밋에 포함됩니다.
+**중요:** `/sync`가 **가장 먼저** 실행되어 문서 품질을 점검합니다. 모든 변경이 단일 커밋에 포함됩니다.
 
 ## 실행 단계
+
+### Step 0: /sync 선행 실행 (품질 점검)
+
+**가장 먼저 /sync를 실행하여 기존 문서 상태를 점검합니다.**
+
+```yaml
+수행 항목:
+  - 문서 링크 무결성 검증
+  - README 파일 존재 확인
+  - 코드↔문서 일치 확인
+  - 중복/불일치 항목 감지
+
+결과:
+  - 품질 이슈 발견 시 사용자에게 알림
+  - 자동 수정 가능 항목은 수정 제안
+  - 심각한 문제는 /done 진행 전 해결 권장
+```
+
+**참고:** /sync만 별도 실행도 가능 (`/sync` 명령어)
 
 ### Step 1: 변경사항 분석
 
@@ -144,33 +164,51 @@ git diff --name-only
 
 ```yaml
 Feature 완료:
-  FROM: docs/features/active/{기능명}/
-  TO:   docs/features/completed/{기능명}/
+  FROM: docs/work/active/{기능명}/
+  TO:   docs/work/archive/{기능명}/
 
 Bugfix 완료:
-  FROM: docs/bugfixes/active/{버그명}/
-  TO:   docs/bugfixes/completed/{버그명}/
+  FROM: docs/work/active/{버그명}/
+  TO:   docs/work/archive/{버그명}/
 
 이동 후 정리:
   - PROGRESS.md 삭제 (IMPLEMENTATION.md로 대체)
   - 불필요한 임시 파일 삭제
 ```
 
-### Step 4: /sync 문서 동기화
+### Step 4: 컨텍스트 문서 업데이트 제안
 
-**커밋 전에 실행하여 모든 문서 변경을 포함**
+**변경사항에 따른 컨텍스트 문서 업데이트를 제안합니다.**
 
 ```yaml
-수행:
-  - 코드↔문서 일치 확인
-  - 불일치 항목 자동 수정
-  - PROJECT_STATUS.md 업데이트
-  - concepts/ 문서 업데이트 (해당시)
+분석 대상:
+  - docs/architecture/context/domain/     # 도메인 로직 변경 시
+  - docs/architecture/context/architecture/  # 아키텍처 변경 시
+  - docs/architecture/context/codebase/   # 파일 구조 변경 시
+
+동작:
+  1. 변경 파일 분석
+  2. 관련 컨텍스트 문서 식별
+  3. 업데이트 필요 항목 제안
+  4. 사용자 승인 후 반영
+
+예시:
+  - Controller 추가 → architecture/context/codebase/file-structure.md 업데이트 제안
+  - 새 모드 추가 → architecture/context/domain/mode-system.md 업데이트 제안
+  - 스토어 구조 변경 → architecture/context/architecture/frontend.md 업데이트 제안
+```
+
+**반자동 워크플로우:**
+```
+1. 분석 결과 표시: "다음 컨텍스트 문서 업데이트를 제안합니다:"
+2. 제안 내용 표시: 변경/추가할 내용
+3. 사용자 확인: "적용하시겠습니까? (y/n)"
+4. 승인 시 적용, 거부 시 스킵
 ```
 
 ### Step 5: 일일 로그 기록
 
-**파일:** `docs/daily/YYYY-MM-DD.md`
+**파일:** `docs/logs/YYYY-MM-DD.md`
 
 ```markdown
 # 2026-01-06 작업 로그
@@ -235,8 +273,8 @@ Bugfix 완료:
 
 | 에이전트 | 역할 | 호출 시점 |
 |---------|------|---------|
+| `doc-syncer` | 문서 동기화 + 컨텍스트 관리 | Step 0, Step 4 |
 | `project-manager` | 문서 구조 관리 | 폴더 이동 |
-| `doc-syncer` | 문서 동기화 | /sync 호출 |
 | `code-reviewer` | 변경 검토 | 선택적 |
 
 ## 자동 감지 항목
@@ -246,12 +284,12 @@ Bugfix 완료:
 ```yaml
 Backend 변경 시:
   - *Controller.kt 추가 → api/ 문서 업데이트 필요
-  - *Service.kt 변경 → 해당 concepts/ 업데이트 필요
-  - algorithm/*.kt 변경 → concepts/algorithms/ 업데이트 필요
+  - *Service.kt 변경 → 해당 architecture/context/ 업데이트 필요
+  - algorithm/*.kt 변경 → architecture/algorithms/ 업데이트 필요
 
 Frontend 변경 시:
-  - *Page.vue 추가 → UI_Architecture.md 업데이트 필요
-  - *Store.ts 변경 → Store_Architecture.md 업데이트 필요
+  - *Page.vue 추가 → architecture/UI_Architecture.md 업데이트 필요
+  - *Store.ts 변경 → architecture/context/architecture/frontend.md 업데이트 필요
 ```
 
 ### ADR 생성 권장 감지
@@ -275,25 +313,32 @@ Frontend 변경 시:
 
 → /done 워크플로우 시작:
 
-[변경 분석]
+[Step 0: /sync 선행]
+  ✅ 문서 링크 무결성: OK
+  ✅ README 파일: OK
+  ⚠️ 코드↔문서: 1개 불일치 감지 → 자동 수정
+
+[Step 1: 변경 분석]
   - 수정: 3개 파일
   - 영역: Frontend (PassSchedulePage.vue, passScheduleStore.ts)
-  - 관련 문서: docs/features/active/PassSchedule_Chart_Zoom/
+  - 관련 문서: docs/work/active/PassSchedule_Chart_Zoom/
 
-[문서 생성]
+[Step 2: 문서 생성]
   - IMPLEMENTATION.md 생성
   - CHANGELOG.md 업데이트
 
-[폴더 이동]
-  active/PassSchedule_Chart_Zoom/ → completed/PassSchedule_Chart_Zoom/
+[Step 3: 폴더 이동]
+  work/active/PassSchedule_Chart_Zoom/ → work/archive/PassSchedule_Chart_Zoom/
 
-[로그 기록]
-  docs/daily/2026-01-06.md 업데이트
+[Step 4: 컨텍스트 제안]
+  "다음 컨텍스트 문서 업데이트를 제안합니다:"
+  - codebase/key-components.md: PassSchedulePage 설명 추가
+  → 사용자: "y" → 적용
 
-[동기화]
-  /sync 호출 → PROJECT_STATUS.md, concepts/ 업데이트
+[Step 5: 로그 기록]
+  docs/logs/2026-01-14.md 업데이트
 
-[커밋]
+[Step 6: 커밋]
   feat(passschedule): 차트 줌 기능 구현
   (코드 + 모든 문서 변경 포함)
 ```
@@ -312,7 +357,7 @@ Frontend 변경 시:
   - FIX.md에 "구현 완료" 표시
 
 [이동]
-  bugfixes/active/Chart_Performance/ → completed/Chart_Performance/
+  work/active/Chart_Performance/ → work/archive/Chart_Performance/
 
 [커밋]
   fix(passschedule): 차트 렌더링 성능 개선
@@ -328,7 +373,7 @@ Frontend 변경 시:
 [분석] 변경 파일: docs/ 내 파일만
 
 [로그]
-  docs/daily/2026-01-06.md 기록
+  docs/logs/2026-01-06.md 기록
 
 [커밋]
   docs: SYSTEM_OVERVIEW.md 업데이트

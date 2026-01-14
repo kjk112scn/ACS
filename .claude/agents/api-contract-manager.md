@@ -479,7 +479,7 @@ jobs:
 ## 참고 문서
 
 ### 내부 문서
-- [RFC_Configuration_Management.md](../../docs/features/active/Architecture_Refactoring/RFC_Configuration_Management.md)
+- [RFC_Configuration_Management.md](../../docs/work/active/Architecture_Refactoring/RFC_Configuration_Management.md)
 - [CLAUDE.md](../../CLAUDE.md) - API 명세 위치
 
 ### 외부 문서

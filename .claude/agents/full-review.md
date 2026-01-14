@@ -12,7 +12,7 @@ model: opus
 ## 검토 항목
 
 ### 1. 문서 일관성 검토
-- `docs/features/active/` 내 모든 계획 문서 확인
+- `docs/work/active/` 내 모든 계획 문서 확인
 - 상위-하위 문서 간 버전, Phase 번호, 우선순위 일치 여부
 - 변경 이력 최신 상태 확인
 

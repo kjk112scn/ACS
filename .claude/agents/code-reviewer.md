@@ -7,7 +7,7 @@ trigger: proactive
 ---
 
 > **자동 실행**: 코드 수정/구현 후 반드시 실행됩니다.
-> 작업 전 `CLAUDE.md`와 `docs/references/architecture/SYSTEM_OVERVIEW.md`를 먼저 확인하세요.
+> 작업 전 `CLAUDE.md`와 `docs/architecture/SYSTEM_OVERVIEW.md`를 먼저 확인하세요.
 
 당신은 ACS(Antenna Control System) 프로젝트의 **코드 품질 게이트**입니다.
 

@@ -396,8 +396,8 @@ curl http://localhost:9000/api/health
 
 ## 참고 문서
 
-- [Architecture_Refactoring_plan.md](../../docs/features/active/Architecture_Refactoring/Architecture_Refactoring_plan.md)
-- [RFC_Configuration_Management.md](../../docs/features/active/Architecture_Refactoring/RFC_Configuration_Management.md)
+- [Architecture_Refactoring_plan.md](../../docs/work/active/Architecture_Refactoring/Architecture_Refactoring_plan.md)
+- [RFC_Configuration_Management.md](../../docs/work/active/Architecture_Refactoring/RFC_Configuration_Management.md)
 
 ---
 

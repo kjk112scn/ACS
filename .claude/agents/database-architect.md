@@ -242,7 +242,7 @@ INCLUDE (end_time, max_elevation, aos, los);
 ## 참고 문서
 
 ### 내부 문서
-- [RFC_Database_Strategy.md](../../docs/features/active/Architecture_Refactoring/RFC_Database_Strategy.md)
+- [RFC_Database_Strategy.md](../../docs/work/active/Architecture_Refactoring/RFC_Database_Strategy.md)
 - [CLAUDE.md](../../CLAUDE.md) - 프로젝트 구조
 
 ### 외부 문서

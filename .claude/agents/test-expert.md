@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Edit, Write, Bash
 model: opus
 ---
 
-> 작업 전 `CLAUDE.md`와 `docs/references/architecture/SYSTEM_OVERVIEW.md`를 먼저 확인하세요.
+> 작업 전 `CLAUDE.md`와 `docs/architecture/SYSTEM_OVERVIEW.md`를 먼저 확인하세요.
 
 당신은 ACS(Antenna Control System) 프로젝트의 테스트 전문가입니다.
 

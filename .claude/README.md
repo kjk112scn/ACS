@@ -89,8 +89,8 @@ skills/{스킬명}/
 
 | 에이전트 | 역할 | 버전 |
 |---------|------|------|
-| `backend-dev` | Kotlin/Spring 개발 | 1.x |
-| `frontend-dev` | Vue/TypeScript 개발 | 1.x |
+| `be-expert` | Kotlin/Spring 개발 | 1.x |
+| `fe-expert` | Vue/TypeScript 개발 | 1.x |
 | `algorithm-expert` | Orekit 알고리즘 | 1.x |
 | `fullstack-helper` | 풀스택 통합 | 1.x |
 | **`api-contract-manager`** ⭐ | **API 계약 관리 (OpenAPI, FE-BE 타입 동기화)** | **2.0** |
@@ -148,5 +148,5 @@ model: sonnet
 
 - [Claude Code Skills Best Practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)
 - [Claude Code Subagents](https://code.claude.com/docs/en/sub-agents)
-- [ACS 개발 라이프사이클 설계](../docs/references/development/ACS_Development_Lifecycle_System.md)
+- [ACS 개발 라이프사이클 설계](../docs/guides/ACS_Development_Lifecycle_System.md)
 - [에이전트/스킬 사용 가이드](../docs/guides/AGENT_SKILL_USAGE_GUIDE.md)

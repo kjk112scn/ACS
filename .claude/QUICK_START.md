@@ -391,13 +391,13 @@ User: "Settings History 기능을 문서화해줘"
 
 Doc Syncer 에이전트:
 1. API 명세 업데이트
-   - docs/references/api/settings.md
+   - docs/api/settings.md
 
 2. 컴포넌트 문서
    - frontend/src/components/Settings/SettingsHistory.vue 주석
 
 3. 변경 이력
-   - docs/features/completed/settings-history.md
+   - docs/work/archive/settings-history.md
 
 → Output: 최신 문서
 ```
@@ -747,7 +747,7 @@ Doc Syncer 에이전트:
 ## 참고 문서
 
 - [AGENT_COLLABORATION_GUIDE.md](./AGENT_COLLABORATION_GUIDE.md) - 에이전트 협업 가이드
-- [Architecture_Refactoring_plan.md](../docs/features/active/Architecture_Refactoring/Architecture_Refactoring_plan.md) - 리팩토링 계획
+- [Architecture_Refactoring_plan.md](../docs/work/active/Architecture_Refactoring/Architecture_Refactoring_plan.md) - 리팩토링 계획
 
 ---
 

@@ -555,7 +555,7 @@ jobs:
 ## 참고 문서
 
 ### 내부 문서
-- [RFC_UIUX_Consistency.md](../../docs/features/active/Architecture_Refactoring/RFC_UIUX_Consistency.md)
+- [RFC_UIUX_Consistency.md](../../docs/work/active/Architecture_Refactoring/RFC_UIUX_Consistency.md)
 - [CLAUDE.md](../../CLAUDE.md) - 코딩 규칙
 
 ### 외부 문서
