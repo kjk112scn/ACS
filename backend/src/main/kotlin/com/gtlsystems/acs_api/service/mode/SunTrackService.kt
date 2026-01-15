@@ -100,7 +100,7 @@ class SunTrackService(
      * ✅ 모드 타이머 시작
      */
     private fun startModeTimer() {
-        if (modeTask != null && !modeTask!!.isCancelled) {
+        if (modeTask?.isCancelled == false) {
             logger.warn("모드 타이머가 이미 실행 중입니다")
             return
         }
@@ -421,7 +421,7 @@ class SunTrackService(
                 val moveTolerance = 1.0 // ±1.0도 허용
                 
                 if (currentTrainAngle != null && targetTrainAngle != null) {
-                    val offsetAppliedAngle = getTrainOffsetCalculator()!!.toFloat()
+                    val offsetAppliedAngle = getTrainOffsetCalculator()?.toFloat() ?: return
                     val angleDifference = Math.abs(currentTrainAngle - offsetAppliedAngle)
                     
                     logger.debug("📊 [TRAIN_MOVING] Train 목표 각도 확인 중:")
@@ -459,7 +459,7 @@ class SunTrackService(
             val stabilizationTolerance = 0.5 // ±0.5도 허용
 
             if (currentTrainAngle != null && targetTrainAngle != null) {
-                val offsetAppliedAngle = getTrainOffsetCalculator()!!.toFloat()
+                val offsetAppliedAngle = getTrainOffsetCalculator()?.toFloat() ?: return
                 val angleDifference = Math.abs(currentTrainAngle - offsetAppliedAngle)
                 
                 logger.debug("⏱️ [TRAIN_STABILIZING] 안정화 체크:")

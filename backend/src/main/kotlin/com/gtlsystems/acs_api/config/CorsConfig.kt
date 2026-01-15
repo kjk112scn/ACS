@@ -17,13 +17,12 @@ class CorsConfig {
         logger.info("🚀 WebFlux CORS 설정 초기화 중...")
 
         val corsConfig = CorsConfiguration().apply {
-            // 허용할 Origin 설정
+            // 허용할 Origin 설정 (보안: Wildcard "*" 제거)
             allowedOriginPatterns = listOf(
                 "http://localhost:9000",
                 "http://127.0.0.1:9000",
                 "http://localhost:*",
-                "http://127.0.0.1:*",
-                "*"
+                "http://127.0.0.1:*"
             )
 
             // 허용할 HTTP 메서드

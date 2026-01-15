@@ -25,9 +25,9 @@ object GlobalData {
             get() = LocalDateTime.now()
         val systemTimeZone: ZoneId = ZoneId.systemDefault()
 
-        var serverTimeZone: ZoneId  = systemTimeZone
+        @Volatile var serverTimeZone: ZoneId  = systemTimeZone
 
-        var clientTimeZone: ZoneId = systemTimeZone
+        @Volatile var clientTimeZone: ZoneId = systemTimeZone
         /**
          * 현재 로컬 시간을 출력함.
          * utcNow + addLocalTime을 계산하여 반환
@@ -46,31 +46,31 @@ object GlobalData {
     }
 
     object Offset {
-        var TimeOffset: Float = 0.0f
-        var azimuthPositionOffset: Float = 0.0f
-        var elevationPositionOffset: Float = 0.0f
-        var trainPositionOffset: Float = 0.0f
-        var trueNorthOffset: Float = 0.0f
+        @Volatile var TimeOffset: Float = 0.0f
+        @Volatile var azimuthPositionOffset: Float = 0.0f
+        @Volatile var elevationPositionOffset: Float = 0.0f
+        @Volatile var trainPositionOffset: Float = 0.0f
+        @Volatile var trueNorthOffset: Float = 0.0f
     }
     object EphemerisTrakingAngle {
-        var azimuthAngle: Float = 0.0f
-        var elevationAngle: Float = 0.0f
-        var trainAngle: Float = 0.0f
+        @Volatile var azimuthAngle: Float = 0.0f
+        @Volatile var elevationAngle: Float = 0.0f
+        @Volatile var trainAngle: Float = 0.0f
     }
     object SunTrackingData {
-        var azimuthAngle: Float = 0.0f
-        var azimuthSpeed: Float = 0.0f
-        var elevationAngle: Float = 0.0f
-        var elevationSpeed: Float = 0.0f
-        var trainAngle: Float = 0.0f
-        var trainSpeed: Float = 0.0f
+        @Volatile var azimuthAngle: Float = 0.0f
+        @Volatile var azimuthSpeed: Float = 0.0f
+        @Volatile var elevationAngle: Float = 0.0f
+        @Volatile var elevationSpeed: Float = 0.0f
+        @Volatile var trainAngle: Float = 0.0f
+        @Volatile var trainSpeed: Float = 0.0f
     }
     /*
 * 버전 정보
 */
     object Version {
-        var apiVersion: String = "1.0.0"
-        var buildDate: String = "2023-01-01T00:00:00Z"
+        @Volatile var apiVersion: String = "1.0.0"
+        @Volatile var buildDate: String = "2023-01-01T00:00:00Z"
     }
 
     /*

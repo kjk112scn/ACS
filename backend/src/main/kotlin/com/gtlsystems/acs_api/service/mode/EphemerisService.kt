@@ -132,27 +132,33 @@ class EphemerisService(
     fun eventBus() {
         // 위성 추적 헤더 이벤트 구독
         val headerSubscription =
-            acsEventBus.subscribeToType<ACSEvent.ICDEvent.SatelliteTrackHeaderReceived>().subscribe { event ->
-                // ✅ 상태 기반: TRACKING 상태일 때만 초기 데이터 전송
-                if (currentTrackingState == TrackingState.TRACKING) {
-                    currentTrackingPassId?.let { passId ->
-                        sendInitialTrackingData(passId)
+            acsEventBus.subscribeToType<ACSEvent.ICDEvent.SatelliteTrackHeaderReceived>().subscribe(
+                { event ->
+                    // ✅ 상태 기반: TRACKING 상태일 때만 초기 데이터 전송
+                    if (currentTrackingState == TrackingState.TRACKING) {
+                        currentTrackingPassId?.let { passId ->
+                            sendInitialTrackingData(passId)
+                        }
+                    } else {
+                        logger.info("⏳ 헤더 수신 완료, 시작 시간 대기 중 (초기 데이터는 TRACKING 상태에서 전송)")
                     }
-                } else {
-                    logger.info("⏳ 헤더 수신 완료, 시작 시간 대기 중 (초기 데이터는 TRACKING 상태에서 전송)")
-                }
-            }
+                },
+                { error -> logger.error("위성 추적 헤더 이벤트 처리 중 오류: {}", error.message, error) }
+            )
 
         // 위성 추적 데이터 요청 이벤트 구독
         val dataRequestSubscription =
-            acsEventBus.subscribeToType<ACSEvent.ICDEvent.SatelliteTrackDataRequested>().subscribe { event ->
-                // 데이터 요청에 응답하여 추가 데이터 전송
-                currentTrackingPassId?.let { passId ->
-                    // 요청된 시간 누적치에 따라 적절한 데이터 전송
-                    val requestData = event.requestData as ICDService.SatelliteTrackThree.GetDataFrame
-                    handleEphemerisTrackingDataRequest(requestData.timeAcc, requestData.requestDataLength)
-                }
-            }
+            acsEventBus.subscribeToType<ACSEvent.ICDEvent.SatelliteTrackDataRequested>().subscribe(
+                { event ->
+                    // 데이터 요청에 응답하여 추가 데이터 전송
+                    currentTrackingPassId?.let { passId ->
+                        // 요청된 시간 누적치에 따라 적절한 데이터 전송
+                        val requestData = event.requestData as ICDService.SatelliteTrackThree.GetDataFrame
+                        handleEphemerisTrackingDataRequest(requestData.timeAcc, requestData.requestDataLength)
+                    }
+                },
+                { error -> logger.error("위성 추적 데이터 요청 이벤트 처리 중 오류: {}", error.message, error) }
+            )
 
         // 구독 객체 저장
         subscriptions.add(headerSubscription)
@@ -1110,7 +1116,7 @@ class EphemerisService(
      * ✅ 모드 타이머 상태 확인 (기존 isTimerRunning() 메서드 수정)
      */
     fun isTimerRunning(): Boolean {
-        return trackingExecutor != null && modeTask != null && !modeTask!!.isCancelled
+        return trackingExecutor != null && modeTask?.isCancelled == false
     }
 
     /**
@@ -2714,10 +2720,11 @@ class EphemerisService(
         logger.info("timeAcc :${timeAcc}.")
         logger.info("requestDataLength :${requestDataLength}.")
         // ✅ MstId 필드 사용 (No 필드 제거)
-        val mstId = (currentTrackingPass!!["MstId"] as? Number)?.toLong() 
-            ?: (currentTrackingPass!!["No"] as? Number)?.toLong() 
+        val trackingPass = currentTrackingPass ?: throw IllegalStateException("추적 데이터가 없습니다")
+        val mstId = (trackingPass["MstId"] as? Number)?.toLong()
+            ?: (trackingPass["No"] as? Number)?.toLong()
             ?: throw IllegalStateException("MstId가 없습니다")
-        val detailId = (currentTrackingPass!!["DetailId"] as? Number)?.toInt() ?: 0  // ✅ UInt → Int 변경 (PassSchedule과 동일)
+        val detailId = (trackingPass["DetailId"] as? Number)?.toInt() ?: 0  // ✅ UInt → Int 변경 (PassSchedule과 동일)
         logger.info("📡 데이터 요청 처리: mstId=${mstId}, detailId=${detailId}")
 
         // ✅ timeAcc를 인덱스로 변환 (timeAcc는 누적 시간 ms 단위, 인덱스는 100ms 단위)

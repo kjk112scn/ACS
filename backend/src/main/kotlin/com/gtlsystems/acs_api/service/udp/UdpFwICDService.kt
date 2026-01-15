@@ -192,10 +192,13 @@ class UdpFwICDService(
 
     /** 연결 재시도 스케줄링 */
     private fun scheduleReconnection() {
-        Mono.delay(Duration.ofSeconds(5)).subscribeOn(Schedulers.boundedElastic()).subscribe {
-            logger.info("UDP 연결 재시도 중...")
-            initializeUdpChannel()
-        }
+        Mono.delay(Duration.ofSeconds(5)).subscribeOn(Schedulers.boundedElastic()).subscribe(
+            {
+                logger.info("UDP 연결 재시도 중...")
+                initializeUdpChannel()
+            },
+            { error -> logger.error("UDP 연결 재시도 중 오류: {}", error.message, error) }
+        )
     }
 
     /** 실시간 UDP 데이터 수신 (논블로킹) */
@@ -930,7 +933,10 @@ class UdpFwICDService(
                                 // 100ms 후 다시 체크
                                 Mono.delay(Duration.ofMillis(100))
                                     .subscribeOn(Schedulers.boundedElastic())
-                                    .subscribe { this.run() }
+                                    .subscribe(
+                                        { this.run() },
+                                        { error -> logger.error("틸트 안정화 재체크 스케줄링 오류: {}", error.message, error) }
+                                    )
                             }
                         } catch (e: Exception) {
                             logger.error("틸트 안정화 체크 중 오류: {}", e.message, e)
@@ -1104,15 +1110,13 @@ class UdpFwICDService(
             if (::channel.isInitialized && channel.isOpen) {
                 channel.close()
             }
-
-            // 잠시 대기
-            Thread.sleep(1000)
-
-            // 재연결 시도
-            initializeUdpChannel()
-
-            logger.info("강제 재연결 완료")
         }
+            .delayElement(Duration.ofSeconds(1))  // 리액티브 방식 대기
+            .doOnNext {
+                // 재연결 시도
+                initializeUdpChannel()
+                logger.info("강제 재연결 완료")
+            }
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe(
                 { /* 성공 */ },

@@ -402,30 +402,36 @@ class PassScheduleService(
     private fun setupEventSubscriptions() {
         // ✅ 기존 이벤트 구독 로직 유지 (필드명 및 타입 변경)
         val headerSubscription =
-            acsEventBus.subscribeToType<ACSEvent.ICDEvent.SatelliteTrackHeaderReceived>().subscribe { event ->
-                val currentSchedule = getCurrentSelectedTrackingPassWithTime(GlobalData.Time.calUtcTimeOffsetTime)
-                currentSchedule?.let { schedule ->
-                    // ✅ "No" → "MstId" 변경, UInt → Long 변경
-                    val passId = (schedule["MstId"] as? Number)?.toLong()
-                    if (passId != null) {
-                        sendInitialTrackingData(passId)
+            acsEventBus.subscribeToType<ACSEvent.ICDEvent.SatelliteTrackHeaderReceived>().subscribe(
+                { event ->
+                    val currentSchedule = getCurrentSelectedTrackingPassWithTime(GlobalData.Time.calUtcTimeOffsetTime)
+                    currentSchedule?.let { schedule ->
+                        // ✅ "No" → "MstId" 변경, UInt → Long 변경
+                        val passId = (schedule["MstId"] as? Number)?.toLong()
+                        if (passId != null) {
+                            sendInitialTrackingData(passId)
+                        }
                     }
-                }
-            }
+                },
+                { error -> logger.error("위성 추적 헤더 이벤트 처리 중 오류: {}", error.message, error) }
+            )
 
         val dataRequestSubscription =
-            acsEventBus.subscribeToType<ACSEvent.ICDEvent.SatelliteTrackDataRequested>().subscribe { event ->
-                val currentSchedule = getCurrentSelectedTrackingPassWithTime(GlobalData.Time.calUtcTimeOffsetTime)
-                currentSchedule?.let { schedule ->
-                    // ✅ "No" → "MstId" 변경, UInt → Long 변경
-                    val passId = (schedule["MstId"] as? Number)?.toLong()
-                    if (passId != null) {
-                        val requestData = event.requestData as ICDService.SatelliteTrackThree.GetDataFrame
-                        // ✅ 최적화된 메서드 호출 (기존 인터페이스 유지)
-                        handleTrackingDataRequest(passId, requestData.timeAcc, requestData.requestDataLength)
+            acsEventBus.subscribeToType<ACSEvent.ICDEvent.SatelliteTrackDataRequested>().subscribe(
+                { event ->
+                    val currentSchedule = getCurrentSelectedTrackingPassWithTime(GlobalData.Time.calUtcTimeOffsetTime)
+                    currentSchedule?.let { schedule ->
+                        // ✅ "No" → "MstId" 변경, UInt → Long 변경
+                        val passId = (schedule["MstId"] as? Number)?.toLong()
+                        if (passId != null) {
+                            val requestData = event.requestData as ICDService.SatelliteTrackThree.GetDataFrame
+                            // ✅ 최적화된 메서드 호출 (기존 인터페이스 유지)
+                            handleTrackingDataRequest(passId, requestData.timeAcc, requestData.requestDataLength)
+                        }
                     }
-                }
-            }
+                },
+                { error -> logger.error("위성 추적 데이터 요청 이벤트 처리 중 오류: {}", error.message, error) }
+            )
 
         subscriptions.add(headerSubscription)
         subscriptions.add(dataRequestSubscription)
@@ -715,8 +721,8 @@ class PassScheduleService(
                     
                     PreparingStep.MOVING_TRAIN -> {
                         // Train 회전 중
-                        if (preparingPassId != null) {
-                            val selectedPass = getTrackingPassMst(preparingPassId!!)
+                        preparingPassId?.let { passId ->
+                            val selectedPass = getTrackingPassMst(passId)
                             val isKeyhole = selectedPass?.get("IsKeyhole") as? Boolean ?: false
                             val recommendedTrainAngle = selectedPass?.get("RecommendedTrainAngle") as? Double ?: 0.0
                             
@@ -920,22 +926,26 @@ class PassScheduleService(
 
             // 추적 종료 (로깅만)
             lastDisplayedSchedule != null && currentSchedule == null -> {
-                outputTrackingEnd(lastDisplayedSchedule!!, calTime)
+                lastDisplayedSchedule?.let { lastSchedule ->
+                    outputTrackingEnd(lastSchedule, calTime)
 
-                val nextSchedule = getNextSelectedTrackingPassWithTime(calTime)
-                if (nextSchedule != null) {
-                    outputUpcomingScheduleInfo(nextSchedule, calTime)
-                } else {
-                    outputScheduleFixed(lastDisplayedSchedule!!, calTime)
+                    val nextSchedule = getNextSelectedTrackingPassWithTime(calTime)
+                    if (nextSchedule != null) {
+                        outputUpcomingScheduleInfo(nextSchedule, calTime)
+                    } else {
+                        outputScheduleFixed(lastSchedule, calTime)
+                    }
                 }
             }
 
             // 추적 변경 (로깅만)
             lastDisplayedSchedule != null && currentSchedule != null &&
                     // ✅ "No" → "MstId" 변경
-                    lastDisplayedSchedule!!["MstId"] != currentSchedule["MstId"] -> {
-                outputScheduleChange(lastDisplayedSchedule!!, currentSchedule, calTime)
-                outputNextScheduleInfo(calTime)
+                    lastDisplayedSchedule?.get("MstId") != currentSchedule["MstId"] -> {
+                lastDisplayedSchedule?.let { lastSchedule ->
+                    outputScheduleChange(lastSchedule, currentSchedule, calTime)
+                    outputNextScheduleInfo(calTime)
+                }
             }
         }
         lastDisplayedSchedule = currentSchedule

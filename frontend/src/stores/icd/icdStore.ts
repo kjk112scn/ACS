@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, onScopeDispose, readonly } from 'vue'
+import { ref, shallowRef, computed, onScopeDispose, readonly } from 'vue'
 import { icdService, type MessageData, type MultiControlCommand } from '@/services'
 import type { HardwareErrorLog } from '@/types/hardwareError'
 import { useI18n } from 'vue-i18n'
@@ -305,8 +305,8 @@ export const useICDStore = defineStore('icd', () => {
   const udpConnected = ref<boolean>(false)
   const lastUdpUpdateTime = ref<string>('')
 
-  // 에러 데이터 상태
-  const errorStatusBarData = ref<{
+  // 에러 데이터 상태 (shallowRef: 전체 객체 교체로 업데이트)
+  const errorStatusBarData = shallowRef<{
     activeErrorCount: number
     latestError: {
       id: string
@@ -322,7 +322,7 @@ export const useICDStore = defineStore('icd', () => {
     } | null
     hasNewErrors: boolean
   } | null>(null)
-  const errorPopupData = ref<{
+  const errorPopupData = shallowRef<{
     isInitialLoad: boolean
     newLogs: {
       id: string
@@ -1264,8 +1264,8 @@ export const useICDStore = defineStore('icd', () => {
   const updateCount = ref(0)
   const lastUpdateTime = ref(0)
 
-  // 최신 데이터 버퍼 (WebSocket에서 받은 데이터 임시 저장)
-  const latestDataBuffer = ref<MessageData | null>(null)
+  // 최신 데이터 버퍼 (WebSocket에서 받은 데이터 임시 저장, shallowRef: 30ms마다 전체 교체)
+  const latestDataBuffer = shallowRef<MessageData | null>(null)
   const bufferUpdateTime = ref(0)
 
   const hasActiveConnection = computed(() => isConnected.value && isUpdating.value)

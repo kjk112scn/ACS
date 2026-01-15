@@ -168,14 +168,20 @@ class LoggingController(
     ): ResponseEntity<ByteArray> {
         return try {
             logger.info("로그 파일 다운로드 요청: $fileName")
-            
-            val filePath = Paths.get(LOGS_DIRECTORY, fileName)
-            val archivePath = Paths.get(LOG_ARCHIVE_DIRECTORY, fileName)
-            
+
+            // Path Traversal 공격 방지: 파일명 검증
+            val logsBaseDir = Paths.get(LOGS_DIRECTORY).normalize().toAbsolutePath()
+            val archiveBaseDir = Paths.get(LOG_ARCHIVE_DIRECTORY).normalize().toAbsolutePath()
+
+            val filePath = Paths.get(LOGS_DIRECTORY, fileName).normalize().toAbsolutePath()
+            val archivePath = Paths.get(LOG_ARCHIVE_DIRECTORY, fileName).normalize().toAbsolutePath()
+
             val targetPath = when {
-                Files.exists(filePath) -> filePath
-                Files.exists(archivePath) -> archivePath
-                else -> throw IllegalArgumentException("로그 파일을 찾을 수 없습니다: $fileName")
+                Files.exists(filePath) && filePath.startsWith(logsBaseDir) -> filePath
+                Files.exists(archivePath) && archivePath.startsWith(archiveBaseDir) -> archivePath
+                filePath.startsWith(logsBaseDir) || archivePath.startsWith(archiveBaseDir) ->
+                    throw IllegalArgumentException("로그 파일을 찾을 수 없습니다: $fileName")
+                else -> throw IllegalArgumentException("잘못된 파일 경로입니다: $fileName")
             }
             
             val fileBytes = Files.readAllBytes(targetPath)

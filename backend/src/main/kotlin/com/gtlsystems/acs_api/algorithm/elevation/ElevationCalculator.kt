@@ -68,17 +68,6 @@ class ElevationCalculator(
         )
     }
 
-    /**
-     * 동기 버전 - 두 API 결과 비교
-     */
-    fun getElevationComparisonBlocking(
-        latitude: Double,
-        longitude: Double,
-        googleApiKey: String? = null
-    ): ElevationComparison = kotlinx.coroutines.runBlocking {
-        getElevationComparison(latitude, longitude, googleApiKey)
-    }
-
     // 기존 함수들...
     suspend fun getElevationFromGoogle(
         latitude: Double,

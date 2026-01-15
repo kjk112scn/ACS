@@ -365,7 +365,7 @@ watch([selectedCategory, selectedSeverity, selectedResolvedStatus, startDate, en
   })
   // 필터 변경 시 첫 페이지부터 새로 로드
   void loadErrorLogsPage(0, true)
-}, { deep: true })
+})
 
 // ✅ 스크롤 이벤트 핸들러 - 무한 스크롤 지원
 const handleScroll = (event: Event) => {

@@ -1,6 +1,7 @@
 package com.gtlsystems.acs_api.config
 
 import jakarta.annotation.PostConstruct
+import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -525,63 +526,51 @@ class ThreadManager(
     }
     
     /**
-     * ✅ 쓰레드 풀 정리
+     * ✅ 쓰레드 풀 정리 (Graceful Shutdown)
      */
+    @PreDestroy
     fun shutdown() {
         logger.info("🔄 스레드 풀 정리 시작")
-        
-        // ✅ 기존 스레드 풀 정리
-        realtimeExecutor?.shutdown()
-        modeExecutor?.shutdown()
-        batchExecutor?.shutdown()
-        
-        // ✅ 통합 스레드 풀 정리
-        udpExecutor?.shutdown()
-        websocketExecutor?.shutdown()
-        trackingExecutor?.shutdown()
-        batchScheduler?.shutdown()
-        calculationExecutor?.shutdown()
-        
+
+        // ✅ 모든 스레드 풀 shutdown 요청
+        listOf(realtimeExecutor, modeExecutor, batchExecutor,
+               udpExecutor, websocketExecutor, trackingExecutor,
+               batchScheduler, calculationExecutor)
+            .filterNotNull()
+            .forEach { it.shutdown() }
+
         try {
-            // ✅ 기존 스레드 풀 종료 대기
-            if (!realtimeExecutor?.awaitTermination(5, TimeUnit.SECONDS)!!) {
-                realtimeExecutor?.shutdownNow()
-            }
-            if (!modeExecutor?.awaitTermination(5, TimeUnit.SECONDS)!!) {
-                modeExecutor?.shutdownNow()
-            }
-            if (!batchExecutor?.awaitTermination(5, TimeUnit.SECONDS)!!) {
-                batchExecutor?.shutdownNow()
-            }
-            
-            // ✅ 통합 스레드 풀 종료 대기
-            if (!udpExecutor?.awaitTermination(5, TimeUnit.SECONDS)!!) {
-                udpExecutor?.shutdownNow()
-            }
-            if (!websocketExecutor?.awaitTermination(5, TimeUnit.SECONDS)!!) {
-                websocketExecutor?.shutdownNow()
-            }
-            if (!trackingExecutor?.awaitTermination(5, TimeUnit.SECONDS)!!) {
-                trackingExecutor?.shutdownNow()
-            }
-            if (!batchScheduler?.awaitTermination(5, TimeUnit.SECONDS)!!) {
-                batchScheduler?.shutdownNow()
-            }
-            if (!calculationExecutor?.awaitTermination(5, TimeUnit.SECONDS)!!) {
-                calculationExecutor?.shutdownNow()
+            // ✅ 각 스레드 풀 종료 대기 (5초 타임아웃)
+            val executors = listOf(
+                "realtimeExecutor" to realtimeExecutor,
+                "modeExecutor" to modeExecutor,
+                "batchExecutor" to batchExecutor,
+                "udpExecutor" to udpExecutor,
+                "websocketExecutor" to websocketExecutor,
+                "trackingExecutor" to trackingExecutor,
+                "batchScheduler" to batchScheduler,
+                "calculationExecutor" to calculationExecutor
+            )
+
+            executors.forEach { (name, executor) ->
+                executor?.let {
+                    if (!it.awaitTermination(5, TimeUnit.SECONDS)) {
+                        logger.warn("⚠️ $name 타임아웃, 강제 종료")
+                        it.shutdownNow()
+                    }
+                }
             }
         } catch (e: InterruptedException) {
+            logger.warn("⚠️ 스레드 풀 종료 중단됨, 강제 종료 진행")
             // ✅ 강제 종료
-            realtimeExecutor?.shutdownNow()
-            modeExecutor?.shutdownNow()
-            batchExecutor?.shutdownNow()
-            udpExecutor?.shutdownNow()
-            websocketExecutor?.shutdownNow()
-            trackingExecutor?.shutdownNow()
-            batchScheduler?.shutdownNow()
-            calculationExecutor?.shutdownNow()
+            listOf(realtimeExecutor, modeExecutor, batchExecutor,
+                   udpExecutor, websocketExecutor, trackingExecutor,
+                   batchScheduler, calculationExecutor)
+                .filterNotNull()
+                .forEach { it.shutdownNow() }
+            Thread.currentThread().interrupt()
         }
-        
+
         logger.info("✅ 모든 스레드 풀 정리 완료")
     }
 } 

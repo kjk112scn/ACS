@@ -706,11 +706,22 @@ export const showComponentSelector = (): Promise<ComponentName | null> => {
         text-align: left;
       `
 
-      button.innerHTML = `
-        <div style="font-size: 2rem; margin-bottom: 0.5rem;">${config.icon}</div>
-        <div style="font-weight: bold; margin-bottom: 0.25rem;">${config.title}</div>
-        <div style="font-size: 0.9rem; opacity: 0.7;">${config.description || ''}</div>
-      `
+      // XSS 방지: innerHTML 대신 DOM API 사용
+      const iconDiv = document.createElement('div')
+      iconDiv.style.cssText = 'font-size: 2rem; margin-bottom: 0.5rem;'
+      iconDiv.textContent = config.icon
+
+      const titleDiv = document.createElement('div')
+      titleDiv.style.cssText = 'font-weight: bold; margin-bottom: 0.25rem;'
+      titleDiv.textContent = config.title
+
+      const descDiv = document.createElement('div')
+      descDiv.style.cssText = 'font-size: 0.9rem; opacity: 0.7;'
+      descDiv.textContent = config.description || ''
+
+      button.appendChild(iconDiv)
+      button.appendChild(titleDiv)
+      button.appendChild(descDiv)
 
       button.addEventListener('mouseenter', () => {
         button.style.background = '#4a4a4a'
@@ -818,7 +829,8 @@ export const showDisplayModeDialog = (
     `
 
     const title = document.createElement('h2')
-    title.innerHTML = `${config.icon} ${config.title}`
+    // XSS 방지: innerHTML 대신 textContent 사용
+    title.textContent = `${config.icon} ${config.title}`
     title.style.cssText = `
       color: white;
       margin: 0 0 1rem 0;
@@ -842,17 +854,32 @@ export const showDisplayModeDialog = (
       margin-bottom: 1rem;
     `
 
-    // 팝업 버튼
+    // 팝업 버튼 (XSS 방지: innerHTML 대신 DOM API 사용)
     const popupButton = document.createElement('button')
-    popupButton.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 1rem;">
-        <span style="font-size: 1.5rem;">🪟</span>
-        <div style="text-align: left;">
-          <div style="font-weight: bold;">새 창으로 열기</div>
-          <div style="font-size: 0.9rem; opacity: 0.7;">별도의 브라우저 창에서 열림</div>
-        </div>
-      </div>
-    `
+    const popupContent = document.createElement('div')
+    popupContent.style.cssText = 'display: flex; align-items: center; gap: 1rem;'
+
+    const popupIcon = document.createElement('span')
+    popupIcon.style.cssText = 'font-size: 1.5rem;'
+    popupIcon.textContent = '🪟'
+
+    const popupTextContainer = document.createElement('div')
+    popupTextContainer.style.cssText = 'text-align: left;'
+
+    const popupTitle = document.createElement('div')
+    popupTitle.style.cssText = 'font-weight: bold;'
+    popupTitle.textContent = '새 창으로 열기'
+
+    const popupDesc = document.createElement('div')
+    popupDesc.style.cssText = 'font-size: 0.9rem; opacity: 0.7;'
+    popupDesc.textContent = '별도의 브라우저 창에서 열림'
+
+    popupTextContainer.appendChild(popupTitle)
+    popupTextContainer.appendChild(popupDesc)
+    popupContent.appendChild(popupIcon)
+    popupContent.appendChild(popupTextContainer)
+    popupButton.appendChild(popupContent)
+
     popupButton.style.cssText = `
       background: #3a3a3a;
       border: 2px solid #555;
@@ -864,17 +891,32 @@ export const showDisplayModeDialog = (
       width: 100%;
     `
 
-    // 모달 버튼
+    // 모달 버튼 (XSS 방지: innerHTML 대신 DOM API 사용)
     const modalButton = document.createElement('button')
-    modalButton.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 1rem;">
-        <span style="font-size: 1.5rem;">🎭</span>
-        <div style="text-align: left;">
-          <div style="font-weight: bold;">모달로 열기</div>
-          <div style="font-size: 0.9rem; opacity: 0.7;">현재 창 위에 오버레이로 표시</div>
-        </div>
-      </div>
-    `
+    const modalContent = document.createElement('div')
+    modalContent.style.cssText = 'display: flex; align-items: center; gap: 1rem;'
+
+    const modalIcon = document.createElement('span')
+    modalIcon.style.cssText = 'font-size: 1.5rem;'
+    modalIcon.textContent = '🎭'
+
+    const modalTextContainer = document.createElement('div')
+    modalTextContainer.style.cssText = 'text-align: left;'
+
+    const modalTitle = document.createElement('div')
+    modalTitle.style.cssText = 'font-weight: bold;'
+    modalTitle.textContent = '모달로 열기'
+
+    const modalDesc = document.createElement('div')
+    modalDesc.style.cssText = 'font-size: 0.9rem; opacity: 0.7;'
+    modalDesc.textContent = '현재 창 위에 오버레이로 표시'
+
+    modalTextContainer.appendChild(modalTitle)
+    modalTextContainer.appendChild(modalDesc)
+    modalContent.appendChild(modalIcon)
+    modalContent.appendChild(modalTextContainer)
+    modalButton.appendChild(modalContent)
+
     modalButton.style.cssText = `
       background: #3a3a3a;
       border: 2px solid #555;

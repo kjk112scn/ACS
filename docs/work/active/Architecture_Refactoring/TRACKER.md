@@ -1,8 +1,20 @@
 # Refactoring Tracker (검증 완료)
 
-> **Last Updated**: 2026-01-15
-> **Status**: Sprint 0 Ready
+> **Last Updated**: 2026-01-15 18:00
+> **Status**: Phase 2 완료, CP3/CP4 테스트 대기
 > **Target**: 1/15~21 (전체 리팩토링 완료)
+
+---
+
+## 체크포인트 상태
+
+| CP | 시점 | 상태 | 비고 |
+|:--:|------|:----:|------|
+| CP1 | Sprint 0 완료 후 | ✅ 통과 | 보안 수정 확인 완료 |
+| CP2 | Phase 1 완료 후 | ✅ 통과 | BE 서버 정상 동작 확인 |
+| CP3 | P2-1 deep watch 후 | 🔄 테스트 대기 | FE 재시작 후 확인 필요 |
+| CP4 | P2-3 icdStore 후 | 🔄 테스트 대기 | FE 재시작 후 확인 필요 |
+| CP5 | P3 각 파일 분리 후 | ⏳ 대기 | 기능 동작 확인 |
 
 ---
 
@@ -10,14 +22,26 @@
 
 | Phase | Description | Status | Items | Progress |
 |-------|-------------|--------|-------|----------|
-| Sprint 0 | 보안 Critical | **Ready** | 3건 | 0/3 |
-| Phase 1 | BE 안정성 | Pending | 6 tasks | 0% |
-| Phase 2 | FE 성능 | Pending | 3 tasks | 0% |
+| Sprint 0 | 보안 Critical | ✅ Done | 3건 | 3/3 |
+| Phase 1 | BE 안정성 | ✅ Done | 6 tasks | 6/6 |
+| Phase 2 | FE 성능 | ✅ Done | 3 tasks | 3/3 |
+| 추가 | 로깅 유틸리티 | ✅ Done | 1 task | 1/1 |
 | Phase 4 | 품질 개선 | Pending | 2 tasks | 0% |
 | Phase 3 | FE 파일 분리 | Pending | 3 tasks | 0% |
 | Phase 5 | 키보드 단축키 | Pending | 2 tasks | 0% |
 | Phase 3 | BE 서비스 분리 | 🎯 1/20~21 | 1 task | 0% |
+| 별도 | DB 설계 (RFC-001) | 📋 대기 | 4 tables | 0% |
 | 장기 | 테스트/인증/Docker | 📅 개발 완료 후 | 4 tasks | - |
+
+---
+
+## 추가 작업 (재검토/별도)
+
+| 항목 | 상태 | 설명 |
+|------|------|------|
+| deep watch 기준 정립 | 📋 재검토 | Settings 컴포넌트 분석 필요 (적용 버튼 방식) |
+| 로깅 유틸리티 연계 | 📋 선택적 | 주요 스토어(icdStore, passScheduleStore) 교체 검토 |
+| DB 설계 (RFC-001) | 📋 별도 작업 | PostgreSQL + TimescaleDB, 4개 테이블 |
 
 ---
 
@@ -27,7 +51,7 @@
 
 | Item | File | Line | Status |
 |------|------|------|--------|
-| [ ] | LoggingController.kt | 172-173 | Not Started |
+| [x] | LoggingController.kt | 172-173 | ✅ Done |
 
 **수정 내용**: 파일명 검증 추가
 ```kotlin
@@ -43,7 +67,7 @@ if (!normalizedPath.startsWith(Paths.get(LOGS_DIRECTORY).normalize())) {
 
 | Item | File | Line | Status |
 |------|------|------|--------|
-| [ ] | CorsConfig.kt | 26 | Not Started |
+| [x] | CorsConfig.kt | 26 | ✅ Done |
 
 **수정 내용**: `"*"` 제거
 
@@ -53,10 +77,10 @@ if (!normalizedPath.startsWith(Paths.get(LOGS_DIRECTORY).normalize())) {
 
 | Item | File | Line | Status |
 |------|------|------|--------|
-| [ ] | windowUtils.ts | 709 | Not Started |
-| [ ] | windowUtils.ts | 821 | Not Started |
-| [ ] | windowUtils.ts | 847 | Not Started |
-| [ ] | windowUtils.ts | 869 | Not Started |
+| [x] | windowUtils.ts | 709 | ✅ Done |
+| [x] | windowUtils.ts | 821 | ✅ Done |
+| [x] | windowUtils.ts | 847 | ✅ Done |
+| [x] | windowUtils.ts | 869 | ✅ Done |
 
 **수정 내용**: `innerHTML` → `textContent` 또는 DOM API
 
@@ -369,7 +393,15 @@ export function useKeyboardNavigation(options: KeyboardOptions) {
 |------|-------|------|--------|-------|
 | 2026-01-15 | Setup | 문서 재구성 | Done | Legacy 이동, 새 문서 생성 |
 | 2026-01-15 | Analysis | 코드 검증 | Done | Legacy 46건 → 실제 7건 확인 |
-| - | - | - | - | - |
+| 2026-01-15 | Sprint 0 | 보안 수정 (3건) | Done | Path Traversal, CORS, XSS |
+| 2026-01-15 | CP1 | 테스트 | Pass | 보안 수정 확인 완료 |
+| 2026-01-15 | Phase 1 | BE 안정성 (6건) | Done | !!, Thread.sleep, runBlocking, GlobalData, subscribe, Shutdown |
+| 2026-01-15 | CP2 | 테스트 | Pass | 서버 시작, UDP 연결, FE 표시 정상 |
+| 2026-01-15 | P2-1 | deep watch 분석 | Done | 34건 중 1건만 제거 가능 (HardwareErrorLogPanel) |
+| 2026-01-15 | P2-2 | console.log 설정 | Done | Production 빌드 시 자동 제거 설정 |
+| 2026-01-15 | P2-3 | icdStore shallowRef | Done | 3개 객체 변환 (errorStatusBarData, errorPopupData, latestDataBuffer) |
+| 2026-01-15 | 추가 | 로깅 유틸리티 | Done | logger.ts 생성 (debug/info/warn/error) |
+| 2026-01-15 | - | **중단** | - | CP3/CP4 테스트 대기, 재검토 항목 정리 |
 
 ---
 

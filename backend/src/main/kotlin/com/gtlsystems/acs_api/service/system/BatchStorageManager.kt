@@ -7,6 +7,7 @@ import com.gtlsystems.acs_api.service.system.LoggingService
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import jakarta.annotation.PostConstruct
+import jakarta.annotation.PreDestroy
 import java.time.ZonedDateTime
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
@@ -279,8 +280,9 @@ class BatchStorageManager(
     }
 
     /**
-     * ✅ 안전한 배치 종료 처리
+     * ✅ 안전한 배치 종료 처리 (Graceful Shutdown)
      */
+    @PreDestroy
     fun safeShutdown(): Boolean {
         try {
             logger.info("🔄 안전한 배치 종료 처리 시작")
@@ -291,6 +293,8 @@ class BatchStorageManager(
                 forceProcessBatch()
                 var waitCount = 0
                 while (waitCount < 50) { // 50 * 100ms = 5초
+                    // Note: Shutdown context에서는 blocking 대기가 필요 (리액티브 변환 불필요)
+                    @Suppress("BlockingMethodInNonBlockingContext")
                     Thread.sleep(100)
                     val newStatus = getBatchStatus()
                     val newBufferSize = newStatus["bufferSize"] as? Int ?: 0

@@ -73,6 +73,12 @@ export default function (ctx) {
           '@/composables': path.resolve(__dirname, './src/composables'),
           '@/i18n': path.resolve(__dirname, './src/i18n'),
         }
+
+        // Production 빌드에서 console.log, console.debug 자동 제거
+        if (ctx.prod) {
+          viteConf.esbuild = viteConf.esbuild || {}
+          viteConf.esbuild.drop = ['console', 'debugger']
+        }
       },
       // viteVuePluginOptions: {},
 
