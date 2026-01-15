@@ -405,6 +405,58 @@ class EphemerisController(
         }
     }
 
+    /**
+     * 특정 MST 데이터를 CSV 파일로 직접 다운로드합니다.
+     * 브라우저에서 직접 다운로드 가능
+     */
+    @GetMapping("/export/csv/download", produces = ["text/csv"])
+    @Operation(
+        operationId = "downloadMstDataCsv",
+        tags = ["Mode - Ephemeris"],
+        summary = "특정 MST 데이터를 CSV 파일로 다운로드"
+    )
+    fun downloadMstDataToCsv(
+        @Parameter(description = "MST ID", required = true)
+        @RequestParam mstId: Long,
+        @Parameter(description = "Detail ID (패스 인덱스)", required = false)
+        @RequestParam(required = false) detailId: Int?
+    ): Mono<org.springframework.http.ResponseEntity<ByteArray>> {
+        return Mono.fromCallable {
+            try {
+                logger.info("📊 CSV 다운로드 요청: mstId=$mstId, detailId=$detailId")
+                val csvContent = ephemerisService.generateMstDataCsvContent(mstId, detailId)
+
+                if (csvContent.isNullOrEmpty()) {
+                    logger.warn("⚠️ MST ID $mstId 에 해당하는 데이터가 없습니다")
+                    return@fromCallable org.springframework.http.ResponseEntity
+                        .noContent()
+                        .build<ByteArray>()
+                }
+
+                val timestamp = java.time.LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+                val filename = "MST_${mstId}_Data_${timestamp}.csv"
+
+                // UTF-8 BOM + CSV 내용
+                val bom = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())
+                val csvBytes = csvContent.toByteArray(Charsets.UTF_8)
+                val fullContent = bom + csvBytes
+
+                logger.info("✅ CSV 다운로드 준비 완료: $filename (${csvBytes.size} bytes)")
+
+                org.springframework.http.ResponseEntity.ok()
+                    .header("Content-Disposition", "attachment; filename=\"$filename\"")
+                    .header("Content-Type", "text/csv; charset=UTF-8")
+                    .body(fullContent)
+            } catch (e: Exception) {
+                logger.error("CSV 다운로드 중 오류 발생: ${e.message}", e)
+                org.springframework.http.ResponseEntity
+                    .internalServerError()
+                    .build<ByteArray>()
+            }
+        }
+    }
+
     // ❌ 현재 사용하지 않음.
     // @PostMapping("/realtime-data/clear")
     // @Operation(

@@ -2667,35 +2667,47 @@ const openAxisTransformCalculator = () => {
   }
 }
 
-// 모든 MST 데이터를 CSV로 내보내기
+// ✅ 이론치 데이터를 백엔드에서 CSV로 다운로드 (선택된 스케줄만)
 const exportAllMstDataToCsv = async () => {
   if (isExportingCsv.value) {
     warning('이미 CSV 내보내기가 진행 중입니다. 잠시만 기다려주세요.')
     return
   }
 
+  // ✅ 선택된 스케줄 확인
+  const selectedSchedule = ephemerisStore.selectedSchedule
+  if (!selectedSchedule) {
+    warning('먼저 스케줄을 선택해주세요.')
+    return
+  }
+
+  // ✅ MST ID 추출 (숫자로 변환)
+  const rawMstId = selectedSchedule.MstId || selectedSchedule.mstId || selectedSchedule.No
+  if (!rawMstId) {
+    warning('선택된 스케줄의 MST ID를 찾을 수 없습니다.')
+    return
+  }
+  const mstId = Number(rawMstId)
+
+  const rawDetailId = selectedSchedule.DetailId || selectedSchedule.detailId
+  const detailId = rawDetailId ? Number(rawDetailId) : undefined
+
   isExportingCsv.value = true
 
   try {
-    info('이론치 데이터를 통합 CSV로 내보내는 중...')
+    const satelliteName = selectedSchedule.SatelliteName || selectedSchedule.SatelliteID || 'Unknown'
+    info(`${satelliteName} (MST ${mstId}) 이론치 데이터를 CSV로 다운로드 중...`)
 
-    // ✅ 기존 엔드포인트 사용 (이제 통합 CSV 생성)
-    const response = await ephemerisTrackService.exportAllMstDataToCsv()
+    // ✅ 백엔드 API를 통해 선택된 MST ID 데이터만 다운로드
+    // (Original, AxisTransformed, FinalTransformed 포함)
+    await ephemerisTrackService.downloadMstDataToCsv(mstId, detailId)
 
-    if (response.success) {
-      console.log(`통합 이론치 데이터 내보내기 완료! 총 ${response.totalMstCount}개 MST, ${response.successCount}개 성공`)
+    success(`${satelliteName} 이론치 데이터 다운로드 완료!`)
+    console.log('이론치 CSV 다운로드 완료:', { mstId, detailId, satelliteName })
 
-      // ✅ 성공 메시지 개선
-      success(`통합 이론치 데이터 내보내기 완료! 총 ${response.totalMstCount}개 MST, ${response.successCount}개 성공`)
-
-      console.log('통합 CSV 내보내기 결과:', response)
-    } else {
-      console.error(`통합 이론치 데이터 내보내기 실패: ${response.error || '알 수 없는 오류'}`)
-      error(`통합 이론치 데이터 내보내기 실패: ${response.error || '알 수 없는 오류'}`)
-    }
-  } catch (error) {
-    console.error('통합 CSV 내보내기 실패:', error)
-    error('통합 이론치 데이터 내보내기 중 오류가 발생했습니다')
+  } catch (err) {
+    console.error('이론치 CSV 다운로드 실패:', err)
+    error('이론치 데이터 다운로드 중 오류가 발생했습니다')
   } finally {
     isExportingCsv.value = false
   }

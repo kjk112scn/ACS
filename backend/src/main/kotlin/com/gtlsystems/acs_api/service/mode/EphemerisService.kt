@@ -4333,6 +4333,335 @@ class EphemerisService(
             )
         }
     }
+
+    /**
+     * 📊 특정 MST 데이터를 CSV 문자열로 생성 (브라우저 다운로드용)
+     * 선택된 스케줄의 MST ID만 처리하여 빠른 응답
+     */
+    fun generateMstDataCsvContent(mstId: Long, detailId: Int? = null): String? {
+        try {
+            logger.info("📊 MST ID $mstId 데이터를 CSV 문자열로 생성 시작")
+
+            // ✅ original 데이터에서 MST 정보 조회
+            val originalMstInfo = ephemerisTrackMstStorage.find {
+                (it["MstId"] as? Number)?.toLong() == mstId && it["DataType"] == "original"
+            }
+
+            if (originalMstInfo == null) {
+                logger.warn("⚠️ MST ID $mstId 의 original MST 정보를 찾을 수 없습니다")
+                return null
+            }
+
+            val actualDetailId = detailId ?: ((originalMstInfo["DetailId"] as? Number)?.toInt() ?: 0)
+            val satelliteName = originalMstInfo["SatelliteName"] as? String ?: "Unknown"
+
+            logger.info("📊 MST ID $mstId 처리: DetailId=$actualDetailId, SatelliteName=$satelliteName")
+
+            val originalDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "original", actualDetailId)
+            val axisTransformedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "axis_transformed", actualDetailId)
+            val finalTransformedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "final_transformed", actualDetailId)
+
+            if (originalDtl.isEmpty()) {
+                logger.warn("⚠️ MST ID $mstId 의 원본 DTL 데이터를 찾을 수 없습니다 (DetailId=$actualDetailId)")
+                return null
+            }
+
+            logger.info("📊 MST ID $mstId: Original=${originalDtl.size}, AxisTransformed=${axisTransformedDtl.size}, FinalTransformed=${finalTransformedDtl.size}")
+
+            val csvBuilder = StringBuilder()
+
+            // CSV 헤더 작성 (한국 시간 컬럼 추가)
+            csvBuilder.append("Index,Time_UTC,Time_KST,")
+            csvBuilder.append("Original_Azimuth,Original_Elevation,Original_Azimuth_Velocity,Original_Elevation_Velocity,")
+            csvBuilder.append("Original_Range,Original_Altitude,")
+            csvBuilder.append("AxisTransformed_Azimuth,AxisTransformed_Elevation,AxisTransformed_Azimuth_Velocity,AxisTransformed_Elevation_Velocity,")
+            csvBuilder.append("FinalTransformed_Azimuth,FinalTransformed_Elevation,FinalTransformed_Azimuth_Velocity,FinalTransformed_Elevation_Velocity,")
+            csvBuilder.append("Azimuth_Transformation_Error,Elevation_Transformation_Error\n")
+
+            val maxSize = maxOf(originalDtl.size, axisTransformedDtl.size, finalTransformedDtl.size)
+
+            for (i in 0 until maxSize) {
+                val originalPoint = if (i < originalDtl.size) originalDtl[i] else null
+                val axisTransformedPoint = if (i < axisTransformedDtl.size) axisTransformedDtl[i] else null
+                val finalTransformedPoint = if (i < finalTransformedDtl.size) finalTransformedDtl[i] else null
+
+                val originalTime = originalPoint?.get("Time") as? java.time.ZonedDateTime
+                val originalAz = originalPoint?.get("Azimuth") as? Double ?: 0.0
+                val originalEl = originalPoint?.get("Elevation") as? Double ?: 0.0
+                val originalRange = originalPoint?.get("Range") as? Double ?: 0.0
+                val originalAltitude = originalPoint?.get("Altitude") as? Double ?: 0.0
+
+                val axisTransformedAz = axisTransformedPoint?.get("Azimuth") as? Double ?: 0.0
+                val axisTransformedEl = axisTransformedPoint?.get("Elevation") as? Double ?: 0.0
+
+                val finalTransformedAz = finalTransformedPoint?.get("Azimuth") as? Double ?: 0.0
+                val finalTransformedEl = finalTransformedPoint?.get("Elevation") as? Double ?: 0.0
+
+                // 각 변환 단계별 각속도 계산
+                var originalAzimuthVelocity = 0.0
+                var originalElevationVelocity = 0.0
+                var axisTransformedAzimuthVelocity = 0.0
+                var axisTransformedElevationVelocity = 0.0
+                var finalTransformedAzimuthVelocity = 0.0
+                var finalTransformedElevationVelocity = 0.0
+
+                if (i >= 9 && axisTransformedDtl.isNotEmpty() && finalTransformedDtl.isNotEmpty()) {
+                    var currentOriginalAzSum = 0.0
+                    var currentOriginalElSum = 0.0
+                    var currentAxisTransformedAzSum = 0.0
+                    var currentAxisTransformedElSum = 0.0
+                    var currentFinalTransformedAzSum = 0.0
+                    var currentFinalTransformedElSum = 0.0
+
+                    for (j in (i - 9)..i) {
+                        if (j > 0 && j < originalDtl.size && j < axisTransformedDtl.size && j < finalTransformedDtl.size) {
+                            val prevOriginalAz = originalDtl[j - 1]["Azimuth"] as? Double ?: 0.0
+                            val currentOriginalAz = originalDtl[j]["Azimuth"] as? Double ?: 0.0
+                            val prevOriginalEl = originalDtl[j - 1]["Elevation"] as? Double ?: 0.0
+                            val currentOriginalEl = originalDtl[j]["Elevation"] as? Double ?: 0.0
+                            var azDiffOriginal = currentOriginalAz - prevOriginalAz
+                            if (azDiffOriginal > 180) azDiffOriginal -= 360
+                            if (azDiffOriginal < -180) azDiffOriginal += 360
+                            currentOriginalAzSum += kotlin.math.abs(azDiffOriginal)
+                            currentOriginalElSum += kotlin.math.abs(currentOriginalEl - prevOriginalEl)
+
+                            val prevAxisAz = axisTransformedDtl[j - 1]["Azimuth"] as? Double ?: 0.0
+                            val currentAxisAz = axisTransformedDtl[j]["Azimuth"] as? Double ?: 0.0
+                            val prevAxisEl = axisTransformedDtl[j - 1]["Elevation"] as? Double ?: 0.0
+                            val currentAxisEl = axisTransformedDtl[j]["Elevation"] as? Double ?: 0.0
+                            var azDiffAxis = currentAxisAz - prevAxisAz
+                            if (azDiffAxis > 180) azDiffAxis -= 360
+                            if (azDiffAxis < -180) azDiffAxis += 360
+                            currentAxisTransformedAzSum += kotlin.math.abs(azDiffAxis)
+                            currentAxisTransformedElSum += kotlin.math.abs(currentAxisEl - prevAxisEl)
+
+                            val prevFinalAz = finalTransformedDtl[j - 1]["Azimuth"] as? Double ?: 0.0
+                            val currentFinalAz = finalTransformedDtl[j]["Azimuth"] as? Double ?: 0.0
+                            val prevFinalEl = finalTransformedDtl[j - 1]["Elevation"] as? Double ?: 0.0
+                            val currentFinalEl = finalTransformedDtl[j]["Elevation"] as? Double ?: 0.0
+                            var azDiffFinal = currentFinalAz - prevFinalAz
+                            if (azDiffFinal > 180) azDiffFinal -= 360
+                            if (azDiffFinal < -180) azDiffFinal += 360
+                            currentFinalTransformedAzSum += kotlin.math.abs(azDiffFinal)
+                            currentFinalTransformedElSum += kotlin.math.abs(currentFinalEl - prevFinalEl)
+                        }
+                    }
+
+                    originalAzimuthVelocity = currentOriginalAzSum
+                    originalElevationVelocity = currentOriginalElSum
+                    axisTransformedAzimuthVelocity = currentAxisTransformedAzSum
+                    axisTransformedElevationVelocity = currentAxisTransformedElSum
+                    finalTransformedAzimuthVelocity = currentFinalTransformedAzSum
+                    finalTransformedElevationVelocity = currentFinalTransformedElSum
+                }
+
+                val azimuthTransformationError = finalTransformedAz - originalAz
+                val elevationTransformationError = finalTransformedEl - originalEl
+
+                // UTC 시간 포맷
+                val timeStringUtc = originalTime?.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")) ?: ""
+                // KST 시간 포맷 (UTC+9)
+                val timeStringKst = originalTime?.plusHours(9)?.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")) ?: ""
+
+                csvBuilder.append("$i,$timeStringUtc,$timeStringKst,")
+                csvBuilder.append("${String.format("%.6f", originalAz)},${String.format("%.6f", originalEl)},${String.format("%.6f", originalAzimuthVelocity)},${String.format("%.6f", originalElevationVelocity)},")
+                csvBuilder.append("${String.format("%.6f", originalRange)},${String.format("%.6f", originalAltitude)},")
+                csvBuilder.append("${String.format("%.6f", axisTransformedAz)},${String.format("%.6f", axisTransformedEl)},${String.format("%.6f", axisTransformedAzimuthVelocity)},${String.format("%.6f", axisTransformedElevationVelocity)},")
+                csvBuilder.append("${String.format("%.6f", finalTransformedAz)},${String.format("%.6f", finalTransformedEl)},${String.format("%.6f", finalTransformedAzimuthVelocity)},${String.format("%.6f", finalTransformedElevationVelocity)},")
+                csvBuilder.append("${String.format("%.6f", azimuthTransformationError)},${String.format("%.6f", elevationTransformationError)}\n")
+            }
+
+            logger.info("📊 CSV 문자열 생성 완료: MST ID $mstId, $maxSize 행")
+            return csvBuilder.toString()
+
+        } catch (e: Exception) {
+            logger.error("❌ MST ID $mstId CSV 문자열 생성 중 오류: ${e.message}", e)
+            return null
+        }
+    }
+
+    /**
+     * 📊 모든 MST 데이터를 CSV 문자열로 생성 (브라우저 다운로드용)
+     * 파일 저장 없이 CSV 콘텐츠를 문자열로 반환
+     */
+    fun generateAllMstDataCsvContent(): String? {
+        try {
+            logger.info("📊 모든 MST 데이터를 CSV 문자열로 생성 시작")
+
+            // ✅ 중복 방지: original 데이터만 사용하여 MstId 추출
+            logger.info("🔍 디버그: ephemerisTrackMstStorage 총 개수: ${ephemerisTrackMstStorage.size}")
+            val originalMstData = ephemerisTrackMstStorage.filter { it["DataType"] == "original" }
+            logger.info("🔍 디버그: original 데이터 개수: ${originalMstData.size}")
+
+            val allMstIds = originalMstData.mapNotNull { (it["MstId"] as? Number)?.toLong() }.distinct().sorted()
+            if (allMstIds.isEmpty()) {
+                logger.warn("⚠️ 추출할 MST 데이터가 없습니다")
+                return null
+            }
+
+            logger.info("총 ${allMstIds.size}개의 MST ID 발견 - CSV 문자열 생성: $allMstIds")
+
+            val csvBuilder = StringBuilder()
+
+            // CSV 헤더 작성 (한국 시간 컬럼 추가)
+            csvBuilder.append("MST_ID,Satellite_Name,Index,Time_UTC,Time_KST,")
+            csvBuilder.append("Original_Azimuth,Original_Elevation,Original_Azimuth_Velocity,Original_Elevation_Velocity,")
+            csvBuilder.append("Original_Range,Original_Altitude,")
+            csvBuilder.append("AxisTransformed_Azimuth,AxisTransformed_Elevation,AxisTransformed_Azimuth_Velocity,AxisTransformed_Elevation_Velocity,")
+            csvBuilder.append("FinalTransformed_Azimuth,FinalTransformed_Elevation,FinalTransformed_Azimuth_Velocity,FinalTransformed_Elevation_Velocity,")
+            csvBuilder.append("Azimuth_Transformation_Error,Elevation_Transformation_Error\n")
+
+            var totalRows = 0
+            var processedMstCount = 0
+
+            allMstIds.forEach { mstId ->
+                try {
+                    // ✅ original 데이터에서 MST 정보 조회
+                    val originalMstInfo = ephemerisTrackMstStorage.find {
+                        (it["MstId"] as? Number)?.toLong() == mstId && it["DataType"] == "original"
+                    }
+
+                    if (originalMstInfo == null) {
+                        logger.warn("⚠️ MST ID $mstId 의 original MST 정보를 찾을 수 없습니다")
+                        return@forEach
+                    }
+
+                    val detailId = (originalMstInfo["DetailId"] as? Number)?.toInt() ?: 0
+                    val satelliteName = originalMstInfo["SatelliteName"] as? String ?: "Unknown"
+
+                    logger.info("📊 MST ID $mstId 처리 중: DetailId=$detailId, SatelliteName=$satelliteName")
+
+                    val originalDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "original", detailId)
+                    val axisTransformedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "axis_transformed", detailId)
+                    val finalTransformedDtl = getEphemerisTrackDtlByMstIdAndDataType(mstId, "final_transformed", detailId)
+
+                    if (originalDtl.isEmpty()) {
+                        logger.warn("⚠️ MST ID $mstId 의 원본 DTL 데이터를 찾을 수 없습니다 (DetailId=$detailId)")
+                        return@forEach
+                    }
+
+                    logger.info("📊 MST ID $mstId: Original=${originalDtl.size}, AxisTransformed=${axisTransformedDtl.size}, FinalTransformed=${finalTransformedDtl.size}")
+
+                    val maxSize = maxOf(originalDtl.size, axisTransformedDtl.size, finalTransformedDtl.size)
+
+                    for (i in 0 until maxSize) {
+                        val originalPoint = if (i < originalDtl.size) originalDtl[i] else null
+                        val axisTransformedPoint = if (i < axisTransformedDtl.size) axisTransformedDtl[i] else null
+                        val finalTransformedPoint = if (i < finalTransformedDtl.size) finalTransformedDtl[i] else null
+
+                        val originalTime = originalPoint?.get("Time") as? java.time.ZonedDateTime
+                        val originalAz = originalPoint?.get("Azimuth") as? Double ?: 0.0
+                        val originalEl = originalPoint?.get("Elevation") as? Double ?: 0.0
+                        val originalRange = originalPoint?.get("Range") as? Double ?: 0.0
+                        val originalAltitude = originalPoint?.get("Altitude") as? Double ?: 0.0
+
+                        val axisTransformedAz = axisTransformedPoint?.get("Azimuth") as? Double ?: 0.0
+                        val axisTransformedEl = axisTransformedPoint?.get("Elevation") as? Double ?: 0.0
+
+                        val finalTransformedAz = finalTransformedPoint?.get("Azimuth") as? Double ?: 0.0
+                        val finalTransformedEl = finalTransformedPoint?.get("Elevation") as? Double ?: 0.0
+
+                        // 각 변환 단계별 각속도 계산
+                        var originalAzimuthVelocity = 0.0
+                        var originalElevationVelocity = 0.0
+                        var axisTransformedAzimuthVelocity = 0.0
+                        var axisTransformedElevationVelocity = 0.0
+                        var finalTransformedAzimuthVelocity = 0.0
+                        var finalTransformedElevationVelocity = 0.0
+
+                        if (i >= 9) {
+                            var currentOriginalAzSum = 0.0
+                            var currentOriginalElSum = 0.0
+                            var currentAxisTransformedAzSum = 0.0
+                            var currentAxisTransformedElSum = 0.0
+                            var currentFinalTransformedAzSum = 0.0
+                            var currentFinalTransformedElSum = 0.0
+
+                            for (j in (i - 9)..i) {
+                                if (j > 0 && j < originalDtl.size && j < axisTransformedDtl.size && j < finalTransformedDtl.size) {
+                                    val prevOriginalPoint = originalDtl[j - 1]
+                                    val currentOriginalPoint = originalDtl[j]
+                                    val prevAxisTransformedPoint = axisTransformedDtl[j - 1]
+                                    val currentAxisTransformedPoint = axisTransformedDtl[j]
+                                    val prevFinalTransformedPoint = finalTransformedDtl[j - 1]
+                                    val currentFinalTransformedPoint = finalTransformedDtl[j]
+
+                                    val prevOriginalAz = prevOriginalPoint["Azimuth"] as? Double ?: 0.0
+                                    val currentOriginalAz = currentOriginalPoint["Azimuth"] as? Double ?: 0.0
+                                    val prevOriginalEl = prevOriginalPoint["Elevation"] as? Double ?: 0.0
+                                    val currentOriginalEl = currentOriginalPoint["Elevation"] as? Double ?: 0.0
+                                    var azDiffOriginal = currentOriginalAz - prevOriginalAz
+                                    if (azDiffOriginal > 180) azDiffOriginal -= 360
+                                    if (azDiffOriginal < -180) azDiffOriginal += 360
+                                    currentOriginalAzSum += kotlin.math.abs(azDiffOriginal)
+                                    currentOriginalElSum += kotlin.math.abs(currentOriginalEl - prevOriginalEl)
+
+                                    val prevAxisTransformedAz = prevAxisTransformedPoint["Azimuth"] as? Double ?: 0.0
+                                    val currentAxisTransformedAz = currentAxisTransformedPoint["Azimuth"] as? Double ?: 0.0
+                                    val prevAxisTransformedEl = prevAxisTransformedPoint["Elevation"] as? Double ?: 0.0
+                                    val currentAxisTransformedEl = currentAxisTransformedPoint["Elevation"] as? Double ?: 0.0
+                                    var azDiffAxis = currentAxisTransformedAz - prevAxisTransformedAz
+                                    if (azDiffAxis > 180) azDiffAxis -= 360
+                                    if (azDiffAxis < -180) azDiffAxis += 360
+                                    currentAxisTransformedAzSum += kotlin.math.abs(azDiffAxis)
+                                    currentAxisTransformedElSum += kotlin.math.abs(currentAxisTransformedEl - prevAxisTransformedEl)
+
+                                    val prevFinalTransformedAz = prevFinalTransformedPoint["Azimuth"] as? Double ?: 0.0
+                                    val currentFinalTransformedAz = currentFinalTransformedPoint["Azimuth"] as? Double ?: 0.0
+                                    val prevFinalTransformedEl = prevFinalTransformedPoint["Elevation"] as? Double ?: 0.0
+                                    val currentFinalTransformedEl = currentFinalTransformedPoint["Elevation"] as? Double ?: 0.0
+                                    var azDiffFinal = currentFinalTransformedAz - prevFinalTransformedAz
+                                    if (azDiffFinal > 180) azDiffFinal -= 360
+                                    if (azDiffFinal < -180) azDiffFinal += 360
+                                    currentFinalTransformedAzSum += kotlin.math.abs(azDiffFinal)
+                                    currentFinalTransformedElSum += kotlin.math.abs(currentFinalTransformedEl - prevFinalTransformedEl)
+                                }
+                            }
+
+                            originalAzimuthVelocity = currentOriginalAzSum
+                            originalElevationVelocity = currentOriginalElSum
+                            axisTransformedAzimuthVelocity = currentAxisTransformedAzSum
+                            axisTransformedElevationVelocity = currentAxisTransformedElSum
+                            finalTransformedAzimuthVelocity = currentFinalTransformedAzSum
+                            finalTransformedElevationVelocity = currentFinalTransformedElSum
+                        }
+
+                        val azimuthTransformationError = finalTransformedAz - originalAz
+                        val elevationTransformationError = finalTransformedEl - originalEl
+
+                        // UTC 시간 포맷
+                        val timeStringUtc = originalTime?.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")) ?: ""
+
+                        // KST 시간 포맷 (UTC+9)
+                        val timeStringKst = originalTime?.plusHours(9)?.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")) ?: ""
+
+                        csvBuilder.append("$mstId,$satelliteName,$i,$timeStringUtc,$timeStringKst,")
+                        csvBuilder.append("${String.format("%.6f", originalAz)},${String.format("%.6f", originalEl)},${String.format("%.6f", originalAzimuthVelocity)},${String.format("%.6f", originalElevationVelocity)},")
+                        csvBuilder.append("${String.format("%.6f", originalRange)},${String.format("%.6f", originalAltitude)},")
+                        csvBuilder.append("${String.format("%.6f", axisTransformedAz)},${String.format("%.6f", axisTransformedEl)},${String.format("%.6f", axisTransformedAzimuthVelocity)},${String.format("%.6f", axisTransformedElevationVelocity)},")
+                        csvBuilder.append("${String.format("%.6f", finalTransformedAz)},${String.format("%.6f", finalTransformedEl)},${String.format("%.6f", finalTransformedAzimuthVelocity)},${String.format("%.6f", finalTransformedElevationVelocity)},")
+                        csvBuilder.append("${String.format("%.6f", azimuthTransformationError)},${String.format("%.6f", elevationTransformationError)}\n")
+
+                        totalRows++
+                    }
+
+                    processedMstCount++
+                    logger.info("✅ MST ID $mstId 데이터 처리 완료")
+
+                } catch (e: Exception) {
+                    logger.error("❌ MST ID $mstId 처리 중 오류: ${e.message}", e)
+                }
+            }
+
+            logger.info("📊 CSV 문자열 생성 완료: $processedMstCount MST, $totalRows 행")
+            return csvBuilder.toString()
+
+        } catch (e: Exception) {
+            logger.error("❌ CSV 문자열 생성 중 오류: ${e.message}", e)
+            return null
+        }
+    }
+
     /**
      * ✅ MST 데이터를 CSV 파일로 내보내기 (개선된 버전 - 필터링 + Keyhole 대응)
      * 

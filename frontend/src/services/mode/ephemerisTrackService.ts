@@ -802,6 +802,48 @@ class EphemerisTrackService {
       throw error
     }
   }
+
+  /**
+   * 특정 MST 데이터를 CSV 파일로 브라우저에 직접 다운로드
+   * 선택된 스케줄의 MST ID만 처리하여 빠른 응답
+   */
+  async downloadMstDataToCsv(mstId: number, detailId?: number): Promise<void> {
+    try {
+      const params: { mstId: number; detailId?: number } = { mstId }
+      if (detailId !== undefined) {
+        params.detailId = detailId
+      }
+
+      const response = await api.get('/ephemeris/export/csv/download', {
+        params,
+        responseType: 'blob',
+      })
+
+      // Content-Disposition 헤더에서 파일명 추출
+      const contentDisposition = response.headers['content-disposition']
+      let filename = `MST_${mstId}_Data.csv`
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?([^";\n]+)"?/)
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1]
+        }
+      }
+
+      // Blob을 다운로드 링크로 변환
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('CSV 다운로드 실패:', error)
+      throw error
+    }
+  }
   async exportMstDataToCsv(
     mstId: number,
     outputDirectory: string = 'csv_exports',
