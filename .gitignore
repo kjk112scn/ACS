@@ -19,3 +19,12 @@ Desktop.ini
 
 # Claude Code temp folders
 tmpclaude-*
+
+# Local development files
+.mcp.json
+.claude/settings.local.json
+
+# Temporary analysis scripts
+analyze_*.sh
+analyze_*.txt
+check_*.sh
