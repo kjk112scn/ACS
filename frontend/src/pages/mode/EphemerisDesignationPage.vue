@@ -1,133 +1,17 @@
 <template>
   <div class="ephemeris-mode">
-    <!-- 1행: Offset Controls - 원본 형태로 복원하고 반응형 적용 -->
+    <!-- 1행: Offset Controls -->
     <div class="row q-col-gutter-md q-mb-sm offset-control-row">
       <div class="col-12">
-        <q-card flat bordered class="control-card">
-          <q-card-section class="compact-control purple-1">
-            <!-- 모든 간격이 동적으로 조정되는 반응형 레이아웃 -->
-            <div class="flexible-offset-layout">
-              <!-- Azimuth Offset -->
-              <div class="offset-group">
-                <div class="row q-gutter-xs align-center">
-                  <div class="col-auto position-offset-label">
-                    <div class="text-subtitle2 text-weight-bold text-primary text-center">
-                      Azimuth<br>Offset
-                    </div>
-                  </div>
-                  <div class="col-auto">
-                    <q-input v-model="inputs[0]" @input="(val: string) => onInputChange(0, val)" dense outlined
-                      type="number" step="0.01" label="Azimuth" class="offset-input" />
-                  </div>
-                  <div class="col-auto">
-                    <div class="vertical-button-group">
-                      <div class="vertical-buttons">
-                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
-                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
-                      </div>
-                      <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(0)" />
-                    </div>
-                  </div>
-                  <div class="col-auto">
-                    <q-input v-model="outputs[0]" dense outlined readonly label="Output"
-                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
-                  </div>
-                </div>
-              </div>
-
-              <!-- Elevation Offset -->
-              <div class="offset-group">
-                <div class="row q-gutter-xs align-center">
-                  <div class="col-auto position-offset-label">
-                    <div class="text-subtitle2 text-weight-bold text-primary text-center">
-                      Elevation<br>Offset
-                    </div>
-                  </div>
-                  <div class="col-auto">
-                    <q-input v-model="inputs[1]" @input="(val: string) => onInputChange(1, val)" dense outlined
-                      type="number" step="0.01" label="Elevation"
-                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
-                  </div>
-                  <div class="col-auto">
-                    <div class="vertical-button-group">
-                      <div class="vertical-buttons">
-                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(1)" />
-                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
-                      </div>
-                      <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(1)" />
-                    </div>
-                  </div>
-                  <div class="col-auto">
-                    <q-input v-model="outputs[1]" dense outlined readonly label="Output"
-                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
-                  </div>
-                </div>
-              </div>
-
-              <!-- Tilt Offset -->
-              <div class="offset-group">
-                <div class="row q-gutter-xs align-center">
-                  <div class="col-auto position-offset-label">
-                    <div class="text-subtitle2 text-weight-bold text-primary text-center">
-                      Tilt<br>Offset
-                    </div>
-                  </div>
-                  <div class="col-auto">
-                    <q-input v-model="inputs[2]" @input="(val: string) => onInputChange(2, val)" dense outlined
-                      type="number" step="0.01" label="Tilt"
-                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
-                  </div>
-                  <div class="col-auto">
-                    <div class="vertical-button-group">
-                      <div class="vertical-buttons">
-                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(2)" />
-                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
-                      </div>
-                      <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(2)" />
-                    </div>
-                  </div>
-                  <div class="col-auto">
-                    <q-input v-model="outputs[2]" dense outlined readonly label="Output"
-                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
-                  </div>
-                </div>
-              </div>
-
-              <!-- Time Offset + Cal Time -->
-              <div class="offset-group">
-                <div class="row q-gutter-xs align-center">
-                  <div class="col-auto position-offset-label">
-                    <div class="text-subtitle2 text-weight-bold text-primary text-center">
-                      Time<br>Offset
-                    </div>
-                  </div>
-                  <div class="col-auto">
-                    <q-input v-model="inputs[3]" @input="(val: string) => onInputChange(3, val)" dense outlined
-                      type="number" step="0.01" label="Time"
-                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
-                  </div>
-                  <div class="col-auto">
-                    <div class="vertical-button-group">
-                      <div class="vertical-buttons">
-                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(3)" />
-                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
-                      </div>
-                      <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(3)" />
-                    </div>
-                  </div>
-                  <div class="col-auto">
-                    <q-input v-model="outputs[3]" dense outlined readonly label="Result"
-                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
-                  </div>
-                  <div class="col-auto cal-time-field">
-                    <q-input v-model="formattedCalTime" dense outlined readonly label="Cal Time"
-                      style="min-width: 190px !important; max-width: 220px !important;" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </q-card-section>
-        </q-card>
+        <OffsetControls
+          :inputs="inputs"
+          :outputs="outputs"
+          :cal-time="formattedCalTime"
+          @input-change="onInputChange"
+          @increment="increment"
+          @decrement="decrement"
+          @reset="reset"
+        />
       </div>
     </div>
 
@@ -148,200 +32,40 @@
         </q-card>
       </div>
 
-      <!-- 2번 영역: 계산 정보 표시 영역 수정 -->
+      <!-- 2번 영역: 위성 추적 정보 -->
       <div class="col-12 col-md-3">
-        <q-card class="control-section">
-          <q-card-section>
-            <div class="row justify-between items-center q-mb-xs">
-              <div class="text-subtitle1 text-weight-bold text-primary">위성 추적 정보</div>
-              <div class="row items-center q-gutter-sm">
-                <span class="info-label">추적 상태:</span>
-                <q-chip :color="icdStore.ephemerisTrackingStateInfo.displayColor" text-color="white"
-                  :label="icdStore.ephemerisTrackingStateInfo.displayLabel" size="sm" class="tracking-status-chip" />
-              </div>
-            </div>
-
-            <div class="ephemeris-form">
-              <div class="form-row">
-                <!-- ✅ 정지궤도 정보 표시 -->
-                <div v-if="selectedScheduleInfo.isGeostationary" class="schedule-info q-mt-xs">
-                  <div class="text-subtitle2 text-weight-bold text-primary q-mb-xs">
-                    정지궤도 위성 정보
-                  </div>
-
-                  <div class="info-row">
-                    <span class="info-label">위성 이름/ID:</span>
-                    <span class="info-value">{{ selectedScheduleInfo.satelliteName }}</span>
-                  </div>
-
-                  <div class="info-row">
-                    <span class="info-label">방위각:</span>
-                    <span class="info-value">{{ safeToFixed(selectedScheduleInfo.startAzimuth, 2) }}°</span>
-                  </div>
-
-                  <div class="info-row">
-                    <span class="info-label">고도:</span>
-                    <span class="info-value">{{ safeToFixed(selectedScheduleInfo.startElevation, 2) }}°</span>
-                  </div>
-                </div>
-
-                <!-- ✅ 기존 스케줄 정보 표시 (정지궤도가 아닌 경우) -->
-                <div v-else-if="selectedScheduleInfo.satelliteName" class="schedule-info q-mt-xs">
-                  <div class="info-row">
-                    <span class="info-label">위성 이름/ID:</span>
-                    <span class="info-value">
-                      {{ selectedScheduleInfo.satelliteName }} / {{ selectedScheduleInfo.satelliteId }}
-                      <!-- KEYHOLE 배지 -->
-                      <q-badge v-if="selectedScheduleInfo.isKeyhole" color="red" class="q-ml-sm" label="KEYHOLE" />
-                    </span>
-                  </div>
-
-                  <div class="info-row">
-                    <span class="info-label">시작/종료 시간:</span>
-                    <span class="info-value">{{
-                      formatToLocalTime(selectedScheduleInfo.startTime)
-                      }} / {{
-                        formatToLocalTime(selectedScheduleInfo.endTime)
-                      }}</span>
-                  </div>
-
-                  <div class="info-row">
-                    <span class="info-label">지속 시간:</span>
-                    <span class="info-value">{{ formatDuration(selectedScheduleInfo.duration) }}</span>
-                  </div>
-
-                  <div class="info-row">
-                    <span class="info-label">시작/종료 방위각/고도:</span>
-                    <span class="info-value">{{ safeToFixed(selectedScheduleInfo.startAzimuth, 6) }}° / {{
-                      safeToFixed(selectedScheduleInfo.endAzimuth, 6) }}° / {{
-                        safeToFixed(selectedScheduleInfo.startElevation, 6) }}°</span>
-                  </div>
-
-                  <div class="info-row">
-                    <span class="info-label">최대 고도:</span>
-                    <span class="info-value">{{ safeToFixed(selectedScheduleInfo.maxElevation, 6) }}°</span>
-                  </div>
-
-                  <!-- KEYHOLE 정보 표시 -->
-                  <div v-if="selectedScheduleInfo.isKeyhole" class="keyhole-info q-mt-sm q-pa-sm"
-                    style="background-color: rgba(255, 0, 0, 0.1); border-left: 3px solid #f44336;">
-                    <div class="text-weight-bold text-red q-mb-xs">🚀 KEYHOLE 위성 정보</div>
-                    <div class="info-row">
-                      <span class="info-label">권장 Train 각도:</span>
-                      <span class="info-value text-positive">{{
-                        safeToFixed(selectedScheduleInfo.recommendedTrainAngle, 6)
-                        }}°</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">2축/3축/최적화 Azimuth 속도:</span>
-                      <span class="info-value text-red">
-                        {{ safeToFixed(selectedScheduleInfo.OriginalMaxAzRate ?? 0, 2) }} /
-                        {{ safeToFixed(selectedScheduleInfo.FinalTransformedMaxAzRate ?? 0, 2) }} /
-                        {{ safeToFixed(selectedScheduleInfo.KeyholeOptimizedFinalTransformedMaxAzRate ?? 0, 2) }}°/s
-                      </span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">2축/3축/최적화 Elevation 속도:</span>
-                      <span class="info-value text-red">
-                        {{ safeToFixed(selectedScheduleInfo.OriginalMaxElRate ?? 0, 2) }} /
-                        {{ safeToFixed(selectedScheduleInfo.FinalTransformedMaxElRate ?? 0, 2) }} /
-                        {{ safeToFixed(selectedScheduleInfo.KeyholeOptimizedFinalTransformedMaxElRate ?? 0, 2) }}°/s
-                      </span>
-                    </div>
-                  </div>
-
-                  <div class="info-row">
-                    <span class="info-label">남은 시간:</span>
-                    <span class="info-value" :class="{
-                      'text-negative': timeRemaining < 0,
-                      'text-positive': timeRemaining > 0,
-                      'text-grey': timeRemaining === 0,
-                    }">
-                      {{ formatTimeRemaining(timeRemaining) }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </q-card-section>
-        </q-card>
+        <SatelliteTrackingInfo
+          :tracking-state-info="icdStore.ephemerisTrackingStateInfo"
+          :schedule-info="selectedScheduleInfo"
+          :time-remaining-ms="timeRemaining"
+        />
       </div>
 
       <!-- 3번 영역: TLE Data -->
       <div class="col-12 col-md-6 schedule-control-col">
-        <q-card class="control-section">
-          <q-card-section class="schedule-control-section">
-            <!-- ✅ TLE Data 헤더 - PassSchedulePage.vue와 동일한 구조 -->
-            <div class="schedule-header">
-              <div class="text-subtitle1 text-weight-bold text-primary schedule-header-title">TLE Data</div>
-            </div>
-            <div class="tle-display q-mt-sm">
-              <pre class="tle-content">{{ tleData.displayText || 'No TLE data available' }}</pre>
-            </div>
-            <!-- ✅ 버튼 그룹을 하나로 통합 - PassSchedulePage.vue와 동일한 구조 -->
-            <div class="button-group">
-              <div class="button-row">
-                <q-btn color="primary" label="Text" icon="description" @click="openTLEModal" class="q-mr-sm upload-btn"
-                  size="sm" />
-                <q-btn color="primary" label="Select Schedule" icon="playlist_add_check" @click="openScheduleModal"
-                  class="upload-btn" size="sm" />
-              </div>
-              <div class="control-button-row">
-                <q-btn color="positive" icon="play_arrow" label="Go" @click="handleEphemerisCommand" class="control-btn"
-                  size="sm" />
-                <q-btn color="negative" icon="stop" label="Stop" @click="handleStopCommand" class="control-btn"
-                  size="sm" />
-                <q-btn color="warning" icon="home" label="Stow" @click="handleStowCommand" class="control-btn"
-                  size="sm" />
-              </div>
-              <div class="button-row">
-                <q-btn color="info" label="Axis Calculator" icon="calculate" @click="openAxisTransformCalculator"
-                  class="upload-btn" size="sm" />
-                <q-btn color="secondary" label="이론치 다운로드" icon="download" @click="exportAllMstDataToCsv"
-                  :loading="isExportingCsv" class="upload-btn" size="sm" />
-                <q-btn color="secondary" label="Download" icon="download" @click="downloadRealtimeData"
-                  class="upload-btn" size="sm" />
-              </div>
-            </div>
-          </q-card-section>
-        </q-card>
+        <TleDataSection
+          :tle-display-text="tleData.displayText || ''"
+          :is-exporting-csv="isExportingCsv"
+          @open-tle-modal="openTLEModal"
+          @open-schedule-modal="openScheduleModal"
+          @go-command="handleEphemerisCommand"
+          @stop-command="handleStopCommand"
+          @stow-command="handleStowCommand"
+          @open-axis-calculator="openAxisTransformCalculator"
+          @export-csv="exportAllMstDataToCsv"
+          @download-realtime-data="downloadRealtimeData"
+        />
       </div>
     </div>
   </div>
 
   <!-- TLE 입력 모달 -->
-  <q-dialog v-model="showTLEModal" persistent>
-    <q-card class="q-pa-md" style="width: 700px; max-width: 95vw">
-      <q-card-section class="bg-primary text-white">
-        <div class="text-h6">TLE 입력</div>
-      </q-card-section>
-
-      <q-card-section class="q-pa-md">
-        <div class="text-body2 q-mb-md">
-          2줄 또는 3줄 형식의 TLE 데이터를 입력하세요. 3줄 형식인 경우 첫 번째 줄은 위성 이름으로
-          처리됩니다.
-          <br />예시:
-          <pre class="q-mt-sm q-pa-sm bg-grey-9 text-white rounded-borders"
-            style="font-size: 0.8rem; white-space: pre-wrap">
-ISS (ZARYA)
-1 25544U 98067A   24054.51736111  .00020125  00000+0  36182-3 0  9999
-2 25544  51.6416 142.1133 0003324 324.9821 218.2594 15.49780383446574</pre>
-        </div>
-        <div class="tle-input-container q-mb-md">
-          <q-input v-model="tempTLEData.tleText" type="textarea" filled autogrow class="tle-textarea full-width"
-            style="min-height: 100px; font-family: monospace; font-size: 0.9rem" placeholder="TLE 데이터를 여기에 붙여넣으세요..."
-            :input-style="'white-space: pre;'" spellcheck="false" autofocus :error="tleError !== null"
-            :error-message="tleError || undefined" @keydown.ctrl.enter="addTLEData" />
-        </div>
-      </q-card-section>
-
-      <q-card-actions align="right" class="q-px-md q-pb-md">
-        <q-btn flat label="추가" color="primary" @click="addTLEData" :loading="isProcessingTLE"
-          :disable="!tempTLEData.tleText.trim()" />
-        <q-btn flat label="닫기" color="primary" v-close-popup class="q-ml-sm" :disable="isProcessingTLE" />
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+  <TleInputModal
+    v-model="showTLEModal"
+    :error="tleError"
+    :is-processing="isProcessingTLE"
+    @add="handleTleAdd"
+  />
 
   <!-- 스케줄 선택 모달 -->
   <q-dialog v-model="showScheduleModal" persistent maximized>
@@ -664,6 +388,13 @@ import {
 } from '../../services/mode/ephemerisTrackService'
 import { openPopup } from '../../utils/windowUtils'
 import { useNotification } from '../../composables/useNotification'
+// 분리된 컴포넌트 및 composable import
+import { OffsetControls, useOffsetControls } from './shared'
+import {
+  SatelliteTrackingInfo,
+  TleDataSection,
+  TleInputModal
+} from './ephemerisDesignation/components'
 
 // ✅ 알림 시스템 사용
 const { success, error, warning, info } = useNotification()
@@ -686,6 +417,9 @@ const formatDuration = (duration: string): string => {
 
 // ✅ 스토어 연동 추가
 const ephemerisStore = useEphemerisTrackModeStore()
+
+// ✅ 공용 Offset Controls composable 사용 (3개 페이지에서 동기화)
+const { inputs, outputs, formattedCalTime, onInputChange, increment, decrement, reset } = useOffsetControls()
 
 // ECharts 데이터 포인트 타입 정의
 interface EChartsScatterParam {
@@ -1017,16 +751,7 @@ const scheduleColumns: QTableColumn[] = [
   },
 ]
 
-// ✅ 새로운 코드로 교체:
-// 스토어에서 상태 가져오기
-const inputs = ref<string[]>(['0.00', '0.00', '0.00', '0.00'])
-// ✅ outputs 계산된 속성 수정 - Time Result 분리
-const outputs = computed(() => [
-  ephemerisStore.offsetValues.azimuth,
-  ephemerisStore.offsetValues.elevation,
-  ephemerisStore.offsetValues.train,
-  ephemerisStore.offsetValues.timeResult, // ✅ 별도 관리되는 Result 값
-])
+// ✅ inputs/outputs는 useOffsetControls composable에서 가져옴 (3개 페이지에서 동기화)
 
 // ✅ 로딩 상태 관리
 const isLoadingComparison = ref(false)
@@ -2139,31 +1864,6 @@ const restoreChartData = (forceRestoreTrackingPath = false) => {
   }
 }
 
-// ✅ 남은 시간을 시:분:초 형식으로 포맷하는 함수 (24시간 이상도 표시 가능)
-const formatTimeRemaining = (ms: number): string => {
-  if (ms < 0) {
-    // ✅ 추적 진행 중일 때는 경과 시간 표시 (음수를 양수로 변환)
-    const elapsedMs = Math.abs(ms)
-    const totalSeconds = Math.floor(elapsedMs / 1000)
-    const hours = Math.floor(totalSeconds / 3600)
-    const minutes = Math.floor((totalSeconds % 3600) / 60)
-    const seconds = totalSeconds % 60
-
-    return `+${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
-  }
-  if (ms === 0) {
-    return 'Completed' // 완료
-  }
-
-  const totalSeconds = Math.floor(ms / 1000)
-  const hours = Math.floor(totalSeconds / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  const seconds = totalSeconds % 60
-
-  // ✅ 시:분:초 형식 (24시간 이상도 표시 가능)
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
-}
-
 // ✅ 개선된 시간 계산 함수 수정
 const updateTimeRemaining = () => {
   if (selectedScheduleInfo.value.startTimeMs > 0) {
@@ -2264,134 +1964,8 @@ const selectSchedule = async () => {
   }
 }
 
-// ===== 기존 메서드들 유지 =====
-
-// 입력값 업데이트 함수들
-// 증가 함수 - 입력된 값만큼 증가
-const increment = async (index: number) => {
-  // 현재 출력값 (현재 상태)
-  const currentOutput = parseFloat(outputs.value[index] || '0')
-  console.log('currentOutput:', currentOutput)
-  // 입력된 값 (증가량)
-  const inputValue = parseFloat(inputs.value[index] || '0')
-  console.log('inputValue:', inputValue)
-  // 새로운 값 계산 (현재 출력값 + 입력된 값)
-  const newValue = (currentOutput + inputValue).toFixed(2)
-  console.log('newValue:', newValue)
-  // 출력값 업데이트
-  outputs.value[index] = newValue
-
-  // 오프셋 업데이트 (서버에 전송)
-  await updateOffset(index, newValue)
-}
-
-// 감소 함수 - 입력된 값만큼 감소
-const decrement = async (index: number) => {
-  // 현재 출력값 (현재 상태)
-  const currentOutput = parseFloat(outputs.value[index] || '0')
-
-  // 입력된 값 (감소량)
-  const inputValue = parseFloat(inputs.value[index] || '0')
-
-  // 새로운 값 계산 (현재 출력값 - 입력된 값)
-  const newValue = (currentOutput - inputValue).toFixed(2)
-
-  // 출력값 업데이트
-  outputs.value[index] = newValue
-
-  // 오프셋 업데이트 (서버에 전송)
-  await updateOffset(index, newValue)
-}
-
-// 리셋 함수
-const reset = async (index: number) => {
-  inputs.value[index] = '0.00'
-  await updateOffset(index, '0.00')
-}
-// ✅ updateOffset 함수 수정 - Time 처리 분리
-const updateOffset = async (index: number, value: string) => {
-  try {
-    // ✅ 디버깅 로그 추가
-    console.log('updateOffset 호출됨:', {
-      index,
-      value,
-      valueType: typeof value,
-      inputs3: inputs.value[3],
-      currentTimeResult: ephemerisStore.offsetValues.timeResult,
-    })
-
-    const numValue = Number(parseFloat(value).toFixed(2)) || 0
-    console.log('계산된 numValue:', numValue)
-
-    const offsetTypes = ['azimuth', 'elevation', 'train', 'time'] as const
-    const offsetType = offsetTypes[index]
-
-    if (!offsetType) {
-      console.error('Invalid offset index:', index)
-      return
-    }
-
-    if (index === 3) {
-      const timeInputValue = inputs.value[3] || '0.00'
-      ephemerisStore.updateOffsetValues('time', timeInputValue)
-      try {
-        await ephemerisStore.sendTimeOffset(numValue)
-        ephemerisStore.updateOffsetValues('timeResult', numValue.toFixed(2))
-        console.log('Time Result 업데이트:', numValue.toFixed(2))
-      } catch (error) {
-        console.error('Time offset command failed:', error)
-      }
-      return
-    }
-
-    // Position Offset 처리 (azimuth, elevation, train)
-    ephemerisStore.updateOffsetValues(offsetType, numValue.toFixed(2))
-
-    const azOffset = Number((parseFloat(ephemerisStore.offsetValues.azimuth) || 0).toFixed(2))
-    const elOffset = Number((parseFloat(ephemerisStore.offsetValues.elevation) || 0).toFixed(2))
-    const trainOffset = Number((parseFloat(ephemerisStore.offsetValues.train) || 0).toFixed(2))
-
-    await icdStore.sendPositionOffsetCommand(azOffset, elOffset, trainOffset)
-  } catch (error) {
-    console.error('Error updating offset:', error)
-  }
-}
-// 입력값이 변경될 때 호출되는 함수
-const onInputChange = (index: number, value: string) => {
-  console.log('onInputChange 호출:', { index, value, inputs: inputs.value })
-  inputs.value[index] = value
-  void updateOffset(index, value)
-}
-
-// 서버 시간 포맷팅을 위한 계산된 속성
-const formattedCalTime = computed(() => {
-  const calTime = icdStore.resultTimeOffsetCalTime
-  if (!calTime) return ''
-  try {
-    // 서버 시간 파싱
-    const dateObj = new Date(calTime)
-
-    // 유효한 날짜인지 확인
-    if (isNaN(dateObj.getTime())) {
-      return calTime // 유효하지 않은 날짜면 원본 반환
-    }
-
-    // UTC 기준으로 시간 형식 지정
-    const utcYear = dateObj.getFullYear()
-    const utcMonth = String(dateObj.getMonth() + 1).padStart(2, '0')
-    const utcDay = String(dateObj.getDate()).padStart(2, '0')
-    const utcHours = String(dateObj.getHours()).padStart(2, '0')
-    const utcMinutes = String(dateObj.getMinutes()).padStart(2, '0')
-    const utcSeconds = String(dateObj.getSeconds()).padStart(2, '0')
-    const utcMilliseconds = String(dateObj.getMilliseconds()).padStart(3, '0')
-
-    // YYYY-MM-DD HH:MM:SS.mmm (UTC) 형식
-    return `${utcYear}-${utcMonth}-${utcDay} ${utcHours}:${utcMinutes}:${utcSeconds}.${utcMilliseconds} `
-  } catch (e) {
-    console.error('Error formatting cal time:', e)
-    return calTime
-  }
-})
+// ✅ offset 관련 함수들 (increment, decrement, reset, onInputChange, formattedCalTime)은
+//    useOffsetControls composable에서 가져옴 - 3개 페이지에서 동기화됨
 
 // TLE 관련 함수들
 const openTLEModal = () => {
@@ -2502,6 +2076,12 @@ const addTLEData = async () => {
   } finally {
     isProcessingTLE.value = false
   }
+}
+
+// TleInputModal에서 호출되는 핸들러
+const handleTleAdd = async (tleText: string) => {
+  tempTLEData.value.tleText = tleText
+  await addTLEData()
 }
 
 // 안전한 숫자 포맷팅 헬퍼 함수
@@ -2869,13 +2449,7 @@ onMounted(() => {
     // ✅ 메인 스레드 모니터링 시작
     startMainThreadMonitoring()
 
-    // ✅ 스토어에서 오프셋 값 복원
-    inputs.value = [
-      ephemerisStore.offsetValues.azimuth,
-      ephemerisStore.offsetValues.elevation,
-      ephemerisStore.offsetValues.train,
-      ephemerisStore.offsetValues.time,
-    ]
+    // ✅ inputs/outputs는 useOffsetControls composable에서 관리 (3개 페이지에서 동기화)
 
     // ✅ localStorage에서 데이터 복원
     const restored = ephemerisStore.loadFromLocalStorage()

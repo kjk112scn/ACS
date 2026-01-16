@@ -64,7 +64,7 @@
       <q-td :props="props" class="elevation-info-cell">
         <div class="elevation-container">
           <div class="max-elevation">{{ formatAngle(props.row.maxElevation) }}</div>
-          <div class="train">{{ formatAngle(0) }}</div>
+          <div class="train">{{ formatAngle(props.row.train) }}</div>
         </div>
       </q-td>
     </template>

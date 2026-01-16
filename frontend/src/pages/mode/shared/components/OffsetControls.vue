@@ -186,8 +186,8 @@
 
 <script setup lang="ts">
 interface Props {
-  inputs: string[]
-  outputs: string[]
+  inputs: readonly string[] | string[]
+  outputs: readonly string[] | string[]
   calTime: string
 }
 

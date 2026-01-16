@@ -139,16 +139,17 @@ import type { ECharts } from 'echarts'
 import type { QTableProps } from 'quasar'
 import { openModal } from '../../utils/windowUtils'
 import { getCalTimeTimestamp } from '../../utils/times'
-// 분리된 컴포넌트 import
-import {
-  ScheduleInfoPanel,
-  ScheduleTable,
-  OffsetControls
-} from './passSchedule/components'
+// 분리된 컴포넌트 및 composable import
+import { ScheduleInfoPanel, ScheduleTable } from './passSchedule/components'
+import { OffsetControls, useOffsetControls } from './shared'
 
 const $q = useQuasar()
 const passScheduleStore = usePassScheduleModeStore()
 const icdStore = useICDStore()
+
+// ✅ 공용 Offset Controls composable 사용 (3개 페이지에서 동기화)
+const { inputs, outputs, formattedCalTime, onInputChange, increment, decrement, reset } = useOffsetControls()
+
 // 차트 관련 변수
 const chartRef = ref<HTMLElement | null>(null)
 let updateTimer: number | null = null
@@ -1188,9 +1189,7 @@ watch(displaySchedule, (newSchedule) => {
 }, { immediate: true })
 const loading = passScheduleStore.loading
 
-// 입력값과 출력값 - PassSchedule 독립적 상태
-const inputs = ref<string[]>(['0.00', '0.00', '0.00', '0'])
-const outputs = ref<string[]>(['0.00', '0.00', '0.00', '0'])
+// ✅ inputs/outputs는 useOffsetControls composable에서 가져옴 (3개 페이지에서 동기화)
 
 // 테이블 컬럼 정의 - Store의 실제 필드명에 맞춤
 type QTableColumn = NonNullable<QTableProps['columns']>[0]
@@ -2109,92 +2108,8 @@ const clearActualPath = () => {
   updateChart()
 }
  */
-// 입력값 변경 핸들러
-const onInputChange = (index: number, value: string) => {
-  inputs.value[index] = value
-  updateOutputs()
-}
-
-// 증가 함수
-const increment = async (index: number) => {
-  const currentOutput = parseFloat(outputs.value[index] || '0')
-  const inputValue = parseFloat(inputs.value[index] || '0')
-  const newValue = (currentOutput + inputValue).toFixed(index === 3 ? 0 : 2)
-
-  outputs.value[index] = newValue
-  await updateOffset(index, newValue)
-}
-
-// 감소 함수
-const decrement = async (index: number) => {
-  const currentOutput = parseFloat(outputs.value[index] || '0')
-  const inputValue = parseFloat(inputs.value[index] || '0')
-  const newValue = (currentOutput - inputValue).toFixed(index === 3 ? 0 : 2)
-
-  outputs.value[index] = newValue
-  await updateOffset(index, newValue)
-}
-
-// 리셋 함수
-const reset = async (index: number) => {
-  inputs.value[index] = index === 3 ? '0' : '0.00'
-  outputs.value[index] = index === 3 ? '0' : '0.00'
-  await updateOffset(index, outputs.value[index])
-}
-
-// 출력값 업데이트
-const updateOutputs = () => {
-  outputs.value = [...inputs.value]
-}
-
-// ✅ updateOffset 함수 수정 - Time 처리 분리
-const updateOffset = async (index: number, value: string) => {
-  try {
-    // ✅ 디버깅 로그 추가
-    console.log('updateOffset 호출됨:', {
-      index,
-      value,
-      valueType: typeof value,
-      inputs3: inputs.value[3],
-      currentTimeResult: passScheduleStore.offsetValues.timeResult,
-    })
-
-    const numValue = Number(parseFloat(value).toFixed(2)) || 0
-    console.log('계산된 numValue:', numValue)
-
-    const offsetTypes = ['azimuth', 'elevation', 'train', 'time'] as const
-    const offsetType = offsetTypes[index]
-
-    if (!offsetType) {
-      console.error('Invalid offset index:', index)
-      return
-    }
-
-    if (index === 3) {
-      const timeInputValue = inputs.value[3] || '0.00'
-      passScheduleStore.updateOffsetValues('time', timeInputValue)
-      try {
-        await passScheduleStore.sendTimeOffset(numValue)
-        passScheduleStore.updateOffsetValues('timeResult', numValue.toFixed(2))
-        console.log('Time Result 업데이트:', numValue.toFixed(2))
-      } catch (error) {
-        console.error('Time offset command failed:', error)
-      }
-      return
-    }
-
-    // Position Offset 처리 (azimuth, elevation, train)
-    passScheduleStore.updateOffsetValues(offsetType, numValue.toFixed(2))
-
-    const azOffset = Number((parseFloat(passScheduleStore.offsetValues.azimuth) || 0).toFixed(2))
-    const elOffset = Number((parseFloat(passScheduleStore.offsetValues.elevation) || 0).toFixed(2))
-    const tiOffset = Number((parseFloat(passScheduleStore.offsetValues.train) || 0).toFixed(2))
-
-    await icdStore.sendPositionOffsetCommand(azOffset, elOffset, tiOffset)
-  } catch (error) {
-    console.error('Error updating offset:', error)
-  }
-}
+// ✅ offset 관련 함수들 (increment, decrement, reset, onInputChange, formattedCalTime)은
+//    useOffsetControls composable에서 가져옴 - 3개 페이지에서 동기화됨
 
 // 명령 핸들러들 - handleStartCommand 수정
 const handleStartCommand = async () => {
@@ -2533,35 +2448,7 @@ onUnmounted(() => {
   console.log('✅ PassSchedulePage 정리 완료 (차트는 유지)')
 })
 
-// 서버 시간 포맷팅을 위한 계산된 속성 추가
-const formattedCalTime = computed(() => {
-  const calTime = icdStore.resultTimeOffsetCalTime
-  if (!calTime) return ''
-  try {
-    // 서버 시간 파싱
-    const dateObj = new Date(calTime)
-
-    // 유효한 날짜인지 확인
-    if (isNaN(dateObj.getTime())) {
-      return calTime // 유효하지 않은 날짜면 원본 반환
-    }
-
-    // UTC 기준으로 시간 형식 지정
-    const utcYear = dateObj.getFullYear()
-    const utcMonth = String(dateObj.getMonth() + 1).padStart(2, '0')
-    const utcDay = String(dateObj.getDate()).padStart(2, '0')
-    const utcHours = String(dateObj.getHours()).padStart(2, '0')
-    const utcMinutes = String(dateObj.getMinutes()).padStart(2, '0')
-    const utcSeconds = String(dateObj.getSeconds()).padStart(2, '0')
-    const utcMilliseconds = String(dateObj.getMilliseconds()).padStart(3, '0')
-
-    // YYYY-MM-DD HH:MM:SS.mmm (UTC) 형식
-    return `${utcYear}-${utcMonth}-${utcDay} ${utcHours}:${utcMinutes}:${utcSeconds}.${utcMilliseconds} `
-  } catch (e) {
-    console.error('Error formatting cal time:', e)
-    return calTime
-  }
-})
+// ✅ formattedCalTime은 useOffsetControls composable에서 가져옴
 </script>
 
 <style scoped>
@@ -2648,10 +2535,11 @@ const formattedCalTime = computed(() => {
   }
 }
 
-/* ✅ 오프셋 컨트롤 행 하단 여백 줄이기 */
+/* ✅ 오프셋 컨트롤 행 - EphemerisDesignationPage와 동일하게 설정 */
 .pass-schedule-mode .offset-control-row {
   margin-bottom: 0.5rem !important;
-  /* ✅ 기본 q-mb-sm (0.5rem) 유지하되 명시적으로 설정 */
+  position: relative;
+  z-index: 100;
 }
 
 /* ✅ 메인 콘텐츠 행 하단 여백을 EphemerisDesignationPage.vue와 동일하게 설정 (하단 마진 없음) */
