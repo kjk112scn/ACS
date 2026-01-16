@@ -1,133 +1,17 @@
 <template>
   <div class="pass-schedule-mode">
-    <!-- 1행: Offset Controls - EphemerisDesignationPage와 동일한 구조 -->
+    <!-- 1행: Offset Controls -->
     <div class="row q-col-gutter-md q-mb-sm offset-control-row">
       <div class="col-12">
-        <q-card flat bordered class="control-card">
-          <q-card-section class="compact-control purple-1">
-            <!-- 모든 간격이 동적으로 조정되는 반응형 레이아웃 -->
-            <div class="flexible-offset-layout">
-              <!-- Azimuth Offset -->
-              <div class="offset-group">
-                <div class="row q-gutter-xs align-center">
-                  <div class="col-auto position-offset-label">
-                    <div class="text-subtitle2 text-weight-bold text-primary text-center">
-                      Azimuth<br>Offset
-                    </div>
-                  </div>
-                  <div class="col-auto">
-                    <q-input v-model="inputs[0]" @input="(val: string) => onInputChange(0, val)" dense outlined
-                      type="number" step="0.01" label="Azimuth" class="offset-input" />
-                  </div>
-                  <div class="col-auto">
-                    <div class="vertical-button-group">
-                      <div class="vertical-buttons">
-                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(0)" />
-                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(0)" />
-                      </div>
-                      <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(0)" />
-                    </div>
-                  </div>
-                  <div class="col-auto">
-                    <q-input v-model="outputs[0]" dense outlined readonly label="Output"
-                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
-                  </div>
-                </div>
-              </div>
-
-              <!-- Elevation Offset -->
-              <div class="offset-group">
-                <div class="row q-gutter-xs align-center">
-                  <div class="col-auto position-offset-label">
-                    <div class="text-subtitle2 text-weight-bold text-primary text-center">
-                      Elevation<br>Offset
-                    </div>
-                  </div>
-                  <div class="col-auto">
-                    <q-input v-model="inputs[1]" @input="(val: string) => onInputChange(1, val)" dense outlined
-                      type="number" step="0.01" label="Elevation"
-                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
-                  </div>
-                  <div class="col-auto">
-                    <div class="vertical-button-group">
-                      <div class="vertical-buttons">
-                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(1)" />
-                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(1)" />
-                      </div>
-                      <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(1)" />
-                    </div>
-                  </div>
-                  <div class="col-auto">
-                    <q-input v-model="outputs[1]" dense outlined readonly label="Output"
-                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
-                  </div>
-                </div>
-              </div>
-
-              <!-- Tilt Offset -->
-              <div class="offset-group">
-                <div class="row q-gutter-xs align-center">
-                  <div class="col-auto position-offset-label">
-                    <div class="text-subtitle2 text-weight-bold text-primary text-center">
-                      Tilt<br>Offset
-                    </div>
-                  </div>
-                  <div class="col-auto">
-                    <q-input v-model="inputs[2]" @input="(val: string) => onInputChange(2, val)" dense outlined
-                      type="number" step="0.01" label="Tilt"
-                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
-                  </div>
-                  <div class="col-auto">
-                    <div class="vertical-button-group">
-                      <div class="vertical-buttons">
-                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(2)" />
-                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(2)" />
-                      </div>
-                      <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(2)" />
-                    </div>
-                  </div>
-                  <div class="col-auto">
-                    <q-input v-model="outputs[2]" dense outlined readonly label="Output"
-                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
-                  </div>
-                </div>
-              </div>
-
-              <!-- Time Offset + Cal Time -->
-              <div class="offset-group">
-                <div class="row q-gutter-xs align-center">
-                  <div class="col-auto position-offset-label">
-                    <div class="text-subtitle2 text-weight-bold text-primary text-center">
-                      Time<br>Offset
-                    </div>
-                  </div>
-                  <div class="col-auto">
-                    <q-input v-model="inputs[3]" @input="(val: string) => onInputChange(3, val)" dense outlined
-                      type="number" step="0.01" label="Time"
-                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
-                  </div>
-                  <div class="col-auto">
-                    <div class="vertical-button-group">
-                      <div class="vertical-buttons">
-                        <q-btn icon="add" size="sm" color="primary" dense flat @click="increment(3)" />
-                        <q-btn icon="remove" size="sm" color="primary" dense flat @click="decrement(3)" />
-                      </div>
-                      <q-btn icon="refresh" size="sm" color="grey-7" dense flat @click="reset(3)" />
-                    </div>
-                  </div>
-                  <div class="col-auto">
-                    <q-input v-model="outputs[3]" dense outlined readonly label="Result"
-                      style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;" />
-                  </div>
-                  <div class="col-auto cal-time-field">
-                    <q-input v-model="formattedCalTime" dense outlined readonly label="Cal Time"
-                      style="min-width: 190px !important; max-width: 220px !important;" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </q-card-section>
-        </q-card>
+        <OffsetControls
+          :inputs="inputs"
+          :outputs="outputs"
+          :cal-time="formattedCalTime"
+          @input-change="onInputChange"
+          @increment="increment"
+          @decrement="decrement"
+          @reset="reset"
+        />
       </div>
     </div>
     <!-- 2행: Main Content -->
@@ -149,71 +33,11 @@
 
       <!-- 2번 영역: Schedule Information -->
       <div class="col-12 col-md-3">
-        <q-card class="control-section">
-          <q-card-section>
-            <div class="text-subtitle1 text-weight-bold text-primary q-mb-xs">Schedule Information</div>
-            <div class="schedule-form">
-              <div class="form-row">
-                <!-- 자동/수동 선택된 스케줄 정보 표시 -->
-                <div v-if="displaySchedule" class="schedule-info q-mt-xs">
-                  <div class="info-row">
-                    <span class="info-label">스케줄 ID / 상태:</span>
-                    <div class="info-value-with-badge">
-                      <span class="info-value">{{ displaySchedule.no }}</span>
-                      <q-badge v-if="currentScheduleStatus" :color="currentScheduleStatus.color"
-                        :label="currentScheduleStatus.label" class="q-ml-sm" />
-                      <q-badge v-if="displaySchedule.isKeyhole || displaySchedule.IsKeyhole" color="red" label="KEYHOLE"
-                        class="q-ml-sm" />
-                    </div>
-                  </div>
-                  <!--     <div class="info-row">
-                      <span class="info-label">Index:</span>
-                      <span class="info-value">{{ displaySchedule.index }}</span>
-                    </div> -->
-                  <div class="info-row">
-                    <span class="info-label">위성 이름:</span>
-                    <span class="info-value">{{ displaySchedule.satelliteName }}</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="info-label">시작 시간:</span>
-                    <span class="info-value">{{ formatToLocalTime(displaySchedule.startTime) }}</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="info-label">종료 시간:</span>
-                    <span class="info-value">{{ formatToLocalTime(displaySchedule.endTime) }}</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="info-label">지속 시간:</span>
-                    <span class="info-value">{{ formatDuration(displaySchedule.duration) }}</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="info-label">시작 방위각:</span>
-                    <span class="info-value">{{ displaySchedule.startAzimuthAngle.toFixed(2) }}°</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="info-label">최대 고도각:</span>
-                    <span class="info-value">{{ displaySchedule.maxElevation?.toFixed(2) }}°</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="info-label">남은 시간:</span>
-                    <span class="info-value" :class="{
-                      'text-negative': timeRemaining < 0,
-                      'text-positive': timeRemaining > 0,
-                      'text-grey': timeRemaining === 0,
-                    }">
-                      {{ formatTimeRemaining(timeRemaining) }}
-                    </span>
-                  </div>
-
-                </div>
-                <!-- 스케줄이 선택되지 않은 경우 -->
-                <div v-else class="no-schedule-selected">
-                  <div class="text-grey-5">추적 중인 스케줄이 없습니다</div>
-                </div>
-              </div>
-            </div>
-          </q-card-section>
-        </q-card>
+        <ScheduleInfoPanel
+          :schedule="displaySchedule"
+          :schedule-status="currentScheduleStatus"
+          :time-remaining="timeRemaining"
+        />
       </div>
 
       <!-- 3번 영역: Schedule Control -->
@@ -264,65 +88,14 @@
                 </q-card>
               </div>
  -->
-            <!-- ✅ 스케줄 테이블 - 체크박스 제거, 높이 고정 (모든 데이터 표시, 화면에는 정확히 3개 행만 보이도록) -->
-            <q-table flat bordered :row-class="getRowClass" :row-style="getRowStyleDirect" :rows="sortedScheduleList"
-              :columns="scheduleColumns" row-key="no" :pagination="{ rowsPerPage: 0 }" hide-pagination
-              :loading="loading && sortedScheduleList.length === 0" @row-click="onRowClick"
-              class="schedule-table q-mt-sm" style="height: 210px; max-height: 210px;" :no-data-label="'등록된 스케줄이 없습니다'"
-              :virtual-scroll="false">
-              <template v-slot:loading>
-                <q-inner-loading showing color="primary">
-                  <q-spinner size="50px" color="primary" />
-                </q-inner-loading>
-              </template>
-              <!-- Keyhole 배지 컬럼 -->
-              <template v-slot:body-cell-keyhole="props">
-                <q-td :props="props">
-                  <q-badge v-if="props.row.isKeyhole || props.row.IsKeyhole" color="red" label="KEYHOLE" />
-                </q-td>
-              </template>
-              <!-- 위성 정보 컬럼 템플릿 -->
-              <template v-slot:body-cell-satelliteInfo="props">
-                <q-td :props="props" class="satellite-info-cell">
-                  <div class="satellite-container">
-                    <div class="satellite-id">{{ props.row.satelliteId || '-' }}</div>
-                    <div class="satellite-name">{{ props.row.satelliteName }}</div>
-                  </div>
-                </q-td>
-              </template>
-
-              <!-- 시간 범위 컬럼 템플릿 - formatDateTime 함수 사용 -->
-              <template v-slot:body-cell-timeRange="props">
-                <q-td :props="props" class="time-range-cell">
-                  <div class="time-container">
-
-
-                    <div class="start-time">{{ formatDateTime(props.row.startTime) }}</div>
-                    <div class="end-time">{{ formatDateTime(props.row.endTime) }}</div>
-                  </div>
-                </q-td>
-              </template>
-
-              <!-- Azimuth 범위 컬럼 템플릿 -->
-              <template v-slot:body-cell-azimuthRange="props">
-                <q-td :props="props" class="azimuth-range-cell">
-                  <div class="azimuth-container">
-                    <div class="start-az">{{ formatAngle(props.row.startAzimuthAngle) }}</div>
-                    <div class="end-az">{{ formatAngle(props.row.endAzimuthAngle) }}</div>
-                  </div>
-                </q-td>
-              </template>
-
-              <!-- Elevation 정보 컬럼 템플릿 -->
-              <template v-slot:body-cell-elevationInfo="props">
-                <q-td :props="props" class="elevation-info-cell">
-                  <div class="elevation-container">
-                    <div class="max-elevation">{{ formatAngle(props.row.maxElevation) }}</div>
-                    <div class="train">{{ formatAngle(0) }}</div>
-                  </div>
-                </q-td>
-              </template>
-            </q-table>
+            <!-- 스케줄 테이블 컴포넌트 -->
+            <ScheduleTable
+              :schedule-list="sortedScheduleList"
+              :columns="scheduleColumns"
+              :loading="loading"
+              :highlight-info="tableHighlightInfo"
+              @row-click="onTableRowClick"
+            />
             <!-- 버튼 그룹 섹션 -->
             <div class="button-group">
               <div class="button-row">
@@ -365,7 +138,13 @@ import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 import type { QTableProps } from 'quasar'
 import { openModal } from '../../utils/windowUtils'
-import { formatToLocalTime, formatTimeRemaining, getCalTimeTimestamp } from '../../utils/times'
+import { getCalTimeTimestamp } from '../../utils/times'
+// 분리된 컴포넌트 import
+import {
+  ScheduleInfoPanel,
+  ScheduleTable,
+  OffsetControls
+} from './passSchedule/components'
 
 const $q = useQuasar()
 const passScheduleStore = usePassScheduleModeStore()
@@ -518,10 +297,6 @@ const reactivityTrigger = ref(0)
 // ✅ appendData를 위한 이전 경로 길이 추적 (watch보다 먼저 선언)
 const lastTrackingPathLength = ref(0)
 const lastPredictedPathLength = ref(0)
-
-// ✅ 디버깅: 마지막 로그 출력 시간 (10초당 1개씩만 출력)
-const lastDebugLogTime = ref(0)
-const DEBUG_LOG_INTERVAL = 10000 // 10초
 
 // 🆕 Store 값 변경 감지
 // ✅ 스케줄 전환 시 경로 초기화 및 신규 스케줄 이론치 경로 로드 로직
@@ -750,6 +525,14 @@ const highlightedRows = computed(() => {
   }
 })
 
+// ScheduleTable 컴포넌트용 하이라이트 정보
+const tableHighlightInfo = computed(() => ({
+  currentMstId: highlightedRows.value.current,
+  currentDetailId: highlightedRows.value.currentDetailId,
+  nextMstId: highlightedRows.value.next,
+  nextDetailId: highlightedRows.value.nextDetailId
+}))
+
 const currentDisplaySchedule = computed(() => {
   try {
     if (icdStore.currentTrackingMstId !== null) {
@@ -772,204 +555,8 @@ const currentDisplaySchedule = computed(() => {
     return null
   }
 })
-/**
- * 직접 스타일 적용 함수
- *
- * PassSchedule 데이터 구조 리팩토링에 따라 mstId 기준 매칭.
- *
- * @param props 행 데이터
- * @returns 인라인 스타일 객체
- */
-const getRowStyleDirect = (props: { row: ScheduleItem }) => {
-  try {
-    if (!props || !props.row) {
-      return ''
-    }
-    const schedule = props.row
-    // ✅ mstId와 detailId 기준으로 매칭 (전역 고유 ID + 패스 인덱스)
-    const scheduleMstId = schedule.mstId ?? schedule.no
-    const scheduleDetailId = schedule.detailId ?? null
-    const { current, currentDetailId, next, nextDetailId } = highlightedRows.value
 
-    console.log(`🎨 getRowStyleDirect 호출: mstId=${scheduleMstId}, detailId=${scheduleDetailId}, current=${current}/${currentDetailId}, next=${next}/${nextDetailId}`)
-
-    if (scheduleMstId !== undefined) {
-      // ✅ mstId와 detailId 모두 비교 (detailId가 항상 존재한다고 가정)
-      const currentMatch = current !== null &&
-        Number(scheduleMstId) === Number(current) &&
-        (currentDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(currentDetailId))
-      const nextMatch = next !== null &&
-        Number(scheduleMstId) === Number(next) &&
-        (nextDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(nextDetailId))
-
-      // 현재 추적 중인 스케줄이 있는 경우
-      if (current !== null) {
-        if (currentMatch) {
-          console.log('✅ 현재 스케줄 매칭 - 직접 녹색 스타일 적용:', scheduleMstId, scheduleDetailId)
-          return {
-            backgroundColor: '#c8e6c9 !important',
-            borderLeft: '4px solid #4caf50 !important',
-            color: '#2e7d32 !important',
-            fontWeight: '500 !important'
-          }
-        }
-        if (nextMatch) {
-          console.log('✅ 다음 스케줄 매칭 - 직접 파란색 스타일 적용:', scheduleMstId, scheduleDetailId)
-          return {
-            backgroundColor: '#e3f2fd !important',
-            borderLeft: '4px solid #2196f3 !important',
-            color: '#1565c0 !important',
-            fontWeight: '500 !important'
-          }
-        }
-      }
-      // 다음 예정 스케줄 (현재 추적 중인 스케줄이 있든 없든 파란색으로 표시)
-      if (next !== null && nextMatch) {
-        console.log('✅ 다음 스케줄 매칭 - 직접 파란색 스타일 적용:', scheduleMstId, scheduleDetailId)
-        return {
-          backgroundColor: '#e3f2fd !important',
-          borderLeft: '4px solid #2196f3 !important',
-          color: '#1565c0 !important',
-          fontWeight: '500 !important'
-        }
-      }
-    }
-
-    return {}
-  } catch (error) {
-    console.error('❌ getRowStyleDirect 에러:', error)
-    return {}
-  }
-}
-
-/**
- * 행 스타일 클래스 반환 함수
- *
- * PassSchedule 데이터 구조 리팩토링에 따라 mstId 기준 매칭.
- *
- * @param props 행 데이터
- * @returns CSS 클래스명
- */
-const getRowClass = (props: { row: ScheduleItem }) => {
-  try {
-    if (!props || !props.row) {
-      return ''
-    }
-    const schedule = props.row
-    // ✅ mstId와 detailId 기준으로 매칭 (전역 고유 ID + 패스 인덱스)
-    const scheduleMstId = schedule.mstId ?? schedule.no
-    const scheduleDetailId = schedule.detailId ?? null
-    const { current, currentDetailId, next, nextDetailId } = highlightedRows.value
-
-    // ✅ 디버깅: getRowClass 호출 로그 (10초당 1개씩만 출력)
-    const currentTime = Date.now()
-    if (currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
-      console.log(`📋 getRowClass 호출: mstId=${scheduleMstId}, detailId=${scheduleDetailId}, current=${current}/${currentDetailId}, next=${next}/${nextDetailId}`)
-      lastDebugLogTime.value = currentTime
-    }
-
-    // ✅ 스케줄 하이라이트 로직 - mstId와 detailId 모두 비교
-    if (scheduleMstId !== undefined) {
-      // ✅ mstId와 detailId 모두 비교 (detailId가 항상 존재한다고 가정)
-      const currentMatch = current !== null &&
-        Number(scheduleMstId) === Number(current) &&
-        (currentDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(currentDetailId))
-      const nextMatch = next !== null &&
-        Number(scheduleMstId) === Number(next) &&
-        (nextDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(nextDetailId))
-
-      // ✅ mstId 디버깅 로그 (14와 28 모두, 10초당 1개씩만 출력)
-      if ((Number(scheduleMstId) === 14 || Number(scheduleMstId) === 28) &&
-          currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
-        console.log(`🔥 MSTID ${scheduleMstId} 디버깅:`, {
-          satelliteName: schedule.satelliteName,
-          scheduleMstId,
-          scheduleDetailId,
-          scheduleMstIdNumber: Number(scheduleMstId),
-          current,
-          currentDetailId,
-          currentNumber: Number(current),
-          next,
-          nextDetailId,
-          nextNumber: Number(next),
-          currentMatch,
-          nextMatch,
-          currentIsNull: current === null,
-          nextIsNotNull: next !== null,
-          nextDetailIdIsNotNull: nextDetailId !== null,
-          scheduleDetailIdIsNotNull: scheduleDetailId !== null,
-          nextDetailIdNumber: nextDetailId !== null ? Number(nextDetailId) : null,
-          scheduleDetailIdNumber: scheduleDetailId !== null ? Number(scheduleDetailId) : null,
-          detailIdMatch: nextDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(nextDetailId)
-        })
-        lastDebugLogTime.value = currentTime
-      }
-
-      // 1. 현재 추적 중인 스케줄이 있는 경우
-      if (current !== null) {
-        if (currentMatch) {
-          // ✅ 디버깅: 10초당 1개씩만 출력
-          if (currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
-            console.log('✅ 현재 스케줄 매칭 - 녹색 적용:', scheduleMstId, scheduleDetailId)
-            lastDebugLogTime.value = currentTime
-          }
-          return 'highlight-current-schedule'
-        }
-        if (nextMatch) {
-          // ✅ 디버깅: 10초당 1개씩만 출력
-          if (currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
-            console.log('✅ 다음 스케줄 매칭 - 파란색 적용:', scheduleMstId, scheduleDetailId)
-            lastDebugLogTime.value = currentTime
-          }
-          return 'highlight-next-schedule'
-        }
-      }
-      // 2. 다음 예정 스케줄 (현재 추적 중인 스케줄이 있든 없든 파란색으로 표시)
-      if (next !== null && nextMatch) {
-        // ✅ 디버깅: 10초당 1개씩만 출력
-        if (currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
-          console.log('✅ 다음 스케줄 매칭 - 파란색 적용:', scheduleMstId, scheduleDetailId)
-          lastDebugLogTime.value = currentTime
-        }
-        return 'highlight-next-schedule'  // 다음 스케줄은 항상 파란색
-      }
-
-      // ✅ mstId 14 또는 28인데 매칭되지 않은 경우 원인 분석 (10초당 1개씩만 출력)
-      if ((Number(scheduleMstId) === 14 || Number(scheduleMstId) === 28) &&
-          !currentMatch && !nextMatch &&
-          currentTime - lastDebugLogTime.value >= DEBUG_LOG_INTERVAL) {
-        console.log(`❌ MSTID ${scheduleMstId} 매칭 실패 원인:`, {
-          current값: current,
-          currentDetailId값: currentDetailId,
-          current타입: typeof current,
-          next값: next,
-          nextDetailId값: nextDetailId,
-          next타입: typeof next,
-          scheduleMstId값: scheduleMstId,
-          scheduleDetailId값: scheduleDetailId,
-          scheduleMstId타입: typeof scheduleMstId,
-          조건1_current가null: current === null,
-          조건2_next가notNull: next !== null,
-          조건3_nextDetailId가notNull: nextDetailId !== null,
-          조건4_scheduleDetailId가notNull: scheduleDetailId !== null,
-          조건5_mstId매칭: Number(scheduleMstId) === Number(next),
-          조건6_detailId매칭: nextDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(nextDetailId),
-          조건3_nextMatch: nextMatch,
-          전체조건: current === null && next !== null && nextMatch
-        })
-        lastDebugLogTime.value = currentTime
-      }
-    }
-
-    return ''
-  } catch (error) {
-    console.error('❌ getRowClass 에러:', error)
-    return ''
-  }
-}
-
-
-
+// NOTE: getRowStyleDirect, getRowClass 함수는 ScheduleTable 컴포넌트로 이동됨
 
 
 // 🔧 DOM 직접 조작으로 색상 적용
@@ -1660,19 +1247,7 @@ const scheduleColumns: QTableColumn[] = [
   { name: 'keyhole', label: 'keyhole', field: 'keyhole', align: 'center' as const, sortable: false, style: 'width: 80px' },
 ]
 
-const formatDateTime = (dateString: string): string => {
-  try {
-    return formatToLocalTime(dateString)
-  } catch (error) {
-    console.error('시간 포맷팅 오류:', error)
-    return dateString
-  }
-}
-
-const formatAngle = (angle: number | undefined | null): string => {
-  if (angle === undefined || angle === null) return '-'
-  return `${angle.toFixed(1)}°`
-}
+// NOTE: formatDateTime, formatAngle 함수는 ScheduleTable 컴포넌트로 이동됨
 
 // ✅ Duration 포맷 함수 추가 (ISO 8601 Duration 형식 파싱)
 const formatDuration = (duration: string): string => {
@@ -2460,6 +2035,11 @@ const onRowClick = (evt: Event, row: ScheduleItem) => {
     satelliteName: row.satelliteName,
     startTime: row.startTime,
   })
+}
+
+// ScheduleTable 컴포넌트에서 emit된 row-click 이벤트 핸들러
+const onTableRowClick = (evt: Event, row: ScheduleItem) => {
+  onRowClick(evt, row)
 }
 
 // 🆕 선택된 스케줄에 따른 차트 업데이트 (사용하지 않음 - loadSelectedScheduleTrackingPath로 대체)
