@@ -5,6 +5,25 @@ import type { HardwareErrorLog } from '@/types/hardwareError'
 import { useI18n } from 'vue-i18n'
 import { getWebSocketUrl } from '@/utils/api-config'
 
+// Composables - 순수 파싱 함수들
+import {
+  parseProtocolStatusBits as parseProtocolBits,
+  parseMainBoardStatusBits as parseMainBoardBits,
+  parseMainBoardMCOnOffBits as parseMCOnOffBits,
+  parseServoStatusBits,
+  parseAzimuthBoardStatusBits as parseAzimuthBits,
+  parseElevationBoardStatusBits as parseElevationBits,
+  parseTrainBoardStatusBits as parseTrainBits,
+  parseFeedSBoardStatusBits as parseFeedSBits,
+  parseFeedXBoardStatusBits as parseFeedXBits,
+  parseFeedBoardETCStatusBits as parseFeedETCBits,
+  parseFeedKaBoardStatusBits as parseFeedKaBits,
+} from './composables/useBoardStatus'
+import {
+  parseTrackingStatusUpdate,
+  type CurrentTrackingState,
+} from './composables/useTrackingState'
+
 // 값을 안전하게 문자열로 변환하는 헬퍼 함수
 const safeToString = (value: unknown): string => {
   if (value === null || value === undefined) {
@@ -349,217 +368,177 @@ export const useICDStore = defineStore('icd', () => {
     return clientId.value
   }
 
-  // 비트 문자열을 개별 boolean으로 파싱하는 헬퍼 함수
+  // 비트 문자열을 개별 boolean으로 파싱하는 헬퍼 함수 (순수 함수 사용)
   const parseProtocolStatusBits = (bitString: string) => {
-    // "00001000" -> ['0','0','0','0','1','0','0','0']
-    const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
-
-    protocolElevationStatus.value = bits[0] === '1' // 1번째 비트
-    protocolAzimuthStatus.value = bits[1] === '1' // 2번째 비트
-    protocolTrainStatus.value = bits[2] === '1' // 3번째 비트
-    protocolFeedStatus.value = bits[3] === '1' // 4번째 비트
-    mainBoardProtocolStatusBitsReserve1.value = bits[4] === '1' // 5번째 비트
-    mainBoardProtocolStatusBitsReserve2.value = bits[5] === '1' // 6번째 비트
-    mainBoardProtocolStatusBitsReserve3.value = bits[6] === '1' // 7번째 비트
-    defaultReceiveStatus.value = bits[7] === '1' // 8번째 비트
+    const parsed = parseProtocolBits(bitString)
+    protocolElevationStatus.value = parsed.elevation
+    protocolAzimuthStatus.value = parsed.azimuth
+    protocolTrainStatus.value = parsed.train
+    protocolFeedStatus.value = parsed.feed
+    mainBoardProtocolStatusBitsReserve1.value = parsed.reserve1
+    mainBoardProtocolStatusBitsReserve2.value = parsed.reserve2
+    mainBoardProtocolStatusBitsReserve3.value = parsed.reserve3
+    defaultReceiveStatus.value = parsed.defaultReceive
   }
-  // 비트 문자열을 개별 boolean으로 파싱하는 헬퍼 함수 (기존 parseProtocolStatusBits 함수 뒤에 추가)
+  // 메인보드 상태 비트 파싱 (순수 함수 사용)
   const parseMainBoardStatusBits = (bitString: string) => {
-    // "00001000" -> ['0','0','0','0','1','0','0','0']
-    const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
-
-    powerSurgeProtector.value = bits[0] === '1' // 1번째 비트
-    powerReversePhaseSensor.value = bits[1] === '1' // 2번째 비트
-    emergencyStopACU.value = bits[2] === '1' // 3번째 비트
-    emergencyStopPositioner.value = bits[3] === '1' // 4번째 비트
-    mainBoardStatusBitsReserve1.value = bits[4] === '1' // 5번째 비트
-    mainBoardStatusBitsReserve2.value = bits[5] === '1' // 6번째 비트
-    mainBoardStatusBitsReserve3.value = bits[6] === '1' // 7번째 비트
-    mainBoardStatusBitsReserve4.value = bits[7] === '1' // 8번째 비트
+    const parsed = parseMainBoardBits(bitString)
+    powerSurgeProtector.value = parsed.powerSurgeProtector
+    powerReversePhaseSensor.value = parsed.powerReversePhaseSensor
+    emergencyStopACU.value = parsed.emergencyStopACU
+    emergencyStopPositioner.value = parsed.emergencyStopPositioner
+    mainBoardStatusBitsReserve1.value = parsed.reserve1
+    mainBoardStatusBitsReserve2.value = parsed.reserve2
+    mainBoardStatusBitsReserve3.value = parsed.reserve3
+    mainBoardStatusBitsReserve4.value = parsed.reserve4
   }
-  // 비트 문자열을 개별 boolean으로 파싱하는 헬퍼 함수 (기존 parseMainBoardStatusBits 함수 뒤에 추가)
+
+  // MC On/Off 비트 파싱 (순수 함수 사용)
   const parseMainBoardMCOnOffBits = (bitString: string) => {
-    // "00001000" -> ['0','0','0','0','1','0','0','0']
-    const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
-
-    mcTrain.value = bits[0] === '1' // 1번째 비트
-    mcElevation.value = bits[1] === '1' // 2번째 비트
-    mcAzimuth.value = bits[2] === '1' // 3번째 비트
-    mainBoardMCOnOffBitsReserve1.value = bits[3] === '1' // 4번째 비트
-    mainBoardMCOnOffBitsReserve2.value = bits[4] === '1' // 5번째 비트
-    mainBoardMCOnOffBitsReserve3.value = bits[5] === '1' // 6번째 비트
-    mainBoardMCOnOffBitsReserve4.value = bits[6] === '1' // 7번째 비트
-    mainBoardMCOnOffBitsReserve5.value = bits[7] === '1' // 8번째 비트
+    const parsed = parseMCOnOffBits(bitString)
+    mcTrain.value = parsed.mcTrain
+    mcElevation.value = parsed.mcElevation
+    mcAzimuth.value = parsed.mcAzimuth
+    mainBoardMCOnOffBitsReserve1.value = parsed.reserve1
+    mainBoardMCOnOffBitsReserve2.value = parsed.reserve2
+    mainBoardMCOnOffBitsReserve3.value = parsed.reserve3
+    mainBoardMCOnOffBitsReserve4.value = parsed.reserve4
+    mainBoardMCOnOffBitsReserve5.value = parsed.reserve5
   }
-  // 비트 문자열을 개별 boolean으로 파싱하는 헬퍼 함수 (기존 parseMainBoardMCOnOffBits 함수 뒤에 추가)
+
+  // Azimuth 서보 상태 비트 파싱 (순수 함수 사용)
   const parseAzimuthBoardServoStatusBits = (bitString: string) => {
-    // "00001000" -> ['0','0','0','0','1','0','0','0']
-    const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
-
-    azimuthBoardServoStatusServoAlarmCode1.value = bits[0] === '1' // 1번째 비트
-    azimuthBoardServoStatusServoAlarmCode2.value = bits[1] === '1' // 2번째 비트
-    azimuthBoardServoStatusServoAlarmCode3.value = bits[2] === '1' // 3번째 비트
-    azimuthBoardServoStatusServoAlarmCode4.value = bits[3] === '1' // 4번째 비트
-    azimuthBoardServoStatusServoAlarmCode5.value = bits[4] === '1' // 5번째 비트
-    azimuthBoardServoStatusServoAlarm.value = bits[5] === '1' // 6번째 비트
-    azimuthBoardServoStatusServoBrake.value = bits[6] === '1' // 7번째 비트
-    azimuthBoardServoStatusServoMotor.value = bits[7] === '1' // 8번째 비트
+    const parsed = parseServoStatusBits(bitString)
+    azimuthBoardServoStatusServoAlarmCode1.value = parsed.servoAlarmCode1
+    azimuthBoardServoStatusServoAlarmCode2.value = parsed.servoAlarmCode2
+    azimuthBoardServoStatusServoAlarmCode3.value = parsed.servoAlarmCode3
+    azimuthBoardServoStatusServoAlarmCode4.value = parsed.servoAlarmCode4
+    azimuthBoardServoStatusServoAlarmCode5.value = parsed.servoAlarmCode5
+    azimuthBoardServoStatusServoAlarm.value = parsed.servoAlarm
+    azimuthBoardServoStatusServoBrake.value = parsed.servoBrake
+    azimuthBoardServoStatusServoMotor.value = parsed.servoMotor
   }
 
-  // 비트 문자열을 개별 boolean으로 파싱하는 헬퍼 함수 (기존 parseAzimuthBoardServoStatusBits 함수 뒤에 추가)
+  // Azimuth 보드 상태 비트 파싱 (순수 함수 사용)
   const parseAzimuthBoardStatusBits = (bitString: string) => {
-    // "00001000" -> ['0','0','0','0','1','0','0','0']
-    const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
-
-    azimuthBoardStatusLimitSwitchPositive275.value = bits[0] === '1' // 1번째 비트
-    azimuthBoardStatusLimitSwitchNegative275.value = bits[1] === '1' // 2번째 비트
-    azimuthBoardStatusReserve1.value = bits[2] === '1' // 3번째 비트
-    azimuthBoardStatusReserve2.value = bits[3] === '1' // 4번째 비트
-    azimuthBoardStatusStowPin.value = bits[4] === '1' // 5번째 비트
-    azimuthBoardStatusReserve3.value = bits[5] === '1' // 6번째 비트
-    azimuthBoardStatusReserve4.value = bits[6] === '1' // 7번째 비트
-    azimuthBoardStatusEncoder.value = bits[7] === '1' // 8번째 비트
+    const parsed = parseAzimuthBits(bitString)
+    azimuthBoardStatusLimitSwitchPositive275.value = parsed.limitSwitchPositive275
+    azimuthBoardStatusLimitSwitchNegative275.value = parsed.limitSwitchNegative275
+    azimuthBoardStatusReserve1.value = parsed.reserve1
+    azimuthBoardStatusReserve2.value = parsed.reserve2
+    azimuthBoardStatusStowPin.value = parsed.stowPin
+    azimuthBoardStatusReserve3.value = parsed.reserve3
+    azimuthBoardStatusReserve4.value = parsed.reserve4
+    azimuthBoardStatusEncoder.value = parsed.encoder
   }
-  // 비트 문자열을 개별 boolean으로 파싱하는 헬퍼 함수 (기존 parseAzimuthBoardStatusBits 함수 뒤에 추가)
+
+  // Elevation 서보 상태 비트 파싱 (순수 함수 사용)
   const parseElevationBoardServoStatusBits = (bitString: string) => {
-    // "00001000" -> ['0','0','0','0','1','0','0','0']
-    const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
-
-    elevationBoardServoStatusServoAlarmCode1.value = bits[0] === '1' // 1번째 비트
-    elevationBoardServoStatusServoAlarmCode2.value = bits[1] === '1' // 2번째 비트
-    elevationBoardServoStatusServoAlarmCode3.value = bits[2] === '1' // 3번째 비트
-    elevationBoardServoStatusServoAlarmCode4.value = bits[3] === '1' // 4번째 비트
-    elevationBoardServoStatusServoAlarmCode5.value = bits[4] === '1' // 5번째 비트
-    elevationBoardServoStatusServoAlarm.value = bits[5] === '1' // 6번째 비트
-    elevationBoardServoStatusServoBrake.value = bits[6] === '1' // 7번째 비트
-    elevationBoardServoStatusServoMotor.value = bits[7] === '1' // 8번째 비트
+    const parsed = parseServoStatusBits(bitString)
+    elevationBoardServoStatusServoAlarmCode1.value = parsed.servoAlarmCode1
+    elevationBoardServoStatusServoAlarmCode2.value = parsed.servoAlarmCode2
+    elevationBoardServoStatusServoAlarmCode3.value = parsed.servoAlarmCode3
+    elevationBoardServoStatusServoAlarmCode4.value = parsed.servoAlarmCode4
+    elevationBoardServoStatusServoAlarmCode5.value = parsed.servoAlarmCode5
+    elevationBoardServoStatusServoAlarm.value = parsed.servoAlarm
+    elevationBoardServoStatusServoBrake.value = parsed.servoBrake
+    elevationBoardServoStatusServoMotor.value = parsed.servoMotor
   }
-  // 비트 문자열을 개별 boolean으로 파싱하는 헬퍼 함수 (기존 parseElevationBoardServoStatusBits 함수 뒤에 추가)
+
+  // Elevation 보드 상태 비트 파싱 (순수 함수 사용)
   const parseElevationBoardStatusBits = (bitString: string) => {
-    // "00001000" -> ['0','0','0','0','1','0','0','0']
-    const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
-
-    elevationBoardStatusLimitSwitchPositive180.value = bits[0] === '1' // 1번째 비트
-    elevationBoardStatusLimitSwitchPositive185.value = bits[1] === '1' // 2번째 비트
-    elevationBoardStatusLimitSwitchNegative0.value = bits[2] === '1' // 3번째 비트
-    elevationBoardStatusLimitSwitchNegative5.value = bits[3] === '1' // 4번째 비트
-    elevationBoardStatusStowPin.value = bits[4] === '1' // 5번째 비트
-    elevationBoardStatusReserve1.value = bits[5] === '1' // 6번째 비트
-    elevationBoardStatusReserve2.value = bits[6] === '1' // 7번째 비트
-    elevationBoardStatusEncoder.value = bits[7] === '1' // 8번째 비트
+    const parsed = parseElevationBits(bitString)
+    elevationBoardStatusLimitSwitchPositive180.value = parsed.limitSwitchPositive180
+    elevationBoardStatusLimitSwitchPositive185.value = parsed.limitSwitchPositive185
+    elevationBoardStatusLimitSwitchNegative0.value = parsed.limitSwitchNegative0
+    elevationBoardStatusLimitSwitchNegative5.value = parsed.limitSwitchNegative5
+    elevationBoardStatusStowPin.value = parsed.stowPin
+    elevationBoardStatusReserve1.value = parsed.reserve1
+    elevationBoardStatusReserve2.value = parsed.reserve2
+    elevationBoardStatusEncoder.value = parsed.encoder
   }
-  // 비트 문자열을 개별 boolean으로 파싱하는 헬퍼 함수 (기존 parseElevationBoardStatusBits 함수 뒤에 추가)
+
+  // Train 서보 상태 비트 파싱 (순수 함수 사용)
   const parseTrainBoardServoStatusBits = (bitString: string) => {
-    // "00001000" -> ['0','0','0','0','1','0','0','0']
-    const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
-
-    trainBoardServoStatusServoAlarmCode1.value = bits[0] === '1' // 1번째 비트
-    trainBoardServoStatusServoAlarmCode2.value = bits[1] === '1' // 2번째 비트
-    trainBoardServoStatusServoAlarmCode3.value = bits[2] === '1' // 3번째 비트
-    trainBoardServoStatusServoAlarmCode4.value = bits[3] === '1' // 4번째 비트
-    trainBoardServoStatusServoAlarmCode5.value = bits[4] === '1' // 5번째 비트
-    trainBoardServoStatusServoAlarm.value = bits[5] === '1' // 6번째 비트
-    trainBoardServoStatusServoBrake.value = bits[6] === '1' // 7번째 비트
-    trainBoardServoStatusServoMotor.value = bits[7] === '1' // 8번째 비트
+    const parsed = parseServoStatusBits(bitString)
+    trainBoardServoStatusServoAlarmCode1.value = parsed.servoAlarmCode1
+    trainBoardServoStatusServoAlarmCode2.value = parsed.servoAlarmCode2
+    trainBoardServoStatusServoAlarmCode3.value = parsed.servoAlarmCode3
+    trainBoardServoStatusServoAlarmCode4.value = parsed.servoAlarmCode4
+    trainBoardServoStatusServoAlarmCode5.value = parsed.servoAlarmCode5
+    trainBoardServoStatusServoAlarm.value = parsed.servoAlarm
+    trainBoardServoStatusServoBrake.value = parsed.servoBrake
+    trainBoardServoStatusServoMotor.value = parsed.servoMotor
   }
-  // 비트 문자열을 개별 boolean으로 파싱하는 헬퍼 함수 (기존 parseTrainBoardServoStatusBits 함수 뒤에 추가)
-  const parseTrainBoardStatusBits = (bitString: string) => {
-    // "00001000" -> ['0','0','0','0','1','0','0','0']
-    const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
 
-    trainBoardStatusLimitSwitchPositive275.value = bits[0] === '1' // 1번째 비트
-    trainBoardStatusLimitSwitchNegative275.value = bits[1] === '1' // 2번째 비트
-    trainBoardStatusReserve1.value = bits[2] === '1' // 3번째 비트
-    trainBoardStatusReserve2.value = bits[3] === '1' // 4번째 비트
-    trainBoardStatusStowPin.value = bits[4] === '1' // 5번째 비트
-    trainBoardStatusReserve3.value = bits[5] === '1' // 6번째 비트
-    trainBoardStatusReserve4.value = bits[6] === '1' // 7번째 비트
-    trainBoardStatusEncoder.value = bits[7] === '1' // 8번째 비트
+  // Train 보드 상태 비트 파싱 (순수 함수 사용)
+  const parseTrainBoardStatusBits = (bitString: string) => {
+    const parsed = parseTrainBits(bitString)
+    trainBoardStatusLimitSwitchPositive275.value = parsed.limitSwitchPositive275
+    trainBoardStatusLimitSwitchNegative275.value = parsed.limitSwitchNegative275
+    trainBoardStatusReserve1.value = parsed.reserve1
+    trainBoardStatusReserve2.value = parsed.reserve2
+    trainBoardStatusStowPin.value = parsed.stowPin
+    trainBoardStatusReserve3.value = parsed.reserve3
+    trainBoardStatusReserve4.value = parsed.reserve4
+    trainBoardStatusEncoder.value = parsed.encoder
   }
   /**
-   * S-Band Status Bits 파싱 (ICD 문서: Bits 15-8, 바이트 내부: Bit 0-3 사용)
-   * Bit 0: S RX LNA LHCP Power (0=OFF, 1=ON)
-   * Bit 1: S RX LNA LHCP Error (0=정상, 1=비정상)
-   * Bit 2: S RX LNA RHCP Power (0=OFF, 1=ON)
-   * Bit 3: S RX LNA RHCP Error (0=정상, 1=비정상)
-   * Bit 4-7: Reserved
+   * S-Band Status Bits 파싱 (순수 함수 사용)
+   * ICD 문서: Bits 15-8
    */
   const parseFeedSBoardStatusBits = (bitString: string) => {
-    const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
-
-    feedSBoardStatusLNALHCPPower.value = bits[0] === '1' // Bit 0: LHCP Power
-    feedSBoardStatusLNALHCPError.value = bits[1] === '1' // Bit 1: LHCP Error
-    feedSBoardStatusLNARHCPPower.value = bits[2] === '1' // Bit 2: RHCP Power
-    feedSBoardStatusLNARHCPError.value = bits[3] === '1' // Bit 3: RHCP Error
-    // Bit 4-7: Reserved (사용하지 않음)
-    feedSBoardStatusBitsReserve1.value = false
-    feedSBoardStatusBitsReserve2.value = false
-    // RF Switch는 ETC 바이트에 있음
-    feedSBoardStatusRFSwitchMode.value = false
-    feedSBoardStatusRFSwitchError.value = false
+    const parsed = parseFeedSBits(bitString)
+    feedSBoardStatusLNALHCPPower.value = parsed.lnaLHCPPower
+    feedSBoardStatusLNALHCPError.value = parsed.lnaLHCPError
+    feedSBoardStatusLNARHCPPower.value = parsed.lnaRHCPPower
+    feedSBoardStatusLNARHCPError.value = parsed.lnaRHCPError
+    feedSBoardStatusBitsReserve1.value = parsed.reserve1
+    feedSBoardStatusBitsReserve2.value = parsed.reserve2
+    feedSBoardStatusRFSwitchMode.value = parsed.rfSwitchMode
+    feedSBoardStatusRFSwitchError.value = parsed.rfSwitchError
   }
 
   /**
-   * X-Band Status Bits 파싱 (ICD 문서: Bits 23-16, 바이트 내부: Bit 0-3 사용)
-   * Bit 0: X RX LNA LHCP Power (0=OFF, 1=ON)
-   * Bit 1: X RX LNA LHCP Error (0=정상, 1=비정상)
-   * Bit 2: X RX LNA RHCP Power (0=OFF, 1=ON)
-   * Bit 3: X RX LNA RHCP Error (0=정상, 1=비정상)
-   * Bit 4-7: Reserved
+   * X-Band Status Bits 파싱 (순수 함수 사용)
+   * ICD 문서: Bits 23-16
    */
   const parseFeedXBoardStatusBits = (bitString: string) => {
-    const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
-
-    feedXBoardStatusLNALHCPPower.value = bits[0] === '1' // Bit 0: LHCP Power
-    feedXBoardStatusLNALHCPError.value = bits[1] === '1' // Bit 1: LHCP Error
-    feedXBoardStatusLNARHCPPower.value = bits[2] === '1' // Bit 2: RHCP Power
-    feedXBoardStatusLNARHCPError.value = bits[3] === '1' // Bit 3: RHCP Error
-    // Bit 4-7: Reserved (사용하지 않음)
-    // Fan은 ETC 바이트에 있음
-    feedBoardETCStatusFanPower.value = false
-    feedBoardETCStatusFanError.value = false
+    const parsed = parseFeedXBits(bitString)
+    feedXBoardStatusLNALHCPPower.value = parsed.lnaLHCPPower
+    feedXBoardStatusLNALHCPError.value = parsed.lnaLHCPError
+    feedXBoardStatusLNARHCPPower.value = parsed.lnaRHCPPower
+    feedXBoardStatusLNARHCPError.value = parsed.lnaRHCPError
+    feedBoardETCStatusFanPower.value = parsed.fanPower
+    feedBoardETCStatusFanError.value = parsed.fanError
   }
 
   /**
-   * ETC Status Bits 파싱 (ICD 문서: Bits 7-0)
-   * Bit 0: S TX RF Switch Mode (0=RHCP, 1=LHCP)
-   * Bit 1: S TX RF Switch Error (0=정상, 1=비정상)
-   * Bit 2: Fan Power (0=OFF, 1=ON)
-   * Bit 3: Fan Error (0=정상, 1=비정상)
-   * Bit 4-7: Reserved
+   * ETC Status Bits 파싱 (순수 함수 사용)
+   * ICD 문서: Bits 7-0
    */
   const parseFeedBoardETCStatusBits = (bitString: string) => {
-    const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
-
-    feedBoardETCStatusRFSwitchMode.value = bits[0] === '1' // Bit 0: RF Switch Mode (0=RHCP, 1=LHCP)
-    feedBoardETCStatusRFSwitchError.value = bits[1] === '1' // Bit 1: RF Switch Error
-    feedBoardETCStatusFanPower.value = bits[2] === '1' // Bit 2: Fan Power
-    feedBoardETCStatusFanError.value = bits[3] === '1' // Bit 3: Fan Error
-    // Bit 4-7: Reserved (사용하지 않음)
+    const parsed = parseFeedETCBits(bitString)
+    feedBoardETCStatusRFSwitchMode.value = parsed.rfSwitchMode
+    feedBoardETCStatusRFSwitchError.value = parsed.rfSwitchError
+    feedBoardETCStatusFanPower.value = parsed.fanPower
+    feedBoardETCStatusFanError.value = parsed.fanError
   }
 
   /**
-   * Ka-Band Status Bits 파싱 (ICD 문서: Bits 31-24)
-   * Bit 0: Ka RX LNA LHCP Power (0=OFF, 1=ON)
-   * Bit 1: Ka RX LNA LHCP Error (0=정상, 1=비정상)
-   * Bit 2: Ka RX LNA RHCP Power (0=OFF, 1=ON)
-   * Bit 3: Ka RX LNA RHCP Error (0=정상, 1=비정상)
-   * Bit 4: Ka Selection LHCP Band (0=Band1, 1=Band2)
-   * Bit 5: Ka Selection LHCP Error (0=정상, 1=비정상)
-   * Bit 6: Ka Selection RHCP Band (0=Band1, 1=Band2)
-   * Bit 7: Ka Selection RHCP Error (0=정상, 1=비정상)
+   * Ka-Band Status Bits 파싱 (순수 함수 사용)
+   * ICD 문서: Bits 31-24
    */
   const parseFeedKaBoardStatusBits = (bitString: string) => {
-    const bits = bitString.padStart(8, '0').split('').reverse() // 오른쪽부터 1번째 비트
-
-    feedKaBoardStatusLNALHCPPower.value = bits[0] === '1' // Bit 0: RX LNA LHCP Power
-    feedKaBoardStatusLNALHCPError.value = bits[1] === '1' // Bit 1: RX LNA LHCP Error
-    feedKaBoardStatusLNARHCPPower.value = bits[2] === '1' // Bit 2: RX LNA RHCP Power
-    feedKaBoardStatusLNARHCPError.value = bits[3] === '1' // Bit 3: RX LNA RHCP Error
-    feedKaBoardStatusSelectionLHCPBand.value = bits[4] === '1' // Bit 4: Selection LHCP Band
-    feedKaBoardStatusSelectionLHCPError.value = bits[5] === '1' // Bit 5: Selection LHCP Error
-    feedKaBoardStatusSelectionRHCPBand.value = bits[6] === '1' // Bit 6: Selection RHCP Band
-    feedKaBoardStatusSelectionRHCPError.value = bits[7] === '1' // Bit 7: Selection RHCP Error
+    const parsed = parseFeedKaBits(bitString)
+    feedKaBoardStatusLNALHCPPower.value = parsed.lnaLHCPPower
+    feedKaBoardStatusLNALHCPError.value = parsed.lnaLHCPError
+    feedKaBoardStatusLNARHCPPower.value = parsed.lnaRHCPPower
+    feedKaBoardStatusLNARHCPError.value = parsed.lnaRHCPError
+    feedKaBoardStatusSelectionLHCPBand.value = parsed.selectionLHCPBand
+    feedKaBoardStatusSelectionLHCPError.value = parsed.selectionLHCPError
+    feedKaBoardStatusSelectionRHCPBand.value = parsed.selectionRHCPBand
+    feedKaBoardStatusSelectionRHCPError.value = parsed.selectionRHCPError
   }
 
   // 전체 프로토콜 상태 정보를 제공하는 computed
@@ -1810,67 +1789,40 @@ export const useICDStore = defineStore('icd', () => {
       console.error('❌ UI 업데이트 오류:', e)
     }
   }
-  // 추적 상태 업데이트 함수 수정
+  // 추적 상태 업데이트 함수 (순수 함수 사용)
   const updataTrackingStatus = (trackingStatusData: Record<string, unknown>) => {
     try {
-      // Ephemeris 상태 업데이트 (Boolean)
-      if (trackingStatusData.ephemerisStatus !== undefined) {
-        const newStatus = trackingStatusData.ephemerisStatus as boolean | null
-        if (ephemerisStatus.value !== newStatus) {
-          // ✅ 디버깅 로그 비활성화
-          // console.log(`📡 Ephemeris 상태 변경: ${ephemerisStatus.value} → ${newStatus}`)
-          ephemerisStatus.value = newStatus
-        }
+      // 현재 상태
+      const currentState: CurrentTrackingState = {
+        ephemerisStatus: ephemerisStatus.value,
+        ephemerisTrackingState: ephemerisTrackingState.value,
+        passScheduleStatus: passScheduleStatus.value,
+        passScheduleTrackingState: passScheduleTrackingState.value,
+        sunTrackStatus: sunTrackStatus.value,
+        sunTrackTrackingState: sunTrackTrackingState.value,
       }
 
-      // ✅ 새로 추가: Ephemeris 추적 상태 업데이트
-      if (trackingStatusData.ephemerisTrackingState !== undefined) {
-        const newState = trackingStatusData.ephemerisTrackingState as string | null
-        if (ephemerisTrackingState.value !== newState) {
-          ephemerisTrackingState.value = newState
-          // ✅ 디버깅 로그 비활성화
-          // console.log(' Ephemeris 추적 상태 업데이트:', newState)
-        }
-      }
+      // 순수 함수로 업데이트할 필드 계산
+      const updates = parseTrackingStatusUpdate(trackingStatusData, currentState)
 
-      // Pass Schedule 상태 업데이트 (Boolean)
-      if (trackingStatusData.passScheduleStatus !== undefined) {
-        const newStatus = trackingStatusData.passScheduleStatus as boolean | null
-        if (passScheduleStatus.value !== newStatus) {
-          // ✅ 디버깅 로그 비활성화
-          // console.log(`📅 Pass Schedule 상태 변경: ${passScheduleStatus.value} → ${newStatus}`)
-          passScheduleStatus.value = newStatus
-        }
+      // 변경된 필드만 업데이트
+      if (updates.ephemerisStatus !== undefined) {
+        ephemerisStatus.value = updates.ephemerisStatus
       }
-
-      // ✅ 새로 추가: Pass Schedule 추적 상태 업데이트 (상세 상태)
-      if (trackingStatusData.passScheduleTrackingState !== undefined) {
-        const newState = trackingStatusData.passScheduleTrackingState as string | null
-        if (passScheduleTrackingState.value !== newState) {
-          // console.log('📅 Pass Schedule 추적 상태 변경:', passScheduleTrackingState.value, '→', newState)
-          passScheduleTrackingState.value = newState
-        }
+      if (updates.ephemerisTrackingState !== undefined) {
+        ephemerisTrackingState.value = updates.ephemerisTrackingState
       }
-
-      // Sun Track 상태 업데이트 (Boolean)
-      if (trackingStatusData.sunTrackStatus !== undefined) {
-        const newStatus = trackingStatusData.sunTrackStatus as boolean | null
-        if (sunTrackStatus.value !== newStatus) {
-          // ✅ 디버깅 로그 비활성화
-          // console.log(`☀️ Sun Track 상태 변경: ${sunTrackStatus.value} → ${newStatus}`)
-          sunTrackStatus.value = newStatus
-        }
+      if (updates.passScheduleStatus !== undefined) {
+        passScheduleStatus.value = updates.passScheduleStatus
       }
-
-      // ✅ 새로 추가: Sun Track 추적 상태 업데이트
-      if (trackingStatusData.sunTrackTrackingState !== undefined) {
-        const newState = trackingStatusData.sunTrackTrackingState as string | null
-        if (sunTrackTrackingState.value !== newState) {
-          // ✅ 디버깅 로그 비활성화
-          // console.log('☀️ Sun Track 추적 상태 변경 감지:', { ... })
-          sunTrackTrackingState.value = newState
-          // console.log('☀️ Sun Track 추적 상태 업데이트 완료:', newState)
-        }
+      if (updates.passScheduleTrackingState !== undefined) {
+        passScheduleTrackingState.value = updates.passScheduleTrackingState
+      }
+      if (updates.sunTrackStatus !== undefined) {
+        sunTrackStatus.value = updates.sunTrackStatus
+      }
+      if (updates.sunTrackTrackingState !== undefined) {
+        sunTrackTrackingState.value = updates.sunTrackTrackingState
       }
     } catch (e) {
       console.error('❌ 추적 상태 업데이트 오류:', e)
