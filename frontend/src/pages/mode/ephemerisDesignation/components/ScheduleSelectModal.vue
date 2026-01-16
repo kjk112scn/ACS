@@ -1,5 +1,9 @@
 <template>
-  <q-dialog :model-value="modelValue" @update:model-value="emit('update:modelValue', $event)" persistent maximized>
+  <q-dialog
+    :model-value="modelValue"
+    @update:model-value="emit('update:modelValue', $event)"
+    maximized
+  >
     <q-card class="q-pa-md" style="width: 1200px; max-width: 98vw; max-height: 70vh">
       <q-card-section class="bg-primary text-white">
         <div class="text-h6">Select Schedule</div>

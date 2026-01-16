@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
+import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.*
 import reactor.core.publisher.Mono
 import java.time.ZonedDateTime
@@ -56,7 +57,7 @@ class PassScheduleController(
             description = "TLE 데이터 추가 요청",
             required = true
         )
-        @RequestBody request: AddTleRequest
+        @Valid @RequestBody request: AddTleRequest
     ): ResponseEntity<Map<String, Any>> {
         return try {
             // satelliteId 결정: 요청에서 제공되면 사용, 없으면 TLE Line1에서 추출
@@ -131,12 +132,21 @@ class PassScheduleController(
                     "timestamp" to System.currentTimeMillis()
                 )
             )
+        } catch (e: IllegalArgumentException) {
+            logger.warn("TLE 데이터 추가 실패 - 잘못된 입력: ${e.message}")
+            ResponseEntity.badRequest().body(
+                mapOf(
+                    "success" to false,
+                    "message" to "TLE 데이터 추가 실패: ${e.message}",
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
         } catch (e: Exception) {
-            logger.error("TLE 데이터 추가 실패: ${e.message}", e)
+            logger.error("TLE 데이터 추가 실패", e)
             ResponseEntity.internalServerError().body(
                 mapOf(
                     "success" to false,
-                    "message" to "TLE 데이터 추가 중 오류가 발생했습니다: ${e.message}",
+                    "message" to "TLE 데이터 추가 중 서버 오류가 발생했습니다.",
                     "timestamp" to System.currentTimeMillis()
                 )
             )
@@ -386,7 +396,7 @@ class PassScheduleController(
     )
     fun updateTle(
         @PathVariable satelliteId: String,
-        @RequestBody request: UpdateTleRequest
+        @Valid @RequestBody request: UpdateTleRequest
     ): ResponseEntity<Map<String, Any>> {
         return try {
             // 입력 검증
@@ -947,7 +957,7 @@ class PassScheduleController(
         operationId = "addtleandgeneratetracking",
         tags = ["Mode - Pass Schedule"]
     )
-    fun addTleAndGenerateTracking(@RequestBody request: AddTleRequest): Mono<ResponseEntity<Map<String, Any>>> {
+    fun addTleAndGenerateTracking(@Valid @RequestBody request: AddTleRequest): Mono<ResponseEntity<Map<String, Any>>> {
         logger.info("TLE 추가 및 추적 데이터 생성 요청 수신")
 
         return Mono.fromCallable {
@@ -1058,7 +1068,7 @@ class PassScheduleController(
         operationId = "setpassscheduletargets",
         tags = ["Mode - Pass Schedule"]
     )
-    fun setTrackingTargets(@RequestBody request: SetTrackingTargetsRequest): ResponseEntity<Map<String, Any>> {
+    fun setTrackingTargets(@Valid @RequestBody request: SetTrackingTargetsRequest): ResponseEntity<Map<String, Any>> {
         return try {
             // 입력 검증
             if (request.targets.isEmpty()) {

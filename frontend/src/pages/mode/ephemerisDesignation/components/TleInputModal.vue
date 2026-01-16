@@ -1,5 +1,5 @@
 <template>
-  <q-dialog :model-value="modelValue" @update:model-value="emit('update:modelValue', $event)" persistent>
+  <q-dialog :model-value="modelValue" @update:model-value="emit('update:modelValue', $event)">
     <q-card class="q-pa-md" style="width: 700px; max-width: 95vw">
       <q-card-section class="bg-primary text-white">
         <div class="text-h6">TLE 입력</div>

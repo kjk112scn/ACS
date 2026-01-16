@@ -68,7 +68,7 @@
   />
 
   <!-- 스케줄 선택 모달 -->
-  <q-dialog v-model="showScheduleModal" persistent maximized>
+  <q-dialog v-model="showScheduleModal" maximized>
     <q-card class="q-pa-md" style="width: 1200px; max-width: 98vw; max-height: 70vh">
       <q-card-section class="bg-primary text-white">
         <div class="text-h6">Select Schedule</div>

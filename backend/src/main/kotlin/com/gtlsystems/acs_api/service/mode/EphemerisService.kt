@@ -34,6 +34,8 @@ import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import com.gtlsystems.acs_api.service.system.BatchStorageManager
 import com.gtlsystems.acs_api.service.system.settings.SettingsService
+import com.gtlsystems.acs_api.service.mode.ephemeris.EphemerisTLECache
+import com.gtlsystems.acs_api.service.mode.ephemeris.EphemerisDataRepository
 import kotlin.math.abs
 
 /**
@@ -49,19 +51,23 @@ class EphemerisService(
     private val dataStoreService: DataStoreService, // DataStoreService 주입
     private val threadManager: ThreadManager, // ✅ 통합 쓰레드 관리자 주입
     private val batchStorageManager: BatchStorageManager, // ✅ 배치 저장 관리자 주입
-    private val settingsService: SettingsService // ✅ 설정 서비스 주입
+    private val settingsService: SettingsService, // ✅ 설정 서비스 주입
+    private val ephemerisTLECache: EphemerisTLECache, // ✅ Phase 5: TLE 캐시 분리
+    private val ephemerisDataRepository: EphemerisDataRepository // ✅ Phase 5: 데이터 저장소 분리
 ) {
 
     // 밀리초를 포함하는 사용자 정의 포맷터 생성
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    // 위성 TLE 데이터 캐시
-    private val satelliteTleCache = ConcurrentHashMap<String, Pair<String, String>>()
+    // ✅ Phase 5: TLE 캐시는 ephemerisTLECache로 분리됨
     private val locationData = settingsService.locationData
 
-    // 위성 추적 마스터 및 세부 데이터 저장소 (실제로는 데이터베이스를 사용할 것입니다)
-    private val ephemerisTrackMstStorage = mutableListOf<Map<String, Any?>>()
-    private val ephemerisTrackDtlStorage = mutableListOf<Map<String, Any?>>()
+    // ✅ Phase 5: 데이터 저장소는 ephemerisDataRepository로 분리됨
+    // 내부 저장소 접근자 (기존 코드 호환성 유지)
+    private val ephemerisTrackMstStorage: MutableList<Map<String, Any?>>
+        get() = ephemerisDataRepository.getAllMst().toMutableList()
+    private val ephemerisTrackDtlStorage: MutableList<Map<String, Any?>>
+        get() = ephemerisDataRepository.getAllDtl().toMutableList()
 
     // 현재 추적 중인 위성 정보
     private var currentTrackingPass: Map<String, Any?>? = null
@@ -449,51 +455,56 @@ class EphemerisService(
             )
             logger.info("✅ Processor 완료")
 
-            // 3️⃣ ephemerisTrackMstStorage, ephemerisTrackDtlStorage에 저장
+            // 3️⃣ ✅ Phase 5: ephemerisDataRepository에 저장 (저장소 분리)
             logger.info("💾 저장소에 데이터 저장 중...")
-            ephemerisTrackMstStorage.clear()
-            ephemerisTrackDtlStorage.clear()
 
-            // Original 데이터 저장
-            ephemerisTrackMstStorage.addAll(processedData.originalMst)
-            ephemerisTrackDtlStorage.addAll(processedData.originalDtl)
-            logger.debug("Original 저장: ${processedData.originalMst.size} Mst, ${processedData.originalDtl.size} Dtl")
+            // 모든 MST/DTL 데이터 수집
+            val allMstData = mutableListOf<Map<String, Any?>>()
+            val allDtlData = mutableListOf<Map<String, Any?>>()
 
-            // 3축 변환 데이터 저장
-            ephemerisTrackMstStorage.addAll(processedData.axisTransformedMst)
-            ephemerisTrackDtlStorage.addAll(processedData.axisTransformedDtl)
-            logger.debug("3축 변환 저장: ${processedData.axisTransformedMst.size} Mst, ${processedData.axisTransformedDtl.size} Dtl")
+            // Original 데이터
+            allMstData.addAll(processedData.originalMst)
+            allDtlData.addAll(processedData.originalDtl)
+            logger.debug("Original 준비: ${processedData.originalMst.size} Mst, ${processedData.originalDtl.size} Dtl")
 
-            // 최종 변환 데이터 저장 (Train=0, 각도 제한 ✅)
-            ephemerisTrackMstStorage.addAll(processedData.finalTransformedMst)
-            ephemerisTrackDtlStorage.addAll(processedData.finalTransformedDtl)
-            logger.debug("최종 변환 저장: ${processedData.finalTransformedMst.size} Mst, ${processedData.finalTransformedDtl.size} Dtl")
+            // 3축 변환 데이터
+            allMstData.addAll(processedData.axisTransformedMst)
+            allDtlData.addAll(processedData.axisTransformedDtl)
+            logger.debug("3축 변환 준비: ${processedData.axisTransformedMst.size} Mst, ${processedData.axisTransformedDtl.size} Dtl")
 
-            // ✅ Keyhole Axis 변환 데이터 저장 (Train≠0, 각도 제한 ❌)
-            ephemerisTrackMstStorage.addAll(processedData.keyholeAxisTransformedMst)
-            ephemerisTrackDtlStorage.addAll(processedData.keyholeAxisTransformedDtl)
-            logger.debug("Keyhole Axis 저장: ${processedData.keyholeAxisTransformedMst.size} Mst, ${processedData.keyholeAxisTransformedDtl.size} Dtl")
+            // 최종 변환 데이터 (Train=0, 각도 제한 ✅)
+            allMstData.addAll(processedData.finalTransformedMst)
+            allDtlData.addAll(processedData.finalTransformedDtl)
+            logger.debug("최종 변환 준비: ${processedData.finalTransformedMst.size} Mst, ${processedData.finalTransformedDtl.size} Dtl")
 
-            // ✅ Keyhole Final 변환 데이터 저장 (Train≠0, 각도 제한 ✅)
-            ephemerisTrackMstStorage.addAll(processedData.keyholeFinalTransformedMst)
-            ephemerisTrackDtlStorage.addAll(processedData.keyholeFinalTransformedDtl)
-            logger.debug("Keyhole Final 저장: ${processedData.keyholeFinalTransformedMst.size} Mst, ${processedData.keyholeFinalTransformedDtl.size} Dtl")
+            // ✅ Keyhole Axis 변환 데이터 (Train≠0, 각도 제한 ❌)
+            allMstData.addAll(processedData.keyholeAxisTransformedMst)
+            allDtlData.addAll(processedData.keyholeAxisTransformedDtl)
+            logger.debug("Keyhole Axis 준비: ${processedData.keyholeAxisTransformedMst.size} Mst, ${processedData.keyholeAxisTransformedDtl.size} Dtl")
 
-            // ✅ Keyhole Optimized Axis 변환 데이터 저장 (Train≠0 최적화, 각도 제한 ❌)
-            ephemerisTrackMstStorage.addAll(processedData.keyholeOptimizedAxisTransformedMst)
-            ephemerisTrackDtlStorage.addAll(processedData.keyholeOptimizedAxisTransformedDtl)
-            logger.debug("Keyhole Optimized Axis 저장: ${processedData.keyholeOptimizedAxisTransformedMst.size} Mst, ${processedData.keyholeOptimizedAxisTransformedDtl.size} Dtl")
+            // ✅ Keyhole Final 변환 데이터 (Train≠0, 각도 제한 ✅)
+            allMstData.addAll(processedData.keyholeFinalTransformedMst)
+            allDtlData.addAll(processedData.keyholeFinalTransformedDtl)
+            logger.debug("Keyhole Final 준비: ${processedData.keyholeFinalTransformedMst.size} Mst, ${processedData.keyholeFinalTransformedDtl.size} Dtl")
 
-            // ✅ Keyhole Optimized Final 변환 데이터 저장 (Train≠0 최적화, 각도 제한 ✅)
-            ephemerisTrackMstStorage.addAll(processedData.keyholeOptimizedFinalTransformedMst)
-            ephemerisTrackDtlStorage.addAll(processedData.keyholeOptimizedFinalTransformedDtl)
-            logger.info("✅ Keyhole Optimized Final 저장: ${processedData.keyholeOptimizedFinalTransformedMst.size} Mst, ${processedData.keyholeOptimizedFinalTransformedDtl.size} Dtl")
+            // ✅ Keyhole Optimized Axis 변환 데이터 (Train≠0 최적화, 각도 제한 ❌)
+            allMstData.addAll(processedData.keyholeOptimizedAxisTransformedMst)
+            allDtlData.addAll(processedData.keyholeOptimizedAxisTransformedDtl)
+            logger.debug("Keyhole Optimized Axis 준비: ${processedData.keyholeOptimizedAxisTransformedMst.size} Mst, ${processedData.keyholeOptimizedAxisTransformedDtl.size} Dtl")
+
+            // ✅ Keyhole Optimized Final 변환 데이터 (Train≠0 최적화, 각도 제한 ✅)
+            allMstData.addAll(processedData.keyholeOptimizedFinalTransformedMst)
+            allDtlData.addAll(processedData.keyholeOptimizedFinalTransformedDtl)
+            logger.info("✅ Keyhole Optimized Final 준비: ${processedData.keyholeOptimizedFinalTransformedMst.size} Mst, ${processedData.keyholeOptimizedFinalTransformedDtl.size} Dtl")
+
+            // ✅ Repository에 일괄 저장 (로그 포함)
+            ephemerisDataRepository.replaceAll(allMstData, allDtlData)
             // 🔍 디버깅: 저장된 MST 데이터 상세 정보
             processedData.keyholeOptimizedFinalTransformedMst.forEach { mst ->
                 logger.info("   저장된 MST - No: ${mst["No"]}, RecommendedTrainAngle: ${mst["RecommendedTrainAngle"]}, MaxAzRate: ${mst["MaxAzRate"]}, DataType: ${mst["DataType"]}")
             }
 
-            logger.info("✅ 저장 완료: 총 ${ephemerisTrackMstStorage.size}개 Mst, ${ephemerisTrackDtlStorage.size}개 Dtl")
+            logger.info("✅ 저장 완료: 총 ${ephemerisDataRepository.getMstSize()}개 Mst, ${ephemerisDataRepository.getDtlSize()}개 Dtl")
             logger.info("🎉 위성 궤도 추적 완료")
 
             // 최종 변환된 데이터 반환
@@ -773,21 +784,24 @@ class EphemerisService(
     ) {
         logger.info("💾 4단계: 모든 변환 데이터 저장 시작")
 
-        // 저장소 초기화
-        ephemerisTrackMstStorage.clear()
-        ephemerisTrackDtlStorage.clear()
+        // ✅ Phase 5: Repository 사용
+        val allMstData = mutableListOf<Map<String, Any?>>()
+        val allDtlData = mutableListOf<Map<String, Any?>>()
 
-        // 원본 데이터 저장
-        ephemerisTrackMstStorage.addAll(originalMst)
-        ephemerisTrackDtlStorage.addAll(originalDtl)
+        // 원본 데이터
+        allMstData.addAll(originalMst)
+        allDtlData.addAll(originalDtl)
 
-        // 축변환 데이터 저장
-        ephemerisTrackMstStorage.addAll(axisTransformedMst)
-        ephemerisTrackDtlStorage.addAll(axisTransformedDtl)
+        // 축변환 데이터
+        allMstData.addAll(axisTransformedMst)
+        allDtlData.addAll(axisTransformedDtl)
 
-        // 최종 변환 데이터 저장
-        ephemerisTrackMstStorage.addAll(finalMst)
-        ephemerisTrackDtlStorage.addAll(finalDtl)
+        // 최종 변환 데이터
+        allMstData.addAll(finalMst)
+        allDtlData.addAll(finalDtl)
+
+        // Repository에 일괄 저장
+        ephemerisDataRepository.replaceAll(allMstData, allDtlData)
 
         logger.info("💾 4단계 완료: 모든 변환 데이터 저장")
         logger.info("  - 원본 데이터: ${originalMst.size}개 마스터, ${originalDtl.size}개 세부")
@@ -3722,14 +3736,10 @@ class EphemerisService(
 
     /**
      * 기울기 변환이 적용된 추적 데이터를 저장소에 저장
+     * ✅ Phase 5: Repository 사용
      */
     fun saveTiltTransformedData(mstData: List<Map<String, Any?>>, dtlData: List<Map<String, Any?>>) {
-        synchronized(ephemerisTrackMstStorage) {
-            ephemerisTrackMstStorage.addAll(mstData)
-        }
-        synchronized(ephemerisTrackDtlStorage) {
-            ephemerisTrackDtlStorage.addAll(dtlData)
-        }
+        ephemerisDataRepository.addAll(mstData, dtlData)
         logger.info("기울기 변환된 추적 데이터 저장 완료: 마스터 ${mstData.size}개, 세부 ${dtlData.size}개")
     }
 
@@ -3911,32 +3921,34 @@ class EphemerisService(
 
     /**
      * 위성 TLE 데이터를 캐시에 추가합니다.
+     * ✅ Phase 5: EphemerisTLECache 사용
      */
     fun addSatelliteTle(satelliteId: String, tleLine1: String, tleLine2: String) {
-        satelliteTleCache[satelliteId] = Pair(tleLine1, tleLine2)
-        logger.info("위성 TLE 데이터가 캐시에 추가되었습니다. 위성 ID: $satelliteId")
+        ephemerisTLECache.add(satelliteId, tleLine1, tleLine2)
     }
 
     /**
      * 위성 TLE 데이터를 캐시에서 가져옵니다.
+     * ✅ Phase 5: EphemerisTLECache 사용
      */
     fun getSatelliteTle(satelliteId: String): Pair<String, String>? {
-        return satelliteTleCache[satelliteId]
+        return ephemerisTLECache.get(satelliteId)
     }
 
     /**
      * 위성 TLE 데이터를 캐시에서 삭제합니다.
+     * ✅ Phase 5: EphemerisTLECache 사용
      */
     fun removeSatelliteTle(satelliteId: String) {
-        satelliteTleCache.remove(satelliteId)
-        logger.info("위성 TLE 데이터가 캐시에서 삭제되었습니다. 위성 ID: $satelliteId")
+        ephemerisTLECache.remove(satelliteId)
     }
 
     /**
      * 캐시된 모든 위성 ID 목록을 반환합니다.
+     * ✅ Phase 5: EphemerisTLECache 사용
      */
     fun getAllSatelliteIds(): List<String> {
-        return satelliteTleCache.keys.toList()
+        return ephemerisTLECache.getAllIds()
     }
 
     /**

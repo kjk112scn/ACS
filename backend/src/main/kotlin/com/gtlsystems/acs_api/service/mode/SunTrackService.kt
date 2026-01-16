@@ -391,24 +391,28 @@ class SunTrackService(
                     return
                 }
                 
-                targetTrainAngle = trainResult.angle
-                logger.info("📐 [TRAIN_INIT] 계산된 Train 기준 각도: {}° ({})", 
-                    String.format("%.3f", trainResult.angle),
+                val computedTrainAngle = trainResult.angle
+                targetTrainAngle = computedTrainAngle
+                logger.info("📐 [TRAIN_INIT] 계산된 Train 기준 각도: {}° ({})",
+                    String.format("%.3f", computedTrainAngle),
                     trainResult.calculationMethod)
-                
+
                 // ✅ offset 적용된 각도 계산
-                val offsetAppliedAngle = getTrainOffsetCalculator()!!.toFloat()
+                val offsetAppliedAngle = getTrainOffsetCalculator()?.toFloat() ?: run {
+                    logger.error("Train offset 계산 실패")
+                    return
+                }
 
                 logger.info("🎯 [TRAIN_INIT] Offset 적용 완료:")
-                logger.info("  - 기준 각도: {}°", String.format("%.3f", targetTrainAngle))
+                logger.info("  - 기준 각도: {}°", String.format("%.3f", computedTrainAngle))
                 logger.info("  - Train Position Offset: {}°", String.format("%.3f", GlobalData.Offset.trainPositionOffset))
                 logger.info("  - True North Offset: {}°", String.format("%.3f", GlobalData.Offset.trueNorthOffset))
                 logger.info("  - 최종 명령 각도: {}°", String.format("%.3f", offsetAppliedAngle))
 
                 // ✅ Train 이동 명령 전송
                 // 🔧 FIX: 원본값 전송 (펌웨어가 내부적으로 Offset 적용함)
-                GlobalData.SunTrackingData.trainAngle = targetTrainAngle!!.toFloat()
-                sendTrainMovementCommand(targetTrainAngle!!.toFloat(), trainSpeed)
+                GlobalData.SunTrackingData.trainAngle = computedTrainAngle.toFloat()
+                sendTrainMovementCommand(computedTrainAngle.toFloat(), trainSpeed)
                     
                 // ✅ 안정화 단계로 전환
                 sunTrackState = SunTrackState.STABILIZING
@@ -475,7 +479,8 @@ class SunTrackService(
                     }
 
                     val currentTime = System.currentTimeMillis()
-                    val stabilizationDuration = currentTime - trainStabilizationStartTime!!
+                    val startTime = trainStabilizationStartTime ?: return
+                    val stabilizationDuration = currentTime - startTime
                     
                     // ✅ 5초마다 로그 출력
                     if (stabilizationDuration % 5000 < 100) {
@@ -533,116 +538,115 @@ class SunTrackService(
         val totalStartTime = System.currentTimeMillis()
 
         try {
-            if (targetTrainAngle?.toFloat() != null) {
-                // 0단계: Offset 변경 감지 및 Train 축 즉시 조정
-                val currentTrainPosOffset = GlobalData.Offset.trainPositionOffset
-                val currentTrueNorthOffset = GlobalData.Offset.trueNorthOffset
+            val safeTargetTrainAngle = targetTrainAngle ?: return
 
-                if (currentTrainPosOffset != lastAppliedTrainPosOffset || currentTrueNorthOffset != lastAppliedTrueNorthOffset) {
-                    logger.info("⚠️ [OFFSET_CHANGED] Train Offset 변경 감지!")
-                    logger.info("  - Train Position Offset: {}° → {}°",
-                        String.format("%.3f", lastAppliedTrainPosOffset),
-                        String.format("%.3f", currentTrainPosOffset))
-                    logger.info("  - True North Offset: {}° → {}°",
-                        String.format("%.3f", lastAppliedTrueNorthOffset),
-                        String.format("%.3f", currentTrueNorthOffset))
+            // 0단계: Offset 변경 감지 및 Train 축 즉시 조정
+            val currentTrainPosOffset = GlobalData.Offset.trainPositionOffset
+            val currentTrueNorthOffset = GlobalData.Offset.trueNorthOffset
 
-                    // ✅ 새로운 Offset 적용된 Train 각도 계산
-                    val newTrainAngle = getTrainOffsetCalculator()!!.toFloat()
+            if (currentTrainPosOffset != lastAppliedTrainPosOffset || currentTrueNorthOffset != lastAppliedTrueNorthOffset) {
+                logger.info("⚠️ [OFFSET_CHANGED] Train Offset 변경 감지!")
+                logger.info("  - Train Position Offset: {}° → {}°",
+                    String.format("%.3f", lastAppliedTrainPosOffset),
+                    String.format("%.3f", currentTrainPosOffset))
+                logger.info("  - True North Offset: {}° → {}°",
+                    String.format("%.3f", lastAppliedTrueNorthOffset),
+                    String.format("%.3f", currentTrueNorthOffset))
 
-                    // ✅ Train 축 즉시 이동
-                    // 🔧 FIX: 원본값 전송 (펌웨어가 내부적으로 Offset 적용함)
-                    sendTrainMovementCommand(targetTrainAngle!!.toFloat(), trainSpeed)
-                    GlobalData.SunTrackingData.trainAngle = targetTrainAngle!!.toFloat()
-
-                    // ✅ 적용된 Offset 저장
-                    lastAppliedTrainPosOffset = currentTrainPosOffset
-                    lastAppliedTrueNorthOffset = currentTrueNorthOffset
-
-                    logger.info("✅ [OFFSET_APPLIED] Train 각도 즉시 조정: {}°", String.format("%.3f", newTrainAngle))
+                // ✅ 새로운 Offset 적용된 Train 각도 계산
+                val newTrainAngle = getTrainOffsetCalculator()?.toFloat() ?: run {
+                    logger.error("Train offset 계산 실패")
+                    return
                 }
 
-                // 1단계: Cal Time 계산
-                val calTimeStart = System.currentTimeMillis()
-                val calTime = GlobalData.Time.resultTimeOffsetCalTime
-                val utcLocalDateTime = calTime.withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime()
-                val calTimeDuration = System.currentTimeMillis() - calTimeStart
+                // ✅ Train 축 즉시 이동
+                // 🔧 FIX: 원본값 전송 (펌웨어가 내부적으로 Offset 적용함)
+                sendTrainMovementCommand(safeTargetTrainAngle.toFloat(), trainSpeed)
+                GlobalData.SunTrackingData.trainAngle = safeTargetTrainAngle.toFloat()
 
-                // 2단계: 태양 위치 계산
-                val sunCalcStart = System.currentTimeMillis()
-                val sunPosition = solarOrekitCalculator.getSunPositionAt(utcLocalDateTime)
-                val sunCalcDuration = System.currentTimeMillis() - sunCalcStart
+                // ✅ 적용된 Offset 저장
+                lastAppliedTrainPosOffset = currentTrainPosOffset
+                lastAppliedTrueNorthOffset = currentTrueNorthOffset
 
-                // 3단계: 3축 좌표 변환
-                val transformStart = System.currentTimeMillis()
-                val (transformedAz, transformedEl) = CoordinateTransformer.transformCoordinatesWithTrain(
-                    azimuth = sunPosition.azimuthDegrees,
-                    elevation = sunPosition.elevationDegrees,
-                    tiltAngle = settingsService.tiltAngle,
-                    trainAngle = targetTrainAngle!!
-                )
-                val transformDuration = System.currentTimeMillis() - transformStart
-
-                // ✅ 4단계: 연속 추적을 위한 Azimuth 경로 조정 (핵심 수정!)
-                val pathAdjustedAzimuth = calculateAzimuthBySunPath(transformedAz)
-
-                // 5단계: 명령 전송
-                val commandStart = System.currentTimeMillis()
-                // 🔧 FIX: multiManualCommand에서 Offset을 적용하므로 원본값 전달
-                // multiManualCommand가 CMD.cmdTrainAngle = trainAngle + Offset 으로 설정함
-                sendAzimuthAndElevationAxisCommand(
-                    pathAdjustedAzimuth.toFloat(),
-                    azimuthSpeed,
-                    transformedEl.toFloat(),
-                    elevationSpeed,
-                    targetTrainAngle!!.toFloat(),  // 원본값 (multiManualCommand에서 Offset 적용)
-                    trainSpeed
-                )
-                val commandDuration = System.currentTimeMillis() - commandStart
-                
-                // ✅ 데이터 스토어 업데이트
-                dataStoreService.setSunTracking(true)
-                
-                // ✅ 전체 성능 분석
-                val totalEndTime = System.currentTimeMillis()
-                val totalProcessingTime = totalEndTime - totalStartTime
-                val currentTime = System.currentTimeMillis()
-                val timeSinceLastCycle = if (lastTrackingTime != null) currentTime - lastTrackingTime!! else 0L
-                lastTrackingTime = currentTime
-                
-                // ✅ 성능 경고
-                val performanceWarning = StringBuilder()
-                if (calTimeDuration > 10) performanceWarning.append("CalTime:${calTimeDuration}ms ")
-                if (sunCalcDuration > 20) performanceWarning.append("SunCalc:${sunCalcDuration}ms ")
-                if (transformDuration > 10) performanceWarning.append("Transform:${transformDuration}ms ")
-                if (commandDuration > 30) performanceWarning.append("Command:${commandDuration}ms ")
-                if (totalProcessingTime > 50) performanceWarning.append("Total:${totalProcessingTime}ms ")
-                if (timeSinceLastCycle > 150) performanceWarning.append("CycleDelay:${timeSinceLastCycle}ms ")
-                
-                if (performanceWarning.isNotEmpty()) {
-                    logger.warn("🚨 SunTrack 성능 경고: {}", performanceWarning.toString())
-                }
-                
-                logger.info("📊 SunTrack 성능: CalTime={}ms, SunCalc={}ms, Transform={}ms, Command={}ms, Total={}ms", 
-                    calTimeDuration, sunCalcDuration, transformDuration, commandDuration, totalProcessingTime)
-                
-                logger.info("[CalTime] 원본 태양 위치: Az={}°, El={}°", 
-                    String.format("%.3f", sunPosition.azimuthDegrees),
-                    String.format("%.3f", sunPosition.elevationDegrees))
-                logger.info("[CalTime] 3축 변환 후: Az={}°, El={}° (Tilt={}°, Train={}°)", 
-                    String.format("%.3f", transformedAz),
-                    String.format("%.3f", transformedEl),
-                    String.format("%.3f", settingsService.tiltAngle),
-                    String.format("%.3f", targetTrainAngle?.toFloat()!!))
-                logger.info("[CalTime] 연속 추적: {}° → {}°", 
-                    String.format("%.3f", transformedAz),
-                    String.format("%.3f", pathAdjustedAzimuth))
-                
-            } else {
-                logger.error("Train 회전 각도 정보를 가져올 수 없습니다: targetTrainAngle?.toFloat()가 null입니다")
-                dataStoreService.setSunTracking(false)
+                logger.info("✅ [OFFSET_APPLIED] Train 각도 즉시 조정: {}°", String.format("%.3f", newTrainAngle))
             }
-            
+
+            // 1단계: Cal Time 계산
+            val calTimeStart = System.currentTimeMillis()
+            val calTime = GlobalData.Time.resultTimeOffsetCalTime
+            val utcLocalDateTime = calTime.withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime()
+            val calTimeDuration = System.currentTimeMillis() - calTimeStart
+
+            // 2단계: 태양 위치 계산
+            val sunCalcStart = System.currentTimeMillis()
+            val sunPosition = solarOrekitCalculator.getSunPositionAt(utcLocalDateTime)
+            val sunCalcDuration = System.currentTimeMillis() - sunCalcStart
+
+            // 3단계: 3축 좌표 변환
+            val transformStart = System.currentTimeMillis()
+            val (transformedAz, transformedEl) = CoordinateTransformer.transformCoordinatesWithTrain(
+                azimuth = sunPosition.azimuthDegrees,
+                elevation = sunPosition.elevationDegrees,
+                tiltAngle = settingsService.tiltAngle,
+                trainAngle = safeTargetTrainAngle
+            )
+            val transformDuration = System.currentTimeMillis() - transformStart
+
+            // ✅ 4단계: 연속 추적을 위한 Azimuth 경로 조정 (핵심 수정!)
+            val pathAdjustedAzimuth = calculateAzimuthBySunPath(transformedAz)
+
+            // 5단계: 명령 전송
+            val commandStart = System.currentTimeMillis()
+            // 🔧 FIX: multiManualCommand에서 Offset을 적용하므로 원본값 전달
+            // multiManualCommand가 CMD.cmdTrainAngle = trainAngle + Offset 으로 설정함
+            sendAzimuthAndElevationAxisCommand(
+                pathAdjustedAzimuth.toFloat(),
+                azimuthSpeed,
+                transformedEl.toFloat(),
+                elevationSpeed,
+                safeTargetTrainAngle.toFloat(),  // 원본값 (multiManualCommand에서 Offset 적용)
+                trainSpeed
+            )
+            val commandDuration = System.currentTimeMillis() - commandStart
+
+            // ✅ 데이터 스토어 업데이트
+            dataStoreService.setSunTracking(true)
+
+            // ✅ 전체 성능 분석
+            val totalEndTime = System.currentTimeMillis()
+            val totalProcessingTime = totalEndTime - totalStartTime
+            val currentTime = System.currentTimeMillis()
+            val timeSinceLastCycle = lastTrackingTime?.let { currentTime - it } ?: 0L
+            lastTrackingTime = currentTime
+
+            // ✅ 성능 경고
+            val performanceWarning = StringBuilder()
+            if (calTimeDuration > 10) performanceWarning.append("CalTime:${calTimeDuration}ms ")
+            if (sunCalcDuration > 20) performanceWarning.append("SunCalc:${sunCalcDuration}ms ")
+            if (transformDuration > 10) performanceWarning.append("Transform:${transformDuration}ms ")
+            if (commandDuration > 30) performanceWarning.append("Command:${commandDuration}ms ")
+            if (totalProcessingTime > 50) performanceWarning.append("Total:${totalProcessingTime}ms ")
+            if (timeSinceLastCycle > 150) performanceWarning.append("CycleDelay:${timeSinceLastCycle}ms ")
+
+            if (performanceWarning.isNotEmpty()) {
+                logger.warn("🚨 SunTrack 성능 경고: {}", performanceWarning.toString())
+            }
+
+            logger.info("📊 SunTrack 성능: CalTime={}ms, SunCalc={}ms, Transform={}ms, Command={}ms, Total={}ms",
+                calTimeDuration, sunCalcDuration, transformDuration, commandDuration, totalProcessingTime)
+
+            logger.info("[CalTime] 원본 태양 위치: Az={}°, El={}°",
+                String.format("%.3f", sunPosition.azimuthDegrees),
+                String.format("%.3f", sunPosition.elevationDegrees))
+            logger.info("[CalTime] 3축 변환 후: Az={}°, El={}° (Tilt={}°, Train={}°)",
+                String.format("%.3f", transformedAz),
+                String.format("%.3f", transformedEl),
+                String.format("%.3f", settingsService.tiltAngle),
+                String.format("%.3f", safeTargetTrainAngle.toFloat()))
+            logger.info("[CalTime] 연속 추적: {}° → {}°",
+                String.format("%.3f", transformedAz),
+                String.format("%.3f", pathAdjustedAzimuth))
+
         } catch (e: Exception) {
             val errorDuration = System.currentTimeMillis() - totalStartTime
             logger.error("실시간 태양 추적 처리 중 오류 (처리시간: {}ms): {}", errorDuration, e.message, e)
@@ -830,7 +834,7 @@ class SunTrackService(
      * ✅ Sun Track 상태 조회
      */
     fun isSunTrackActive(): Boolean {
-        return modeTask != null && !modeTask!!.isCancelled
+        return modeTask?.isCancelled == false
     }
 
     /**
@@ -852,19 +856,21 @@ class SunTrackService(
      */
     fun getTrainAngleInfo(): Map<String, Any?> {
         val currentTrainAngle = dataStoreService.getLatestData().trainAngle
-        
+        val safeTargetTrainAngle = targetTrainAngle
+        val safeStabilizationStartTime = trainStabilizationStartTime
+
         return mapOf(
             "currentTrainAngle" to currentTrainAngle,
-            "targetTrainAngle" to targetTrainAngle,
-            "angleDifference" to if (currentTrainAngle != null && targetTrainAngle != null) {
-                Math.abs(currentTrainAngle - targetTrainAngle!!)
+            "targetTrainAngle" to safeTargetTrainAngle,
+            "angleDifference" to if (currentTrainAngle != null && safeTargetTrainAngle != null) {
+                Math.abs(currentTrainAngle - safeTargetTrainAngle)
             } else null,
             "isReached" to isTrainAngleReached(),
             "sunTrackState" to sunTrackState.name,
-            "stabilizationStartTime" to trainStabilizationStartTime,
-            "stabilizationDuration" to if (trainStabilizationStartTime != null) {
-                System.currentTimeMillis() - trainStabilizationStartTime!!
-            } else null
+            "stabilizationStartTime" to safeStabilizationStartTime,
+            "stabilizationDuration" to safeStabilizationStartTime?.let {
+                System.currentTimeMillis() - it
+            }
         )
     }
 
@@ -873,10 +879,11 @@ class SunTrackService(
      */
     private fun isTrainAngleReached(): Boolean {
         val currentTrainAngle = dataStoreService.getLatestData().trainAngle
+        val safeTargetTrainAngle = targetTrainAngle
         val tolerance = 0.5 // ±0.5도 허용 오차
-        
-        return if (currentTrainAngle != null && targetTrainAngle != null) {
-            val angleDifference = Math.abs(currentTrainAngle - targetTrainAngle!!)
+
+        return if (currentTrainAngle != null && safeTargetTrainAngle != null) {
+            val angleDifference = Math.abs(currentTrainAngle - safeTargetTrainAngle)
             angleDifference <= tolerance
         } else {
             false

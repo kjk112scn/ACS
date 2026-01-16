@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
+import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.*
 import reactor.core.publisher.Mono
 import java.time.ZonedDateTime
@@ -28,7 +29,7 @@ class EphemerisController(
         @Parameter(
             description = "정지궤도 위성 추적 시작 요청 데이터", 
             required = true
-        ) @RequestBody request: GeostationaryTrackingRequest
+        ) @Valid @RequestBody request: GeostationaryTrackingRequest
     ): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             try {
@@ -40,10 +41,24 @@ class EphemerisController(
                     "satelliteId" to request.tleLine1.substring(2, 7).trim(),
                     "trackingType" to "geostationary"
                 )
-            } catch (e: Exception) {
+            } catch (e: StringIndexOutOfBoundsException) {
+                logger.error("TLE 데이터 파싱 오류", e)
                 mapOf(
                     "status" to "error",
-                    "message" to "정지궤도 위성 추적 시작 실패: ${e.message}", 
+                    "message" to "TLE 데이터 형식이 올바르지 않습니다.",
+                    "error" to "TLE 파싱 오류"
+                )
+            } catch (e: IllegalArgumentException) {
+                mapOf(
+                    "status" to "error",
+                    "message" to "정지궤도 위성 추적 시작 실패: ${e.message}",
+                    "error" to (e.message ?: "잘못된 입력")
+                )
+            } catch (e: Exception) {
+                logger.error("정지궤도 위성 추적 시작 중 오류 발생", e)
+                mapOf(
+                    "status" to "error",
+                    "message" to "정지궤도 위성 추적 시작 실패: 서버 오류가 발생했습니다.",
                     "error" to (e.message ?: "알 수 없는 오류")
                 )
             }
@@ -57,7 +72,7 @@ class EphemerisController(
     fun calculateGeostationaryAngles(
         @Parameter(
             description = "정지궤도 위성 추적 각도 계산 요청 데이터", required = true
-        ) @RequestBody request: GeostationaryTrackingRequest
+        ) @Valid @RequestBody request: GeostationaryTrackingRequest
     ): Mono<Map<String, Any>> {
         return Mono.fromCallable {
             try {
@@ -76,9 +91,18 @@ class EphemerisController(
                     "rotatorAngle" to (geoPosition["rotatorAngle"] as Double),
                     "trackingType" to "geostationary"
                 )
-            } catch (e: Exception) {
+            } catch (e: IllegalArgumentException) {
                 mapOf(
-                    "message" to "정지궤도 위성 각도 계산 실패: ${e.message}", "error" to (e.message ?: "알 수 없는 오류")
+                    "status" to "error",
+                    "message" to "정지궤도 위성 각도 계산 실패: ${e.message}",
+                    "error" to (e.message ?: "잘못된 입력")
+                )
+            } catch (e: Exception) {
+                logger.error("정지궤도 위성 각도 계산 중 오류 발생", e)
+                mapOf(
+                    "status" to "error",
+                    "message" to "정지궤도 위성 각도 계산 실패: 서버 오류가 발생했습니다.",
+                    "error" to (e.message ?: "알 수 없는 오류")
                 )
             }
         }
@@ -124,11 +148,19 @@ class EphemerisController(
                     "passId" to passId.toString()
                 )
             )
+        } catch (e: IllegalArgumentException) {
+            ResponseEntity.badRequest().body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "추적 ID 설정 실패: ${e.message}"
+                )
+            )
         } catch (e: Exception) {
+            logger.error("추적 ID 설정 중 오류 발생", e)
             ResponseEntity.internalServerError().body(
                 mapOf(
-                    "status" to "error", 
-                    "message" to "추적 ID 설정 실패: ${e.message}"
+                    "status" to "error",
+                    "message" to "추적 ID 설정 실패: 서버 오류가 발생했습니다."
                 )
             )
         }
@@ -146,10 +178,19 @@ class EphemerisController(
                     "timeOffset" to inputTimeOffset.toString()
                 )
             )
+        } catch (e: IllegalArgumentException) {
+            ResponseEntity.badRequest().body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "TimeOffset 명령 처리 실패: ${e.message}"
+                )
+            )
         } catch (e: Exception) {
+            logger.error("TimeOffset 명령 처리 중 오류 발생", e)
             ResponseEntity.internalServerError().body(
                 mapOf(
-                    "status" to "error", "message" to "TimeOffset 명령 처리 실패: ${e.message}"
+                    "status" to "error",
+                    "message" to "TimeOffset 명령 처리 실패: 서버 오류가 발생했습니다."
                 )
             )
         }
@@ -166,7 +207,7 @@ class EphemerisController(
     fun generateEphemerisTrack(
         @Parameter(
             description = "추적 데이터 생성 요청 데이터", required = true
-        ) @RequestBody request: EphemerisTrackRequest
+        ) @Valid @RequestBody request: EphemerisTrackRequest
     ): Mono<Map<String, Any>> {
         return ephemerisService.generateEphemerisDesignationTrackAsync(
             request.tleLine1, request.tleLine2, request.satelliteName
@@ -353,7 +394,15 @@ class EphemerisController(
                         "error" to (result["error"] ?: "알 수 없는 오류")
                     )
                 }
+            } catch (e: java.io.IOException) {
+                logger.error("CSV 내보내기 중 파일 입출력 오류", e)
+                mapOf(
+                    "success" to false,
+                    "message" to "CSV 내보내기 실패: 파일 입출력 오류가 발생했습니다.",
+                    "error" to (e.message ?: "파일 입출력 오류")
+                )
             } catch (e: Exception) {
+                logger.error("CSV 내보내기 실패", e)
                 mapOf(
                     "success" to false,
                     "message" to "CSV 내보내기 실패: ${e.message}",
@@ -395,7 +444,15 @@ class EphemerisController(
                         "error" to (result["error"] ?: "알 수 없는 오류")
                     )
                 }
+            } catch (e: java.io.IOException) {
+                logger.error("전체 CSV 내보내기 중 파일 입출력 오류", e)
+                mapOf(
+                    "success" to false,
+                    "message" to "CSV 내보내기 실패: 파일 입출력 오류가 발생했습니다.",
+                    "error" to (e.message ?: "파일 입출력 오류")
+                )
             } catch (e: Exception) {
+                logger.error("전체 CSV 내보내기 실패", e)
                 mapOf(
                     "success" to false,
                     "message" to "CSV 내보내기 중 오류 발생: ${e.message ?: "알 수 없는 오류"}",
@@ -448,6 +505,11 @@ class EphemerisController(
                     .header("Content-Disposition", "attachment; filename=\"$filename\"")
                     .header("Content-Type", "text/csv; charset=UTF-8")
                     .body(fullContent)
+            } catch (e: java.io.IOException) {
+                logger.error("CSV 다운로드 중 파일 입출력 오류: ${e.message}", e)
+                org.springframework.http.ResponseEntity
+                    .internalServerError()
+                    .build<ByteArray>()
             } catch (e: Exception) {
                 logger.error("CSV 다운로드 중 오류 발생: ${e.message}", e)
                 org.springframework.http.ResponseEntity
@@ -979,9 +1041,10 @@ class EphemerisController(
                     "message" to "비교 데이터 조회 완료"
                 )
             } catch (e: Exception) {
+                logger.error("비교 데이터 조회 실패", e)
                 mapOf(
                     "status" to "error",
-                    "message" to "비교 데이터 조회 실패: ${e.message}",
+                    "message" to "비교 데이터 조회 실패: 서버 오류가 발생했습니다.",
                     "error" to (e.message ?: "알 수 없는 오류")
                 )
             }
@@ -1031,10 +1094,10 @@ class EphemerisController(
                     "message" to "병합 데이터 조회 완료"
                 )
             } catch (e: Exception) {
-                logger.error("❌ API 응답 생성 실패: ${e.message}", e)
+                logger.error("병합 데이터 조회 실패", e)
                 mapOf(
                     "status" to "error",
-                    "message" to "병합 데이터 조회 실패: ${e.message}",
+                    "message" to "병합 데이터 조회 실패: 서버 오류가 발생했습니다.",
                     "error" to (e.message ?: "알 수 없는 오류")
                 )
             }

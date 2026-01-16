@@ -73,6 +73,14 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
                     "axes" to axesStr
                 )
             )
+        } catch (e: java.io.IOException) {
+            logger.error("ServoPreset 명령 통신 오류: {}", e.message, e)
+            ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "ServoPreset 명령 전송 실패: 하드웨어 통신 오류"
+                )
+            )
         } catch (e: Exception) {
             logger.error("ServoPreset 명령 요청 실패: {}", e.message, e)
             ResponseEntity.internalServerError().body(
@@ -133,6 +141,14 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
                     "axes" to axesStr
                 )
             )
+        } catch (e: java.io.IOException) {
+            logger.error("Standby 명령 통신 오류: {}", e.message, e)
+            ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "Standby 명령 전송 실패: 하드웨어 통신 오류"
+                )
+            )
         } catch (e: Exception) {
             logger.error("Standby 명령 요청 실패: {}", e.message, e)
             ResponseEntity.internalServerError().body(
@@ -182,6 +198,14 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
                     "type" to commandType.toString()
                 )
             )
+        } catch (e: java.io.IOException) {
+            logger.error("비상 명령 통신 오류: {}", e.message, e)
+            ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "비상 명령 전송 실패: 하드웨어 통신 오류"
+                )
+            )
         } catch (e: Exception) {
             logger.error("비상 명령 요청 실패: {}", e.message, e)
             ResponseEntity.internalServerError().body(
@@ -210,6 +234,14 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
                     "message" to "TimeOffset 명령이 성공적으로 전송되었습니다",
                     "command" to "TimeOffset",
                     "timeOffset" to inputTimeOffset.toString()
+                )
+            )
+        } catch (e: java.io.IOException) {
+            logger.error("TimeOffset 명령 통신 오류: {}", e.message, e)
+            ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "TimeOffset 명령 전송 실패: 하드웨어 통신 오류"
                 )
             )
         } catch (e: Exception) {
@@ -267,6 +299,14 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
                     "command" to "MultiManualControl",
                     "axes" to axesStr,
                     "angles" to "Az:${azAngle}°, El:${elAngle}°, Train:${trainAngle}°"
+                )
+            )
+        } catch (e: java.io.IOException) {
+            logger.error("MultiManual 제어 명령 통신 오류: {}", e.message, e)
+            ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "MultiManual 제어 명령 전송 실패: 하드웨어 통신 오류"
                 )
             )
         } catch (e: Exception) {
@@ -450,6 +490,14 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
                     "axes" to bitStr
                 )
             )
+        } catch (e: java.io.IOException) {
+            logger.error("Stop 명령 통신 오류: {}", e.message, e)
+            ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "Stop 명령 전송 실패: 하드웨어 통신 오류"
+                )
+            )
         } catch (e: Exception) {
             logger.error("Stop 명령 요청 실패: {}", e.message, e)
             ResponseEntity.internalServerError().body(
@@ -480,6 +528,14 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
                     "utcTime" to GlobalData.Time.utcNow.toString(),
                     "timeOffset" to GlobalData.Offset.TimeOffset.toString(),
                     "offsets" to "Az:${GlobalData.Offset.azimuthPositionOffset}°, El:${GlobalData.Offset.elevationPositionOffset}°, Ti:${GlobalData.Offset.trainPositionOffset}°"
+                )
+            )
+        } catch (e: java.io.IOException) {
+            logger.error("DefaultInfo 명령 통신 오류: {}", e.message, e)
+            ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "DefaultInfo 명령 전송 실패: 하드웨어 통신 오류"
                 )
             )
         } catch (e: Exception) {
@@ -539,6 +595,14 @@ class ICDController(private val udpFwICDService: UdpFwICDService) {
                     "status" to "success",
                     "message" to "Stow 명령이 성공적으로 시작되었습니다",
                     "command" to "Stow"
+                )
+            )
+        } catch (e: java.io.IOException) {
+            logger.error("Stow 명령 통신 오류: {}", e.message, e)
+            ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
+                mapOf(
+                    "status" to "error",
+                    "message" to "Stow 명령 시작 실패: 하드웨어 통신 오류"
                 )
             )
         } catch (e: Exception) {

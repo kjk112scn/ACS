@@ -37,6 +37,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicLong
+import com.gtlsystems.acs_api.service.mode.passSchedule.PassScheduleTLECache
+import com.gtlsystems.acs_api.service.mode.passSchedule.PassScheduleDataRepository
 
 /**
  * TLE 데이터를 캐시로 관리하고 위성 패스 스케줄링을 담당하는 서비스
@@ -55,7 +57,9 @@ class PassScheduleService(
     private val udpFwICDService: UdpFwICDService,
     private val dataStoreService: DataStoreService,
     private val settingsService: SettingsService,
-    private val threadManager: ThreadManager
+    private val threadManager: ThreadManager,
+    private val passScheduleTLECache: PassScheduleTLECache, // ✅ Phase 5: TLE 캐시 분리
+    private val passScheduleDataRepository: PassScheduleDataRepository // ✅ Phase 5: 데이터 저장소 분리
 ) {
     private val logger = LoggerFactory.getLogger(PassScheduleService::class.java)
 
@@ -299,10 +303,14 @@ class PassScheduleService(
      */
     private val MIN_STATE_CHANGE_INTERVAL = 500 // 0.5초
 
-    // ===== 기존 저장소들 (변경 없음) =====
-    private val passScheduleTleCache = ConcurrentHashMap<String, Triple<String, String, String>>()
-    private val passScheduleTrackMstStorage = ConcurrentHashMap<String, List<Map<String, Any?>>>()
-    private val passScheduleTrackDtlStorage = ConcurrentHashMap<String, List<Map<String, Any?>>>()
+    // ===== 기존 저장소들 =====
+    // ✅ Phase 5: TLE 캐시는 passScheduleTLECache로 분리됨
+    // ✅ Phase 5: 데이터 저장소는 passScheduleDataRepository로 분리됨
+    // 내부 저장소 접근자 (기존 코드 호환성 유지, 읽기 전용)
+    private val passScheduleTrackMstStorage: ConcurrentHashMap<String, List<Map<String, Any?>>>
+        get() = ConcurrentHashMap(passScheduleDataRepository.getAllMst())
+    private val passScheduleTrackDtlStorage: ConcurrentHashMap<String, List<Map<String, Any?>>>
+        get() = ConcurrentHashMap(passScheduleDataRepository.getAllDtl())
     private val trackingTargetList = mutableListOf<TrackingTarget>()
     private val selectedTrackMstStorage = ConcurrentHashMap<String, List<Map<String, Any?>>>()
 
@@ -1948,7 +1956,7 @@ class PassScheduleService(
         logger.info("🔄 전역 MstId 카운터 초기화 완료 (시작값: 0)")
 
         return Flux.fromIterable(allTleIds).flatMap { satelliteId ->
-            val tleData = passScheduleTleCache[satelliteId]
+            val tleData = passScheduleTLECache.getWithName(satelliteId)  // ✅ Phase 5: TLE 캐시 사용
             if (tleData != null) {
                 val (tleLine1, tleLine2, satelliteName) = tleData
 
@@ -2058,9 +2066,8 @@ class PassScheduleService(
             allDtlData.addAll(processedData.keyholeAxisTransformedDtl)
             allDtlData.addAll(processedData.keyholeFinalTransformedDtl)
 
-            // 저장소에 데이터 저장
-            passScheduleTrackMstStorage[satelliteId] = allMstData
-            passScheduleTrackDtlStorage[satelliteId] = allDtlData
+            // ✅ Phase 5: Repository에 데이터 저장
+            passScheduleDataRepository.saveSatelliteData(satelliteId, allMstData, allDtlData)
 
             logger.info("✅ 위성 $satelliteId 추적 데이터 저장 완료: ${allMstData.size}개 MST 레코드 (5가지 DataType 포함), ${allDtlData.size}개 DTL 레코드")
 
@@ -2367,8 +2374,8 @@ class PassScheduleService(
     }
 
     fun clearPassScheduleTrackingData(satelliteId: String) {
-        passScheduleTrackMstStorage.remove(satelliteId)
-        passScheduleTrackDtlStorage.remove(satelliteId)
+        // ✅ Phase 5: Repository 사용
+        passScheduleDataRepository.removeSatelliteData(satelliteId)
         logger.info("위성 $satelliteId 의 패스 스케줄 추적 데이터가 삭제되었습니다.")
     }
 
@@ -2378,12 +2385,13 @@ class PassScheduleService(
      * PassSchedule 데이터 구조 리팩토링에 따라 globalMstId → mstIdCounter로 변경.
      */
     fun clearAllPassScheduleTrackingData() {
-        val mstSize = passScheduleTrackMstStorage.size
-        val dtlSize = passScheduleTrackDtlStorage.values.sumOf { it.size }
+        val summary = passScheduleDataRepository.getStorageSummary()
+        val mstSize = summary["totalPasses"] as? Int ?: 0
+        val dtlSize = summary["totalTrackingPoints"] as? Int ?: 0
         // ✅ globalMstId → mstIdCounter로 변경
         mstIdCounter.set(0)
-        passScheduleTrackMstStorage.clear()
-        passScheduleTrackDtlStorage.clear()
+        // ✅ Phase 5: Repository 사용
+        passScheduleDataRepository.clear()
 
         logger.info("모든 패스 스케줄 추적 데이터가 삭제되었습니다. (마스터: ${mstSize}개, 세부: ${dtlSize}개, MstId 카운터 초기화)")
     }    // ✅ 기존 추적 대상 관리 메서드들 - 변경 없음
@@ -2946,50 +2954,42 @@ class PassScheduleService(
         logger.info("선별된 추적 데이터가 초기화되었습니다. ${size}개 패스 삭제")
     }
 
-    // ✅ 기존 TLE 캐시 관리 메서드들 - 변경 없음
+    // ✅ Phase 5: TLE 캐시 관리 메서드들 - PassScheduleTLECache 사용
     fun addPassScheduleTle(satelliteId: String, tleLine1: String, tleLine2: String, satelliteName: String? = null) {
-        val finalSatelliteName = satelliteName ?: satelliteId
-        passScheduleTleCache[satelliteId] = Triple(tleLine1, tleLine2, finalSatelliteName)
-        logger.info("위성 TLE 데이터가 캐시에 추가되었습니다. 위성 ID: $satelliteId, 이름: $finalSatelliteName")
+        passScheduleTLECache.add(satelliteId, tleLine1, tleLine2, satelliteName)
     }
 
     fun getPassScheduleTle(satelliteId: String): Pair<String, String>? {
-        val tleData = passScheduleTleCache[satelliteId]
-        return if (tleData != null) {
-            Pair(tleData.first, tleData.second)
-        } else {
-            null
-        }
+        return passScheduleTLECache.get(satelliteId)
     }
 
     fun getPassScheduleSatelliteName(satelliteId: String): String? {
-        return passScheduleTleCache[satelliteId]?.third
+        return passScheduleTLECache.getName(satelliteId)
     }
 
     fun getPassScheduleTleWithName(satelliteId: String): Triple<String, String, String>? {
-        return passScheduleTleCache[satelliteId]
+        return passScheduleTLECache.getWithName(satelliteId)
     }
 
     fun removePassScheduleTle(satelliteId: String) {
-        passScheduleTleCache.remove(satelliteId)
-        passScheduleTrackMstStorage.remove(satelliteId)
-        passScheduleTrackDtlStorage.remove(satelliteId)
-        logger.info("위성 TLE 데이터가 캐시에서 삭제되었습니다. 위성 ID: $satelliteId")
+        passScheduleTLECache.remove(satelliteId)
+        // ✅ Phase 5: 관련 추적 데이터 저장소도 함께 정리
+        passScheduleDataRepository.removeSatelliteData(satelliteId)
     }
 
     fun getAllPassScheduleTleIds(): List<String> {
-        return passScheduleTleCache.keys.toList()
+        return passScheduleTLECache.getAllIds()
     }
 
     fun getCacheSize(): Int {
-        return passScheduleTleCache.size
+        return passScheduleTLECache.size()
     }
 
     fun clearCache() {
-        val size = passScheduleTleCache.size
-        passScheduleTleCache.clear()
-        passScheduleTrackMstStorage.clear()
-        passScheduleTrackDtlStorage.clear()
+        val size = passScheduleTLECache.size()
+        passScheduleTLECache.clear()
+        // ✅ Phase 5: Repository 사용
+        passScheduleDataRepository.clear()
 
         // ✅ 최적화 캐시도 함께 정리
         trackingDataCache.clear()
@@ -3732,11 +3732,12 @@ class PassScheduleService(
                 }
 
                 // 2. 첫 스케줄 선택
-                currentScheduleContext = scheduleContextQueue.first()
+                val firstSchedule = scheduleContextQueue.first()
+                currentScheduleContext = firstSchedule
                 nextScheduleContext = scheduleContextQueue.getOrNull(1)
 
                 // 3. 초기 상태 결정
-                val timeToStart = Duration.between(calTime, currentScheduleContext!!.startTime)
+                val timeToStart = Duration.between(calTime, firstSchedule.startTime)
                 val initialState = if (timeToStart.toMinutes() <= 2) {
                     PassScheduleState.MOVING_TRAIN
                 } else {

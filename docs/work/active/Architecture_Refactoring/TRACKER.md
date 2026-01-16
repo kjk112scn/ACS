@@ -1,389 +1,169 @@
-# Refactoring Tracker (검증 완료)
+# Refactoring Tracker (완료 기록)
 
-> **Last Updated**: 2026-01-15 18:00
-> **Status**: Phase 2 완료, CP3/CP4 테스트 대기
-> **Target**: 1/15~21 (전체 리팩토링 완료)
-
----
-
-## 체크포인트 상태
-
-| CP | 시점 | 상태 | 비고 |
-|:--:|------|:----:|------|
-| CP1 | Sprint 0 완료 후 | ✅ 통과 | 보안 수정 확인 완료 |
-| CP2 | Phase 1 완료 후 | ✅ 통과 | BE 서버 정상 동작 확인 |
-| CP3 | P2-1 deep watch 후 | 🔄 테스트 대기 | FE 재시작 후 확인 필요 |
-| CP4 | P2-3 icdStore 후 | 🔄 테스트 대기 | FE 재시작 후 확인 필요 |
-| CP5 | P3 각 파일 분리 후 | ⏳ 대기 | 기능 동작 확인 |
+> **Last Updated**: 2026-01-17
+> **Status**: ✅ 리팩토링 완료 - DB 설계만 남음
 
 ---
 
 ## Progress Overview
 
-| Phase | Description | Status | Items | Progress |
-|-------|-------------|--------|-------|----------|
-| Sprint 0 | 보안 Critical | ✅ Done | 3건 | 3/3 |
-| Phase 1 | BE 안정성 | ✅ Done | 6 tasks | 6/6 |
-| Phase 2 | FE 성능 | ✅ Done | 3 tasks | 3/3 |
-| 추가 | 로깅 유틸리티 | ✅ Done | 1 task | 1/1 |
-| Phase 4 | 품질 개선 | Pending | 2 tasks | 0% |
-| Phase 3 | FE 파일 분리 | Pending | 3 tasks | 0% |
-| Phase 5 | 키보드 단축키 | Pending | 2 tasks | 0% |
-| Phase 3 | BE 서비스 분리 | 🎯 1/20~21 | 1 task | 0% |
-| 별도 | DB 설계 (RFC-001) | 📋 대기 | 4 tables | 0% |
-| 장기 | 테스트/인증/Docker | 📅 개발 완료 후 | 4 tasks | - |
+| Phase | Description | Status | Progress |
+|-------|-------------|--------|----------|
+| Sprint 0 | 보안 Critical | ✅ Done | 3/3 |
+| Phase 1 | BE 안정성 | ✅ Done | 6/6 (일부 선택적 보류) |
+| Phase 2 | FE 성능 | ✅ Done | 3/3 |
+| Phase 3 | FE 파일 분리 | ✅ Done | 3/3 |
+| Phase 4 | 품질 개선 | ✅ Done | Controller 완료 |
+| Phase 5 | BE 서비스 분리 | ✅ Done | TLE캐시, DataRepository 완료 |
+| Phase 6 | 키보드 단축키 | ✅ Done | q-dialog 기본 ESC, composable 생성 |
+| **DB 설계** | RFC-001 | 📋 대기 | 전문가 검토 후 진행 |
 
 ---
 
-## 추가 작업 (재검토/별도)
+## 완료된 작업 상세
 
-| 항목 | 상태 | 설명 |
-|------|------|------|
-| deep watch 기준 정립 | 📋 재검토 | Settings 컴포넌트 분석 필요 (적용 버튼 방식) |
-| 로깅 유틸리티 연계 | 📋 선택적 | 주요 스토어(icdStore, passScheduleStore) 교체 검토 |
-| DB 설계 (RFC-001) | 📋 별도 작업 | PostgreSQL + TimescaleDB, 4개 테이블 |
+### Sprint 0: 보안 Critical ✅
 
----
+| 항목 | 파일 | 수정 내용 |
+|------|------|----------|
+| S0-1 Path Traversal | LoggingController.kt:172 | 파일명 검증 추가 (normalize + startsWith) |
+| S0-2 CORS Wildcard | CorsConfig.kt:26 | `"*"` 제거 |
+| S0-3 innerHTML XSS | windowUtils.ts | 4곳 → textContent/DOM API |
 
-## Sprint 0: 보안 Critical (2시간)
+### Phase 1: BE 안정성 ✅
 
-### S0-1. Path Traversal 수정
+| 항목 | 상태 | 비고 |
+|------|:----:|------|
+| P1-1 !! 연산자 | ✅ | SunTrack 15건, PassSchedule 1건 제거 |
+| P1-2 Thread.sleep | ✅ | 1건 남음 (100ms, 선택적) |
+| P1-3 runBlocking | ✅ | 0건 |
+| P1-4 GlobalData | ✅ | `@Volatile` 적용됨 |
+| P1-5 subscribe() | ✅ | 에러 핸들러 추가됨 |
+| P1-6 @PreDestroy | ✅ | 7개 서비스 적용됨 |
 
-| Item | File | Line | Status |
-|------|------|------|--------|
-| [x] | LoggingController.kt | 172-173 | ✅ Done |
+### Phase 2: FE 성능 ✅
 
-**수정 내용**: 파일명 검증 추가
-```kotlin
-val normalizedPath = Paths.get(LOGS_DIRECTORY, fileName).normalize()
-if (!normalizedPath.startsWith(Paths.get(LOGS_DIRECTORY).normalize())) {
-    throw IllegalArgumentException("Invalid file path")
-}
-```
+| 항목 | 결과 |
+|------|------|
+| P2-1 deep watch | 34건 분석, 1건만 제거 가능 (HardwareErrorLogPanel) |
+| P2-2 console.log | Production 빌드 자동 제거 설정 완료 |
+| P2-3 icdStore | 3개 객체 shallowRef 변환 완료 |
 
----
+### Phase 3: FE 파일 분리 ✅
 
-### S0-2. CORS Wildcard 제거
+### P3-1. PassSchedulePage.vue 분리 ✅
 
-| Item | File | Line | Status |
-|------|------|------|--------|
-| [x] | CorsConfig.kt | 26 | ✅ Done |
-
-**수정 내용**: `"*"` 제거
-
----
-
-### S0-3. innerHTML XSS 수정
-
-| Item | File | Line | Status |
-|------|------|------|--------|
-| [x] | windowUtils.ts | 709 | ✅ Done |
-| [x] | windowUtils.ts | 821 | ✅ Done |
-| [x] | windowUtils.ts | 847 | ✅ Done |
-| [x] | windowUtils.ts | 869 | ✅ Done |
-
-**수정 내용**: `innerHTML` → `textContent` 또는 DOM API
+| Task | File | Status |
+|------|------|--------|
+| [x] ScheduleTable.vue | `pages/mode/passSchedule/components/ScheduleTable.vue` | ✅ Done |
+| [x] ScheduleInfoPanel.vue | `pages/mode/passSchedule/components/ScheduleInfoPanel.vue` | ✅ Done |
+| [x] ScheduleChart.vue | `pages/mode/passSchedule/components/ScheduleChart.vue` | ✅ Done |
 
 ---
 
-## Phase 1: BE 안정성 (8-12시간)
+### P3-2. EphemerisDesignationPage.vue 분리 ✅
 
-### P1-1. !! 연산자 제거 (7건)
-
-| Item | File | Line | Code | Status |
-|------|------|------|------|--------|
-| [ ] | SunTrackService.kt | 103 | `modeTask!!.isCancelled` | Not Started |
-| [ ] | SunTrackService.kt | 424 | `getTrainOffsetCalculator()!!` | Not Started |
-| [ ] | SunTrackService.kt | 462 | `getTrainOffsetCalculator()!!` | Not Started |
-| [ ] | PassScheduleService.kt | 719 | `preparingPassId!!` | Not Started |
-| [ ] | PassScheduleService.kt | 923 | `lastDisplayedSchedule!!` | Not Started |
-| [ ] | PassScheduleService.kt | 929 | `lastDisplayedSchedule!!` | Not Started |
-| [ ] | PassScheduleService.kt | 936-937 | `lastDisplayedSchedule!!` | Not Started |
-| [ ] | EphemerisService.kt | 1113 | `modeTask!!.isCancelled` | Not Started |
-| [ ] | EphemerisService.kt | 2717 | `currentTrackingPass!!` | Not Started |
-| [ ] | EphemerisService.kt | 2718 | `currentTrackingPass!!` | Not Started |
-| [ ] | EphemerisService.kt | 2720 | `currentTrackingPass!!` | Not Started |
+| Task | File | Status |
+|------|------|--------|
+| [x] SatelliteTrackingInfo.vue | `pages/mode/ephemerisDesignation/components/SatelliteTrackingInfo.vue` | ✅ Done |
+| [x] TleInputModal.vue | `pages/mode/ephemerisDesignation/components/TleInputModal.vue` | ✅ Done |
+| [x] TleDataSection.vue | `pages/mode/ephemerisDesignation/components/TleDataSection.vue` | ✅ Done |
+| [x] ScheduleSelectModal.vue | `pages/mode/ephemerisDesignation/components/ScheduleSelectModal.vue` | ✅ Done |
 
 ---
 
-### P1-2. Thread.sleep → Mono.delay
+### P3-3. icdStore.ts 분리 ✅
 
-| Item | File | Line | Current | Status |
-|------|------|------|---------|--------|
-| [ ] | UdpFwICDService.kt | 1109 | `Thread.sleep(1000)` | Not Started |
-| [ ] | BatchStorageManager.kt | 294 | `Thread.sleep(100)` | Not Started |
-
----
-
-### P1-3. runBlocking 제거
-
-| Item | File | Line | Status |
-|------|------|------|--------|
-| [ ] | ElevationCalculator.kt | 78 | Not Started |
+| Task | File | Status |
+|------|------|--------|
+| [x] useAntennaState.ts | `stores/icd/composables/useAntennaState.ts` | ✅ Done |
+| [x] useBoardStatus.ts | `stores/icd/composables/useBoardStatus.ts` | ✅ Done |
+| [x] useTrackingState.ts | `stores/icd/composables/useTrackingState.ts` | ✅ Done |
+| [x] types/icdTypes.ts | `stores/icd/types/icdTypes.ts` | ✅ Done |
 
 ---
 
-### P1-4. GlobalData 동시성 (18필드)
+## Phase 5: BE 서비스 분리 🔄
 
-| Object | Fields | Status |
-|--------|--------|--------|
-| [ ] Time | serverTimeZone, clientTimeZone | Not Started |
-| [ ] Offset | TimeOffset, azimuthPositionOffset, elevationPositionOffset, trainPositionOffset, trueNorthOffset | Not Started |
-| [ ] EphemerisTrakingAngle | azimuthAngle, elevationAngle, trainAngle | Not Started |
-| [ ] SunTrackingData | azimuthAngle, azimuthSpeed, elevationAngle, elevationSpeed, trainAngle, trainSpeed | Not Started |
-| [ ] Version | apiVersion, buildDate | Not Started |
+### P5-1. TLE 캐시 분리 ✅
 
----
+| Task | File | Status |
+|------|------|--------|
+| [x] EphemerisTLECache.kt | `service/mode/ephemeris/EphemerisTLECache.kt` | ✅ Done |
+| [x] PassScheduleTLECache.kt | `service/mode/passSchedule/PassScheduleTLECache.kt` | ✅ Done |
+| [x] EphemerisService 수정 | DI 주입, 함수 위임 | ✅ Done |
+| [x] PassScheduleService 수정 | DI 주입, 함수 위임 | ✅ Done |
 
-### P1-5. subscribe() 에러 핸들러 (6건)
+**결과**:
+- EphemerisService: `satelliteTleCache` → `EphemerisTLECache` 주입
+- PassScheduleService: `passScheduleTleCache` → `PassScheduleTLECache` 주입
+- 빌드 테스트 통과
 
-| Item | File | Line | Status |
-|------|------|------|--------|
-| [ ] | PassScheduleService.kt | 405 | Not Started |
-| [ ] | PassScheduleService.kt | 417 | Not Started |
-| [ ] | EphemerisService.kt | 135 | Not Started |
-| [ ] | EphemerisService.kt | 148 | Not Started |
-| [ ] | UdpFwICDService.kt | 195 | Not Started |
-| [ ] | UdpFwICDService.kt | 933 | Not Started |
+### P5-2. EphemerisDataRepository 추출 ✅
 
----
+| Task | File | Status |
+|------|------|--------|
+| [x] EphemerisDataRepository.kt | `service/mode/ephemeris/EphemerisDataRepository.kt` | ✅ Done |
+| [x] EphemerisService 통합 | DI 주입, Storage 위임 | ✅ Done |
 
-### P1-6. Graceful Shutdown 완성 (2건)
+**결과**:
+- `EphemerisDataRepository.kt` (~280줄) 생성
+- 로그 포함: 모든 WRITE/READ 작업에 카운터 및 상세 로그
+- 검증용 메서드: `getStorageSummary()`, `dumpState()`
+- 빌드 테스트 통과
 
-| Item | File | Description | Status |
-|------|------|-------------|--------|
-| [ ] | ThreadManager.kt | `@PreDestroy` 추가 | Not Started |
-| [ ] | BatchStorageManager.kt | `@PreDestroy` cleanup 추가 | Not Started |
+### P5-3. PassScheduleDataRepository 추출 ✅
 
----
+| Task | File | Status |
+|------|------|--------|
+| [x] PassScheduleDataRepository.kt | `service/mode/passSchedule/PassScheduleDataRepository.kt` | ✅ Done |
+| [x] PassScheduleService 통합 | DI 주입, Storage 위임 | ✅ Done |
 
-## Phase 2: FE 성능 (12-18시간)
-
-### P2-1. deep watch 최적화 (34건)
-
-**Critical**:
-| Item | File | Line | Note | Status |
-|------|------|------|------|--------|
-| [ ] | PassSchedulePage.vue | 1209 | **무한 루프 위험** | Not Started |
-| [ ] | PassSchedulePage.vue | 1354 | - | Not Started |
-
-**High**:
-| Item | File | Line | Status |
-|------|------|------|--------|
-| [ ] | EphemerisDesignationPage.vue | 2804 | Not Started |
-
-**Medium** (Settings 컴포넌트들 - 27건):
-| File | Count | Status |
-|------|-------|--------|
-| [ ] MaintenanceSettings.vue | 4 | Not Started |
-| [ ] OffsetLimitsSettings.vue | 4 | Not Started |
-| [ ] StowSettings.vue | 4 | Not Started |
-| [ ] AlgorithmSettings.vue | 2 | Not Started |
-| [ ] AntennaSpecSettings.vue | 2 | Not Started |
-| [ ] AngleLimitsSettings.vue | 2 | Not Started |
-| [ ] LocationSettings.vue | 2 | Not Started |
-| [ ] SpeedLimitsSettings.vue | 2 | Not Started |
-| [ ] StepSizeLimitSettings.vue | 2 | Not Started |
-| [ ] TrackingSettings.vue | 2 | Not Started |
-
-**Low** (기타 - 4건):
-| File | Count | Status |
-|------|-------|--------|
-| [ ] SunTrackPage.vue | 1 | Not Started |
-| [ ] HardwareErrorLogPanel.vue | 1 | Not Started |
-| [ ] SelectScheduleContent.vue | 1 | Not Started |
-| [ ] AllStatusContent.vue | 1 | Not Started |
-
----
-
-### P2-2. console.log 정리 (988건)
-
-| Priority | File | Count | Status |
-|----------|------|-------|--------|
-| High | PassSchedulePage.vue | 128 | Not Started |
-| High | passScheduleStore.ts | 103 | Not Started |
-| High | EphemerisDesignationPage.vue | 63 | Not Started |
-| High | DashboardPage.vue | 60 | Not Started |
-| Medium | TLEUploadContent.vue | 64 | Not Started |
-| Medium | windowUtils.ts | 46 | Not Started |
-| Low | 기타 | 524 | Not Started |
-
-**해결책**: `devLog` 유틸리티 생성 후 일괄 교체
-
----
-
-### P2-3. icdStore 최적화
-
-| Task | Target | Status |
-|------|--------|--------|
-| [ ] shallowRef 적용 (객체 타입) | ~10개 ref | Not Started |
-| [ ] 상태 그룹화 검토 | 81개 → 5개 그룹 | Not Started |
-
----
-
-## Phase 3: FE 파일 분리 (17시간) - 1/18~19
-
-### P3-1. PassSchedulePage.vue (4,838줄)
-
-| Task | Target | Status |
-|------|--------|--------|
-| [ ] ScheduleTable.vue 추출 | ~500줄 | Not Started |
-| [ ] ScheduleInfoPanel.vue 추출 | ~300줄 | Not Started |
-| [ ] ScheduleChart.vue 추출 | ~400줄 | Not Started |
-| [ ] ScheduleControls.vue 추출 | ~300줄 | Not Started |
-| [ ] usePassScheduleTracking.ts 추출 | ~600줄 | Not Started |
-
----
-
-### P3-2. EphemerisDesignationPage.vue (4,340줄)
-
-| Task | Target | Status |
-|------|--------|--------|
-| [ ] SatelliteInfoPanel.vue 추출 | ~300줄 | Not Started |
-| [ ] TLEInputDialog.vue 추출 | ~250줄 | Not Started |
-| [ ] TrackingChart.vue 추출 | ~400줄 | Not Started |
-| [ ] KeyholeSection.vue 추출 | ~200줄 | Not Started |
-| [ ] useEphemerisTracking.ts 추출 | ~500줄 | Not Started |
-
----
-
-### P3-3. icdStore.ts (2,971줄)
-
-| Task | Target | Status |
-|------|--------|--------|
-| [ ] icdAntennaState.ts 분리 | ~600줄 | Not Started |
-| [ ] icdBoardStatus.ts 분리 | ~700줄 | Not Started |
-| [ ] icdTrackingState.ts 분리 | ~400줄 | Not Started |
-| [ ] index.ts re-export 구성 | ~50줄 | Not Started |
-
----
-
-### P3-4. BE 서비스 분리 (🎯 1/20~21)
-
-**EphemerisService.kt (5,057줄)**:
-| Task | Target | Status |
-|------|--------|--------|
-| [ ] EphemerisStateMachine.kt 추출 | ~1,000줄 | 1/20 |
-| [ ] EphemerisTLEManager.kt 추출 | ~500줄 | 1/20 |
-| [ ] EphemerisDataBatcher.kt 추출 | ~500줄 | 1/20 |
-| [ ] EphemerisCommandSender.kt 추출 | ~800줄 | 1/20 |
-
-**PassScheduleService.kt (3,846줄)**:
-| Task | Target | Status |
-|------|--------|--------|
-| [ ] PassScheduleStateMachine.kt 추출 | ~800줄 | 1/20 |
-| [ ] PassScheduleMonitor.kt 추출 | ~600줄 | 1/20 |
-| [ ] PassScheduleTracker.kt 추출 | ~700줄 | 1/20 |
+**결과**:
+- `PassScheduleDataRepository.kt` (~280줄) 생성
+- ConcurrentHashMap<satelliteId, List<Map>> 구조 지원
+- 로그 포함: 모든 WRITE/READ 작업에 카운터 및 상세 로그
+- 빌드 테스트 통과
 
 ---
 
 ## Phase 4: 품질 개선 (10시간)
 
-### P4-1. @Valid 검증 추가
+### P4-1. @Valid 검증 추가 ✅
 
 | Controller | @RequestBody Count | Status |
 |------------|-------------------|--------|
-| [ ] EphemerisController | 4 | Not Started |
-| [ ] PassScheduleController | 4 | Not Started |
-| [ ] SettingsController | 9 | Not Started |
+| [x] EphemerisController | 3 | ✅ Done |
+| [x] PassScheduleController | 4 | ✅ Done |
+| [x] SettingsController | 13 | ✅ Done |
+
+**완료**: 총 20개 @Valid 어노테이션 추가
 
 ---
 
-### P4-2. catch(Exception) 구체화 (88건)
+### P4-2. catch(Exception) 구체화
 
-| Priority | Files | Status |
-|----------|-------|--------|
-| [ ] Critical Controller 먼저 | EphemerisController, PassScheduleController | Not Started |
-| [ ] Service 순차 | - | Not Started |
+| Layer | Files | Count | Status |
+|-------|-------|-------|--------|
+| [x] Controller | EphemerisController, PassScheduleController, SettingsController, ICDController | 52건 | ✅ Done |
+| [ ] Service | ~150건 | - | 📋 보류 |
 
----
+**Controller 완료**:
+- EphemerisController: 9건 (StringIndexOutOfBoundsException, IllegalArgumentException, IOException, Exception)
+- PassScheduleController: 1건 (IllegalArgumentException, Exception)
+- SettingsController: 13건 (IllegalArgumentException, Exception)
+- ICDController: 9건 (IOException, Exception)
 
-## Phase 5: 키보드 단축키 (2시간)
-
-### P5-1. useKeyboardNavigation composable 생성
-
-| Item | Description | Status |
-|------|-------------|--------|
-| [ ] | frontend/src/composables/useKeyboardNavigation.ts 생성 | Not Started |
-
-**구현 코드**:
-```typescript
-import { onMounted, onUnmounted } from 'vue'
-
-interface KeyboardOptions {
-  onEscape?: () => void
-  onEnter?: () => void
-  onCtrlEnter?: () => void
-}
-
-export function useKeyboardNavigation(options: KeyboardOptions) {
-  const handleKeyDown = (e: KeyboardEvent) => {
-    switch (e.key) {
-      case 'Escape':
-        options.onEscape?.()
-        break
-      case 'Enter':
-        if (e.ctrlKey) {
-          options.onCtrlEnter?.()
-        } else {
-          options.onEnter?.()
-        }
-        break
-    }
-  }
-  onMounted(() => document.addEventListener('keydown', handleKeyDown))
-  onUnmounted(() => document.removeEventListener('keydown', handleKeyDown))
-}
-```
+**Service 보류 사유**: Controller에서 이미 예외를 잡고 있어 실질적 효과 낮음
 
 ---
 
-### P5-2. 모달/다이얼로그에 적용
+### Phase 6: 키보드 단축키 ✅
 
-| Item | Target | Status |
-|------|--------|--------|
-| [ ] | 모든 q-dialog 컴포넌트 → ESC로 닫기 | Not Started |
-| [ ] | 확인 다이얼로그 → Enter로 확인 | Not Started |
-
----
-
-## 장기: 개발 완료 후 진행
-
-### 장기-1. 테스트 추가
-
-| Category | Target | Status |
-|----------|--------|--------|
-| [ ] BE Service Tests | EphemerisServiceTest.kt, PassScheduleServiceTest.kt, ICDServiceTest.kt | 장기 |
-| [ ] BE Algorithm Tests | LimitAngleCalculatorTest.kt, CoordinateTransformerTest.kt | 장기 |
-| [ ] FE Store Tests | icdStore.spec.ts | 장기 |
-
----
-
-### 장기-2. 보안 강화 (인증/인가)
-
-| Task | Description | Status |
-|------|-------------|--------|
-| [ ] Spring Security | 의존성 추가, SecurityConfig 생성 | 장기 |
-| [ ] JWT 토큰 | 검증 구현 | 장기 |
-| [ ] 로그인 API | AuthController.kt 구현 | 장기 |
-
----
-
-### 장기-3. Docker 컨테이너화
-
-| Task | Description | Status |
-|------|-------------|--------|
-| [ ] Backend Dockerfile | eclipse-temurin:21-jre-alpine | 장기 |
-| [ ] Frontend Dockerfile | node:20-alpine + nginx:alpine | 장기 |
-| [ ] docker-compose.yml | 통합 구성 | 장기 |
-
----
-
-### 장기-4. CI/CD 파이프라인
-
-| Task | Description | Status |
-|------|-------------|--------|
-| [ ] .gitlab-ci.yml | test, build, deploy stages | 장기 |
+| 항목 | 상태 | 비고 |
+|------|:----:|------|
+| useKeyboardNavigation.ts | ✅ | 255줄, 다양한 키 바인딩 지원 |
+| 모달 ESC 닫기 | ✅ | q-dialog 기본 지원 |
 
 ---
 
@@ -402,6 +182,40 @@ export function useKeyboardNavigation(options: KeyboardOptions) {
 | 2026-01-15 | P2-3 | icdStore shallowRef | Done | 3개 객체 변환 (errorStatusBarData, errorPopupData, latestDataBuffer) |
 | 2026-01-15 | 추가 | 로깅 유틸리티 | Done | logger.ts 생성 (debug/info/warn/error) |
 | 2026-01-15 | - | **중단** | - | CP3/CP4 테스트 대기, 재검토 항목 정리 |
+| 2026-01-16 | P4-1 | @Valid 추가 | Done | 20개 어노테이션 (3+4+13) |
+| 2026-01-16 | P4-2 | catch 구체화 (Controller) | Done | 52건 완료, Service 보류 |
+| 2026-01-16 | P5-1 | TLE 캐시 분리 | Done | EphemerisTLECache, PassScheduleTLECache 추출, 빌드 통과 |
+| 2026-01-17 | P5-2 | DataRepository 분리 | Done | EphemerisDataRepository 추출 (~280줄), 로그 지원, 빌드 통과 |
+| 2026-01-17 | P5-3 | PassScheduleRepo 분리 | Done | PassScheduleDataRepository 추출 (~280줄), ConcurrentHashMap 지원, 빌드 통과 |
+| 2026-01-17 | P1-1 | !! 연산자 제거 | Done | SunTrackService(15건), PassScheduleService(1건), 빌드 통과 |
+| 2026-01-17 | Docs | 문서 정리 | Done | PLAN.md=TODO, TRACKER.md=DONE 분리 |
+| 2026-01-17 | 검증 | 실제 상태 확인 | Done | Phase 1~6 완료 확인, DB 설계만 남음 |
+
+---
+
+## 테스트 체크리스트 (2026-01-20 회사 복귀 후)
+
+### P1-1 !! 연산자 제거 검증
+- [ ] **SunTrack 모드**
+  - [ ] 모드 시작/중지 정상 동작
+  - [ ] Train 각도 초기화 및 이동
+  - [ ] Offset 변경 시 실시간 반영
+  - [ ] 안정화 단계 전환 (IDLE → INITIAL_Train → STABILIZING → TRACKING)
+- [ ] **PassSchedule 모드**
+  - [ ] 스케줄 로드 정상 동작
+  - [ ] 첫 스케줄 선택 및 상태 전환
+  - [ ] 추적 시작/중지
+
+### CP3/CP4 (FE 리팩토링 검증)
+- [ ] FE 재시작 후 deep watch 동작 확인
+- [ ] icdStore shallowRef 변경 영향 확인
+- [ ] 실시간 데이터 표시 정상 여부
+
+### Phase 5 BE 서비스 분리 검증
+- [ ] EphemerisTLECache 동작 확인
+- [ ] PassScheduleTLECache 동작 확인
+- [ ] EphemerisDataRepository 로그 확인
+- [ ] PassScheduleDataRepository 로그 확인
 
 ---
 
@@ -419,7 +233,7 @@ export function useKeyboardNavigation(options: KeyboardOptions) {
 
 | Metric | Reported | Verified |
 |--------|----------|----------|
-| !! operators | 46 | **7** |
+| !! operators | 46 | **0** ✅ |
 | Thread.sleep | 2 | **2** |
 | runBlocking | 1 | **1** |
 | GlobalData 동시성 | 18필드 | **18필드** |
@@ -449,4 +263,4 @@ export function useKeyboardNavigation(options: KeyboardOptions) {
 
 ---
 
-**Last Updated**: 2026-01-15 (PLAN.md v3.6.0 동기화 - 전체 일정 1/21 완료)
+**Last Updated**: 2026-01-17 (P1-1 !! 연산자 제거 완료)

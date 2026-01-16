@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*
 import org.springframework.http.ResponseEntity
 import org.springframework.transaction.annotation.Transactional
 import org.slf4j.LoggerFactory
+import jakarta.validation.Valid
 import jakarta.validation.constraints.DecimalMax
 import jakarta.validation.constraints.DecimalMin
 import jakarta.validation.constraints.NotNull
@@ -48,7 +49,7 @@ class SettingsController(
             description = "위치 설정 변경 요청 데이터",
             required = true
         )
-        @RequestBody request: LocationRequest
+        @Valid @RequestBody request: LocationRequest
     ): ResponseEntity<Map<String, Any>> {
         return try {
             settingsService.setLocation(
@@ -65,10 +66,16 @@ class SettingsController(
                     "altitude" to settingsService.altitude
                 )
             ))
-        } catch (e: Exception) {
+        } catch (e: IllegalArgumentException) {
             ResponseEntity.badRequest().body(mapOf(
                 "status" to "error",
                 "message" to "위치 설정 변경 실패: ${e.message}"
+            ))
+        } catch (e: Exception) {
+            logger.error("위치 설정 변경 중 오류 발생", e)
+            ResponseEntity.internalServerError().body(mapOf(
+                "status" to "error",
+                "message" to "위치 설정 변경 중 서버 오류가 발생했습니다."
             ))
         }
     }
@@ -98,7 +105,7 @@ class SettingsController(
             description = "추적 설정 변경 요청 데이터",
             required = true
         )
-        @RequestBody request: TrackingRequest
+        @Valid @RequestBody request: TrackingRequest
     ): ResponseEntity<Map<String, Any>> {
         return try {
             settingsService.setTracking(
@@ -115,10 +122,16 @@ class SettingsController(
                     "minElevationAngle" to settingsService.minElevationAngle
                 )
             ))
-        } catch (e: Exception) {
+        } catch (e: IllegalArgumentException) {
             ResponseEntity.badRequest().body(mapOf(
                 "status" to "error",
                 "message" to "추적 설정 변경 실패: ${e.message}"
+            ))
+        } catch (e: Exception) {
+            logger.error("추적 설정 변경 중 오류 발생", e)
+            ResponseEntity.internalServerError().body(mapOf(
+                "status" to "error",
+                "message" to "추적 설정 변경 중 서버 오류가 발생했습니다."
             ))
         }
     }
@@ -144,7 +157,7 @@ class SettingsController(
         tags = ["System - Settings"]
     )
     fun setStowAngle(
-        @RequestBody request: StowAngleRequest
+        @Valid @RequestBody request: StowAngleRequest
     ): ResponseEntity<Map<String, Any>> {
         return try {
             settingsService.setStowAngles(
@@ -161,10 +174,16 @@ class SettingsController(
                     "train" to settingsService.stowAngleTrain
                 )
             ))
-        } catch (e: Exception) {
+        } catch (e: IllegalArgumentException) {
             ResponseEntity.badRequest().body(mapOf(
                 "status" to "error",
                 "message" to "Stow Angle 설정 변경 실패: ${e.message}"
+            ))
+        } catch (e: Exception) {
+            logger.error("Stow Angle 설정 변경 중 오류 발생", e)
+            ResponseEntity.internalServerError().body(mapOf(
+                "status" to "error",
+                "message" to "Stow Angle 설정 변경 중 서버 오류가 발생했습니다."
             ))
         }
     }
@@ -190,7 +209,7 @@ class SettingsController(
         tags = ["System - Settings"]
     )
     fun setStowSpeed(
-        @RequestBody request: StowSpeedRequest
+        @Valid @RequestBody request: StowSpeedRequest
     ): ResponseEntity<Map<String, Any>> {
         return try {
             settingsService.setStowSpeeds(
@@ -207,10 +226,16 @@ class SettingsController(
                     "train" to settingsService.stowSpeedTrain
                 )
             ))
-        } catch (e: Exception) {
+        } catch (e: IllegalArgumentException) {
             ResponseEntity.badRequest().body(mapOf(
                 "status" to "error",
                 "message" to "Stow Speed 설정 변경 실패: ${e.message}"
+            ))
+        } catch (e: Exception) {
+            logger.error("Stow Speed 설정 변경 중 오류 발생", e)
+            ResponseEntity.internalServerError().body(mapOf(
+                "status" to "error",
+                "message" to "Stow Speed 설정 변경 중 서버 오류가 발생했습니다."
             ))
         }
     }
@@ -239,7 +264,7 @@ class SettingsController(
         tags = ["System - Settings"]
     )
     fun setStowAll(
-        @RequestBody request: StowAllRequest
+        @Valid @RequestBody request: StowAllRequest
     ): ResponseEntity<Map<String, Any>> {
         return try {
             settingsService.setStowAll(
@@ -266,10 +291,16 @@ class SettingsController(
                     )
                 )
             ))
-        } catch (e: Exception) {
+        } catch (e: IllegalArgumentException) {
             ResponseEntity.badRequest().body(mapOf(
                 "status" to "error",
                 "message" to "Stow 전체 설정 변경 실패: ${e.message}"
+            ))
+        } catch (e: Exception) {
+            logger.error("Stow 전체 설정 변경 중 오류 발생", e)
+            ResponseEntity.internalServerError().body(mapOf(
+                "status" to "error",
+                "message" to "Stow 전체 설정 변경 중 서버 오류가 발생했습니다."
             ))
         }
     }
@@ -295,7 +326,7 @@ class SettingsController(
         tags = ["System - Settings"]
     )
     fun setAntennaSpec(
-        @RequestBody request: AntennaSpecRequest
+        @Valid @RequestBody request: AntennaSpecRequest
     ): ResponseEntity<Map<String, Any>> {
         return try {
             settingsService.setAntennaSpec(
@@ -310,10 +341,16 @@ class SettingsController(
                     "tiltAngle" to settingsService.tiltAngle
                 )
             ))
-        } catch (e: Exception) {
+        } catch (e: IllegalArgumentException) {
             ResponseEntity.badRequest().body(mapOf(
                 "status" to "error",
                 "message" to "AntennaSpec 설정 변경 실패: ${e.message}"
+            ))
+        } catch (e: Exception) {
+            logger.error("AntennaSpec 설정 변경 중 오류 발생", e)
+            ResponseEntity.internalServerError().body(mapOf(
+                "status" to "error",
+                "message" to "AntennaSpec 설정 변경 중 서버 오류가 발생했습니다."
             ))
         }
     }
@@ -339,7 +376,7 @@ class SettingsController(
         tags = ["System - Settings"]
     )
     fun setAngleLimits(
-        @RequestBody request: AngleLimitsRequest
+        @Valid @RequestBody request: AngleLimitsRequest
     ): ResponseEntity<Map<String, Any>> {
         return try {
             settingsService.setAngleLimits(
@@ -362,10 +399,16 @@ class SettingsController(
                     "trainMax" to settingsService.angleTrainMax
                 )
             ))
-        } catch (e: Exception) {
+        } catch (e: IllegalArgumentException) {
             ResponseEntity.badRequest().body(mapOf(
                 "status" to "error",
                 "message" to "Angle Limits 설정 변경 실패: ${e.message}"
+            ))
+        } catch (e: Exception) {
+            logger.error("Angle Limits 설정 변경 중 오류 발생", e)
+            ResponseEntity.internalServerError().body(mapOf(
+                "status" to "error",
+                "message" to "Angle Limits 설정 변경 중 서버 오류가 발생했습니다."
             ))
         }
     }
@@ -391,7 +434,7 @@ class SettingsController(
         tags = ["System - Settings"]
     )
     fun setSpeedLimits(
-        @RequestBody request: SpeedLimitsRequest
+        @Valid @RequestBody request: SpeedLimitsRequest
     ): ResponseEntity<Map<String, Any>> {
         return try {
             settingsService.setSpeedLimits(
@@ -414,10 +457,16 @@ class SettingsController(
                     "trainMax" to settingsService.speedTrainMax
                 )
             ))
-        } catch (e: Exception) {
+        } catch (e: IllegalArgumentException) {
             ResponseEntity.badRequest().body(mapOf(
                 "status" to "error",
                 "message" to "Speed Limits 설정 변경 실패: ${e.message}"
+            ))
+        } catch (e: Exception) {
+            logger.error("Speed Limits 설정 변경 중 오류 발생", e)
+            ResponseEntity.internalServerError().body(mapOf(
+                "status" to "error",
+                "message" to "Speed Limits 설정 변경 중 서버 오류가 발생했습니다."
             ))
         }
     }
@@ -443,7 +492,7 @@ class SettingsController(
         tags = ["System - Settings"]
     )
     fun setAngleOffsetLimits(
-        @RequestBody request: AngleOffsetLimitsRequest
+        @Valid @RequestBody request: AngleOffsetLimitsRequest
     ): ResponseEntity<Map<String, Any>> {
         return try {
             settingsService.setAngleOffsetLimits(
@@ -460,10 +509,16 @@ class SettingsController(
                     "train" to settingsService.angleOffsetTrain
                 )
             ))
-        } catch (e: Exception) {
+        } catch (e: IllegalArgumentException) {
             ResponseEntity.badRequest().body(mapOf(
                 "status" to "error",
                 "message" to "Angle Offset Limits 설정 변경 실패: ${e.message}"
+            ))
+        } catch (e: Exception) {
+            logger.error("Angle Offset Limits 설정 변경 중 오류 발생", e)
+            ResponseEntity.internalServerError().body(mapOf(
+                "status" to "error",
+                "message" to "Angle Offset Limits 설정 변경 중 서버 오류가 발생했습니다."
             ))
         }
     }
@@ -489,7 +544,7 @@ class SettingsController(
         tags = ["System - Settings"]
     )
     fun setTimeOffsetLimits(
-        @RequestBody request: TimeOffsetLimitsRequest
+        @Valid @RequestBody request: TimeOffsetLimitsRequest
     ): ResponseEntity<Map<String, Any>> {
         return try {
             settingsService.setTimeOffsetLimits(
@@ -504,10 +559,16 @@ class SettingsController(
                     "max" to settingsService.timeOffsetMax
                 )
             ))
-        } catch (e: Exception) {
+        } catch (e: IllegalArgumentException) {
             ResponseEntity.badRequest().body(mapOf(
                 "status" to "error",
                 "message" to "Time Offset Limits 설정 변경 실패: ${e.message}"
+            ))
+        } catch (e: Exception) {
+            logger.error("Time Offset Limits 설정 변경 중 오류 발생", e)
+            ResponseEntity.internalServerError().body(mapOf(
+                "status" to "error",
+                "message" to "Time Offset Limits 설정 변경 중 서버 오류가 발생했습니다."
             ))
         }
     }
@@ -533,7 +594,7 @@ class SettingsController(
         tags = ["System - Settings"]
     )
     fun setAlgorithm(
-        @RequestBody request: AlgorithmRequest
+        @Valid @RequestBody request: AlgorithmRequest
     ): ResponseEntity<Map<String, Any>> {
         return try {
             settingsService.setAlgorithm(
@@ -546,10 +607,16 @@ class SettingsController(
                     "geoMinMotion" to settingsService.geoMinMotion
                 )
             ))
-        } catch (e: Exception) {
+        } catch (e: IllegalArgumentException) {
             ResponseEntity.badRequest().body(mapOf(
                 "status" to "error",
                 "message" to "Algorithm 설정 변경 실패: ${e.message}"
+            ))
+        } catch (e: Exception) {
+            logger.error("Algorithm 설정 변경 중 오류 발생", e)
+            ResponseEntity.internalServerError().body(mapOf(
+                "status" to "error",
+                "message" to "Algorithm 설정 변경 중 서버 오류가 발생했습니다."
             ))
         }
     }
@@ -575,7 +642,7 @@ class SettingsController(
         tags = ["System - Settings"]
     )
     fun setStepSizeLimit(
-        @RequestBody request: StepSizeLimitRequest
+        @Valid @RequestBody request: StepSizeLimitRequest
     ): ResponseEntity<Map<String, Any>> {
         return try {
             settingsService.setStepSizeLimit(
@@ -590,10 +657,16 @@ class SettingsController(
                     "max" to settingsService.stepSizeMax
                 )
             ))
-        } catch (e: Exception) {
+        } catch (e: IllegalArgumentException) {
             ResponseEntity.badRequest().body(mapOf(
                 "status" to "error",
                 "message" to "StepSizeLimit 설정 변경 실패: ${e.message}"
+            ))
+        } catch (e: Exception) {
+            logger.error("StepSizeLimit 설정 변경 중 오류 발생", e)
+            ResponseEntity.internalServerError().body(mapOf(
+                "status" to "error",
+                "message" to "StepSizeLimit 설정 변경 중 서버 오류가 발생했습니다."
             ))
         }
     }
@@ -623,7 +696,7 @@ class SettingsController(
             description = "Feed 설정 변경 요청 데이터",
             required = true
         )
-        @RequestBody request: FeedRequest
+        @Valid @RequestBody request: FeedRequest
     ): ResponseEntity<Map<String, Any>> {
         return try {
             logger.info("📥 Feed 설정 변경 요청 수신: enabledBands = ${request.enabledBands}")
@@ -637,11 +710,17 @@ class SettingsController(
                     "enabledBands" to updatedBands
                 )
             ))
-        } catch (e: Exception) {
-            logger.error("❌ Feed 설정 변경 실패: ${e.message}", e)
+        } catch (e: IllegalArgumentException) {
+            logger.warn("Feed 설정 변경 실패 - 잘못된 입력: ${e.message}")
             ResponseEntity.badRequest().body(mapOf(
                 "status" to "error",
                 "message" to "Feed 설정 변경 실패: ${e.message}"
+            ))
+        } catch (e: Exception) {
+            logger.error("Feed 설정 변경 중 오류 발생", e)
+            ResponseEntity.internalServerError().body(mapOf(
+                "status" to "error",
+                "message" to "Feed 설정 변경 중 서버 오류가 발생했습니다."
             ))
         }
     }

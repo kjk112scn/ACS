@@ -62,49 +62,43 @@ export function parseTrackingStatusUpdate(
 
   // Ephemeris 상태 업데이트
   if (input.ephemerisStatus !== undefined) {
-    const newStatus = input.ephemerisStatus as boolean | null
-    if (current.ephemerisStatus !== newStatus) {
-      updates.ephemerisStatus = newStatus
+    if (current.ephemerisStatus !== input.ephemerisStatus) {
+      updates.ephemerisStatus = input.ephemerisStatus
     }
   }
 
   // Ephemeris 추적 상태 업데이트
   if (input.ephemerisTrackingState !== undefined) {
-    const newState = input.ephemerisTrackingState as string | null
-    if (current.ephemerisTrackingState !== newState) {
-      updates.ephemerisTrackingState = newState
+    if (current.ephemerisTrackingState !== input.ephemerisTrackingState) {
+      updates.ephemerisTrackingState = input.ephemerisTrackingState
     }
   }
 
   // Pass Schedule 상태 업데이트
   if (input.passScheduleStatus !== undefined) {
-    const newStatus = input.passScheduleStatus as boolean | null
-    if (current.passScheduleStatus !== newStatus) {
-      updates.passScheduleStatus = newStatus
+    if (current.passScheduleStatus !== input.passScheduleStatus) {
+      updates.passScheduleStatus = input.passScheduleStatus
     }
   }
 
   // Pass Schedule 추적 상태 업데이트
   if (input.passScheduleTrackingState !== undefined) {
-    const newState = input.passScheduleTrackingState as string | null
-    if (current.passScheduleTrackingState !== newState) {
-      updates.passScheduleTrackingState = newState
+    if (current.passScheduleTrackingState !== input.passScheduleTrackingState) {
+      updates.passScheduleTrackingState = input.passScheduleTrackingState
     }
   }
 
   // Sun Track 상태 업데이트
   if (input.sunTrackStatus !== undefined) {
-    const newStatus = input.sunTrackStatus as boolean | null
-    if (current.sunTrackStatus !== newStatus) {
-      updates.sunTrackStatus = newStatus
+    if (current.sunTrackStatus !== input.sunTrackStatus) {
+      updates.sunTrackStatus = input.sunTrackStatus
     }
   }
 
   // Sun Track 추적 상태 업데이트
   if (input.sunTrackTrackingState !== undefined) {
-    const newState = input.sunTrackTrackingState as string | null
-    if (current.sunTrackTrackingState !== newState) {
-      updates.sunTrackTrackingState = newState
+    if (current.sunTrackTrackingState !== input.sunTrackTrackingState) {
+      updates.sunTrackTrackingState = input.sunTrackTrackingState
     }
   }
 
