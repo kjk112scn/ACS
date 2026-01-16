@@ -854,6 +854,91 @@ useKeyboardNavigation({
 
 ---
 
+## 보류 항목 (Backlog)
+
+> 현재 리팩토링 범위에서 제외된 항목들. 추후 별도 요청 시 진행.
+
+| ID | 항목 | 설명 | 우선순위 | 비고 |
+|----|------|------|:--------:|------|
+| BL-1 | **로깅 유틸리티 연계** | 기존 988개 console.log → logger.ts로 교체 | 낮음 | Production 자동 제거 설정 완료됨. 새 코드만 logger 사용 권장 |
+| BL-2 | **Settings 실시간 제어 분리** | 메인터넌스 기능(실시간)과 일반 설정(적용 버튼) UI 분리 | 중간 | UX 개선 사항. 별도 아이콘/메뉴로 관리자 기능 분리 |
+| BL-3 | **DB 설계 (RFC-001)** | PostgreSQL + TimescaleDB 위성 추적 데이터 저장 | 별도 | 4개 테이블 설계 완료. 구현은 별도 Feature로 |
+
+### BL-1. 로깅 유틸리티 연계
+
+**현재 상태**:
+- ✅ `logger.ts` 생성 완료
+- ✅ Production 빌드 시 console 자동 제거 설정 완료
+
+**추가 작업 (선택)**:
+```typescript
+// 기존
+console.log('데이터:', data)
+
+// 변경
+import { logger } from '@/utils/logger'
+logger.debug('데이터:', data)
+```
+
+**효과**: 개발 시 로그 레벨 관리 (debug/info/warn/error)
+
+---
+
+### BL-2. Settings 실시간 제어 분리
+
+**현재 구조**:
+```
+⚙️ Settings 모달
+├── 일반 설정 (적용 버튼 방식)
+├── 시스템 설정 (적용 버튼 방식)
+└── 관리자 설정
+    └── 메인터넌스 (실시간 적용) ← 혼재
+```
+
+**제안 구조**:
+```
+⚙️ Settings              🔧 Maintenance (관리자 전용)
+├── 일반 설정             ├── 서보 테스트 (실시간)
+├── 시스템 설정           ├── MC On/Off (실시간)
+└── 관리자 설정           └── 인코더 프리셋 (실시간)
+```
+
+**구현 시 필요 작업**:
+- 새 아이콘/메뉴 추가
+- MaintenanceSettings 분리
+- 권한 체크 로직 추가
+
+---
+
+### BL-3. DB 설계 (RFC-001)
+
+**문서 위치**: `docs/work/active/Architecture_Refactoring/legacy/RFC-001_Database_Strategy.md`
+
+**설계 완료 항목**:
+- PostgreSQL 16 + TimescaleDB
+- 4개 테이블: tracking_master, tracking_detail, realtime_result, icd_realtime
+
+**결정**: 리팩토링 완료 후 진행
+
+| 근거 | 설명 |
+|------|------|
+| 현재 기능 정상 | DB 없이도 기존 기능 모두 동작 |
+| 신규 기능 성격 | 버그 수정이 아닌 기능 확장 |
+| 코드 준비 | Phase 3 서비스 분리 후 DB 레이어 추가 용이 |
+
+**실행 순서**:
+```
+1. 리팩토링 완료 (Phase 3까지)
+   ↓
+2. DB 구현 시작
+   - PostgreSQL + TimescaleDB 설치
+   - 테이블 생성 (4개)
+   - Repository 레이어 추가
+   - Service에 저장 로직 연동
+```
+
+---
+
 ## References
 
 - [refactoring-hints.md](../../architecture/context/analysis/synthesis/refactoring-hints.md)
