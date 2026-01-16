@@ -18,8 +18,88 @@
 
 ## Phase 1: 인프라 설정
 
-- [ ] PostgreSQL 16 설치
-- [ ] TimescaleDB 확장 설치
+### 환경별 설치 방법
+
+| 환경 | 방식 | 포트 |
+|------|------|------|
+| 집 PC | Docker | 5433 |
+| 회사 PC | Native | 5432 |
+
+---
+
+### 옵션 A: Docker 설치 (집 PC)
+
+#### 1. 컨테이너 생성
+
+```powershell
+docker run -d `
+  --name acs-timescaledb `
+  -p 5433:5432 `
+  -e POSTGRES_USER=acs_user `
+  -e POSTGRES_PASSWORD=acs1234 `
+  -e POSTGRES_DB=acs `
+  -v acs_pgdata:/var/lib/postgresql/data `
+  timescale/timescaledb:latest-pg16
+```
+
+#### 2. 확인
+
+```powershell
+docker ps
+docker exec -it acs-timescaledb psql -U acs_user -d acs -c "SELECT version();"
+```
+
+#### 3. 테이블 생성
+
+```powershell
+docker cp "g:\Kyu\repo\ACS\docs\work\active\Database_Integration\sql\schema.sql" acs-timescaledb:/tmp/
+docker exec -it acs-timescaledb psql -U acs_user -d acs -f /tmp/schema.sql
+```
+
+---
+
+### 옵션 B: Native 설치 (회사 PC)
+
+#### 1. PostgreSQL 16에 TimescaleDB 확장 추가
+
+```sql
+-- psql 접속 후
+CREATE EXTENSION IF NOT EXISTS timescaledb;
+```
+
+> TimescaleDB 미설치 시: https://docs.timescale.com/self-hosted/latest/install/installation-windows/
+
+#### 2. 데이터베이스/사용자 생성
+
+```sql
+CREATE USER acs_user WITH PASSWORD 'acs1234';
+CREATE DATABASE acs OWNER acs_user;
+GRANT ALL PRIVILEGES ON DATABASE acs TO acs_user;
+```
+
+#### 3. 테이블 생성
+
+```powershell
+psql -U acs_user -d acs -f "g:\Kyu\repo\ACS\docs\work\active\Database_Integration\sql\schema.sql"
+```
+
+---
+
+### 접속 정보
+
+| 항목 | Docker | Native |
+|------|--------|--------|
+| Host | localhost | localhost |
+| Port | **5433** | 5432 |
+| Database | acs | acs |
+| User | acs_user | acs_user |
+| Password | acs1234 | acs1234 |
+
+---
+
+### 체크리스트
+
+- [ ] PostgreSQL 16 + TimescaleDB 설치
 - [ ] 데이터베이스 생성 (`acs`)
 - [ ] 사용자 생성 (`acs_user`)
 - [ ] 테이블 생성 (sql/schema.sql 실행)
