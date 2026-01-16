@@ -1,7 +1,7 @@
 # Refactoring Tracker (완료 기록)
 
 > **Last Updated**: 2026-01-17
-> **Status**: ✅ 리팩토링 완료 - DB 설계만 남음
+> **Status**: ✅ 리팩토링 완료 - 필수 작업 없음, 선택적 개선만 남음
 
 ---
 
@@ -10,12 +10,13 @@
 | Phase | Description | Status | Progress |
 |-------|-------------|--------|----------|
 | Sprint 0 | 보안 Critical | ✅ Done | 3/3 |
-| Phase 1 | BE 안정성 | ✅ Done | 6/6 (일부 선택적 보류) |
+| Phase 1 | BE 안정성 | ✅ Done | 6/6 |
 | Phase 2 | FE 성능 | ✅ Done | 3/3 |
-| Phase 3 | FE 파일 분리 | ✅ Done | 3/3 |
+| Phase 3 | FE 파일 분리 | ✅ Done | 3/3 + OffsetControls 통합 |
 | Phase 4 | 품질 개선 | ✅ Done | Controller 완료 |
 | Phase 5 | BE 서비스 분리 | ✅ Done | TLE캐시, DataRepository 완료 |
 | Phase 6 | 키보드 단축키 | ✅ Done | q-dialog 기본 ESC, composable 생성 |
+| **레거시 검토** | 전문가 검토 | ✅ Done | 실제 필요 작업 20% (대부분 완료/불필요) |
 | **DB 설계** | RFC-001 | 📋 대기 | 전문가 검토 후 진행 |
 
 ---
@@ -190,6 +191,10 @@
 | 2026-01-17 | P1-1 | !! 연산자 제거 | Done | SunTrackService(15건), PassScheduleService(1건), 빌드 통과 |
 | 2026-01-17 | Docs | 문서 정리 | Done | PLAN.md=TODO, TRACKER.md=DONE 분리 |
 | 2026-01-17 | 검증 | 실제 상태 확인 | Done | Phase 1~6 완료 확인, DB 설계만 남음 |
+| 2026-01-17 | 검토 | 레거시 vs 실제 비교 | Done | 전문가 에이전트 검토, 실제 필요 작업 20% |
+| 2026-01-17 | 검토 | subscribe() 에러 핸들러 | Done | **25건 모두 이미 있음 확인** |
+| 2026-01-17 | 검토 | Offset Control 통합 | Done | **useOffsetControls로 이미 통합됨** |
+| 2026-01-17 | 문서 | PLAN.md, TRACKER.md | Done | 검토 결과 반영, 불필요 항목 정리 |
 
 ---
 
@@ -263,4 +268,34 @@
 
 ---
 
-**Last Updated**: 2026-01-17 (P1-1 !! 연산자 제거 완료)
+## 🔍 레거시 vs 실제 검토 결과 (2026-01-17)
+
+> 전문가 에이전트 검토 완료 - 실제 필요 작업량 **약 20%**
+
+### BE 검토 결과
+
+| 항목 | 레거시 | 실제 | 판정 |
+|------|:------:|:----:|:----:|
+| !! 연산자 | 46건 | 10건 | ❌ 불필요 (null 체크 직후 사용) |
+| subscribe() 핸들러 | 25건 | **0건** | ❌ 불필요 (**모두 있음**) |
+| mutableListOf | 65건 | 1건 | ❌ 불필요 (로컬/synchronized) |
+| println | 102건 | 68건 | ⚠️ 선택적 |
+| runBlocking | 1건 | 0건 | ✅ 제거됨 |
+
+### FE 검토 결과
+
+| 항목 | 레거시 | 실제 | 판정 |
+|------|:------:|:----:|:----:|
+| Offset Control 분산 | 3곳 | **0곳** | ✅ 통합됨 (useOffsetControls) |
+| 대형 파일 분리 | 5개 | 0개 긴급 | ❌ 불필요 (이미 분리됨) |
+| 하드코딩 색상 | 304건 | 50~80건 | ⚠️ 선택적 (차트 예외) |
+| as 타입 단언 | 99건 | 20~30건 | ⚠️ 선택적 |
+
+### 결론
+
+**필수 작업**: 없음 (모두 완료 또는 불필요)
+**선택적 작업**: ICDService println(68건), UI 색상(50~80건), Type Guard(20~30건)
+
+---
+
+**Last Updated**: 2026-01-17 (레거시 vs 실제 검토 완료)

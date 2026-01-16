@@ -1,6 +1,6 @@
 # RFC-001: 데이터베이스 전략
 
-> **버전**: 1.1.0 | **작성일**: 2026-01-13
+> **버전**: 1.3.0 | **작성일**: 2026-01-17
 > **상태**: 검토 완료 (Reviewed)
 > **우선순위**: P0 (Critical)
 
@@ -10,6 +10,8 @@
 
 | 버전 | 날짜 | 변경 내용 |
 |------|------|----------|
+| 1.3.0 | 2026-01-17 | 드라이버 변경: Spring Data JDBC → R2DBC (논블로킹 100ms 쓰기 최적화) |
+| 1.2.0 | 2026-01-17 | 테이블명 정리: tracking_master→tracking_session, tracking_detail→tracking_trajectory, realtime_result→tracking_result, icd_realtime→icd_status |
 | 1.1.0 | 2026-01-13 | 전문가 검토 반영: 타입 수정(mst_id→BIGINT, detail_id→INTEGER), data_type 필수화, 복합 인덱스 추가, 청크 크기 설정, 압축 정책 추가 |
 | 1.0.0 | 2026-01-13 | 초기 작성 |
 
@@ -77,14 +79,14 @@ TLE 데이터 → SatelliteTrackingProcessor → Map<String, Any?> → 메모리
 |---------|------|------|
 | DBMS | PostgreSQL 16 | 안정성, 성능, 무료 |
 | 확장 | TimescaleDB | 시계열 최적화, 자동 압축/삭제 |
-| 드라이버 | Spring Data JDBC | 단순, 안정적, TimescaleDB 완전 지원 |
+| 드라이버 | Spring Data R2DBC | 논블로킹 I/O, WebFlux 통합, 100ms 쓰기 최적화 |
 
 ### 3.2 테이블 설계
 
-#### 3.2.1 tracking_master (패스별 요약)
+#### 3.2.1 tracking_session (패스별 요약)
 
 ```sql
-CREATE TABLE tracking_master (
+CREATE TABLE tracking_session (
     id                      BIGSERIAL PRIMARY KEY,
     mst_id                  BIGINT NOT NULL,           -- 코드와 일치 (Long)
     detail_id               INTEGER NOT NULL,          -- 코드와 일치 (Int)
@@ -111,23 +113,23 @@ CREATE TABLE tracking_master (
     -- 시스템 필드
     created_at              TIMESTAMPTZ DEFAULT NOW(),
 
-    CONSTRAINT uk_tracking_master UNIQUE (mst_id, data_type, tracking_mode)
+    CONSTRAINT uk_tracking_session UNIQUE (mst_id, data_type, tracking_mode)
 );
 
 -- 인덱스
-CREATE INDEX idx_tm_satellite ON tracking_master(satellite_id);
-CREATE INDEX idx_tm_start_time ON tracking_master(start_time DESC);
-CREATE INDEX idx_tm_mode ON tracking_master(tracking_mode);
-CREATE INDEX idx_tm_mst_datatype ON tracking_master(mst_id, data_type);  -- 복합 인덱스
-CREATE INDEX idx_tm_mode_satellite_time ON tracking_master(tracking_mode, satellite_id, start_time DESC);
+CREATE INDEX idx_tm_satellite ON tracking_session(satellite_id);
+CREATE INDEX idx_tm_start_time ON tracking_session(start_time DESC);
+CREATE INDEX idx_tm_mode ON tracking_session(tracking_mode);
+CREATE INDEX idx_tm_mst_datatype ON tracking_session(mst_id, data_type);  -- 복합 인덱스
+CREATE INDEX idx_tm_mode_satellite_time ON tracking_session(tracking_mode, satellite_id, start_time DESC);
 ```
 
-#### 3.2.2 tracking_detail (이론 궤적)
+#### 3.2.2 tracking_trajectory (이론 궤적)
 
 ```sql
-CREATE TABLE tracking_detail (
+CREATE TABLE tracking_trajectory (
     id                      BIGSERIAL PRIMARY KEY,
-    master_id               BIGINT REFERENCES tracking_master(id) ON DELETE CASCADE,
+    master_id               BIGINT REFERENCES tracking_session(id) ON DELETE CASCADE,
     detail_id               INTEGER NOT NULL,          -- 코드와 일치 (Int)
     data_type               VARCHAR(50) NOT NULL,      -- 8가지 DataType
 
@@ -148,29 +150,29 @@ CREATE TABLE tracking_detail (
 );
 
 -- Hypertable 변환 (시계열 최적화)
-SELECT create_hypertable('tracking_detail', 'timestamp');
+SELECT create_hypertable('tracking_trajectory', 'timestamp');
 
 -- 청크 크기 설정 (7일 단위)
-SELECT set_chunk_time_interval('tracking_detail', INTERVAL '7 days');
+SELECT set_chunk_time_interval('tracking_trajectory', INTERVAL '7 days');
 
 -- 압축 정책 (7일 후 압축)
-ALTER TABLE tracking_detail SET (
+ALTER TABLE tracking_trajectory SET (
     timescaledb.compress,
     timescaledb.compress_segmentby = 'master_id'
 );
-SELECT add_compression_policy('tracking_detail', INTERVAL '7 days');
+SELECT add_compression_policy('tracking_trajectory', INTERVAL '7 days');
 
 -- 인덱스
-CREATE INDEX idx_td_master ON tracking_detail(master_id);
-CREATE INDEX idx_td_master_timestamp ON tracking_detail(master_id, timestamp);
+CREATE INDEX idx_td_master ON tracking_trajectory(master_id);
+CREATE INDEX idx_td_master_timestamp ON tracking_trajectory(master_id, timestamp);
 ```
 
-#### 3.2.3 realtime_result (실측 추적 결과)
+#### 3.2.3 tracking_result (실측 추적 결과)
 
 ```sql
-CREATE TABLE realtime_result (
+CREATE TABLE tracking_result (
     id                      BIGSERIAL PRIMARY KEY,
-    master_id               BIGINT REFERENCES tracking_master(id) ON DELETE CASCADE,
+    master_id               BIGINT REFERENCES tracking_session(id) ON DELETE CASCADE,
 
     -- 인덱스/시간
     index                   INTEGER NOT NULL,
@@ -238,28 +240,28 @@ CREATE TABLE realtime_result (
 );
 
 -- Hypertable 변환
-SELECT create_hypertable('realtime_result', 'timestamp');
+SELECT create_hypertable('tracking_result', 'timestamp');
 
 -- 청크 크기 설정 (1일 단위 - 100ms 데이터 대량)
-SELECT set_chunk_time_interval('realtime_result', INTERVAL '1 day');
+SELECT set_chunk_time_interval('tracking_result', INTERVAL '1 day');
 
 -- 압축 정책 (7일 후 압축)
-ALTER TABLE realtime_result SET (
+ALTER TABLE tracking_result SET (
     timescaledb.compress,
     timescaledb.compress_segmentby = 'master_id'
 );
-SELECT add_compression_policy('realtime_result', INTERVAL '7 days');
+SELECT add_compression_policy('tracking_result', INTERVAL '7 days');
 
 -- 인덱스
-CREATE INDEX idx_rr_master ON realtime_result(master_id);
-CREATE INDEX idx_rr_timestamp ON realtime_result(timestamp DESC);
-CREATE INDEX idx_rr_quality ON realtime_result(tracking_quality);
+CREATE INDEX idx_rr_master ON tracking_result(master_id);
+CREATE INDEX idx_rr_timestamp ON tracking_result(timestamp DESC);
+CREATE INDEX idx_rr_quality ON tracking_result(tracking_quality);
 ```
 
-#### 3.2.4 icd_realtime (ICD 실시간 데이터)
+#### 3.2.4 icd_status (ICD 실시간 데이터)
 
 ```sql
-CREATE TABLE icd_realtime (
+CREATE TABLE icd_status (
     timestamp                       TIMESTAMPTZ NOT NULL,
 
     -- 각도 (6개)
@@ -342,37 +344,37 @@ CREATE TABLE icd_realtime (
 );
 
 -- Hypertable 변환 (Primary Key 없음, timestamp가 파티션 키)
-SELECT create_hypertable('icd_realtime', 'timestamp');
+SELECT create_hypertable('icd_status', 'timestamp');
 
 -- 청크 크기 설정 (1일 단위)
-SELECT set_chunk_time_interval('icd_realtime', INTERVAL '1 day');
+SELECT set_chunk_time_interval('icd_status', INTERVAL '1 day');
 
 -- 압축 정책 (7일 후 압축)
-ALTER TABLE icd_realtime SET (
+ALTER TABLE icd_status SET (
     timescaledb.compress,
     timescaledb.compress_segmentby = ''
 );
-SELECT add_compression_policy('icd_realtime', INTERVAL '7 days');
+SELECT add_compression_policy('icd_status', INTERVAL '7 days');
 
 -- 보관 정책 (30일 후 삭제)
-SELECT add_retention_policy('icd_realtime', INTERVAL '30 days');
+SELECT add_retention_policy('icd_status', INTERVAL '30 days');
 ```
 
 ### 3.3 보관 정책
 
 | 테이블 | 보관 기간 | 삭제 방식 | 압축 |
 |--------|----------|----------|------|
-| tracking_master | 30일 | Spring Scheduler | 없음 |
-| tracking_detail | 30일 | CASCADE (master 삭제 시) | TimescaleDB |
-| realtime_result | 30일 | CASCADE (master 삭제 시) | TimescaleDB |
-| icd_realtime | 30일 | TimescaleDB retention_policy | TimescaleDB (7일 후) |
+| tracking_session | 30일 | Spring Scheduler | 없음 |
+| tracking_trajectory | 30일 | CASCADE (master 삭제 시) | TimescaleDB |
+| tracking_result | 30일 | CASCADE (master 삭제 시) | TimescaleDB |
+| icd_status | 30일 | TimescaleDB retention_policy | TimescaleDB (7일 후) |
 
 ### 3.4 초기 로딩 전략
 
 ```kotlin
 @Service
 class TrackingDataLoader(
-    private val trackingMasterRepository: TrackingMasterRepository
+    private val trackingMasterRepository: TrackingSessionRepository
 ) {
 
     @PostConstruct
@@ -462,10 +464,10 @@ class TrackingExportController(
 | PassScheduleService.kt | 메모리 저장 → DB 저장 호출 추가 |
 | UdpFwICDService.kt | ICD 데이터 배치 저장 추가 |
 | BatchStorageManager.kt | DB 배치 INSERT 구현 |
-| (신규) TrackingMasterEntity.kt | Entity 클래스 |
-| (신규) TrackingDetailEntity.kt | Entity 클래스 |
-| (신규) RealtimeResultEntity.kt | Entity 클래스 |
-| (신규) IcdRealtimeEntity.kt | Entity 클래스 |
+| (신규) TrackingSessionEntity.kt | Entity 클래스 |
+| (신규) TrackingTrajectoryEntity.kt | Entity 클래스 |
+| (신규) TrackingResultEntity.kt | Entity 클래스 |
+| (신규) IcdStatusEntity.kt | Entity 클래스 |
 | (신규) TrackingRepository.kt | Repository 인터페이스 |
 | (신규) TrackingExportService.kt | CSV 내보내기 |
 
@@ -483,8 +485,9 @@ class TrackingExportController(
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
-    implementation("org.postgresql:postgresql:42.7.1")
+    implementation("org.springframework.boot:spring-boot-starter-data-r2dbc")
+    implementation("org.postgresql:r2dbc-postgresql:1.0.4.RELEASE")
+    runtimeOnly("org.postgresql:postgresql:42.7.1")  // 마이그레이션/초기화용
     // TimescaleDB는 PostgreSQL 확장이므로 별도 의존성 불필요
 }
 ```
@@ -562,7 +565,7 @@ acs:
 
 ## 8. Entity 클래스 설계
 
-### 8.1 TrackingMasterEntity
+### 8.1 TrackingSessionEntity
 
 ```kotlin
 package com.gtlsystems.acs_api.entity
@@ -571,12 +574,12 @@ import org.springframework.data.annotation.Id
 import org.springframework.data.relational.core.mapping.Table
 import java.time.ZonedDateTime
 
-@Table("tracking_master")
-data class TrackingMasterEntity(
+@Table("tracking_session")
+data class TrackingSessionEntity(
     @Id
     val id: Long? = null,
-    val mstId: String,
-    val detailId: String,
+    val mstId: Long,
+    val detailId: Int,
     val satelliteId: String,
     val satelliteName: String?,
     val trackingMode: String,  // EPHEMERIS | PASS_SCHEDULE
@@ -598,11 +601,11 @@ data class TrackingMasterEntity(
 )
 ```
 
-### 8.2 RealtimeResultEntity (57개 필드)
+### 8.2 TrackingResultEntity (57개 필드)
 
 ```kotlin
-@Table("realtime_result")
-data class RealtimeResultEntity(
+@Table("tracking_result")
+data class TrackingResultEntity(
     @Id
     val id: Long? = null,
     val masterId: Long,
