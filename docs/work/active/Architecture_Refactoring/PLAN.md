@@ -863,6 +863,7 @@ useKeyboardNavigation({
 | BL-1 | **로깅 유틸리티 연계** | 기존 988개 console.log → logger.ts로 교체 | 낮음 | Production 자동 제거 설정 완료됨. 새 코드만 logger 사용 권장 |
 | BL-2 | **Settings 실시간 제어 분리** | 메인터넌스 기능(실시간)과 일반 설정(적용 버튼) UI 분리 | 중간 | UX 개선 사항. 별도 아이콘/메뉴로 관리자 기능 분리 |
 | BL-3 | **DB 설계 (RFC-001)** | PostgreSQL + TimescaleDB 위성 추적 데이터 저장 | 별도 | 4개 테이블 설계 완료. 구현은 별도 Feature로 |
+| BL-4 | **코드 품질 Cleanup** | 하드코딩 색상 → 테마 변수, 중복 로직 통합, 인라인 스타일 정리 | 중간 | Phase 3 완료 후 일괄 진행. `/cleanup` 스킬 활용 |
 
 ### BL-1. 로깅 유틸리티 연계
 
@@ -936,6 +937,40 @@ logger.debug('데이터:', data)
    - Repository 레이어 추가
    - Service에 저장 로직 연동
 ```
+
+---
+
+### BL-4. 코드 품질 Cleanup
+
+**대상 파일** (Phase 3 완료 후 일괄 진행):
+- `passSchedule/components/*.vue` - 4개 컴포넌트
+- `ephemerisDesignation/components/*.vue` - 분리 예정 컴포넌트들
+- 기타 분리된 컴포넌트들
+
+**발견된 이슈**:
+
+| 유형 | 개수 | 위치 | 설명 |
+|------|:----:|------|------|
+| 하드코딩 색상 | 27개 | ScheduleTable, ScheduleChart 등 | `#ff5722`, `#2196f3` 등 → `var(--theme-*)` 변환 |
+| 중복 로직 | 2곳 | ScheduleTable.vue | `getRowStyleDirect`/`getRowClass` 동일 매칭 로직 |
+| 인라인 스타일 | 다수 | OffsetControls.vue | `style="width: 110px !important"` 반복 |
+
+**작업 내용**:
+```typescript
+// Before
+itemStyle: { color: '#ff5722' }
+
+// After
+itemStyle: { color: 'var(--theme-accent-color)' }
+```
+
+**실행 방법**: `/cleanup` 스킬 활용
+```bash
+/cleanup passSchedule/components
+/cleanup ephemerisDesignation/components
+```
+
+**우선순위**: 중간 (기능 동작에 영향 없음, 유지보수성 개선)
 
 ---
 
