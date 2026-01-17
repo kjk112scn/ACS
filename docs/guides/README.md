@@ -21,6 +21,13 @@ guides/
 |------|------|
 | [AGENT_SKILL_USAGE_GUIDE.md](AGENT_SKILL_USAGE_GUIDE.md) | 에이전트 15개, 스킬 12개 사용법 총정리 |
 
+### 코딩 규칙
+
+| 문서 | 설명 |
+|------|------|
+| [frontend-rules.md](frontend-rules.md) | Frontend 코딩 규칙 (Vue/Quasar/Pinia) |
+| [backend-rules.md](backend-rules.md) | Backend 코딩 규칙 (Kotlin/Spring/WebFlux) |
+
 ### 개발 가이드
 
 | 문서 | 설명 |

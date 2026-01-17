@@ -1,0 +1,74 @@
+# ACS (Antenna Control System)
+
+> Satellite/Sun tracking antenna control system
+
+## Tech Stack
+
+- Frontend: Vue 3 + Quasar 2.x + TypeScript + Pinia
+- Backend: Kotlin 1.9 + Spring Boot 3.x + WebFlux
+- Algorithm: Orekit 13.0 (satellite), solarpositioning (sun)
+- Communication: REST API, WebSocket, UDP (ICD)
+
+## Entry Points
+
+- /CLAUDE.md - Project rules and conventions
+- /docs/README.md - Documentation hub
+
+## Key Documentation
+
+### Architecture
+- /docs/architecture/SYSTEM_OVERVIEW.md - System integration
+- /docs/architecture/context/ - Domain knowledge for AI agents
+
+### Development
+- /docs/guides/frontend-rules.md - Frontend coding rules
+- /docs/guides/backend-rules.md - Backend coding rules
+- /docs/handbook/project/acs-patterns.md - Project patterns
+
+### API
+- /docs/api/README.md - API documentation
+- /docs/api/ICDService.md - Hardware protocol
+
+### Decisions
+- /docs/decisions/ - Architecture Decision Records (ADR)
+
+## Active Work
+
+- /docs/work/active/ - Current development tasks
+
+## Project Structure
+
+```
+frontend/src/
+├── components/     # Vue components
+├── pages/          # Route pages (mode/ for mode pages)
+├── stores/         # Pinia stores
+├── services/       # API services
+├── composables/    # Vue composition functions
+└── types/          # TypeScript types
+
+backend/src/main/kotlin/
+├── controller/     # REST API endpoints
+├── service/        # Business logic
+├── algorithm/      # Calculation (satellite/sun tracking)
+├── dto/            # Data transfer objects
+└── model/          # Domain models
+```
+
+## Important Conventions
+
+- Angle units: internal=radians, display=degrees
+- Time: internal=UTC, display=local
+- Train/Tilt: variable name=`train`, UI display=`Tilt`
+- Orekit: requires initialization (orekit-data path)
+
+## Modes
+
+| Mode | Description |
+|------|-------------|
+| Standby | Idle mode |
+| Step | Step movement |
+| Slew | Slew movement |
+| EphemerisDesignation | Satellite orbit tracking |
+| PassSchedule | Pass schedule automation |
+| SunTrack | Sun tracking |

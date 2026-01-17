@@ -35,6 +35,7 @@ Architecture Decision Record는 아키텍처 결정의 컨텍스트, 결정 내�
 | ADR-001 | [Train vs Tilt 명칭 결정](ADR-001-train-vs-tilt.md) | 승인됨 | - |
 | ADR-002 | [Orekit 라이브러리 선택](ADR-002-orekit-selection.md) | 승인됨 | - |
 | ADR-003 | [Performance Analyzer 에이전트 도입](ADR-003-performance-analyzer-agent.md) | 승인됨 | 2026-01-07 |
+| ADR-004 | [Claude Code 최적화 문서 구조](ADR-004-claude-code-optimized-doc-structure.md) | 제안됨 | 2026-01-17 |
 
 ## 새 ADR 작성
 

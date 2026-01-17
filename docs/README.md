@@ -30,6 +30,11 @@ docs/
 │   ├── active/            # 진행 중인 작업
 │   └── archive/           # 완료된 작업
 │
+├── handbook/              # 팀 핸드북 (기술 참조 + 학습)
+│   ├── kotlin/            # Kotlin/Spring 기본 + 패턴
+│   ├── vue/               # Vue/TypeScript 기본 + 패턴
+│   └── project/           # ACS 프로젝트 패턴
+│
 └── logs/                  # 일일 작업 로그
     └── YYYY-MM-DD.md
 ```
@@ -80,5 +85,6 @@ docs/
 - [시스템 개요](architecture/SYSTEM_OVERVIEW.md)
 - [API 문서](api/README.md)
 - [개발 가이드](guides/Development_Guide.md)
+- [팀 핸드북](handbook/README.md) - 기술 학습 + 프로젝트 패턴
 - [ADR 목록](decisions/README.md)
 - [작업 로그](logs/README.md)
