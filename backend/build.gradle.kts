@@ -77,10 +77,15 @@ dependencies {
 	//Orekit
 	implementation("org.orekit:orekit:13.0.2")
 
+    // JPA (기존 Settings용 - blocking)
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("jakarta.persistence:jakarta.persistence-api:3.1.0")
     implementation("org.hibernate:hibernate-core:6.2.0.Final")
     runtimeOnly("org.postgresql:postgresql")
+
+    // R2DBC (추적 데이터용 - reactive)
+    implementation("org.springframework.boot:spring-boot-starter-data-r2dbc")
+    implementation("org.postgresql:r2dbc-postgresql:1.0.7.RELEASE")
 
 }
 

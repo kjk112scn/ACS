@@ -1,7 +1,7 @@
 # Database Integration Design
 
-> **Version**: 1.0.0 | **Date**: 2026-01-17
-> **Status**: 설계 완료 (Ready for Implementation)
+> **Version**: 1.1.0 | **Date**: 2026-01-17
+> **Status**: Phase 1 완료 (Docker DB 설치)
 > **Reference**: `Architecture_Refactoring/legacy/RFC-001_Database_Strategy.md`
 
 ---
@@ -43,14 +43,14 @@ tracking_session (1) ─┬─ (N) tracking_trajectory
 icd_status (독립 - 시계열)
 ```
 
-### 2.3 보관 정책
+### 2.3 보관 정책 (2026-01-17 확정)
 
 | 테이블 | 보관 기간 | 삭제 방식 | 압축 |
 |--------|----------|----------|------|
-| tracking_session | 30일 | Spring Scheduler | 없음 |
-| tracking_trajectory | 30일 | CASCADE | TimescaleDB (7일 후) |
-| tracking_result | 30일 | CASCADE | TimescaleDB (7일 후) |
-| icd_status | 30일 | TimescaleDB retention | TimescaleDB (7일 후) |
+| tracking_session | **365일** | Spring Scheduler | 없음 (일반 테이블) |
+| tracking_trajectory | CASCADE | 부모 삭제 시 자동 | TimescaleDB (7일 후) |
+| tracking_result | CASCADE | 부모 삭제 시 자동 | TimescaleDB (7일 후) |
+| icd_status | **90일** | TimescaleDB retention | TimescaleDB (7일 후) |
 
 ---
 

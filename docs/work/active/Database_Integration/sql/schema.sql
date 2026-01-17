@@ -7,8 +7,11 @@
 CREATE EXTENSION IF NOT EXISTS timescaledb;
 
 -- =============================================================================
--- 1. tracking_session (추적 세션)
+-- 1. tracking_session (추적 세션) - 일반 테이블
 -- =============================================================================
+-- FK 부모 테이블이므로 Hypertable 불가, 압축 없음
+-- 삭제: Spring Scheduler로 365일 후 삭제
+
 CREATE TABLE tracking_session (
     id                      BIGSERIAL PRIMARY KEY,
     mst_id                  BIGINT NOT NULL,
@@ -47,16 +50,17 @@ CREATE INDEX idx_ts_mst_datatype ON tracking_session(mst_id, data_type);
 CREATE INDEX idx_ts_mode_satellite_time ON tracking_session(tracking_mode, satellite_id, start_time DESC);
 
 -- =============================================================================
--- 2. tracking_trajectory (이론 궤적)
+-- 2. tracking_trajectory (이론 궤적) - Hypertable
 -- =============================================================================
+-- 압축: 7일 후, 삭제: tracking_session CASCADE
+
 CREATE TABLE tracking_trajectory (
-    id                      BIGSERIAL PRIMARY KEY,
-    session_id              BIGINT REFERENCES tracking_session(id) ON DELETE CASCADE,
+    timestamp               TIMESTAMPTZ NOT NULL,
+    session_id              BIGINT NOT NULL REFERENCES tracking_session(id) ON DELETE CASCADE,
     detail_id               INTEGER NOT NULL,
     data_type               VARCHAR(50) NOT NULL,
 
-    -- 시간
-    timestamp               TIMESTAMPTZ NOT NULL,
+    -- 인덱스
     index                   INTEGER NOT NULL,
 
     -- 각도
@@ -71,7 +75,7 @@ CREATE TABLE tracking_trajectory (
     created_at              TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Hypertable 변환
+-- Hypertable 변환 (PRIMARY KEY 없이)
 SELECT create_hypertable('tracking_trajectory', 'timestamp');
 SELECT set_chunk_time_interval('tracking_trajectory', INTERVAL '7 days');
 
@@ -87,16 +91,17 @@ CREATE INDEX idx_tt_session ON tracking_trajectory(session_id);
 CREATE INDEX idx_tt_session_timestamp ON tracking_trajectory(session_id, timestamp);
 
 -- =============================================================================
--- 3. tracking_result (실측 추적 결과)
+-- 3. tracking_result (실측 추적 결과) - Hypertable
 -- =============================================================================
+-- 압축: 7일 후, 삭제: tracking_session CASCADE
+
 CREATE TABLE tracking_result (
-    id                      BIGSERIAL PRIMARY KEY,
-    session_id              BIGINT REFERENCES tracking_session(id) ON DELETE CASCADE,
+    timestamp               TIMESTAMPTZ NOT NULL,
+    session_id              BIGINT NOT NULL REFERENCES tracking_session(id) ON DELETE CASCADE,
 
     -- 인덱스/시간
     index                   INTEGER NOT NULL,
     theoretical_index       INTEGER,
-    timestamp               TIMESTAMPTZ NOT NULL,
 
     -- 원본 각도 (2축)
     original_azimuth        DOUBLE PRECISION,
@@ -158,7 +163,7 @@ CREATE TABLE tracking_result (
     created_at              TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Hypertable 변환
+-- Hypertable 변환 (PRIMARY KEY 없이)
 SELECT create_hypertable('tracking_result', 'timestamp');
 SELECT set_chunk_time_interval('tracking_result', INTERVAL '1 day');
 
@@ -175,8 +180,10 @@ CREATE INDEX idx_tr_timestamp ON tracking_result(timestamp DESC);
 CREATE INDEX idx_tr_quality ON tracking_result(tracking_quality);
 
 -- =============================================================================
--- 4. icd_status (ICD 제어 상태 - 100ms)
+-- 4. icd_status (ICD 제어 상태 - 100ms) - Hypertable
 -- =============================================================================
+-- 압축: 7일 후, 삭제: 90일 후 (TimescaleDB retention)
+
 CREATE TABLE icd_status (
     timestamp                       TIMESTAMPTZ NOT NULL,
 
@@ -259,7 +266,7 @@ CREATE TABLE icd_status (
     tracking_actual_train           REAL
 );
 
--- Hypertable 변환 (Primary Key 없음)
+-- Hypertable 변환
 SELECT create_hypertable('icd_status', 'timestamp');
 SELECT set_chunk_time_interval('icd_status', INTERVAL '1 day');
 
@@ -270,12 +277,19 @@ ALTER TABLE icd_status SET (
 );
 SELECT add_compression_policy('icd_status', INTERVAL '7 days');
 
--- 보관 정책 (30일)
-SELECT add_retention_policy('icd_status', INTERVAL '30 days');
+-- 보관 정책 (90일)
+SELECT add_retention_policy('icd_status', INTERVAL '90 days');
 
 -- 인덱스
 CREATE INDEX idx_is_timestamp ON icd_status(timestamp DESC);
 
 -- =============================================================================
--- 완료
+-- 테이블 설정 요약
+-- =============================================================================
+-- | 테이블              | 타입       | 압축   | 삭제 정책              |
+-- |---------------------|------------|--------|------------------------|
+-- | tracking_session    | 일반 테이블 | 없음   | 365일 (Spring Scheduler)|
+-- | tracking_trajectory | Hypertable | 7일 후 | CASCADE (session 삭제시)|
+-- | tracking_result     | Hypertable | 7일 후 | CASCADE (session 삭제시)|
+-- | icd_status          | Hypertable | 7일 후 | 90일 (TimescaleDB)     |
 -- =============================================================================
