@@ -14,7 +14,7 @@
 | **추가 리팩토링** | 🔄 진행중 | 50% |
 | CSS !important Phase 1 | ✅ 완료 | 100% |
 | CSS !important Phase 2 | ✅ 완료 | 100% |
-| CSS !important Phase 3 | 📋 대기중 | 0% |
+| CSS !important Phase 3 | 🔄 진행중 | 15% |
 | Quasar 근본 개선 | 📋 계획수립 | 0% |
 
 ---
@@ -70,14 +70,15 @@
 |-------|-----|:----:|:-----:|:----:|
 | Phase 1 | 6개 파일 (LOW) | 87개 | 🟢 | ✅ 완료 |
 | Phase 2 | FeedPage 등 3개 | 124개 | 🟡 | ✅ 완료 |
-| Phase 3 | Ephemeris/PassSchedule | ~200개 | 🔴 | 📋 대기 |
+| Phase 3 | Ephemeris/PassSchedule | 22개 | 🔴 | 🔄 진행중 |
 
 **현황**:
 - ✅ Phase 1 완료: 87개 제거
 - ✅ Phase 2 완료: 124개 제거 (FeedPage 106, ScheduleTable 1, ScheduleChart 17)
-- 총 제거: **211개**
-- **남은 !important**: ~855개
-- 상세: [CSS_Phase2_Execution_Plan.md](./CSS_Phase2_Execution_Plan.md)
+- 🔄 Phase 3 진행중: 22개 제거 (EphemerisDesignation 중복 정리)
+- 총 제거: **233개**
+- **남은 !important**: ~780개
+- 상세: [CSS_Phase2_Execution_Plan.md](./CSS_Phase2_Execution_Plan.md), [CSS_Phase3_Execution_Plan.md](./CSS_Phase3_Execution_Plan.md)
 
 ### 3. Quasar 근본 개선 (장기)
 
@@ -153,6 +154,7 @@
 | 2026-01-18 | Quasar 근본 해결 전략 수립 | 📋 |
 | 2026-01-18 | **CSS Phase 1 실행 완료 (87개 제거)** | ✅ |
 | 2026-01-18 | **CSS Phase 2 실행 완료 (124개 제거)** | ✅ |
+| 2026-01-18 | **CSS Phase 3 시작 (22개 제거)** | 🔄 |
 
 ---
 
