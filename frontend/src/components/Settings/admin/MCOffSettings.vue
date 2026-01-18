@@ -11,32 +11,10 @@
           <q-btn-toggle v-model="mcState" :options="[
             { label: $t('settings.admin.states.off'), value: false },
             { label: $t('settings.admin.states.on'), value: true }
-          ]" color="primary" class="full-width" :loading="isLoading" @click="showConfirmation" />
+          ]" color="primary" class="full-width" :loading="isLoading" @click="handleToggle" />
         </div>
       </q-card-section>
     </q-card>
-
-    <!-- 확인 모달 -->
-    <q-dialog v-model="confirmationDialog" persistent>
-      <q-card style="min-width: 350px">
-        <q-card-section class="row items-center">
-          <div class="text-h6">{{ $t('settings.admin.mcOnOffDetails.confirmTitle') }}</div>
-        </q-card-section>
-
-        <q-card-section>
-          <p>{{ $t('settings.admin.mcOnOffDetails.confirmMessage', {
-            state: $t(`settings.admin.states.${mcState ? 'on' : 'off'}`)
-          }) }}</p>
-        </q-card-section>
-
-        <q-card-actions align="right">
-          <q-btn flat :label="$t('buttons.no')" color="negative" v-close-popup @click="cancelConfirmation"
-            :disable="isLoading" />
-          <q-btn flat :label="$t('buttons.yes')" color="positive" @click="confirmExecution" :loading="isLoading"
-            :disable="isLoading" />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
   </div>
 </template>
 
@@ -45,40 +23,36 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useICDStore } from '@/stores/icd/icdStore'
 import { useNotification } from '@/composables/useNotification'
+import { useDialog } from '@/composables/useDialog'
+import { useErrorHandler } from '@/composables/useErrorHandler'
 
 const { t } = useI18n()
 const icdStore = useICDStore()
-const { success, error: showError } = useNotification()
+const { success } = useNotification()
+const { confirm } = useDialog()
+const { handleApiError } = useErrorHandler()
 
-// 로딩 상태
 const isLoading = ref(false)
 const mcState = ref(false)
 
-// 확인 모달 상태
-const confirmationDialog = ref(false)
+const handleToggle = async () => {
+  const stateText = t(`settings.admin.states.${mcState.value ? 'on' : 'off'}`)
+  const message = t('settings.admin.mcOnOffDetails.confirmMessage', { state: stateText })
 
-// 확인 모달 표시
-const showConfirmation = () => {
-  confirmationDialog.value = true
-}
+  const confirmed = await confirm(message, {
+    title: t('settings.admin.mcOnOffDetails.confirmTitle'),
+    ok: { label: t('buttons.yes'), color: 'positive' },
+    cancel: { label: t('buttons.no'), color: 'negative' },
+  })
 
-// 확인 모달 취소
-const cancelConfirmation = () => {
-  confirmationDialog.value = false
-}
+  if (!confirmed) return
 
-// 실행 확인
-const confirmExecution = async () => {
   isLoading.value = true
-
   try {
     await icdStore.sendMCOnOffCommand(mcState.value)
-
     success(t('settings.admin.success'))
-    confirmationDialog.value = false
   } catch (error) {
-    console.error('M/C On/Off 실행 실패:', error)
-    showError(t('settings.admin.error'))
+    handleApiError(error, 'M/C On/Off')
   } finally {
     isLoading.value = false
   }

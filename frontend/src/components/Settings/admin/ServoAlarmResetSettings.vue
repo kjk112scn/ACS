@@ -8,12 +8,10 @@
         <q-card class="command-card">
           <q-card-section>
             <div class="text-h6">{{ $t('settings.admin.axes.azimuth') }}</div>
-            <div class="text-caption text-grey-6 q-mb-md">{{ $t('settings.admin.servoAlarmResetDetails.azimuthDesc') }}
-            </div>
-
+            <div class="text-caption text-grey-6 q-mb-md">{{ $t('settings.admin.servoAlarmResetDetails.azimuthDesc') }}</div>
             <div class="q-mt-md">
               <q-btn color="primary" :label="$t('settings.admin.servoAlarmResetDetails.azimuthButton')"
-                class="full-width" :loading="isLoading.azimuth" @click="showConfirmation('azimuth')" />
+                class="full-width" :loading="isLoading.azimuth" @click="handleReset('azimuth')" />
             </div>
           </q-card-section>
         </q-card>
@@ -24,12 +22,10 @@
         <q-card class="command-card">
           <q-card-section>
             <div class="text-h6">{{ $t('settings.admin.axes.elevation') }}</div>
-            <div class="text-caption text-grey-6 q-mb-md">{{ $t('settings.admin.servoAlarmResetDetails.elevationDesc')
-              }}</div>
-
+            <div class="text-caption text-grey-6 q-mb-md">{{ $t('settings.admin.servoAlarmResetDetails.elevationDesc') }}</div>
             <div class="q-mt-md">
               <q-btn color="primary" :label="$t('settings.admin.servoAlarmResetDetails.elevationButton')"
-                class="full-width" :loading="isLoading.elevation" @click="showConfirmation('elevation')" />
+                class="full-width" :loading="isLoading.elevation" @click="handleReset('elevation')" />
             </div>
           </q-card-section>
         </q-card>
@@ -40,97 +36,60 @@
         <q-card class="command-card">
           <q-card-section>
             <div class="text-h6">{{ $t('settings.admin.axes.tilt') }}</div>
-            <div class="text-caption text-grey-6 q-mb-md">{{ $t('settings.admin.servoAlarmResetDetails.tiltDesc') }}
-            </div>
-
+            <div class="text-caption text-grey-6 q-mb-md">{{ $t('settings.admin.servoAlarmResetDetails.tiltDesc') }}</div>
             <div class="q-mt-md">
               <q-btn color="primary" :label="$t('settings.admin.servoAlarmResetDetails.tiltButton')" class="full-width"
-                :loading="isLoading.tilt" @click="showConfirmation('tilt')" />
+                :loading="isLoading.tilt" @click="handleReset('tilt')" />
             </div>
           </q-card-section>
         </q-card>
       </div>
     </div>
-
-    <!-- 확인 모달 -->
-    <q-dialog v-model="confirmationDialog" persistent>
-      <q-card style="min-width: 350px">
-        <q-card-section class="row items-center">
-          <div class="text-h6">{{ $t('settings.admin.servoAlarmResetDetails.confirmTitle') }}</div>
-        </q-card-section>
-
-        <q-card-section>
-          <p>{{ $t('settings.admin.servoAlarmResetDetails.confirmMessage', {
-            axis:
-              $t(`settings.admin.axes.${selectedAxis}`) }) }}</p>
-        </q-card-section>
-
-        <q-card-actions align="right">
-          <q-btn flat :label="$t('buttons.no')" color="negative" v-close-popup @click="cancelConfirmation"
-            :disable="isLoading[selectedAxis]" />
-          <q-btn flat :label="$t('buttons.yes')" color="positive" @click="confirmExecution"
-            :loading="isLoading[selectedAxis]" :disable="isLoading[selectedAxis]" />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useICDStore } from '@/stores/icd/icdStore'
 import { useNotification } from '@/composables/useNotification'
+import { useDialog } from '@/composables/useDialog'
+import { useErrorHandler } from '@/composables/useErrorHandler'
+
+type AxisType = 'azimuth' | 'elevation' | 'tilt'
 
 const { t } = useI18n()
 const icdStore = useICDStore()
-const { success, error: showError } = useNotification()
+const { success } = useNotification()
+const { confirm } = useDialog()
+const { handleApiError } = useErrorHandler()
 
-// 로딩 상태
-const isLoading = ref({
-  azimuth: false,
-  elevation: false,
-  tilt: false
-})
+const isLoading = reactive({ azimuth: false, elevation: false, tilt: false })
 
-// 확인 모달 상태
-const confirmationDialog = ref(false)
-const selectedAxis = ref('')
+const handleReset = async (axis: AxisType) => {
+  const axisName = t(`settings.admin.axes.${axis}`)
+  const message = t('settings.admin.servoAlarmResetDetails.confirmMessage', { axis: axisName })
 
-// 확인 모달 표시
-const showConfirmation = (axis: string) => {
-  selectedAxis.value = axis
-  confirmationDialog.value = true
-}
+  const confirmed = await confirm(message, {
+    title: t('settings.admin.servoAlarmResetDetails.confirmTitle'),
+    ok: { label: t('buttons.yes'), color: 'positive' },
+    cancel: { label: t('buttons.no'), color: 'negative' },
+  })
 
-// 확인 모달 취소
-const cancelConfirmation = () => {
-  confirmationDialog.value = false
-  selectedAxis.value = ''
-}
+  if (!confirmed) return
 
-// 실행 확인
-const confirmExecution = async () => {
-  if (!selectedAxis.value) return
-
-  isLoading.value[selectedAxis.value as keyof typeof isLoading.value] = true
-
+  isLoading[axis] = true
   try {
-    // 각 축에 따라 boolean 값 설정
-    const azimuth = selectedAxis.value === 'azimuth'
-    const elevation = selectedAxis.value === 'elevation'
-    const tilt = selectedAxis.value === 'tilt'
-
-    await icdStore.sendServoAlarmResetCommand(azimuth, elevation, tilt)
-
+    await icdStore.sendServoAlarmResetCommand(
+      axis === 'azimuth',
+      axis === 'elevation',
+      axis === 'tilt'
+    )
     success(t('settings.admin.success'))
-    confirmationDialog.value = false
   } catch (error) {
-    console.error('Servo Alarm Reset 실행 실패:', error)
-    showError(t('settings.admin.error'))
+    handleApiError(error, `Servo Alarm Reset (${axis})`)
   } finally {
-    isLoading.value[selectedAxis.value as keyof typeof isLoading.value] = false
-    selectedAxis.value = ''
+    isLoading[axis] = false
   }
 }
 </script>

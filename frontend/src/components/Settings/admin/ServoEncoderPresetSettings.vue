@@ -9,10 +9,9 @@
           <q-card-section>
             <div class="text-h6">Azimuth</div>
             <div class="text-caption text-grey-6 q-mb-md">Azimuth 축 서보 인코더 프리셋</div>
-
             <div class="q-mt-md">
               <q-btn color="primary" label="Azimuth Preset" class="full-width" :loading="isLoading.azimuth"
-                @click="showConfirmation('azimuth')" />
+                @click="handlePreset('azimuth')" />
             </div>
           </q-card-section>
         </q-card>
@@ -24,10 +23,9 @@
           <q-card-section>
             <div class="text-h6">Elevation</div>
             <div class="text-caption text-grey-6 q-mb-md">Elevation 축 서보 인코더 프리셋</div>
-
             <div class="q-mt-md">
               <q-btn color="primary" label="Elevation Preset" class="full-width" :loading="isLoading.elevation"
-                @click="showConfirmation('elevation')" />
+                @click="handlePreset('elevation')" />
             </div>
           </q-card-section>
         </q-card>
@@ -39,127 +37,62 @@
           <q-card-section>
             <div class="text-h6">Tilt</div>
             <div class="text-caption text-grey-6 q-mb-md">Tilt 축 서보 인코더 프리셋</div>
-
             <div class="q-mt-md">
               <q-btn color="primary" label="Tilt Preset" class="full-width" :loading="isLoading.tilt"
-                @click="showConfirmation('tilt')" />
+                @click="handlePreset('tilt')" />
             </div>
           </q-card-section>
         </q-card>
       </div>
     </div>
-
-    <!-- 확인 모달 -->
-    <q-dialog v-model="confirmationDialog" persistent>
-      <q-card style="min-width: 350px">
-        <q-card-section class="row items-center">
-          <div class="text-h6">Servo Preset 확인</div>
-        </q-card-section>
-
-        <q-card-section>
-          <p>{{ getAxisTitle(selectedAxis) }} 축의 Servo Preset 명령을 실행하시겠습니까?</p>
-        </q-card-section>
-
-        <q-card-actions align="right">
-          <q-btn flat label="아니오" color="negative" v-close-popup @click="cancelConfirmation" :disable="isAnyLoading" />
-          <q-btn flat label="예" color="positive" @click="confirmExecution" :loading="isAnyLoading"
-            :disable="isAnyLoading" />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { reactive } from 'vue'
 import { useICDStore } from '@/stores/icd/icdStore'
 import { useNotification } from '@/composables/useNotification'
+import { useDialog } from '@/composables/useDialog'
+import { useErrorHandler } from '@/composables/useErrorHandler'
+
+type AxisType = 'azimuth' | 'elevation' | 'tilt'
 
 const icdStore = useICDStore()
 const { success, error: showError } = useNotification()
+const { confirm } = useDialog()
+const { handleApiError } = useErrorHandler()
 
-// 로딩 상태 (각 축별)
-const isLoading = ref({
-  azimuth: false,
-  elevation: false,
-  tilt: false
-})
+const isLoading = reactive({ azimuth: false, elevation: false, tilt: false })
 
-// 확인 모달 관련 상태
-const confirmationDialog = ref(false)
-const selectedAxis = ref<'azimuth' | 'elevation' | 'tilt' | null>(null)
+const handlePreset = async (axis: AxisType) => {
+  const axisTitle = axis.charAt(0).toUpperCase() + axis.slice(1)
+  const message = `${axisTitle} 축의 Servo Preset 명령을 실행하시겠습니까?`
 
-// 전체 로딩 상태 확인
-const isAnyLoading = computed(() => {
-  return isLoading.value.azimuth || isLoading.value.elevation || isLoading.value.tilt
-})
+  const confirmed = await confirm(message, {
+    title: 'Servo Preset 확인',
+    ok: { label: '예', color: 'positive' },
+    cancel: { label: '아니오', color: 'negative' },
+  })
 
-// 축 제목 가져오기
-const getAxisTitle = (axis: string | null) => {
-  if (!axis) return ''
+  if (!confirmed) return
 
-  switch (axis) {
-    case 'azimuth':
-      return 'Azimuth'
-    case 'elevation':
-      return 'Elevation'
-    case 'tilt':
-      return 'Tilt'
-    default:
-      return ''
-  }
-}
-
-// 확인 모달 표시
-const showConfirmation = (axis: 'azimuth' | 'elevation' | 'tilt') => {
-  selectedAxis.value = axis
-  confirmationDialog.value = true
-}
-
-// 확인 취소
-const cancelConfirmation = () => {
-  selectedAxis.value = null
-  confirmationDialog.value = false
-}
-
-// 확인 및 명령 실행
-const confirmExecution = async () => {
-  if (!selectedAxis.value) return
-
+  isLoading[axis] = true
   try {
-    isLoading.value[selectedAxis.value] = true
-
-    // ✅ 선택된 축에 따라 boolean 값들을 설정
-    const azimuth = selectedAxis.value === 'azimuth'
-    const elevation = selectedAxis.value === 'elevation'
-    const tilt = selectedAxis.value === 'tilt'
-
-    // Servo Preset 명령 실행
     const result = await icdStore.sendServoPresetCommand(
-      azimuth ? 1 : 0,
-      elevation ? 1 : 0,
-      tilt ? 1 : 0
+      axis === 'azimuth' ? 1 : 0,
+      axis === 'elevation' ? 1 : 0,
+      axis === 'tilt' ? 1 : 0
     )
 
-    if (result && result.success) {
-      // ✅ useNotification 사용
-      success(`${getAxisTitle(selectedAxis.value)} 축 Servo Preset 명령이 성공적으로 실행되었습니다.`)
-
-      // 모달 닫기
-      confirmationDialog.value = false
+    if (result?.success) {
+      success(`${axisTitle} 축 Servo Preset 명령이 성공적으로 실행되었습니다.`)
     } else {
-      // ✅ useNotification 사용
       showError(result?.message || '명령 실행 중 오류가 발생했습니다.')
     }
   } catch (error) {
-    console.error('Servo Preset error:', error)
-    // ✅ useNotification 사용
-    showError('명령 처리 중 오류가 발생했습니다.')
+    handleApiError(error, `Servo Preset (${axis})`)
   } finally {
-    if (selectedAxis.value) {
-      isLoading.value[selectedAxis.value] = false
-    }
-    selectedAxis.value = null
+    isLoading[axis] = false
   }
 }
 </script>
