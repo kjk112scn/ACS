@@ -95,6 +95,8 @@ import { defineComponent, onUnmounted } from 'vue'
 import { useICDStore } from '../../stores/icd/icdStore'
 import { useSlewModeStore, type AxisKey } from '@/stores'
 import { useAngleLimitsSettingsStore } from '@/stores/api/settings/angleLimitsSettingsStore'
+import { useNotification } from '@/composables/useNotification'
+import { useErrorHandler } from '@/composables/useErrorHandler'
 
 // 컴포넌트 이름 정의
 defineComponent({
@@ -105,6 +107,8 @@ defineComponent({
 const icdStore = useICDStore()
 const slewStore = useSlewModeStore()
 const angleLimitsStore = useAngleLimitsSettingsStore()
+const { success } = useNotification()
+const { handleApiError } = useErrorHandler()
 
 // Loop 도달 판정 상수
 const ARRIVAL_THRESHOLD = 0.5 // ±0.5°
@@ -150,9 +154,9 @@ const handleGo = async () => {
       elSpeed: elSpeed,
       trainSpeed: tiSpeed,
     })
-    console.log('Slew 명령 전송 성공')
+    success('Slew 명령이 전송되었습니다.')
   } catch (error) {
-    console.error('Slew 명령 전송 실패:', error)
+    handleApiError(error, 'Slew 명령')
   }
 }
 
@@ -169,9 +173,9 @@ const handleStop = async () => {
       slewStore.selectedAxes.elevation,
       slewStore.selectedAxes.train,
     )
-    console.log('Stop 명령 전송 성공')
+    success('Stop 명령이 전송되었습니다.')
   } catch (error) {
-    console.error('Stop 명령 전송 실패:', error)
+    handleApiError(error, 'Stop 명령')
   }
 }
 
@@ -179,9 +183,9 @@ const handleStop = async () => {
 const handleStow = async () => {
   try {
     await icdStore.stowCommand()
-    console.log('Stow 명령 전송 성공')
+    success('Stow 명령이 전송되었습니다.')
   } catch (error) {
-    console.error('Stow 명령 전송 실패:', error)
+    handleApiError(error, 'Stow 명령')
   }
 }
 

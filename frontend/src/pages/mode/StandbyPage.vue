@@ -26,6 +26,8 @@
 import { computed } from 'vue'
 import { useICDStore } from '../../stores/icd/icdStore'
 import { useStandbyModeStore } from '../../stores/mode/standbyStore'
+import { useNotification } from '@/composables/useNotification'
+import { useErrorHandler } from '@/composables/useErrorHandler'
 import { defineComponent } from 'vue'
 
 // 컴포넌트 이름 정의
@@ -36,6 +38,8 @@ defineComponent({
 // 스토어 인스턴스 생성
 const icdStore = useICDStore()
 const standbyStore = useStandbyModeStore()
+const { success } = useNotification()
+const { handleApiError } = useErrorHandler()
 
 // 체크박스 상태를 computed로 양방향 바인딩
 const azimuthChecked = computed({
@@ -58,9 +62,9 @@ const handleStandby = async () => {
   try {
     const axes = standbyStore.selectedAxes
     await icdStore.standbyCommand(axes.azimuth, axes.elevation, axes.train)
-    console.log('Standby 명령 전송 성공')
+    success('Standby 명령이 전송되었습니다.')
   } catch (error) {
-    console.error('Standby 명령 전송 실패:', error)
+    handleApiError(error, 'Standby 명령')
   }
 }
 
@@ -68,9 +72,9 @@ const handleStandby = async () => {
 const handleAllStandby = async () => {
   try {
     await icdStore.standbyCommand(true, true, true)
-    console.log('All Standby 명령 전송 성공')
+    success('All Standby 명령이 전송되었습니다.')
   } catch (error) {
-    console.error('All Standby 명령 전송 실패:', error)
+    handleApiError(error, 'All Standby 명령')
   }
 }
 
@@ -78,9 +82,9 @@ const handleAllStandby = async () => {
 const handleStow = async () => {
   try {
     await icdStore.stowCommand()
-    console.log('Stow 명령 전송 성공')
+    success('Stow 명령이 전송되었습니다.')
   } catch (error) {
-    console.error('Stow 명령 전송 실패:', error)
+    handleApiError(error, 'Stow 명령')
   }
 }
 </script>

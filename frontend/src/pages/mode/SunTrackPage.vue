@@ -117,9 +117,13 @@
 import { ref } from 'vue'
 import { useICDStore } from '../../stores/icd/icdStore'
 import { OffsetControls, useOffsetControls } from './shared'
+import { useNotification } from '@/composables/useNotification'
+import { useErrorHandler } from '@/composables/useErrorHandler'
 
 // ICD 스토어
 const icdStore = useICDStore()
+const { success } = useNotification()
+const { handleApiError } = useErrorHandler()
 
 // Offset Controls (공용 composable - 3페이지 동기화)
 const {
@@ -154,9 +158,9 @@ const handleGoCommand = async () => {
     const interval = 1000 // 1초
 
     await icdStore.startSunTrack(interval, azimuthSpeed, elevationSpeed, trainSpeed)
-    console.log('Sun Track이 시작되었습니다. 설정된 속도:', azimuthSpeed, elevationSpeed, trainSpeed)
+    success('Sun Track이 시작되었습니다.')
   } catch (error) {
-    console.error('Sun Track 시작 중 오류:', error)
+    handleApiError(error, 'Sun Track 시작')
   } finally {
     isGoLoading.value = false
   }
@@ -167,9 +171,9 @@ const handleStopCommand = async () => {
   try {
     isStopLoading.value = true
     await icdStore.stopCommand(true, true, true)
-    console.log('Sun Track이 중지되었습니다.')
+    success('Sun Track이 중지되었습니다.')
   } catch (error) {
-    console.error('Sun Track 중지 중 오류:', error)
+    handleApiError(error, 'Sun Track 중지')
   } finally {
     isStopLoading.value = false
   }
@@ -180,9 +184,9 @@ const handleStowCommand = async () => {
   try {
     isStowLoading.value = true
     await icdStore.stowCommand()
-    console.log('Stow 명령이 성공적으로 전송되었습니다.')
+    success('Stow 명령이 전송되었습니다.')
   } catch (error) {
-    console.error('Stow 명령 처리 중 오류:', error)
+    handleApiError(error, 'Stow 명령')
   } finally {
     isStowLoading.value = false
   }

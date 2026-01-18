@@ -114,11 +114,13 @@
 import { ref, watch, onMounted } from 'vue'
 import { useICDStore } from '../../stores/icd/icdStore'
 import { usePedestalPositionModeStore } from '@/stores'
-import { useQuasar } from 'quasar'
+import { useNotification } from '@/composables/useNotification'
+import { useErrorHandler } from '@/composables/useErrorHandler'
 
-const $q = useQuasar()
 const icdStore = useICDStore()
 const pedestalStore = usePedestalPositionModeStore()
+const { success } = useNotification()
+const { handleApiError } = useErrorHandler()
 
 const isGoLoading = ref(false)
 const isStopLoading = ref(false)
@@ -256,23 +258,11 @@ const handleGoCommand = async () => {
 
     statusMessage.value = '위치 명령이 성공적으로 전송되었습니다.'
     statusClass.value = 'bg-positive text-white'
-
-    $q.notify({
-      type: 'positive',
-      message: '위치 명령이 성공적으로 전송되었습니다.',
-      timeout: 2000,
-    })
+    success('위치 명령이 성공적으로 전송되었습니다.')
   } catch (error) {
-    console.error('위치 명령 전송 중 오류:', error)
-
     statusMessage.value = '위치 명령 전송 중 오류가 발생했습니다.'
     statusClass.value = 'bg-negative text-white'
-
-    $q.notify({
-      type: 'negative',
-      message: '위치 명령 전송 중 오류가 발생했습니다.',
-      timeout: 2000,
-    })
+    handleApiError(error, '위치 명령')
   } finally {
     isGoLoading.value = false
 
@@ -294,23 +284,11 @@ const handleStopCommand = async () => {
 
     statusMessage.value = '정지 명령이 성공적으로 전송되었습니다.'
     statusClass.value = 'bg-positive text-white'
-
-    $q.notify({
-      type: 'positive',
-      message: '정지 명령이 성공적으로 전송되었습니다.',
-      timeout: 2000,
-    })
+    success('정지 명령이 성공적으로 전송되었습니다.')
   } catch (error) {
-    console.error('정지 명령 전송 중 오류:', error)
-
     statusMessage.value = '정지 명령 전송 중 오류가 발생했습니다.'
     statusClass.value = 'bg-negative text-white'
-
-    $q.notify({
-      type: 'negative',
-      message: '정지 명령 전송 중 오류가 발생했습니다.',
-      timeout: 2000,
-    })
+    handleApiError(error, '정지 명령')
   } finally {
     isStopLoading.value = false
 
@@ -327,23 +305,11 @@ const handleStowCommand = async () => {
 
     statusMessage.value = 'Stow 명령이 성공적으로 전송되었습니다.'
     statusClass.value = 'bg-positive text-white'
-
-    $q.notify({
-      type: 'positive',
-      message: 'Stow 명령이 성공적으로 전송되었습니다.',
-      timeout: 2000,
-    })
+    success('Stow 명령이 성공적으로 전송되었습니다.')
   } catch (error) {
-    console.error('Stow 명령 전송 중 오류:', error)
-
     statusMessage.value = 'Stow 명령 전송 중 오류가 발생했습니다.'
     statusClass.value = 'bg-negative text-white'
-
-    $q.notify({
-      type: 'negative',
-      message: 'Stow 명령 전송 중 오류가 발생했습니다.',
-      timeout: 2000,
-    })
+    handleApiError(error, 'Stow 명령')
   } finally {
     isStowLoading.value = false
 

@@ -103,6 +103,8 @@
 import { defineComponent } from 'vue'
 import { useICDStore } from '../../stores/icd/icdStore'
 import { useStepStore } from '../../stores/mode/stepStore'
+import { useNotification } from '@/composables/useNotification'
+import { useErrorHandler } from '@/composables/useErrorHandler'
 
 // 컴포넌트 이름 정의
 defineComponent({
@@ -112,6 +114,8 @@ defineComponent({
 // 스토어 인스턴스 생성
 const icdStore = useICDStore()
 const stepStore = useStepStore()
+const { success } = useNotification()
+const { handleApiError } = useErrorHandler()
 
 // Go 버튼 핸들러
 const handleGo = async () => {
@@ -217,9 +221,9 @@ const handleGo = async () => {
       elSpeed: calculatedElSpeed,
       trainSpeed: calculatedTrainSpeed,
     })
-    console.log('Step 명령 전송 성공')
+    success('Step 명령이 전송되었습니다.')
   } catch (error) {
-    console.error('Step 명령 전송 실패:', error)
+    handleApiError(error, 'Step 명령')
   }
 }
 
@@ -231,9 +235,9 @@ const handleStop = async () => {
       stepStore.selectedAxes.elevation,
       stepStore.selectedAxes.train,
     )
-    console.log('Stop 명령 전송 성공')
+    success('Stop 명령이 전송되었습니다.')
   } catch (error) {
-    console.error('Stop 명령 전송 실패:', error)
+    handleApiError(error, 'Stop 명령')
   }
 }
 
@@ -241,9 +245,9 @@ const handleStop = async () => {
 const handleStow = async () => {
   try {
     await icdStore.stowCommand()
-    console.log('Stow 명령 전송 성공')
+    success('Stow 명령이 전송되었습니다.')
   } catch (error) {
-    console.error('Stow 명령 전송 실패:', error)
+    handleApiError(error, 'Stow 명령')
   }
 }
 
