@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * PassSchedule 추적 데이터 저장소 
+ * PassSchedule 추적 데이터 저장소 르
  *
  * 위성별 패스 스케줄 마스터(MST) 및 세부(DTL) 데이터를 관리합니다.
  * ConcurrentHashMap 기반으로 위성 ID별 데이터 저장.

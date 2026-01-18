@@ -152,7 +152,7 @@ Phase 4: Export/UI (1일)
 
 - [schema.sql](sql/schema.sql) - 테이블 생성 SQL
 - [PROGRESS.md](PROGRESS.md) - 구현 진행 상황
-- [RFC-001](../Architecture_Refactoring/legacy/RFC-001_Database_Strategy.md) - 원본 설계 문서
+- [RFC-001](../legacy/RFC-001_Database_Strategy.md) - 원본 설계 문서
 
 ---
 

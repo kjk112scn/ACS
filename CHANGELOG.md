@@ -35,7 +35,7 @@
 - 테마 변수 기반 스타일링으로 전환
 
 ### Details
-- [CSS Cleanup Plan](docs/work/active/Architecture_Refactoring/CSS_Important_Cleanup_Plan.md)
+- [CSS Cleanup Plan](docs/work/active/Architecture_Refactoring/css/CSS_Important_Cleanup_Plan.md)
 
 ---
 
@@ -50,7 +50,7 @@
 - Frontend Composable 패턴 분리 (Phase 3)
 
 ### Details
-- [Architecture Refactoring](docs/work/active/Architecture_Refactoring/PLAN.md)
+- [Architecture Refactoring](docs/work/active/Architecture_Refactoring/README.md)
 
 ---
 
@@ -62,7 +62,7 @@
 - OffsetControls 공용 모듈화
 
 ### Details
-- [FE Refactoring Plan](docs/work/active/Architecture_Refactoring/FE_REFACTORING_PLAN.md)
+- [FE Refactoring Plan](docs/work/active/Architecture_Refactoring/frontend/FE_REFACTORING_PLAN.md)
 
 ---
 
