@@ -115,12 +115,14 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useHardwareErrorLogStore } from '@/stores/hardwareErrorLogStore'
 import { useTheme } from '@/composables/useTheme'
 import { useI18n } from 'vue-i18n'
+import { useErrorHandler } from '@/composables/useErrorHandler'
 import type { HardwareErrorLog } from '@/types/hardwareError'
 import { getApiBaseUrl } from '@/utils/api-config'
 
 const hardwareErrorLogStore = useHardwareErrorLogStore()
 const { initializeTheme } = useTheme()
 const { t } = useI18n()
+const { handleApiError } = useErrorHandler()
 
 // 직접 번역 함수 테스트 (사용하지 않으므로 제거)
 // const testTranslate = (errorKey: string, isResolved: boolean) => {
@@ -310,10 +312,10 @@ const loadErrorLogsPage = async (page: number, reset: boolean = false) => {
         isLastPage: data.last
       })
     } else {
-      console.error('❌ 페이지 로드 실패:', response.status, response.statusText)
+      handleApiError(new Error(`페이지 로드 실패: ${response.status}`), 'Hardware Error Log')
     }
   } catch (error) {
-    console.error('❌ 페이지 로드 에러:', error)
+    handleApiError(error, 'Hardware Error Log 페이지 로드')
   } finally {
     isLoadingMore.value = false
   }
@@ -350,7 +352,7 @@ const refreshErrorLogs = async () => {
 
     console.log('✅ 실시간 에러 로그 새로고침 완료')
   } catch (error) {
-    console.error('❌ 실시간 에러 로그 새로고침 실패:', error)
+    handleApiError(error, '에러 로그 새로고침')
   }
 }
 
