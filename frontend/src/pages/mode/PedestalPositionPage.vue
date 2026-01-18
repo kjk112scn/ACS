@@ -88,17 +88,18 @@
             </div>
           </div>
 
-          <!-- 제어 버튼 섹션 -->
-          <div class="button-section mode-button-bar">
-            <div class="row justify-center q-gutter-md">
-              <q-btn label="Go" color="positive" icon="play_arrow" size="lg"
-                :disable="!pedestalStore.isAnyAxisSelected()" @click="handleGoCommand" :loading="isGoLoading" />
-              <q-btn label="Stop" color="negative" icon="stop" size="lg" :disable="!pedestalStore.isAnyAxisSelected()"
-                @click="handleStopCommand" :loading="isStopLoading" />
-              <q-btn label="Stow" color="warning" icon="home" size="lg" @click="handleStowCommand"
-                :loading="isStowLoading" />
-            </div>
-          </div>
+          <!-- 제어 버튼 섹션 - 공용 컴포넌트 사용 -->
+          <ControlButtonBar
+            class="button-section"
+            :go-disabled="!pedestalStore.isAnyAxisSelected()"
+            :stop-disabled="!pedestalStore.isAnyAxisSelected()"
+            :go-loading="isGoLoading"
+            :stop-loading="isStopLoading"
+            :stow-loading="isStowLoading"
+            @go="handleGoCommand"
+            @stop="handleStopCommand"
+            @stow="handleStowCommand"
+          />
         </div>
 
         <!-- 상태 메시지 -->
@@ -116,6 +117,7 @@ import { useICDStore } from '../../stores/icd/icdStore'
 import { usePedestalPositionModeStore } from '@/stores'
 import { useNotification } from '@/composables/useNotification'
 import { useErrorHandler } from '@/composables/useErrorHandler'
+import { ControlButtonBar } from '@/components/common'
 
 const icdStore = useICDStore()
 const pedestalStore = usePedestalPositionModeStore()

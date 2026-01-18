@@ -75,15 +75,14 @@
             </div>
           </div>
 
-          <!-- 제어 버튼 섹션 (Step 모드와 동일) -->
-          <div class="button-section mode-button-bar">
-            <div class="row justify-center q-gutter-md">
-              <q-btn label="Go" color="positive" icon="play_arrow" size="lg" :disable="!slewStore.isAnyAxisSelected()"
-                @click="handleGo" />
-              <q-btn label="Stop" color="negative" icon="stop" size="lg" @click="handleStop" />
-              <q-btn label="Stow" color="warning" icon="home" size="lg" @click="handleStow" />
-            </div>
-          </div>
+          <!-- 제어 버튼 섹션 - 공용 컴포넌트 사용 -->
+          <ControlButtonBar
+            class="button-section"
+            :go-disabled="!slewStore.isAnyAxisSelected()"
+            @go="handleGo"
+            @stop="handleStop"
+            @stow="handleStow"
+          />
         </div>
       </q-card>
     </div>
@@ -97,6 +96,7 @@ import { useSlewModeStore, type AxisKey } from '@/stores'
 import { useAngleLimitsSettingsStore } from '@/stores/api/settings/angleLimitsSettingsStore'
 import { useNotification } from '@/composables/useNotification'
 import { useErrorHandler } from '@/composables/useErrorHandler'
+import { ControlButtonBar } from '@/components/common'
 
 // 컴포넌트 이름 정의
 defineComponent({

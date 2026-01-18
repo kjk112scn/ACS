@@ -69,41 +69,16 @@
                   속도 값은 Go 버튼을 클릭할 때 적용됩니다.
                 </div>
 
-                <!-- 제어 버튼 섹션 -->
-                <div class="control-buttons-section q-mt-md mode-button-bar">
-                  <div class="row q-col-gutter-md justify-center">
-                    <div class="col-auto">
-                      <q-btn
-                        label="Go"
-                        color="positive"
-                        icon="play_arrow"
-                        size="lg"
-                        @click="handleGoCommand"
-                        :loading="isGoLoading"
-                      />
-                    </div>
-                    <div class="col-auto">
-                      <q-btn
-                        label="Stop"
-                        color="negative"
-                        icon="stop"
-                        size="lg"
-                        @click="handleStopCommand"
-                        :loading="isStopLoading"
-                      />
-                    </div>
-                    <div class="col-auto">
-                      <q-btn
-                        label="Stow"
-                        color="warning"
-                        icon="home"
-                        size="lg"
-                        @click="handleStowCommand"
-                        :loading="isStowLoading"
-                      />
-                    </div>
-                  </div>
-                </div>
+                <!-- 제어 버튼 섹션 - 공용 컴포넌트 사용 -->
+                <ControlButtonBar
+                  class="q-mt-md"
+                  :go-loading="isGoLoading"
+                  :stop-loading="isStopLoading"
+                  :stow-loading="isStowLoading"
+                  @go="handleGoCommand"
+                  @stop="handleStopCommand"
+                  @stow="handleStowCommand"
+                />
               </div>
             </div>
           </q-card-section>
@@ -119,6 +94,7 @@ import { useICDStore } from '../../stores/icd/icdStore'
 import { OffsetControls, useOffsetControls } from './shared'
 import { useNotification } from '@/composables/useNotification'
 import { useErrorHandler } from '@/composables/useErrorHandler'
+import { ControlButtonBar } from '@/components/common'
 
 // ICD 스토어
 const icdStore = useICDStore()
@@ -331,13 +307,7 @@ q-page-container .sun-track-mode {
   color: var(--theme-text-secondary);
 }
 
-.control-buttons-section {
-  margin-top: 1rem;
-  padding-top: 0;
-  flex-shrink: 0;
-  margin-bottom: 0;
-  padding-bottom: 0;
-}
+/* control-buttons-section 스타일은 ControlButtonBar 컴포넌트로 이동 */
 
 .speed-input {
   width: 100%;
