@@ -14,14 +14,22 @@
 
 ```
 handbook/
-├── README.md           ← 현재 문서
-├── overview/           ← 시스템 전체 (시작점)
-│   ├── tech-stack.md   # 기술 스택 + 선택 이유
-│   ├── data-flow.md    # FE ↔ BE ↔ HW 데이터 흐름
-│   └── glossary.md     # 용어 사전
-├── kotlin/             ← BE 문법/패턴
-├── vue/                ← FE 문법/패턴
-└── project/            ← ACS 특화 패턴
+├── README.md               ← 현재 문서
+├── overview/               ← 시스템 전체 (시작점)
+│   ├── tech-stack.md       # 기술 스택 + 선택 이유
+│   ├── data-flow.md        # FE ↔ BE ↔ HW 데이터 흐름
+│   └── glossary.md         # 용어 사전
+├── kotlin/                 ← BE 문법/패턴
+│   ├── kotlin-null-safety.md
+│   ├── kotlin-reactive.md
+│   └── spring-annotations.md
+├── vue/                    ← FE 문법/패턴
+│   ├── vue-reactivity.md
+│   ├── vue-composables.md
+│   ├── typescript-patterns.md
+│   └── quasar-components.md
+└── project/                ← ACS 특화 패턴
+    └── acs-patterns.md
 ```
 
 ---
@@ -32,22 +40,23 @@ handbook/
 | 문서 | 주제 | 상태 |
 |------|------|:----:|
 | [tech-stack.md](./overview/tech-stack.md) | 기술 스택 전체 + 왜 선택했는지 | ✅ |
-| [data-flow.md](./overview/data-flow.md) | FE ↔ BE ↔ 안테나 데이터 흐름 | ✅ |
-| [glossary.md](./overview/glossary.md) | 용어 사전 (약어, 도메인 용어) | ✅ |
+| [data-flow.md](./overview/data-flow.md) | FE ↔ BE ↔ 안테나 데이터 흐름, 에러/로깅 처리 | ✅ |
+| [glossary.md](./overview/glossary.md) | 용어 사전 (약어, 도메인/프로그래밍 용어) | ✅ |
 
 ### Kotlin (Backend)
 | 문서 | 주제 | 상태 |
 |------|------|:----:|
-| [kotlin-null-safety.md](./kotlin/kotlin-null-safety.md) | Null 안전 처리 | ✅ |
-| [kotlin-reactive.md](./kotlin/kotlin-reactive.md) | WebFlux/리액티브 | ✅ |
-| [spring-annotations.md](./kotlin/spring-annotations.md) | Spring 어노테이션 | ✅ |
+| [kotlin-null-safety.md](./kotlin/kotlin-null-safety.md) | Null 안전 처리 (`?.`, `?:`, `!!`, `?.let`) | ✅ |
+| [kotlin-reactive.md](./kotlin/kotlin-reactive.md) | WebFlux/리액티브 (Mono, Flux, suspend) | ✅ |
+| [spring-annotations.md](./kotlin/spring-annotations.md) | Spring 어노테이션 (@Service, @Controller 등) | ✅ |
 
 ### Vue/TypeScript (Frontend)
 | 문서 | 주제 | 상태 |
 |------|------|:----:|
-| [vue-reactivity.md](./vue/vue-reactivity.md) | 반응형 시스템 | ✅ |
-| [vue-composables.md](./vue/vue-composables.md) | Composable 패턴 | 📝 |
-| [typescript-patterns.md](./vue/typescript-patterns.md) | TS 패턴 | 📝 |
+| [vue-reactivity.md](./vue/vue-reactivity.md) | 반응형 시스템 (ref, reactive, computed, watch) | ✅ |
+| [vue-composables.md](./vue/vue-composables.md) | Composable 패턴 (useXxx 함수) | ✅ |
+| [typescript-patterns.md](./vue/typescript-patterns.md) | TS 패턴 (제네릭, 유틸리티 타입, 타입 가드) | ✅ |
+| [quasar-components.md](./vue/quasar-components.md) | Quasar UI 컴포넌트 (q-btn, q-table 등) | ✅ |
 
 ### 프로젝트 특화
 | 문서 | 주제 | 상태 |

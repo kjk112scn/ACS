@@ -1,6 +1,7 @@
 ---
 name: planning-work
 description: 작업 계획 수립 스킬. 요구사항 분석, 작업 분해, 의존성 파악, 단계별 계획 수립. "계획", "plan", "설계", "작업 분해", "어떻게 할까" 키워드에 반응.
+model: opus
 ---
 
 # Planning Work - 작업 계획 스킬

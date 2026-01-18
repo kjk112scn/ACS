@@ -19,6 +19,7 @@ class ICDService {
     companion object {
         const val ICD_STX: Byte = 0x02
         const val ICD_ETX: Byte = 0x03
+        private val logger = LoggerFactory.getLogger(ICDService::class.java)
     }
 
     class Classify(private val dataStoreService: DataStoreService, private val acsEventBus: ACSEventBus) {
@@ -217,56 +218,56 @@ class ICDService {
                 else if (receiveData[1] == 'W'.code.toByte()) {
                     val parsedData = DefaultInfo.GetDataFrame.fromByteArray(receiveData)
                     parsedData?.let {
-                        println("파싱된 ICD 데이터: $it")
+                        logger.debug("파싱된 ICD 데이터: {}", it)
                     }
                 }
                 //2.5 Write NTP Info
                 else if (receiveData[1] == 'I'.code.toByte()) {
                     val parsedData = WriteNTP.GetDataFrame.fromByteArray(receiveData)
                     parsedData?.let {
-                        println("파싱된 ICD 데이터: $it")
+                        logger.debug("파싱된 ICD 데이터: {}", it)
                     }
                 }
                 //2.6 ACU S/W Emergency Command
                 else if (receiveData[1] == 'E'.code.toByte()) {
                     val parsedData = Emergency.GetDataFrame.fromByteArray(receiveData)
                     parsedData?.let {
-                        println("파싱된 ICD 데이터: $it")
+                        logger.debug("파싱된 ICD 데이터: {}", it)
                     }
                 }
                 //2.7 Manual Controls Command(1-Axis)
                 else if (receiveData[1] == 'M'.code.toByte()) {
                     val parsedData = SingleManualControl.GetDataFrame.fromByteArray(receiveData)
                     parsedData?.let {
-                        // println("파싱된 ICD 데이터: $it")
+                        // logger.debug("파싱된 ICD 데이터: {}", it)
                     }
                 }
                 //2.8 Manual Controls Command(Multi-Axis)
                 else if (receiveData[1] == 'A'.code.toByte()) {
                     val parsedData = MultiManualControl.GetDataFrame.fromByteArray(receiveData)
                     parsedData?.let {
-                        // println("파싱된 ICD 데이터: $it")
+                        // logger.debug("파싱된 ICD 데이터: {}", it)
                     }
                 }
                 //2.9 Stop Command
                 else if (receiveData[1] == 'S'.code.toByte()) {
                     val parsedData = Stop.GetDataFrame.fromByteArray(receiveData)
                     parsedData?.let {
-                        println("파싱된 ICD 데이터: $it")
+                        logger.debug("파싱된 ICD 데이터: {}", it)
                     }
                 }
                 //2.10 Standby Command
                 else if (receiveData[1] == 'B'.code.toByte()) {
                     val parsedData = Standby.GetDataFrame.fromByteArray(receiveData)
                     parsedData?.let {
-                        println("파싱된 ICD 데이터: $it")
+                        logger.debug("파싱된 ICD 데이터: {}", it)
                     }
                 }
                 //2.11 Feed On/Off Control Command
                 else if (receiveData[1] == 'F'.code.toByte()) {
                     val parsedData = FeedOnOff.GetDataFrame.fromByteArray(receiveData)
                     parsedData?.let {
-                        println("파싱된 ICD 데이터: $it")
+                        logger.debug("파싱된 ICD 데이터: {}", it)
                     }
                 }
                 //2.12 Satellite Track Command
@@ -275,7 +276,7 @@ class ICDService {
                     if (receiveData[2] == 'T'.code.toByte()) {
                         val parsedData = SatelliteTrackOne.GetDataFrame.fromByteArray(receiveData)
                         parsedData?.let {
-                            println("파싱된 ICD 데이터: $it")
+                            logger.debug("파싱된 ICD 데이터: {}", it)
                             // 이벤트 발행
                             acsEventBus.publish(ACSEvent.ICDEvent.SatelliteTrackHeaderReceived(it))
                         }
@@ -285,14 +286,14 @@ class ICDService {
                     else if (receiveData[2] == 'M'.code.toByte()) {
                         val parsedData = SatelliteTrackTwo.GetDataFrame.fromByteArray(receiveData)
                         parsedData?.let {
-                            println("파싱된 ICD 데이터: $it")
+                            logger.debug("파싱된 ICD 데이터: {}", it)
                         }
                     }
                     //2.12.3 위성 추적 추가 데이터 요청
                     else if (receiveData[2] == 'R'.code.toByte()) {
                         val parsedData = SatelliteTrackThree.GetDataFrame.fromByteArray(receiveData)
                         parsedData?.let {
-                            println("파싱된 ICD 데이터: $it")
+                            logger.debug("파싱된 ICD 데이터: {}", it)
                             // 데이터 요청 이벤트 발행
                             acsEventBus.publish(ACSEvent.ICDEvent.SatelliteTrackDataRequested(it))
                         }
@@ -304,14 +305,14 @@ class ICDService {
                     if (receiveData[2] == 'T'.code.toByte()) {
                         val parsedData = TimeOffset.GetDataFrame.fromByteArray(receiveData)
                         parsedData?.let {
-                            println("파싱된 ICD 데이터: $it")
+                            logger.debug("파싱된 ICD 데이터: {}", it)
                         }
                     }
                     // 2.14 Position Offset Command
                     else if (receiveData[2] == 'P'.code.toByte()) {
                         val parsedData = PositionOffset.GetDataFrame.fromByteArray(receiveData)
                         parsedData?.let {
-                            println("파싱된 ICD 데이터: $it")
+                            logger.debug("파싱된 ICD 데이터: {}", it)
                         }
                     }
                 }
@@ -393,7 +394,7 @@ class ICDService {
 
                 fun fromByteArray(data: ByteArray): GetDataFrame? {
                     if (data.size < FRAME_LENGTH) {
-                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        logger.warn("수신 데이터 길이 부족: {} < {}", data.size, FRAME_LENGTH)
                         return null
                     }
 
@@ -413,7 +414,7 @@ class ICDService {
                             etx = data.last()
                         )
                     } else {
-                        println("CRC 체크 실패 또는 ETX 불일치")
+                        logger.warn("CRC 체크 실패 또는 ETX 불일치")
                         return null
                     }
                 }
@@ -520,7 +521,7 @@ class ICDService {
 
                 fun fromByteArray(data: ByteArray): GetDataFrame? {
                     if (data.size < FRAME_LENGTH) {
-                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        logger.warn("수신 데이터 길이 부족: {} < {}", data.size, FRAME_LENGTH)
                         return null
                     }
 
@@ -532,8 +533,7 @@ class ICDService {
 
                     // CRC 검증 및 ETX 확인
                     if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
-                        println("one: ${data[1].toInt().toChar()}")
-                        println("two: ${data[2].toInt().toChar()}")
+                        logger.debug("CMD: one={}, two={}", data[1].toInt().toChar(), data[2].toInt().toChar())
 
                         return GetDataFrame(
                             stx = data[0],
@@ -544,7 +544,7 @@ class ICDService {
                             etx = data.last()
                         )
                     } else {
-                        println("CRC 체크 실패 또는 ETX 불일치")
+                        logger.warn("CRC 체크 실패 또는 ETX 불일치")
                         return null
                     }
                 }
@@ -668,7 +668,7 @@ class ICDService {
 
                 fun fromByteArray(data: ByteArray): GetDataFrame? {
                     if (data.size < FRAME_LENGTH) {
-                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        logger.warn("수신 데이터 길이 부족: {} < {}", data.size, FRAME_LENGTH)
                         return null
                     }
 
@@ -680,8 +680,7 @@ class ICDService {
 
                     // CRC 검증 및 ETX 확인
                     if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
-                        println("Two: ${data[1].toInt().toChar()}")
-                        println("${data[2].toInt().toChar()}")
+                        logger.debug("CMD: one={}, two={}", data[1].toInt().toChar(), data[2].toInt().toChar())
 
                         return GetDataFrame(
                             stx = data[0],
@@ -692,7 +691,7 @@ class ICDService {
                             etx = data.last()
                         )
                     } else {
-                        println("CRC 체크 실패 또는 ETX 불일치")
+                        logger.warn("CRC 체크 실패 또는 ETX 불일치")
                         return null
                     }
                 }
@@ -790,7 +789,7 @@ class ICDService {
 
                 fun fromByteArray(data: ByteArray): GetDataFrame? {
                     if (data.size < FRAME_LENGTH) {
-                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        logger.warn("수신 데이터 길이 부족: {} < {}", data.size, FRAME_LENGTH)
                         return null
                     }
 
@@ -804,10 +803,9 @@ class ICDService {
                     if (rxChecksum == crc16Check && data.last() == ICD_ETX) {
                         // 데이터 길이 추출
                         val requestDataLength = JKUtil.JKConvert.Companion.byteArrayToUShort(byteArrayOf(data[3], data[4]))
-                        println("Main Board의 요청 시간 누적치: $requestDataLength")
                         // 시간 누적치 추출
                         val timeAcc = JKUtil.JKConvert.Companion.uintEndianConvert(data[5], data[6], data[7], data[8], false)
-                        println("Main Board의 요청 시간 누적치: $timeAcc")
+                        logger.debug("Main Board 요청: dataLength={}, timeAcc={}", requestDataLength, timeAcc)
 
                         return GetDataFrame(
                             stx = data[0],
@@ -819,7 +817,7 @@ class ICDService {
                             etx = data.last()
                         )
                     } else {
-                        println("CRC 체크 실패 또는 ETX 불일치")
+                        logger.warn("CRC 체크 실패 또는 ETX 불일치")
                         return null
                     }
                 }
@@ -913,7 +911,7 @@ class ICDService {
 
                 fun fromByteArray(data: ByteArray): GetDataFrame? {
                     if (data.size < FRAME_LENGTH) {
-                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        logger.warn("수신 데이터 길이 부족: {} < {}", data.size, FRAME_LENGTH)
                         return null
                     }
 
@@ -939,7 +937,7 @@ class ICDService {
                             etx = data.last()
                         )
                     } else {
-                        println("CRC 체크 실패 또는 ETX 불일치")
+                        logger.warn("CRC 체크 실패 또는 ETX 불일치")
                         return null
                     }
                 }
@@ -1037,7 +1035,7 @@ class ICDService {
 
                 fun fromByteArray(data: ByteArray): GetDataFrame? {
                     if (data.size < FRAME_LENGTH) {
-                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        logger.warn("수신 데이터 길이 부족: {} < {}", data.size, FRAME_LENGTH)
                         return null
                     }
 
@@ -1072,7 +1070,7 @@ class ICDService {
                             etx = data.last()
                         )
                     } else {
-                        println("CRC 체크 실패 또는 ETX 불일치")
+                        logger.warn("CRC 체크 실패 또는 ETX 불일치")
                         return null
                     }
                 }
@@ -1184,7 +1182,7 @@ class ICDService {
 
                 fun fromByteArray(data: ByteArray): GetDataFrame? {
                     if (data.size < FRAME_LENGTH) {
-                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        logger.warn("수신 데이터 길이 부족: {} < {}", data.size, FRAME_LENGTH)
                         return null
                     }
 
@@ -1203,7 +1201,7 @@ class ICDService {
                             etx = data.last()
                         )
                     } else {
-                        println("CRC 체크 실패 또는 ETX 불일치")
+                        logger.warn("CRC 체크 실패 또는 ETX 불일치")
                         return null
                     }
                 }
@@ -1274,7 +1272,7 @@ class ICDService {
 
                 fun fromByteArray(data: ByteArray): GetDataFrame? {
                     if (data.size < FRAME_LENGTH) {
-                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        logger.warn("수신 데이터 길이 부족: {} < {}", data.size, FRAME_LENGTH)
                         return null
                     }
 
@@ -1298,7 +1296,7 @@ class ICDService {
                             etx = data.last()
                         )
                     } else {
-                        println("CRC 체크 실패 또는 ETX 불일치")
+                        logger.warn("CRC 체크 실패 또는 ETX 불일치")
                         return null
                     }
                 }
@@ -1385,7 +1383,7 @@ class ICDService {
 
                 fun fromByteArray(data: ByteArray): GetDataFrame? {
                     if (data.size < FRAME_LENGTH) {
-                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        logger.warn("수신 데이터 길이 부족: {} < {}", data.size, FRAME_LENGTH)
                         return null
                     }
                     val rxChecksum = ByteBuffer.wrap(byteArrayOf(data[FRAME_LENGTH - 3], data[FRAME_LENGTH - 2]))
@@ -1416,7 +1414,7 @@ class ICDService {
                             etx = data.last()
                         )
                     } else {
-                        println("CRC 체크 실패 또는 ETX 불일치")
+                        logger.warn("CRC 체크 실패 또는 ETX 불일치")
                         return null
                     }
                 }
@@ -1479,7 +1477,7 @@ class ICDService {
 
                 fun fromByteArray(data: ByteArray): GetDataFrame? {
                     if (data.size < FRAME_LENGTH) {
-                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        logger.warn("수신 데이터 길이 부족: {} < {}", data.size, FRAME_LENGTH)
                         return null
                     }
 
@@ -1498,7 +1496,7 @@ class ICDService {
                         frame.etx = data.last()
                         return frame
                     } else {
-                        println("CRC 체크 실패 또는 ETX 불일치")
+                        logger.warn("CRC 체크 실패 또는 ETX 불일치")
                         return null
                     }
                 }
@@ -1559,7 +1557,7 @@ class ICDService {
 
                 fun fromByteArray(data: ByteArray): GetDataFrame? {
                     if (data.size < FRAME_LENGTH) {
-                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        logger.warn("수신 데이터 길이 부족: {} < {}", data.size, FRAME_LENGTH)
                         return null
                     }
                     val rxChecksum = ByteBuffer.wrap(byteArrayOf(data[FRAME_LENGTH - 3], data[FRAME_LENGTH - 2]))
@@ -1578,7 +1576,7 @@ class ICDService {
                         return frame
 
                     } else {
-                        println("CRC 체크 실패 또는 ETX 불일치")
+                        logger.warn("CRC 체크 실패 또는 ETX 불일치")
                         return null
                     }
                 }
@@ -1689,7 +1687,7 @@ class ICDService {
 
                 fun fromByteArray(data: ByteArray): GetDataFrame? {
                     if (data.size < FRAME_LENGTH) {
-                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        logger.warn("수신 데이터 길이 부족: {} < {}", data.size, FRAME_LENGTH)
                         return null
                     }
 
@@ -1707,7 +1705,7 @@ class ICDService {
                         frame.etx = data.last()
                         return frame
                     } else {
-                        println("CRC 체크 실패 또는 ETX 불일치")
+                        logger.warn("CRC 체크 실패 또는 ETX 불일치")
                         return null
                     }
                 }
@@ -1981,9 +1979,11 @@ class ICDService {
                 const val FRAME_LENGTH = 190
 
                 fun fromByteArray(data: ByteArray): GetDataFrame? {
+                    val logger = LoggerFactory.getLogger(ReadStatus::class.java)
+
                     // 최소 길이 체크 (STX + CMD + 최소 데이터 + CRC + ETX)
                     if (data.size < 10) {
-                        println("수신 데이터 길이가 너무 짧습니다: ${data.size}")
+                        logger.warn("수신 데이터 길이가 너무 짧습니다: {}", data.size)
                         return null
                     }
 
@@ -1991,13 +1991,13 @@ class ICDService {
                     val etxByte = data.last()
                     val expectedEtx = ICD_ETX
                     if (etxByte != expectedEtx) {
-                        println("ETX 불일치: 수신=0x${etxByte.toUByte().toString(16)}, 예상=0x${expectedEtx.toUByte().toString(16)}")
+                        logger.warn("ETX 불일치: 수신=0x{}, 예상=0x{}", etxByte.toUByte().toString(16), expectedEtx.toUByte().toString(16))
                         return null
                     }
 
                     // 실제 프레임 길이 계산 (ETX 제외)
                     val actualFrameLength = data.size - 1 // ETX 제외
-                    
+
                     // CRC 위치: ETX 직전 2바이트 (빅 엔디안 - 다른 클래스들과 동일)
                     // data[actualFrameLength - 2], data[actualFrameLength - 1] = CRC
                     // data[actualFrameLength] = ETX
@@ -2010,22 +2010,14 @@ class ICDService {
 
                     // CRC 검증
                     if (rxChecksum != crc16Check) {
-                        println("ReadStatus CRC 체크 실패:")
-                        println("  수신 데이터 길이: ${data.size} (ETX 제외: $actualFrameLength)")
-                        println("  STX: 0x${data[0].toUByte().toString(16)} (예상: 0x${ICD_STX.toUByte().toString(16)})")
-                        println("  CMD1: 0x${data[1].toUByte().toString(16)} (예상: 'R'=0x${'R'.code.toString(16)})")
-                        if (data.size > 2) {
-                            println("  CMD2: 0x${data[2].toUByte().toString(16)} (예상: 'R'=0x${'R'.code.toString(16)})")
+                        logger.warn("ReadStatus CRC 체크 실패: 수신CRC=0x{}, 계산CRC=0x{}, 데이터길이={}", rxChecksum.toString(16), crc16Check.toString(16), data.size)
+                        if (logger.isDebugEnabled) {
+                            logger.debug("CRC 상세: STX=0x{}, CMD1=0x{}, CMD2=0x{}, HEX(처음20)={}",
+                                data[0].toUByte().toString(16),
+                                data[1].toUByte().toString(16),
+                                if (data.size > 2) data[2].toUByte().toString(16) else "N/A",
+                                JKUtil.JKConvert.Companion.byteArrayToHexString(crc16Target.take(20).toByteArray()))
                         }
-                        println("  수신 CRC 위치: data[${actualFrameLength - 2}], data[${actualFrameLength - 1}]")
-                        println("  수신 CRC 바이트: 0x${data[actualFrameLength - 2].toUByte().toString(16)}, 0x${data[actualFrameLength - 1].toUByte().toString(16)}")
-                        println("  수신 CRC (빅 엔디안): 0x${rxChecksum.toString(16)}")
-                        println("  계산 CRC: 0x${crc16Check.toString(16)}")
-                        println("  CRC 타겟 범위: data[1] ~ data[${actualFrameLength - 2}] (${actualFrameLength - 2}바이트)")
-                        println("  CRC 타겟 HEX: ${JKUtil.JKConvert.Companion.byteArrayToHexString(crc16Target.take(20).toByteArray())}...")
-                        println("  ETX: 0x${etxByte.toUByte().toString(16)} (예상: 0x${expectedEtx.toUByte().toString(16)})")
-                        println("  전체 데이터 HEX (처음 50바이트): ${JKUtil.JKConvert.Companion.byteArrayToHexString(data.take(50).toByteArray())}...")
-                        println("  전체 데이터 HEX (마지막 10바이트): ...${JKUtil.JKConvert.Companion.byteArrayToHexString(data.takeLast(10).toByteArray())}")
                         return null
                     }
                     
@@ -2152,27 +2144,20 @@ class ICDService {
                         frame.trackingActualTiltAngle = buffer.float
                         frame.checkSum = rxChecksum
                         frame.etx = data.last()
-                        //println(" az :${frame.azimuthAngle}, el : ${frame.elevationAngle}, ti : ${frame.tiltAngle}")
                         return frame
 
 
                     } else {
                         // 상세한 디버깅 정보 출력 (ReadStatus CRC 체크 실패 시)
-                        println("ReadStatus CRC 체크 실패 또는 ETX 불일치:")
-                        println("  수신 데이터 길이: ${data.size} (예상: $FRAME_LENGTH)")
-                        println("  STX: 0x${data[0].toUByte().toString(16)} (예상: 0x${ICD_STX.toUByte().toString(16)})")
-                        println("  CMD1: 0x${data[1].toUByte().toString(16)} (예상: 'R'=0x${'R'.code.toString(16)})")
-                        if (data.size > 2) {
-                            println("  CMD2: 0x${data[2].toUByte().toString(16)} (예상: 'R'=0x${'R'.code.toString(16)})")
+                        logger.warn("ReadStatus CRC 체크 실패: 수신CRC=0x{}, 계산CRC=0x{}, 데이터길이={}", rxChecksum.toString(16), crc16Check.toString(16), data.size)
+                        if (logger.isDebugEnabled) {
+                            logger.debug("CRC 상세: STX=0x{}, CMD1=0x{}, CMD2=0x{}, ETX=0x{}, HEX(처음20)={}",
+                                data[0].toUByte().toString(16),
+                                data[1].toUByte().toString(16),
+                                if (data.size > 2) data[2].toUByte().toString(16) else "N/A",
+                                etxByte.toUByte().toString(16),
+                                JKUtil.JKConvert.Companion.byteArrayToHexString(crc16Target.take(20).toByteArray()))
                         }
-                        println("  수신 CRC 위치: data[${FRAME_LENGTH - 2}], data[${FRAME_LENGTH - 1}]")
-                        println("  수신 CRC: 0x${rxChecksum.toString(16)}")
-                        println("  계산 CRC: 0x${crc16Check.toString(16)}")
-                        println("  CRC 타겟 범위: data[1] ~ data[${FRAME_LENGTH - 2}] (${FRAME_LENGTH - 3}바이트)")
-                        println("  CRC 타겟 HEX: ${JKUtil.JKConvert.Companion.byteArrayToHexString(crc16Target.take(20).toByteArray())}...")
-                        println("  ETX: 0x${etxByte.toUByte().toString(16)} (예상: 0x${expectedEtx.toUByte().toString(16)})")
-                        println("  전체 데이터 HEX (처음 50바이트): ${JKUtil.JKConvert.Companion.byteArrayToHexString(data.take(50).toByteArray())}...")
-                        println("  전체 데이터 HEX (마지막 10바이트): ...${JKUtil.JKConvert.Companion.byteArrayToHexString(data.takeLast(10).toByteArray())}")
                         return null
                     }
                 }
@@ -2236,7 +2221,7 @@ class ICDService {
 
                 fun fromByteArray(data: ByteArray): GetDataFrame? {
                     if (data.size < FRAME_LENGTH) {
-                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        logger.warn("수신 데이터 길이 부족: {} < {}", data.size, FRAME_LENGTH)
                         return null
                     }
 
@@ -2258,7 +2243,7 @@ class ICDService {
                             etx = data.last()
                         )
                     } else {
-                        println("CRC 체크 실패 또는 ETX 불일치")
+                        logger.warn("CRC 체크 실패 또는 ETX 불일치")
                         return null
                     }
                 }
@@ -2341,7 +2326,7 @@ class ICDService {
 
                 fun fromByteArray(data: ByteArray): GetDataFrame? {
                     if (data.size < FRAME_LENGTH) {
-                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        logger.warn("수신 데이터 길이 부족: {} < {}", data.size, FRAME_LENGTH)
                         return null
                     }
 
@@ -2361,7 +2346,7 @@ class ICDService {
                             etx = data.last()
                         )
                     } else {
-                        println("CRC 체크 실패 또는 ETX 불일치")
+                        logger.warn("CRC 체크 실패 또는 ETX 불일치")
                         return null
                     }
                 }
@@ -2419,7 +2404,7 @@ class ICDService {
 
                 fun fromByteArray(data: ByteArray): GetDataFrame? {
                     if (data.size < FRAME_LENGTH) {
-                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        logger.warn("수신 데이터 길이 부족: {} < {}", data.size, FRAME_LENGTH)
                         return null
                     }
 
@@ -2439,7 +2424,7 @@ class ICDService {
                             etx = data.last()
                         )
                     } else {
-                        println("CRC 체크 실패 또는 ETX 불일치")
+                        logger.warn("CRC 체크 실패 또는 ETX 불일치")
                         return null
                     }
                 }
@@ -2508,7 +2493,7 @@ class ICDService {
 
                 fun fromByteArray(data: ByteArray): GetDataFrame? {
                     if (data.size < FRAME_LENGTH) {
-                        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+                        logger.warn("수신 데이터 길이 부족: {} < {}", data.size, FRAME_LENGTH)
                         return null
                     }
 
@@ -2530,7 +2515,7 @@ class ICDService {
                             etx = data.last()
                         )
                     } else {
-                        println("CRC 체크 실패 또는 ETX 불일치")
+                        logger.warn("CRC 체크 실패 또는 ETX 불일치")
                         return null
                     }
                 }
@@ -2649,7 +2634,7 @@ class ICDService {
 
                 fun fromByteArray(data: ByteArray): GetDataFrame? {
     if (data.size < FRAME_LENGTH) {
-        println("수신 데이터 길이가 프레임 길이보다 짧습니다: ${data.size} < $FRAME_LENGTH")
+        logger.warn("수신 데이터 길이 부족: {} < {}", data.size, FRAME_LENGTH)
         return null
     }
 
@@ -2779,7 +2764,7 @@ class ICDService {
             etx = data.last()
         )
     } else {
-        println("CRC 체크 실패 또는 ETX 불일치")
+        logger.warn("CRC 체크 실패 또는 ETX 불일치")
         return null
     }
 }

@@ -1,6 +1,7 @@
 ---
 name: refactor
 description: 리팩토링 워크플로우. 대형 파일 분리, 구조 개선, 코드 품질 향상. "리팩토링", "refactor", "분리", "구조 개선", "정리" 키워드에 반응.
+model: opus
 ---
 
 # Refactor - 리팩토링 스킬

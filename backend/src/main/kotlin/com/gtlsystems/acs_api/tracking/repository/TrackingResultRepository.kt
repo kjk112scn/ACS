@@ -1,6 +1,7 @@
 package com.gtlsystems.acs_api.tracking.repository
 
 import com.gtlsystems.acs_api.tracking.entity.TrackingResultEntity
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean
 import org.springframework.r2dbc.core.DatabaseClient
 import org.springframework.stereotype.Repository
 import reactor.core.publisher.Flux
@@ -12,6 +13,7 @@ import java.time.OffsetDateTime
  * - Hypertable (PRIMARY KEY 없음) → DatabaseClient 사용
  */
 @Repository
+@ConditionalOnBean(DatabaseClient::class)
 class TrackingResultRepository(
     private val databaseClient: DatabaseClient
 ) {

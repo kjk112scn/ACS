@@ -1,3 +1,9 @@
+---
+name: api-sync
+description: Backend-Frontend API 자동 동기화 스킬. OpenAPI 스펙 생성, TypeScript 타입 자동 생성, 불일치 검증 자동화. "api-sync", "타입 동기화", "OpenAPI" 키워드에 반응.
+model: opus
+---
+
 # API Sync Skill (API 자동 동기화 스킬)
 
 Backend-Frontend API 자동 동기화 스킬. OpenAPI 스펙 생성, TypeScript 타입 자동 생성, 불일치 검증 자동화.

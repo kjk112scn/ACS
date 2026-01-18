@@ -1,6 +1,7 @@
 ---
 name: documentation
 description: 문서화 스킬. 기존 코드 분석, 협의, 문서 자동 생성. "문서화", "docs", "문서 작성", "문서 정리", "코드 분석해서 문서" 키워드에 반응.
+model: opus
 ---
 
 # Documentation - 문서화 스킬

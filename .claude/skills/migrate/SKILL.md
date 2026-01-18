@@ -1,3 +1,9 @@
+---
+name: migrate
+description: 단계별 마이그레이션 실행 및 관리 스킬. Feature Flag 기반 점진적 배포, 롤백 플레이북 제공. "migrate", "마이그레이션", "롤백", "배포" 키워드에 반응.
+model: opus
+---
+
 # Migrate Skill (마이그레이션 관리 스킬)
 
 단계별 마이그레이션 실행 및 관리 스킬. Feature Flag 기반 점진적 배포, 롤백 플레이북 제공.

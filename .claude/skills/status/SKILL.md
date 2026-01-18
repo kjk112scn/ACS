@@ -1,6 +1,7 @@
 ---
 name: reporting-status
 description: 프로젝트 현황 보고 스킬. 코드 메트릭스, 진행 상황, 기술 부채 분석. "현황", "status", "상태", "진행 상황", "어디까지" 키워드에 반응.
+model: opus
 ---
 
 # Reporting Status - 프로젝트 현황 보고 스킬

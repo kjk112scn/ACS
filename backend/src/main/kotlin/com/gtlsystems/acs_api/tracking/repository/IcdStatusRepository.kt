@@ -1,6 +1,7 @@
 package com.gtlsystems.acs_api.tracking.repository
 
 import com.gtlsystems.acs_api.tracking.entity.IcdStatusEntity
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean
 import org.springframework.r2dbc.core.DatabaseClient
 import org.springframework.stereotype.Repository
 import reactor.core.publisher.Flux
@@ -13,6 +14,7 @@ import java.time.OffsetDateTime
  * - 100ms 주기 대용량 데이터 처리
  */
 @Repository
+@ConditionalOnBean(DatabaseClient::class)
 class IcdStatusRepository(
     private val databaseClient: DatabaseClient
 ) {

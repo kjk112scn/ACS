@@ -4,12 +4,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import com.gtlsystems.acs_api.service.system.settings.SettingsService
 import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
 import java.net.HttpURLConnection
 import java.net.URL
 
 class ElevationCalculator(
     private val settingsService: SettingsService
 ) {
+    companion object {
+        private val logger = LoggerFactory.getLogger(ElevationCalculator::class.java)
+    }
 
     /**
      * 두 API 모두 호출해서 결과 비교
@@ -23,21 +27,21 @@ class ElevationCalculator(
         googleApiKey: String? = null
     ): ElevationComparison = withContext(Dispatchers.IO) {
 
-        println("두 API 동시 호출 시작: 위도=$latitude, 경도=$longitude")
+        logger.debug("두 API 동시 호출 시작: 위도={}, 경도={}", latitude, longitude)
 
         // 두 API를 동시에 호출 (병렬 처리)
         val googleDeferred = async {
             if (!googleApiKey.isNullOrEmpty()) {
-                println("Google API 호출 중...")
+                logger.debug("Google API 호출 중...")
                 getElevationFromGoogle(latitude, longitude, googleApiKey)
             } else {
-                println("Google API 키가 없어 건너뜀")
+                logger.debug("Google API 키가 없어 건너뜀")
                 null
             }
         }
 
         val openElevationDeferred = async {
-            println("Open-Elevation API 호출 중...")
+            logger.debug("Open-Elevation API 호출 중...")
             getElevationFromOpenElevation(latitude, longitude)
         }
 
@@ -45,14 +49,14 @@ class ElevationCalculator(
         val googleResult = try {
             googleDeferred.await()
         } catch (e: Exception) {
-            println("Google API 오류: ${e.message}")
+            logger.warn("Google API 오류: {}", e.message)
             null
         }
 
         val openElevationResult = try {
             openElevationDeferred.await()
         } catch (e: Exception) {
-            println("Open-Elevation API 오류: ${e.message}")
+            logger.warn("Open-Elevation API 오류: {}", e.message)
             null
         }
 
@@ -90,11 +94,11 @@ class ElevationCalculator(
                 val response = connection.inputStream.bufferedReader().readText()
                 parseGoogleElevationResponse(response)
             } else {
-                println("Google API HTTP Error: ${connection.responseCode}")
+                logger.warn("Google API HTTP Error: {}", connection.responseCode)
                 null
-            }   
+            }
         } catch (e: Exception) {
-            println("Google Elevation API 호출 실패: ${e.message}")
+            logger.warn("Google Elevation API 호출 실패: {}", e.message)
             null
         }
     }
@@ -116,11 +120,11 @@ class ElevationCalculator(
                 val response = connection.inputStream.bufferedReader().readText()
                 parseOpenElevationResponse(response)
             } else {
-                println("Open-Elevation API HTTP Error: ${connection.responseCode}")
+                logger.warn("Open-Elevation API HTTP Error: {}", connection.responseCode)
                 null
             }
         } catch (e: Exception) {
-            println("Open-Elevation API 호출 실패: ${e.message}")
+            logger.warn("Open-Elevation API 호출 실패: {}", e.message)
             null
         }
     }
@@ -130,7 +134,7 @@ class ElevationCalculator(
             val statusRegex = "\"status\"\\s*:\\s*\"([^\"]+)\"".toRegex()
             val statusMatch = statusRegex.find(response)
             if (statusMatch?.groupValues?.get(1) != "OK") {
-                println("Google Elevation API Error: ${statusMatch?.groupValues?.get(1)}")
+                logger.warn("Google Elevation API Error: {}", statusMatch?.groupValues?.get(1))
                 return null
             }
 
@@ -138,7 +142,7 @@ class ElevationCalculator(
             val elevationMatch = elevationRegex.find(response)
             elevationMatch?.groupValues?.get(1)?.toDoubleOrNull()
         } catch (e: Exception) {
-            println("Google API 응답 파싱 실패: ${e.message}")
+            logger.warn("Google API 응답 파싱 실패: {}", e.message)
             null
         }
     }
@@ -149,7 +153,7 @@ class ElevationCalculator(
             val elevationMatch = elevationRegex.find(response)
             elevationMatch?.groupValues?.get(1)?.toDoubleOrNull()
         } catch (e: Exception) {
-            println("Open-Elevation API 응답 파싱 실패: ${e.message}")
+            logger.warn("Open-Elevation API 응답 파싱 실패: {}", e.message)
             null
         }
     }

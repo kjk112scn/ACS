@@ -1,6 +1,7 @@
 ---
 name: fixing-bug
 description: 버그 수정 워크플로우. 원인 분석, 수정 계획, 회귀 테스트까지 체계적 버그 해결. "버그 수정", "에러 해결", "bugfix", "오류", "문제 해결" 키워드에 반응.
+model: opus
 ---
 
 # Fixing Bug - 버그 수정 스킬

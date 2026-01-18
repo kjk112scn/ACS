@@ -1,6 +1,7 @@
 ---
 name: cleanup
 description: 코드 품질 일괄 정리. console.log, print, 광범위 catch, 하드코딩 값 정리. "정리", "cleanup", "console.log", "print", "삭제" 키워드에 반응.
+model: opus
 ---
 
 # Cleanup - 코드 품질 정리 스킬

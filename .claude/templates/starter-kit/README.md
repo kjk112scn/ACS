@@ -95,7 +95,7 @@ starter-kit/
 | `debugger` | 버그 분석/수정 | Opus |
 | `refactorer` | 리팩토링/분리 | Opus |
 | `code-reviewer` | 코드 품질 검증 | Opus |
-| `doc-syncer` | 문서 동기화 | Haiku |
+| `doc-syncer` | 문서 동기화 | Sonnet |
 
 ## 커스터마이징
 

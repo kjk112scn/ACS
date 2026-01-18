@@ -1,4 +1,4 @@
-# ACS 용어 사전
+ㅈ# ACS 용어 사전
 
 > 프로젝트에서 사용되는 용어와 약어
 
@@ -161,6 +161,240 @@ fun getUser(): Mono<User>  // 0~1개 결과를 비동기로 반환
 ```kotlin
 @PostMapping("/users")  // POST /users 요청을 이 함수가 처리
 fun create() { ... }
+```
+
+---
+
+## 추가 프로그래밍 용어
+
+### HTTP 관련
+
+| 용어 | 설명 | 예시 |
+|------|------|------|
+| **GET** | 데이터 조회 요청 | `GET /api/users` |
+| **POST** | 데이터 생성 요청 | `POST /api/users` |
+| **PUT** | 데이터 전체 수정 | `PUT /api/users/1` |
+| **PATCH** | 데이터 부분 수정 | `PATCH /api/users/1` |
+| **DELETE** | 데이터 삭제 요청 | `DELETE /api/users/1` |
+| **200 OK** | 요청 성공 | 정상 응답 |
+| **201 Created** | 생성 성공 | POST 성공 |
+| **400 Bad Request** | 잘못된 요청 | 검증 실패 |
+| **404 Not Found** | 리소스 없음 | 존재하지 않는 데이터 |
+| **500 Internal Error** | 서버 에러 | 예외 발생 |
+
+### TypeScript 키워드
+
+| 키워드 | 설명 | 예시 |
+|--------|------|------|
+| **interface** | 객체 구조 정의 | `interface User { name: string }` |
+| **type** | 타입 별칭 | `type Status = 'active' \| 'inactive'` |
+| **generic** | 타입 매개변수 | `Array<T>`, `Promise<T>` |
+| **extends** | 타입 확장 | `interface Admin extends User` |
+| **keyof** | 객체의 키 타입 | `keyof User` = `'name' \| 'age'` |
+| **typeof** | 값에서 타입 추출 | `typeof myObj` |
+| **as** | 타입 단언 | `data as User` |
+| **unknown** | 안전한 any | 타입 체크 필수 |
+| **never** | 절대 발생 안 함 | 에러 throw 함수 반환 |
+| **readonly** | 읽기 전용 | `readonly name: string` |
+
+### Vue 3 용어
+
+| 용어 | 설명 | 예시 |
+|------|------|------|
+| **SFC** | Single File Component | `.vue` 파일 |
+| **Composition API** | setup 기반 API | `<script setup>` |
+| **Options API** | data/methods 기반 | `export default { data() }` |
+| **v-model** | 양방향 바인딩 | `<input v-model="text">` |
+| **v-if / v-show** | 조건부 렌더링 | `v-if="visible"` |
+| **v-for** | 반복 렌더링 | `v-for="item in items"` |
+| **v-on / @** | 이벤트 바인딩 | `@click="handler"` |
+| **v-bind / :** | 속성 바인딩 | `:class="className"` |
+| **slot** | 컨텐츠 삽입 위치 | `<slot name="header">` |
+| **provide/inject** | 깊은 props 전달 | 조상→후손 데이터 전달 |
+
+### Kotlin 키워드
+
+| 키워드 | 설명 | 예시 |
+|--------|------|------|
+| **val** | 불변 변수 | `val name = "Kim"` |
+| **var** | 가변 변수 | `var count = 0` |
+| **fun** | 함수 정의 | `fun add(a: Int, b: Int): Int` |
+| **class** | 클래스 정의 | `class User(val name: String)` |
+| **data class** | 데이터 전용 클래스 | `data class User(val name: String)` |
+| **object** | 싱글톤 객체 | `object Config { }` |
+| **companion object** | 클래스 동반 객체 | 정적 메서드 대체 |
+| **sealed class** | 제한된 하위 클래스 | 상태 표현에 유용 |
+| **when** | 패턴 매칭 | `when (x) { 1 -> ... }` |
+| **is** | 타입 체크 | `if (obj is String)` |
+| **as** | 타입 캐스팅 | `obj as String` |
+| **suspend** | 코루틴 함수 | `suspend fun fetch()` |
+| **lateinit** | 지연 초기화 | `lateinit var service: Service` |
+| **by lazy** | 지연 초기화 (불변) | `val data by lazy { load() }` |
+
+### Spring 어노테이션
+
+| 어노테이션 | 설명 | 사용 위치 |
+|-----------|------|----------|
+| **@RestController** | REST API 컨트롤러 | 클래스 |
+| **@Service** | 서비스 레이어 | 클래스 |
+| **@Repository** | 데이터 접근 레이어 | 클래스 |
+| **@Component** | 일반 Bean | 클래스 |
+| **@Autowired** | 의존성 주입 | 생성자/필드 |
+| **@GetMapping** | GET 요청 매핑 | 메서드 |
+| **@PostMapping** | POST 요청 매핑 | 메서드 |
+| **@RequestBody** | 요청 본문 파싱 | 파라미터 |
+| **@PathVariable** | URL 경로 변수 | 파라미터 |
+| **@RequestParam** | 쿼리 파라미터 | 파라미터 |
+| **@Valid** | 입력 검증 | 파라미터 |
+| **@PreDestroy** | 소멸 전 실행 | 메서드 |
+| **@PostConstruct** | 생성 후 실행 | 메서드 |
+| **@Scheduled** | 스케줄링 | 메서드 |
+| **@ControllerAdvice** | 전역 예외 처리 | 클래스 |
+
+---
+
+## 디자인 패턴 용어
+
+| 패턴 | 설명 | ACS 예시 |
+|------|------|----------|
+| **Singleton** | 인스턴스 하나만 | GlobalData (object) |
+| **Observer** | 상태 변경 알림 | Vue watch, WebSocket |
+| **Factory** | 객체 생성 추상화 | - |
+| **Strategy** | 알고리즘 교체 가능 | 추적 알고리즘 |
+| **Repository** | 데이터 접근 추상화 | Repository 레이어 |
+| **DTO** | 데이터 전송 객체 | Request/Response 클래스 |
+| **DI** | 의존성 주입 | Spring @Autowired |
+
+---
+
+## 개발 도구 용어
+
+| 용어 | 설명 |
+|------|------|
+| **IDE** | 통합 개발 환경 (IntelliJ, VSCode) |
+| **npm** | Node.js 패키지 매니저 |
+| **Gradle** | JVM 빌드 도구 |
+| **Git** | 버전 관리 시스템 |
+| **CI/CD** | 지속적 통합/배포 |
+| **Lint** | 코드 스타일 검사 |
+| **Unit Test** | 단위 테스트 |
+| **E2E Test** | End-to-End 테스트 |
+| **HMR** | Hot Module Replacement (코드 변경 즉시 반영) |
+| **Transpile** | 코드 변환 (TS→JS) |
+| **Bundle** | 파일 묶음 (Vite) |
+| **Minify** | 코드 압축 |
+| **Source Map** | 디버깅용 원본 매핑 |
+
+---
+
+## 수학/좌표 용어
+
+| 용어 | 설명 | 예시 |
+|------|------|------|
+| **라디안 (rad)** | 각도 단위 (π = 180°) | `Math.PI / 2 = 90°` |
+| **도 (°)** | 일반적인 각도 단위 | `360°` = 1회전 |
+| **위도 (Latitude)** | 적도 기준 남북 위치 | -90° ~ +90° |
+| **경도 (Longitude)** | 본초자오선 기준 동서 위치 | -180° ~ +180° |
+| **고도 (Altitude)** | 해수면 기준 높이 | 미터 (m) |
+| **방위각 (Azimuth)** | 북쪽 기준 시계방향 각도 | 0° ~ 360° |
+| **고도각 (Elevation)** | 수평면 기준 위쪽 각도 | 0° ~ 90° |
+| **ECEF** | 지구 중심 좌표계 | X, Y, Z (미터) |
+| **ECI** | 관성 좌표계 | 위성 궤도 계산 |
+| **Topocentric** | 관측자 중심 좌표 | Az/El 계산 |
+
+---
+
+## 위성 궤도 용어 (상세)
+
+| 용어 | 설명 |
+|------|------|
+| **TLE 1행** | 위성 번호, 분류, 에포크 시각 |
+| **TLE 2행** | 궤도 요소 (경사각, 이심률 등) |
+| **Epoch** | TLE 기준 시각 |
+| **Inclination** | 궤도 경사각 |
+| **Eccentricity** | 이심률 (원=0, 타원<1) |
+| **Mean Motion** | 하루당 공전 횟수 |
+| **RAAN** | 승교점 적경 |
+| **Argument of Perigee** | 근지점 인수 |
+| **Mean Anomaly** | 평균 이각 |
+| **Propagator** | 궤도 전파기 (SGP4) |
+| **Ground Track** | 지상 궤적 |
+| **Footprint** | 위성 가시 영역 |
+
+---
+
+## 통신 프로토콜 용어
+
+| 용어 | 설명 |
+|------|------|
+| **TCP** | 연결 기반, 신뢰성 보장 |
+| **UDP** | 비연결, 빠름, 손실 가능 |
+| **HTTP** | 웹 통신 프로토콜 |
+| **HTTPS** | 암호화된 HTTP |
+| **WebSocket** | 양방향 실시간 통신 |
+| **JSON** | JavaScript Object Notation |
+| **Binary** | 이진 데이터 형식 |
+| **Packet** | 데이터 전송 단위 |
+| **Payload** | 실제 데이터 부분 |
+| **Header** | 메타데이터 부분 |
+| **Handshake** | 연결 수립 과정 |
+| **Heartbeat** | 연결 유지 확인 |
+
+---
+
+## 에러/예외 용어
+
+| 용어 | 설명 |
+|------|------|
+| **Exception** | 예외 (복구 가능) |
+| **Error** | 에러 (복구 불가) |
+| **try/catch** | 예외 처리 구문 |
+| **throw** | 예외 발생 |
+| **finally** | 항상 실행되는 블록 |
+| **Stack Trace** | 에러 발생 위치 추적 |
+| **NullPointerException** | null 참조 에러 |
+| **IllegalArgumentException** | 잘못된 인자 |
+| **IndexOutOfBoundsException** | 배열 범위 초과 |
+| **RuntimeException** | 실행 중 예외 |
+| **Checked Exception** | 처리 강제 예외 (Java) |
+| **Unchecked Exception** | 처리 선택 예외 |
+
+---
+
+## Quick Lookup
+
+```
+Frontend (Vue/TS)
+├── ref()         반응형 변수
+├── reactive()    반응형 객체
+├── computed()    계산된 값
+├── watch()       값 변경 감시
+├── v-model       양방향 바인딩
+├── @click        이벤트 핸들러
+└── :class        동적 클래스
+
+Backend (Kotlin/Spring)
+├── @Service      서비스 클래스
+├── @GetMapping   GET 요청
+├── @PostMapping  POST 요청
+├── ?.            Safe call
+├── ?:            Elvis (기본값)
+├── ?.let { }     null 아니면 실행
+└── data class    데이터 클래스
+
+통신
+├── REST API      HTTP 요청/응답
+├── WebSocket     실시간 양방향
+├── UDP           빠른 단방향
+└── JSON          데이터 형식
+
+안테나/위성
+├── Az            방위각 (0~360°)
+├── El            고도각 (0~90°)
+├── TLE           궤도 요소
+├── AOS           신호 획득
+├── LOS           신호 손실
+└── TCA           최근접 시각
 ```
 
 ---

@@ -198,6 +198,43 @@
 | 2026-01-18 | DB | Settings R2DBC 마이그레이션 | Done | JPA → R2DBC, settings/setting_history 테이블 |
 | 2026-01-18 | 품질 | 상용 SW 품질 검토 | Done | B- (68/100), CRITICAL 2건 식별 |
 | 2026-01-18 | 품질 | CLAUDE.md CRITICAL 섹션 | Done | 인증/테스트 이슈 추적 체계 수립 |
+| 2026-01-18 | 설정 | 프로필 정리 (home/office → db) | Done | `db`/`no-db` 2개로 통일, 포트 5433 |
+| 2026-01-18 | 설정 | SettingsService 로그 레벨 | Done | INFO 레벨 추가 |
+| 2026-01-18 | 검토 | P1-6 Graceful Shutdown | Done | ThreadManager, BatchStorageManager 이미 구현됨 |
+| 2026-01-18 | 코드 | println → logger 변환 | Done | ICDService(83건), ElevationCalculator(14건), InitService(6건) |
+| 2026-01-18 | 품질 | LoggingService Critical 수정 | Done | TTL/배치삭제/vararg순서 개선 |
+
+---
+
+## ✅ 완료: println → logger 변환 (2026-01-18)
+
+### 완료 현황
+
+| 파일 | 총 개수 | 상태 |
+|------|:------:|:----:|
+| LoggingService.kt | Critical 3건 | ✅ 수정 완료 |
+| ICDService.kt | 83건 | ✅ logger 변환 완료 |
+| ElevationCalculator.kt | 14건 | ✅ logger 변환 완료 |
+| InitService.kt | 6건 | ✅ logger 변환 완료 |
+
+### LoggingService Critical 수정 내용
+
+| 문제 | 해결 방안 |
+|------|----------|
+| performanceTimers 메모리 누수 | TimerEntry 도입 (TTL 5분), ScheduledExecutor로 주기적 정리 |
+| businessLogs O(n) 삭제 | 배치 삭제 (20% 초과 시 10% 제거) |
+| error(throwable) vararg 순서 | SLF4J 표준 순서로 수정 (message, throwable) |
+
+### 변환 규칙 (적용됨)
+
+| println 패턴 | 변환 | 로그 레벨 |
+|-------------|------|----------|
+| 데이터 길이 부족 | `logger.warn` | WARN |
+| CRC/ETX 실패 | `logger.warn` | WARN |
+| 파싱된 데이터 | `logger.debug` | DEBUG |
+| 바이트 디버깅 | `logger.debug` | DEBUG |
+| API 호출/오류 | `logger.warn` | WARN |
+| 초기화 정보 | `logger.info` | INFO |
 
 ---
 

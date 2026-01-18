@@ -1,6 +1,7 @@
 ---
 name: optimize
 description: 성능 최적화 워크플로우. icdStore, 렌더링, 메모리, 번들 크기 최적화. "최적화", "optimize", "성능", "느려", "빨리" 키워드에 반응.
+model: opus
 ---
 
 # Optimize - 성능 최적화 스킬

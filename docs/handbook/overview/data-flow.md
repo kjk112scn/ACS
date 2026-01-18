@@ -290,5 +290,352 @@ GlobalExceptionHandler
 
 ---
 
+## 에러 처리 흐름
+
+### Frontend 에러 처리 상세
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    Frontend 에러 처리 아키텍처                      │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
+│  │ API 호출     │ →  │ try/catch   │ →  │ useError    │          │
+│  │ axios       │    │ 블록        │    │ Handler     │          │
+│  └─────────────┘    └─────────────┘    └─────────────┘          │
+│         │                                     │                  │
+│         ▼                                     ▼                  │
+│  ┌─────────────┐                      ┌─────────────┐           │
+│  │ Interceptor │                      │ q-notify    │           │
+│  │ (전역 처리)  │                      │ (사용자 알림)│           │
+│  └─────────────┘                      └─────────────┘           │
+│         │                                     │                  │
+│         ▼                                     ▼                  │
+│  ┌─────────────────────────────────────────────────┐            │
+│  │              console.error (개발용 로깅)          │            │
+│  └─────────────────────────────────────────────────┘            │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**에러 유형별 처리**:
+```typescript
+// services/api.ts - Axios Interceptor
+axios.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response) {
+      // 서버 응답 에러 (4xx, 5xx)
+      switch (error.response.status) {
+        case 400: // Bad Request
+          console.error('잘못된 요청:', error.response.data)
+          break
+        case 404: // Not Found
+          console.error('리소스 없음')
+          break
+        case 500: // Server Error
+          console.error('서버 에러')
+          break
+      }
+    } else if (error.request) {
+      // 네트워크 에러 (응답 없음)
+      console.error('네트워크 연결 실패')
+    }
+    return Promise.reject(error)
+  }
+)
+```
+
+**컴포넌트에서 에러 처리**:
+```typescript
+// composables/useErrorHandler.ts 사용
+const { handleError, showError, showSuccess } = useErrorHandler()
+
+async function saveSettings() {
+  try {
+    await api.saveSettings(data)
+    showSuccess('설정 저장 완료')
+  } catch (error) {
+    handleError(error, '설정 저장 실패')
+    // handleError 내부:
+    // 1. 사용자에게 q-notify로 알림
+    // 2. console.error로 상세 로깅
+  }
+}
+```
+
+---
+
+### Backend 에러 처리 상세
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    Backend 에러 처리 아키텍처                       │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
+│  │ Controller  │ →  │ Service     │ →  │ Repository  │          │
+│  │ 예외 발생   │    │ 예외 발생   │    │ 예외 발생   │          │
+│  └─────────────┘    └─────────────┘    └─────────────┘          │
+│         │                 │                   │                  │
+│         └────────────────┼───────────────────┘                  │
+│                          ▼                                       │
+│              ┌─────────────────────┐                            │
+│              │ GlobalException     │                            │
+│              │ Handler             │                            │
+│              │ (@ControllerAdvice) │                            │
+│              └─────────────────────┘                            │
+│                          │                                       │
+│          ┌───────────────┼───────────────┐                      │
+│          ▼               ▼               ▼                      │
+│   ┌───────────┐   ┌───────────┐   ┌───────────┐                │
+│   │ 400       │   │ 404       │   │ 500       │                │
+│   │ BadRequest│   │ NotFound  │   │ Internal  │                │
+│   └───────────┘   └───────────┘   └───────────┘                │
+│                          │                                       │
+│                          ▼                                       │
+│              ┌─────────────────────┐                            │
+│              │ 표준 에러 응답 반환   │                            │
+│              │ { error, message }  │                            │
+│              └─────────────────────┘                            │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**GlobalExceptionHandler 예시**:
+```kotlin
+@ControllerAdvice
+class GlobalExceptionHandler {
+
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun handleBadRequest(e: IllegalArgumentException): ResponseEntity<ErrorResponse> {
+        logger.warn("Bad Request: ${e.message}")
+        return ResponseEntity.badRequest()
+            .body(ErrorResponse("BAD_REQUEST", e.message ?: "잘못된 요청"))
+    }
+
+    @ExceptionHandler(NoSuchElementException::class)
+    fun handleNotFound(e: NoSuchElementException): ResponseEntity<ErrorResponse> {
+        logger.warn("Not Found: ${e.message}")
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            .body(ErrorResponse("NOT_FOUND", e.message ?: "리소스를 찾을 수 없음"))
+    }
+
+    @ExceptionHandler(Exception::class)
+    fun handleGeneral(e: Exception): ResponseEntity<ErrorResponse> {
+        logger.error("Internal Error", e)
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(ErrorResponse("INTERNAL_ERROR", "서버 내부 오류"))
+    }
+}
+
+data class ErrorResponse(
+    val error: String,
+    val message: String,
+    val timestamp: Instant = Instant.now()
+)
+```
+
+---
+
+## 로깅 흐름
+
+### Frontend 로깅
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    Frontend 로깅 전략                              │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  로그 레벨:                                                        │
+│  ├── console.error()  → 에러, 예외                                │
+│  ├── console.warn()   → 경고, 비권장 사용                          │
+│  ├── console.info()   → 중요 정보                                  │
+│  └── console.log()    → 디버그 (production에서 제거)              │
+│                                                                   │
+│  로깅 위치:                                                        │
+│  ├── API 호출 실패 → useErrorHandler                              │
+│  ├── WebSocket 연결/끊김 → icdStore                               │
+│  ├── 상태 변경 → 개발 모드에서만                                   │
+│  └── 사용자 액션 → 중요 액션만                                     │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**로깅 예시**:
+```typescript
+// WebSocket 연결 상태 로깅
+function connectWebSocket() {
+  socket.onopen = () => {
+    console.info('[WebSocket] 연결됨')
+  }
+
+  socket.onclose = (event) => {
+    console.warn('[WebSocket] 연결 끊김:', event.code, event.reason)
+  }
+
+  socket.onerror = (error) => {
+    console.error('[WebSocket] 에러:', error)
+  }
+}
+
+// 개발 모드 전용 로깅
+if (import.meta.env.DEV) {
+  console.log('[Debug] 상태 변경:', newState)
+}
+```
+
+---
+
+### Backend 로깅
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    Backend 로깅 아키텍처 (SLF4J + Logback)         │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  로그 레벨:                                                        │
+│  ├── ERROR  → 심각한 에러, 즉시 대응 필요                          │
+│  ├── WARN   → 경고, 잠재적 문제                                   │
+│  ├── INFO   → 중요 비즈니스 이벤트                                 │
+│  ├── DEBUG  → 상세 디버깅 정보                                    │
+│  └── TRACE  → 매우 상세한 정보 (거의 사용 안 함)                   │
+│                                                                   │
+│  출력 대상:                                                        │
+│  ├── Console (개발)                                               │
+│  ├── File (운영) → logs/acs.log                                   │
+│  └── Rolling → 일별/크기별 로테이션                                │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**로깅 예시**:
+```kotlin
+@Service
+class EphemerisService {
+    private val logger = LoggerFactory.getLogger(javaClass)
+
+    fun startTracking(satelliteId: String) {
+        logger.info("위성 추적 시작: satelliteId={}", satelliteId)
+
+        try {
+            val satellite = findSatellite(satelliteId)
+            logger.debug("위성 정보: {}", satellite)
+
+            // 추적 로직...
+
+            logger.info("추적 시작 완료: {}", satelliteId)
+        } catch (e: Exception) {
+            logger.error("추적 시작 실패: satelliteId={}", satelliteId, e)
+            throw e
+        }
+    }
+}
+```
+
+**logback-spring.xml 설정**:
+```xml
+<configuration>
+    <!-- 콘솔 출력 -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 파일 출력 (Rolling) -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/acs.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/acs.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 로그 레벨 설정 -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="FILE" />
+    </root>
+
+    <!-- 패키지별 레벨 -->
+    <logger name="com.acs" level="DEBUG" />
+    <logger name="org.springframework" level="WARN" />
+</configuration>
+```
+
+---
+
+## WebSocket 연결 관리
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    WebSocket 생명주기                              │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  1. 연결 시도                                                      │
+│     Frontend → ws://backend:8080/ws/icd                          │
+│                                                                   │
+│  2. 연결 성공                                                      │
+│     ├── icdStore: isConnected = true                             │
+│     └── Backend: 클라이언트 세션 등록                              │
+│                                                                   │
+│  3. 데이터 수신 (30ms 주기)                                        │
+│     ├── Backend → JSON 메시지 전송                                │
+│     └── Frontend → shallowRef 업데이트                            │
+│                                                                   │
+│  4. 연결 끊김                                                      │
+│     ├── 네트워크 문제 / 서버 재시작                                 │
+│     ├── icdStore: isConnected = false                            │
+│     └── 자동 재연결 시도 (3초 후)                                  │
+│                                                                   │
+│  5. 재연결                                                         │
+│     └── 성공 시 1번부터 반복                                       │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**재연결 로직**:
+```typescript
+// stores/icdStore.ts
+let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
+const RECONNECT_DELAY = 3000
+
+function connect() {
+  const socket = new WebSocket('ws://localhost:8080/ws/icd')
+
+  socket.onopen = () => {
+    isConnected.value = true
+    console.info('[WS] 연결됨')
+  }
+
+  socket.onclose = () => {
+    isConnected.value = false
+    console.warn('[WS] 연결 끊김, 재연결 시도...')
+
+    // 자동 재연결
+    reconnectTimeout = setTimeout(() => {
+      connect()
+    }, RECONNECT_DELAY)
+  }
+
+  socket.onmessage = (event) => {
+    icdData.value = JSON.parse(event.data)
+  }
+}
+
+// 컴포넌트 언마운트 시 정리
+onUnmounted(() => {
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout)
+  }
+})
+```
+
+---
+
 **이전**: [tech-stack.md](./tech-stack.md) - 기술 스택
 **다음**: [glossary.md](./glossary.md) - 용어 사전
