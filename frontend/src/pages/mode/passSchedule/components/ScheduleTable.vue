@@ -12,7 +12,6 @@
     :loading="loading && scheduleList.length === 0"
     @row-click="handleRowClick"
     class="schedule-table q-mt-sm"
-    style="height: 210px; max-height: 210px;"
     :no-data-label="'등록된 스케줄이 없습니다'"
     :virtual-scroll="false"
   >
@@ -319,7 +318,7 @@ const handleRowClick = (evt: Event, row: ScheduleItem) => {
 
 /* ===== 컬럼별 스타일 ===== */
 .satellite-info-cell {
-  padding: 8px 6px !important;
+  padding: 8px 6px;
   min-width: 100px;
   text-align: center;
 }
@@ -347,7 +346,7 @@ const handleRowClick = (evt: Event, row: ScheduleItem) => {
 }
 
 .time-range-cell {
-  padding: 8px 6px !important;
+  padding: 8px 6px;
   min-width: 130px;
   text-align: center;
 }
@@ -376,8 +375,8 @@ const handleRowClick = (evt: Event, row: ScheduleItem) => {
 }
 
 .azimuth-range-cell {
-  padding: 8px 6px !important;
-  vertical-align: middle !important;
+  padding: 8px 6px;
+  vertical-align: middle;
   min-width: 80px;
   text-align: center;
 }
@@ -408,8 +407,8 @@ const handleRowClick = (evt: Event, row: ScheduleItem) => {
 }
 
 .elevation-info-cell {
-  padding: 8px 6px !important;
-  vertical-align: middle !important;
+  padding: 8px 6px;
+  vertical-align: middle;
   min-width: 70px;
   text-align: center;
 }

@@ -1201,353 +1201,213 @@ q-page .feed-mode,
 .feed-mode,
 [class*="feed-mode"],
 div.feed-mode {
-  /* ✅ mode-common.scss의 높이 제한을 따르도록 height: auto 제거 */
+  /* mode-common.scss에서 padding, margin, display, flex, gap 등 정의됨 */
   width: 100%;
-  padding: 0 !important;
-  margin: 0 !important;
-  margin-bottom: 0 !important;
-  /* ✅ 하단 마진 제거 */
-  padding-bottom: 0 !important;
-  /* ✅ 하단 패딩 제거 */
-  /* ✅ mode-common.scss에서 높이 제한 설정 (450px) */
   overflow: visible !important;
-  /* ✅ 테두리가 보이도록 overflow: visible로 변경 */
-  display: flex !important;
-  /* ✅ flexbox로 변경 */
-  flex-direction: column !important;
-  /* ✅ 세로 방향 */
+  /* ✅ 테두리가 보이도록 overflow: visible (mode-common은 hidden) */
   justify-content: center;
-  /* ✅ 컨텐츠를 가운데 정렬 */
   align-items: center;
-  /* ✅ 컨텐츠를 가운데 정렬 */
-  gap: 0 !important;
-  /* ✅ flex gap 제거 */
-  row-gap: 0 !important;
-  /* ✅ flex row-gap 제거 */
-  column-gap: 0 !important;
-  /* ✅ flex column-gap 제거 */
 }
 
-/* router-view, q-page-container의 하단 패딩/마진 제거 */
-router-view .feed-mode,
-q-page-container .feed-mode {
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
-/* ✅ feed-mode 하단 여백 제거 - SunTrackPage와 동일한 구조 */
+/* mode-common.scss에서 margin-bottom, padding-bottom 정의됨 */
 
 .feed-container {
-  padding: 0.5rem 0.5rem 0.5rem 0.5rem !important;
-  /* ✅ 좌우 패딩 더 감소 (0.75rem → 0.5rem) - S-Band를 좌측으로 더 붙임 */
-  max-width: 100% !important;
-  /* ✅ 최대 너비 제한 제거 - 전체 화면 너비 사용 */
-  width: 100% !important;
+  padding: 0.5rem;
+  max-width: 100%;
+  width: 100%;
   margin: 0 auto;
-  margin-bottom: 0 !important;
-  padding-bottom: 0.5rem !important;
-  /* ✅ 한 화면에 나오도록 패딩 최소화 */
-  box-sizing: border-box !important;
+  margin-bottom: 0;
+  padding-bottom: 0.5rem;
+  box-sizing: border-box;
 }
 
-/* ✅ row stretch - S-Band, X-Band+FAN, Legend 섹션이 동일한 높이를 가지도록 */
+/* row stretch - S-Band, X-Band+FAN, Legend 섹션이 동일한 높이를 가지도록 */
 .feed-container .row {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  align-items: stretch !important;
-  /* ✅ flex container로 명시적으로 설정하고 stretch로 동일한 높이 유지 */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
 }
 
-/* ✅ col 높이를 100%로 설정하여 모든 섹션이 동일한 높이를 가지도록 */
+/* col 높이를 100%로 설정하여 모든 섹션이 동일한 높이를 가지도록 */
 .feed-container .row>[class*="col-"] {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: stretch !important;
-  /* ✅ col의 높이는 row의 stretch로 자동 결정됨 */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
 }
 
-/* ✅ q-col-gutter-md가 추가하는 padding을 고려하여 높이 조정 */
-.feed-container .row.q-col-gutter-md>[class*="col-"] {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: stretch !important;
-  /* ✅ gutter padding이 있어도 높이는 stretch로 자동 결정됨 */
+/* 밴드 개수에 따른 반응형 레이아웃 */
+.feed-container .feed-main-row .q-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  align-self: stretch;
 }
 
-/* ✅ 밴드 개수에 따른 반응형 레이아웃 */
-/* 1개 밴드: 전체 너비 */
-.feed-container .feed-main-row.feed-row-single .q-card {
-  display: flex !important;
-  flex-direction: column !important;
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  align-self: stretch !important;
-}
-
-/* 2개 밴드: 각각 넓게 (50%) */
-.feed-container .feed-main-row.feed-row-double .q-card {
-  display: flex !important;
-  flex-direction: column !important;
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  align-self: stretch !important;
-}
-
-/* 3개 밴드: 가로 배치, 내부 컨텐츠 축소 */
-.feed-container .feed-main-row.feed-row-triple .q-card {
-  display: flex !important;
-  flex-direction: column !important;
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  align-self: stretch !important;
-}
-
-/* ✅ 3개 밴드 선택 시 내부 컨텐츠 축소 */
+/* 3개 밴드 선택 시 내부 컨텐츠 축소 */
 .feed-container .feed-main-row.feed-row-triple .feed-path {
-  padding: 0.75rem 0.75rem !important;
-  height: 75px !important;
-  min-height: 75px !important;
-  max-height: 75px !important;
+  padding: 0.75rem;
+  height: 75px;
+  min-height: 75px;
+  max-height: 75px;
 }
 
 .feed-container .feed-main-row.feed-row-triple .feed-path-wrapper {
-  padding: 0.375rem 0.75rem !important;
-  gap: 0.15rem !important;
+  padding: 0.375rem 0.75rem;
+  gap: 0.15rem;
 }
 
 .feed-container .feed-main-row.feed-row-triple .lna-icon svg {
-  width: 50px !important;
-  height: 50px !important;
+  width: 50px;
+  height: 50px;
 }
 
 .feed-container .feed-main-row.feed-row-triple .rf-switch-icon svg {
-  width: 70px !important;
-  height: 70px !important;
+  width: 70px;
+  height: 70px;
 }
 
 .feed-container .feed-main-row.feed-row-triple .path-label {
-  min-width: 50px !important;
-  width: 50px !important;
-  max-width: 50px !important;
-  font-size: 0.85rem !important;
+  min-width: 50px;
+  width: 50px;
+  max-width: 50px;
+  font-size: 0.85rem;
 }
 
 .feed-container .feed-main-row.feed-row-triple .arrow-container {
-  min-width: 60px !important;
-  width: 60px !important;
-  max-width: 60px !important;
+  width: 60px;
 }
 
 .feed-container .feed-main-row.feed-row-triple .lna-container {
-  min-width: 50px !important;
-  width: 50px !important;
-  max-width: 50px !important;
+  width: 50px;
 }
 
 .feed-container .feed-main-row.feed-row-triple .current-display-above {
-  font-size: 0.75rem !important;
-  padding: 0.2rem 0.4rem !important;
-  min-width: 50px !important;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.4rem;
+  min-width: 50px;
 }
 
 .feed-container .feed-main-row.feed-row-triple .path-output {
-  font-size: 0.85rem !important;
-  min-width: 70px !important;
-  /* ✅ 최소 너비 증가 */
+  font-size: 0.85rem;
+  min-width: 70px;
 }
 
 .feed-container .feed-main-row.feed-row-triple .rf-switch-path {
-  padding: 0.75rem 0.75rem !important;
-  height: 75px !important;
-  min-height: 75px !important;
-  max-height: 75px !important;
+  padding: 0.75rem;
+  height: 75px;
+  min-height: 75px;
+  max-height: 75px;
 }
 
 .feed-container .feed-main-row.feed-row-triple .rf-switch-labels {
-  min-width: 60px !important;
-  width: 60px !important;
+  width: 60px;
 }
 
 .feed-container .feed-main-row.feed-row-triple .rf-switch-inputs-container {
-  min-width: 60px !important;
-  width: 60px !important;
+  width: 60px;
 }
 
 .feed-container .feed-main-row.feed-row-triple .path-output-multiline {
-  min-width: 100px !important;
-  font-size: 0.8rem !important;
+  min-width: 100px;
+  font-size: 0.8rem;
 }
 
-/* ✅ 두 번째 행 (FAN, Legend) - 높이 최소화 */
+/* 두 번째 행 (FAN, Legend) - 높이 최소화 */
 .feed-container .feed-second-row {
-  margin-top: 0.5rem !important;
+  margin-top: 0.5rem;
 }
 
 .feed-container .feed-second-row .fan-section-card {
-  height: auto !important;
-  min-height: auto !important;
+  height: auto;
+  min-height: auto;
 }
 
-/* ✅ col 내부의 q-card도 높이를 100%로 설정 - S-Band 높이 기준 */
-.feed-container .row>[class*="col-"]:first-child .q-card,
-.feed-container .row>[class*="col-"]:first-child .q-card.control-section {
-  display: flex !important;
-  flex-direction: column !important;
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  align-self: stretch !important;
-  /* ✅ S-Band 높이 기준 */
+/* col 내부의 q-card도 높이를 100%로 설정 */
+.feed-container .row>[class*="col-"] .q-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  align-self: stretch;
 }
 
-/* ✅ Legend 카드도 S-Band 높이에 맞춤 */
-.feed-container .row>[class*="col-md-2"] .q-card {
-  display: flex !important;
-  flex-direction: column !important;
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  align-self: stretch !important;
+/* q-card-section도 높이를 100%로 설정 */
+.feed-container .row>[class*="col-"] .q-card .q-card-section {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  min-height: auto;
 }
 
-/* ✅ q-card-section도 높이를 100%로 설정 */
-.feed-container .row>[class*="col-"] .q-card .q-card-section,
-.feed-container .row>[class*="col-"] .q-card .q-card__section {
-  flex: 1 1 auto !important;
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: flex-start !important;
-  align-items: stretch !important;
-  min-height: auto !important;
-  /* ✅ min-height: auto로 설정하여 flex 컨테이너가 내용에 맞게 크기를 조정하도록 */
-  /* ✅ flex: 1 1 auto로 남은 공간을 채우도록 설정 */
-  /* ✅ justify-content: center로 행들을 가운데 정렬 */
-  /* ✅ align-items: stretch로 자식 요소들이 전체 너비를 사용하도록 */
+/* LEGEND 섹션은 상단 정렬로 오버라이드 */
+.feed-container .row>[class*="col-"] .control-section:has(.legend-grid) .q-card-section {
+  justify-content: flex-start;
 }
 
-/* ✅ LEGEND 섹션은 상단 정렬로 오버라이드 */
-.feed-container .row>[class*="col-"] .control-section:has(.legend-grid) .q-card-section,
-.feed-container .row>[class*="col-"] .control-section:has(.legend-grid) .q-card__section {
-  justify-content: flex-start !important;
-  /* ✅ Legend를 X-BAND 라벨과 동일한 선상에 위치 (상단 정렬) */
-}
-
-/* ✅ 마지막 row 하단 여백 제거 */
+/* 마지막 row 하단 여백 제거 */
 .feed-container .row:last-child {
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
 
 .control-section {
-  display: flex !important;
-  flex-direction: column !important;
-  flex: 1 1 auto !important;
-  justify-content: center !important;
-  min-height: 0 !important;
-  /* ✅ flex: 1 1 auto로 남은 공간을 채우고, min-height: 0으로 축소 가능하도록 설정 */
-  /* ✅ justify-content: center로 행들을 가운데 정렬 */
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  justify-content: center;
+  min-height: 0;
   background-color: var(--theme-card-background);
-  /* ✅ border, border-radius, box-shadow는 mode-common.scss에서 통일 관리 */
-  /* ✅ col의 높이에 맞춰 늘어나도록 flex 설정 */
 }
 
 /* q-card-section의 패딩 조정 */
 .control-section :deep(.q-card-section) {
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
-  padding-left: 0.75rem !important;
-  /* ✅ 좌측 패딩 감소 - 더 넓게 사용 */
-  padding-right: 0.75rem !important;
-  /* ✅ 우측 패딩 감소 - 더 넓게 사용 */
-  /* ✅ 한 화면에 나오도록 패딩 감소 */
-  flex: 1 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: flex-start !important;
+  padding: 0.5rem 0.75rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
 }
 
-/* S-Band와 X-Band의 행을 수평으로 정렬하기 위한 스타일 */
-.feed-container .row>[class*="col-"] .control-section :deep(.q-card-section) {
-  padding-top: 0.5rem;
-  padding-left: 0.75rem !important;
-  /* ✅ 좌측 패딩 감소 - 더 넓게 사용 */
-  padding-right: 0.75rem !important;
-  /* ✅ 우측 패딩 감소 - 더 넓게 사용 */
-  /* ✅ 한 화면에 나오도록 패딩 감소 */
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: flex-start !important;
-  /* ✅ 행들을 가운데 정렬 */
-}
-
-/* ✅ feed-path-section 설정 */
+/* feed-path-section 설정 */
 .feed-container .row>[class*="col-"] .feed-path-section {
   flex-shrink: 0;
-  /* ✅ flex item이 축소되지 않도록 설정 */
-  margin-bottom: 0 !important;
-  /* ✅ 섹션들 사이 간격은 feed-path-wrapper의 gap으로 제어 */
+  margin-bottom: 0;
 }
 
-/* Legend 섹션의 상단 패딩 조정 - X-Band RHCP 테두리 상단에 맞추기 */
+/* Legend 섹션의 상단 패딩 조정 */
 .control-section:has(.legend-grid) {
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  /* ✅ Legend 섹션이 S-Band와 동일한 높이를 유지하도록 flex 설정 */
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .control-section:has(.legend-grid) :deep(.q-card-section) {
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
-  /* ✅ 한 화면에 나오도록 패딩 감소 */
-  padding-left: 1.25rem !important;
-  /* ✅ 좌측 패딩 증가 (0.75rem → 1.25rem) - 내부 컨텐츠 넓이보다 여유 있게 */
-  padding-right: 1.25rem !important;
-  /* ✅ 우측 패딩 증가 (calc(1.05rem + 0.3125rem) → 1.25rem) - 내부 컨텐츠 넓이보다 여유 있게 */
+  padding: 0.5rem 1.25rem;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start !important;
-  /* ✅ Legend를 X-BAND 라벨과 동일한 선상에 위치 (상단 정렬) - !important로 오버라이드 */
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  /* ✅ Legend 섹션이 S-Band와 동일한 높이를 유지하도록 flex 설정 */
+  justify-content: flex-start;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
-/* ✅ feed-path-section을 flex container로 변경하여 gap으로 간격 제어 */
+/* feed-path-section을 flex container로 변경 */
 .feed-path-section {
-  display: flex !important;
-  flex-direction: column !important;
-  row-gap: 0.2rem !important;
-  column-gap: 0 !important;
-  gap: 0.2rem !important;
-  /* ✅ 한 화면에 나오도록 간격 감소: 0.25rem → 0.2rem */
-  margin-bottom: 0 !important;
-  /* ✅ 섹션들 사이 간격은 feed-path-wrapper의 gap으로 제어 */
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0;
 }
 
-/* ✅ 더 구체적인 선택자로 강제 적용 */
-.control-section .q-card-section .feed-path-wrapper .feed-path-section {
-  display: flex !important;
-  flex-direction: column !important;
-  row-gap: 0.2rem !important;
-  gap: 0.2rem !important;
-  margin-bottom: 0 !important;
-  /* ✅ 한 화면에 나오도록 간격 감소 */
-}
-
-/* S-Band 스위치 섹션과 X-Band FAN 섹션을 같은 선상에 배치 */
-.rf-switch-section {
-  margin-top: 0;
-  margin-bottom: 0 !important;
-  /* ✅ RF Switch 섹션 간격은 feed-path-wrapper의 gap으로 제어 */
-}
-
-/* rf-switch-section이 feed-path-section 클래스도 가지고 있어서 margin-bottom이 적용되도록 수정 */
+/* S-Band 스위치 섹션과 X-Band FAN 섹션 */
+.rf-switch-section,
 .rf-switch-section.feed-path-section {
-  margin-bottom: 0 !important;
-  /* ✅ RF Switch 섹션 간격은 feed-path-wrapper의 gap으로 제어 */
+  margin: 0;
 }
 
 .fan-section {
-  margin-top: 0;
-  margin-bottom: 0;
+  margin: 0;
 }
 
 @media (max-width: 1200px) {
@@ -1565,84 +1425,43 @@ q-page-container .feed-mode {
 
 .feed-path {
   display: flex;
-  align-items: center !important;
-  justify-content: center !important;
+  align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-  margin-bottom: 0 !important;
-  /* ✅ margin-bottom 제거 - feed-path-section의 gap으로 제어 */
-  /* ✅ 복잡한 패딩 계산 대신 단순하고 명확한 패딩 사용 */
-  /* ✅ 상하 패딩을 동일하게 설정하고 flex 정렬에 의존 */
-  padding: 1.5rem 1rem !important;
-  /* ✅ 좌우 패딩 조정 (1.5rem → 1rem) - 더 넓게 사용하면서도 라벨이 들어오도록 */
-  height: 115px !important;
-  min-height: 115px !important;
-  max-height: 115px !important;
-  box-sizing: border-box !important;
+  margin-bottom: 0;
+  padding: 1.5rem 1rem;
+  height: 115px;
+  min-height: 115px;
+  max-height: 115px;
+  box-sizing: border-box;
   border-radius: 6px;
   background-color: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  /* 전체 경로가 하나의 배경색으로 통일되도록 */
   position: relative;
-  overflow: visible !important;
-  /* ✅ 오른쪽이 잘리지 않도록 */
+  overflow: visible;
   width: 100%;
-  /* ✅ 내부 컨텐츠를 완전히 가운데 정렬하기 위한 추가 설정 */
-  /* ✅ 좌우 균형을 맞추기 위해 내부 요소들의 flex 속성 조정 */
-  /* ✅ 수평 정렬을 위해 내부 요소들을 감싸는 wrapper처럼 동작하도록 설정 */
-  flex-wrap: nowrap !important;
-  /* ✅ 줄바꿈 방지 */
+  flex-wrap: nowrap;
   align-content: center;
 }
 
-/* ✅ Rx 경로와 Tx 경로(스위치)의 가운데 정렬을 위한 추가 스타일 */
-.feed-path-section:has(.rf-switch-path) {
-  display: flex !important;
-  justify-content: center !important;
-  /* ✅ 스위치 경로를 가운데 정렬 */
-}
-
+/* Rx 경로와 Tx 경로(스위치)의 가운데 정렬 */
+.feed-path-section:has(.rf-switch-path),
 .feed-path-section:has(.feed-path:not(.rf-switch-path)) {
-  display: flex !important;
-  justify-content: center !important;
-  /* ✅ LNA 경로를 가운데 정렬 */
+  display: flex;
+  justify-content: center;
 }
-
-/* ✅ feed-path-section 내부의 feed-path들 사이 간격은 feed-path-section의 gap으로 제어됨 */
 
 .feed-path-wrapper {
   background-color: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
-  padding: 0.5rem 1rem !important;
-  /* ✅ 좌우 패딩 조정 (1.5rem → 1rem) - 더 넓게 사용하면서도 라벨이 들어오도록 */
-  display: flex !important;
-  flex-direction: column !important;
-  row-gap: 0.2rem !important;
-  column-gap: 0 !important;
-  gap: 0.2rem !important;
-  /* ✅ 한 화면에 나오도록 패딩과 간격 감소 */
-  overflow: visible !important;
-  /* ✅ 오른쪽이 잘리지 않도록 */
-  width: 100% !important;
-  /* ✅ 전체 너비 사용 */
-  box-sizing: border-box !important;
-}
-
-/* ✅ feed-path-wrapper 내부 간격 명시적으로 설정 */
-.feed-container .row>[class*="col-"] .feed-path-wrapper {
-  display: flex !important;
-  flex-direction: column !important;
-  row-gap: 0.25rem !important;
-  gap: 0.25rem !important;
-  /* ✅ 한 화면에 나오도록 간격 감소: 0.375rem → 0.25rem */
-}
-
-/* ✅ 더 구체적인 선택자로 강제 적용 */
-.control-section .q-card-section .feed-path-wrapper {
-  display: flex !important;
-  flex-direction: column !important;
-  row-gap: 0.375rem !important;
-  gap: 0.375rem !important;
+  padding: 0.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow: visible;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .feed-path-wrapper .feed-path,
@@ -1651,8 +1470,7 @@ q-page-container .feed-mode {
   border: none;
   padding-left: 0.5rem;
   padding-right: 0.5rem;
-  margin-bottom: 0 !important;
-  /* ✅ feed-path들 사이 간격은 feed-path-section 내부에서 제어 */
+  margin-bottom: 0;
 }
 
 .feed-path-wrapper .fan-section {

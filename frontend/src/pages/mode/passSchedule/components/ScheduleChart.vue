@@ -1,18 +1,8 @@
 <template>
-  <q-card
-    class="control-section position-view-card"
-    style="min-height: 360px !important; height: 100% !important; display: flex !important; flex-direction: column !important;"
-  >
-    <q-card-section
-      class="position-view-section"
-      style="min-height: 360px !important; height: 100% !important; flex: 1 !important; display: flex !important; flex-direction: column !important; padding-top: 16px !important; padding-bottom: 0px !important;"
-    >
+  <q-card class="control-section position-view-card">
+    <q-card-section class="position-view-section">
       <div class="text-subtitle1 text-weight-bold text-primary position-view-title">Position View</div>
-      <div
-        class="chart-area"
-        ref="chartRef"
-        style="min-height: 340px !important; height: 100% !important; flex: 1 !important; padding-top: 0 !important; padding-bottom: 0 !important; margin-bottom: 0 !important;"
-      ></div>
+      <div class="chart-area" ref="chartRef"></div>
     </q-card-section>
   </q-card>
 </template>
@@ -346,10 +336,21 @@ defineExpose({
 <style scoped>
 .position-view-card {
   background-color: var(--theme-card-background);
+  min-height: 360px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .position-view-section {
   position: relative;
+  min-height: 360px;
+  height: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-top: 16px;
+  padding-bottom: 0;
 }
 
 .position-view-title {
@@ -359,9 +360,13 @@ defineExpose({
 .chart-area {
   position: relative;
   width: 100%;
+  min-height: 340px;
+  height: 100%;
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  margin-bottom: 0;
 }
 </style>
