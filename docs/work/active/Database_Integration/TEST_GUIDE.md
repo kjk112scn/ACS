@@ -60,14 +60,16 @@ psql -U acs_user -d acs -f "g:\Kyu\repo\ACS\docs\work\active\Database_Integratio
 ### 1.4 테이블 확인
 
 ```powershell
-# 테이블 목록 (4개)
+# 테이블 목록 (6개)
 psql -U acs_user -d acs -c "\dt"
 
 # 예상 결과:
-#  tracking_session
-#  tracking_trajectory
-#  tracking_result
-#  icd_status
+#  tracking_session     - 추적 세션
+#  tracking_trajectory  - 추적 궤적 (Hypertable)
+#  tracking_result      - 추적 결과 (Hypertable)
+#  icd_status           - ICD 상태 (Hypertable)
+#  settings             - 시스템 설정
+#  setting_history      - 설정 변경 이력
 ```
 
 ### 1.5 Hypertable 확인
@@ -92,14 +94,24 @@ psql -U acs_user -d acs -c "SELECT hypertable_name, compress_after FROM timescal
 psql -U acs_user -d acs -c "SELECT hypertable_name, drop_after FROM timescaledb_information.jobs WHERE proc_name = 'policy_retention';"
 ```
 
-### 1.7 체크리스트
+### 1.7 Settings 테이블 확인
+
+```powershell
+# settings 테이블 구조
+psql -U acs_user -d acs -c "\d settings"
+
+# setting_history 테이블 구조
+psql -U acs_user -d acs -c "\d setting_history"
+```
+
+### 1.8 체크리스트
 
 - [ ] PostgreSQL 16 설치 확인
 - [ ] TimescaleDB 확장 설치
 - [ ] acs_user 사용자 생성
 - [ ] acs 데이터베이스 생성
 - [ ] schema.sql 실행 성공
-- [ ] 테이블 4개 확인
+- [ ] 테이블 **6개** 확인 (tracking 4개 + settings 2개)
 - [ ] Hypertable 3개 확인
 - [ ] 압축 정책 확인 (7일)
 - [ ] 보관 정책 확인 (icd_status 90일)
@@ -167,13 +179,36 @@ psql -U acs_user -d acs -c "SELECT * FROM icd_status ORDER BY timestamp DESC LIM
 psql -U acs_user -d acs -c "DELETE FROM tracking_session WHERE satellite_id = 'TEST-SAT';"
 ```
 
-### 2.6 체크리스트
+### 2.6 Settings DB 연동 테스트
+
+```powershell
+# 1. 서버 시작 후 Settings 로그 확인
+# 정상 시: "설정 초기화 완료 (DB 모드)"
+# 비정상 시: "설정 초기화 완료 (RAM 전용 모드)"
+
+# 2. FE에서 설정 변경 후 DB 확인
+psql -U acs_user -d acs -c "SELECT key, value, updated_at FROM settings ORDER BY updated_at DESC LIMIT 10;"
+
+# 3. 변경 이력 확인
+psql -U acs_user -d acs -c "SELECT setting_key, old_value, new_value, created_at FROM setting_history ORDER BY created_at DESC LIMIT 10;"
+```
+
+**테스트 시나리오:**
+1. FE Settings 모달 열기
+2. 위도/경도 값 변경 → 저장
+3. DB에서 settings 테이블 확인
+4. 서버 재시작
+5. FE에서 변경된 값 유지 확인 ← **영속성 검증**
+
+### 2.7 체크리스트
 
 - [ ] 서버 시작 (office 프로필)
 - [ ] DB 연결 로그 확인
 - [ ] tracking_session INSERT 성공
 - [ ] tracking_trajectory INSERT 성공
 - [ ] icd_status INSERT 성공
+- [ ] **Settings DB 저장 확인**
+- [ ] **서버 재시작 후 Settings 복원 확인**
 - [ ] 데이터 조회 성공
 - [ ] 테스트 데이터 정리
 

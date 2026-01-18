@@ -329,18 +329,271 @@ Java도 되지만...
 
 ---
 
+## 유틸리티 라이브러리 (Frontend)
+
+### Axios
+**무엇인가?**
+- HTTP 클라이언트 라이브러리
+- REST API 호출에 사용
+
+**왜 선택했나?**
+| 장점 | 설명 |
+|------|------|
+| Promise 기반 | async/await 사용 가능 |
+| 인터셉터 | 요청/응답 가로채기 |
+| 에러 처리 | HTTP 에러 자동 감지 |
+| TypeScript | 타입 지원 |
+
+**사용 예시**:
+```typescript
+// services/api.ts
+import axios from 'axios'
+
+const api = axios.create({
+  baseURL: '/api',
+  timeout: 10000
+})
+
+// 인터셉터로 공통 에러 처리
+api.interceptors.response.use(
+  response => response,
+  error => {
+    console.error('API 에러:', error)
+    return Promise.reject(error)
+  }
+)
+
+// 사용
+const user = await api.get('/users/1')
+await api.post('/settings', { theme: 'dark' })
+```
+
+---
+
+### ECharts
+**무엇인가?**
+- 데이터 시각화 차트 라이브러리
+- 바이두에서 개발, Apache 재단 프로젝트
+
+**왜 선택했나?**
+| 장점 | 설명 |
+|------|------|
+| 풍부한 차트 | 라인, 바, 파이, 게이지 등 |
+| 대용량 데이터 | 수만 개 데이터 포인트 처리 |
+| 실시간 업데이트 | 애니메이션 지원 |
+| 커스터마이징 | 세밀한 스타일 조정 |
+
+**ACS에서 사용처**:
+- 안테나 위치 차트 (Az/El 시계열)
+- 패스 예측 그래프
+- 시스템 상태 게이지
+
+**사용 예시**:
+```typescript
+import * as echarts from 'echarts'
+
+const chart = echarts.init(document.getElementById('chart'))
+chart.setOption({
+  xAxis: { type: 'time' },
+  yAxis: { type: 'value' },
+  series: [{
+    type: 'line',
+    data: [[timestamp1, value1], [timestamp2, value2]]
+  }]
+})
+
+// 실시간 업데이트
+chart.setOption({
+  series: [{ data: newData }]
+})
+```
+
+---
+
+### Day.js
+**무엇인가?**
+- 날짜/시간 처리 라이브러리
+- Moment.js의 경량 대안 (2KB)
+
+**왜 선택했나?**
+| 장점 | 설명 |
+|------|------|
+| 경량 | 2KB (Moment.js는 67KB) |
+| 불변성 | 원본 수정 안 함 |
+| 플러그인 | 필요한 기능만 추가 |
+| Moment 호환 | API 거의 동일 |
+
+**ACS에서 사용처**:
+- UTC ↔ 로컬 시간 변환
+- 패스 시간 표시
+- 타임스탬프 포맷팅
+
+**사용 예시**:
+```typescript
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+import timezone from 'dayjs/plugin/timezone'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
+
+// UTC → 로컬
+const utcTime = dayjs.utc('2024-01-15T10:00:00Z')
+const localTime = utcTime.local().format('YYYY-MM-DD HH:mm:ss')
+
+// 시간 차이
+const diff = dayjs(aosTime).diff(dayjs(), 'minute')
+console.log(`패스 시작까지 ${diff}분`)
+```
+
+---
+
+### Lodash
+**무엇인가?**
+- 유틸리티 함수 라이브러리
+- 배열, 객체, 함수 조작에 유용
+
+**왜 선택했나?**
+| 장점 | 설명 |
+|------|------|
+| 검증된 함수 | 엣지 케이스 처리 |
+| Tree-shaking | 사용하는 것만 번들 |
+| 성능 최적화 | 대용량 데이터 처리 |
+
+**자주 쓰는 함수**:
+```typescript
+import { debounce, throttle, cloneDeep, groupBy } from 'lodash-es'
+
+// debounce: 마지막 호출 후 일정 시간 대기
+const search = debounce((query) => {
+  api.search(query)
+}, 300)
+
+// throttle: 일정 시간당 1회만 실행
+const updatePosition = throttle((pos) => {
+  sendCommand(pos)
+}, 100)
+
+// cloneDeep: 깊은 복사
+const copy = cloneDeep(originalObject)
+
+// groupBy: 그룹화
+const byStatus = groupBy(passes, 'status')
+```
+
+---
+
+## 유틸리티 라이브러리 (Backend)
+
+### Jackson
+**무엇인가?**
+- JSON 직렬화/역직렬화 라이브러리
+- Spring 기본 JSON 처리기
+
+**사용 예시**:
+```kotlin
+// 자동 변환 (Spring이 처리)
+@PostMapping("/users")
+fun create(@RequestBody user: UserDto): Mono<User>
+
+// 수동 변환
+val json = objectMapper.writeValueAsString(user)
+val user = objectMapper.readValue<User>(json)
+```
+
+---
+
+### SLF4J + Logback
+**무엇인가?**
+- 로깅 프레임워크
+- SLF4J = 인터페이스, Logback = 구현체
+
+**사용 예시**:
+```kotlin
+private val logger = LoggerFactory.getLogger(this::class.java)
+
+logger.debug("상세 정보: {}", data)
+logger.info("처리 완료")
+logger.warn("주의: {}", message)
+logger.error("에러 발생", exception)
+```
+
+---
+
+### solarpositioning
+**무엇인가?**
+- 태양 위치 계산 라이브러리
+- SunTrack 모드에서 사용
+
+**사용 예시**:
+```kotlin
+val sunPos = SPA.calculateSolarPosition(
+    dateTime,
+    latitude,
+    longitude,
+    altitude
+)
+val azimuth = sunPos.azimuth
+val elevation = sunPos.elevation
+```
+
+---
+
+## 개발 도구
+
+### Vite
+**무엇인가?**
+- 프론트엔드 빌드 도구
+- Webpack보다 빠름
+
+**왜 선택했나?**
+| 장점 | 설명 |
+|------|------|
+| HMR | 코드 변경 즉시 반영 (Hot Module Replacement) |
+| 빠른 시작 | 번들링 없이 개발 서버 시작 |
+| ES 모듈 | 네이티브 ESM 사용 |
+
+---
+
+### Gradle
+**무엇인가?**
+- 빌드 자동화 도구
+- Maven보다 유연하고 빠름
+
+**주요 명령어**:
+```bash
+./gradlew bootRun          # 개발 서버 실행
+./gradlew build            # 빌드
+./gradlew clean build -x test  # 테스트 스킵 빌드
+./gradlew test             # 테스트 실행
+```
+
+---
+
 ## 버전 정보
 
-| 기술 | 버전 | 비고 |
+### Frontend
+| 기술 | 버전 | 용도 |
 |------|------|------|
-| Vue | 3.x | Composition API |
-| Quasar | 2.x | Vue 3 전용 |
-| TypeScript | 5.x | 최신 |
-| Pinia | 2.x | Vue 3 공식 |
-| Kotlin | 1.9 | LTS |
-| Spring Boot | 3.x | Java 17+ |
-| WebFlux | (Spring 포함) | 리액티브 |
+| Vue | 3.x | UI 프레임워크 |
+| Quasar | 2.x | UI 컴포넌트 |
+| TypeScript | 5.x | 타입 시스템 |
+| Pinia | 2.x | 상태 관리 |
+| Axios | 1.x | HTTP 클라이언트 |
+| ECharts | 5.x | 차트 |
+| Day.js | 1.x | 날짜 처리 |
+| Vite | 5.x | 빌드 도구 |
+
+### Backend
+| 기술 | 버전 | 용도 |
+|------|------|------|
+| Kotlin | 1.9 | 언어 |
+| Spring Boot | 3.x | 프레임워크 |
+| WebFlux | (포함) | 리액티브 |
 | Orekit | 13.0 | 위성 궤도 |
+| Jackson | (포함) | JSON 처리 |
+| Logback | (포함) | 로깅 |
+| Gradle | 8.x | 빌드 |
 
 ---
 

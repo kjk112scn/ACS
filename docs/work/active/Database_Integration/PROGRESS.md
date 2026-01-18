@@ -430,4 +430,34 @@ SELECT add_retention_policy('icd_status', INTERVAL '90 days');
 
 ---
 
-**Last Updated**: 2026-01-17 (Phase 1~4 완료, 집 작업 완료)
+**Last Updated**: 2026-01-18
+
+---
+
+## 프로필별 동작 요약
+
+| 프로필 | DB | Settings | 용도 |
+|--------|:--:|:--------:|------|
+| `no-db` | ❌ | RAM | 개발/테스트 (DB 없이) |
+| `home` | Docker (5433) | DB | 집 개발 |
+| `office` | Native (5432) | DB | 회사 운영 |
+
+### 실행 명령어
+
+```powershell
+# no-db (기본, DB 없이 실행)
+cd backend && ./gradlew bootRun
+
+# home (Docker DB)
+cd backend && ./gradlew bootRun --args='--spring.profiles.active=home'
+
+# office (Native DB)
+cd backend && ./gradlew bootRun --args='--spring.profiles.active=office'
+```
+
+### Settings 동작
+
+| 상황 | 초기화 | 저장 | 재시작 후 |
+|------|--------|------|----------|
+| **no-db** | 기본값 | RAM만 | 기본값으로 리셋 |
+| **home/office** | DB 로드 | DB 저장 | DB에서 복원 ✅ |
