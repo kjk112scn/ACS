@@ -1,6 +1,7 @@
 ---
 name: health
 description: 빌드/품질 점검. "health", "점검", "상태", "빌드" 키워드에 반응.
+model: opus
 ---
 
 # Health - 프로젝트 상태 점검

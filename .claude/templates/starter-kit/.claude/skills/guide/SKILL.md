@@ -1,7 +1,7 @@
 ---
 name: guide
 description: 사용법 안내. "가이드", "guide", "사용법", "도움말" 키워드에 반응.
-model: haiku
+model: opus
 ---
 
 # Guide - 사용법 안내

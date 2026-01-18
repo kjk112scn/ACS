@@ -1,8 +1,8 @@
-﻿package com.gtlsystems.acs_api.dto.response.settings
+package com.gtlsystems.acs_api.dto.response.settings
 
 import com.gtlsystems.acs_api.settings.entity.Setting
 import com.gtlsystems.acs_api.settings.entity.SettingType
-import java.time.LocalDateTime
+import java.time.OffsetDateTime
 
 data class SettingsResponse(
     val key: String,
@@ -10,7 +10,7 @@ data class SettingsResponse(
     val type: SettingType,
     val description: String?,
     val isSystemSetting: Boolean,
-    val updatedAt: LocalDateTime
+    val updatedAt: OffsetDateTime?
 ) {
     companion object {
         fun from(setting: Setting) = SettingsResponse(
@@ -22,4 +22,4 @@ data class SettingsResponse(
             updatedAt = setting.updatedAt
         )
     }
-} 
+}

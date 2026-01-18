@@ -1,52 +1,41 @@
 package com.gtlsystems.acs_api.settings.entity
-import jakarta.persistence.*
-import org.hibernate.annotations.CreationTimestamp
-import org.hibernate.annotations.UpdateTimestamp
-import java.time.LocalDateTime
 
-@Entity
-@Table(name = "settings")
+import org.springframework.data.annotation.Id
+import org.springframework.data.relational.core.mapping.Column
+import org.springframework.data.relational.core.mapping.Table
+import java.time.OffsetDateTime
+
+/**
+ * 시스템 설정 엔티티 (R2DBC)
+ * - 설정값 영속 저장
+ * - 서버 재시작 시 복원
+ */
+@Table("settings")
 data class Setting(
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null,
 
-    @Column(name = "key", nullable = false, unique = true)
+    @Column("key")
     val key: String,
 
-    @Column(name = "value", nullable = false)
+    @Column("value")
     var value: String,
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "type", nullable = false)
+    @Column("type")
     val type: SettingType,
 
-    @Column(name = "description")
+    @Column("description")
     val description: String? = null,
 
-    @Column(name = "is_system_setting", nullable = false)
+    @Column("is_system_setting")
     val isSystemSetting: Boolean = false,
 
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
-    val createdAt: LocalDateTime = LocalDateTime.now(),
+    @Column("created_at")
+    val createdAt: OffsetDateTime? = null,
 
-    @UpdateTimestamp
-    @Column(name = "updated_at", nullable = false)
-    var updatedAt: LocalDateTime = LocalDateTime.now()
-) {
-    // JPA를 위한 기본 생성자 추가
-    constructor() : this(
-        id = null,
-        key = "",
-        value = "",
-        type = SettingType.STRING,
-        description = null,
-        isSystemSetting = false,
-        createdAt = LocalDateTime.now(),
-        updatedAt = LocalDateTime.now()
-    )
-}
+    @Column("updated_at")
+    var updatedAt: OffsetDateTime? = null
+)
 
 enum class SettingType {
     STRING, INTEGER, LONG, FLOAT, DOUBLE, BOOLEAN

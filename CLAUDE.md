@@ -2,6 +2,23 @@
 
 위성/태양 추적 안테나 제어 시스템
 
+## ⚠️ CRITICAL - 미해결 이슈 (매 세션 확인)
+
+> **이 섹션은 개발 완료 전 반드시 해결해야 할 이슈입니다.**
+
+| 이슈 | 심각도 | 영향 | 상태 |
+|------|--------|------|------|
+| **인증/인가 미구현** | CRITICAL | 모든 API 무단 접근 가능 | ⏳ 대기 |
+| **테스트 커버리지 0%** | CRITICAL | 회귀 버그 위험 | ⏳ 대기 |
+
+**조치 계획:**
+- 인증: Spring Security + JWT (개발 80% 완료 후)
+- 테스트: 핵심 Service/Algorithm 단위 테스트 우선
+
+**리마인더:** 새 기능 개발 시 이 이슈들의 우선순위를 고려하세요.
+
+---
+
 ## IMPORTANT - 핵심 규칙
 
 | 규칙 | 설명 |
@@ -77,6 +94,32 @@ cd backend && ./gradlew clean build -x test  # BE 빌드
 | 개발 가이드 | `docs/guides/` |
 | 팀 핸드북 | `docs/handbook/` |
 | 시스템 개요 | `docs/architecture/SYSTEM_OVERVIEW.md` |
+
+## 팀 핸드북 구조 (docs/handbook/)
+
+> 기술 스택 학습 및 참조용 문서
+
+```
+handbook/
+├── README.md           # 목차
+├── overview/           # 시스템 전체 (FE+BE 통합)
+│   ├── tech-stack.md   # 기술 스택 + 선택 이유
+│   ├── data-flow.md    # FE ↔ BE ↔ HW 데이터 흐름
+│   └── glossary.md     # 용어 사전
+├── kotlin/             # BE 문법/패턴
+│   ├── kotlin-null-safety.md
+│   ├── kotlin-reactive.md
+│   └── spring-annotations.md
+├── vue/                # FE 문법/패턴
+│   └── vue-reactivity.md
+└── project/            # ACS 특화 패턴
+    └── acs-patterns.md
+```
+
+**용도**:
+- 새 기술 학습 시 참조
+- 코드 리뷰 기준
+- 문서 추가 요청 시 해당 폴더에 생성
 
 ---
 

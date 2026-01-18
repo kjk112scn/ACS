@@ -284,6 +284,46 @@ SELECT add_retention_policy('icd_status', INTERVAL '90 days');
 CREATE INDEX idx_is_timestamp ON icd_status(timestamp DESC);
 
 -- =============================================================================
+-- 5. settings (시스템 설정) - 일반 테이블
+-- =============================================================================
+-- 설정값 영속 저장, 서버 재시작 시 복원
+
+CREATE TABLE settings (
+    id                      BIGSERIAL PRIMARY KEY,
+    key                     VARCHAR(100) NOT NULL UNIQUE,
+    value                   TEXT NOT NULL,
+    type                    VARCHAR(20) NOT NULL,          -- STRING, INTEGER, LONG, FLOAT, DOUBLE, BOOLEAN
+    description             VARCHAR(500),
+    is_system_setting       BOOLEAN DEFAULT FALSE,
+    created_at              TIMESTAMPTZ DEFAULT NOW(),
+    updated_at              TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 인덱스
+CREATE INDEX idx_settings_key ON settings(key);
+CREATE INDEX idx_settings_system ON settings(is_system_setting);
+
+-- =============================================================================
+-- 6. setting_history (설정 변경 이력) - 일반 테이블
+-- =============================================================================
+-- 감사 로그: 누가 언제 어떤 설정을 변경했는지 추적
+
+CREATE TABLE setting_history (
+    id                      BIGSERIAL PRIMARY KEY,
+    setting_key             VARCHAR(100) NOT NULL,
+    old_value               TEXT,
+    new_value               TEXT NOT NULL,
+    changed_by              VARCHAR(100),
+    change_reason           VARCHAR(500),
+    created_at              TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 인덱스
+CREATE INDEX idx_sh_setting_key ON setting_history(setting_key);
+CREATE INDEX idx_sh_created_at ON setting_history(created_at DESC);
+CREATE INDEX idx_sh_changed_by ON setting_history(changed_by);
+
+-- =============================================================================
 -- 테이블 설정 요약
 -- =============================================================================
 -- | 테이블              | 타입       | 압축   | 삭제 정책              |
@@ -292,4 +332,6 @@ CREATE INDEX idx_is_timestamp ON icd_status(timestamp DESC);
 -- | tracking_trajectory | Hypertable | 7일 후 | CASCADE (session 삭제시)|
 -- | tracking_result     | Hypertable | 7일 후 | CASCADE (session 삭제시)|
 -- | icd_status          | Hypertable | 7일 후 | 90일 (TimescaleDB)     |
+-- | settings            | 일반 테이블 | 없음   | 영구 보관              |
+-- | setting_history     | 일반 테이블 | 없음   | 영구 보관 (감사 로그)   |
 -- =============================================================================

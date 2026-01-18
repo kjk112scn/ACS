@@ -1,22 +1,22 @@
-﻿package com.gtlsystems.acs_api.service.system.settings  
+package com.gtlsystems.acs_api.service.system.settings
 
-import com.gtlsystems.acs_api.settings.entity.Setting  
-import com.gtlsystems.acs_api.settings.entity.SettingType  
+import com.gtlsystems.acs_api.settings.entity.Setting
+import com.gtlsystems.acs_api.settings.entity.SettingHistory
+import com.gtlsystems.acs_api.settings.entity.SettingType
 import com.gtlsystems.acs_api.repository.interfaces.settings.SettingsHistoryRepository
 import com.gtlsystems.acs_api.repository.interfaces.settings.SettingsRepository
-import com.gtlsystems.acs_api.event.settings.SettingsChangedEvent  
-import org.slf4j.LoggerFactory  
+import com.gtlsystems.acs_api.event.settings.SettingsChangedEvent
+import org.slf4j.LoggerFactory
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean
 import org.springframework.stereotype.Service
-import org.springframework.context.ApplicationEventPublisher  
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.context.event.EventListener
 import jakarta.annotation.PostConstruct
-import java.util.concurrent.ConcurrentHashMap  
+import java.util.concurrent.ConcurrentHashMap
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import kotlin.reflect.KProperty
 import kotlin.properties.ReadWriteProperty
-import org.springframework.transaction.annotation.Transactional
-import jakarta.validation.constraints.DecimalMax
-import jakarta.validation.constraints.DecimalMin
-import jakarta.validation.constraints.NotNull
 
 // LocationData 클래스를 SettingsService 밖으로 이동
 data class LocationData(
@@ -39,10 +39,9 @@ data class SettingDefinition(
  *
  * DB 사용 여부:
  * - no-db 프로필: RAM만 사용, Repository는 null
- * - with-db 프로필: DB 사용, Repository 활성화
+ * - office/home 프로필: R2DBC 사용, Repository 활성화
  */
 @Service
-@Transactional
 class SettingsService(
     private val settingsRepository: SettingsRepository?,
     private val settingsHistoryRepository: SettingsHistoryRepository?,
@@ -182,7 +181,7 @@ class SettingsService(
     }
 
     /**
-     * DB에서 설정값을 조회하여 메모리에 로드
+     * DB에서 설정값을 조회하여 메모리에 로드 (R2DBC)
      */
     private fun loadSettingsFromDatabase() {
         val repo = settingsRepository ?: run {
@@ -191,19 +190,20 @@ class SettingsService(
         }
 
         try {
-            val dbSettings = repo.findAll()
+            val dbSettings = repo.findAll().collectList().block() ?: emptyList()
             dbSettings.forEach { setting ->
                 val value = convertStringToValue(setting.value, setting.type)
                 settings[setting.key] = value
                 logger.info("DB에서 설정 로드: ${setting.key} = $value")
             }
+            logger.info("DB에서 설정 ${dbSettings.size}개 로드 완료")
         } catch (e: Exception) {
             logger.warn("DB에서 설정 로드 실패, 기본값 사용: ${e.message}")
         }
     }
 
     /**
-     * 설정값을 DB에 저장
+     * 설정값을 DB에 저장 (R2DBC)
      */
     private fun saveSettingToDatabase(key: String, value: Any) {
         val repo = settingsRepository ?: run {
@@ -213,24 +213,59 @@ class SettingsService(
 
         try {
             val type = settingTypes[key] ?: SettingType.STRING
-            val existingSetting = repo.findByKey(key)
+            val description = settingDefinitions[key]?.description
             val stringValue = value.toString()
+            val now = OffsetDateTime.now(ZoneOffset.UTC)
+
+            // 기존 설정 조회
+            val existingSetting = repo.findByKey(key).block()
 
             if (existingSetting != null) {
-                existingSetting.value = stringValue
-                repo.save(existingSetting)
+                // 기존 설정 업데이트
+                val updatedSetting = existingSetting.copy(
+                    value = stringValue,
+                    updatedAt = now
+                )
+                repo.save(updatedSetting).block()
             } else {
+                // 새 설정 생성
                 val newSetting = Setting(
                     key = key,
                     value = stringValue,
                     type = type,
-                    isSystemSetting = false
+                    description = description,
+                    isSystemSetting = false,
+                    createdAt = now,
+                    updatedAt = now
                 )
-                repo.save(newSetting)
+                repo.save(newSetting).block()
             }
             logger.info("DB에 설정 저장: $key = $stringValue")
         } catch (e: Exception) {
             logger.error("DB에 설정 저장 실패: $key = $value, ${e.message}")
+        }
+    }
+
+    /**
+     * 설정 변경 이력 저장 (R2DBC)
+     */
+    private fun saveSettingHistory(key: String, oldValue: Any?, newValue: Any) {
+        val historyRepo = settingsHistoryRepository ?: return
+
+        try {
+            val history = SettingHistory(
+                settingKey = key,
+                oldValue = oldValue?.toString(),
+                newValue = newValue.toString(),
+                changedBy = "system",
+                createdAt = OffsetDateTime.now(ZoneOffset.UTC)
+            )
+            historyRepo.save(history).subscribe(
+                { logger.debug("설정 변경 이력 저장: $key") },
+                { e -> logger.error("설정 변경 이력 저장 실패: ${e.message}") }
+            )
+        } catch (e: Exception) {
+            logger.error("설정 변경 이력 저장 실패: ${e.message}")
         }
     }
 
@@ -248,6 +283,7 @@ class SettingsService(
         logger.info("설정값 변경됨: $key = $oldValue → $newValue")
         settings[key] = newValue
         saveSettingToDatabase(key, newValue)
+        saveSettingHistory(key, oldValue, newValue)  // 변경 이력 저장
         publishSettingChangedEvent(key, oldValue, newValue)
     }
 

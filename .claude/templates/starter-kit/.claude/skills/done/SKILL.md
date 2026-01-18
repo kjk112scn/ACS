@@ -1,6 +1,7 @@
 ---
 name: done
 description: 작업 완료 + 커밋. "완료", "done", "커밋", "마무리" 키워드에 반응.
+model: opus
 ---
 
 # Done - 작업 완료

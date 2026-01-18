@@ -12,10 +12,15 @@ import org.springframework.scheduling.annotation.EnableScheduling
 /**
  * R2DBC 설정
  * - home/office 프로필에서만 활성화
- * - Repository 스캔 설정
+ * - Repository 스캔 설정:
+ *   - tracking.repository: 추적 데이터 저장
+ *   - repository.interfaces.settings: 시스템 설정 저장
  */
 @Configuration
-@EnableR2dbcRepositories(basePackages = ["com.gtlsystems.acs_api.tracking.repository"])
+@EnableR2dbcRepositories(basePackages = [
+    "com.gtlsystems.acs_api.tracking.repository",
+    "com.gtlsystems.acs_api.repository.interfaces.settings"
+])
 @EnableR2dbcAuditing
 @EnableScheduling
 @ConditionalOnProperty(

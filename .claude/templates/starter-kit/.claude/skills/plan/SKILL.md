@@ -1,6 +1,7 @@
 ---
 name: plan
 description: 계획 수립. "계획", "plan", "어떻게", "설계" 키워드에 반응.
+model: opus
 ---
 
 # Plan - 계획 수립

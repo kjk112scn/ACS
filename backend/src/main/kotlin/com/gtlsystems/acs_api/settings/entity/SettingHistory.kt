@@ -1,32 +1,34 @@
 package com.gtlsystems.acs_api.settings.entity
 
-import jakarta.persistence.*
-import org.hibernate.annotations.CreationTimestamp
-import java.time.LocalDateTime
+import org.springframework.data.annotation.Id
+import org.springframework.data.relational.core.mapping.Column
+import org.springframework.data.relational.core.mapping.Table
+import java.time.OffsetDateTime
 
-@Entity
-@Table(name = "setting_history")
+/**
+ * 설정 변경 이력 엔티티 (R2DBC)
+ * - 감사 로그: 누가 언제 어떤 설정을 변경했는지 추적
+ */
+@Table("setting_history")
 data class SettingHistory(
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null,
 
-    @Column(name = "setting_key", nullable = false)
+    @Column("setting_key")
     val settingKey: String,
 
-    @Column(name = "old_value")
+    @Column("old_value")
     val oldValue: String? = null,
 
-    @Column(name = "new_value", nullable = false)
+    @Column("new_value")
     val newValue: String,
 
-    @Column(name = "changed_by")
+    @Column("changed_by")
     val changedBy: String? = null,
 
-    @Column(name = "change_reason")
+    @Column("change_reason")
     val changeReason: String? = null,
 
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
-    val createdAt: LocalDateTime = LocalDateTime.now()
+    @Column("created_at")
+    val createdAt: OffsetDateTime? = null
 )

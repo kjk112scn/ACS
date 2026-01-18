@@ -10,7 +10,30 @@
 
 ---
 
+## 문서 구조
+
+```
+handbook/
+├── README.md           ← 현재 문서
+├── overview/           ← 시스템 전체 (시작점)
+│   ├── tech-stack.md   # 기술 스택 + 선택 이유
+│   ├── data-flow.md    # FE ↔ BE ↔ HW 데이터 흐름
+│   └── glossary.md     # 용어 사전
+├── kotlin/             ← BE 문법/패턴
+├── vue/                ← FE 문법/패턴
+└── project/            ← ACS 특화 패턴
+```
+
+---
+
 ## 문서 목록
+
+### Overview (시스템 전체) - 먼저 읽기 권장
+| 문서 | 주제 | 상태 |
+|------|------|:----:|
+| [tech-stack.md](./overview/tech-stack.md) | 기술 스택 전체 + 왜 선택했는지 | ✅ |
+| [data-flow.md](./overview/data-flow.md) | FE ↔ BE ↔ 안테나 데이터 흐름 | ✅ |
+| [glossary.md](./overview/glossary.md) | 용어 사전 (약어, 도메인 용어) | ✅ |
 
 ### Kotlin (Backend)
 | 문서 | 주제 | 상태 |

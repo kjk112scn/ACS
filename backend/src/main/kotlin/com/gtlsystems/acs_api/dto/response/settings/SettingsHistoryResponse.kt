@@ -1,14 +1,14 @@
-﻿package com.gtlsystems.acs_api.dto.response.settings
+package com.gtlsystems.acs_api.dto.response.settings
 
 import com.gtlsystems.acs_api.settings.entity.SettingHistory
-import java.time.LocalDateTime
+import java.time.OffsetDateTime
 
 data class SettingsHistoryResponse(
     val key: String,
     val oldValue: String?,
     val newValue: String,
     val changedBy: String?,
-    val createdAt: LocalDateTime,
+    val createdAt: OffsetDateTime?,
     val changeReason: String?
 ) {
     companion object {
