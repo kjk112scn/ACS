@@ -3141,11 +3141,6 @@ q-page-container .pass-schedule-mode {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
 }
 
-.pass-schedule-mode .position-offset-label .text-subtitle2 {
-  font-size: 0.8rem !important;
-  line-height: 1.2 !important;
-}
-
 /* ✅ 간격 제거로 더 타이트하게 */
 .pass-schedule-mode .compact-control .row.q-gutter-none {
   margin: 0 !important;
