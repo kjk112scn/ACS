@@ -53,7 +53,7 @@ const loadingMessage = ref('초기화 중...')
 
 // 다크 모드에 따른 동적 스타일
 const containerStyle = computed(() => ({
-  background: $q.dark.isActive ? '#121212' : '#fafafa',
+  background: $q.dark.isActive ? 'var(--theme-background)' : 'var(--theme-background)',
 }))
 
 // 모달인지 확인 (부모 창이 같은 origin인지 체크)
@@ -196,7 +196,7 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.5rem;
-  background: #2196f3;
+  background: var(--theme-info);
   color: white;
   flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);

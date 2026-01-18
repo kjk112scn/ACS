@@ -21,6 +21,10 @@
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
+import { useChartTheme } from '@/composables/useChartTheme'
+
+// 테마 색상 캐싱
+const { colors: chartColors } = useChartTheme()
 
 // ECharts 매개변수 타입 정의
 interface EChartsScatterParam {
@@ -133,6 +137,9 @@ const initChart = () => {
     const initialSize = 500
     chart = echarts.init(chartRef.value, null, { width: initialSize, height: initialSize })
 
+    // 테마 색상 사용 (캐싱된 값)
+    const colors = chartColors.value
+
     const option = {
       backgroundColor: 'transparent',
       grid: { left: '10%', right: '10%', top: '10%', bottom: '10%', containLabel: false },
@@ -144,8 +151,8 @@ const initChart = () => {
         min: 0,
         max: 360,
         animation: false,
-        axisLine: { show: true, lineStyle: { color: '#555' } },
-        axisTick: { show: true, interval: 60, length: 3, lineStyle: { color: '#555' } },
+        axisLine: { show: true, lineStyle: { color: colors.line } },
+        axisTick: { show: true, interval: 60, length: 3, lineStyle: { color: colors.line } },
         axisLabel: {
           interval: 60,
           formatter: (value: number) => {
@@ -155,11 +162,11 @@ const initChart = () => {
             }
             return labels[value] || (value % 60 === 0 ? value + '°' : '')
           },
-          color: '#999',
+          color: colors.label,
           fontSize: 8,
           distance: -8,
         },
-        splitLine: { show: true, interval: 60, lineStyle: { color: '#555', type: 'dashed', width: 1 } },
+        splitLine: { show: true, interval: 60, lineStyle: { color: colors.line, type: 'dashed', width: 1 } },
       },
       radiusAxis: {
         type: 'value',
@@ -169,8 +176,8 @@ const initChart = () => {
         animation: false,
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { formatter: '{value}°', color: '#999', fontSize: 8 },
-        splitLine: { show: true, lineStyle: { color: '#555', type: 'dashed', width: 1 } },
+        axisLabel: { formatter: '{value}°', color: colors.label, fontSize: 8 },
+        splitLine: { show: true, lineStyle: { color: colors.line, type: 'dashed', width: 1 } },
       },
       series: [
         {
@@ -180,9 +187,9 @@ const initChart = () => {
           symbol: 'circle',
           symbolSize: 15,
           animation: false,
-          itemStyle: { color: '#ff5722' },
+          itemStyle: { color: colors.azimuth },
           data: [[0, 0]],
-          emphasis: { itemStyle: { color: '#ff9800', borderColor: '#fff', borderWidth: 2 } },
+          emphasis: { itemStyle: { color: colors.warning, borderColor: colors.text, borderWidth: 2 } },
           label: {
             show: true,
             formatter: (params: EChartsScatterParam) => {
@@ -192,8 +199,8 @@ const initChart = () => {
             },
             position: 'top',
             distance: 5,
-            color: '#fff',
-            backgroundColor: 'rgba(0,0,0,0.7)',
+            color: colors.text,
+            backgroundColor: colors.tooltipBg,
             padding: [4, 8],
             borderRadius: 4,
             fontSize: 10,
@@ -206,7 +213,7 @@ const initChart = () => {
           coordinateSystem: 'polar',
           symbol: 'none',
           animation: false,
-          lineStyle: { color: '#ffffff', width: 2, opacity: 0.8 },
+          lineStyle: { color: colors.text, width: 2, opacity: 0.8 },
           data: [],
           zlevel: 2,
         },
@@ -216,7 +223,7 @@ const initChart = () => {
           coordinateSystem: 'polar',
           symbol: 'none',
           animation: false,
-          lineStyle: { color: '#2196f3', width: 2 },
+          lineStyle: { color: colors.info, width: 2 },
           data: [],
           zlevel: 1,
         },

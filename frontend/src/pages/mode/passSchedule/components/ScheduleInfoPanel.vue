@@ -140,14 +140,14 @@ const formatDurationValue = (duration: string): string => {
 
 .info-label {
   font-weight: 500;
-  color: var(--theme-text-secondary, #666);
+  color: var(--theme-text-secondary);
   min-width: 90px;
   font-size: 0.85rem;
 }
 
 .info-value {
   font-weight: 600;
-  color: var(--theme-text-primary, #333);
+  color: var(--theme-text);
   font-size: 0.85rem;
 }
 

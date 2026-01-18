@@ -149,16 +149,16 @@ const getRowStyleDirect = (rowProps: { row: ScheduleItem }) => {
       if (currentMatch) {
         return {
           backgroundColor: 'rgba(27, 94, 32, 0.92)',
-          borderLeft: '4px solid #66bb6a',
-          color: '#e8f5e9',
+          borderLeft: '4px solid var(--theme-positive)',
+          color: 'var(--theme-positive-light)',
           fontWeight: '600',
         }
       }
       if (nextMatch) {
         return {
           backgroundColor: 'rgba(13, 71, 161, 0.9)',
-          borderLeft: '4px solid #42a5f5',
-          color: '#e3f2fd',
+          borderLeft: '4px solid var(--theme-info)',
+          color: 'var(--theme-info-light)',
           fontWeight: '600',
         }
       }
@@ -215,7 +215,7 @@ const handleRowClick = (evt: Event, row: ScheduleItem) => {
 /* ===== 테이블 기본 스타일 ===== */
 .schedule-table {
   background-color: var(--theme-card-background);
-  color: white;
+  color: var(--theme-text);
   border-radius: 6px;
   overflow: hidden;
   height: 210px !important;
@@ -224,7 +224,7 @@ const handleRowClick = (evt: Event, row: ScheduleItem) => {
 
 .schedule-table :deep(.q-table__container) {
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--theme-border);
   height: 210px !important;
   max-height: 210px !important;
   display: flex;
@@ -256,12 +256,12 @@ const handleRowClick = (evt: Event, row: ScheduleItem) => {
 }
 
 .schedule-table :deep(.q-table thead th) {
-  background-color: rgba(255, 255, 255, 0.05) !important;
-  color: rgba(255, 255, 255, 0.9);
+  background-color: var(--theme-table-header-bg) !important;
+  color: var(--theme-text);
   font-weight: 600;
   font-size: 12px;
   padding: 8px 20px 8px 6px;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 2px solid var(--theme-border-light);
   text-align: center !important;
   vertical-align: middle !important;
   white-space: pre-line;
@@ -274,29 +274,29 @@ const handleRowClick = (evt: Event, row: ScheduleItem) => {
 
 /* 테이블 행 스타일 */
 .schedule-table :deep(.q-table tbody tr) {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--theme-divider);
   transition: all 0.2s ease;
   cursor: pointer;
 }
 
 .schedule-table :deep(.q-table tbody tr:hover) {
-  background-color: rgba(255, 255, 255, 0.08) !important;
+  background-color: var(--theme-table-row-hover) !important;
 }
 
 .schedule-table :deep(.q-table tbody td) {
   padding: 8px 6px;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.9);
-  border-right: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--theme-text);
+  border-right: 1px solid var(--theme-table-row-even);
   vertical-align: middle;
   text-align: center;
 }
 
-/* ===== 하이라이트 스타일 ===== */
+/* ===== 하이라이트 스타일 (현재/다음 스케줄) ===== */
 .schedule-table tbody tr.highlight-current-schedule {
   background-color: rgba(27, 94, 32, 0.92) !important;
-  border-left: 4px solid #66bb6a !important;
-  color: #e8f5e9 !important;
+  border-left: 4px solid var(--theme-positive) !important;
+  color: var(--theme-positive-light) !important;
 }
 
 .schedule-table tbody tr.highlight-current-schedule td {
@@ -307,8 +307,8 @@ const handleRowClick = (evt: Event, row: ScheduleItem) => {
 
 .schedule-table tbody tr.highlight-next-schedule {
   background-color: rgba(13, 71, 161, 0.9) !important;
-  border-left: 4px solid #42a5f5 !important;
-  color: #e3f2fd !important;
+  border-left: 4px solid var(--theme-info) !important;
+  color: var(--theme-info-light) !important;
 }
 
 .schedule-table tbody tr.highlight-next-schedule td {
@@ -334,13 +334,13 @@ const handleRowClick = (evt: Event, row: ScheduleItem) => {
 .satellite-id {
   font-weight: 600;
   font-size: 14px;
-  color: #2196f3;
+  color: var(--theme-info);
   line-height: 1.2;
 }
 
 .satellite-name {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--theme-text-secondary);
   font-weight: 400;
   line-height: 1.2;
   word-break: break-word;
@@ -368,11 +368,11 @@ const handleRowClick = (evt: Event, row: ScheduleItem) => {
 }
 
 .start-time {
-  color: #4caf50;
+  color: var(--theme-positive);
 }
 
 .end-time {
-  color: #ff9800;
+  color: var(--theme-warning);
 }
 
 .azimuth-range-cell {
@@ -400,11 +400,11 @@ const handleRowClick = (evt: Event, row: ScheduleItem) => {
 }
 
 .start-az {
-  color: #4caf50;
+  color: var(--theme-positive);
 }
 
 .end-az {
-  color: #ff9800;
+  color: var(--theme-warning);
 }
 
 .elevation-info-cell {
@@ -426,12 +426,12 @@ const handleRowClick = (evt: Event, row: ScheduleItem) => {
 .max-elevation {
   font-size: 14px;
   font-weight: 600;
-  color: #4caf50;
+  color: var(--theme-positive);
 }
 
 .train {
   font-size: 14px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--theme-text-muted);
 }
 </style>

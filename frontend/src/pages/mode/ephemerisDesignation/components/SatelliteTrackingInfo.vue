@@ -213,7 +213,7 @@ const formatTimeRemaining = (ms: number): string => {
 
 .keyhole-info {
   background-color: rgba(255, 0, 0, 0.1);
-  border-left: 3px solid #f44336;
+  border-left: 3px solid var(--theme-negative);
   border-radius: 4px;
 }
 

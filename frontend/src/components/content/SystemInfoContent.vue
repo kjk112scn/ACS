@@ -754,11 +754,11 @@ onUnmounted(() => {
 }
 
 .connection-card {
-  border-top-color: #1976d2; /* primary 색상 */
+  border-top-color: var(--theme-button-primary);
 }
 
 .memory-card {
-  border-top-color: #00acc1; /* info 색상 */
+  border-top-color: var(--theme-info);
 }
 
 .status-card h3 {
@@ -784,26 +784,26 @@ onUnmounted(() => {
 
 /* ✅ LED를 DashboardPage status-led 스타일로 변경 */
 .led {
-  width: 20px; /* DashboardPage와 동일 */
+  width: 20px;
   height: 20px;
   border-radius: 50%;
   flex-shrink: 0;
   transition: all 0.3s ease;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 4px var(--theme-shadow);
 }
 
 .led-green {
-  background-color: #4caf50; /* DashboardPage와 동일한 녹색 */
+  background-color: var(--theme-led-normal);
   box-shadow:
-    0 0 12px #4caf50,
-    0 0 24px #4caf50;
+    0 0 12px var(--theme-led-normal),
+    0 0 24px var(--theme-led-normal);
 }
 
 .led-red {
-  background-color: #f44336; /* DashboardPage와 동일한 빨간색 */
+  background-color: var(--theme-led-error);
   box-shadow:
-    0 0 12px #f44336,
-    0 0 24px #f44336;
+    0 0 12px var(--theme-led-error),
+    0 0 24px var(--theme-led-error);
 }
 
 /* ✅ 메모리 카드 스타일 개선 */
@@ -818,11 +818,11 @@ onUnmounted(() => {
 .memory-bar {
   width: 100%;
   height: 24px;
-  background: #e0e0e0; /* 더 부드러운 회색 */
+  background: var(--theme-border);
   border-radius: 12px;
   overflow: hidden;
   position: relative;
-  border: 1px solid #d0d0d0;
+  border: 1px solid var(--theme-border-light);
 }
 
 .memory-fill {
@@ -832,21 +832,21 @@ onUnmounted(() => {
 }
 
 .memory-fill.text-positive {
-  background: linear-gradient(90deg, #4caf50, #66bb6a); /* DashboardPage 녹색 톤 */
+  background: linear-gradient(90deg, var(--theme-positive), var(--theme-tilt-color));
 }
 
 .memory-fill.text-warning {
-  background: linear-gradient(90deg, #ff9800, #ffb74d); /* DashboardPage 주황색 톤 */
+  background: linear-gradient(90deg, var(--theme-warning), #ffb74d);
 }
 
 .memory-fill.text-negative {
-  background: linear-gradient(90deg, #f44336, #ef5350); /* DashboardPage 빨간색 톤 */
+  background: linear-gradient(90deg, var(--theme-negative), #ef5350);
 }
 
 .memory-text {
   font-size: 0.9rem;
   text-align: center;
-  color: #424242;
+  color: var(--theme-text);
   font-weight: 500;
 }
 
@@ -876,19 +876,19 @@ onUnmounted(() => {
 
 /* 각 stat-card에 고유 색상 적용 */
 .stat-card:nth-child(1) {
-  border-top-color: #ff5722; /* azimuth 색상 */
+  border-top-color: var(--theme-azimuth-color);
 }
 
 .stat-card:nth-child(2) {
-  border-top-color: #2196f3; /* elevation 색상 */
+  border-top-color: var(--theme-elevation-color);
 }
 
 .stat-card:nth-child(3) {
-  border-top-color: #4caf50; /* tilt 색상 */
+  border-top-color: var(--theme-tilt-color);
 }
 
 .stat-card:nth-child(4) {
-  border-top-color: #9c27b0; /* statistics 색상 */
+  border-top-color: var(--theme-accent);
 }
 
 .stat-card h4 {
@@ -903,18 +903,18 @@ onUnmounted(() => {
   font-weight: bold;
   font-family: 'Courier New', monospace;
   margin: 0.5rem 0;
-  color: #1976d2; /* primary 색상 */
+  color: var(--theme-button-primary);
 }
 
 .stat-sub {
   font-size: 0.75rem;
-  color: #757575;
+  color: var(--theme-text-muted);
   margin: 0.25rem 0;
 }
 
 .stat-range {
   font-size: 0.7rem;
-  color: #9e9e9e;
+  color: var(--theme-text-secondary);
   margin-top: auto;
 }
 
@@ -933,7 +933,7 @@ onUnmounted(() => {
 }
 
 .timer-label {
-  color: #757575;
+  color: var(--theme-text-muted);
 }
 
 .timer-value {
@@ -956,13 +956,13 @@ onUnmounted(() => {
 }
 
 .detail-item span:first-child {
-  color: #757575;
+  color: var(--theme-text-muted);
 }
 
 .detail-item span:last-child {
   font-weight: 600;
   font-family: 'Courier New', monospace;
-  color: #424242;
+  color: var(--theme-text);
 }
 
 /* ✅ 3행: 액션 섹션 - DashboardPage 버튼 스타일 적용 */
@@ -1007,29 +1007,29 @@ onUnmounted(() => {
   box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
 }
 
-/* ✅ 상태별 색상 클래스 - DashboardPage와 동일 */
+/* ✅ 상태별 색상 클래스 - 테마 변수 사용 */
 .interval-good {
-  color: #4caf50;
+  color: var(--theme-positive);
 }
 
 .interval-warning {
-  color: #ff9800;
+  color: var(--theme-warning);
 }
 
 .interval-error {
-  color: #f44336;
+  color: var(--theme-negative);
 }
 
 .text-positive {
-  color: #4caf50;
+  color: var(--theme-positive);
 }
 
 .text-warning {
-  color: #ff9800;
+  color: var(--theme-warning);
 }
 
 .text-negative {
-  color: #f44336;
+  color: var(--theme-negative);
 }
 
 /* ✅ 다크 모드 지원 - DashboardPage와 동일한 방식 */
@@ -1084,7 +1084,7 @@ onUnmounted(() => {
 }
 
 .system-info-content::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--theme-scrollbar-track);
   border-radius: 3px;
 }
 

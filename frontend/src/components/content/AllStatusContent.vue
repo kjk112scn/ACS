@@ -1599,17 +1599,17 @@ const refreshStatus = () => {
 }
 
 .q-card-section:nth-child(2)::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--theme-scrollbar-track);
   border-radius: 4px;
 }
 
 .q-card-section:nth-child(2)::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: var(--theme-scrollbar-thumb);
   border-radius: 4px;
 }
 
 .q-card-section:nth-child(2)::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: var(--theme-scrollbar-thumb-hover);
 }
 
 .status-grid {
@@ -1682,18 +1682,18 @@ const refreshStatus = () => {
   align-items: center;
   gap: 0.5rem;
   padding: 0.3rem;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--theme-border);
   border-radius: 3px;
-  background-color: rgba(0, 0, 0, 0.02);
+  background-color: var(--theme-table-row-even);
   transition: all 0.2s ease;
   min-width: 0;
   overflow: hidden;
 }
 
 .status-item:hover {
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: var(--theme-table-row-hover);
   transform: translateY(-1px);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 5px var(--theme-shadow);
 }
 
 .status-led {
@@ -1701,7 +1701,7 @@ const refreshStatus = () => {
   height: 12px;
   border-radius: 50%;
   transition: all 0.3s ease;
-  box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 3px var(--theme-shadow);
   flex-shrink: 0;
   position: relative;
 }
@@ -1720,10 +1720,10 @@ const refreshStatus = () => {
 }
 
 .led-on {
-  background-color: #4caf50;
+  background-color: var(--theme-led-normal);
   box-shadow:
-    0 0 5px #4caf50,
-    0 0 10px #4caf50;
+    0 0 5px var(--theme-led-normal),
+    0 0 10px var(--theme-led-normal);
 }
 
 .led-on::before {
@@ -1732,15 +1732,15 @@ const refreshStatus = () => {
 }
 
 .led-off {
-  background-color: #666;
-  box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
+  background-color: var(--theme-led-inactive);
+  box-shadow: 0 0 3px var(--theme-shadow);
 }
 
 .led-error {
-  background-color: #f44336;
+  background-color: var(--theme-led-error);
   box-shadow:
-    0 0 5px #f44336,
-    0 0 10px #f44336;
+    0 0 5px var(--theme-led-error),
+    0 0 10px var(--theme-led-error);
 }
 
 .led-error::before {
@@ -1769,19 +1769,19 @@ const refreshStatus = () => {
 }
 
 .status-item:has(.led-on) .status-value {
-  color: #4caf50;
+  color: var(--theme-positive);
 }
 
 .status-item:has(.led-off) .status-value {
-  color: #666;
+  color: var(--theme-text-muted);
 }
 
 .status-item:has(.led-error) .status-value {
-  color: #f44336;
+  color: var(--theme-negative);
 }
 
 .status-summary {
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--theme-border);
   padding-top: 0.5rem;
   margin-top: 0.5rem;
 }
@@ -1795,7 +1795,7 @@ const refreshStatus = () => {
 
 .summary-label {
   font-weight: 500;
-  color: #666;
+  color: var(--theme-text-muted);
 }
 
 .summary-value {
@@ -1813,7 +1813,7 @@ const refreshStatus = () => {
   font-size: 0.9rem;
   font-weight: 600;
   margin-bottom: 0.5rem;
-  color: #666;
+  color: var(--theme-text-muted);
 }
 
 .q-card {
@@ -1854,48 +1854,8 @@ const refreshStatus = () => {
   }
 }
 
-/* 다크 모드 */
-.body--dark .status-item {
-  background-color: rgba(255, 255, 255, 0.05);
-  border-color: #444;
-}
-
-.body--dark .status-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.body--dark .status-summary {
-  border-color: #444;
-}
-
-.body--dark .summary-label {
-  color: #bbb;
-}
-
-.body--dark .positioner-title,
-.body--dark .feed-section-title {
-  color: #bbb;
-}
-
-.body--dark .led-off {
-  background-color: #444;
-}
-
-.body--dark .status-item:has(.led-off) .status-value {
-  color: #999;
-}
-
-.body--dark .q-card-section:nth-child(2)::-webkit-scrollbar-track {
-  background: #333;
-}
-
-.body--dark .q-card-section:nth-child(2)::-webkit-scrollbar-thumb {
-  background: #666;
-}
-
-.body--dark .q-card-section:nth-child(2)::-webkit-scrollbar-thumb:hover {
-  background: #777;
-}
+/* 다크 모드 - CSS 변수가 자동으로 전환되므로 대부분 오버라이드 불필요 */
+/* 필요한 경우만 추가 스타일 지정 */
 
 /* 컨테이너 쿼리 (더 정확한 반응형) */
 @container (max-width: 1400px) {

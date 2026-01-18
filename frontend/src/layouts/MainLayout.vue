@@ -348,14 +348,14 @@ onBeforeUnmount(() => {
 
 /* 다크 테마일 때 */
 .body--dark .custom-header {
-  background-color: #091d24 !important;
+  background-color: var(--theme-dark) !important;
   box-shadow: none !important;
   border-bottom: 1px solid var(--theme-border) !important;
 }
 
 /* 라이트 테마일 때 */
 .body--light .custom-header {
-  background-color: #1976d2 !important;
+  background-color: var(--theme-button-primary) !important;
   box-shadow: none !important;
   border-bottom: 1px solid var(--theme-border) !important;
 }
@@ -445,15 +445,15 @@ onBeforeUnmount(() => {
 }
 
 .server-status .text-positive {
-  color: #4caf50 !important;
+  color: var(--theme-positive) !important;
 }
 
 .server-status .text-warning {
-  color: #ff9800 !important;
+  color: var(--theme-warning) !important;
 }
 
 .server-status .text-negative {
-  color: #f44336 !important;
+  color: var(--theme-negative) !important;
 }
 
 /* GTL 로고 스타일 */

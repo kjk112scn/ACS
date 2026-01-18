@@ -388,6 +388,7 @@ import {
 } from '../../services/mode/ephemerisTrackService'
 import { openPopup } from '../../utils/windowUtils'
 import { useNotification } from '../../composables/useNotification'
+import { useChartTheme } from '../../composables/useChartTheme'
 // 분리된 컴포넌트 및 composable import
 import { OffsetControls, useOffsetControls } from './shared'
 import {
@@ -398,6 +399,9 @@ import {
 
 // ✅ 알림 시스템 사용
 const { success, error, warning, info } = useNotification()
+
+// ✅ 테마 색상 (ECharts용 CSS 변수 캐싱)
+const { colors: chartColors } = useChartTheme()
 
 // ✅ Duration 포맷 함수 추가 - 시:분:초 형식
 const formatDuration = (duration: string): string => {
@@ -1532,7 +1536,7 @@ const initChart = () => {
       axisLine: {
         show: true,
         lineStyle: {
-          color: '#555',
+          color: chartColors.value.line,
         },
       },
       axisTick: {
@@ -1540,7 +1544,7 @@ const initChart = () => {
         interval: 60,
         length: 3,
         lineStyle: {
-          color: '#555',
+          color: chartColors.value.line,
         },
       },
       axisLabel: {
@@ -1557,7 +1561,7 @@ const initChart = () => {
           if (value % 60 === 0) return value + '°'
           return ''
         },
-        color: '#999',
+        color: chartColors.value.label,
         fontSize: 8,
         distance: -8,
       },
@@ -1565,7 +1569,7 @@ const initChart = () => {
         show: true,
         interval: 60,
         lineStyle: {
-          color: '#555',
+          color: chartColors.value.line,
           type: 'dashed',
           width: 1,
         },
@@ -1585,13 +1589,13 @@ const initChart = () => {
       },
       axisLabel: {
         formatter: '{value}°',
-        color: '#999',
+        color: chartColors.value.label,
         fontSize: 8,
       },
       splitLine: {
         show: true,
         lineStyle: {
-          color: '#555',
+          color: chartColors.value.line,
           type: 'dashed',
         },
       },
@@ -1605,13 +1609,13 @@ const initChart = () => {
         symbolSize: 15,
         animation: false, // ✅ 애니메이션 완전 비활성화
         itemStyle: {
-          color: '#ff5722',
+          color: chartColors.value.azimuth,
         },
         data: [[0, 0]],
         emphasis: {
           itemStyle: {
-            color: '#ff9800',
-            borderColor: '#fff',
+            color: chartColors.value.warning,
+            borderColor: chartColors.value.text,
             borderWidth: 2,
           },
         },
@@ -1625,7 +1629,7 @@ const initChart = () => {
           },
           position: 'top',
           distance: 5,
-          color: '#fff',
+          color: chartColors.value.text,
           backgroundColor: 'rgba(0,0,0,0.7)',
           padding: [4, 8],
           borderRadius: 4,
@@ -1640,7 +1644,7 @@ const initChart = () => {
         symbol: 'none',
         animation: false, // ✅ 애니메이션 완전 비활성화
         lineStyle: {
-          color: '#ffffff',
+          color: chartColors.value.text,
           width: 2, // ✅ 3 → 2로 줄여서 렌더링 부하 감소
           opacity: 0.8,
         },
@@ -1654,7 +1658,7 @@ const initChart = () => {
         symbol: 'none',
         animation: false, // ✅ 애니메이션 완전 비활성화
         lineStyle: {
-          color: '#2196f3',
+          color: chartColors.value.info,
           width: 2,
         },
         data: [],
@@ -3426,13 +3430,13 @@ q-page-container .ephemeris-mode {
 
 .info-label {
   font-weight: 500;
-  color: #90caf9;
+  color: var(--theme-info);
   min-width: 120px;
 }
 
 .info-value {
   font-weight: 400;
-  color: #ffffff;
+  color: var(--theme-text);
   text-align: right;
   flex: 1;
 }
@@ -3788,7 +3792,7 @@ q-page-container .ephemeris-mode {
 /* ✅ KEYHOLE 관련 스타일 - .ephemeris-mode로 스코프 제한 */
 .ephemeris-mode .keyhole-info {
   background-color: rgba(255, 0, 0, 0.1) !important;
-  border-left: 3px solid #f44336 !important;
+  border-left: 3px solid var(--theme-negative) !important;
   border-radius: 4px;
   padding: 12px !important;
   margin-top: 8px !important;
@@ -3799,16 +3803,16 @@ q-page-container .ephemeris-mode {
 }
 
 .ephemeris-mode .keyhole-info .text-red {
-  color: #f44336 !important;
+  color: var(--theme-negative) !important;
 }
 
 .ephemeris-mode .keyhole-info .text-positive {
-  color: #4caf50 !important;
+  color: var(--theme-positive) !important;
 }
 
 /* ✅ KEYHOLE 배지 스타일 - .ephemeris-mode로 스코프 제한 */
 .ephemeris-mode .q-badge.keyhole-badge {
-  background-color: #f44336 !important;
+  background-color: var(--theme-negative) !important;
   color: white !important;
   font-weight: 600 !important;
   font-size: 0.75rem !important;
@@ -3831,11 +3835,11 @@ q-page-container .ephemeris-mode {
 }
 
 .ephemeris-mode .keyhole-column.text-red {
-  color: #f44336 !important;
+  color: var(--theme-negative) !important;
 }
 
 .ephemeris-mode .keyhole-column.text-positive {
-  color: #4caf50 !important;
+  color: var(--theme-positive) !important;
 }
 
 /* ✅ 각도 컬럼 스타일 (Azimuth/Elevation 각도) */
@@ -3875,13 +3879,13 @@ q-page-container .ephemeris-mode {
 }
 
 .ephemeris-mode .start-angle .angle-value {
-  color: #4caf50;
+  color: var(--theme-positive);
   font-size: 14px !important;
   font-weight: 700 !important;
 }
 
 .ephemeris-mode .end-angle .angle-value {
-  color: #ff9800;
+  color: var(--theme-warning);
   font-size: 14px !important;
   font-weight: 700 !important;
 }

@@ -433,7 +433,7 @@
               <div class="legend-grid">
                 <div class="legend-item">
                   <svg viewBox="0 0 24 24" width="24" height="24" class="legend-icon">
-                    <polygon points="22,12 2,2 2,22" fill="#4caf50" stroke="#4caf50" stroke-width="1" />
+                    <polygon points="22,12 2,2 2,22" fill="var(--theme-positive)" stroke="var(--theme-positive)" stroke-width="1" />
                   </svg>
                   <span class="legend-text">LNA Power On</span>
                 </div>
@@ -446,13 +446,13 @@
                 </div>
                 <div class="legend-item">
                   <svg viewBox="0 0 24 24" width="24" height="24" class="legend-icon">
-                    <polygon points="22,12 2,2 2,22" fill="#f44336" stroke="#f44336" stroke-width="1" />
+                    <polygon points="22,12 2,2 2,22" fill="var(--theme-negative)" stroke="var(--theme-negative)" stroke-width="1" />
                   </svg>
                   <span class="legend-text">LNA Error</span>
                 </div>
                 <div class="legend-item">
                   <svg viewBox="0 0 24 24" width="24" height="24" class="legend-icon">
-                    <rect x="2" y="2" width="20" height="20" rx="2" fill="#4caf50" stroke="#4caf50" stroke-width="2" />
+                    <rect x="2" y="2" width="20" height="20" rx="2" fill="var(--theme-positive)" stroke="var(--theme-positive)" stroke-width="2" />
                     <!-- RHCP: 위 왼쪽 원(6,6)의 아래쪽(6, 7.5)에서 우측 가운데 원(18,12)의 왼쪽 중앙(16.5, 12)으로 연결 -->
                     <line x1="6" y1="7.5" x2="16.5" y2="12" stroke="white" stroke-width="1" />
                     <circle cx="6" cy="6" r="1.5" fill="none" stroke="white" stroke-width="1" />
@@ -463,7 +463,7 @@
                 </div>
                 <div class="legend-item">
                   <svg viewBox="0 0 24 24" width="24" height="24" class="legend-icon">
-                    <rect x="2" y="2" width="20" height="20" rx="2" fill="#2196f3" stroke="#2196f3" stroke-width="2" />
+                    <rect x="2" y="2" width="20" height="20" rx="2" fill="var(--theme-info)" stroke="var(--theme-info)" stroke-width="2" />
                     <!-- LHCP: 아래 왼쪽 원(6,18)의 위쪽(6, 16.5)에서 우측 가운데 원(18,12)의 왼쪽 중앙(16.5, 12)으로 연결 -->
                     <line x1="6" y1="16.5" x2="16.5" y2="12" stroke="white" stroke-width="1" />
                     <circle cx="6" cy="18" r="1.5" fill="none" stroke="white" stroke-width="1" />
@@ -474,7 +474,7 @@
                 </div>
                 <div class="legend-item">
                   <svg viewBox="0 0 24 24" width="24" height="24" class="legend-icon">
-                    <rect x="2" y="2" width="20" height="20" rx="2" fill="#f44336" stroke="#f44336" stroke-width="2" />
+                    <rect x="2" y="2" width="20" height="20" rx="2" fill="var(--theme-negative)" stroke="var(--theme-negative)" stroke-width="2" />
                     <!-- Error: RHCP와 동일한 형태 -->
                     <line x1="6" y1="7.5" x2="16.5" y2="12" stroke="white" stroke-width="1" />
                     <circle cx="6" cy="6" r="1.5" fill="none" stroke="white" stroke-width="1" />
@@ -485,19 +485,19 @@
                 </div>
                 <div class="legend-item">
                   <svg viewBox="0 0 24 24" width="24" height="24" class="legend-icon">
-                    <rect x="2" y="2" width="20" height="20" rx="2" fill="#4caf50" stroke="#4caf50" stroke-width="1" />
+                    <rect x="2" y="2" width="20" height="20" rx="2" fill="var(--theme-positive)" stroke="var(--theme-positive)" stroke-width="1" />
                   </svg>
                   <span class="legend-text">FAN ON</span>
                 </div>
                 <div class="legend-item">
                   <svg viewBox="0 0 24 24" width="24" height="24" class="legend-icon">
-                    <rect x="2" y="2" width="20" height="20" rx="2" fill="none" stroke="white" stroke-width="2" />
+                    <rect x="2" y="2" width="20" height="20" rx="2" fill="none" stroke="var(--theme-text-secondary)" stroke-width="2" />
                   </svg>
                   <span class="legend-text">FAN OFF</span>
                 </div>
                 <div class="legend-item">
                   <svg viewBox="0 0 24 24" width="24" height="24" class="legend-icon">
-                    <rect x="2" y="2" width="20" height="20" rx="2" fill="#f44336" stroke="#f44336" stroke-width="1" />
+                    <rect x="2" y="2" width="20" height="20" rx="2" fill="var(--theme-negative)" stroke="var(--theme-negative)" stroke-width="1" />
                   </svg>
                   <span class="legend-text">FAN Error</span>
                 </div>
@@ -522,9 +522,13 @@ import { ref, computed } from 'vue'
 import { useICDStore } from '../../stores/icd/icdStore'
 import { useNotification } from '@/composables/useNotification'
 import { useFeedSettingsStore } from '@/stores/ui/feedSettingsStore'
+import { useChartTheme } from '@/composables/useChartTheme'
 
 // ICD 스토어 인스턴스 생성
 const icdStore = useICDStore()
+
+// 테마 색상 (CSS 변수 캐싱)
+const { colors: themeColors } = useChartTheme()
 
 // 피드 설정 스토어 인스턴스 생성
 const feedSettingsStore = useFeedSettingsStore()
@@ -650,8 +654,8 @@ const getLNAFillColor = (band: 's' | 'x' | 'ka', type: 'lhcp' | 'rhcp'): string 
         : icdStore.feedKaBoardStatusInfo
   const lnaStatus = type === 'lhcp' ? statusInfo.lnaStatus.lhcp : statusInfo.lnaStatus.rhcp
 
-  if (lnaStatus.hasError) return '#f44336' // 빨간색 (Error)
-  if (lnaStatus.isActive) return '#4caf50' // 녹색 (ON)
+  if (lnaStatus.hasError) return themeColors.value.negative // Error
+  if (lnaStatus.isActive) return themeColors.value.positive // ON
   return 'none' // 채우기 없음 (OFF)
 }
 
@@ -667,10 +671,10 @@ const getLNAStrokeColor = (band: 's' | 'x' | 'ka', type: 'lhcp' | 'rhcp'): strin
         : icdStore.feedKaBoardStatusInfo
   const lnaStatus = type === 'lhcp' ? statusInfo.lnaStatus.lhcp : statusInfo.lnaStatus.rhcp
 
-  if (lnaStatus.hasError) return '#f44336' // 빨간색 (Error)
-  if (lnaStatus.isActive) return '#4caf50' // 녹색 (ON)
-  // OFF일 때 화살표 색상과 동일하게 설정
-  return getComputedStyle(document.documentElement).getPropertyValue('--theme-text-secondary').trim() || '#b0bec5'
+  if (lnaStatus.hasError) return themeColors.value.negative // Error
+  if (lnaStatus.isActive) return themeColors.value.positive // ON
+  // OFF일 때 텍스트 보조 색상 사용
+  return themeColors.value.textSecondary
 }
 
 
@@ -689,9 +693,9 @@ const getRFSwitchStatusClass = (): string => {
  */
 const getRFSwitchFillColor = (): string => {
   const statusInfo = icdStore.feedBoardETCStatusInfo
-  if (statusInfo.rfSwitchStatus.hasError) return '#f44336' // 빨간색 (Error)
-  if (statusInfo.rfSwitchStatus.isRHCP) return '#4caf50' // 녹색 (RHCP)
-  return '#2196f3' // 파란색 (LHCP)
+  if (statusInfo.rfSwitchStatus.hasError) return themeColors.value.negative // Error
+  if (statusInfo.rfSwitchStatus.isRHCP) return themeColors.value.positive // RHCP
+  return themeColors.value.info // LHCP
 }
 
 /**
@@ -699,9 +703,9 @@ const getRFSwitchFillColor = (): string => {
  */
 const getRFSwitchStrokeColor = (): string => {
   const statusInfo = icdStore.feedBoardETCStatusInfo
-  if (statusInfo.rfSwitchStatus.hasError) return '#f44336' // 빨간색 (Error)
-  if (statusInfo.rfSwitchStatus.isRHCP) return '#4caf50' // 녹색 (RHCP)
-  return '#2196f3' // 파란색 (LHCP)
+  if (statusInfo.rfSwitchStatus.hasError) return themeColors.value.negative // Error
+  if (statusInfo.rfSwitchStatus.isRHCP) return themeColors.value.positive // RHCP
+  return themeColors.value.info // LHCP
 }
 
 /**
@@ -733,13 +737,13 @@ const getKaSelectionRHCPStatusClass = (): string => {
 const getKaSelectionRHCPFillColor = (): string => {
   const statusInfo = icdStore.feedKaBoardStatusInfo
   if (statusInfo.selectionStatus.rhcp.error) {
-    return '#f44336' // 빨간색 (Error)
+    return themeColors.value.negative // Error
   }
   // Band1 = 녹색, Band2 = 파란색
   if (statusInfo.selectionStatus.rhcp.band === 'Band1') {
-    return '#4caf50' // 녹색 (Band1)
+    return themeColors.value.positive // Band1
   }
-  return '#2196f3' // 파란색 (Band2)
+  return themeColors.value.info // Band2
 }
 
 /**
@@ -748,13 +752,13 @@ const getKaSelectionRHCPFillColor = (): string => {
 const getKaSelectionRHCPStrokeColor = (): string => {
   const statusInfo = icdStore.feedKaBoardStatusInfo
   if (statusInfo.selectionStatus.rhcp.error) {
-    return '#f44336' // 빨간색 (Error)
+    return themeColors.value.negative // Error
   }
   // Band1 = 녹색, Band2 = 파란색
   if (statusInfo.selectionStatus.rhcp.band === 'Band1') {
-    return '#4caf50' // 녹색 (Band1)
+    return themeColors.value.positive // Band1
   }
-  return '#2196f3' // 파란색 (Band2)
+  return themeColors.value.info // Band2
 }
 
 /**
@@ -779,13 +783,13 @@ const getKaSelectionLHCPStatusClass = (): string => {
 const getKaSelectionLHCPFillColor = (): string => {
   const statusInfo = icdStore.feedKaBoardStatusInfo
   if (statusInfo.selectionStatus.lhcp.error) {
-    return '#f44336' // 빨간색 (Error)
+    return themeColors.value.negative // Error
   }
   // Band1 = 녹색, Band2 = 파란색
   if (statusInfo.selectionStatus.lhcp.band === 'Band1') {
-    return '#4caf50' // 녹색 (Band1)
+    return themeColors.value.positive // Band1
   }
-  return '#2196f3' // 파란색 (Band2)
+  return themeColors.value.info // Band2
 }
 
 /**
@@ -794,13 +798,13 @@ const getKaSelectionLHCPFillColor = (): string => {
 const getKaSelectionLHCPStrokeColor = (): string => {
   const statusInfo = icdStore.feedKaBoardStatusInfo
   if (statusInfo.selectionStatus.lhcp.error) {
-    return '#f44336' // 빨간색 (Error)
+    return themeColors.value.negative // Error
   }
   // Band1 = 녹색, Band2 = 파란색
   if (statusInfo.selectionStatus.lhcp.band === 'Band1') {
-    return '#4caf50' // 녹색 (Band1)
+    return themeColors.value.positive // Band1
   }
-  return '#2196f3' // 파란색 (Band2)
+  return themeColors.value.info // Band2
 }
 
 /**

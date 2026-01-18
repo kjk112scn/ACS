@@ -121,7 +121,7 @@ const emit = defineEmits<{
 .tle-content {
   font-family: 'Consolas', 'Monaco', monospace;
   font-size: 0.8rem;
-  color: #4fc3f7;
+  color: var(--theme-info);
   margin: 0;
   white-space: pre-wrap;
   word-break: break-all;

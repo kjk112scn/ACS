@@ -309,6 +309,7 @@ import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 import { openComponent } from '../utils/windowUtils'
 import { useTheme } from '../composables/useTheme'
+import { useChartTheme } from '../composables/useChartTheme'
 import type { MessageData } from '../services/api/icdService'
 
 const icdStore = useICDStore()
@@ -317,6 +318,7 @@ const route = useRoute()
 
 // 테마 관련 추가
 const { initializeTheme } = useTheme()
+const { colors: chartColors } = useChartTheme()
 
 // Dashboard 페이지용 WebSocket 메시지 핸들러
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1144,12 +1146,12 @@ const initCharts = () => {
         max: 360,
         axisLine: {
           show: true,
-          lineStyle: { color: '#555', width: 1 },
+          lineStyle: { color: chartColors.value.line, width: 1 },
         },
         axisTick: {
           show: true,
           interval: 30,
-          lineStyle: { color: '#555' },
+          lineStyle: { color: chartColors.value.line },
         },
         axisLabel: {
           interval: 30,
@@ -1160,7 +1162,7 @@ const initCharts = () => {
             if (value === 270) return '{vAlign|W}\n(270°)'
             return value + '°'
           },
-          color: '#999',
+          color: chartColors.value.label,
           fontSize: 12, // 13에서 12로 줄여서 공간 확보
           distance: 20, // 25에서 20으로 줄여서 공간 확보
           rich: {
@@ -1174,7 +1176,7 @@ const initCharts = () => {
         splitLine: {
           show: true,
           interval: 30,
-          lineStyle: { color: '#555', type: 'dashed', width: 1 },
+          lineStyle: { color: chartColors.value.line, type: 'dashed', width: 1 },
         },
       },
       radiusAxis: {
@@ -1187,7 +1189,7 @@ const initCharts = () => {
         axisLabel: { show: false },
         splitLine: {
           show: true,
-          lineStyle: { color: '#555', type: 'dashed', width: 1 },
+          lineStyle: { color: chartColors.value.line, type: 'dashed', width: 1 },
         },
       },
       series: [
@@ -1197,7 +1199,7 @@ const initCharts = () => {
           coordinateSystem: 'polar',
           symbol: 'circle',
           symbolSize: 10, // 12에서 10으로 줄여서 공간 확보
-          itemStyle: { color: '#ff5722' },
+          itemStyle: { color: chartColors.value.azimuth },
           data: [[1, azimuth]], // [radius, angle] 형식으로 변경
           zlevel: 2,
           label: {
@@ -1211,7 +1213,7 @@ const initCharts = () => {
             },
             position: 'top',
             distance: 5, // 0에서 5로 증가하여 여백 확보
-            color: '#ff5722',
+            color: chartColors.value.azimuth,
             fontSize: 13, // 15에서 13으로 줄여서 공간 확보
             padding: [2, 6], // [4, 8]에서 [2, 6]으로 줄여서 공간 확보
             backgroundColor: 'rgba(0,0,0,0.5)',
@@ -1260,12 +1262,12 @@ const initCharts = () => {
         max: 360,
         axisLine: {
           show: true,
-          lineStyle: { color: '#555', width: 1 },
+          lineStyle: { color: chartColors.value.line, width: 1 },
         },
         axisTick: {
           show: true,
           interval: 30,
-          lineStyle: { color: '#555' },
+          lineStyle: { color: chartColors.value.line },
         },
         axisLabel: {
           interval: 30,
@@ -1275,7 +1277,7 @@ const initCharts = () => {
             if (value === 180) return '{upLabel|E(180°)}'
             return value + '°'
           },
-          color: '#999',
+          color: chartColors.value.label,
           fontSize: 12, // 13에서 12로 줄여서 공간 확보
           distance: 20, // 25에서 20으로 줄여서 공간 확보
           rich: {
@@ -1289,7 +1291,7 @@ const initCharts = () => {
         splitLine: {
           show: true,
           interval: 30,
-          lineStyle: { color: '#555', type: 'dashed', width: 1 },
+          lineStyle: { color: chartColors.value.line, type: 'dashed', width: 1 },
         },
       },
       radiusAxis: {
@@ -1302,7 +1304,7 @@ const initCharts = () => {
         axisLabel: { show: false },
         splitLine: {
           show: true,
-          lineStyle: { color: '#555', type: 'dashed', width: 1 },
+          lineStyle: { color: chartColors.value.line, type: 'dashed', width: 1 },
         },
       },
       series: [
@@ -1312,7 +1314,7 @@ const initCharts = () => {
           coordinateSystem: 'polar',
           symbol: 'circle',
           symbolSize: 10, // 12에서 10으로 줄여서 공간 확보
-          itemStyle: { color: '#2196f3' },
+          itemStyle: { color: chartColors.value.elevation },
           data: [[0, normalizedInitialElevation]],
           zlevel: 2,
           label: {
@@ -1322,7 +1324,7 @@ const initCharts = () => {
             },
             position: 'top',
             distance: 5, // 0에서 5로 증가하여 여백 확보
-            color: '#2196f3',
+            color: chartColors.value.elevation,
             fontSize: 13, // 15에서 13으로 줄여서 공간 확보
             padding: [2, 6], // [4, 8]에서 [2, 6]으로 줄여서 공간 확보
             backgroundColor: 'rgba(0,0,0,0.5)',
@@ -1366,12 +1368,12 @@ const initCharts = () => {
         max: 360,
         axisLine: {
           show: true,
-          lineStyle: { color: '#555', width: 1 },
+          lineStyle: { color: chartColors.value.line, width: 1 },
         },
         axisTick: {
           show: true,
           interval: 30,
-          lineStyle: { color: '#555' },
+          lineStyle: { color: chartColors.value.line },
         },
         axisLabel: {
           interval: 30,
@@ -1382,7 +1384,7 @@ const initCharts = () => {
             if (value === 270) return '{vAlign|W}\n(270°)'
             return value + '°'
           },
-          color: '#999',
+          color: chartColors.value.label,
           fontSize: 12, // 13에서 12로 줄여서 공간 확보
           distance: 20, // 25에서 20으로 줄여서 공간 확보
           rich: {
@@ -1395,7 +1397,7 @@ const initCharts = () => {
         splitLine: {
           show: true,
           interval: 30,
-          lineStyle: { color: '#555', type: 'dashed', width: 1 },
+          lineStyle: { color: chartColors.value.line, type: 'dashed', width: 1 },
         },
       },
       radiusAxis: {
@@ -1408,7 +1410,7 @@ const initCharts = () => {
         axisLabel: { show: false },
         splitLine: {
           show: true,
-          lineStyle: { color: '#555', type: 'dashed', width: 1 },
+          lineStyle: { color: chartColors.value.line, type: 'dashed', width: 1 },
         },
       },
       series: [
@@ -1418,7 +1420,7 @@ const initCharts = () => {
           coordinateSystem: 'polar',
           symbol: 'circle',
           symbolSize: 10, // 12에서 10으로 줄여서 공간 확보
-          itemStyle: { color: '#4caf50' },
+          itemStyle: { color: chartColors.value.tilt },
           data: [[1, normalizedInitialTrain]], // 초기값을 현재 train 값으로 설정
           zlevel: 2,
           label: {
@@ -1428,7 +1430,7 @@ const initCharts = () => {
             },
             position: 'top',
             distance: 5, // 0에서 5로 증가하여 여백 확보
-            color: '#4caf50',
+            color: chartColors.value.tilt,
             fontSize: 13, // 15에서 13으로 줄여서 공간 확보
             padding: [2, 6], // [4, 8]에서 [2, 6]으로 줄여서 공간 확보
             backgroundColor: 'rgba(0,0,0,0.5)',
@@ -1706,7 +1708,7 @@ const handleAllStatus = () => {
 /* 차트 툴팁 스타일 조정 */
 .echarts-tooltip {
   background-color: rgba(50, 50, 50, 0.7) !important;
-  border: 1px solid #666 !important;
+  border: 1px solid var(--theme-chart-axis) !important;
   border-radius: 4px !important;
   padding: 6px 8px !important;
   color: white !important;
@@ -2057,9 +2059,9 @@ const handleAllStatus = () => {
 }
 
 .motor-status--ready {
-  border-color: #9e9e9e;
+  border-color: var(--theme-text-muted);
   /* 회색 */
-  color: #9e9e9e;
+  color: var(--theme-text-muted);
   box-shadow: 0 0 6px rgba(158, 158, 158, 0.35);
 }
 
@@ -2079,7 +2081,7 @@ const handleAllStatus = () => {
 }
 
 .axis-card--ready {
-  border-top-color: #9e9e9e !important;
+  border-top-color: var(--theme-text-muted) !important;
   /* 회색 */
 }
 
@@ -2105,7 +2107,7 @@ const handleAllStatus = () => {
   background-color: var(--theme-card-background);
   border: 1px solid var(--theme-border);
   /* 밝은 회색 테두리 */
-  border-top: 5px solid #f44336 !important;
+  border-top: 5px solid var(--theme-negative) !important;
   /* 빨간색 상단 테두리 유지하되 두께는 5px로 증가 */
   border-radius: 8px;
   flex: 0.6;

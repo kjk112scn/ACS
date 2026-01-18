@@ -1130,7 +1130,7 @@ onUnmounted(() => {
 
 .tle-name {
   font-weight: bold;
-  color: #64b5f6;
+  color: var(--theme-info);
   font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
@@ -1147,7 +1147,7 @@ onUnmounted(() => {
 
 
   font-size: 12px;
-  color: #e0e0e0;
+  color: var(--theme-text);
 
 
   white-space: pre-line;
@@ -1165,7 +1165,7 @@ onUnmounted(() => {
 
   padding: 10px 12px;
   border-radius: 4px;
-  border-left: 3px solid #64b5f6;
+  border-left: 3px solid var(--theme-info);
   width: 100%;
 
 
@@ -1261,7 +1261,7 @@ onUnmounted(() => {
 }
 
 .tle-table :deep(.q-table tbody tr.selected) {
-  background-color: rgba(33, 150, 243, 0.2);
+  background-color: rgba(var(--theme-info-rgb), 0.2);
 }
 
 .tle-table :deep(.q-table tbody td) {
@@ -1304,7 +1304,7 @@ onUnmounted(() => {
 
 /* 체크박스 스타일 */
 .tle-table :deep(.q-checkbox) {
-  color: #64b5f6 !important;
+  color: var(--theme-info) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -1315,35 +1315,35 @@ onUnmounted(() => {
 }
 
 .tle-table :deep(.q-checkbox__inner) {
-  color: #64b5f6;
+  color: var(--theme-info);
 }
 
 .tle-table :deep(.q-checkbox__bg) {
-  border-color: #64b5f6;
+  border-color: var(--theme-info);
 }
 
 .tle-table :deep(.q-checkbox__bg--active) {
-  background-color: #64b5f6;
-  border-color: #64b5f6;
+  background-color: var(--theme-info);
+  border-color: var(--theme-info);
 }
 
 /* 선택 상태 강조 */
 .tle-table :deep(.q-table tbody tr.selected .tle-name) {
-  color: #90caf9;
+  color: var(--theme-info-light);
 }
 
 .tle-table :deep(.q-table tbody tr.selected .tle-lines) {
-  border-left-color: #90caf9;
-  background-color: rgba(33, 150, 243, 0.1);
+  border-left-color: var(--theme-info-light);
+  background-color: rgba(var(--theme-info-rgb), 0.1);
 }
 
 .tle-table :deep(.q-table tbody tr.selected .q-checkbox) {
-  color: #90caf9;
+  color: var(--theme-info-light);
 }
 
 .tle-table :deep(.q-table tbody tr.selected .q-checkbox__bg--active) {
-  background-color: #90caf9;
-  border-color: #90caf9;
+  background-color: var(--theme-info-light);
+  border-color: var(--theme-info-light);
 }
 
 /* 컬럼 너비 강제 설정 */
@@ -1630,13 +1630,13 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem;
-  background-color: rgba(33, 150, 243, 0.1);
-  border-left: 3px solid #2196f3;
+  background-color: rgba(var(--theme-info-rgb), 0.1);
+  border-left: 3px solid var(--theme-info);
   border-radius: 4px;
 }
 
 .processing-text {
-  color: #64b5f6;
+  color: var(--theme-info);
   font-size: 13px;
   font-weight: 500;
 }

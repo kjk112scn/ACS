@@ -3370,13 +3370,13 @@ q-page-container .pass-schedule-mode {
 
 .info-label {
   font-weight: 500;
-  color: #90caf9;
+  color: var(--theme-info-light);
   min-width: 120px;
 }
 
 .info-value {
   font-weight: 400;
-  color: #ffffff;
+  color: var(--theme-text);
   text-align: right;
   flex: 1;
 }
@@ -3437,7 +3437,7 @@ q-page-container .pass-schedule-mode {
   margin-bottom: 0;
   font-weight: 600;
   font-size: 11px;
-  color: #2196f3;
+  color: var(--theme-info);
   line-height: 1.2;
 }
 
@@ -3594,72 +3594,72 @@ q-page-container .pass-schedule-mode {
 /* 행 선택 효과 */
 .schedule-table :deep(.q-table tbody tr.selected) {
   background-color: rgba(33, 150, 243, 0.1) !important;
-  border-left: 3px solid #2196f3;
+  border-left: 3px solid var(--theme-info);
 }
 
 /* ===== 11. 하이라이트 스타일 (최고 우선순위) ===== */
 
 /* 현재 추적 중인 스케줄 하이라이트 */
 .schedule-table :deep(.q-table tbody tr.current-tracking-row) {
-  background-color: #c8e6c9 !important;
-  border-left: 4px solid #4caf50 !important;
-  color: #2e7d32 !important;
+  background-color: var(--theme-positive-bg) !important;
+  border-left: 4px solid var(--theme-positive) !important;
+  color: var(--theme-positive-dark) !important;
 }
 
 .schedule-table :deep(.q-table tbody tr.current-tracking-row td) {
-  background-color: #c8e6c9 !important;
-  color: #2e7d32 !important;
+  background-color: var(--theme-positive-bg) !important;
+  color: var(--theme-positive-dark) !important;
   font-weight: 500;
 }
 
 .schedule-table :deep(.q-table tbody tr.current-tracking-row:hover) {
-  background-color: #a5d6a7 !important;
+  background-color: var(--theme-positive-hover) !important;
 }
 
 .schedule-table :deep(.q-table tbody tr.current-tracking-row:hover td) {
-  background-color: #a5d6a7 !important;
+  background-color: var(--theme-positive-hover) !important;
 }
 
 /* 다음 예정 스케줄 하이라이트 */
 .schedule-table :deep(.q-table tbody tr.next-tracking-row) {
-  background-color: #e3f2fd !important;
-  border-left: 4px solid #2196f3 !important;
-  color: #1565c0 !important;
+  background-color: var(--theme-info-bg) !important;
+  border-left: 4px solid var(--theme-info) !important;
+  color: var(--theme-info-dark) !important;
 }
 
 .schedule-table :deep(.q-table tbody tr.next-tracking-row td) {
-  background-color: #e3f2fd !important;
-  color: #1565c0 !important;
+  background-color: var(--theme-info-bg) !important;
+  color: var(--theme-info-dark) !important;
   font-weight: 500;
 }
 
 .schedule-table :deep(.q-table tbody tr.next-tracking-row:hover) {
-  background-color: #bbdefb !important;
+  background-color: var(--theme-info-hover) !important;
 }
 
 .schedule-table :deep(.q-table tbody tr.next-tracking-row:hover td) {
-  background-color: #bbdefb !important;
+  background-color: var(--theme-info-hover) !important;
 }
 
 /* 테스트용 첫 번째 행 하이라이트 */
 .schedule-table :deep(.q-table tbody tr.highlight-first-row) {
-  background-color: #ffeb3b !important;
+  background-color: var(--theme-warning-bg) !important;
   color: #000 !important;
-  border-left: 4px solid #ffc107 !important;
+  border-left: 4px solid var(--theme-warning) !important;
 }
 
 .schedule-table :deep(.q-table tbody tr.highlight-first-row td) {
-  background-color: #ffeb3b !important;
+  background-color: var(--theme-warning-bg) !important;
   color: #000 !important;
   font-weight: 600;
 }
 
 .schedule-table :deep(.q-table tbody tr.highlight-first-row:hover) {
-  background-color: #ffc107 !important;
+  background-color: var(--theme-warning-hover) !important;
 }
 
 .schedule-table :deep(.q-table tbody tr.highlight-first-row:hover td) {
-  background-color: #ffc107 !important;
+  background-color: var(--theme-warning-hover) !important;
   /* ===== 12. 테이블 컬럼별 특별 스타일 ===== */
 
   /* 위성 정보 컬럼 */
@@ -3678,7 +3678,7 @@ q-page-container .pass-schedule-mode {
   .satellite-id {
     font-weight: 600;
     font-size: 11px;
-    color: #2196f3;
+    color: var(--theme-info);
     line-height: 1.2;
   }
 
@@ -3712,11 +3712,11 @@ q-page-container .pass-schedule-mode {
   }
 
   .start-time {
-    color: #4caf50;
+    color: var(--theme-positive);
   }
 
   .end-time {
-    color: #ff9800;
+    color: var(--theme-warning);
   }
 }
 
@@ -3739,7 +3739,7 @@ q-page-container .pass-schedule-mode {
 .satellite-id {
   font-weight: 600;
   font-size: 14px;
-  color: #2196f3;
+  color: var(--theme-info);
   line-height: 1.2;
 }
 
@@ -3774,11 +3774,11 @@ q-page-container .pass-schedule-mode {
 }
 
 .start-time {
-  color: #4caf50;
+  color: var(--theme-positive);
 }
 
 .end-time {
-  color: #ff9800;
+  color: var(--theme-warning);
 }
 
 /* ===== 12.5. 스케줄 하이라이트 스타일 ===== */
@@ -3786,8 +3786,8 @@ q-page-container .pass-schedule-mode {
 /* 현재 추적 중인 스케줄 하이라이트 - 더 강력한 선택자 */
 .schedule-table tbody tr.highlight-current-schedule {
   background-color: rgba(27, 94, 32, 0.92) !important;
-  border-left: 4px solid #66bb6a !important;
-  color: #e8f5e9 !important;
+  border-left: 4px solid var(--theme-positive-light) !important;
+  color: var(--theme-positive-light) !important;
 }
 
 .schedule-table tbody tr.highlight-current-schedule td {
@@ -3812,8 +3812,8 @@ q-page-container .pass-schedule-mode {
 
 .schedule-table tbody tr.highlight-next-schedule {
   background-color: rgba(13, 71, 161, 0.9) !important;
-  border-left: 4px solid #42a5f5 !important;
-  color: #e3f2fd !important;
+  border-left: 4px solid var(--theme-info-light) !important;
+  color: var(--theme-info-light) !important;
 }
 
 .schedule-table tbody tr.highlight-next-schedule td {
@@ -3866,11 +3866,11 @@ q-page-container .pass-schedule-mode {
 }
 
 .start-az {
-  color: #4caf50;
+  color: var(--theme-positive);
 }
 
 .end-az {
-  color: #ff9800;
+  color: var(--theme-warning);
 }
 
 /* Elevation 정보 컬럼 */
@@ -3899,11 +3899,11 @@ q-page-container .pass-schedule-mode {
 }
 
 .max-elevation {
-  color: #9c27b0;
+  color: var(--theme-accent);
 }
 
 .train {
-  color: #607d8b;
+  color: var(--theme-text-muted);
 }
 
 /* ===== 14. 버튼 그룹 스타일 ===== */
@@ -4034,7 +4034,7 @@ q-page-container .pass-schedule-mode {
 }
 
 .debug-panel .text-caption strong {
-  color: #ffc107;
+  color: var(--theme-warning);
   font-weight: 600;
 }
 
@@ -4248,36 +4248,36 @@ q-page-container .pass-schedule-mode {
 
 /* Quasar 테이블 강제 스타일 오버라이드 */
 .schedule-table .q-table tbody tr.highlight-first-row {
-  background-color: #ffeb3b !important;
+  background-color: var(--theme-warning-bg) !important;
   color: #000 !important;
-  border-left: 4px solid #ffc107 !important;
+  border-left: 4px solid var(--theme-warning) !important;
 }
 
 .schedule-table .q-table tbody tr.highlight-first-row td {
-  background-color: #ffeb3b !important;
+  background-color: var(--theme-warning-bg) !important;
   color: #000 !important;
 }
 
 .schedule-table .q-table tbody tr.current-tracking-row {
-  background-color: #c8e6c9 !important;
-  color: #2e7d32 !important;
-  border-left: 4px solid #4caf50 !important;
+  background-color: var(--theme-positive-bg) !important;
+  color: var(--theme-positive-dark) !important;
+  border-left: 4px solid var(--theme-positive) !important;
 }
 
 .schedule-table .q-table tbody tr.current-tracking-row td {
-  background-color: #c8e6c9 !important;
-  color: #2e7d32 !important;
+  background-color: var(--theme-positive-bg) !important;
+  color: var(--theme-positive-dark) !important;
 }
 
 .schedule-table .q-table tbody tr.next-tracking-row {
-  background-color: #e3f2fd !important;
-  color: #1565c0 !important;
-  border-left: 4px solid #2196f3 !important;
+  background-color: var(--theme-info-bg) !important;
+  color: var(--theme-info-dark) !important;
+  border-left: 4px solid var(--theme-info) !important;
 }
 
 .schedule-table .q-table tbody tr.next-tracking-row td {
-  background-color: #e3f2fd !important;
-  color: #1565c0 !important;
+  background-color: var(--theme-info-bg) !important;
+  color: var(--theme-info-dark) !important;
 }
 
 /* 스크롤바 스타일링 */

@@ -1754,7 +1754,7 @@ onUnmounted(async () => {
   padding: 8px 12px;
   background-color: rgba(255, 152, 0, 0.1);
   border-radius: 4px;
-  border-left: 3px solid #ff9800;
+  border-left: 3px solid var(--theme-warning);
   flex-shrink: 0;
 }
 
@@ -1828,7 +1828,7 @@ onUnmounted(async () => {
 
 /* ✅ 헤더 호버 효과 */
 .schedule-table :deep(.q-table thead th:hover) {
-  background-color: #2a2a2a !important;
+  background-color: var(--theme-surface-elevated) !important;
 }
 
 /* ✅ 테이블 바디 스크롤 영역 */
@@ -1847,13 +1847,13 @@ onUnmounted(async () => {
 
 .schedule-table :deep(.q-table tbody tr.selected) {
   background-color: rgba(25, 118, 210, 0.2) !important;
-  border-left: 3px solid #1976d2 !important;
+  border-left: 3px solid var(--theme-button-primary) !important;
 }
 
 /* ✅ 겹치는 스케줄 행 스타일 (주황색) */
 .schedule-table :deep(.q-table tbody tr.overlapping-row) {
   background-color: rgba(255, 152, 0, 0.15) !important;
-  border-left: 3px solid #ff9800 !important;
+  border-left: 3px solid var(--theme-warning) !important;
 }
 
 .schedule-table :deep(.q-table tbody tr.overlapping-row:hover) {
@@ -1863,7 +1863,7 @@ onUnmounted(async () => {
 /* ✅ 겹치는 스케줄이 선택된 경우 */
 .schedule-table :deep(.q-table tbody tr.overlapping-row.selected) {
   background-color: rgba(255, 152, 0, 0.3) !important;
-  border-left: 3px solid #ff9800 !important;
+  border-left: 3px solid var(--theme-warning) !important;
 }
 
 /* ✅ 선택 불가능한 행 스타일 */
@@ -1880,7 +1880,7 @@ onUnmounted(async () => {
 /* ✅ Keyhole 위성 행 스타일 (빨간색 강조) */
 .schedule-table :deep(.q-table tbody tr.keyhole-row) {
   background-color: rgba(244, 67, 54, 0.1) !important;
-  border-left: 3px solid #f44336 !important;
+  border-left: 3px solid var(--theme-negative) !important;
 }
 
 .schedule-table :deep(.q-table tbody tr.keyhole-row:hover) {
@@ -1889,7 +1889,7 @@ onUnmounted(async () => {
 
 .schedule-table :deep(.q-table tbody tr.keyhole-row.selected) {
   background-color: rgba(244, 67, 54, 0.25) !important;
-  border-left: 3px solid #f44336 !important;
+  border-left: 3px solid var(--theme-negative) !important;
 }
 
 /* ✅ 위성 이름 셀 스타일 */
@@ -1968,11 +1968,11 @@ onUnmounted(async () => {
 
 /* ✅ 체크박스 스타일 (이벤트 허용) */
 .schedule-table :deep(.schedule-checkbox) {
-  color: #1976d2 !important;
+  color: var(--theme-button-primary) !important;
 }
 
 .schedule-table :deep(.schedule-checkbox .q-checkbox__inner) {
-  color: #1976d2 !important;
+  color: var(--theme-button-primary) !important;
 }
 
 /* ✅ 비활성화된 체크박스 스타일 */
@@ -1982,27 +1982,27 @@ onUnmounted(async () => {
 }
 
 .schedule-table :deep(.q-checkbox.disabled .q-checkbox__inner) {
-  color: #666 !important;
+  color: var(--theme-chart-axis) !important;
   cursor: not-allowed !important;
 }
 
 /* ✅ 겹치는 스케줄의 체크박스 스타일 */
 .schedule-table :deep(.overlapping-row .q-checkbox:not(.disabled)) {
-  color: #ff9800 !important;
+  color: var(--theme-warning) !important;
 }
 
 .schedule-table :deep(.overlapping-row .q-checkbox:not(.disabled) .q-checkbox__inner) {
-  color: #ff9800 !important;
+  color: var(--theme-warning) !important;
 }
 
 /* ✅ 겹치는 스케줄의 비활성화된 체크박스 */
 .schedule-table :deep(.overlapping-row .q-checkbox.disabled) {
-  color: #ff9800 !important;
+  color: var(--theme-warning) !important;
   opacity: 0.3 !important;
 }
 
 .schedule-table :deep(.overlapping-row .q-checkbox.disabled .q-checkbox__inner) {
-  color: #ff9800 !important;
+  color: var(--theme-warning) !important;
   opacity: 0.3 !important;
 }
 
@@ -2077,13 +2077,13 @@ onUnmounted(async () => {
 }
 
 .start-angle .angle-value {
-  color: #4caf50;
+  color: var(--theme-positive);
   font-size: 14px !important;
   font-weight: 700 !important;
 }
 
 .end-angle .angle-value {
-  color: #ff9800;
+  color: var(--theme-warning);
   font-size: 14px !important;
   font-weight: 700 !important;
 }
@@ -2143,7 +2143,7 @@ onUnmounted(async () => {
 }
 
 .schedule-table :deep(.q-spinner) {
-  color: #2196f3 !important;
+  color: var(--theme-info) !important;
 }
 
 .schedule-table :deep(.full-width) {
@@ -2203,7 +2203,7 @@ onUnmounted(async () => {
   .schedule-table :deep(.q-table thead th) {
     font-size: 12px;
     padding: 8px 4px;
-    background-color: #1d1d1d !important;
+    background-color: var(--theme-dark) !important;
   }
 
   .schedule-table :deep(.q-table tbody td) {
@@ -2268,7 +2268,7 @@ onUnmounted(async () => {
   }
 
   .schedule-table :deep(.q-table thead th) {
-    background-color: #1d1d1d !important;
+    background-color: var(--theme-dark) !important;
   }
 
   .schedule-table :deep(.q-table tbody td[data-col="startTime"]),
