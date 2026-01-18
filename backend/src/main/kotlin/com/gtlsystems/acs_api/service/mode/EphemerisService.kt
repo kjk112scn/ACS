@@ -434,7 +434,7 @@ class EphemerisService(
                 tleLine1 = tleLine1,
                 tleLine2 = tleLine2,
                 startDate = today.withZoneSameInstant(ZoneOffset.UTC),
-                durationDays = 2,
+                durationDays = settingsService.durationDays.toInt(),  // 설정값 사용 (기본: 1일)
                 minElevation = sourceMinEl,
                 latitude = locationData.latitude,
                 longitude = locationData.longitude,

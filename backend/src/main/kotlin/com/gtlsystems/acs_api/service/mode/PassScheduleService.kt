@@ -1967,14 +1967,14 @@ class PassScheduleService(
                     tleLine1 = tleLine1,
                     tleLine2 = tleLine2,
                     startDate = today.withZoneSameInstant(ZoneOffset.UTC),
-                    durationDays = 2,
+                    durationDays = settingsService.durationDays.toInt(),  // 설정값 사용 (기본: 1일)
                     minElevation = sourceMinEl,
                     latitude = locationData.latitude,
                     longitude = locationData.longitude,
                     altitude = locationData.altitude,
                 )
                 val passCount = schedule.trackingPasses.size
-                
+
                 // ✅ 원자적으로 범위 할당 (동시성 문제 해결)
                 val startMstId = mstIdCounter.getAndAdd(passCount.toLong()) + 1
                 logger.debug("📊 위성 $satelliteId($satelliteName) 할당된 MstId 범위: $startMstId ~ ${startMstId + passCount - 1} (${passCount}개 패스)")
@@ -2122,7 +2122,7 @@ class PassScheduleService(
                 tleLine1 = tleLine1,
                 tleLine2 = tleLine2,
                 startDate = today.withZoneSameInstant(ZoneOffset.UTC),
-                durationDays = 2,
+                durationDays = settingsService.durationDays.toInt(),  // 설정값 사용 (기본: 1일)
                 minElevation = sourceMinEl,
                 latitude = locationData.latitude,
                 longitude = locationData.longitude,

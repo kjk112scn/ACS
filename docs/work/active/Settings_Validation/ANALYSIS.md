@@ -96,42 +96,40 @@ val passes = propagator.getPassesList(
 
 ### 3.1 즉시 수정 필요 (HIGH)
 
-#### tracking.durationDays
+#### tracking.durationDays ✅ 수정 완료 (2026-01-18)
 
 | 항목 | 내용 |
 |------|------|
-| **현재 상태** | 2일 **하드코딩** |
-| **설정값** | 기본 7일 |
-| **문제** | 사용자 설정이 무시됨 |
+| **이전 상태** | 2일 **하드코딩** |
+| **현재 상태** | ✅ `settingsService.durationDays` 사용 |
+| **기본값** | 1일 |
 
-**현재 코드:**
+**수정된 파일:**
+- `EphemerisService.kt:437`
+- `PassScheduleService.kt:1970`
+- `PassScheduleService.kt:2125`
+
 ```kotlin
-// SatelliteService.kt:123
-val endDate = startDate.shiftedBy(2.0 * Constants.JULIAN_DAY)  // 하드코딩!
+// 수정 전
+durationDays = 2,
+
+// 수정 후
+durationDays = settingsService.durationDays.toInt(),  // 설정값 사용 (기본: 1일)
 ```
 
-**수정 방안:**
-```kotlin
-@Value("\${acs.settings.tracking.duration-days:7}")
-private var durationDays: Long = 7
-
-val endDate = startDate.shiftedBy(durationDays.toDouble() * Constants.JULIAN_DAY)
-```
-
-#### tracking.minElevationAngle
+#### tracking.minElevationAngle ⏸️ 보류
 
 | 항목 | 내용 |
 |------|------|
 | **현재 상태** | 정의만 존재 |
-| **설정값** | 기본 5.0° |
-| **문제** | Pass 계산에 미적용 |
+| **설정값** | 기본 0.0° |
+| **보류 사유** | sourceMinElevationAngle과 역할 구분 필요 |
 
-**수정 방안:**
-```kotlin
-// SatelliteService.kt
-@Value("\${acs.settings.tracking.min-elevation-angle:5.0}")
-private var minElevationAngle: Double = 5.0
-```
+**보류 이유:**
+- `sourceMinElevationAngle`: 원본 2축 데이터 생성 시 사용 (현재 사용 중)
+- `minElevationAngle`: Pass 필터링 용도? → 역할 정의 필요
+
+**코드 위치:** `SettingsService.kt:350` (TODO [보류] 주석 추가됨)
 
 ### 3.2 기능 미구현 (MEDIUM)
 

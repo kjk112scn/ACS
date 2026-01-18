@@ -341,6 +341,11 @@ class SettingsService(
      * 최소 고도각 (도)
      * 추적 시 고려할 최소 고도각을 설정합니다.
      * 기본값: -7.0도
+     *
+     * TODO [보류] 현재 이 설정은 실제 로직에서 사용되지 않음
+     * - Pass 필터링에 적용 필요 (SatelliteService)
+     * - sourceMinElevationAngle과의 역할 구분 필요
+     * @see sourceMinElevationAngle 원본 데이터 생성 시 사용되는 설정
      */
     var minElevationAngle: Float by createSettingProperty("tracking.minElevationAngle", "최소 고도각")
 
