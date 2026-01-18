@@ -2828,48 +2828,6 @@ q-page-container .ephemeris-mode {
   /* ✅ 하단 마진 제거 */
 }
 
-/* ✅ main-content-row 내부의 모든 컬럼 하단 여백 완전 제거 - PassSchedulePage.vue와 동일 */
-.ephemeris-mode .main-content-row>[class*="col-"] {
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
-/* ✅ main-content-row 내부의 마지막 컬럼 하단 여백 완전 제거 (더 구체적인 선택자) - PassSchedulePage.vue와 동일 */
-.ephemeris-mode .main-content-row>[class*="col-"]:last-child {
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
-/* ✅ main-content-row 내부의 모든 컬럼 내부의 q-card 하단 여백 제거 - PassSchedulePage.vue와 동일 */
-.ephemeris-mode .main-content-row>[class*="col-"] .q-card {
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
-/* ✅ main-content-row 내부의 마지막 컬럼 내부의 q-card 하단 여백 제거 (더 구체적인 선택자) - PassSchedulePage.vue와 동일 */
-.ephemeris-mode .main-content-row>[class*="col-"]:last-child .q-card {
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
-/* ✅ main-content-row 내부의 모든 컬럼 내부의 q-card-section 하단 여백 제거 - PassSchedulePage.vue와 동일 */
-.ephemeris-mode .main-content-row>[class*="col-"] .q-card-section {
-  padding-bottom: 0 !important;
-  margin-bottom: 0 !important;
-}
-
-/* ✅ main-content-row 내부의 마지막 컬럼 내부의 q-card-section 하단 여백 제거 (더 구체적인 선택자) - PassSchedulePage.vue와 동일 */
-.ephemeris-mode .main-content-row>[class*="col-"]:last-child .q-card-section {
-  padding-bottom: 0 !important;
-  margin-bottom: 0 !important;
-}
-
-/* ✅ main-content-row 내부의 Quasar q-card 하단 마진/패딩 완전 제거 - PassSchedulePage.vue와 동일 */
-.ephemeris-mode .main-content-row .q-card {
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
 /* ✅ main-content-row 내부의 모든 control-section 하단 여백 제거 - PassSchedulePage.vue와 동일 */
 .ephemeris-mode .main-content-row .control-section {
   margin-bottom: 0 !important;
@@ -3556,13 +3514,10 @@ q-page-container .ephemeris-mode {
 .position-offset-label {
   background: linear-gradient(135deg, rgba(25, 118, 210, 0.15) 0%, rgba(25, 118, 210, 0.08) 100%);
   padding: 4px 8px;
-  /* 높이 줄임: 8px 12px → 4px 8px */
   border-radius: 6px;
   border-right: 3px solid var(--q-primary);
   min-width: 50px;
-  /* 너비도 약간 줄임: 60px → 50px */
   margin-right: 6px;
-  /* 간격도 줄임: 8px → 6px */
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   position: relative;
   overflow: hidden;
@@ -3570,32 +3525,7 @@ q-page-container .ephemeris-mode {
 
 .position-offset-label .text-subtitle2 {
   font-size: 0.8rem !important;
-  /* 텍스트 크기 줄임 */
   line-height: 1.2 !important;
-  /* 줄 간격 줄임 */
-}
-
-/* ✅ 방법 1: 왼쪽 세로 라벨 (카드 안) - 높이 최적화 */
-.position-offset-label {
-  background: linear-gradient(135deg, rgba(25, 118, 210, 0.15) 0%, rgba(25, 118, 210, 0.08) 100%);
-  padding: 4px 8px;
-  /* 높이 줄임: 8px 12px → 4px 8px */
-  border-radius: 6px;
-  border-right: 3px solid var(--q-primary);
-  min-width: 50px;
-  /* 너비도 약간 줄임: 60px → 50px */
-  margin-right: 6px;
-  /* 간격도 줄임: 8px → 6px */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  position: relative;
-  overflow: hidden;
-}
-
-.position-offset-label .text-subtitle2 {
-  font-size: 0.8rem !important;
-  /* 텍스트 크기 줄임 */
-  line-height: 1.2 !important;
-  /* 줄 간격 줄임 */
 }
 
 /* ✅ 카드 테두리 위아래 패딩 완전 제거 - 더 구체적인 셀렉터 */
@@ -3690,25 +3620,6 @@ q-page-container .ephemeris-mode {
 .ephemeris-mode .position-offset-label .text-subtitle2 {
   font-size: 0.8rem !important;
   line-height: 1.2 !important;
-}
-
-/* 간격 제거로 더 타이트하게 */
-.ephemeris-mode .compact-control .row.q-gutter-none {
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-.ephemeris-mode .compact-control .row.q-gutter-none>div {
-  padding-left: 0.25rem !important;
-  padding-right: 0.25rem !important;
-}
-
-.ephemeris-mode .compact-control .row.q-gutter-none>div:first-child {
-  padding-left: 0 !important;
-}
-
-.ephemeris-mode .compact-control .row.q-gutter-none>div:last-child {
-  padding-right: 0 !important;
 }
 </style>
 
