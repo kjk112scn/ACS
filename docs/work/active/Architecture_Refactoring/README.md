@@ -1,161 +1,265 @@
-# Architecture Refactoring - 마스터 문서
+# Architecture Refactoring
 
-> **Last Updated**: 2026-01-18
 > **Status**: Active
+> **Last Updated**: 2026-01-18
+> **Version**: 5.0.0
 
 ---
 
-## 전체 진행 현황
+## 전체 현황
 
-| 구분 | 상태 | 완료율 |
-|-----|:----:|:-----:|
-| Phase 1-4 (BE/FE 기본) | ✅ 완료 | 100% |
-| Phase 5 (컴포넌트 분리) | ✅ 완료 | 100% |
-| **추가 리팩토링** | 🔄 진행중 | 50% |
-| CSS !important Phase 1 | ✅ 완료 | 100% |
-| CSS !important Phase 2 | ✅ 완료 | 100% |
-| CSS !important Phase 3 | ✅ 완료 | 100% |
-| Quasar 근본 개선 | 📋 계획수립 | 0% |
+| 영역 | 상태 | 완료율 | 상세 |
+|-----|:----:|:-----:|------|
+| BE 리팩토링 (Phase 1-5) | ✅ 완료 | 100% | [legacy/](legacy/) |
+| FE 리팩토링 (Phase 2-3,6) | ✅ 완료 | 100% | [frontend/](frontend/) |
+| CSS !important 정리 | ✅ 완료 | 100% | [css/](css/) |
+| **DB Integration** | ✅ 코드완료 | 100% | [database/](database/) |
+| DB 테스트 | ⬜ 대기 | 0% | 회사에서 실행 |
 
 ---
 
-## 문서 구조
+## 폴더 구조
 
-### 핵심 문서
-
-| 문서 | 설명 | 상태 |
-|-----|------|:----:|
-| [PLAN.md](./PLAN.md) | 통합 리팩토링 계획 | ✅ |
-| [TRACKER.md](./TRACKER.md) | 실행 체크리스트 | ✅ |
-| [IMPROVEMENT_ROADMAP.md](./IMPROVEMENT_ROADMAP.md) | 7-Expert 종합 로드맵 | ✅ |
-
-### FE 리팩토링
-
-| 문서 | 설명 | 상태 |
-|-----|------|:----:|
-| [FE_REFACTORING_PLAN.md](./FE_REFACTORING_PLAN.md) | FE 리팩토링 상세 계획 | ✅ |
-| [FE_REVIEW_2026-01-18.md](./FE_REVIEW_2026-01-18.md) | FE 전문가 리뷰 결과 | ✅ |
-| [FE_Refactoring_Test_Checklist.md](./FE_Refactoring_Test_Checklist.md) | 통합 테스트 체크리스트 (79개) | 📋 |
-
-### CSS 관련
-
-| 문서 | 설명 | 상태 |
-|-----|------|:----:|
-| [CSS_Important_Cleanup_Plan.md](./CSS_Important_Cleanup_Plan.md) | !important 정리 계획 (Phase 1: 87개 완료) | ✅ P1 |
-| [CSS_Quasar_Override_Strategy.md](./CSS_Quasar_Override_Strategy.md) | Quasar 근본 해결 전략 | 📋 |
-
-### 기타
-
-| 문서 | 설명 | 상태 |
-|-----|------|:----:|
-| [PHASE5_SEPARATION_PLAN.md](./PHASE5_SEPARATION_PLAN.md) | 대형 파일 분리 계획 | ✅ |
-| [EXPERT_REVIEW_2026-01-18.md](./EXPERT_REVIEW_2026-01-18.md) | 전문가 종합 리뷰 | ✅ |
+```
+Architecture_Refactoring/
+├── README.md          ← 현재 문서 (마스터)
+├── css/               ← CSS 리팩토링 문서
+├── frontend/          ← FE 리팩토링 문서
+├── database/          ← DB Integration 문서
+└── legacy/            ← 완료된 과거 문서
+```
 
 ---
 
-## 추후 작업 목록 (TODO)
+## 레거시 vs 실제 검토 결과 (2026-01-17)
 
-### 1. 코드 수정 완료 - 테스트 필요
+> 전문가 에이전트 검토 완료 - 레거시 RFC 문서 대비 **실제 필요 작업량 약 20%**
 
-| 작업 | 파일 | 테스트 문서 |
-|-----|-----|-----------|
-| useErrorHandler 적용 | FeedPage, EphemerisDesignation, PassSchedule | [Test Checklist](./FE_Refactoring_Test_Checklist.md) Part 1 |
-| defineComponent 제거 | StepPage, SlewPage, StandbyPage | [Test Checklist](./FE_Refactoring_Test_Checklist.md) Part 1 |
-| ControlButtonBar 공용화 | 4개 모드 페이지 | [Test Checklist](./FE_Refactoring_Test_Checklist.md) Part 1 |
-| ModeCard/ModeLayout 삭제 | components/common/ | 빌드 확인 |
+### BE (백엔드)
 
-### 2. CSS !important 정리
+| 항목 | 레거시 | 실제 | 판정 | 비고 |
+|------|:------:|:----:|:----:|------|
+| !! 연산자 | 46건 | 10건 | ❌ 불필요 | null 체크 직후 사용, 안전 |
+| subscribe() 핸들러 | 25건 | 0건 | ❌ 불필요 | **모두 에러 핸들러 있음** |
+| mutableListOf | 65건 | 1건 | ❌ 불필요 | 대부분 로컬 변수/synchronized |
+| println | 102건 | 68건 | ✅ 완료 | logger 변환 완료 |
+| Thread.sleep | 2건 | 1건 | ⚠️ 선택적 | BatchStorageManager (100ms) |
+| runBlocking | 1건 | 0건 | ✅ 완료 | 제거됨 |
 
-| Phase | 대상 | 제거 | 난이도 | 상태 |
-|-------|-----|:----:|:-----:|:----:|
-| Phase 1 | 6개 파일 (LOW) | 87개 | 🟢 | ✅ 완료 |
-| Phase 2 | FeedPage 등 3개 | 124개 | 🟡 | ✅ 완료 |
-| Phase 3 | Ephemeris/PassSchedule | 24개 | 🔴 | ✅ 완료 |
+### FE (프론트엔드)
 
-**현황**:
-- ✅ Phase 1 완료: 87개 제거
-- ✅ Phase 2 완료: 124개 제거 (FeedPage 106, ScheduleTable 1, ScheduleChart 17)
-- ✅ Phase 3 완료: 24개 제거 (EphemerisDesignation 22, PassSchedule 2)
-- 총 제거: **235개**
-- **남은 !important**: ~778개
-- 상세: [CSS_Phase2_Execution_Plan.md](./CSS_Phase2_Execution_Plan.md), [CSS_Phase3_Execution_Plan.md](./CSS_Phase3_Execution_Plan.md)
-
-### 3. Quasar 근본 개선 (장기)
-
-| 전략 | 효과 | 작업량 | 예상 제거 |
-|-----|:---:|:-----:|:--------:|
-| SCSS 변수 오버라이드 | 높음 | 중간 | ~200개 |
-| CSS Layers | 높음 | 낮음 | ~150개 |
-| 컴포넌트 래퍼 | 중간 | 높음 | ~100개 |
-
-**상세**: [CSS_Quasar_Override_Strategy.md](./CSS_Quasar_Override_Strategy.md)
+| 항목 | 레거시 | 실제 | 판정 | 비고 |
+|------|:------:|:----:|:----:|------|
+| Offset Control 분산 | 3곳 | 0곳 | ✅ 완료 | **useOffsetControls로 통합됨** |
+| 대형 파일 분리 | 5개 | 0개 긴급 | ❌ 불필요 | 이미 컴포넌트/composable 분리됨 |
+| 하드코딩 색상 | 304건 | 50~80건 | ⚠️ 선택적 | 차트 예외, UI만 대상 |
+| as 타입 단언 | 99건 | 20~30건 | ⚠️ 선택적 | icdStore WebSocket만 Type Guard 권장 |
 
 ---
 
-## 우선순위 권장
+## 완료된 작업 상세
 
-### 즉시 (테스트만)
-1. ✅ useErrorHandler/catch 블록 테스트 (Part 1: 41개)
-2. ✅ 빌드 확인 (`npm run build`)
-3. ✅ CSS Phase 1 실행 (87개 제거)
-4. ✅ CSS Phase 2 실행 (124개 제거)
-5. ✅ CSS Phase 3 실행 (24개 제거)
-6. ✅ CSS Phase 1-3 수동 테스트 완료
+### Sprint 0: 보안 Critical ✅
 
-### 단기 (1-2주)
-1. 📋 Quasar SCSS 변수 확장
+| 항목 | 파일 | 수정 내용 |
+|------|------|----------|
+| S0-1 Path Traversal | LoggingController.kt:172 | 파일명 검증 추가 (normalize + startsWith) |
+| S0-2 CORS Wildcard | CorsConfig.kt:26 | `"*"` 제거 |
+| S0-3 innerHTML XSS | windowUtils.ts | 4곳 → textContent/DOM API |
 
-### 중기 (2-4주)
-1. 📋 컴포넌트 래퍼 도입
+### Phase 1: BE 안정성 ✅
 
-### 장기 (1개월+)
-1. 📋 CSS Layers 검토
-2. 📋 Design Token 시스템 구축
+| 항목 | 상태 | 비고 |
+|------|:----:|------|
+| P1-1 !! 연산자 | ✅ | SunTrack 15건, PassSchedule 1건 제거 |
+| P1-2 Thread.sleep | ✅ | 1건 남음 (100ms, 선택적) |
+| P1-3 runBlocking | ✅ | 0건 |
+| P1-4 GlobalData | ✅ | `@Volatile` 적용됨 |
+| P1-5 subscribe() | ✅ | 에러 핸들러 모두 있음 확인 |
+| P1-6 @PreDestroy | ✅ | 7개 서비스 적용됨 |
+
+### Phase 2: FE 성능 ✅
+
+| 항목 | 결과 |
+|------|------|
+| P2-1 deep watch | 34건 분석, 1건만 제거 가능 (HardwareErrorLogPanel) |
+| P2-2 console.log | Production 빌드 자동 제거 설정 완료 |
+| P2-3 icdStore | 3개 객체 shallowRef 변환 완료 |
+
+### Phase 3: FE 파일 분리 ✅
+
+| 분리 대상 | 결과물 |
+|----------|--------|
+| PassSchedulePage.vue | ScheduleTable, ScheduleInfoPanel, ScheduleChart |
+| EphemerisDesignationPage.vue | SatelliteTrackingInfo, TleInputModal, TleDataSection, ScheduleSelectModal |
+| icdStore.ts | useAntennaState, useBoardStatus, useTrackingState, icdTypes |
+
+### Phase 4: 품질 개선 ✅
+
+| 항목 | 완료 내용 |
+|------|----------|
+| @Valid 검증 | 20개 어노테이션 추가 (Controller 3+4+13) |
+| catch(Exception) 구체화 | Controller 52건 완료, Service 보류 |
+
+### Phase 5: BE 서비스 분리 ✅
+
+| 분리 대상 | 결과물 |
+|----------|--------|
+| TLE 캐시 | EphemerisTLECache.kt, PassScheduleTLECache.kt |
+| DataRepository | EphemerisDataRepository.kt (~280줄), PassScheduleDataRepository.kt (~280줄) |
+
+### Phase 6: 키보드 단축키 ✅
+
+| 항목 | 상태 | 비고 |
+|------|:----:|------|
+| useKeyboardNavigation.ts | ✅ | 255줄, 다양한 키 바인딩 지원 |
+| 모달 ESC 닫기 | ✅ | q-dialog 기본 지원 |
+
+### CSS !important 정리 ✅
+
+| Phase | 제거 수 | 상태 |
+|-------|:------:|:----:|
+| Phase 1 | 87개 | ✅ |
+| Phase 2 | 124개 | ✅ |
+| Phase 3 | 22개 | ✅ |
+| **합계** | **233개** | ✅ |
+
+### DB Integration (Phase 6) ✅
+
+| 항목 | 테이블 | 상태 |
+|------|--------|:----:|
+| TLE Cache | tle_cache | ✅ 코드완료 |
+| Schedule Data | tracking_session, tracking_trajectory | ✅ 코드완료 |
+| Tracking Result | tracking_result | ✅ 코드완료 |
+| Hardware Error | hardware_error_log | ✅ 코드완료 |
 
 ---
 
-## 검증 체크리스트
+## 작업 이력 (Execution Log)
 
-### 코드 수정 후 필수 확인
-
-- [ ] `npm run build` 성공
-- [ ] `npx vue-tsc --noEmit` 타입 체크 통과
-- [ ] 각 페이지 로드 정상
-- [ ] 다크/라이트 테마 전환
-- [ ] 반응형 레이아웃 (1024px, 768px)
-
-### CSS 수정 후 필수 확인
-
-- [ ] 레이아웃 깨짐 없음
-- [ ] 차트 렌더링 정상
-- [ ] 테이블 기능 (스크롤, 헤더 고정, 하이라이트)
-- [ ] Quasar 컴포넌트 동작
+| Date | Phase | Task | Result |
+|------|-------|------|--------|
+| 2026-01-15 | Sprint 0 | 보안 수정 (3건) | Done |
+| 2026-01-15 | Phase 1 | BE 안정성 (6건) | Done |
+| 2026-01-15 | Phase 2 | FE 성능 개선 | Done |
+| 2026-01-16 | Phase 4 | @Valid, catch 구체화 | Done |
+| 2026-01-16 | Phase 5 | TLE 캐시 분리 | Done |
+| 2026-01-17 | Phase 5 | DataRepository 분리 | Done |
+| 2026-01-17 | 검토 | 레거시 vs 실제 비교 | Done |
+| 2026-01-18 | DB | Write-through 패턴 적용 | Done |
+| 2026-01-18 | 품질 | println → logger 변환 (103건) | Done |
 
 ---
 
-## 관련 컨텍스트 문서
+## Metrics
 
-| 문서 | 경로 |
-|-----|-----|
-| FE 아키텍처 | `docs/architecture/context/architecture/frontend.md` |
-| BE 아키텍처 | `docs/architecture/context/architecture/backend.md` |
-| 리팩토링 힌트 | `docs/architecture/context/analysis/synthesis/refactoring-hints.md` |
+### Before → After
 
----
-
-## 히스토리
-
-| 날짜 | 작업 | 상태 |
-|-----|-----|:----:|
-| 2026-01-15 | Phase 1-4 완료 | ✅ |
-| 2026-01-17 | Phase 5 완료 | ✅ |
-| 2026-01-18 | FE 추가 리팩토링 (catch, defineComponent) | ✅ |
-| 2026-01-18 | CSS !important 분석 완료 | ✅ |
-| 2026-01-18 | Quasar 근본 해결 전략 수립 | 📋 |
-| 2026-01-18 | **CSS Phase 1 실행 완료 (87개 제거)** | ✅ |
-| 2026-01-18 | **CSS Phase 2 실행 완료 (124개 제거)** | ✅ |
-| 2026-01-18 | **CSS Phase 3 완료 (24개 제거)** | ✅ |
+| Metric | Before | After | 상태 |
+|--------|:------:|:-----:|:----:|
+| !! operators | 46 | 0 | ✅ |
+| Thread.sleep | 2 | 1 | ⚠️ 선택적 |
+| runBlocking | 1 | 0 | ✅ |
+| subscribe() 미처리 | 4 | 0 | ✅ |
+| @PreDestroy 누락 | 2 | 0 | ✅ |
+| console.log (prod) | 1,513 | 0 | ✅ 자동제거 |
+| Path Traversal | 1 | 0 | ✅ |
+| CORS Wildcard | 1 | 0 | ✅ |
+| innerHTML XSS | 4 | 0 | ✅ |
+| CSS !important | 233 | 0 | ✅ |
 
 ---
 
-**Note**: `legacy/` 폴더에는 이전 문서들이 보관되어 있습니다. 필요 시 참고하세요.
+## 남은 작업
+
+### 필수
+
+- [ ] **DB 테스트**: 회사에서 TimescaleDB 설치 후 테스트
+  - 상세: [database/TEST_PLAN.md](database/TEST_PLAN.md)
+
+### 선택적 (P3)
+
+| 항목 | 작업량 | 비고 |
+|------|:------:|------|
+| UI 하드코딩 색상 | 50~80건 | 차트 예외 |
+| icdStore Type Guard | 20~30건 | 안정성 개선 |
+| Thread.sleep 1건 | 1건 | BatchStorageManager |
+| Quasar CSS 근본 개선 | - | [css/CSS_Quasar_Override_Strategy.md](css/CSS_Quasar_Override_Strategy.md) |
+
+---
+
+## 장기 계획
+
+> 핵심 리팩토링 완료 후 진행
+
+| 항목 | 설명 |
+|------|------|
+| 테스트 추가 | BE 2개 → 10+, FE 0개 → 추가 |
+| 인증/인가 | Spring Security + JWT |
+| Docker | Backend/Frontend 컨테이너화 |
+| CI/CD | GitLab 전환 시 파이프라인 |
+
+---
+
+## 테스트 체크리스트
+
+> 회사 복귀 후 실행
+
+### Phase 1 검증
+
+- [ ] SunTrack 모드 시작/중지
+- [ ] Train 각도 초기화 및 이동
+- [ ] Offset 변경 시 실시간 반영
+- [ ] PassSchedule 스케줄 로드
+
+### Phase 5 검증
+
+- [ ] TLECache 동작 확인
+- [ ] DataRepository 로그 확인
+
+### DB Integration 검증
+
+- [ ] TimescaleDB 연결
+- [ ] Write-through 저장 확인
+- [ ] 서버 재시작 후 복원 확인
+
+---
+
+## 하위 문서 참조
+
+### CSS 리팩토링
+
+| 문서 | 설명 |
+|------|------|
+| [CSS_Important_Cleanup_Plan.md](css/CSS_Important_Cleanup_Plan.md) | !important 정리 계획 |
+| [CSS_Test_Checklist.md](css/CSS_Test_Checklist.md) | CSS 테스트 체크리스트 |
+| [CSS_Quasar_Override_Strategy.md](css/CSS_Quasar_Override_Strategy.md) | Quasar 근본 해결 전략 |
+
+### Frontend 리팩토링
+
+| 문서 | 설명 |
+|------|------|
+| [FE_REFACTORING_PLAN.md](frontend/FE_REFACTORING_PLAN.md) | FE 리팩토링 상세 계획 |
+| [FE_Refactoring_Test_Checklist.md](frontend/FE_Refactoring_Test_Checklist.md) | 통합 테스트 체크리스트 |
+
+### Database Integration
+
+| 문서 | 설명 |
+|------|------|
+| [DESIGN.md](database/DESIGN.md) | DB 설계 문서 |
+| [PROGRESS.md](database/PROGRESS.md) | 진행 상황 + 설치 가이드 |
+| [TEST_PLAN.md](database/TEST_PLAN.md) | 테스트 계획 |
+
+### Legacy (과거 문서)
+
+| 문서 | 설명 |
+|------|------|
+| [IMPROVEMENT_ROADMAP.md](legacy/IMPROVEMENT_ROADMAP.md) | 7-Expert 종합 로드맵 |
+| [PHASE5_SEPARATION_PLAN.md](legacy/PHASE5_SEPARATION_PLAN.md) | 대형 파일 분리 계획 |
+
+---
+
+## 관련 문서
+
+- [CHANGELOG.md](../../../CHANGELOG.md) - 전체 변경 이력
+- [일일 로그](../../logs/) - 작업 로그

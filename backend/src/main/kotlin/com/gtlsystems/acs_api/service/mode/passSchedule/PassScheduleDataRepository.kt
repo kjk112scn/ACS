@@ -1,21 +1,36 @@
 package com.gtlsystems.acs_api.service.mode.passSchedule
 
+import com.gtlsystems.acs_api.tracking.entity.TrackingSessionEntity
+import com.gtlsystems.acs_api.tracking.entity.TrackingTrajectoryEntity
+import com.gtlsystems.acs_api.tracking.repository.TrackingSessionRepository
+import com.gtlsystems.acs_api.tracking.repository.TrackingTrajectoryRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.time.ZonedDateTime
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * PassSchedule 추적 데이터 저장소
+ * PassSchedule 추적 데이터 저장소 
  *
  * 위성별 패스 스케줄 마스터(MST) 및 세부(DTL) 데이터를 관리합니다.
  * ConcurrentHashMap 기반으로 위성 ID별 데이터 저장.
  * 모든 데이터 접근에 로그를 기록하여 검증 가능성을 보장합니다.
  *
+ * Write-through 패턴:
+ * - 메모리 캐시: 빠른 조회
+ * - DB 저장: 영속성 보장 (tracking_session, tracking_trajectory)
+ *
  * @since Phase 5 - BE 서비스 분리
+ * @since Phase 6 - DB 연동 추가
  */
 @Component
-class PassScheduleDataRepository {
+class PassScheduleDataRepository(
+    private val sessionRepository: TrackingSessionRepository?,
+    private val trajectoryRepository: TrackingTrajectoryRepository?
+) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -58,6 +73,9 @@ class PassScheduleDataRepository {
         dtlStorage[satelliteId] = dtlData
 
         logStorageSummary(opId)
+
+        // DB 저장 (Write-through)
+        saveToDatabase(satelliteId, mstData, dtlData, opId)
     }
 
     /**
@@ -303,5 +321,182 @@ class PassScheduleDataRepository {
         }
 
         return sb.toString()
+    }
+
+    // ========================================
+    // DB 연동 (Write-through)
+    // ========================================
+
+    /**
+     * DB에 위성별 스케줄 데이터를 저장합니다.
+     * MST → tracking_session, DTL → tracking_trajectory
+     */
+    private fun saveToDatabase(
+        satelliteId: String,
+        mstData: List<Map<String, Any?>>,
+        dtlData: List<Map<String, Any?>>,
+        opId: Long
+    ) {
+        if (sessionRepository == null || trajectoryRepository == null) {
+            logger.warn("DB Repository가 없습니다. 메모리 전용 모드로 동작합니다.")
+            return
+        }
+
+        // MST 데이터 → TrackingSession 저장
+        mstData.forEach { mst ->
+            try {
+                val session = mapMstToSession(satelliteId, mst)
+                sessionRepository.save(session)
+                    .doOnSuccess { saved: TrackingSessionEntity ->
+                        logger.debug("📝 [DB #$opId] Session 저장: id=${saved.id}, satelliteId=$satelliteId, mstId=${saved.mstId}")
+                        // 해당 세션의 DTL 데이터 저장
+                        val sessionDtlData = dtlData.filter { dtl ->
+                            val dtlMstId = (dtl["MstId"] as? Number)?.toLong()
+                            val dtlDataType = dtl["DataType"] as? String
+                            dtlMstId == saved.mstId && dtlDataType == saved.dataType
+                        }
+                        if (sessionDtlData.isNotEmpty() && saved.id != null) {
+                            saveTrajectories(saved.id, sessionDtlData, opId)
+                        }
+                    }
+                    .doOnError { e: Throwable ->
+                        logger.error("❌ [DB #$opId] Session 저장 실패: ${e.message}")
+                    }
+                    .subscribe()
+            } catch (e: Exception) {
+                logger.error("❌ [DB #$opId] MST → Session 변환 실패: ${e.message}")
+            }
+        }
+
+        logger.info("📝 [DB #$opId] PassSchedule 스케줄 DB 저장 요청 완료 (위성: $satelliteId, MST: ${mstData.size}개)")
+    }
+
+    /**
+     * DTL 데이터를 trajectory로 저장합니다.
+     */
+    private fun saveTrajectories(sessionId: Long, dtlData: List<Map<String, Any?>>, opId: Long) {
+        if (trajectoryRepository == null) return
+
+        val trajectories = dtlData.mapNotNull { dtl ->
+            try {
+                mapDtlToTrajectory(sessionId, dtl)
+            } catch (e: Exception) {
+                logger.error("❌ [DB #$opId] DTL → Trajectory 변환 실패: ${e.message}")
+                null
+            }
+        }
+
+        if (trajectories.isNotEmpty()) {
+            trajectoryRepository.saveAll(trajectories)
+                .doOnSuccess {
+                    logger.debug("📝 [DB #$opId] Trajectory 배치 저장 완료: ${trajectories.size}개")
+                }
+                .doOnError { e: Throwable ->
+                    logger.error("❌ [DB #$opId] Trajectory 저장 실패: ${e.message}")
+                }
+                .subscribe()
+        }
+    }
+
+    /**
+     * MST Map을 TrackingSessionEntity로 변환합니다.
+     */
+    private fun mapMstToSession(satelliteId: String, mst: Map<String, Any?>): TrackingSessionEntity {
+        val mstId = (mst["MstId"] as? Number)?.toLong() ?: 0L
+        val detailId = (mst["DetailId"] as? Number)?.toInt() ?: 0
+        val satelliteName = mst["SatelliteName"] as? String
+        val dataType = mst["DataType"] as? String ?: "original"
+
+        // 시간 파싱
+        val now = OffsetDateTime.now(ZoneOffset.UTC)
+        val startTime = parseTime(mst["StartTime"]) ?: now
+        val endTime = parseTime(mst["EndTime"]) ?: now
+        val duration = (mst["Duration"] as? Number)?.toInt()
+
+        // 각도 정보
+        val maxElevation = (mst["MaxElevation"] as? Number)?.toDouble()
+        val maxAzimuthRate = (mst["MaxAzimuthRate"] as? Number)?.toDouble()
+        val maxElevationRate = (mst["MaxElevationRate"] as? Number)?.toDouble()
+        val keyholeDetected = mst["KeyholeDetected"] as? Boolean ?: false
+        val recommendedTrainAngle = (mst["RecommendedTrainAngle"] as? Number)?.toDouble()
+        val totalPoints = (mst["TotalPoints"] as? Number)?.toInt()
+
+        return TrackingSessionEntity(
+            mstId = mstId,
+            detailId = detailId,
+            satelliteId = satelliteId,
+            satelliteName = satelliteName,
+            trackingMode = "PASS_SCHEDULE",
+            dataType = dataType,
+            startTime = startTime,
+            endTime = endTime,
+            duration = duration,
+            maxElevation = maxElevation,
+            maxAzimuthRate = maxAzimuthRate,
+            maxElevationRate = maxElevationRate,
+            keyholeDetected = keyholeDetected,
+            recommendedTrainAngle = recommendedTrainAngle,
+            totalPoints = totalPoints
+        )
+    }
+
+    /**
+     * DTL Map을 TrackingTrajectoryEntity로 변환합니다.
+     */
+    private fun mapDtlToTrajectory(sessionId: Long, dtl: Map<String, Any?>): TrackingTrajectoryEntity {
+        val detailId = (dtl["DetailId"] as? Number)?.toInt() ?: 0
+        val dataType = dtl["DataType"] as? String ?: "original"
+        val index = (dtl["Index"] as? Number)?.toInt() ?: 0
+
+        // 시간 파싱
+        val timestamp = parseTime(dtl["Time"]) ?: parseTime(dtl["Timestamp"])
+            ?: OffsetDateTime.now(ZoneOffset.UTC)
+
+        // 각도
+        val azimuth = (dtl["Azimuth"] as? Number)?.toDouble() ?: 0.0
+        val elevation = (dtl["Elevation"] as? Number)?.toDouble() ?: 0.0
+        val train = (dtl["Train"] as? Number)?.toDouble()
+
+        // 속도
+        val azimuthRate = (dtl["AzimuthRate"] as? Number)?.toDouble()
+        val elevationRate = (dtl["ElevationRate"] as? Number)?.toDouble()
+
+        return TrackingTrajectoryEntity(
+            timestamp = timestamp,
+            sessionId = sessionId,
+            detailId = detailId,
+            dataType = dataType,
+            index = index,
+            azimuth = azimuth,
+            elevation = elevation,
+            train = train,
+            azimuthRate = azimuthRate,
+            elevationRate = elevationRate
+        )
+    }
+
+    /**
+     * 다양한 시간 형식을 OffsetDateTime으로 파싱합니다.
+     */
+    private fun parseTime(value: Any?): OffsetDateTime? {
+        return when (value) {
+            is OffsetDateTime -> value
+            is ZonedDateTime -> value.toOffsetDateTime()
+            is java.time.Instant -> value.atOffset(ZoneOffset.UTC)
+            is String -> try {
+                OffsetDateTime.parse(value)
+            } catch (e: Exception) {
+                try {
+                    ZonedDateTime.parse(value).toOffsetDateTime()
+                } catch (e2: Exception) {
+                    null
+                }
+            }
+            is Number -> OffsetDateTime.ofInstant(
+                java.time.Instant.ofEpochMilli(value.toLong()),
+                ZoneOffset.UTC
+            )
+            else -> null
+        }
     }
 }

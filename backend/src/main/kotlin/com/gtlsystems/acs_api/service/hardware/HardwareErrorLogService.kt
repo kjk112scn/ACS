@@ -1,22 +1,56 @@
 package com.gtlsystems.acs_api.service.hardware
 
+import com.gtlsystems.acs_api.tracking.entity.HardwareErrorLogEntity
+import com.gtlsystems.acs_api.tracking.repository.HardwareErrorLogRepository
+import jakarta.annotation.PostConstruct
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.Duration
 import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import com.gtlsystems.acs_api.model.PushData
 
 /**
- * 하드웨어 에러 로그 관리 서비스 (메모리 기반)
+ * 하드웨어 에러 로그 관리 서비스
+ * - Write-through: 메모리 + DB 동시 저장
+ * - 서버 시작 시 DB에서 최근 에러 로드
  */
 @Service
-class HardwareErrorLogService {
-    
-        private val logger: Logger = LoggerFactory.getLogger(HardwareErrorLogService::class.java)
+class HardwareErrorLogService(
+    private val hardwareErrorLogRepository: HardwareErrorLogRepository?
+) {
+    private val logger: Logger = LoggerFactory.getLogger(HardwareErrorLogService::class.java)
+
+    /**
+     * 서버 시작 시 DB에서 최근 에러 로그를 로드합니다
+     */
+    @PostConstruct
+    fun initFromDatabase() {
+        if (hardwareErrorLogRepository == null) {
+            logger.warn("⚠️ HardwareErrorLogRepository가 없습니다. 메모리 전용 모드로 동작합니다.")
+            return
+        }
+
+        logger.info("📥 DB에서 하드웨어 에러 로그 로드 중...")
+
+        hardwareErrorLogRepository.findRecent(1000)
+            .doOnNext { entity: HardwareErrorLogEntity ->
+                val errorLog = mapEntityToErrorLog(entity)
+                errorLogs.offer(errorLog)
+            }
+            .doOnComplete {
+                logger.info("🚀 HardwareErrorLogService 초기화 완료: ${errorLogs.size}개 에러 로드")
+            }
+            .doOnError { e: Throwable ->
+                logger.error("❌ DB 에러 로그 로드 실패: ${e.message}", e)
+            }
+            .subscribe()
+    }
     
     // 이전 비트 상태 저장
     private val previousBitStates = ConcurrentHashMap<String, String>()
@@ -289,17 +323,132 @@ class HardwareErrorLogService {
     }
     
     /**
-     * 에러 로그를 추가합니다
+     * 에러 로그를 추가합니다 (Write-through: 메모리 + DB)
      */
     private fun addErrorLog(error: HardwareErrorLog) {
+        // 1. 메모리에 저장
         errorLogs.offer(error)
-        
+
         // 최대 1000개로 제한
         while (errorLogs.size > 1000) {
             errorLogs.poll()
         }
-        
+
         logger.info("📝 에러 로그 추가: {} - {}", error.component, error.errorKey)
+
+        // 2. DB에 저장 (Write-through)
+        saveToDatabase(error)
+    }
+
+    /**
+     * 에러 로그를 DB에 저장합니다
+     */
+    private fun saveToDatabase(error: HardwareErrorLog) {
+        if (hardwareErrorLogRepository == null) return
+
+        try {
+            val entity = mapErrorLogToEntity(error)
+            hardwareErrorLogRepository.save(entity)
+                .doOnSuccess {
+                    logger.debug("💾 [DB] 하드웨어 에러 저장 완료: {}", error.errorKey)
+                }
+                .doOnError { e: Throwable ->
+                    logger.error("❌ [DB] 하드웨어 에러 저장 실패: ${e.message}", e)
+                }
+                .subscribe()
+        } catch (e: Exception) {
+            logger.error("❌ [DB] 에러 매핑 실패: ${e.message}", e)
+        }
+    }
+
+    // ==================== 매핑 함수 ====================
+
+    /**
+     * HardwareErrorLog → HardwareErrorLogEntity 변환
+     */
+    private fun mapErrorLogToEntity(error: HardwareErrorLog): HardwareErrorLogEntity {
+        val timestamp = try {
+            LocalDateTime.parse(error.timestamp).atOffset(ZoneOffset.UTC)
+        } catch (e: Exception) {
+            OffsetDateTime.now(ZoneOffset.UTC)
+        }
+
+        val resolvedAt = error.resolvedAt?.let {
+            try {
+                LocalDateTime.parse(it).atOffset(ZoneOffset.UTC)
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        // component에서 axis 추출 (예: "Azimuth Servo" → "AZIMUTH")
+        val axis = extractAxis(error.component)
+        // component에서 source 추출 (예: "Azimuth Servo" → "AZIMUTH")
+        val source = extractSource(error.component, error.category)
+
+        return HardwareErrorLogEntity(
+            timestamp = timestamp,
+            errorCode = error.errorKey,
+            errorType = error.category,
+            errorMessage = null,  // 프론트엔드에서 i18n 처리
+            source = source,
+            axis = axis,
+            severity = error.severity,
+            trackingMode = null,  // 추적 모드 정보 없음
+            sessionId = null,
+            rawData = null,
+            correlationId = null,
+            occurrenceCount = 1,
+            resolved = error.isResolved,
+            resolvedAt = resolvedAt,
+            resolvedBy = null,
+            resolutionNote = null
+        )
+    }
+
+    /**
+     * HardwareErrorLogEntity → HardwareErrorLog 변환
+     */
+    private fun mapEntityToErrorLog(entity: HardwareErrorLogEntity): HardwareErrorLog {
+        return HardwareErrorLog(
+            id = "${entity.errorCode}-${entity.timestamp.toInstant().toEpochMilli()}",
+            timestamp = entity.timestamp.toLocalDateTime().toString(),
+            category = entity.errorType,
+            severity = entity.severity,
+            errorKey = entity.errorCode,
+            component = entity.source,
+            isResolved = entity.resolved,
+            resolvedAt = entity.resolvedAt?.toLocalDateTime()?.toString()
+        )
+    }
+
+    /**
+     * component에서 axis 추출
+     */
+    private fun extractAxis(component: String): String? {
+        return when {
+            component.contains("Azimuth", ignoreCase = true) -> HardwareErrorLogEntity.AXIS_AZIMUTH
+            component.contains("Elevation", ignoreCase = true) -> HardwareErrorLogEntity.AXIS_ELEVATION
+            component.contains("Train", ignoreCase = true) ||
+            component.contains("Tilt", ignoreCase = true) -> HardwareErrorLogEntity.AXIS_TRAIN
+            else -> null
+        }
+    }
+
+    /**
+     * component와 category에서 source 추출
+     */
+    private fun extractSource(component: String, category: String): String {
+        return when {
+            component.contains("Azimuth", ignoreCase = true) -> HardwareErrorLogEntity.SOURCE_AZIMUTH
+            component.contains("Elevation", ignoreCase = true) -> HardwareErrorLogEntity.SOURCE_ELEVATION
+            component.contains("Train", ignoreCase = true) ||
+            component.contains("Tilt", ignoreCase = true) -> HardwareErrorLogEntity.SOURCE_TRAIN
+            component.contains("Feed", ignoreCase = true) ||
+            component.contains("S-Band", ignoreCase = true) ||
+            component.contains("X-Band", ignoreCase = true) -> HardwareErrorLogEntity.SOURCE_FEED
+            else -> HardwareErrorLogEntity.SOURCE_ACU
+        }
     }
     
     /**
