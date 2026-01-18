@@ -170,54 +170,11 @@ const handleStowCommand = async () => {
 </script>
 
 <style scoped>
-/* SunTrackPage 레이아웃 - EphemerisDesignationPage, PassSchedulePage와 동일한 구조 */
-div.sun-track-mode {
-  height: auto !important;
-  /* ✅ height: 100% 제거하여 내용에 맞게 조정 */
-  width: 100%;
-  padding: 0 !important;
-  margin: 0 !important;
-  margin-bottom: 0 !important;
-  /* ✅ 하단 마진 제거 */
-  padding-bottom: 0 !important;
-  /* ✅ 하단 패딩 제거 */
-  /* ✅ min-height는 공통 CSS의 var(--theme-layout-modePageMinHeight, 500px) 사용 */
-  max-height: none !important;
-  /* ✅ 최대 높이 제거 */
-  display: flex !important;
-  /* ✅ flexbox로 변경 */
-  flex-direction: column !important;
-  /* ✅ 세로 방향 */
-  gap: 0 !important;
-  /* ✅ flex gap 제거 */
-  row-gap: 0 !important;
-  /* ✅ flex row-gap 제거 */
-  column-gap: 0 !important;
-  /* ✅ flex column-gap 제거 */
-}
-
-/* router-view, q-page-container의 하단 패딩/마진 제거 */
-router-view .sun-track-mode,
-q-page-container .sun-track-mode {
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
-/* ✅ sun-track-mode 내부의 모든 직접 자식 요소 하단 여백 제거 */
-.sun-track-mode > * {
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
-/* ✅ sun-track-mode의 마지막 div 요소 하단 여백 완전 제거 */
-.sun-track-mode > div:last-child {
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
+/* SunTrackPage 레이아웃 → mode-common.scss로 통일됨 */
 
 /* Offset Control Row */
 .sun-track-mode .offset-control-row {
-  margin-bottom: 0.5rem !important;
+  margin-bottom: 0.5rem;
   position: relative;
   z-index: 100;
 }

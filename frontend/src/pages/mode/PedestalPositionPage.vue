@@ -329,13 +329,7 @@ const handleStowCommand = async () => {
   /* ✅ justify-content와 align-items는 mode-shell__content에서 처리 */
 }
 
-/* 섹션 제목 간격 최소화 */
-.section-title {
-  font-weight: 500;
-  padding-left: 0.5rem;
-  margin-bottom: 0.5rem !important;
-  /* 마진 줄임 */
-}
+/* 섹션 제목 → mode-common.scss로 통일됨 */
 
 /* 중앙 집중형 컨테이너 */
 .pedestal-container {
@@ -362,44 +356,38 @@ const handleStowCommand = async () => {
   transition: opacity 0.3s, filter 0.3s;
 }
 
-/* 카드 섹션 패딩 최소화 */
+/* 카드 섹션 패딩 - PedestalPositionPage 커스텀 */
 .axis-panel .q-card-section {
-  padding: 0.1rem 0.8rem 1.2rem 0.8rem !important;
+  padding: 0.1rem 0.8rem 1.2rem 0.8rem;
   /* 상단 패딩을 최소화하고 하단 패딩을 최대화해서 위아래 균형 맞춤 */
 }
 
-/* 체크박스와 라벨을 함께 가운데 정렬하는 그룹 */
+/* 체크박스/라벨 그룹 - PedestalPositionPage 커스텀 */
 .checkbox-label-group {
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  justify-content: center !important;
-  /* 체크박스와 라벨을 함께 가운데 정렬 */
-  width: 100% !important;
-  margin: 0 !important;
-  /* 모든 마진 제거 */
-  margin-top: -0.5rem !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  width: 100%;
+  margin: 0;
+  margin-top: -0.5rem;
   /* 체크박스 그룹을 위로 올림 */
 }
 
-/* 축 헤더 간격 최소화 */
+/* 축 헤더 - PedestalPositionPage 커스텀 */
 .axis-header {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  /* 헤더 전체를 가운데 정렬 */
-  margin-bottom: 0.2rem !important;
-  /* 체크박스와 Speed 간격을 위아래 동일하게 맞춤 */
-  margin-top: -0.5rem !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.2rem;
+  margin-top: -0.5rem;
   /* 헤더를 위로 올림 */
-  width: 100% !important;
-  /* 전체 너비 사용 */
+  width: 100%;
 }
 
-/* 체크박스 위 공간 늘리기 */
+/* 체크박스 위 공간 - PedestalPositionPage 커스텀 */
 .axis-checkbox {
-  margin: 0.5rem 0 0 0 !important;
-  /* 체크박스 위 공간을 늘림 */
+  margin: 0.5rem 0 0 0;
   flex-shrink: 0;
 }
 
@@ -413,26 +401,22 @@ const handleStowCommand = async () => {
   flex: 1;
 }
 
-/* 입력 필드 마진 최소화 */
+/* 입력 필드 마진 - PedestalPositionPage 커스텀 */
 .axis-panel .q-field {
-  margin-bottom: 0 !important;
-  /* Speed 아래 공간을 완전히 제거 */
+  margin-bottom: 0;
 }
 
 .axis-panel .q-field:last-child {
-  margin-bottom: 0 !important;
-  /* 마지막 필드는 하단 마진 없음 */
+  margin-bottom: 0;
 }
 
-/* 라벨 마진 최소화 */
+/* 라벨 마진 - PedestalPositionPage 커스텀 */
 .axis-panel .text-subtitle2 {
-  margin-bottom: 0.2rem !important;
-  /* 라벨 하단 마진 최소화 */
+  margin-bottom: 0.2rem;
 }
 
 .axis-panel .text-subtitle2:first-of-type {
-  margin-top: 0 !important;
-  /* 첫 번째 라벨은 상단 마진 없음 */
+  margin-top: 0;
 }
 
 /* 버튼 섹션 스타일 */

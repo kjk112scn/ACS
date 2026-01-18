@@ -38,7 +38,7 @@
                 outlined
                 readonly
                 label="Output"
-                style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;"
+                class="offset-input"
               />
             </div>
           </div>
@@ -61,7 +61,7 @@
                 type="number"
                 step="0.01"
                 label="Elevation"
-                style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;"
+                class="offset-input"
               />
             </div>
             <div class="col-auto">
@@ -80,7 +80,7 @@
                 outlined
                 readonly
                 label="Output"
-                style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;"
+                class="offset-input"
               />
             </div>
           </div>
@@ -103,7 +103,7 @@
                 type="number"
                 step="0.01"
                 label="Tilt"
-                style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;"
+                class="offset-input"
               />
             </div>
             <div class="col-auto">
@@ -122,7 +122,7 @@
                 outlined
                 readonly
                 label="Output"
-                style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;"
+                class="offset-input"
               />
             </div>
           </div>
@@ -145,7 +145,7 @@
                 type="number"
                 step="0.01"
                 label="Time"
-                style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;"
+                class="offset-input"
               />
             </div>
             <div class="col-auto">
@@ -164,7 +164,7 @@
                 outlined
                 readonly
                 label="Result"
-                style="width: 110px !important; min-width: 110px !important; max-width: 110px !important;"
+                class="offset-input"
               />
             </div>
             <div class="col-auto cal-time-field">
@@ -174,7 +174,7 @@
                 outlined
                 readonly
                 label="Cal Time"
-                style="min-width: 190px !important; max-width: 220px !important;"
+                class="cal-time-input"
               />
             </div>
           </div>
@@ -272,9 +272,14 @@ const reset = (index: number) => {
 }
 
 .offset-input {
-  width: 110px !important;
-  min-width: 110px !important;
-  max-width: 110px !important;
+  width: 110px;
+  min-width: 110px;
+  max-width: 110px;
+}
+
+.cal-time-input {
+  min-width: 190px;
+  max-width: 220px;
 }
 
 /* 반응형 동작 */

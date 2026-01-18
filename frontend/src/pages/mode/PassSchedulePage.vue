@@ -142,8 +142,10 @@ import { getCalTimeTimestamp } from '../../utils/times'
 // 분리된 컴포넌트 및 composable import
 import { ScheduleInfoPanel, ScheduleTable } from './passSchedule/components'
 import { OffsetControls, useOffsetControls } from './shared'
+import { useErrorHandler } from '@/composables/useErrorHandler'
 
 const $q = useQuasar()
+const { handleApiError } = useErrorHandler()
 const passScheduleStore = usePassScheduleModeStore()
 const icdStore = useICDStore()
 
@@ -1307,12 +1309,8 @@ const handleTLEUpload = async () => {
     if (modal) {
       console.log('TLE 업로드 모달 열기 성공')
     }
-  } catch (error) {
-    console.error('TLE 업로드 모달 열기 실패:', error)
-    $q.notify({
-      type: 'negative',
-      message: 'TLE 업로드 창을 열 수 없습니다',
-    })
+  } catch (err) {
+    handleApiError(err, 'TLE 업로드 모달 열기')
   }
 }
 
@@ -1980,12 +1978,8 @@ const selectScheduleData = async () => {
       try {
         await passScheduleStore.fetchScheduleDataFromServer()
         console.log('✅ 스케줄 데이터 로드 완료:', passScheduleStore.scheduleData.length, '개')
-      } catch (error) {
-        console.error('❌ 스케줄 데이터 로드 실패:', error)
-        $q.notify({
-          type: 'negative',
-          message: '스케줄 데이터를 불러오는데 실패했습니다',
-        })
+      } catch (err) {
+        handleApiError(err, '스케줄 데이터 로드')
         return
       }
     }
@@ -2013,12 +2007,8 @@ const selectScheduleData = async () => {
     if (modal) {
       console.log('스케줄 선택 모달 열기 성공')
     }
-  } catch (error) {
-    console.error('스케줄 선택 모달 열기 실패:', error)
-    $q.notify({
-      type: 'negative',
-      message: '스케줄 선택 창을 열 수 없습니다',
-    })
+  } catch (err) {
+    handleApiError(err, '스케줄 선택 모달 열기')
   }
 }
 
@@ -2253,12 +2243,8 @@ const handleStartCommand = async () => {
         message: '추적 대상 설정에 실패했습니다',
       })
     }
-  } catch (error) {
-    console.error('❌ ACS Start 명령 실패:', error)
-    $q.notify({
-      type: 'negative',
-      message: '스케줄 시작에 실패했습니다',
-    })
+  } catch (err) {
+    handleApiError(err, 'ACS Start 명령')
   }
 }
 
@@ -2295,12 +2281,8 @@ const handleStopCommand = async () => {
         message: '시스템 정지 명령은 전송되었으나 모니터링 중지에 실패했습니다',
       })
     }
-  } catch (error) {
-    console.error('Failed to send stop command:', error)
-    $q.notify({
-      type: 'negative',
-      message: '정지 명령 전송에 실패했습니다',
-    })
+  } catch (err) {
+    handleApiError(err, '정지 명령 전송')
   }
 }
 const handleStowCommand = async () => {
@@ -2313,12 +2295,8 @@ const handleStowCommand = async () => {
       type: 'positive',
       message: 'Stow 명령이 전송되었습니다',
     })
-  } catch (error) {
-    console.error('Failed to send stow command:', error)
-    $q.notify({
-      type: 'negative',
-      message: 'Stow 명령 전송에 실패했습니다',
-    })
+  } catch (err) {
+    handleApiError(err, 'Stow 명령 전송')
   }
 }
 /*

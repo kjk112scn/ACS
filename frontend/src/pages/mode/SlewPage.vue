@@ -90,18 +90,13 @@
 </template>
 
 <script setup lang="ts">
-import { defineComponent, onUnmounted } from 'vue'
+import { onUnmounted } from 'vue'
 import { useICDStore } from '../../stores/icd/icdStore'
 import { useSlewModeStore, type AxisKey } from '@/stores'
 import { useAngleLimitsSettingsStore } from '@/stores/api/settings/angleLimitsSettingsStore'
 import { useNotification } from '@/composables/useNotification'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 import { ControlButtonBar } from '@/components/common'
-
-// 컴포넌트 이름 정의
-defineComponent({
-  name: 'SlewMode',
-})
 
 // 스토어 인스턴스 생성
 const icdStore = useICDStore()
@@ -443,13 +438,7 @@ onUnmounted(() => {
   /* 중앙 정렬 */
 }
 
-/* 섹션 제목 간격 최소화 */
-.section-title {
-  font-weight: 500;
-  padding-left: 0.5rem;
-  margin-bottom: 0.5rem !important;
-  /* 마진 줄임 */
-}
+/* 섹션 제목 → mode-common.scss로 통일됨 */
 
 /* 축 패널 스타일 - 공간 최적화 */
 /* ✅ 테두리는 mode-common.scss의 .axis-panel에서 통일 관리 */
@@ -468,33 +457,21 @@ onUnmounted(() => {
   /* 하단 패딩을 더 줄임 */
 }
 
-/* 체크박스와 라벨을 함께 가운데 정렬하는 그룹 */
-.checkbox-label-group {
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  justify-content: center !important;
-  /* 체크박스와 라벨을 함께 가운데 정렬 */
-  width: 100% !important;
-  margin: 0 auto !important;
-  /* 가운데 정렬 강제 */
-}
+/* 체크박스/라벨 그룹 → mode-common.scss로 통일됨 */
 
-/* 축 헤더 간격 최소화 */
+/* 축 헤더 - SlewPage 커스텀 간격 */
 .axis-header {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  /* 헤더 전체를 가운데 정렬 */
-  margin-bottom: 2rem !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2rem;
   /* 체크박스와 Speed 간격을 조금 줄여서 Speed를 조금 올림 */
-  width: 100% !important;
-  /* 전체 너비 사용 */
+  width: 100%;
 }
 
-/* 체크박스 위 공간 늘리기 */
+/* 체크박스 위 공간 - SlewPage 커스텀 */
 .axis-checkbox {
-  margin: 0.5rem 0 0 0 !important;
+  margin: 0.5rem 0 0 0;
   /* 체크박스 위 공간을 늘림 */
   flex-shrink: 0;
 }
@@ -504,40 +481,24 @@ onUnmounted(() => {
   filter: grayscale(30%);
 }
 
-/* 입력 필드 간격 최소화 */
-.axis-panel .text-subtitle2 {
-  font-size: 0.9rem;
-  margin-bottom: 0.25rem !important;
-  /* 마진 최소화 */
-  margin-top: 0.5rem !important;
-  /* 첫 번째 라벨만 상단 마진 */
-}
+/* 입력 필드 라벨 → mode-common.scss로 통일됨 */
 
-.axis-panel .text-subtitle2:first-of-type {
-  margin-top: 0 !important;
-  /* 첫 번째 라벨은 상단 마진 없음 */
-}
-
-/* 입력 필드 마진 최소화 */
+/* 입력 필드 마진 - SlewPage 커스텀 (Speed 아래 공간 제거) */
 .axis-panel .q-field {
-  margin-bottom: 0 !important;
-  /* Speed 아래 공간을 완전히 제거 */
+  margin-bottom: 0;
 }
 
 .axis-panel .q-field:last-child {
-  margin-bottom: 0 !important;
-  /* 마지막 필드는 하단 마진 없음 */
+  margin-bottom: 0;
 }
 
-/* Speed 입력창 높이 줄이기 */
+/* Speed 입력창 높이 - SlewPage 커스텀 */
 .axis-panel .q-field__control {
-  min-height: 2rem !important;
-  /* 입력창 높이를 줄임 */
+  min-height: 2rem;
 }
 
 .axis-panel .q-field__native {
-  padding: 0.3rem 0.5rem !important;
-  /* 입력창 내부 패딩 줄임 */
+  padding: 0.3rem 0.5rem;
 }
 
 .axis-title {

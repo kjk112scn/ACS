@@ -388,6 +388,7 @@ import {
 } from '../../services/mode/ephemerisTrackService'
 import { openPopup } from '../../utils/windowUtils'
 import { useNotification } from '../../composables/useNotification'
+import { useErrorHandler } from '../../composables/useErrorHandler'
 import { useChartTheme } from '../../composables/useChartTheme'
 // 분리된 컴포넌트 및 composable import
 import { OffsetControls, useOffsetControls } from './shared'
@@ -398,7 +399,8 @@ import {
 } from './ephemerisDesignation/components'
 
 // ✅ 알림 시스템 사용
-const { success, error, warning, info } = useNotification()
+const { success, warning, info } = useNotification()
+const { handleApiError } = useErrorHandler()
 
 // ✅ 테마 색상 (ECharts용 CSS 변수 캐싱)
 const { colors: chartColors } = useChartTheme()
@@ -772,8 +774,7 @@ const loadScheduleData = async () => {
     console.log(`✅ 스케줄 데이터 로드 완료: ${ephemerisStore.masterData.length}개 패스`)
 
   } catch (err) {
-    console.error('❌ 스케줄 데이터 로드 실패:', err)
-    error('스케줄 데이터 로드에 실패했습니다')
+    handleApiError(err, '스케줄 데이터 로드')
   } finally {
     isLoadingComparison.value = false
   }
@@ -1172,9 +1173,8 @@ const downloadRealtimeData = async () => {
     } else {
       warning('다운로드할 실시간 추적 데이터가 없습니다')
     }
-  } catch (error) {
-    console.error('실시간 추적 데이터 다운로드 실패:', error)
-    error('실시간 추적 데이터 다운로드에 실패했습니다')
+  } catch (err) {
+    handleApiError(err, '실시간 추적 데이터 다운로드')
   }
 }
 
@@ -1962,9 +1962,8 @@ const selectSchedule = async () => {
     success(`${selectedItem.SatelliteName || selectedItem.SatelliteID} 스케줄이 선택되었습니다`)
 
     showScheduleModal.value = false
-  } catch (error) {
-    console.error('스케줄 선택 실패:', error)
-    error('스케줄 선택에 실패했습니다')
+  } catch (err) {
+    handleApiError(err, '스케줄 선택')
   }
 }
 
@@ -2074,9 +2073,9 @@ const addTLEData = async () => {
     success(`TLE 데이터가 성공적으로 처리되었습니다${isGEO ? ' (정지궤도)' : ''}`)
 
     showTLEModal.value = false
-  } catch (error) {
-    console.error('TLE 처리 실패:', error)
-    tleError.value = error instanceof Error ? error.message : 'TLE 데이터 처리에 실패했습니다'
+  } catch (err) {
+    handleApiError(err, 'TLE 처리')
+    tleError.value = err instanceof Error ? err.message : 'TLE 데이터 처리에 실패했습니다'
   } finally {
     isProcessingTLE.value = false
   }
@@ -2197,10 +2196,8 @@ const handleEphemerisCommand = async () => {
 
     success('Ephemeris 추적이 시작되었습니다')
     console.log('Ephemeris 추적이 시작되었습니다')
-  } catch (error) {
-    console.error('Failed to start tracking:', error)
-    const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'
-    error(`추적 시작에 실패했습니다: ${errorMessage}`)
+  } catch (err) {
+    handleApiError(err, '추적 시작')
   }
 }
 
@@ -2220,9 +2217,8 @@ const handleStopCommand = async () => {
     console.log('🛑 Stop 버튼 클릭 - 추적 중지 및 상태 변경')
 
     console.log('정지 명령이 전송되었습니다')
-  } catch (error) {
-    console.error('Failed to send stop command:', error)
-    console.error('정지 명령 전송에 실패했습니다')
+  } catch (err) {
+    handleApiError(err, '정지 명령 전송')
   }
 }
 
@@ -2231,9 +2227,8 @@ const handleStowCommand = async () => {
     await icdStore.stowCommand()
 
     console.log('Stow 명령이 전송되었습니다')
-  } catch (error) {
-    console.error('Failed to send stow command:', error)
-    console.error('Stow 명령 전송에 실패했습니다')
+  } catch (err) {
+    handleApiError(err, 'Stow 명령 전송')
   }
 }
 
@@ -2245,9 +2240,8 @@ const openAxisTransformCalculator = () => {
       height: 600,
       title: '3축 변환 계산기'
     })
-  } catch (error) {
-    console.error('ATC 팝업 열기 실패:', error)
-    error('ATC 팝업을 열 수 없습니다')
+  } catch (err) {
+    handleApiError(err, 'ATC 팝업 열기')
   }
 }
 
@@ -2290,8 +2284,7 @@ const exportAllMstDataToCsv = async () => {
     console.log('이론치 CSV 다운로드 완료:', { mstId, detailId, satelliteName })
 
   } catch (err) {
-    console.error('이론치 CSV 다운로드 실패:', err)
-    error('이론치 데이터 다운로드 중 오류가 발생했습니다')
+    handleApiError(err, '이론치 CSV 다운로드')
   } finally {
     isExportingCsv.value = false
   }

@@ -99,17 +99,11 @@
 </template>
 
 <script setup lang="ts">
-import { defineComponent } from 'vue'
 import { useICDStore } from '../../stores/icd/icdStore'
 import { useStepStore } from '../../stores/mode/stepStore'
 import { useNotification } from '@/composables/useNotification'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 import { ControlButtonBar } from '@/components/common'
-
-// 컴포넌트 이름 정의
-defineComponent({
-  name: 'StepMode',
-})
 
 // 스토어 인스턴스 생성
 const icdStore = useICDStore()
@@ -315,13 +309,7 @@ const handleBlur = (type: 'speeds' | 'angles', axis: 'azimuth' | 'elevation' | '
   /* 중앙 정렬 */
 }
 
-/* 섹션 제목 간격 최소화 */
-.section-title {
-  font-weight: 500;
-  padding-left: 0.5rem;
-  margin-bottom: 0.5rem !important;
-  /* 마진 줄임 */
-}
+/* 섹션 제목 → mode-common.scss로 통일됨 */
 
 /* 축 패널 스타일 - 공간 최적화 */
 /* ✅ 테두리는 mode-common.scss의 .axis-panel에서 통일 관리 */
@@ -340,59 +328,14 @@ const handleBlur = (type: 'speeds' | 'angles', axis: 'azimuth' | 'elevation' | '
   /* 패딩 줄임 */
 }
 
-/* 체크박스와 라벨을 함께 가운데 정렬하는 그룹 */
-.checkbox-label-group {
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  justify-content: center !important;
-  /* 체크박스와 라벨을 함께 가운데 정렬 */
-  width: 100% !important;
-  margin: 0 auto !important;
-  /* 가운데 정렬 강제 */
-}
-
-/* 축 헤더 간격 최소화 */
-.axis-header {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  /* 헤더 전체를 가운데 정렬 */
-  margin-bottom: 0.5rem !important;
-  /* 마진 줄임 */
-  width: 100% !important;
-  /* 전체 너비 사용 */
-}
+/* 체크박스/축 헤더 → mode-common.scss로 통일됨 */
 
 .disabled-panel {
   opacity: 0.7;
   filter: grayscale(30%);
 }
 
-/* 입력 필드 간격 최소화 */
-.axis-panel .text-subtitle2 {
-  font-size: 0.9rem;
-  margin-bottom: 0.25rem !important;
-  /* 마진 최소화 */
-  margin-top: 0.5rem !important;
-  /* 첫 번째 라벨만 상단 마진 */
-}
-
-.axis-panel .text-subtitle2:first-of-type {
-  margin-top: 0 !important;
-  /* 첫 번째 라벨은 상단 마진 없음 */
-}
-
-/* 입력 필드 마진 최소화 */
-.axis-panel .q-field {
-  margin-bottom: 0.5rem !important;
-  /* 마진 줄임 */
-}
-
-.axis-panel .q-field:last-child {
-  margin-bottom: 0 !important;
-  /* 마지막 필드는 하단 마진 없음 */
-}
+/* 입력 필드 스타일 → mode-common.scss로 통일됨 */
 
 .axis-checkbox {
   margin: 0;

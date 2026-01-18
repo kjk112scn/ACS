@@ -521,6 +521,7 @@
 import { ref, computed } from 'vue'
 import { useICDStore } from '../../stores/icd/icdStore'
 import { useNotification } from '@/composables/useNotification'
+import { useErrorHandler } from '@/composables/useErrorHandler'
 import { useFeedSettingsStore } from '@/stores/ui/feedSettingsStore'
 import { useChartTheme } from '@/composables/useChartTheme'
 
@@ -535,6 +536,7 @@ const feedSettingsStore = useFeedSettingsStore()
 
 // 알림 composable
 const { success, error: notifyError } = useNotification()
+const { handleApiError } = useErrorHandler()
 
 // 로딩 상태
 const isLoading = ref(false)
@@ -858,8 +860,7 @@ const toggleKaSelectionRHCP = async () => {
     }
     statusTimestamp.value = Date.now()
   } catch (error) {
-    console.error('Ka-Band Selection RHCP 토글 중 오류:', error)
-    notifyError('Ka-Band Selection RHCP 토글 중 오류가 발생했습니다.')
+    handleApiError(error, 'Ka-Band Selection RHCP 토글')
     statusMessage.value = 'Ka-Band Selection RHCP 토글 중 오류가 발생했습니다.'
     statusSuccess.value = false
     statusTimestamp.value = Date.now()
@@ -919,8 +920,7 @@ const toggleKaSelectionLHCP = async () => {
     }
     statusTimestamp.value = Date.now()
   } catch (error) {
-    console.error('Ka-Band Selection LHCP 토글 중 오류:', error)
-    notifyError('Ka-Band Selection LHCP 토글 중 오류가 발생했습니다.')
+    handleApiError(error, 'Ka-Band Selection LHCP 토글')
     statusMessage.value = 'Ka-Band Selection LHCP 토글 중 오류가 발생했습니다.'
     statusSuccess.value = false
     statusTimestamp.value = Date.now()
@@ -1063,8 +1063,7 @@ const toggleLNA = async (band: 's' | 'x' | 'ka', type: 'lhcp' | 'rhcp') => {
     }
     statusTimestamp.value = Date.now()
   } catch (error) {
-    console.error('LNA 토글 중 오류:', error)
-    notifyError('LNA 토글 중 오류가 발생했습니다.')
+    handleApiError(error, 'LNA 토글')
     statusMessage.value = 'LNA 토글 중 오류가 발생했습니다.'
     statusSuccess.value = false
     statusTimestamp.value = Date.now()
@@ -1123,8 +1122,7 @@ const toggleRFSwitch = async () => {
     }
     statusTimestamp.value = Date.now()
   } catch (error) {
-    console.error('RF Switch 토글 중 오류:', error)
-    notifyError('RF Switch 토글 중 오류가 발생했습니다.')
+    handleApiError(error, 'RF Switch 토글')
     statusMessage.value = 'RF Switch 토글 중 오류가 발생했습니다.'
     statusSuccess.value = false
     statusTimestamp.value = Date.now()
@@ -1183,8 +1181,7 @@ const toggleFan = async () => {
     }
     statusTimestamp.value = Date.now()
   } catch (error) {
-    console.error('FAN 토글 중 오류:', error)
-    notifyError('FAN 토글 중 오류가 발생했습니다.')
+    handleApiError(error, 'FAN 토글')
     statusMessage.value = 'FAN 토글 중 오류가 발생했습니다.'
     statusSuccess.value = false
     statusTimestamp.value = Date.now()

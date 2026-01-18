@@ -28,12 +28,6 @@ import { useICDStore } from '../../stores/icd/icdStore'
 import { useStandbyModeStore } from '../../stores/mode/standbyStore'
 import { useNotification } from '@/composables/useNotification'
 import { useErrorHandler } from '@/composables/useErrorHandler'
-import { defineComponent } from 'vue'
-
-// 컴포넌트 이름 정의
-defineComponent({
-  name: 'StandbyMode',
-})
 
 // 스토어 인스턴스 생성
 const icdStore = useICDStore()
@@ -141,12 +135,5 @@ const handleStow = async () => {
 }
 
 /* 버튼 스타일은 mode-common.scss의 .mode-button-bar .q-btn로 통일됨 */
-
-/* 섹션 제목 스타일 */
-.section-title {
-  font-weight: 500;
-  padding-left: 0.5rem;
-  margin-bottom: 0.5rem !important;
-  /* 마진 줄임 */
-}
+/* 섹션 제목 스타일 → mode-common.scss로 통일됨 */
 </style>
