@@ -38,9 +38,10 @@
 | Phase | Description | Status | 환경 |
 |:-----:|-------------|:------:|:----:|
 | 1 | Docker DB 설치 | ✅ 완료 | 🏠 집 |
-| 2 | Entity/Repository | ✅ 완료 | 🏠 집 |
+| 2 | Entity/Repository (Tracking) | ✅ 완료 | 🏠 집 |
 | 3 | Service 연동 | ✅ 완료 | 🏠 집 |
 | 4 | 기본 테스트 | ✅ 완료 | 🏠 집 |
+| **4.5** | **Settings R2DBC 마이그레이션** | ✅ 완료 | 🏠 집 |
 | 5 | Native DB 설치 | - | 🏢 회사 |
 | 6 | 통합 테스트 | - | 🏢 회사 |
 
@@ -351,6 +352,8 @@ psql -U acs_user -d acs -c "DELETE FROM tracking_session WHERE satellite_id = 'T
 | tracking_trajectory | **Hypertable** | 시계열, 대용량 (~10,000건/세션) |
 | tracking_result | **Hypertable** | 시계열, 대용량 (~10,000건/세션) |
 | icd_status | **Hypertable** | 시계열, 초대용량 (864,000건/일) |
+| settings | 일반 테이블 | 시스템 설정 영속화 (~50건) |
+| setting_history | 일반 테이블 | 설정 변경 감사 로그 |
 
 > **Hypertable 제약**: PRIMARY KEY를 가진 테이블은 Hypertable 변환 불가
 > → trajectory, result 테이블에서 BIGSERIAL PRIMARY KEY 제거
@@ -409,6 +412,8 @@ SELECT add_retention_policy('icd_status', INTERVAL '90 days');
 | 2026-01-17 | Repository 4개 생성 | Done | 🏠 집 | 빌드 성공 확인 |
 | 2026-01-17 | TrackingDataService 생성 | Done | 🏠 집 | R2dbcConfig 포함 |
 | 2026-01-17 | DB INSERT/SELECT 테스트 | Done | 🏠 집 | 4개 테이블 모두 성공 |
+| 2026-01-18 | Settings R2DBC 마이그레이션 | Done | 🏠 집 | settings, setting_history 테이블 추가 |
+| 2026-01-18 | Settings Entity/Repository 전환 | Done | 🏠 집 | JPA → R2DBC, 빌드 성공 |
 
 ---
 

@@ -195,6 +195,9 @@
 | 2026-01-17 | 검토 | subscribe() 에러 핸들러 | Done | **25건 모두 이미 있음 확인** |
 | 2026-01-17 | 검토 | Offset Control 통합 | Done | **useOffsetControls로 이미 통합됨** |
 | 2026-01-17 | 문서 | PLAN.md, TRACKER.md | Done | 검토 결과 반영, 불필요 항목 정리 |
+| 2026-01-18 | DB | Settings R2DBC 마이그레이션 | Done | JPA → R2DBC, settings/setting_history 테이블 |
+| 2026-01-18 | 품질 | 상용 SW 품질 검토 | Done | B- (68/100), CRITICAL 2건 식별 |
+| 2026-01-18 | 품질 | CLAUDE.md CRITICAL 섹션 | Done | 인증/테스트 이슈 추적 체계 수립 |
 
 ---
 
