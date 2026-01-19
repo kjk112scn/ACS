@@ -6,6 +6,18 @@
 
 ---
 
+## [2026-01-19] - License Change
+
+### Changed
+- MIT License → GTL Proprietary License
+- package.json에 license 필드 추가
+
+### Why
+- 기업 소유 비공개 소프트웨어에 MIT 라이센스 부적합
+- 무단 복제/배포/사용 금지 명시 필요
+
+---
+
 ## [2026-01-18] - Architecture Refactoring Phase 6
 
 ### Added
