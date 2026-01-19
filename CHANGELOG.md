@@ -6,6 +6,24 @@
 
 ---
 
+## [2026-01-20] - 작업 추적 시스템 구축
+
+### Added
+- `docs/work/CURRENT_STATUS.md` - 세션 간 작업 상태 추적
+- `docs/work/health-checks/` - 빌드/품질 점검 결과 저장
+- `/done` 스킬 v2.1.0 - Step 3: CURRENT_STATUS.md 자동 업데이트
+
+### Why
+- 새 세션 시작 시 컨텍스트 빠른 복원 ("CURRENT_STATUS.md 읽고 이어서 해줘")
+- 프로젝트 건강 상태 이력 관리
+- 작업 완료 시 상태 자동 동기화
+
+### Details
+- [CURRENT_STATUS.md](docs/work/CURRENT_STATUS.md)
+- [health-checks/README.md](docs/work/health-checks/README.md)
+
+---
+
 ## [2026-01-20] - 통합 워크플로우 v2.0
 
 ### Changed
