@@ -10,6 +10,7 @@ export const useTrackingSettingsStore = defineStore('trackingSettings', () => {
     msInterval: 1000,
     durationDays: 1,
     minElevationAngle: 10.0,
+    preparationTimeMinutes: 4,  // Train+Az 이동 시간 (기본 4분)
   })
 
   const loadingStates = ref({

@@ -37,6 +37,7 @@
           :schedule="displaySchedule"
           :schedule-status="currentScheduleStatus"
           :time-remaining="timeRemaining"
+          :tracking-state-info="icdStore.passScheduleTrackingStateInfo"
         />
       </div>
 

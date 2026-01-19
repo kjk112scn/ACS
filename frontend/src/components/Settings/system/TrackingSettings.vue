@@ -23,6 +23,10 @@
       <q-input v-model.number="localSettings.minElevationAngle" label="최소 고도각 (도)" type="number" :rules="elevationRules"
         outlined :loading="loadingStates.tracking" hint="추적 시 고려할 최소 고도각" suffix="°" />
 
+      <!-- 추적 준비 시간 입력 -->
+      <q-input v-model.number="localSettings.preparationTimeMinutes" label="추적 준비 시간 (분)" type="number" :rules="preparationTimeRules"
+        outlined :loading="loadingStates.tracking" hint="PassSchedule Train+Az 이동 시간 (권장: 4분)" suffix="분" />
+
       <!-- 버튼들 -->
       <div class="row q-gutter-sm q-mt-md">
         <q-btn type="submit" color="primary" label="저장" :loading="loadingStates.tracking" :disable="!isFormValid"
@@ -61,7 +65,8 @@ const getInitialLocalSettings = (): TrackingSettings => {
   return {
     msInterval: trackingSettingsStore.trackingSettings.msInterval || 1000,
     durationDays: trackingSettingsStore.trackingSettings.durationDays || 1,
-    minElevationAngle: trackingSettingsStore.trackingSettings.minElevationAngle || 10.0
+    minElevationAngle: trackingSettingsStore.trackingSettings.minElevationAngle || 10.0,
+    preparationTimeMinutes: trackingSettingsStore.trackingSettings.preparationTimeMinutes || 4
   }
 }
 
@@ -102,11 +107,18 @@ const elevationRules = [
   (val: number) => val <= 90 || '최소 고도각은 90도 이하여야 합니다'
 ]
 
+const preparationTimeRules = [
+  (val: number) => val !== null && val !== undefined || '추적 준비 시간은 필수입니다',
+  (val: number) => val >= 1 || '추적 준비 시간은 1분 이상이어야 합니다',
+  (val: number) => val <= 10 || '추적 준비 시간은 10분 이하여야 합니다'
+]
+
 // 폼 유효성 검사
 const isFormValid = computed(() => {
   return localSettings.value.msInterval !== null && localSettings.value.msInterval !== undefined &&
     localSettings.value.durationDays !== null && localSettings.value.durationDays !== undefined &&
-    localSettings.value.minElevationAngle !== null && localSettings.value.minElevationAngle !== undefined
+    localSettings.value.minElevationAngle !== null && localSettings.value.minElevationAngle !== undefined &&
+    localSettings.value.preparationTimeMinutes !== null && localSettings.value.preparationTimeMinutes !== undefined
 })
 
 // 변경사항 감지 watch - Store 상태 업데이트

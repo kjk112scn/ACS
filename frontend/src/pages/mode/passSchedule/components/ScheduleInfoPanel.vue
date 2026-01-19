@@ -1,7 +1,15 @@
 <template>
   <q-card class="control-section">
     <q-card-section>
-      <div class="text-subtitle1 text-weight-bold text-primary q-mb-xs">Schedule Information</div>
+      <div class="row items-center justify-between q-mb-xs">
+        <div class="text-subtitle1 text-weight-bold text-primary">Schedule Information</div>
+        <!-- BE 추적 상태 표시 -->
+        <q-badge
+          v-if="trackingStateInfo"
+          :color="trackingStateInfo.displayColor"
+          :label="trackingStateInfo.displayLabel"
+        />
+      </div>
       <div class="schedule-form">
         <div class="form-row">
           <!-- 자동/수동 선택된 스케줄 정보 표시 -->
@@ -81,10 +89,16 @@ interface ScheduleStatus {
   label: string
 }
 
+interface TrackingStateInfo {
+  displayLabel: string
+  displayColor: string
+}
+
 interface Props {
   schedule: ScheduleItem | null
   scheduleStatus: ScheduleStatus | null
   timeRemaining: number
+  trackingStateInfo?: TrackingStateInfo | null
 }
 
 defineProps<Props>()

@@ -31,6 +31,7 @@ export const useSettingsStore = defineStore('settings', () => {
     msInterval: 100,
     durationDays: 1,
     minElevationAngle: 0,
+    preparationTimeMinutes: 4,
   })
 
   // Stow Settings

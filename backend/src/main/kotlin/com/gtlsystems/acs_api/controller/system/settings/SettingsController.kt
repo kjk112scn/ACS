@@ -8,7 +8,6 @@ import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 import org.springframework.http.ResponseEntity
-import org.springframework.transaction.annotation.Transactional
 import org.slf4j.LoggerFactory
 import jakarta.validation.Valid
 import jakarta.validation.constraints.DecimalMax
@@ -18,7 +17,6 @@ import jakarta.validation.constraints.NotNull
 @RestController
 @RequestMapping("/api/settings")
 @Tag(name = "System - Settings", description = "시스템 설정 관리 API - 위치, 추적, 기타 설정값 관리")
-@Transactional  // ← 이 어노테이션 추가 필요
 class SettingsController(
     private val settingsService: SettingsService
 ) {

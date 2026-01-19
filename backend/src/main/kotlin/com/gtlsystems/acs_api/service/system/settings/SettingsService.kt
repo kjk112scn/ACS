@@ -61,7 +61,8 @@ class SettingsService(
         "tracking.msInterval" to SettingDefinition("tracking.msInterval", 100, SettingType.INTEGER, "추적 간격"),
         "tracking.durationDays" to SettingDefinition("tracking.durationDays", 1L, SettingType.LONG, "추적 기간(일)"),
         "tracking.minElevationAngle" to SettingDefinition("tracking.minElevationAngle", 0f, SettingType.FLOAT, "최소 고도각"),
-        
+        "tracking.preparationTimeMinutes" to SettingDefinition("tracking.preparationTimeMinutes", 4L, SettingType.LONG, "추적 준비 시간(분) - Train+Az 이동 시간"),
+
         // Stow Angle 설정
         "stow.angle.azimuth" to SettingDefinition("stow.angle.azimuth", 0.0, SettingType.DOUBLE, "Stow 방위각"),
         "stow.angle.elevation" to SettingDefinition("stow.angle.elevation", 90.0, SettingType.DOUBLE, "Stow 고도각"),
@@ -384,6 +385,14 @@ class SettingsService(
      * @see sourceMinElevationAngle 원본 데이터 생성 시 사용되는 설정
      */
     var minElevationAngle: Float by createSettingProperty("tracking.minElevationAngle", "최소 고도각")
+
+    /**
+     * 추적 준비 시간 (분)
+     * PassSchedule에서 추적 시작 전 준비 시간을 설정합니다.
+     * Train 이동(~2분) + Az 이동(~2분) = 약 4분 권장
+     * 기본값: 4분
+     */
+    var preparationTimeMinutes: Long by createSettingProperty("tracking.preparationTimeMinutes", "추적 준비 시간")
 
     // === Stow Angle 설정 ===
     /**

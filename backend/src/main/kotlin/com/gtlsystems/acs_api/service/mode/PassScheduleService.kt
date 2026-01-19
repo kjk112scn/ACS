@@ -63,50 +63,7 @@ class PassScheduleService(
 ) {
     private val logger = LoggerFactory.getLogger(PassScheduleService::class.java)
 
-    // ===== 추적 상태 관리 (개선된 방식) =====
-    
-    /**
-     * 추적 상태를 정의하는 열거형 (사용자 요구사항에 맞게 단순화)
-     * 
-     * 핵심: 스케줄 판단만 하고, 실제 추적은 사용자가 제어
-     */
-    enum class TrackingState {
-        /** 초기 대기 상태 - 추적 모니터링 시작 전 */
-        IDLE,
-        
-        /** 2분 이상 남음 - Stow 위치에서 대기 */
-        WAITING,
-        
-        /** 2분 이내 - 시작 위치로 이동 */
-        PREPARING,
-        
-        /** 실제 추적 중 - 사용자가 시작한 후 */
-        TRACKING,
-        
-        /** 개별 스케줄 완료 - Stow 위치로 이동 */
-        COMPLETED
-    }
-
-    /**
-     * PREPARING 상태 내에서의 진행 단계를 정의하는 열거형
-     * 
-     * PREPARING 상태 내에서 Train 회전 → 안정화 대기 → Az/El 이동을 순차적으로 처리하기 위한 내부 플래그
-     */
-    private enum class PreparingStep {
-        /** 초기화 */
-        INIT,
-
-        /** Train 회전 중 */
-        MOVING_TRAIN,
-
-        /** Train 안정화 대기 */
-        WAITING_TRAIN,
-
-        /** Az/El 이동 중 */
-        MOVING_AZ_EL
-    }
-
-    // ===== 신규 상태 머신 (v2.0 - 통합 상태) =====
+    // ===== 상태 머신 (v2.0) =====
 
     /**
      * PassSchedule 통합 상태 머신 (v2.0)
@@ -230,80 +187,26 @@ class PassScheduleService(
     private val scheduleContextQueue = mutableListOf<ScheduleTrackingContext>()
 
     /** 타이머 카운트 (v2.0) */
-    private var v2CheckCount: Long = 0L
+    private var trackingCheckCount: Long = 0L
 
-    /** 종료 중 플래그 (v2.0) */
-    private var isV2ShuttingDown: Boolean = false
+    /** 종료 중 플래그 */
+    private var isShuttingDown: Boolean = false
 
-    /** v2.0 상태 머신 활성화 플래그 (기본 활성화) */
-    private var useV2StateMachine: Boolean = true
-
-    // ===== 신규 상수 (v2.0) =====
+    // ===== 상수 =====
     companion object {
-        /** 준비 시간 (2분) */
-        const val V2_PREPARATION_TIME_MS = 2 * 60 * 1000L
         /** Train 안정화 시간 (3초) */
-        const val V2_TRAIN_STABILIZATION_MS = 3000L
+        const val TRAIN_STABILIZATION_MS = 3000L
         /** 위치 허용 오차 (~0.057도) */
-        const val V2_POSITION_TOLERANCE_RAD = 0.001f
+        const val POSITION_TOLERANCE_RAD = 0.001f
         /** 타이머 주기 (100ms) */
-        const val V2_CHECK_INTERVAL_MS = 100L
+        const val CHECK_INTERVAL_MS = 100L
     }
 
-    // ===== 기존 상태 관리 (v1.0 - 호환성 유지) =====
+    /** 준비 시간 (Settings에서 읽음, 기본 4분) */
+    private val preparationTimeMs: Long
+        get() = settingsService.preparationTimeMinutes * 60 * 1000L
 
-    /**
-     * 현재 추적 상태
-     * 상태 변경 시에만 실제 액션을 실행하여 중복 실행을 방지합니다.
-     */
-    private var currentTrackingState = TrackingState.IDLE
-
-    /**
-     * PREPARING 상태 내에서의 진행 단계
-     */
-    private var currentPreparingStep = PreparingStep.INIT
-
-    /**
-     * PREPARING 상태에서 처리 중인 전역 고유 패스 ID (Long 타입)
-     * 
-     * PassSchedule 데이터 구조 리팩토링에 따라 UInt → Long으로 변경.
-     * 전역 고유 MstId를 저장하기 위해 Long 타입 사용.
-     */
-    private var preparingPassId: Long? = null
-
-    /**
-     * 목표 Azimuth 각도
-     */
-    private var targetAzimuth: Float = 0f
-
-    /**
-     * 목표 Elevation 각도
-     */
-    private var targetElevation: Float = 0f
-
-    /**
-     * Train 안정화 대기 시작 시간
-     */
-    private var trainStabilizationStartTime: Long = 0
-
-    /**
-     * Train 안정화 대기 시간 (밀리초)
-     */
-    private val TRAIN_STABILIZATION_TIMEOUT = 3000L // 3초
-    
-    /**
-     * 마지막 상태 변경 시간 (밀리초)
-     * 상태 변경 간격을 제어하여 과도한 상태 전환을 방지합니다.
-     */
-    private var lastStateChangeTime = 0L
-
-    /**
-     * 상태 변경 최소 간격 (밀리초)
-     * 너무 빈번한 상태 변경을 방지하기 위한 설정
-     */
-    private val MIN_STATE_CHANGE_INTERVAL = 500 // 0.5초
-
-    // ===== 기존 저장소들 =====
+    // ===== 저장소 =====
     // ✅ Phase 5: TLE 캐시는 passScheduleTLECache로 분리됨
     // ✅ Phase 5: 데이터 저장소는 passScheduleDataRepository로 분리됨
     // 내부 저장소 접근자 (기존 코드 호환성 유지, 읽기 전용)
@@ -316,7 +219,6 @@ class PassScheduleService(
 
     // ===== 기존 상태 관리 변수들 (Boolean 제거) =====
     private var lastPreparedSchedule: Map<String, Any?>? = null
-    private val PREPARATION_TIME_MINUTES = 2L
     private val subscriptions: MutableList<Disposable> = mutableListOf()
 
     // ✅ 새로 추가: 성능 최적화용 캐시 및 스레드 (기존 동작에 영향 없음)
@@ -445,12 +347,11 @@ class PassScheduleService(
         subscriptions.add(dataRequestSubscription)
     }
 
-    // ✅ 기존 추적 모니터링 필드들 (변경 없음)
+    // ✅ 추적 모니터링 필드들
     private var trackingExecutor: ScheduledExecutorService? = null
     private var trackingMonitorTask: ScheduledFuture<*>? = null
     private var isTrackingMonitorRunning = AtomicBoolean(false)
     private var lastDisplayedSchedule: Map<String, Any?>? = null
-    private var trackingCheckCount = 0L  // Long 타입으로 변경
 
     private val trackingMonitorThreadFactory = ThreadFactory { runnable ->
         Thread(runnable, "tracking-monitor").apply {
@@ -534,385 +435,40 @@ class PassScheduleService(
     }
 
     /**
-     * 상태 머신 기반 추적 스케줄 체크 함수 (수정됨)
+     * 상태 머신 기반 추적 스케줄 체크 함수
      *
-     * V2 상태 머신이 활성화된 경우 V2 로직을 실행합니다.
+     * V2.0 상태 머신만 사용 (v1.0 제거됨)
      */
     private fun checkTrackingScheduleWithStateMachine() {
-        // ═══ V2.0 상태 머신 분기 ═══
-        if (useV2StateMachine) {
-            checkV2StateMachine()
-            return
-        }
-
-        // ═══ 기존 V1.0 로직 ═══
-        try {
-            val calTime = GlobalData.Time.calUtcTimeOffsetTime
-            val currentSchedule = getCurrentSelectedTrackingPassWithTime(calTime)
-            val nextSchedule = getNextSelectedTrackingPassWithTime(calTime)
-
-            // 디버깅 로그 (처음 20회만 상세 출력)
-            if (trackingCheckCount < 20) {
-                logCurrentStatus(calTime, currentSchedule, nextSchedule)
-            }
-
-            // 🔧 DEBUG: 10초마다 상태 요약 출력 (100회 = 10초)
-            if (trackingCheckCount % 100L == 0L) {
-                val nextMstId = (nextSchedule?.get("MstId") as? Number)?.toLong()
-                val nextStartTime = nextSchedule?.get("StartTime")
-                val isWithin2Min = if (nextSchedule != null) isWithinPreparationTime(nextSchedule, calTime) else false
-                logger.info("🔄 [DEBUG] 상태요약: state=$currentTrackingState, nextMstId=$nextMstId, nextStart=$nextStartTime, within2min=$isWithin2Min, calTime=$calTime")
-            }
-
-            trackingCheckCount++
-
-            // ✅ 상태 머신을 통한 상태 결정 및 전환
-            val newState = determineTrackingState(currentSchedule, nextSchedule, calTime)
-            transitionToState(newState, currentSchedule, nextSchedule, calTime)
-            
-            // ✅ 별도로 추적 상태 변경 처리 (기존 로직과 분리)
-            handleTrackingStateChangeSeparately(currentSchedule, calTime)
-
-        } catch (e: Exception) {
-            logger.error("추적 체크 중 오류: ${e.message}", e)
-        }
+        checkStateMachine()
     }
 
     /**
-     * 현재 상황을 분석하여 적절한 추적 상태를 결정하는 함수 (사용자 요구사항에 맞게 개선)
-     * 
-     * @param currentSchedule 현재 추적 중인 스케줄
-     * @param nextSchedule 다음 추적 예정 스케줄
-     * @param calTime 현재 계산된 시간
-     * @return 결정된 추적 상태
+     * V2.0 상태 머신 초기화
+     *
+     * 새로운 추적 모니터링 시작 시 호출됩니다.
      */
-    private fun determineTrackingState(
-        currentSchedule: Map<String, Any?>?,
-        nextSchedule: Map<String, Any?>?,
-        calTime: ZonedDateTime
-    ): TrackingState {
-        
-        return when {
-            // 현재 추적 중인 경우
-            currentSchedule != null -> {
-                logger.debug("[STATE] 현재 추적 중 - TRACKING 상태")
-                TrackingState.TRACKING
-            }
-            
-            // 다음 스케줄이 2분 이내인 경우 (추적 준비)
-            nextSchedule != null && isWithinPreparationTime(nextSchedule, calTime) -> {
-                logger.debug("[STATE] 2분 이내 - PREPARING 상태")
-                TrackingState.PREPARING
-            }
-            
-            // 다음 스케줄이 2분 이상 남은 경우 (대기)
-            nextSchedule != null -> {
-                logger.debug("[STATE] 2분 이상 남음 - WAITING 상태 (Stow 위치)")
-                TrackingState.WAITING
-            }
-            
-            // 개별 스케줄 완료
-            else -> {
-                logger.debug("[STATE] 개별 스케줄 완료 - COMPLETED 상태")
-                TrackingState.COMPLETED
-            }
-        }
-    }
-
-    /**
-     * 결정된 상태로 전환하는 함수 (수정됨)
-     */
-    private fun transitionToState(
-        newState: TrackingState,
-        currentSchedule: Map<String, Any?>?,
-        nextSchedule: Map<String, Any?>?,
-        calTime: ZonedDateTime
-    ) {
-        // ✅ PREPARING 상태는 내부 단계 처리를 위해 항상 액션 실행
-        if (newState == TrackingState.PREPARING && currentTrackingState == TrackingState.PREPARING) {
-            // PREPARING 상태 유지 중 - 내부 PreparingStep 단계 처리 계속
-            executeStateAction(newState, currentSchedule, nextSchedule, calTime)
-            return
-        }
-
-        // 상태가 변경되지 않았거나 최소 간격이 지나지 않은 경우 액션 실행하지 않음
-        if (currentTrackingState == newState) {
-            // 🔧 DEBUG: 상태 동일로 스킵 (10초마다 출력)
-            if (trackingCheckCount % 100L == 0L) {
-                logger.info("🔄 [DEBUG] 상태 동일로 스킵: current=$currentTrackingState, new=$newState")
-            }
-            return
-        }
-        if (!canChangeState()) {
-            logger.info("⏳ [DEBUG] 상태 변경 간격 미달로 스킵: current=$currentTrackingState, new=$newState")
-            return
-        }
-
-        val oldState = currentTrackingState
-        currentTrackingState = newState
-        lastStateChangeTime = System.currentTimeMillis()
-
-        // ✅ PushData에 passScheduleTrackingState 업데이트 (프론트엔드로 상태 전송)
-        PushData.TRACKING_STATUS.passScheduleTrackingState = newState.name
-        logger.info("[STATE] 상태 전환: $oldState -> $newState (passScheduleTrackingState=${newState.name})")
-
-        // ✅ 상태별 액션만 실행 (중복 제거)
-        executeStateAction(newState, currentSchedule, nextSchedule, calTime)
-
-        // ✅ handleTrackingStateChange는 별도로 호출하지 않음
-        // (상태 머신이 모든 액션을 관리하므로)
-    }
-
-    /**
-     * 상태 변경 가능 여부를 확인하는 함수
-     * 
-     * @return true: 상태 변경 가능, false: 아직 최소 간격이 지나지 않음
-     */
-    private fun canChangeState(): Boolean {
-        val currentTime = System.currentTimeMillis()
-        val timeSinceLastChange = currentTime - lastStateChangeTime
-        return timeSinceLastChange >= MIN_STATE_CHANGE_INTERVAL
-    }
-
-    /**
-     * 상태별 액션을 실행하는 함수 (사용자 요구사항에 맞게 단순화)
-     * 
-     * 핵심: 스케줄 판단만 하고, 실제 추적 시작/종료는 사용자가 제어
-     */
-    private fun executeStateAction(
-        state: TrackingState,
-        currentSchedule: Map<String, Any?>?,
-        nextSchedule: Map<String, Any?>?,
-        calTime: ZonedDateTime
-    ) {
-        when (state) {
-            TrackingState.TRACKING -> {
-                // ✅ 현재 스케줄 추적 중 - 추적 시작 처리
-                if (currentSchedule != null) {
-                    val satelliteName = currentSchedule["SatelliteName"] as? String ?: "Unknown"
-                    // ✅ "No" → "MstId" 변경, UInt → Long 변경
-                    val mstId = (currentSchedule["MstId"] as? Number)?.toLong()
-                    logger.info("[ACTION] TRACKING 상태 - 추적 중: $satelliteName (ID: $mstId)")
-
-                    // ✅ 이전 추적의 tracking 각도 값 초기화 (TRACKING 전환 시 이전 값으로 점프 방지)
-                    dataStoreService.clearTrackingAngles()
-
-                    // ✅ 추적 시작 처리 (캐시 로딩 + 헤더 전송)
-                    prepareTrackingStart(mstId)
-                }
-            }
-            
-            TrackingState.WAITING -> {
-                // ✅ 대기 상태 - Stow 위치로 이동 (2분 이상 남음)
-                logger.info("[ACTION] WAITING 상태 - Stow 위치로 이동 (2분 이상 남음)")
-                moveToStowPosition(calTime)
-            }
-            
-            TrackingState.PREPARING -> {
-                // ✅ PREPARING 상태 내에서 단계별 처리
-                // ✅ "No" → "MstId" 변경, UInt → Long 변경
-                val nextMstId = (nextSchedule?.get("MstId") as? Number)?.toLong()
-
-                // 🔧 DEBUG: PREPARING 상태 진입 로그
-                logger.info("🔧 [STEP-4] executeStateAction(PREPARING) - currentPreparingStep=$currentPreparingStep, nextMstId=$nextMstId")
-
-                when (currentPreparingStep) {
-                    PreparingStep.INIT -> {
-                        // 초기화: moveToStartPosition() 호출
-                        if (nextMstId != null) {
-                            logger.info("✅ [STEP-4] PREPARING/INIT - 시작 위치로 이동 명령 (nextMstId=$nextMstId)")
-                            moveToStartPosition(nextMstId)
-                        } else {
-                            logger.error("❌ [STEP-4] PREPARING/INIT - nextMstId가 null! nextSchedule=$nextSchedule")
-                        }
-                    }
-                    
-                    PreparingStep.MOVING_TRAIN -> {
-                        // Train 회전 중
-                        preparingPassId?.let { passId ->
-                            val selectedPass = getTrackingPassMst(passId)
-                            val isKeyhole = selectedPass?.get("IsKeyhole") as? Boolean ?: false
-                            val recommendedTrainAngle = selectedPass?.get("RecommendedTrainAngle") as? Double ?: 0.0
-                            
-                            val trainAngle = if (isKeyhole) {
-                                recommendedTrainAngle.toFloat()
-                            } else {
-                                0f
-                            }
-                            
-                            // Train 각도 이동 명령 전송 (한 번만)
-                            moveTrainToZero(trainAngle)
-                            
-                            // Train 각도 도달 확인
-                            if (isTrainAtZero()) {
-                                currentPreparingStep = PreparingStep.WAITING_TRAIN
-                                trainStabilizationStartTime = System.currentTimeMillis()
-                                logger.info("✅ Train가 ${trainAngle}도에 도달, 안정화 대기 시작")
-                            }
-                        }
-                    }
-                    
-                    PreparingStep.WAITING_TRAIN -> {
-                        // Train 안정화 대기
-                        if (System.currentTimeMillis() - trainStabilizationStartTime >= TRAIN_STABILIZATION_TIMEOUT && isTrainStabilized()) {
-                            moveToTargetAzEl()
-                            currentPreparingStep = PreparingStep.MOVING_AZ_EL
-                            logger.info("✅ Train 안정화 완료, 목표 Az/El로 이동 시작")
-                        }
-                    }
-                    
-                    PreparingStep.MOVING_AZ_EL -> {
-                        // Az/El 이동 완료 (목표 위치 도달 체크는 생략, 즉시 완료)
-                        currentPreparingStep = PreparingStep.INIT
-                        preparingPassId = null
-                        logger.info("✅ 목표 위치 이동 완료")
-                    }
-                }
-            }
-            
-            TrackingState.COMPLETED -> {
-                // ✅ 완료 상태 - Stow 위치로 이동 (추적 완료)
-                logger.info("[ACTION] COMPLETED 상태 - 개별 스케줄 완료, Stow 위치로 이동")
-                
-                // ✅ 이전 추적 종료 처리
-                lastDisplayedSchedule?.let { completedSchedule ->
-                    // ✅ "No" → "MstId" 변경, UInt → Long 변경
-                    val completedMstId = (completedSchedule["MstId"] as? Number)?.toLong()
-                    if (completedMstId != null) {
-                        cleanupTrackingEnd(completedMstId, completedSchedule)
-                    }
-                }
-                
-                // Stow 위치로 이동
-                moveToStowPosition(calTime)
-            }
-            
-            TrackingState.IDLE -> {
-                // ✅ 대기 상태 - 특별한 액션 없음
-                logger.debug("[ACTION] IDLE 상태 - 액션 없음")
-            }
-        }
-    }
-
-    /**
-     * 다음 스케줄이 2분 이내인지 확인하는 함수
-     * 
-     * @param nextSchedule 다음 스케줄
-     * @param calTime 현재 시간
-     * @return true: 2분 이내, false: 2분 이상
-     */
-    private fun isWithinPreparationTime(nextSchedule: Map<String, Any?>?, calTime: ZonedDateTime): Boolean {
-        val nextStartTime = nextSchedule?.get("StartTime") as? ZonedDateTime ?: return false
-        val timeUntilNext = Duration.between(calTime, nextStartTime)
-
-        // ✅ 전체 초 단위로 계산 (초 단위 버림 방지)
-        val totalSecondsUntilNext = timeUntilNext.seconds
-        val minutesUntilNext = totalSecondsUntilNext / 60
-        val secondsUntilNext = totalSecondsUntilNext % 60
-
-        // ✅ 2분 = 120초로 정확히 계산
-        val preparationTimeSeconds = PREPARATION_TIME_MINUTES * 60 // 2분 = 120초
-
-        val result = totalSecondsUntilNext <= preparationTimeSeconds && totalSecondsUntilNext >= 0
-
-        // 🔧 DEBUG: 5초마다 또는 상태 변경 시점에 로그 출력
-        val shouldLog = trackingCheckCount % 50L == 0L
-        if (shouldLog) {
-            logger.info("⏱️ [STEP-3] isWithinPreparationTime 체크:")
-            logger.info("   - 다음 스케줄까지: ${minutesUntilNext}분 ${secondsUntilNext}초 (총 ${totalSecondsUntilNext}초)")
-            logger.info("   - 임계값: ${preparationTimeSeconds}초 (2분)")
-            logger.info("   - 2분 이내 여부: $result")
-        }
-
-        // 🔧 DEBUG: 상태 변경 시점 (WAITING → PREPARING)에는 항상 로그
-        if (result && currentTrackingState == TrackingState.WAITING) {
-            logger.info("🎉 [STEP-3] 2분 이내 진입! WAITING → PREPARING 전환 예정")
-            logger.info("   - 남은 시간: ${minutesUntilNext}분 ${secondsUntilNext}초")
-        }
-
-        return result
+    private fun resetTrackingState() {
+        currentPassScheduleState = PassScheduleState.IDLE
+        previousPassScheduleState = PassScheduleState.IDLE
+        currentScheduleContext = null
+        nextScheduleContext = null
+        scheduleContextQueue.clear()
+        trackingCheckCount = 0
+        isShuttingDown = false
+        // ✅ PushData에 passScheduleTrackingState 초기화
+        PushData.TRACKING_STATUS.passScheduleTrackingState = PassScheduleState.IDLE.name
+        logger.debug("[V2-STATE] 상태 머신 초기화 완료 (passScheduleTrackingState=IDLE)")
     }
 
     /**
      * 종료 시 적절한 액션을 수행하는 함수
-     * 
+     *
      * 사용자 요구사항: 사용자가 직접 Stow 버튼을 누르므로 자동 Stow 명령 제거
      */
     private fun handleShutdownAction() {
         logger.info("[SHUTDOWN] 추적 모니터링 종료 - 사용자가 직접 Stow 버튼을 눌러주세요.")
         // ✅ 사용자가 직접 제어하므로 자동 Stow 명령 제거
-    }
-
-    /**
-     * 추적 상태를 초기화하는 함수
-     * 
-     * 새로운 추적 모니터링 시작 시 호출됩니다.
-     */
-    private fun resetTrackingState() {
-        currentTrackingState = TrackingState.IDLE
-        lastStateChangeTime = 0L
-        trackingCheckCount = 0
-        // ✅ PushData에 passScheduleTrackingState 초기화
-        PushData.TRACKING_STATUS.passScheduleTrackingState = TrackingState.IDLE.name
-        logger.debug("[STATE] 추적 상태 초기화 완료 (passScheduleTrackingState=IDLE)")
-    }
-
-    /**
-     * 현재 상태를 로깅하는 함수 (최적화됨)
-     * 
-     * @param calTime 현재 시간
-     * @param currentSchedule 현재 스케줄
-     * @param nextSchedule 다음 스케줄
-     */
-    private fun logCurrentStatus(
-        calTime: ZonedDateTime,
-        currentSchedule: Map<String, Any?>?,
-        nextSchedule: Map<String, Any?>?
-    ) {
-        // ✅ 최적화: 처음 1회만 상세 로그, 이후는 20초마다만 로그 (100ms * 200 = 20초)
-        val shouldLogDetailed = trackingCheckCount < 1L || trackingCheckCount % 200L == 0L
-        
-        if (shouldLogDetailed) {
-            logger.info("[STATUS] 추적 체크 #${trackingCheckCount}")
-            logger.info("  현재시간: $calTime")
-            logger.info("  현재상태: $currentTrackingState")
-            logger.info("  현재 스케줄: ${if (currentSchedule != null) "있음" else "없음"}")
-
-            if (nextSchedule != null) {
-                val nextMstId = nextSchedule["No"] as? UInt
-                val nextSatName = nextSchedule["SatelliteName"] as? String
-                val nextStartTime = nextSchedule["StartTime"] as? ZonedDateTime
-
-                logger.info("  다음 스케줄: MST=$nextMstId, Name=$nextSatName")
-                logger.info("  시작시간: $nextStartTime")
-
-                if (nextStartTime != null) {
-                    val timeUntilNext = Duration.between(calTime, nextStartTime)
-                    val minutesUntilNext = timeUntilNext.toMinutes()
-                    val secondsUntilNext = (timeUntilNext.seconds % 60).toInt()
-                    val hoursUntilNext = timeUntilNext.toHours()
-
-                    logger.info("  남은시간: ${hoursUntilNext}시간 ${minutesUntilNext % 60}분 ${secondsUntilNext}초")
-                }
-            } else {
-                logger.info("  다음 스케줄: 없음")
-            }
-        } else {
-            // ✅ 간소화된 로그: 상태 변경이나 중요한 정보만
-            if (nextSchedule != null) {
-                val nextStartTime = nextSchedule["StartTime"] as? ZonedDateTime
-                if (nextStartTime != null) {
-                    val timeUntilNext = Duration.between(calTime, nextStartTime)
-                    val minutesUntilNext = timeUntilNext.toMinutes()
-                    val secondsUntilNext: Long = timeUntilNext.seconds % 60
-                    
-                    // ✅ 1분 단위로만 로그 출력 (중복 방지)
-                    if (secondsUntilNext == 0L) {
-                        logger.debug("[STATUS] 다음 스케줄까지: ${minutesUntilNext}분 남음")
-                    }
-                }
-            }
-        }
     }
 
     /**
@@ -1041,121 +597,6 @@ class PassScheduleService(
             
         } catch (e: Exception) {
             logger.error("❌ 추적 종료 정리 실패: MST ID = $mstId, ${e.message}", e)
-        }
-    }
-
-    /**
-     * Train 축만 활성화하여 목표 각도로 회전합니다.
-     *
-     * 이 함수는 PREPARING 상태에서 Train을 먼저 회전하기 위해 사용됩니다.
-     * Train 축만 활성화하여 다른 축(Az, El)에는 영향을 주지 않습니다.
-     *
-     * @param trainAngle 목표 Train 각도 (도 단위, Float)
-     *
-     * @see moveToTargetAzEl Train 회전 후 Az/El 이동
-     * @see isTrainAtZero Train 각도 도달 확인
-     */
-    private fun moveTrainToZero(trainAngle: Float) {
-        val multiAxis = BitSet()
-        multiAxis.set(2)  // Train 축만 활성화
-        udpFwICDService.singleManualCommand(
-            multiAxis, trainAngle, 5f
-        )
-        logger.info("🔄 Train 각도 이동 시작: ${trainAngle}°")
-    }
-
-    /**
-     * Azimuth와 Elevation 축만 활성화하여 목표 위치로 이동합니다.
-     *
-     * 이 함수는 Train 회전 및 안정화 완료 후 Az/El을 이동하기 위해 사용됩니다.
-     * Az와 El 축만 활성화하여 Train 축에는 영향을 주지 않습니다.
-     *
-     * @see moveTrainToZero Train 회전 먼저 수행
-     * @see isTrainStabilized Train 안정화 확인
-     */
-    private fun moveToTargetAzEl() {
-        val multiAxis = BitSet()
-        multiAxis.set(0)  // Azimuth
-        multiAxis.set(1)  // Elevation
-        udpFwICDService.multiManualCommand(
-            multiAxis, targetAzimuth, 5f, targetElevation, 5f, 0f, 0f
-        )
-        logger.info("🔄 목표 Az/El로 이동: Az=${targetAzimuth}°, El=${targetElevation}°")
-    }
-
-    /**
-     * Train 각도가 목표 각도에 도달했는지 확인합니다.
-     *
-     * @return Train 각도가 목표 각도에 도달했으면 true, 아니면 false
-     *
-     * @see moveTrainToZero Train 회전 명령 후 확인
-     */
-    private fun isTrainAtZero(): Boolean {
-        val cmdTrain = PushData.CMD.cmdTrainAngle ?: 0f
-        val currentTrain = dataStoreService.getLatestData().trainAngle ?: 0.0
-        return kotlin.math.abs(cmdTrain - currentTrain.toFloat()) <= 0.1f
-    }
-
-    /**
-     * Train 각도가 안정화되었는지 확인합니다.
-     *
-     * @return Train 각도가 안정화되었으면 true, 아니면 false
-     *
-     * @see isTrainAtZero Train 각도 도달 확인 후 안정화 확인
-     */
-    private fun isTrainStabilized(): Boolean {
-        val cmdTrain = PushData.CMD.cmdTrainAngle ?: 0f
-        val currentTrain = dataStoreService.getLatestData().trainAngle ?: 0.0
-        return kotlin.math.abs(cmdTrain - currentTrain.toFloat()) <= 0.1f
-    }
-
-    /**
-     * 시작 위치로 이동하는 함수
-     * 
-     * PassSchedule 데이터 구조 리팩토링에 따라 파라미터 타입을 UInt → Long으로 변경.
-     * 
-     * @param passId 전역 고유 패스 ID (Long 타입)
-     */
-    private fun moveToStartPosition(passId: Long) {  // ✅ UInt → Long 변경
-        logger.info("═══════════════════════════════════════════════════════════════")
-        logger.info("🎯 [STEP-5] moveToStartPosition() 호출 - passId=$passId")
-
-        // ✅ Keyhole 여부에 따라 적절한 MST 선택
-        val selectedPass = getTrackingPassMst(passId)
-
-        if (selectedPass == null) {
-            logger.error("❌ [STEP-5] 패스 ID ${passId}에 해당하는 MST 데이터를 찾을 수 없습니다!")
-            logger.error("   - passScheduleTrackMstStorage 크기: ${passScheduleTrackMstStorage.size}")
-            logger.error("   - selectedTrackMstStorage 크기: ${selectedTrackMstStorage.size}")
-            return
-        }
-
-        logger.info("✅ [STEP-5] MST 데이터 조회 성공")
-        logger.info("   - SatelliteName: ${selectedPass["SatelliteName"]}")
-        logger.info("   - StartTime: ${selectedPass["StartTime"]}")
-        logger.info("   - IsKeyhole: ${selectedPass["IsKeyhole"]}")
-
-        // DTL 데이터 조회 (Keyhole 여부에 따라 적절한 DataType)
-        val passDetails = getSelectedTrackDtlByMstId(passId)
-        logger.info("📊 [STEP-5] DTL 데이터 조회: ${passDetails.size}개 포인트")
-
-        if (passDetails.isNotEmpty()) {
-            val startPoint = passDetails.first()
-            targetAzimuth = (startPoint["Azimuth"] as Double).toFloat()
-            targetElevation = (startPoint["Elevation"] as Double).toFloat()
-
-            logger.info("✅ [STEP-5] 시작 위치 설정:")
-            logger.info("   - targetAzimuth: ${targetAzimuth}°")
-            logger.info("   - targetElevation: ${targetElevation}°")
-
-            // ✅ PREPARING 상태 내에서 Train 회전 시작
-            preparingPassId = passId
-            currentPreparingStep = PreparingStep.MOVING_TRAIN
-            logger.info("🔄 [STEP-5] PreparingStep → MOVING_TRAIN")
-            logger.info("═══════════════════════════════════════════════════════════════")
-        } else {
-            logger.error("❌ [STEP-5] DTL 데이터가 비어있음! passId=$passId")
-            logger.error("═══════════════════════════════════════════════════════════════")
         }
     }
 
@@ -2002,7 +1443,7 @@ class PassScheduleService(
             logger.error("전체 위성 패스 스케줄 추적 데이터 생성 실패 (비동기): ${error.message}", error)
         }.timeout(Duration.ofMinutes(60)).onErrorMap { error ->
             when (error) {
-                is IOException -> RuntimeException("네트워크 연결 오류: ${error.message}", error)
+                is IOException -> RuntimeException("네트��크 연결 오류: ${error.message}", error)
                 is TimeoutException -> RuntimeException("계산 시간 초과", error)
                 else -> RuntimeException("전체 위성 패스 스케줄 추적 데이터 생성 실패: ${error.message}", error)
             }
@@ -3186,47 +2627,47 @@ class PassScheduleService(
      * 100ms 주기로 실행되며, 시간 기반 상태 결정을 수행합니다.
      *
      * 순서:
-     * 0. 종료 중 체크 (isV2ShuttingDown)
+     * 0. 종료 중 체크 (isShuttingDown)
      * 1. 진행 상태 업데이트 (하드웨어 위치 확인)
      * 2. ERROR 상태 복구 시도
      * 3. 시간 기반 상태 결정 (calTime 우선!)
      * 4. 상태 전환 시 진입 액션 실행
      * 5. 주기적 작업 (추적 데이터 전송 등)
      */
-    private fun checkV2StateMachine() {
+    private fun checkStateMachine() {
         // 0️⃣ 종료 중이면 아무 작업도 하지 않음
-        if (isV2ShuttingDown) {
+        if (isShuttingDown) {
             return
         }
 
-        v2CheckCount++
+        trackingCheckCount++
 
         val calTime = GlobalData.Time.calUtcTimeOffsetTime
 
         // 10초마다 상태 로깅
-        if (v2CheckCount % 100L == 0L) {
+        if (trackingCheckCount % 100L == 0L) {
             logger.info("[V2-STATE] 현재: $currentPassScheduleState, 스케줄: ${currentScheduleContext?.satelliteName}, calTime: $calTime")
         }
 
         // 1️⃣ 진행 상태 업데이트 (Train/Az/El 위치 확인)
-        updateV2ProgressFlags(calTime)
+        updateProgressFlags(calTime)
 
         // 2️⃣ ERROR 상태 복구 시도
         if (currentPassScheduleState == PassScheduleState.ERROR) {
-            handleV2ErrorRecovery(calTime)
+            handleErrorRecovery(calTime)
             return  // ERROR 복구 중에는 다른 처리 스킵
         }
 
         // 3️⃣ 시간 기반 상태 결정
-        val nextState = evaluateV2Transition(calTime)
+        val nextState = evaluateTransition(calTime)
 
         // 4️⃣ 상태 전환
         if (nextState != null && nextState != currentPassScheduleState) {
-            transitionToV2(nextState, calTime)
+            transitionTo(nextState, calTime)
         }
 
         // 5️⃣ 상태별 주기적 작업 (추적 데이터 전송 등)
-        executeV2PeriodicAction(calTime)
+        executePeriodicAction(calTime)
     }
 
     /**
@@ -3234,12 +2675,12 @@ class PassScheduleService(
      *
      * 매 100ms마다 하드웨어 위치를 확인하고 컨텍스트 플래그를 갱신합니다.
      */
-    private fun updateV2ProgressFlags(calTime: ZonedDateTime) {
+    private fun updateProgressFlags(calTime: ZonedDateTime) {
         val ctx = currentScheduleContext ?: return
 
         // Train 이동 완료 체크
         if (ctx.trainMoveCommandSent && !ctx.trainMoveCompleted) {
-            if (isV2TrainAtTarget(ctx.trainAngle)) {
+            if (isTrainAtTarget(ctx.trainAngle)) {
                 ctx.trainMoveCompleted = true
                 ctx.trainStabilizationStartTime = calTime  // 안정화 시작
                 logger.info("[V2] ✅ Train 목표 도달, 안정화 시작")
@@ -3251,7 +2692,7 @@ class PassScheduleService(
             val stabilizationStart = ctx.trainStabilizationStartTime
             if (stabilizationStart != null) {
                 val elapsed = Duration.between(stabilizationStart, calTime)
-                if (elapsed.toMillis() >= V2_TRAIN_STABILIZATION_MS) {
+                if (elapsed.toMillis() >= TRAIN_STABILIZATION_MS) {
                     ctx.trainStabilizationCompleted = true
                     logger.info("[V2] ✅ Train 안정화 완료 (3초 경과)")
                 }
@@ -3260,7 +2701,7 @@ class PassScheduleService(
 
         // Az/El 이동 완료 체크
         if (ctx.azElMoveCommandSent && !ctx.azElMoveCompleted) {
-            if (isV2AzElAtTarget(ctx.startAzimuth, ctx.startElevation)) {
+            if (isAzElAtTarget(ctx.startAzimuth, ctx.startElevation)) {
                 ctx.azElMoveCompleted = true
                 logger.info("[V2] ✅ Az/El 목표 도달")
             }
@@ -3323,7 +2764,7 @@ class PassScheduleService(
 
         return when {
             // Train 이동 완료 + 안정화 완료 + Az/El 도달
-            ctx.azElMoveCompleted && isV2AzElAtTarget(ctx.startAzimuth, ctx.startElevation) -> {
+            ctx.azElMoveCompleted && isAzElAtTarget(ctx.startAzimuth, ctx.startElevation) -> {
                 PassScheduleState.READY
             }
             // Train 이동 완료 + 안정화 완료
@@ -3346,7 +2787,7 @@ class PassScheduleService(
      *
      * 시간 기반 상태 + 현재 상태를 비교하여 전환 결정
      */
-    private fun evaluateV2Transition(calTime: ZonedDateTime): PassScheduleState? {
+    private fun evaluateTransition(calTime: ZonedDateTime): PassScheduleState? {
         // IDLE 상태는 START 버튼에 의해서만 변경
         if (currentPassScheduleState == PassScheduleState.IDLE) {
             return null
@@ -3368,7 +2809,7 @@ class PassScheduleService(
      *
      * 추적 완료 후 다음 스케줄을 평가하고 상태를 결정합니다.
      */
-    private fun evaluateV2NextSchedule(calTime: ZonedDateTime): PassScheduleState {
+    private fun evaluateNextSchedule(calTime: ZonedDateTime): PassScheduleState {
         // 다음 스케줄 가져오기 (아직 종료되지 않은 것)
         val nextSchedule = scheduleContextQueue
             .filter { it.endTime.isAfter(calTime) }
@@ -3387,12 +2828,13 @@ class PassScheduleService(
         nextScheduleContext = if (nextIdx < scheduleContextQueue.size) scheduleContextQueue[nextIdx] else null
 
         val timeToStart = Duration.between(calTime, nextSchedule.startTime)
+        val prepMinutes = settingsService.preparationTimeMinutes
 
-        return if (timeToStart.toMinutes() <= 2) {
-            logger.info("[V2-SCHEDULE] 다음 스케줄 2분 이내 → MOVING_TRAIN")
+        return if (timeToStart.toMinutes() <= prepMinutes) {
+            logger.info("[V2-SCHEDULE] 다음 스케줄 ${prepMinutes}분 이내 → MOVING_TRAIN")
             PassScheduleState.MOVING_TRAIN
         } else {
-            logger.info("[V2-SCHEDULE] 다음 스케줄 2분 이상 → STOWING")
+            logger.info("[V2-SCHEDULE] 다음 스케줄 ${prepMinutes}분 이상 → STOWING")
             PassScheduleState.STOWING
         }
     }
@@ -3403,7 +2845,7 @@ class PassScheduleService(
      * @param newState 새 상태
      * @param calTime 현재 calTime (ZonedDateTime)
      */
-    private fun transitionToV2(newState: PassScheduleState, calTime: ZonedDateTime) {
+    private fun transitionTo(newState: PassScheduleState, calTime: ZonedDateTime) {
         val ctx = currentScheduleContext
 
         logger.info("═══════════════════════════════════════════════")
@@ -3420,16 +2862,16 @@ class PassScheduleService(
         ctx?.stateEntryTime = calTime
 
         // 진입 액션 실행
-        executeV2EnterAction(newState, ctx, calTime)
+        executeEnterAction(newState, ctx, calTime)
 
         // 프론트엔드 상태 전송
-        sendV2StateToFrontend(newState, ctx)
+        sendStateToFrontend(newState, ctx)
     }
 
     /**
      * V2.0 상태 진입 시 1회 실행되는 액션
      */
-    private fun executeV2EnterAction(
+    private fun executeEnterAction(
         state: PassScheduleState,
         ctx: ScheduleTrackingContext?,
         calTime: ZonedDateTime
@@ -3525,7 +2967,7 @@ class PassScheduleService(
     /**
      * V2.0 매 100ms마다 실행되는 주기적 액션
      */
-    private fun executeV2PeriodicAction(calTime: ZonedDateTime) {
+    private fun executePeriodicAction(calTime: ZonedDateTime) {
         when (currentPassScheduleState) {
             PassScheduleState.TRACKING -> {
                 val ctx = currentScheduleContext ?: return
@@ -3537,9 +2979,9 @@ class PassScheduleService(
 
             PassScheduleState.POST_TRACKING -> {
                 // POST_TRACKING 상태에서 다음 스케줄 평가
-                val nextState = evaluateV2NextSchedule(calTime)
+                val nextState = evaluateNextSchedule(calTime)
                 if (nextState != currentPassScheduleState) {
-                    transitionToV2(nextState, calTime)
+                    transitionTo(nextState, calTime)
                 }
             }
 
@@ -3550,7 +2992,7 @@ class PassScheduleService(
     /**
      * V2.0 프론트엔드로 상태 전송
      */
-    private fun sendV2StateToFrontend(state: PassScheduleState, ctx: ScheduleTrackingContext?) {
+    private fun sendStateToFrontend(state: PassScheduleState, ctx: ScheduleTrackingContext?) {
         // PushData에 상태 동기화 (기존 TRACKING_STATUS 활용)
         PushData.TRACKING_STATUS.passScheduleTrackingState = state.name
 
@@ -3569,7 +3011,7 @@ class PassScheduleService(
      *
      * Time Offset이 변경되면 스케줄 큐 재평가 및 상태 재결정
      */
-    fun handleV2TimeOffsetChange() {
+    fun handleTimeOffsetChange() {
         if (currentPassScheduleState == PassScheduleState.IDLE) {
             return
         }
@@ -3583,20 +3025,20 @@ class PassScheduleService(
         logger.info("═══════════════════════════════════════════════")
 
         // 스케줄 큐 재평가
-        reevaluateV2ScheduleQueue(calTime)
+        reevaluateScheduleQueue(calTime)
 
         // 현재 상태 재결정 (시간 기반)
         val newState = determineStateByTime(calTime)
         if (newState != currentPassScheduleState) {
             logger.info("[V2-TIME_OFFSET] 상태 전환: $currentPassScheduleState → $newState")
-            transitionToV2(newState, calTime)
+            transitionTo(newState, calTime)
         }
     }
 
     /**
      * V2.0 스케줄 큐 재평가
      */
-    private fun reevaluateV2ScheduleQueue(calTime: ZonedDateTime) {
+    private fun reevaluateScheduleQueue(calTime: ZonedDateTime) {
         val activeSchedules = scheduleContextQueue.filter { it.endTime.isAfter(calTime) }
 
         if (activeSchedules.isEmpty() && scheduleContextQueue.isNotEmpty()) {
@@ -3604,8 +3046,9 @@ class PassScheduleService(
         }
 
         // 현재/다음 컨텍스트 재설정
+        val prepMinutes = settingsService.preparationTimeMinutes
         val currentSchedule = activeSchedules
-            .filter { it.startTime.isBefore(calTime) || Duration.between(calTime, it.startTime).toMinutes() <= 2 }
+            .filter { it.startTime.isBefore(calTime) || Duration.between(calTime, it.startTime).toMinutes() <= prepMinutes }
             .minByOrNull { it.startTime }
 
         if (currentSchedule != null && currentSchedule.mstId != currentScheduleContext?.mstId) {
@@ -3617,7 +3060,7 @@ class PassScheduleService(
     /**
      * V2.0 ERROR 상태 복구 시도
      */
-    private fun handleV2ErrorRecovery(calTime: ZonedDateTime) {
+    private fun handleErrorRecovery(calTime: ZonedDateTime) {
         if (currentPassScheduleState != PassScheduleState.ERROR) return
 
         val ctx = currentScheduleContext ?: return
@@ -3635,10 +3078,10 @@ class PassScheduleService(
             if (isCommOk) {
                 val recoveryState = determineStateByTime(calTime)
                 logger.info("[V2-ERROR_RECOVERY] 복구 성공, $recoveryState 상태로 전환")
-                transitionToV2(recoveryState, calTime)
+                transitionTo(recoveryState, calTime)
             } else if (elapsed.seconds >= 30) {
                 logger.error("[V2-ERROR_RECOVERY] 30초 동안 복구 실패, IDLE로 전환")
-                stopV2ScheduleTracking()
+                stopStateMachineTracking()
             }
         }
     }
@@ -3646,11 +3089,11 @@ class PassScheduleService(
     /**
      * V2.0 안전한 일괄 종료
      */
-    private fun safeV2BatchShutdown() {
+    private fun safeBatchShutdown() {
         logger.info("[V2-SHUTDOWN] 일괄 종료 시작")
 
         try {
-            isV2ShuttingDown = true
+            isShuttingDown = true
 
             // Stow 명령 전송
             udpFwICDService.StowCommand()
@@ -3664,7 +3107,7 @@ class PassScheduleService(
                 logger.error("[V2-SHUTDOWN] Stow 명령 실패: ${stowError.message}", stowError)
             }
         } finally {
-            isV2ShuttingDown = false
+            isShuttingDown = false
         }
     }
 
@@ -3675,7 +3118,7 @@ class PassScheduleService(
      *
      * 기존 isTrainAtZero/isTrainStabilized와 유사하게 dataStoreService 사용
      */
-    private fun isV2TrainAtTarget(targetTrain: Float): Boolean {
+    private fun isTrainAtTarget(targetTrain: Float): Boolean {
         val currentTrain = dataStoreService.getLatestData().trainAngle?.toFloat() ?: return false
         val targetTrainDeg = Math.toDegrees(targetTrain.toDouble()).toFloat()
         return kotlin.math.abs(currentTrain - targetTrainDeg) <= 0.1f
@@ -3686,7 +3129,7 @@ class PassScheduleService(
      *
      * dataStoreService를 통해 현재 위치 확인
      */
-    private fun isV2AzElAtTarget(targetAz: Float, targetEl: Float): Boolean {
+    private fun isAzElAtTarget(targetAz: Float, targetEl: Float): Boolean {
         val latestData = dataStoreService.getLatestData()
         val currentAz = latestData.azimuthAngle ?: return false
         val currentEl = latestData.elevationAngle ?: return false
@@ -3707,7 +3150,7 @@ class PassScheduleService(
      *
      * @return 시작 성공 여부
      */
-    fun startV2ScheduleTracking(): Mono<Boolean> {
+    fun startStateMachineTracking(): Mono<Boolean> {
         return Mono.fromCallable {
             try {
                 logger.info("════════════════════════════════════════")
@@ -3718,7 +3161,7 @@ class PassScheduleService(
 
                 // 1. 스케줄 큐 생성
                 scheduleContextQueue.clear()
-                val allContexts = buildV2ScheduleQueue(calTime)
+                val allContexts = buildScheduleQueue(calTime)
                 scheduleContextQueue.addAll(allContexts)
 
                 if (scheduleContextQueue.isEmpty()) {
@@ -3738,17 +3181,15 @@ class PassScheduleService(
 
                 // 3. 초기 상태 결정
                 val timeToStart = Duration.between(calTime, firstSchedule.startTime)
-                val initialState = if (timeToStart.toMinutes() <= 2) {
+                val prepMinutes = settingsService.preparationTimeMinutes
+                val initialState = if (timeToStart.toMinutes() <= prepMinutes) {
                     PassScheduleState.MOVING_TRAIN
                 } else {
                     PassScheduleState.STOWING
                 }
 
                 // 4. 상태 전환
-                transitionToV2(initialState, calTime)
-
-                // 5. v2 활성화
-                useV2StateMachine = true
+                transitionTo(initialState, calTime)
 
                 true
             } catch (e: Exception) {
@@ -3763,7 +3204,7 @@ class PassScheduleService(
      *
      * @return 정지 성공 여부
      */
-    fun stopV2ScheduleTracking(): Mono<Boolean> {
+    fun stopStateMachineTracking(): Mono<Boolean> {
         return Mono.fromCallable {
             try {
                 logger.info("════════════════════════════════════════")
@@ -3771,7 +3212,7 @@ class PassScheduleService(
                 logger.info("════════════════════════════════════════")
 
                 // 1. 안전한 일괄 종료
-                safeV2BatchShutdown()
+                safeBatchShutdown()
 
                 // 2. 상태 초기화
                 currentPassScheduleState = PassScheduleState.IDLE
@@ -3782,11 +3223,8 @@ class PassScheduleService(
                 nextScheduleContext = null
                 scheduleContextQueue.clear()
 
-                // 4. v2 비활성화
-                useV2StateMachine = false
-
-                // 5. 프론트엔드 알림
-                sendV2StateToFrontend(PassScheduleState.IDLE, null)
+                // 4. 프론트엔드 알림
+                sendStateToFrontend(PassScheduleState.IDLE, null)
 
                 true
             } catch (e: Exception) {
@@ -3801,7 +3239,7 @@ class PassScheduleService(
      *
      * 선택된 스케줄 데이터를 ScheduleTrackingContext로 변환합니다.
      */
-    private fun buildV2ScheduleQueue(calTime: ZonedDateTime): List<ScheduleTrackingContext> {
+    private fun buildScheduleQueue(calTime: ZonedDateTime): List<ScheduleTrackingContext> {
         // getAllSelectedTrackMst()는 Map<String, List<Map<String, Any?>>> 반환
         // 모든 위성의 스케줄을 평탄화하여 필터링
         val allSchedules = getAllSelectedTrackMst().values.flatten()
@@ -3849,10 +3287,10 @@ class PassScheduleService(
     /**
      * V2.0 현재 상태 조회
      */
-    fun getV2CurrentState(): PassScheduleState = currentPassScheduleState
+    fun getCurrentState(): PassScheduleState = currentPassScheduleState
 
     /**
      * V2.0 현재 컨텍스트 조회
      */
-    fun getV2CurrentContext(): ScheduleTrackingContext? = currentScheduleContext
+    fun getCurrentContext(): ScheduleTrackingContext? = currentScheduleContext
 }

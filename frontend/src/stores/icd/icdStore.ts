@@ -2460,6 +2460,43 @@ export const useICDStore = defineStore('icd', () => {
     }
   })
 
+  // ✅ PassSchedule 추적 상태 정보 computed 속성 추가
+  const passScheduleTrackingStateInfo = computed(() => {
+    const state = passScheduleTrackingState.value
+    switch (state) {
+      // V2 상태 (11개)
+      case 'IDLE':
+        return { displayLabel: '정지', displayColor: 'grey' }
+      case 'STOWING':
+        return { displayLabel: 'Stow 이동', displayColor: 'blue' }
+      case 'STOWED':
+        return { displayLabel: 'Stow 대기', displayColor: 'blue-grey' }
+      case 'MOVING_TRAIN':
+        return { displayLabel: 'Train 이동', displayColor: 'deep-orange' }
+      case 'TRAIN_STABILIZING':
+        return { displayLabel: 'Train 안정화', displayColor: 'amber-7' }
+      case 'MOVING_TO_START':
+        return { displayLabel: '시작위치 이동', displayColor: 'cyan' }
+      case 'READY':
+        return { displayLabel: '추적 준비완료', displayColor: 'light-green' }
+      case 'TRACKING':
+        return { displayLabel: '추적 중', displayColor: 'green' }
+      case 'POST_TRACKING':
+        return { displayLabel: '추적 후 처리', displayColor: 'teal' }
+      case 'COMPLETED':
+        return { displayLabel: '완료', displayColor: 'purple' }
+      case 'ERROR':
+        return { displayLabel: '오류', displayColor: 'red' }
+      // V1 호환 상태
+      case 'WAITING':
+        return { displayLabel: '대기 중', displayColor: 'blue-grey' }
+      case 'PREPARING':
+        return { displayLabel: '준비 중', displayColor: 'orange' }
+      default:
+        return { displayLabel: '알 수 없음', displayColor: 'grey' }
+    }
+  })
+
   // Standby 명령 전송
   const standbyCommand = async (azimuth: boolean, elevation: boolean, train: boolean) => {
     try {
@@ -2866,6 +2903,7 @@ export const useICDStore = defineStore('icd', () => {
     passScheduleStatus,
     passScheduleStatusInfo,
     passScheduleTrackingState,
+    passScheduleTrackingStateInfo,
     sunTrackStatus,
     sunTrackStatusInfo,
     sunTrackTrackingState,

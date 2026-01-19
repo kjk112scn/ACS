@@ -1,6 +1,7 @@
 # 회사 테스트 가이드
 
 > **작성일**: 2026-01-18
+> **수정일**: 2026-01-19 (Windows Native 설치 가이드 추가)
 > **목적**: DB Integration Phase 5-6 + Architecture Refactoring + Settings 검증
 
 ---
@@ -10,111 +11,159 @@
 ```
 [1. DB 설치] → [2. 서버 시작] → [3. 리팩토링 검증] → [4. Settings 검증] → [5. 통합 테스트]
      │              │                │                    │                   │
- TimescaleDB    office 프로필     SunTrack 등         Dead 설정          실제 추적
+ TimescaleDB    with-db 프로필    SunTrack 등         Dead 설정          실제 추적
    설치           연결 확인         모드 테스트          정리               데이터
 ```
 
 ---
 
-## Part 1: DB Integration 테스트
+## Part 1: DB Integration 테스트 (Windows Native)
 
-### 1.1 TimescaleDB 설치 확인
+> **권장 환경**: PostgreSQL 16.11+, TimescaleDB 2.24.0
+> **주의**: PostgreSQL 마이너 버전과 TimescaleDB 빌드 버전이 맞아야 함
 
+### 1.0 사전 준비
+
+**psql 명령어 사용 시 (PATH 미설정 환경):**
 ```powershell
-# PostgreSQL 16 버전 확인
-psql -U postgres -c "SELECT version();"
+# 전체 경로로 실행
+& "C:\Program Files\PostgreSQL\16\bin\psql" -U postgres -c "SELECT version();"
 
-# TimescaleDB 확장 확인
-psql -U postgres -c "SELECT * FROM pg_extension WHERE extname = 'timescaledb';"
+# 또는 PATH에 추가 후 사용
+$env:Path += ";C:\Program Files\PostgreSQL\16\bin"
 ```
 
-**TimescaleDB 미설치 시:**
+### 1.1 PostgreSQL + TimescaleDB 설치
+
+#### Step 1: PostgreSQL 설치
+
+1. https://www.enterprisedb.com/downloads/postgres-postgresql-downloads
+2. **Windows x86-64** → **16.11** (최신 마이너 버전 권장)
+3. 설치 완료 후 Stack Builder는 건너뛰기
+
+#### Step 2: TimescaleDB 다운로드
+
+1. https://github.com/timescale/timescaledb/releases
+2. `timescaledb-postgresql-16-windows-amd64.zip` 다운로드
+3. 압축 해제 (예: `C:\Users\{사용자}\Downloads\timescaledb\`)
+
+#### Step 3: TimescaleDB 파일 복사 (관리자 PowerShell)
+
 ```powershell
-# Windows: https://docs.timescale.com/self-hosted/latest/install/installation-windows/
-# 또는 PostgreSQL Extension Manager 사용
+# DLL 복사
+Copy-Item "C:\Users\{사용자}\Downloads\timescaledb\timescaledb\*.dll" "C:\Program Files\PostgreSQL\16\lib\" -Force
+
+# SQL, control 파일 복사
+Copy-Item "C:\Users\{사용자}\Downloads\timescaledb\timescaledb\*.sql" "C:\Program Files\PostgreSQL\16\share\extension\" -Force
+Copy-Item "C:\Users\{사용자}\Downloads\timescaledb\timescaledb\*.control" "C:\Program Files\PostgreSQL\16\share\extension\" -Force
+```
+
+#### Step 4: postgresql.conf 수정 (관리자 PowerShell)
+
+```powershell
+Add-Content -Path "C:\Program Files\PostgreSQL\16\data\postgresql.conf" -Value "`nshared_preload_libraries = 'timescaledb'"
+```
+
+#### Step 5: 서비스 재시작
+
+```powershell
+Restart-Service postgresql-x64-16
+```
+
+#### Step 6: 설치 확인
+
+```powershell
+& "C:\Program Files\PostgreSQL\16\bin\psql" -U postgres -c "SELECT default_version FROM pg_available_extensions WHERE name = 'timescaledb';"
+# 결과: 2.24.0 (또는 설치한 버전)
 ```
 
 ### 1.2 데이터베이스/사용자 생성
 
 ```powershell
 # 1. 사용자 생성
-psql -U postgres -c "CREATE USER acs_user WITH PASSWORD 'acs1234';"
+& "C:\Program Files\PostgreSQL\16\bin\psql" -U postgres -c "CREATE USER acs_user WITH PASSWORD 'acs1234';"
 
 # 2. 데이터베이스 생성
-psql -U postgres -c "CREATE DATABASE acs OWNER acs_user;"
+& "C:\Program Files\PostgreSQL\16\bin\psql" -U postgres -c "CREATE DATABASE acs OWNER acs_user ENCODING 'UTF8';"
 
-# 3. 권한 부여
-psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE acs TO acs_user;"
-
-# 4. TimescaleDB 확장 활성화 (acs DB에서)
-psql -U acs_user -d acs -c "CREATE EXTENSION IF NOT EXISTS timescaledb;"
+# 3. TimescaleDB 확장 활성화 (acs DB에서)
+& "C:\Program Files\PostgreSQL\16\bin\psql" -U postgres -d acs -c "CREATE EXTENSION IF NOT EXISTS timescaledb;"
 ```
 
 ### 1.3 스키마 적용
 
 ```powershell
-# schema.sql 실행
-psql -U acs_user -d acs -f "g:\Kyu\repo\ACS\docs\work\active\Database_Integration\sql\schema.sql"
+# schema.sql 실행 (인코딩 지정 필수 - 한글 주석 포함)
+& "C:\Program Files\PostgreSQL\16\bin\psql" -U postgres -d acs -c "SET client_encoding TO 'UTF8';" -f "{프로젝트경로}\docs\work\active\Architecture_Refactoring\database\sql\schema.sql"
+```
+
+**경로 예시:**
+```powershell
+& "C:\Program Files\PostgreSQL\16\bin\psql" -U postgres -d acs -c "SET client_encoding TO 'UTF8';" -f "C:\Users\NG2\source\repos\VueQuasar\ACS\docs\work\active\Architecture_Refactoring\database\sql\schema.sql"
 ```
 
 ### 1.4 테이블 확인
 
 ```powershell
-# 테이블 목록 (6개)
-psql -U acs_user -d acs -c "\dt"
+# 테이블 목록 (8개)
+& "C:\Program Files\PostgreSQL\16\bin\psql" -U postgres -d acs -c "\dt"
 
 # 예상 결과:
-#  tracking_session     - 추적 세션
+#  tracking_session     - 추적 세션 (일반)
 #  tracking_trajectory  - 추적 궤적 (Hypertable)
 #  tracking_result      - 추적 결과 (Hypertable)
 #  icd_status           - ICD 상태 (Hypertable)
-#  settings             - 시스템 설정
-#  setting_history      - 설정 변경 이력
+#  settings             - 시스템 설정 (일반)
+#  setting_history      - 설정 변경 이력 (일반)
+#  tle_cache            - TLE 캐시 (일반)
+#  hardware_error_log   - 하드웨어 에러 (Hypertable)
 ```
 
 ### 1.5 Hypertable 확인
 
 ```powershell
-# Hypertable 목록 (3개)
-psql -U acs_user -d acs -c "SELECT hypertable_name, compression_enabled FROM timescaledb_information.hypertables;"
+# Hypertable 목록 (4개)
+& "C:\Program Files\PostgreSQL\16\bin\psql" -U postgres -d acs -c "SELECT hypertable_name FROM timescaledb_information.hypertables;"
 
 # 예상 결과:
-#  tracking_trajectory | t
-#  tracking_result     | t
-#  icd_status          | t
+#  tracking_trajectory
+#  tracking_result
+#  icd_status
+#  hardware_error_log
 ```
 
 ### 1.6 압축/보관 정책 확인
 
 ```powershell
 # 압축 정책
-psql -U acs_user -d acs -c "SELECT hypertable_name, compress_after FROM timescaledb_information.jobs WHERE proc_name = 'policy_compression';"
+& "C:\Program Files\PostgreSQL\16\bin\psql" -U postgres -d acs -c "SELECT hypertable_name, compress_after FROM timescaledb_information.jobs WHERE proc_name = 'policy_compression';"
 
-# 보관 정책 (icd_status만)
-psql -U acs_user -d acs -c "SELECT hypertable_name, drop_after FROM timescaledb_information.jobs WHERE proc_name = 'policy_retention';"
+# 보관 정책
+& "C:\Program Files\PostgreSQL\16\bin\psql" -U postgres -d acs -c "SELECT hypertable_name, drop_after FROM timescaledb_information.jobs WHERE proc_name = 'policy_retention';"
 ```
 
-### 1.7 Settings 테이블 확인
+### 1.7 접속 정보 요약
 
-```powershell
-# settings 테이블 구조
-psql -U acs_user -d acs -c "\d settings"
-
-# setting_history 테이블 구조
-psql -U acs_user -d acs -c "\d setting_history"
-```
+| 항목 | 값 |
+|------|-----|
+| Host | localhost |
+| Port | 5432 |
+| Database | acs |
+| User | acs_user |
+| Password | acs1234 |
 
 ### 1.8 체크리스트
 
-- [ ] PostgreSQL 16 설치 확인
-- [ ] TimescaleDB 확장 설치
+- [ ] PostgreSQL 16.11+ 설치 확인
+- [ ] TimescaleDB 2.24.0 설치 (DLL 복사)
+- [ ] postgresql.conf에 shared_preload_libraries 추가
+- [ ] 서비스 재시작
 - [ ] acs_user 사용자 생성
-- [ ] acs 데이터베이스 생성
+- [ ] acs 데이터베이스 생성 (UTF8)
 - [ ] schema.sql 실행 성공
-- [ ] 테이블 **6개** 확인 (tracking 4개 + settings 2개)
-- [ ] Hypertable 3개 확인
-- [ ] 압축 정책 확인 (7일)
-- [ ] 보관 정책 확인 (icd_status 90일)
+- [ ] 테이블 **8개** 확인
+- [ ] Hypertable **4개** 확인
+- [ ] 압축/보관 정책 확인
 
 ---
 
@@ -123,8 +172,10 @@ psql -U acs_user -d acs -c "\d setting_history"
 ### 2.1 서버 시작
 
 ```powershell
-cd g:\Kyu\repo\ACS\backend
-./gradlew bootRun --args='--spring.profiles.active=office'
+cd backend
+./gradlew bootRun
+# 기본 프로필이 with-db이므로 별도 지정 불필요
+# DB 없이 실행하려면: ./gradlew bootRun --args='--spring.profiles.active=no-db'
 ```
 
 ### 2.2 연결 확인 (로그)
@@ -132,7 +183,7 @@ cd g:\Kyu\repo\ACS\backend
 ```
 # 정상 시 로그:
 R2DBC ConnectionFactory created
-Database connected: r2dbc:postgresql://localhost:5432/acs
+Database connected: r2dbc:postgresql://localhost:5433/acs
 ```
 
 ### 2.3 Mock 데이터 INSERT 테스트
@@ -202,7 +253,7 @@ psql -U acs_user -d acs -c "SELECT setting_key, old_value, new_value, created_at
 
 ### 2.7 체크리스트
 
-- [ ] 서버 시작 (office 프로필)
+- [ ] 서버 시작 (기본 db 프로필)
 - [ ] DB 연결 로그 확인
 - [ ] tracking_session INSERT 성공
 - [ ] tracking_trajectory INSERT 성공
@@ -365,15 +416,67 @@ psql -U acs_user -d acs -c "SELECT setting_key, old_value, new_value, created_at
 
 ## 문제 해결
 
+### TimescaleDB DLL 로드 오류
+
+```
+오류: "C:/Program Files/PostgreSQL/16/lib/timescaledb-2.24.0.dll"
+라이브러리를 불러 올 수 없음: The specified procedure could not be found.
+```
+
+**원인:** PostgreSQL 마이너 버전과 TimescaleDB 빌드 버전 불일치
+- 예: PostgreSQL 16.2 + TimescaleDB 2.24.0 (16.11 기준 빌드)
+
+**해결:**
+1. PostgreSQL을 최신 마이너 버전으로 업그레이드 (16.2 → 16.11)
+2. 또는 PostgreSQL 버전에 맞는 TimescaleDB 버전 사용
+
+```powershell
+# PostgreSQL 버전 확인
+& "C:\Program Files\PostgreSQL\16\bin\psql" -U postgres -c "SELECT version();"
+```
+
+### schema.sql 인코딩 오류
+
+```
+오류: 0xec 0x8b 바이트로 조합된 문자(인코딩: "UHC")와 대응되는 문자 코드가 "UTF8" 인코딩에는 없습니다
+```
+
+**원인:** Windows PowerShell 기본 인코딩과 PostgreSQL UTF8 불일치 (한글 주석)
+
+**해결:**
+```powershell
+# 인코딩 지정하여 실행
+& "C:\Program Files\PostgreSQL\16\bin\psql" -U postgres -d acs -c "SET client_encoding TO 'UTF8';" -f "schema.sql 경로"
+```
+
 ### DB 연결 실패
 
 ```
 오류: Connection refused
 원인: PostgreSQL 서비스 미실행
+```
 
-해결:
-1. services.msc → PostgreSQL 서비스 시작
-2. 또는: net start postgresql-x64-16
+**해결:**
+```powershell
+# 서비스 상태 확인
+Get-Service *postgres*
+
+# 서비스 시작
+Restart-Service postgresql-x64-16
+```
+
+### acs_user 인증 실패
+
+```
+오류: password 인증을 실패했습니다
+```
+
+**원인:** acs_user 비밀번호 불일치
+
+**해결:**
+```powershell
+# postgres 사용자로 비밀번호 재설정
+& "C:\Program Files\PostgreSQL\16\bin\psql" -U postgres -c "ALTER USER acs_user PASSWORD 'acs1234';"
 ```
 
 ### Hypertable 생성 실패
@@ -381,37 +484,39 @@ psql -U acs_user -d acs -c "SELECT setting_key, old_value, new_value, created_at
 ```
 오류: cannot create a unique index without the column "timestamp"
 원인: PRIMARY KEY가 있는 테이블
+```
 
-해결:
+**해결:**
 1. DROP TABLE 후 재생성
 2. schema.sql에서 PRIMARY KEY 제거 확인
-```
 
 ### 서버 시작 실패 (R2DBC)
 
 ```
 오류: R2dbcConnectionFactory not found
 원인: 프로필 설정 오류
-
-해결:
-1. --spring.profiles.active=office 확인
-2. application-office.properties 존재 확인
 ```
+
+**해결:**
+1. `--spring.profiles.active=with-db` 확인
+2. `application.properties`에서 R2DBC 설정 확인
 
 ---
 
 ## 완료 체크리스트
 
 ### Phase 5: Native DB 설치
-- [ ] TimescaleDB 설치
+- [ ] PostgreSQL 16.11+ 설치
+- [ ] TimescaleDB 2.24.0 설치
 - [ ] 사용자/DB 생성
-- [ ] 스키마 적용
-- [ ] Hypertable 확인
+- [ ] 스키마 적용 (8개 테이블)
+- [ ] Hypertable 확인 (4개)
 
 ### Phase 6: 서버 연동
-- [ ] 서버 시작 (office 프로필)
-- [ ] DB 연결 확인
-- [ ] CRUD 테스트
+- [ ] 서버 시작 (with-db 프로필)
+- [ ] DB 연결 로그 확인
+- [ ] Mock 데이터 INSERT 테스트
+- [ ] Settings DB 저장/복원 테스트
 
 ### Refactoring 검증
 - [ ] SunTrack 모드
@@ -426,4 +531,4 @@ psql -U acs_user -d acs -c "SELECT setting_key, old_value, new_value, created_at
 
 ---
 
-**Last Updated**: 2026-01-18
+**Last Updated**: 2026-01-19

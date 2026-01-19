@@ -964,9 +964,13 @@ class EphemerisService(
 
             // ✅ Train 각도는 현재 위치 유지 (이동 명령 생략하여 이동 중 멈춤 방지)
             // Train 이동 명령을 보내지 않고 현재 Train 위치에서 바로 추적 시작
-            val currentTrainAngle = dataStoreService.getLatestData().trainAngle?.toFloat() ?: 0f
-            GlobalData.EphemerisTrakingAngle.trainAngle = currentTrainAngle
-            logger.info("🔧 Train 현재 위치 유지: {}° (이동 명령 생략)", currentTrainAngle)
+            // ⚠️ actual(하드웨어 보고값)에서 offset을 빼서 raw angle로 저장해야 함
+            //    그래야 이후 offset 변경 시 CMD가 정확히 계산됨
+            val actualTrainAngle = dataStoreService.getLatestData().trainAngle?.toFloat() ?: 0f
+            val rawTrainAngle = actualTrainAngle - GlobalData.Offset.trainPositionOffset - GlobalData.Offset.trueNorthOffset
+            GlobalData.EphemerisTrakingAngle.trainAngle = rawTrainAngle
+            logger.info("🔧 Train 현재 위치 유지: actual={}°, raw={}° (offset={}°, trueNorth={}°)",
+                actualTrainAngle, rawTrainAngle, GlobalData.Offset.trainPositionOffset, GlobalData.Offset.trueNorthOffset)
 
             // ✅ 상태를 먼저 설정 (sendInitialTrackingData에서 ephemerisStatus 체크하므로)
             currentTrackingState = TrackingState.TRACKING

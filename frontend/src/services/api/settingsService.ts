@@ -14,6 +14,7 @@ export interface TrackingSettings {
   msInterval: number
   durationDays: number
   minElevationAngle: number
+  preparationTimeMinutes: number  // 추적 준비 시간 (분) - Train+Az 이동 시간
 }
 
 export interface StowAngleSettings {
@@ -111,6 +112,7 @@ class SettingsService {
         msInterval: data['tracking.msInterval'],
         durationDays: data['tracking.durationDays'],
         minElevationAngle: data['tracking.minElevationAngle'],
+        preparationTimeMinutes: data['tracking.preparationTimeMinutes'] ?? 4,
       }
     } catch (error) {
       console.error('추적 설정 조회 실패:', error)

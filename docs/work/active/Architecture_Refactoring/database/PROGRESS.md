@@ -142,15 +142,15 @@ spring:
 
 | 프로필 | DB | 용도 |
 |--------|:--:|------|
-| (기본) | ❌ | DB 없이 실행 |
-| `use-db` | ✅ | DB 연동 실행 |
+| `with-db` (기본) | ✅ | DB 연동 실행 |
+| `no-db` | ❌ | RAM만 사용 |
 
 ```powershell
-# DB 없이 실행 (기본)
+# DB 연동 실행 (기본)
 ./gradlew bootRun
 
-# DB 연동 실행
-./gradlew bootRun --args='--spring.profiles.active=use-db'
+# DB 없이 실행
+./gradlew bootRun --args='--spring.profiles.active=no-db'
 ```
 
 ---
