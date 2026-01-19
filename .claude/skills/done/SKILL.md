@@ -41,11 +41,11 @@ CHANGELOG.md                         ← 1단계: 전체 변경 이력 (요약 +
 ## 워크플로우
 
 ```
-[0. 빌드검증] → [1. 변경분석] → [2. 계층문서화] → [3. 로그기록] → [4. 커밋]
-      │              │              │                │            │
-  실패시 중단    git diff      CHANGELOG →       daily/       모든 변경
-                               README →           기록        포함
-                               하위문서
+[0. 빌드검증] → [1. 변경분석] → [2. 계층문서화] → [3. 상태업데이트] → [4. 커밋]
+      │              │              │                    │              │
+  실패시 중단    git diff      CHANGELOG →        CURRENT_STATUS    모든 변경
+                               README →             + daily/         포함
+                               하위문서                기록
 ```
 
 ---
@@ -70,7 +70,10 @@ CHANGELOG.md                         ← 1단계: 전체 변경 이력 (요약 +
   □ 일일 로그 업데이트 (2단계)
   □ 작업 폴더 README.md 업데이트 (3단계)
 
-□ Step 3: 커밋 생성
+□ Step 3: 상태 업데이트
+  □ CURRENT_STATUS.md 업데이트 (진행중/완료 작업)
+
+□ Step 4: 커밋 생성
   □ 모든 변경사항 포함
 ```
 
@@ -190,7 +193,25 @@ git diff --stat
 
 ---
 
-## Step 3: 커밋 생성
+## Step 3: 상태 업데이트
+
+**위치:** `docs/work/CURRENT_STATUS.md`
+
+세션 간 컨텍스트 유지용 상태 파일 업데이트.
+
+**업데이트 항목:**
+- 진행 중 작업 → 완료로 이동
+- 최근 완료 테이블에 커밋 정보 추가
+- 다음 작업 후보 업데이트
+
+**새 세션 시작 시:**
+```
+"CURRENT_STATUS.md 읽고 이어서 진행해줘"
+```
+
+---
+
+## Step 4: 커밋 생성
 
 ```yaml
 형식: <type>(<scope>): <subject>
@@ -235,7 +256,10 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
   📝 docs/logs/2026-01-18.md 업데이트
   📝 Architecture_Refactoring/README.md 업데이트
 
-[Step 3: 커밋]
+[Step 3: 상태 업데이트]
+  📝 CURRENT_STATUS.md 업데이트
+
+[Step 4: 커밋]
   feat(database): DB Integration Phase 6 완료
 ```
 
@@ -301,6 +325,6 @@ A: `/done --no-commit`
 
 ---
 
-**버전:** 2.0.0
-**수정일:** 2026-01-18
-**변경:** 계층적 문서화 구조 강제, 빌드 검증 추가, 폴더 정리 규칙 추가
+**버전:** 2.1.0
+**수정일:** 2026-01-20
+**변경:** CURRENT_STATUS.md 자동 업데이트 추가 (세션 간 컨텍스트 유지)

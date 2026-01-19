@@ -6,6 +6,27 @@
 
 ---
 
+## [2026-01-20] - 통합 워크플로우 v2.0
+
+### Changed
+- 스킬 시스템 v2.0 업그레이드 (refactor, bugfix, feature, plan)
+- 공통 워크플로우: 조사 → 검토 → 계획 → 승인 → 실행 → 완료
+- Phase A-D 분류 표준화 (P0 Critical → P3 Low)
+- 진행 상황 추적 표준화 (PROGRESS.md)
+
+### Added
+- [UNIFIED_WORKFLOW.md](.claude/skills/UNIFIED_WORKFLOW.md) - 통합 워크플로우 마스터 문서
+- 작업 현황 Dashboard ([docs/work/active/README.md](docs/work/active/README.md))
+
+### Why
+- PassSchedule 리팩토링 검증된 워크플로우를 모든 스킬에 적용
+- 자동화된 분석 + 전문가 검토 + 문서 기반 추적
+
+### Details
+- [UNIFIED_WORKFLOW.md](.claude/skills/UNIFIED_WORKFLOW.md)
+
+---
+
 ## [2026-01-20] - PassSchedule Phase C-D 완료
 
 ### Changed

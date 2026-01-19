@@ -4,25 +4,31 @@ description: 리팩토링 워크플로우. 대형 파일 분리, 구조 개선, 
 model: opus
 ---
 
-# Refactor - 리팩토링 스킬
+# Refactor - 리팩토링 스킬 (v2.0)
+
+> **검증 사례**: PassSchedule 상태머신 리팩토링 (15/17 완료, 88%)
 
 ## 역할
 
 코드 구조 개선과 대형 파일 분리를 체계적으로 수행합니다.
 
 **핵심 가치:**
-- 안전한 단계별 리팩토링
-- 기능 변경 없이 구조 개선
-- 테스트 가능성 향상
-- 유지보수성 증가
+- 자동 분석 + 전문가 검토
+- 문서 기반 추적 관리
+- 안전한 단계별 실행
+- 진행 상황 실시간 추적
 
-## 워크플로우
+## 워크플로우 (v2.0 - PassSchedule 검증)
 
 ```
-[1. 분석] → [2. 계획] → [3. 테스트] → [4. 실행] → [5. 검증] → [6. 완료]
+[1. 조사] → [2. 검토] → [3. 계획] → [4. 승인] → [5. 실행] → [6. 완료]
      │           │           │           │           │           │
-  현재 구조    분리 계획   기존 동작   단계별      빌드/기능   /done
-   파악        수립       확인        추출        확인        호출
+  코드 분석   전문가      PLAN.md    사용자      단계별    /done
+  버그 목록   에이전트    작성       확인       구현      호출
+     │           │           │                    │
+     ▼           ▼           ▼                    ▼
+  STATE_     tech-lead    Phase A-D    PROGRESS.md
+  MACHINE.md code-reviewer 분류        실시간 업데이트
 ```
 
 ## 사용법
@@ -32,6 +38,126 @@ model: opus
 | `/refactor {파일}` | 특정 파일 리팩토링 |
 | `/refactor analyze` | 리팩토링 대상 분석 |
 | `/refactor plan` | 리팩토링 계획 수립 |
+
+---
+
+## 실행 단계 (v2.0)
+
+### Step 1: 조사 (Research)
+
+**자동 수행 항목:**
+```yaml
+수행:
+  - 대상 파일 전체 읽기
+  - 버그/이슈 목록 작성
+  - 코드 품질 이슈 식별
+  - CLAUDE.md 규칙 위반 체크
+
+출력: STATE_MACHINE.md (또는 ANALYSIS.md)
+  - 버그 목록 (우선순위별)
+  - 수정 코드 예시
+  - 영향 범위 분석
+```
+
+**예시 (PassSchedule):**
+```markdown
+## 버그 목록
+
+| # | 버그 | 심각도 | 위치 |
+|---|------|:------:|------|
+| 1 | isAtStowPosition() 누락 | P0 | L2751 |
+| 2 | detailId 미전달 | P0 | L3001 |
+| 3 | catch(Exception) | P3 | 13개 |
+```
+
+### Step 2: 전문가 검토 (Expert Review)
+
+**호출 에이전트:**
+```yaml
+병렬 호출:
+  - tech-lead: 전체 방향 검토
+  - code-reviewer: 코드 품질 검토
+  - algorithm-expert: 알고리즘 검토 (필요시)
+  - architect: 아키텍처 검토 (필요시)
+
+피드백 수집:
+  - 우선순위 조정
+  - 누락 이슈 추가
+  - 구현 방향 제안
+```
+
+### Step 3: 계획 수립 (PLAN.md)
+
+**문서 생성:**
+```markdown
+# {대상} 리팩토링 실행 계획
+
+## 작업 범위
+
+| Phase | 내용 | 버그 수 | 우선순위 |
+|:-----:|------|:------:|:--------:|
+| A | Critical 버그 | N | P0 |
+| B | High 버그 | N | P1 |
+| C | Medium 버그 | N | P2 |
+| D | 코드 품질 | N | P3 |
+
+## Phase A: Critical (P0)
+
+### A1. {버그명}
+| 항목 | 내용 |
+|------|------|
+| **위치** | L1234-1250 |
+| **문제** | {문제 설명} |
+| **해결** | {해결 방법} |
+
+## 실행 순서
+
+Phase A (병렬) → 빌드 → Phase B → 빌드 → ...
+```
+
+### Step 4: 사용자 승인
+
+**확인 항목:**
+- Phase 분류 동의
+- 우선순위 확인
+- 실행 순서 확인
+
+### Step 5: 단계별 실행
+
+**원칙:**
+```yaml
+구현:
+  - Phase 단위로 진행
+  - 각 Phase 완료 후 빌드 검증
+  - PROGRESS.md 실시간 업데이트
+
+진행 상황 표시:
+  Phase A [✅✅✅] 3/3 완료!
+  Phase B [✅⬜⬜] 1/3 진행중
+```
+
+### Step 6: 완료 (/done)
+
+**자동 수행:**
+- 빌드 검증
+- CHANGELOG 업데이트
+- 일일 로그 업데이트
+- 커밋 생성
+
+---
+
+## 문서 구조 (자동 생성)
+
+```
+docs/work/active/{Feature}/
+├── README.md              ← 마스터 (현황 + 링크)
+├── STATE_MACHINE.md       ← 분석 결과 (버그 목록)
+├── PLAN.md                ← 실행 계획 (Phase 분류)
+├── IMPLEMENTATION_PROGRESS.md  ← 진행 상황
+└── TEST_SCENARIOS.md      ← 테스트 시나리오 (선택)
+```
+
+---
 
 ## 리팩토링 대상 (ACS 프로젝트)
 
@@ -46,71 +172,10 @@ model: opus
 | 파일 | 줄수 | 분리 방향 |
 |------|------|----------|
 | EphemerisService.kt | 4,986 | Calculator, Loader, Converter |
+| PassScheduleService.kt | 3,400 | ✅ 상태머신 리팩토링 완료 |
 | ICDService.kt | 2,788 | Parser, Sender, Handler |
 
-## 실행 단계
-
-### Step 1: 분석
-```yaml
-분석 항목:
-  - 파일 크기 (줄 수)
-  - 책임 분리 가능 영역
-  - 의존성 그래프
-  - 테스트 커버리지
-```
-
-### Step 2: 계획 수립
-```markdown
-## 리팩토링 계획: {파일명}
-
-### 분리할 컴포넌트
-1. {컴포넌트1}: {역할}
-2. {컴포넌트2}: {역할}
-
-### 인터페이스 정의
-- Props: {필요한 props}
-- Emits: {필요한 events}
-- Exports: {공개할 함수/상태}
-
-### 단계별 실행
-1. [ ] 인터페이스 정의
-2. [ ] 컴포넌트 추출
-3. [ ] 기존 파일에서 import
-4. [ ] 테스트 확인
-```
-
-### Step 3: 테스트 확인
-```bash
-# 리팩토링 전 빌드 확인
-cd frontend && npm run build
-cd backend && ./gradlew clean build -x test
-
-# 현재 동작 스냅샷
-```
-
-### Step 4: 단계별 실행
-```yaml
-원칙:
-  - 한 번에 하나의 컴포넌트만 추출
-  - 각 단계 후 빌드 확인
-  - 기능 변경 없음 (동작 동일)
-
-순서:
-  1. 가장 독립적인 부분부터 추출
-  2. 의존성 적은 순서로 진행
-  3. 마지막에 메인 파일 정리
-```
-
-### Step 5: 검증
-```bash
-# 빌드 확인
-npm run build  # Frontend
-./gradlew build -x test  # Backend
-
-# 기능 동작 확인
-# - 기존 기능 정상 동작
-# - 에러 없음
-```
+---
 
 ## 호출 에이전트
 
@@ -211,6 +276,29 @@ User: "/refactor icdStore.ts"
 
 ---
 
-**스킬 버전:** 1.0.0
-**작성일:** 2026-01-14
+## 검증된 사례: PassSchedule 상태머신
+
+> 이 워크플로우로 PassSchedule 리팩토링 88% 완료
+
+**진행 결과:**
+```
+Phase A (Critical)  [✅✅✅✅] 4/4 완료!
+Phase B (High)      [✅✅✅✅✅✅] 6/6 완료!
+Phase C (Medium)    [✅⬜⬜] 1/3 (C2-C3 보류)
+Phase D (Low)       [✅✅✅✅] 4/4 완료!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Total               15/17 (88%)
+```
+
+**산출 문서:**
+- [STATE_MACHINE.md](../../docs/work/active/Architecture_Refactoring/passschedule/STATE_MACHINE.md) - 버그 목록
+- [PLAN.md](../../docs/work/active/Architecture_Refactoring/passschedule/PLAN.md) - 실행 계획
+- [IMPLEMENTATION_PROGRESS.md](../../docs/work/active/Architecture_Refactoring/passschedule/IMPLEMENTATION_PROGRESS.md) - 진행 상황
+- [TEST_SCENARIOS.md](../../docs/work/active/Architecture_Refactoring/passschedule/TEST_SCENARIOS.md) - 테스트 30개
+
+---
+
+**스킬 버전:** 2.0.0
+**작성일:** 2026-01-20
+**변경:** PassSchedule 검증 워크플로우 반영, 문서 구조 표준화
 **호환:** ACS 프로젝트 전용

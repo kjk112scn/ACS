@@ -1,14 +1,47 @@
 # Active Features (진행 중 작업)
 
-> **최종 수정**: 2026-01-07
+> **최종 수정**: 2026-01-20
 
 현재 진행 중인 기능 개발 및 리팩토링 작업 목록입니다.
 
 ---
 
-## 1. Architecture Refactoring (아키텍처 리팩토링)
+## 진행 현황 Dashboard
 
-> **우선순위**: P0 (핵심) | **상태**: 진행 중
+| 프로젝트 | 진행률 | 우선순위 | 상태 |
+|----------|:------:|:--------:|:----:|
+| [PassSchedule 상태머신](#1-passschedule-상태머신-리팩토링) | 88% | P0 | ✅ A-D |
+| [Architecture Refactoring](#2-architecture-refactoring-아키텍처-리팩토링) | 20% | P1 | 🚧 |
+| [Keyhole Display](#3-기타-진행중-작업) | 50% | P2 | 🚧 |
+
+---
+
+## 1. PassSchedule 상태머신 리팩토링
+
+> **우선순위**: P0 (핵심) | **상태**: ✅ Phase A-D 완료 (C2-C3 보류)
+> **진행률**: 15/17 (88%)
+
+PassScheduleService.kt 상태 머신 버그 수정 및 코드 품질 개선
+
+**완료 항목:**
+| Phase | 내용 | 상태 |
+|:-----:|------|:----:|
+| A | Critical 버그 3개 (isAtStowPosition, detailId, resetFlags) | ✅ |
+| B | High 버그 6개 (ExitAction, IDLE, validTransitions, Timeout) | ✅ |
+| C1 | isShuttingDown → AtomicBoolean | ✅ |
+| D | 코드 품질 4개 (Deprecated 삭제, 로그, 예외, 필드명) | ✅ |
+
+**보류 항목:**
+- C2-C3: 동시성 개선 (상세 분석 필요)
+- T1-T30: 수동 테스트
+
+**문서**: [Architecture_Refactoring/passschedule/](./Architecture_Refactoring/passschedule/)
+
+---
+
+## 2. Architecture Refactoring (아키텍처 리팩토링)
+
+> **우선순위**: P1 | **상태**: 진행 중
 
 위성 추적 시스템(Ephemeris, PassSchedule) 중심의 전체 아키텍처 리팩토링
 
@@ -21,18 +54,13 @@
 
 ---
 
-## 2. PassSchedule 개선 (추후 정리 예정)
-
-> **상태**: 분류 대기 | Architecture_Refactoring 완료 후 정리
-
-PassSchedule 관련 개별 작업들. 아키텍처 리팩토링과 일부 중복되므로 추후 통합/정리 필요.
+## 3. 기타 진행중 작업
 
 | 작업 | 상태 | 비고 |
-|------|------|------|
-| [PassSchedule_Chart_Optimization](./PassSchedule_Chart_Optimization_plan.md) | 보류 | Architecture_Refactoring 차트 분리와 중복 |
-| [PassSchedule_Data_Structure_Refactoring](./PassSchedule_Data_Structure_Refactoring/) | 진행중 | MST/DTL 데이터 구조 재설계 |
-| [PassSchedule_Keyhole_Display_Enhancement](./PassSchedule_Keyhole_Display_Enhancement/) | 진행중 | Keyhole 표시 개선 (독립 기능) |
-| [PassSchedule_Workflow](./PassSchedule_Workflow/) | 진행중 | 워크플로우 문서화 |
+|------|:----:|------|
+| [Keyhole_Display_Enhancement](./PassSchedule_Keyhole_Display_Enhancement/) | 🚧 | Keyhole 표시 개선 |
+| [Data_Structure_Refactoring](./PassSchedule_Data_Structure_Refactoring/) | ⏸️ | MST/DTL 데이터 구조 재설계 |
+| [Chart_Optimization](./PassSchedule_Chart_Optimization_plan.md) | ⏸️ | 차트 분리 (Architecture와 중복) |
 
 ---
 
