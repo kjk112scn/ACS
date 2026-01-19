@@ -6,25 +6,25 @@
 
 ---
 
-## [2026-01-19] - PassSchedule 상태머신 심층 분석
+## [2026-01-19] - PassSchedule 리팩토링 계획 완료 + 스킬 수정
 
 ### Added
-- **시퀀스 무결성 분석 완료**
-  - 상태 전환 매트릭스 검증 (11개 상태)
-  - 스케줄 전환 로직 검증 (3개 시나리오)
-  - 상태 시퀀스 흐름도 작성
+- **PassSchedule 상태머신 4차 전문가 검토 완료**
+  - P0 Critical: 3개 (A1-A3)
+  - P1 High: 6개 (B1-B5, H4는 A2에서 해결)
+  - P2 Medium: 3개 (C1-C3)
+  - 타임아웃 확정: 4분/2분/4분 (STOWING/MOVING_TRAIN/MOVING_TO_START)
 
-### Found (이슈 12개)
-- Critical 3개: 시작함수 큐빌드 누락, 2분 하드코딩, FE detailId 미전달
-- High 4개: 타임아웃 부재, ERROR 스킵 불가, Time Jump 플래그 불일치
-- Medium 5개: 위치확인, 시간정밀도, FE 동기화 등
+### Changed
+- **문서 구조 통합**: 흩어진 5개 폴더 → `passschedule/` 단일 폴더
+- **스킬 name 수정**: 7개 스킬 폴더명↔name 불일치 해결
 
 ### Why
-- PassSchedule 시작 버튼 동작 안 함 (다중 위성 시퀀스 추적 실패)
-- 근본 원인: `startScheduleTracking()`이 큐 빌드 없이 타이머만 시작
+- 문서 분산으로 인한 관리 어려움 해소
+- 스킬 명령어 (`/done`, `/plan` 등) 정상 동작 보장
 
 ### Details
-- [PROGRESS.md](docs/work/active/PassSchedule_State_Machine_Refactoring/PROGRESS.md)
+- [passschedule/README.md](docs/work/active/Architecture_Refactoring/passschedule/README.md)
 
 ---
 

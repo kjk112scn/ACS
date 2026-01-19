@@ -2740,15 +2740,16 @@ class PassScheduleService(
         // 3️⃣ 추적 시작 전: 남은 시간으로 상태 결정
         val timeToStart = Duration.between(calTime, startTime)
         val minutesToStart = timeToStart.toMinutes()
+        val prepMinutes = settingsService.preparationTimeMinutes
 
         return when {
-            minutesToStart <= 2 -> {
-                // 2분 이내: PREPARING (시작 위치로 이동)
+            minutesToStart <= prepMinutes -> {
+                // 준비 시간 이내: PREPARING (시작 위치로 이동)
                 // 내부 진행 상태에 따라 세부 상태 결정
                 determinePreparingSubState()
             }
             else -> {
-                // 2분 이상: WAITING (Stow 대기)
+                // 준비 시간 이상: WAITING (Stow 대기)
                 PassScheduleState.STOWED
             }
         }

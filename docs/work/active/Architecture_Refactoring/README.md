@@ -1,8 +1,8 @@
 # Architecture Refactoring
 
 > **Status**: Active
-> **Last Updated**: 2026-01-18
-> **Version**: 5.0.0
+> **Last Updated**: 2026-01-19
+> **Version**: 5.1.0
 
 ---
 
@@ -13,8 +13,10 @@
 | BE 리팩토링 (Phase 1-5) | ✅ 완료 | 100% | [legacy/](legacy/) |
 | FE 리팩토링 (Phase 2-3,6) | ✅ 완료 | 100% | [frontend/](frontend/) |
 | CSS !important 정리 | ✅ 완료 | 100% | [css/](css/) |
-| **DB Integration** | ✅ 코드완료 | 100% | [database/](database/) |
+| DB Integration | ✅ 코드완료 | 100% | [database/](database/) |
 | DB 테스트 | ⬜ 대기 | 0% | 회사에서 실행 |
+| **PassSchedule 리팩토링** | 🔄 진행중 | 70% | [passschedule/](passschedule/) |
+| **UI/UX 리팩토링** | 🔄 검토완료 | 10% | [uiux/](uiux/) |
 
 ---
 
@@ -23,6 +25,8 @@
 ```
 Architecture_Refactoring/
 ├── README.md          ← 현재 문서 (마스터)
+├── passschedule/      ← PassSchedule 상태머신/워크플로우/데이터구조
+├── uiux/              ← UI/UX 리팩토링 문서
 ├── css/               ← CSS 리팩토링 문서
 ├── frontend/          ← FE 리팩토링 문서
 ├── database/          ← DB Integration 문서
@@ -226,6 +230,21 @@ Architecture_Refactoring/
 ---
 
 ## 하위 문서 참조
+
+### PassSchedule 리팩토링
+
+| 문서 | 설명 |
+|------|------|
+| [passschedule/README.md](passschedule/README.md) | PassSchedule 리팩토링 마스터 |
+| [passschedule/STATE_MACHINE.md](passschedule/STATE_MACHINE.md) | 상태 머신 분석 및 설계 |
+| [passschedule/WORKFLOW.md](passschedule/WORKFLOW.md) | BE-FE 워크플로우 문서 |
+| [passschedule/DATA_STRUCTURE.md](passschedule/DATA_STRUCTURE.md) | 데이터 구조 개선 계획 |
+
+### UI/UX 리팩토링
+
+| 문서 | 설명 |
+|------|------|
+| [uiux/README.md](uiux/README.md) | UI/UX 검토 결과 및 개선 계획 |
 
 ### CSS 리팩토링
 

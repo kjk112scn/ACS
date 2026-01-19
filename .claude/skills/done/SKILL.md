@@ -1,5 +1,5 @@
 ---
-name: completing-work
+name: done
 description: 작업 마무리 및 문서화 스킬. 변경사항 분석, 문서 자동 업데이트, 폴더 이동, 커밋 생성. "완료", "done", "마무리", "커밋", "작업 끝" 키워드에 반응.
 model: opus
 ---

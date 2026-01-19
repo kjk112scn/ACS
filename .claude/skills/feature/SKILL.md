@@ -1,5 +1,5 @@
 ---
-name: creating-feature
+name: feature
 description: 신규 기능 개발 워크플로우. RFC 작성, ADR 생성, DESIGN 문서화, 구현까지 전체 흐름 관리. "기능 추가", "새 기능", "feature", "신규 개발" 키워드에 반응.
 model: opus
 ---

@@ -1,5 +1,5 @@
 ---
-name: creating-adr
+name: adr
 description: ADR(Architecture Decision Record) 생성 스킬. 아키텍처 결정 기록, Why 문서화, 대안 분석. "결정 기록", "adr", "왜", "아키텍처 결정", "기술 결정" 키워드에 반응.
 model: opus
 ---
