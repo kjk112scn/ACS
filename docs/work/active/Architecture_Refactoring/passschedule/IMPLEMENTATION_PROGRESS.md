@@ -1,8 +1,8 @@
 # PassSchedule 리팩토링 구현 진행 상황
 
 > **시작일**: 2026-01-20
-> **완료일**: 2026-01-20
-> **상태**: ✅ Phase A-B 완료
+> **완료일**: 진행 중
+> **상태**: ✅ Phase A-B 완료, ⏳ Phase C-D 진행 중
 
 ---
 
@@ -11,8 +11,10 @@
 ```
 Phase A (Critical)  [✅✅✅✅] 4/4 ✨ 완료!
 Phase B (High)      [✅✅✅✅✅✅] 6/6 ✨ 완료!
+Phase C (Medium)    [✅⬜⬜] 1/3
+Phase D (Low)       [✅✅⬜⬜] 2/4
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Total               [✅✅✅✅✅✅✅✅✅✅] 10/10
+Total               [✅✅✅✅✅✅✅✅✅✅✅✅✅⬜⬜⬜⬜] 13/17
 ```
 
 ---
@@ -45,6 +47,27 @@ Total               [✅✅✅✅✅✅✅✅✅✅] 10/10
 | B2 | IDLE 상태 명시적 처리 | ✅ | ✅ |
 | B3 | reevaluateScheduleQueue 큐 업데이트 | ✅ | ✅ |
 | - | **빌드 검증** | ✅ | ✅ |
+
+---
+
+## Phase C: Medium (P2) - 3개 ⏳
+
+| # | 작업 | 상태 | 완료 |
+|---|------|:----:|:----:|
+| C1 | isShuttingDown → AtomicBoolean | ✅ | ✅ |
+| C2 | updateProgressFlags 동시성 | ⬜ | - |
+| C3 | startStateMachineTracking 동시성 | ⬜ | - |
+
+---
+
+## Phase D: Low (P3) - 4개 ⏳
+
+| # | 작업 | 상태 | 완료 |
+|---|------|:----:|:----:|
+| D1 | @Deprecated 함수 삭제 | ✅ | ✅ |
+| D2 | 로그 레벨 INFO → DEBUG | ✅ | ✅ |
+| D3 | catch(Exception) 17개 | ⬜ | - |
+| D4 | "No" 필드 3개 | ⬜ | - |
 
 ---
 
@@ -82,6 +105,18 @@ Total               [✅✅✅✅✅✅✅✅✅✅] 10/10
 - **위치**: L3212-3221
 - **내용**: resetFlags() 결과를 큐 원본에도 업데이트
 
+### C1: isShuttingDown → AtomicBoolean
+- **위치**: L193, L481, L2659, L3260, L3274
+- **내용**: Boolean → AtomicBoolean 변경 (스레드 안전성)
+
+### D1: handleTrackingPreparation 삭제
+- **위치**: (삭제됨, 기존 L2632-2641)
+- **내용**: @Deprecated 함수 완전 삭제
+
+### D2: 로그 레벨 변경
+- **위치**: L2667-2669
+- **내용**: 10초 상태 로깅 INFO → DEBUG
+
 ---
 
 ## 작업 로그
@@ -92,13 +127,15 @@ Total               [✅✅✅✅✅✅✅✅✅✅] 10/10
 |------|------|------|
 | - | Phase A 구현 | ✅ 빌드 성공 |
 | - | Phase B 구현 | ✅ 빌드 성공 |
+| - | Phase C-D 부분 구현 (C1, D1, D2) | ✅ 빌드 성공 |
 
 ---
 
 ## 다음 단계
 
-- Phase C-D: Medium/Low 수정 (별도 PR)
-- 수동 테스트 (T1-T9)
+- Phase C 나머지: C2-C3 (동시성 개선) - 상세 분석 후 진행
+- Phase D 나머지: D3 (catch(Exception) 17개), D4 ("No" 필드 3개)
+- 수동 테스트 (T1-T30)
 
 ---
 

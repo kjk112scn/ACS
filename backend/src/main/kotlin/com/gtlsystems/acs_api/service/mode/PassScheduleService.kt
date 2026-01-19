@@ -189,8 +189,8 @@ class PassScheduleService(
     /** 타이머 카운트 (v2.0) */
     private var trackingCheckCount: Long = 0L
 
-    /** 종료 중 플래그 */
-    private var isShuttingDown: Boolean = false
+    /** 종료 중 플래그 (스레드 안전) */
+    private val isShuttingDown = AtomicBoolean(false)
 
     // ===== 상수 =====
     companion object {
@@ -478,7 +478,7 @@ class PassScheduleService(
         nextScheduleContext = null
         scheduleContextQueue.clear()
         trackingCheckCount = 0
-        isShuttingDown = false
+        isShuttingDown.set(false)
         // ✅ PushData에 passScheduleTrackingState 초기화
         PushData.TRACKING_STATUS.passScheduleTrackingState = PassScheduleState.IDLE.name
         logger.debug("[V2-STATE] 상태 머신 초기화 완료 (passScheduleTrackingState=IDLE)")
@@ -2629,17 +2629,6 @@ class PassScheduleService(
         }, batchExecutor)
     }
 
-    /**
-     * 기존 추적 준비 로직 (상태 머신으로 대체되었지만 호환성을 위해 유지)
-     *
-     * @deprecated 상태 머신 패턴으로 대체되었습니다. executeStateAction()을 사용하세요.
-     */
-    @Deprecated("상태 머신 패턴으로 대체되었습니다. executeStateAction()을 사용하세요.")
-    private fun handleTrackingPreparation(nextSchedule: Map<String, Any?>?, calTime: ZonedDateTime) {
-        // 이 함수는 더 이상 사용되지 않습니다. 상태 머신이 모든 로직을 처리합니다.
-        logger.debug("[DEPRECATED] handleTrackingPreparation 호출됨 - 상태 머신이 처리 중")
-    }
-
     // ═══════════════════════════════════════════════════════════════════════════
     // ===== V2.0 상태 머신 구현 (신규) =====
     // ═══════════════════════════════════════════════════════════════════════════
@@ -2659,7 +2648,7 @@ class PassScheduleService(
      */
     private fun checkStateMachine() {
         // 0️⃣ 종료 중이면 아무 작업도 하지 않음
-        if (isShuttingDown) {
+        if (isShuttingDown.get()) {
             return
         }
 
@@ -2667,9 +2656,9 @@ class PassScheduleService(
 
         val calTime = GlobalData.Time.calUtcTimeOffsetTime
 
-        // 10초마다 상태 로깅
+        // 10초마다 상태 로깅 (DEBUG 레벨)
         if (trackingCheckCount % 100L == 0L) {
-            logger.info("[V2-STATE] 현재: $currentPassScheduleState, 스케줄: ${currentScheduleContext?.satelliteName}, calTime: $calTime")
+            logger.debug("[V2-STATE] 현재: $currentPassScheduleState, 스케줄: ${currentScheduleContext?.satelliteName}, calTime: $calTime")
         }
 
         // 1️⃣ 진행 상태 업데이트 (Train/Az/El 위치 확인)
@@ -3257,7 +3246,7 @@ class PassScheduleService(
         logger.info("[V2-SHUTDOWN] 일괄 종료 시작")
 
         try {
-            isShuttingDown = true
+            isShuttingDown.set(true)
 
             // Stow 명령 전송
             udpFwICDService.StowCommand()
@@ -3271,7 +3260,7 @@ class PassScheduleService(
                 logger.error("[V2-SHUTDOWN] Stow 명령 실패: ${stowError.message}", stowError)
             }
         } finally {
-            isShuttingDown = false
+            isShuttingDown.set(false)
         }
     }
 

@@ -6,6 +6,25 @@
 
 ---
 
+## [2026-01-20] - PassSchedule Phase C-D 부분 완료
+
+### Changed
+- **Phase C (Medium)**: 1개 완료
+  - C1: `isShuttingDown` → `AtomicBoolean` (스레드 안전성)
+
+- **Phase D (Low)**: 2개 완료
+  - D1: `@Deprecated handleTrackingPreparation()` 삭제
+  - D2: 10초 상태 로깅 INFO → DEBUG
+
+### Why
+- 동시성 버그 예방 (AtomicBoolean)
+- 불필요한 로그 노이즈 감소
+
+### Details
+- [passschedule/README.md](docs/work/active/Architecture_Refactoring/passschedule/README.md)
+
+---
+
 ## [2026-01-20] - PassSchedule Phase A-B 구현 완료
 
 ### Fixed
