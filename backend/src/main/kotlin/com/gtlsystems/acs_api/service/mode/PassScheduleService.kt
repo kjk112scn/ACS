@@ -200,7 +200,30 @@ class PassScheduleService(
         const val POSITION_TOLERANCE_RAD = 0.001f
         /** 타이머 주기 (100ms) */
         const val CHECK_INTERVAL_MS = 100L
+
+        // ===== B4/B5 버그 수정: 타임아웃 상수 (협의 결과: Train 2분, 나머지 4분) =====
+        /** STOWING 타임아웃 (4분 - Az/El/Train 모두 이동) */
+        const val STOWING_TIMEOUT_MS = 240_000L
+        /** MOVING_TRAIN 타임아웃 (2분 - Train 축만 이동) */
+        const val MOVING_TRAIN_TIMEOUT_MS = 120_000L
+        /** MOVING_TO_START 타임아웃 (4분 - Az/El 이동) */
+        const val MOVING_TO_START_TIMEOUT_MS = 240_000L
     }
+
+    // ===== B4 버그 수정: 유효한 상태 전환 맵 (순서 위반 시 ERROR) =====
+    private val validTransitions = mapOf(
+        PassScheduleState.IDLE to setOf(PassScheduleState.STOWING, PassScheduleState.MOVING_TRAIN),
+        PassScheduleState.STOWING to setOf(PassScheduleState.STOWED),
+        PassScheduleState.STOWED to setOf(PassScheduleState.MOVING_TRAIN),
+        PassScheduleState.MOVING_TRAIN to setOf(PassScheduleState.TRAIN_STABILIZING),
+        PassScheduleState.TRAIN_STABILIZING to setOf(PassScheduleState.MOVING_TO_START),
+        PassScheduleState.MOVING_TO_START to setOf(PassScheduleState.READY),
+        PassScheduleState.READY to setOf(PassScheduleState.TRACKING),
+        PassScheduleState.TRACKING to setOf(PassScheduleState.POST_TRACKING),
+        PassScheduleState.POST_TRACKING to setOf(PassScheduleState.STOWING, PassScheduleState.MOVING_TRAIN, PassScheduleState.COMPLETED),
+        PassScheduleState.COMPLETED to setOf(PassScheduleState.IDLE),
+        PassScheduleState.ERROR to setOf(PassScheduleState.IDLE)  // ERROR에서는 IDLE로만 복귀
+    )
 
     /** 준비 시간 (Settings에서 읽음, 기본 4분) */
     private val preparationTimeMs: Long
@@ -2749,8 +2772,12 @@ class PassScheduleService(
                 determinePreparingSubState()
             }
             else -> {
-                // 준비 시간 이상: WAITING (Stow 대기)
-                PassScheduleState.STOWED
+                // 준비 시간 이상: Stow 위치 확인 후 상태 결정
+                if (isAtStowPosition()) {
+                    PassScheduleState.STOWED
+                } else {
+                    PassScheduleState.STOWING
+                }
             }
         }
     }
@@ -2823,9 +2850,14 @@ class PassScheduleService(
             return PassScheduleState.COMPLETED
         }
 
-        // ⚠️ 플래그 리셋하여 새 컨텍스트로 전환
-        currentScheduleContext = nextSchedule.resetFlags()
-        val nextIdx = scheduleContextQueue.indexOf(nextSchedule) + 1
+        // ⚠️ 플래그 리셋하여 새 컨텍스트로 전환 (A3 버그 수정: 큐 원본도 업데이트)
+        val currentIdx = scheduleContextQueue.indexOf(nextSchedule)
+        val resetContext = nextSchedule.resetFlags()
+        if (currentIdx >= 0) {
+            scheduleContextQueue[currentIdx] = resetContext  // 큐 원본 업데이트
+        }
+        currentScheduleContext = resetContext
+        val nextIdx = currentIdx + 1
         nextScheduleContext = if (nextIdx < scheduleContextQueue.size) scheduleContextQueue[nextIdx] else null
 
         val timeToStart = Duration.between(calTime, nextSchedule.startTime)
@@ -2841,7 +2873,41 @@ class PassScheduleService(
     }
 
     /**
-     * V2.0 상태 전환 실행
+     * V2.0 오류 상태로 전환 (B4 버그 수정)
+     *
+     * 절차 위반, 타임아웃 등의 이유로 ERROR 상태로 전환합니다.
+     * 현재 스케줄을 스킵하고 다음 스케줄로 진행합니다.
+     *
+     * @param reason 오류 원인
+     */
+    private fun transitionToError(reason: String) {
+        val ctx = currentScheduleContext
+        val calTime = GlobalData.Time.calUtcTimeOffsetTime
+
+        logger.error("═══════════════════════════════════════════════")
+        logger.error("[V2-ERROR] $currentPassScheduleState → ERROR")
+        logger.error("  - 원인: $reason")
+        logger.error("  - 스케줄: ${ctx?.satelliteName} (mstId: ${ctx?.mstId})")
+        logger.error("═══════════════════════════════════════════════")
+
+        // 이전 상태 저장
+        previousPassScheduleState = currentPassScheduleState
+        currentPassScheduleState = PassScheduleState.ERROR
+
+        // 프론트엔드 상태 전송
+        sendStateToFrontend(PassScheduleState.ERROR, ctx)
+
+        // 현재 스케줄 스킵하고 다음으로
+        val nextState = evaluateNextSchedule(calTime)
+        if (nextState != PassScheduleState.COMPLETED) {
+            // 다음 스케줄이 있으면 IDLE로 복귀 후 재시작
+            currentPassScheduleState = PassScheduleState.IDLE
+            sendStateToFrontend(PassScheduleState.IDLE, null)
+        }
+    }
+
+    /**
+     * V2.0 상태 전환 실행 (B4 버그 수정: 유효성 검사 추가)
      *
      * @param newState 새 상태
      * @param calTime 현재 calTime (ZonedDateTime)
@@ -2849,11 +2915,28 @@ class PassScheduleService(
     private fun transitionTo(newState: PassScheduleState, calTime: ZonedDateTime) {
         val ctx = currentScheduleContext
 
+        // B4: ERROR로 가는 전환은 항상 허용 (transitionToError 사용 권장)
+        if (newState == PassScheduleState.ERROR) {
+            transitionToError("Direct ERROR transition")
+            return
+        }
+
+        // B4: 상태 전환 유효성 검사
+        val allowed = validTransitions[currentPassScheduleState] ?: emptySet()
+        if (newState !in allowed) {
+            logger.error("[V2-INVALID] $currentPassScheduleState → $newState 잘못된 전환")
+            transitionToError("Invalid transition: $currentPassScheduleState → $newState")
+            return
+        }
+
         logger.info("═══════════════════════════════════════════════")
         logger.info("[V2-TRANSITION] $currentPassScheduleState → $newState")
         logger.info("  - 스케줄: ${ctx?.satelliteName} (mstId: ${ctx?.mstId})")
         logger.info("  - calTime: $calTime")
         logger.info("═══════════════════════════════════════════════")
+
+        // B1: 퇴장 액션 실행 (상태 변경 전)
+        executeExitAction(currentPassScheduleState, ctx, calTime)
 
         // 이전 상태 저장
         previousPassScheduleState = currentPassScheduleState
@@ -2867,6 +2950,32 @@ class PassScheduleService(
 
         // 프론트엔드 상태 전송
         sendStateToFrontend(newState, ctx)
+    }
+
+    /**
+     * V2.0 상태 퇴장 시 1회 실행되는 액션 (B1 버그 수정)
+     *
+     * 상태를 떠날 때 필요한 정리 작업을 수행합니다.
+     */
+    private fun executeExitAction(
+        state: PassScheduleState,
+        ctx: ScheduleTrackingContext?,
+        calTime: ZonedDateTime
+    ) {
+        when (state) {
+            PassScheduleState.TRACKING -> {
+                logger.info("[V2-EXIT] 추적 종료")
+                // 추적 종료 시 필요한 정리 작업
+            }
+
+            PassScheduleState.ERROR -> {
+                logger.info("[V2-EXIT] ERROR 상태 탈출")
+            }
+
+            else -> {
+                // 다른 상태는 특별한 퇴장 액션 없음
+            }
+        }
     }
 
     /**
@@ -2956,6 +3065,14 @@ class PassScheduleService(
                 udpFwICDService.StowCommand()
             }
 
+            PassScheduleState.IDLE -> {
+                // B2 버그 수정: IDLE 상태 명시적 처리
+                logger.info("[V2-ACTION] IDLE 상태 진입 - 리소스 정리")
+                dataStoreService.setPassScheduleTracking(false)
+                currentScheduleContext = null
+                nextScheduleContext = null
+            }
+
             PassScheduleState.ERROR -> {
                 logger.error("[V2-ACTION] 오류 상태 진입 - 안전을 위해 Stow로 이동")
                 udpFwICDService.StowCommand()
@@ -2969,6 +3086,11 @@ class PassScheduleService(
      * V2.0 매 100ms마다 실행되는 주기적 액션
      */
     private fun executePeriodicAction(calTime: ZonedDateTime) {
+        // B5: 타임아웃 체크 (STOWING, MOVING_TRAIN, MOVING_TO_START)
+        if (checkStateTimeout(calTime)) {
+            return  // 타임아웃 발생 시 ERROR로 전환됨
+        }
+
         when (currentPassScheduleState) {
             PassScheduleState.TRACKING -> {
                 val ctx = currentScheduleContext ?: return
@@ -2991,20 +3113,55 @@ class PassScheduleService(
     }
 
     /**
+     * V2.0 상태별 타임아웃 체크 (B5 버그 수정)
+     *
+     * STOWING, MOVING_TRAIN, MOVING_TO_START 상태에서 타임아웃 발생 시 ERROR로 전환
+     *
+     * @param calTime 현재 calTime
+     * @return 타임아웃 발생 여부
+     */
+    private fun checkStateTimeout(calTime: ZonedDateTime): Boolean {
+        val ctx = currentScheduleContext ?: return false
+        val entryTime = ctx.stateEntryTime ?: return false
+
+        val elapsed = Duration.between(entryTime, calTime).toMillis()
+
+        val timeout = when (currentPassScheduleState) {
+            PassScheduleState.STOWING -> STOWING_TIMEOUT_MS
+            PassScheduleState.MOVING_TRAIN -> MOVING_TRAIN_TIMEOUT_MS
+            PassScheduleState.MOVING_TO_START -> MOVING_TO_START_TIMEOUT_MS
+            else -> Long.MAX_VALUE
+        }
+
+        if (elapsed > timeout) {
+            logger.error("[V2-TIMEOUT] $currentPassScheduleState 상태에서 ${elapsed}ms 경과 (타임아웃: ${timeout}ms)")
+            transitionToError("State timeout: $currentPassScheduleState after ${elapsed}ms")
+            return true
+        }
+
+        return false
+    }
+
+    /**
      * V2.0 프론트엔드로 상태 전송
      */
     private fun sendStateToFrontend(state: PassScheduleState, ctx: ScheduleTrackingContext?) {
         // PushData에 상태 동기화 (기존 TRACKING_STATUS 활용)
         PushData.TRACKING_STATUS.passScheduleTrackingState = state.name
 
-        // DataStoreService를 통해 현재/다음 추적 정보 동기화
+        // DataStoreService를 통해 현재/다음 추적 정보 동기화 (A2 버그 수정: detailId 전달)
         if (ctx != null) {
-            dataStoreService.setCurrentTrackingMstId(ctx.mstId)
+            dataStoreService.setCurrentTrackingMstId(ctx.mstId, ctx.detailId)
+
+            // 다음 스케줄 정보도 전달 (FE 테이블 하이라이트용)
+            nextScheduleContext?.let { next ->
+                dataStoreService.setNextTrackingMstId(next.mstId, next.detailId)
+            } ?: dataStoreService.setNextTrackingMstId(null, null)
         } else {
             dataStoreService.clearTrackingMstIds()
         }
 
-        logger.debug("[V2-STATE] 프론트엔드 동기화: state=$state, mstId=${ctx?.mstId}")
+        logger.debug("[V2-STATE] 프론트엔드 동기화: state=$state, mstId=${ctx?.mstId}, detailId=${ctx?.detailId}, nextMstId=${nextScheduleContext?.mstId}")
     }
 
     /**
@@ -3054,7 +3211,13 @@ class PassScheduleService(
 
         if (currentSchedule != null && currentSchedule.mstId != currentScheduleContext?.mstId) {
             logger.info("[V2-TIME_OFFSET] 현재 스케줄 변경: ${currentScheduleContext?.satelliteName} → ${currentSchedule.satelliteName}")
-            currentScheduleContext = currentSchedule.resetFlags()
+            // B3 버그 수정: 큐 원본도 업데이트
+            val idx = scheduleContextQueue.indexOf(currentSchedule)
+            val resetContext = currentSchedule.resetFlags()
+            if (idx >= 0) {
+                scheduleContextQueue[idx] = resetContext
+            }
+            currentScheduleContext = resetContext
         }
     }
 
@@ -3142,6 +3305,29 @@ class PassScheduleService(
         val elDiff = kotlin.math.abs(currentEl - targetElDeg)
 
         return azDiff <= 0.1f && elDiff <= 0.1f
+    }
+
+    /**
+     * V2.0 Stow 위치 확인 (A1 버그 수정)
+     *
+     * STOWING→STOWED 전환 시 실제 위치 확인
+     * Settings의 stowAngle 값과 현재 위치 비교 (Az/El/Train 3축)
+     */
+    private fun isAtStowPosition(): Boolean {
+        val latestData = dataStoreService.getLatestData()
+        val currentAz = latestData.azimuthAngle ?: return false
+        val currentEl = latestData.elevationAngle ?: return false
+        val currentTrain = latestData.trainAngle ?: return false
+
+        val stowAz = settingsService.stowAngleAzimuth   // Double
+        val stowEl = settingsService.stowAngleElevation // Double
+        val stowTrain = settingsService.stowAngleTrain  // Double
+
+        val tolerance = 1.0  // 안테나 정밀도 고려 (도 단위)
+
+        return kotlin.math.abs(currentAz - stowAz) <= tolerance &&
+               kotlin.math.abs(currentEl - stowEl) <= tolerance &&
+               kotlin.math.abs(currentTrain - stowTrain) <= tolerance
     }
 
     // ===== V2.0 공개 API =====

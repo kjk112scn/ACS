@@ -1,8 +1,9 @@
 # PassSchedule 리팩토링 실행 계획
 
 > **작성일**: 2026-01-19
-> **상태**: ✅ 최종 검토 완료 (4차 전문가 검토 반영)
-> **참조**: [STATE_MACHINE.md](./STATE_MACHINE.md)
+> **구현 완료**: 2026-01-20
+> **상태**: ✅ Phase A-B 구현 완료
+> **참조**: [STATE_MACHINE.md](./STATE_MACHINE.md), [IMPLEMENTATION_PROGRESS.md](./IMPLEMENTATION_PROGRESS.md)
 
 ---
 
@@ -170,26 +171,26 @@
 
 ## 검증 체크리스트 (업데이트)
 
-### Phase A 완료 조건
+### Phase A 완료 조건 ✅ (2026-01-20 구현 완료)
 
-- [ ] A1: isAtStowPosition() 함수 추가됨 (Az/El/Train 3축)
-- [ ] A1: 허용 오차 1.0, Double 타입 적용됨
-- [ ] A1: determineStateByTime()에서 위치 확인 로직 적용됨
-- [ ] A2: sendStateToFrontend()에 detailId 파라미터 추가됨
-- [ ] A2: nextScheduleContext 정보 FE 전달됨
-- [ ] A3: resetFlags() 결과가 큐에 반영됨
-- [ ] 빌드 성공 (`./gradlew clean build -x test`)
+- [x] A1: isAtStowPosition() 함수 추가됨 (Az/El/Train 3축)
+- [x] A1: 허용 오차 1.0, Double 타입 적용됨
+- [x] A1: determineStateByTime()에서 위치 확인 로직 적용됨
+- [x] A2: sendStateToFrontend()에 detailId 파라미터 추가됨
+- [x] A2: nextScheduleContext 정보 FE 전달됨
+- [x] A3: resetFlags() 결과가 큐에 반영됨
+- [x] 빌드 성공 (`./gradlew clean build -x test`)
 
-### Phase B 완료 조건
+### Phase B 완료 조건 ✅ (2026-01-20 구현 완료)
 
-- [ ] B4: transitionToError(reason) 함수 추가됨
-- [ ] B4: validTransitions 맵 추가됨 (상태 순서 검증)
-- [ ] B5: checkStateTimeout() 함수 추가됨 (4분/2분/4분)
-- [ ] B1: executeExitAction() 함수 구현됨
-- [ ] B1: transitionTo()에서 executeExitAction() 호출됨
-- [ ] B2: IDLE 상태 case 추가됨
-- [ ] B3: reevaluateScheduleQueue에서 큐 업데이트됨
-- [ ] 빌드 성공
+- [x] B4: transitionToError(reason) 함수 추가됨
+- [x] B4: validTransitions 맵 추가됨 (상태 순서 검증)
+- [x] B5: checkStateTimeout() 함수 추가됨 (4분/2분/4분)
+- [x] B1: executeExitAction() 함수 구현됨
+- [x] B1: transitionTo()에서 executeExitAction() 호출됨
+- [x] B2: IDLE 상태 case 추가됨
+- [x] B3: reevaluateScheduleQueue에서 큐 업데이트됨
+- [x] 빌드 성공
 
 ---
 

@@ -6,6 +6,33 @@
 
 ---
 
+## [2026-01-20] - PassSchedule Phase A-B 구현 완료
+
+### Fixed
+- **Phase A (Critical)**: 3개 버그 수정
+  - A1: STOWING→STOWED 위치 확인 (`isAtStowPosition()` 추가)
+  - A2: FE 테이블 하이라이트 (`detailId` 전달)
+  - A3: 다중 위성 추적 플래그 초기화 (큐 원본 업데이트)
+
+- **Phase B (High)**: 6개 버그 수정
+  - B1: `executeExitAction()` 구현
+  - B2: IDLE 상태 명시적 처리
+  - B3: Time Offset 변경 시 큐 업데이트
+  - B4: 상태 전환 유효성 검사 (`validTransitions`)
+  - B5: 상태별 타임아웃 (4분/2분/4분)
+
+### Added
+- 테스트 시나리오 30개 ([TEST_SCENARIOS.md](docs/work/active/Architecture_Refactoring/passschedule/TEST_SCENARIOS.md))
+
+### Why
+- 다중 위성 연속 추적 시 플래그 초기화 실패 버그 해결
+- 상태 전환 안전성 확보 (데드락 방지)
+
+### Details
+- [passschedule/README.md](docs/work/active/Architecture_Refactoring/passschedule/README.md)
+
+---
+
 ## [2026-01-19] - PassSchedule 리팩토링 계획 완료 + 스킬 수정
 
 ### Added
