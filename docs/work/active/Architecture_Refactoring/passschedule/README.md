@@ -1,8 +1,8 @@
 # PassSchedule Refactoring
 
-> **Status**: ✅ Phase A-B 완료, ⏳ Phase C-D 진행 중
+> **Status**: ✅ Phase A-D 완료 (C2-C3 보류)
 > **Last Updated**: 2026-01-20
-> **Version**: 3.1
+> **Version**: 3.2
 
 ---
 
@@ -40,7 +40,7 @@ PassSchedule 서비스의 상태 머신, 워크플로우, 데이터 구조를 �
 | B4 | ERROR 전환 + validTransitions | ✅ |
 | B5 | 상태별 타임아웃 (4분/2분/4분) | ✅ |
 
-### Phase C-D 진행 상황
+### Phase C-D 완료
 
 | Phase | 항목 | 상태 |
 |:-----:|------|:----:|
@@ -48,8 +48,8 @@ PassSchedule 서비스의 상태 머신, 워크플로우, 데이터 구조를 �
 | C2-C3 | 동시성 개선 (보류) | ⬜ |
 | D1 | @Deprecated 함수 삭제 | ✅ |
 | D2 | 로그 레벨 INFO → DEBUG | ✅ |
-| D3 | catch(Exception) 17개 | ⬜ |
-| D4 | "No" 필드 3개 | ⬜ |
+| D3 | catch(Exception) → RuntimeException | ✅ |
+| D4 | "No" 필드 → "MstId" | ✅ |
 
 ### 코드 품질 이슈 (실제 코드 기준 2026-01-19)
 
@@ -128,3 +128,4 @@ START ─► IDLE ─┬─(>4분)─► STOWING ─► STOWED ─┐
 | 2026-01-19 | 2.4 | 4차 전문가 검토: Float→Double, T8/T9 테스트 추가, 승인 완료 |
 | 2026-01-20 | 3.0 | Phase A-B 구현 완료, 테스트 시나리오 30개 작성 |
 | 2026-01-20 | 3.1 | Phase C-D 부분 완료 (C1, D1, D2) |
+| 2026-01-20 | 3.2 | Phase D 완료 (D3, D4) |

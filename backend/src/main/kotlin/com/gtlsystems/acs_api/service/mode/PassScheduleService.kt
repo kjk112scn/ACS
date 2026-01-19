@@ -590,7 +590,7 @@ class PassScheduleService(
             
             logger.info("✅ 추적 시작 준비 완료: MST ID = $mstId")
             
-        } catch (e: Exception) {
+        } catch (e: RuntimeException) {
             logger.error("❌ 추적 시작 준비 실패: MST ID = $mstId, ${e.message}", e)
         }
     }
@@ -618,7 +618,7 @@ class PassScheduleService(
             
             logger.info("✅ 추적 종료 정리 완료: $satelliteName (ID: $mstId)")
             
-        } catch (e: Exception) {
+        } catch (e: RuntimeException) {
             logger.error("❌ 추적 종료 정리 실패: MST ID = $mstId, ${e.message}", e)
         }
     }
@@ -650,7 +650,7 @@ class PassScheduleService(
             lastPreparedSchedule = null
 
             logger.info("[ACTION] Stow 위치로 이동 완료")
-        } catch (e: Exception) {
+        } catch (e: RuntimeException) {
             logger.error("[ERROR] Stow 위치 이동 실패: ${e.message}", e)
         }
     }
@@ -739,7 +739,7 @@ class PassScheduleService(
             udpFwICDService.sendSatelliteTrackHeader(headerFrame)
             logger.info("위성 추적 헤더 정보 전송 완료")
 
-        } catch (e: Exception) {
+        } catch (e: RuntimeException) {
             logger.error("위성 추적 시작 중 오류 발생: ${e.message}", e)
         }
     }
@@ -857,7 +857,7 @@ class PassScheduleService(
             udpFwICDService.sendSatelliteTrackInitialControl(initialControlFrame)
             logger.info("위성 추적 초기 제어 명령 전송 완료 (${initialTrackingData.size}개 데이터 포인트)")
 
-        } catch (e: Exception) {
+        } catch (e: RuntimeException) {
             logger.error("위성 추적 초기 제어 명령 전송 중 오류 발생: ${e.message}", e)
         }
     }
@@ -898,12 +898,12 @@ class PassScheduleService(
             val processingStart = System.nanoTime()
             try {
                 sendAdditionalTrackingDataFromCache(cache, startIndex, requestDataLength, processingStart)
-            } catch (e: Exception) {
+            } catch (e: RuntimeException) {
                 logger.error("캐시에서 추적 데이터 전송 실패: passId=$passId, ${e.message}", e)
                 // 폴백: 메모리 저장소에서 동기 처리로 재시도
                 try {
                     sendAdditionalTrackingDataFromDatabase(passId, startIndex, requestDataLength, processingStart)
-                } catch (fallbackError: Exception) {
+                } catch (fallbackError: RuntimeException) {
                     logger.error("폴백 전송도 실패: passId=$passId, ${fallbackError.message}", fallbackError)
                 }
             }
@@ -913,13 +913,13 @@ class PassScheduleService(
                 try {
                     val processingStart = System.nanoTime()
                     sendAdditionalTrackingDataFromDatabase(passId, startIndex, requestDataLength, processingStart)
-                } catch (e: Exception) {
+                } catch (e: RuntimeException) {
                     logger.error("추적 데이터 전송 실패: passId=$passId, ${e.message}", e)
                     // 폴백: 동기 처리로 재시도
                     try {
                         val processingStart = System.nanoTime()
                         sendAdditionalTrackingDataFromDatabase(passId, startIndex, requestDataLength, processingStart)
-                    } catch (fallbackError: Exception) {
+                    } catch (fallbackError: RuntimeException) {
                         logger.error("폴백 전송도 실패: passId=$passId, ${fallbackError.message}", fallbackError)
                     }
                 }
@@ -1341,7 +1341,7 @@ class PassScheduleService(
         if (nextSchedule != null) {
             val nextName = nextSchedule["SatelliteName"] as? String ?: "Unknown"
             val nextStart = nextSchedule["StartTime"] as? ZonedDateTime
-            val nextId = nextSchedule["No"] as? UInt
+            val nextId = (nextSchedule["MstId"] as? Number)?.toLong()
             val nextMaxElevation = nextSchedule["MaxElevation"] as? Double
 
             if (nextStart != null) {
@@ -1362,7 +1362,7 @@ class PassScheduleService(
     private fun outputUpcomingScheduleInfo(schedule: Map<String, Any?>, calTime: ZonedDateTime) {
         val satelliteName = schedule["SatelliteName"] as? String ?: "Unknown"
         val startTime = schedule["StartTime"] as? ZonedDateTime
-        val passId = schedule["No"] as? UInt
+        val passId = (schedule["MstId"] as? Number)?.toLong()
 
         if (startTime != null) {
             val waitTime = Duration.between(calTime, startTime)
@@ -1377,7 +1377,7 @@ class PassScheduleService(
 
     private fun outputTrackingEnd(schedule: Map<String, Any?>, calTime: ZonedDateTime) {
         val satelliteName = schedule["SatelliteName"] as? String ?: "Unknown"
-        val passId = schedule["No"] as? UInt
+        val passId = (schedule["MstId"] as? Number)?.toLong()
 
         logger.info("🏁 [추적 종료] $satelliteName (ID: $passId)")
         logger.info("   🕐 종료시간: $calTime")
@@ -1386,8 +1386,8 @@ class PassScheduleService(
     private fun outputScheduleChange(prev: Map<String, Any?>, new: Map<String, Any?>, calTime: ZonedDateTime) {
         val prevName = prev["SatelliteName"] as? String ?: "Unknown"
         val newName = new["SatelliteName"] as? String ?: "Unknown"
-        val prevId = prev["No"] as? UInt
-        val newId = new["No"] as? UInt
+        val prevId = (prev["MstId"] as? Number)?.toLong()
+        val newId = (new["MstId"] as? Number)?.toLong()
 
         logger.info("🔄 [추적 변경] $prevName(ID:$prevId) → $newName(ID:$newId)")
         logger.info("   🕐 변경시간: $calTime")
@@ -1397,7 +1397,7 @@ class PassScheduleService(
 
     private fun outputScheduleFixed(schedule: Map<String, Any?>, calTime: ZonedDateTime) {
         val satelliteName = schedule["SatelliteName"] as? String ?: "Unknown"
-        val passId = schedule["No"] as? UInt
+        val passId = (schedule["MstId"] as? Number)?.toLong()
 
         logger.info("📌 [스케줄 고정] $satelliteName (ID: $passId)")
         logger.info("   🕐 고정시간: $calTime")
@@ -1509,7 +1509,7 @@ class PassScheduleService(
                     actualSatelliteName,
                     startMstId  // ✅ 전역 시작 MstId 전달
                 )
-            } catch (e: Exception) {
+            } catch (e: RuntimeException) {
                 logger.error("❌ 위성 추적 데이터 처리 실패: ${e.message}", e)
                 throw e
             }
@@ -2623,7 +2623,7 @@ class PassScheduleService(
                     val elapsedMs = (System.nanoTime() - startTime) / 1_000_000
                     logger.info("✅ 추적 데이터 캐시 완료: passId=$passId, ${cache.totalSize}개 포인트, ${elapsedMs}ms")
                 }
-            } catch (e: Exception) {
+            } catch (e: RuntimeException) {
                 logger.error("추적 데이터 캐싱 실패: passId=$passId, ${e.message}", e)
             }
         }, batchExecutor)
@@ -3252,11 +3252,11 @@ class PassScheduleService(
             udpFwICDService.StowCommand()
 
             logger.info("[V2-SHUTDOWN] 일괄 종료 완료, Stow 이동 시작")
-        } catch (e: Exception) {
+        } catch (e: RuntimeException) {
             logger.error("[V2-SHUTDOWN] 일괄 종료 중 오류: ${e.message}", e)
             try {
                 udpFwICDService.StowCommand()
-            } catch (stowError: Exception) {
+            } catch (stowError: RuntimeException) {
                 logger.error("[V2-SHUTDOWN] Stow 명령 실패: ${stowError.message}", stowError)
             }
         } finally {
@@ -3368,7 +3368,7 @@ class PassScheduleService(
                 transitionTo(initialState, calTime)
 
                 true
-            } catch (e: Exception) {
+            } catch (e: RuntimeException) {
                 logger.error("[V2-START] 시작 실패: ${e.message}", e)
                 false
             }
@@ -3403,7 +3403,7 @@ class PassScheduleService(
                 sendStateToFrontend(PassScheduleState.IDLE, null)
 
                 true
-            } catch (e: Exception) {
+            } catch (e: RuntimeException) {
                 logger.error("[V2-STOP] 정지 실패: ${e.message}", e)
                 false
             }
@@ -3453,7 +3453,7 @@ class PassScheduleService(
                     startElevation = startElevation,
                     trainAngle = trainAngle
                 )
-            } catch (e: Exception) {
+            } catch (e: RuntimeException) {
                 logger.error("[V2] 스케줄 컨텍스트 생성 실패: ${e.message}")
                 null
             }
