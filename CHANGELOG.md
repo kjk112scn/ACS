@@ -6,6 +6,28 @@
 
 ---
 
+## [2026-01-19] - PassSchedule 상태머신 심층 분석
+
+### Added
+- **시퀀스 무결성 분석 완료**
+  - 상태 전환 매트릭스 검증 (11개 상태)
+  - 스케줄 전환 로직 검증 (3개 시나리오)
+  - 상태 시퀀스 흐름도 작성
+
+### Found (이슈 12개)
+- Critical 3개: 시작함수 큐빌드 누락, 2분 하드코딩, FE detailId 미전달
+- High 4개: 타임아웃 부재, ERROR 스킵 불가, Time Jump 플래그 불일치
+- Medium 5개: 위치확인, 시간정밀도, FE 동기화 등
+
+### Why
+- PassSchedule 시작 버튼 동작 안 함 (다중 위성 시퀀스 추적 실패)
+- 근본 원인: `startScheduleTracking()`이 큐 빌드 없이 타이머만 시작
+
+### Details
+- [PROGRESS.md](docs/work/active/PassSchedule_State_Machine_Refactoring/PROGRESS.md)
+
+---
+
 ## [2026-01-19] - License Change
 
 ### Changed
