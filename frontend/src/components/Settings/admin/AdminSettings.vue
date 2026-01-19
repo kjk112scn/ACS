@@ -1,6 +1,6 @@
 <template>
   <div class="admin-settings">
-    <h5 class="q-mt-none q-mb-md">{{ $t('settings.admin.title') }}</h5>
+    <h5 class="q-mt-none q-mb-md">{{ T.settings.admin.title }}</h5>
 
     <!-- ✅ 탭 라벨을 하드코딩된 영어로 변경 -->
     <q-tabs v-model="activeSubTab" class="text-grey" active-color="primary" indicator-color="primary" align="left">
@@ -34,6 +34,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { T } from '@/texts'
 import ServoEncoderPresetSettings from './ServoEncoderPresetSettings.vue'
 import ServoAlarmResetSettings from './ServoAlarmResetSettings.vue'
 import MCOffSettings from './MCOffSettings.vue'

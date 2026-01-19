@@ -2,7 +2,7 @@
   <q-dialog v-model="isOpen" @hide="onHide" maximized>
     <q-card class="settings-modal-card">
       <q-card-section class="row items-center q-pb-none">
-        <div class="text-h6">{{ $t('settings.title') }}</div>
+        <div class="text-h6">{{ T.settings.title }}</div>
         <q-space />
         <q-btn icon="close" flat round dense v-close-popup />
       </q-card-section>
@@ -17,7 +17,7 @@
                 <q-item-section avatar>
                   <q-icon name="settings" />
                 </q-item-section>
-                <q-item-section>{{ $t('settings.generalTab') }}</q-item-section>
+                <q-item-section>{{ T.settings.generalTab }}</q-item-section>
               </q-item>
 
               <q-item clickable v-ripple :active="activeTab === 'connection'" @click="activeTab = 'connection'"
@@ -25,7 +25,7 @@
                 <q-item-section avatar>
                   <q-icon name="wifi" />
                 </q-item-section>
-                <q-item-section>{{ $t('settings.connectionTab') }}</q-item-section>
+                <q-item-section>{{ T.settings.connectionTab }}</q-item-section>
               </q-item>
 
               <!-- 시스템 설정 탭 -->
@@ -34,34 +34,34 @@
                 <q-item-section avatar>
                   <q-icon name="engineering" />
                 </q-item-section>
-                <q-item-section>{{ $t('settings.systemTab') }}</q-item-section>
+                <q-item-section>{{ T.settings.systemTab }}</q-item-section>
               </q-item>
 
-              <!-- ✅ 언어 설정 탭 추가 -->
+              <!-- 언어 설정 탭 -->
               <q-item clickable v-ripple :active="activeTab === 'language'" @click="activeTab = 'language'"
                 active-class="active-tab">
                 <q-item-section avatar>
                   <q-icon name="language" />
                 </q-item-section>
-                <q-item-section>{{ $t('settings.languageTab') }}</q-item-section>
+                <q-item-section>{{ T.settings.languageTab }}</q-item-section>
               </q-item>
 
-              <!-- ✅ 관리자 설정 탭 추가 -->
+              <!-- 관리자 설정 탭 -->
               <q-item clickable v-ripple :active="activeTab === 'admin'" @click="activeTab = 'admin'"
                 active-class="active-tab">
                 <q-item-section avatar>
                   <q-icon name="admin_panel_settings" />
                 </q-item-section>
-                <q-item-section>{{ $t('settings.adminTab') }}</q-item-section>
+                <q-item-section>{{ T.settings.adminTab }}</q-item-section>
               </q-item>
 
-              <!-- ✅ 버전 정보 탭 추가 -->
+              <!-- 버전 정보 탭 -->
               <q-item clickable v-ripple :active="activeTab === 'version'" @click="activeTab = 'version'"
                 active-class="active-tab">
                 <q-item-section avatar>
                   <q-icon name="info" />
                 </q-item-section>
-                <q-item-section>{{ $t('settings.versionTab') }}</q-item-section>
+                <q-item-section>{{ T.settings.versionTab }}</q-item-section>
               </q-item>
             </q-list>
           </div>
@@ -74,34 +74,34 @@
 
             <!-- 연결 설정 탭 -->
             <div v-if="activeTab === 'connection'">
-              <h5 class="q-mt-none q-mb-md">{{ $t('settings.connection.title') }}</h5>
+              <h5 class="q-mt-none q-mb-md">{{ T.settings.connection.title }}</h5>
 
-              <q-input outlined v-model="localServerAddress" :label="$t('settings.connection.websocket')"
+              <q-input outlined v-model="localServerAddress" :label="T.settings.connection.websocket"
                 class="q-mb-md" />
 
-              <q-input outlined v-model="apiBaseUrl" :label="$t('settings.connection.api')" class="q-mb-md" />
+              <q-input outlined v-model="apiBaseUrl" :label="T.settings.connection.api" class="q-mb-md" />
 
-              <q-toggle v-model="autoReconnect" :label="$t('settings.connection.autoReconnect')" />
+              <q-toggle v-model="autoReconnect" :label="T.settings.connection.autoReconnect" />
             </div>
 
             <!-- 시스템 설정 탭 -->
             <SystemSettings v-if="activeTab === 'system'" />
 
-            <!-- ✅ 언어 설정 탭 -->
+            <!-- 언어 설정 탭 -->
             <LanguageSettings v-if="activeTab === 'language'" />
 
-            <!-- ✅ 관리자 설정 탭 -->
+            <!-- 관리자 설정 탭 -->
             <AdminSettings v-if="activeTab === 'admin'" />
 
-            <!-- ✅ 버전 정보 탭 -->
+            <!-- 버전 정보 탭 -->
             <VersionInfoSettings v-if="activeTab === 'version'" />
           </div>
         </div>
       </q-card-section>
 
       <q-card-actions align="right" class="q-pa-md">
-        <q-btn flat :label="$t('buttons.cancel')" color="primary" v-close-popup />
-        <q-btn flat :label="$t('buttons.save')" color="primary" :loading="loadingStates.saveAll"
+        <q-btn flat :label="T.buttons.cancel" color="primary" v-close-popup />
+        <q-btn flat :label="T.buttons.save" color="primary" :loading="loadingStates.saveAll"
           :disable="!hasAnyUnsavedChanges" @click="onSaveAll" />
       </q-card-actions>
     </q-card>
@@ -109,9 +109,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, defineProps, defineEmits, computed } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useSettingsStore } from '@/stores'
 import { useNotification } from '@/composables/useNotification'
+import { T } from '@/texts'
 
 import GeneralSettings from './GeneralSettings.vue'
 import SystemSettings from './system/SystemSettings.vue'
@@ -212,15 +213,13 @@ const onSaveAll = async () => {
       autoReconnect: autoReconnect.value,
     })
 
-    // ✅ useNotification 사용
-    success('모든 설정이 저장되었습니다')
+    success(T.value.system.common.success)
 
     // 모달 닫기
     isOpen.value = false
   } catch (error) {
     console.error('일괄 저장 실패:', error)
-    // ✅ useNotification 사용
-    showError('설정 저장에 실패했습니다')
+    showError(T.value.system.common.error)
   }
 }
 

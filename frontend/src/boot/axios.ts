@@ -1,5 +1,6 @@
 import axios, { type AxiosInstance } from 'axios'
 import { getApiBaseUrl } from '@/utils/api-config'
+import { getCurrentLanguage } from '@/texts'
 
 declare module 'vue' {
   interface ComponentCustomProperties {
@@ -23,6 +24,15 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 })
+
+// 요청 인터셉터 - Accept-Language 헤더 추가
+api.interceptors.request.use(
+  (config) => {
+    config.headers['Accept-Language'] = getCurrentLanguage()
+    return config
+  },
+  (error) => Promise.reject(error)
+)
 
 // 응답 인터셉터 - 에러 처리
 api.interceptors.response.use(

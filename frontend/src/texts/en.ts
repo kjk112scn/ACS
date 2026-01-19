@@ -1,4 +1,6 @@
-export default {
+import type { TextsType } from './ko'
+
+export const en: TextsType = {
   // Common
   common: {
     save: 'Save',
@@ -61,19 +63,21 @@ export default {
     feed: 'Feed',
   },
 
-  // 설정 관련 확장
+  // Settings
   settings: {
     title: 'Settings',
     theme: 'Theme',
     darkMode: 'Dark Mode',
     lightMode: 'Light Mode',
 
-    // 언어 설정
-    'language.current': 'Current Language',
-    'language.changed': 'Changed to {language}',
-    'language.select': 'Select a language',
+    // Language settings
+    language: {
+      current: 'Current Language',
+      changed: (language: string) => `Changed to ${language}`,
+      select: 'Select a language',
+    },
 
-    // 버전 정보
+    // Version info
     version: {
       title: 'Firmware Version Information',
       refresh: 'Refresh Version Information',
@@ -98,7 +102,7 @@ export default {
       },
     },
 
-    // 관리자 설정
+    // Admin settings
     admin: {
       title: 'Admin Settings',
       description: 'System administrator settings',
@@ -112,7 +116,7 @@ export default {
         elevationButton: 'Elevation Preset',
         tiltButton: 'Tilt Preset',
         confirmTitle: 'Servo Preset Confirmation',
-        confirmMessage: 'Execute {axis} axis servo preset?',
+        confirmMessage: (axis: string) => `Execute ${axis} axis servo preset?`,
       },
       servoAlarmReset: 'Servo Alarm Reset',
       mcOnOff: 'M/C On/Off',
@@ -129,47 +133,47 @@ export default {
         off: 'OFF',
       },
 
-      // 서보 프리셋 상세
+      // Servo preset details
       servoPresetDetails: {
         azimuthDesc: 'Azimuth Axis Servo Encoder Preset',
         elevationDesc: 'Elevation Axis Servo Encoder Preset',
         tiltDesc: 'Tilt Axis Servo Encoder Preset',
-        azimuthButton: 'Azimuth Preset', // ← 이 키가 누락됨
+        azimuthButton: 'Azimuth Preset',
         elevationButton: 'Elevation Preset',
         tiltButton: 'Tilt Preset',
         confirmTitle: 'Servo Preset Confirmation',
-        confirmMessage: 'Execute {axis} axis servo preset?',
+        confirmMessage: (axis: string) => `Execute ${axis} axis servo preset?`,
       },
 
-      // 서보 알람 리셋 상세
+      // Servo alarm reset details
       servoAlarmResetDetails: {
         azimuthDesc: 'Azimuth Axis Servo Alarm Reset',
         elevationDesc: 'Elevation Axis Servo Alarm Reset',
         tiltDesc: 'Tilt Axis Servo Alarm Reset',
-        azimuthButton: 'Azimuth Reset', // ← 이 키도 누락됨
+        azimuthButton: 'Azimuth Reset',
         elevationButton: 'Elevation Reset',
         tiltButton: 'Tilt Reset',
         confirmTitle: 'Servo Alarm Reset Confirmation',
-        confirmMessage: 'Reset {axis} axis servo alarm?',
+        confirmMessage: (axis: string) => `Reset ${axis} axis servo alarm?`,
       },
 
-      // M/C On/Off 상세
+      // M/C On/Off details
       mcOnOffDetails: {
         title: 'M/C Status Control',
         description: 'Execute M/C On/Off command',
         confirmTitle: 'M/C On/Off Confirmation',
-        confirmMessage: 'Execute M/C {state} command?',
+        confirmMessage: (state: string) => `Execute M/C ${state} command?`,
       },
     },
 
-    // 일반 설정
+    // General settings
     general: {
       title: 'General Settings',
       theme: 'Theme Settings',
       language: 'Language Settings',
     },
 
-    // 연결 설정
+    // Connection settings
     connection: {
       title: 'Connection Settings',
       websocket: 'WebSocket Server Address',
@@ -177,13 +181,25 @@ export default {
       autoReconnect: 'Auto-reconnect when disconnected',
     },
 
-    // 탭 제목들 (별도로 정의)
+    // Tab titles
     generalTab: 'General Settings',
     systemTab: 'System Settings',
     connectionTab: 'Connection Settings',
     languageTab: 'Language Settings',
     versionTab: 'Version Information',
     adminTab: 'Admin Settings',
+  },
+
+  // Common buttons
+  buttons: {
+    save: 'Save',
+    cancel: 'Cancel',
+    confirm: 'Confirm',
+    yes: 'Yes',
+    no: 'No',
+    refresh: 'Refresh',
+    retry: 'Retry',
+    close: 'Close',
   },
 
   // Error Messages
@@ -195,10 +211,10 @@ export default {
     userError: 'User error occurred.',
     requiredField: 'This field is required.',
     invalidFormat: 'Invalid format.',
-    minLength: 'Please enter at least {min} characters.',
-    maxLength: 'Maximum {max} characters allowed.',
-    minValue: 'Minimum value is {min}.',
-    maxValue: 'Maximum value is {max}.',
+    minLength: (min: number) => `Please enter at least ${min} characters.`,
+    maxLength: (max: number) => `Maximum ${max} characters allowed.`,
+    minValue: (min: number) => `Minimum value is ${min}.`,
+    maxValue: (max: number) => `Maximum value is ${max}.`,
     emailFormat: 'Invalid email format.',
     numericOnly: 'Only numbers are allowed.',
   },
@@ -405,9 +421,9 @@ export default {
     updating: 'Updating...',
     loadMoreLogs: 'Load More Logs',
     loadingMoreLogs: 'Loading more logs...',
-    showingLogs: 'Showing {current} of {total} logs',
+    showingLogs: (current: number, total: number) => `Showing ${current} of ${total} logs`,
     scrollHint: 'or scroll to load more',
-    allLogsLoaded: 'All {total} logs loaded',
+    allLogsLoaded: (total: number) => `All ${total} logs loaded`,
     noLogsToDisplay: 'No error logs to display.',
     resolved: 'Resolved',
     active: 'Active',
@@ -423,19 +439,7 @@ export default {
     speed: 'Speed',
   },
 
-  // 공통 버튼들
-  buttons: {
-    save: 'Save',
-    cancel: 'Cancel',
-    confirm: 'Confirm',
-    yes: 'Yes',
-    no: 'No',
-    refresh: 'Refresh',
-    retry: 'Retry',
-    close: 'Close',
-  },
-
-  // 시스템 설정
+  // System Settings
   system: {
     title: 'System Settings',
     categories: {
@@ -477,7 +481,7 @@ export default {
       },
     },
 
-    // 공통 메시지
+    // Common messages
     common: {
       changed: 'Changed',
       saved: 'Saved',
@@ -493,7 +497,7 @@ export default {
       getCurrentLocation: 'Get Current Location',
     },
 
-    // 위치 설정
+    // Location settings
     location: {
       title: 'Location Settings',
       latitude: 'Latitude (degrees)',
@@ -510,7 +514,7 @@ export default {
       altitudeMin: 'Altitude must be 0 meters or higher',
     },
 
-    // 추적 설정
+    // Tracking settings
     tracking: {
       title: 'Tracking Settings',
       interval: 'Tracking Interval (seconds)',
@@ -527,7 +531,7 @@ export default {
       minElevationRange: 'Minimum elevation must be between 0° and 90°',
     },
 
-    // Stow 설정
+    // Stow settings
     stow: {
       title: 'Stow Settings',
       azimuthAngle: 'Azimuth Stow Angle (degrees)',
@@ -549,7 +553,7 @@ export default {
       speedMin: 'Speed must be 0.1 deg/sec or higher',
     },
 
-    // 안테나 사양 설정
+    // Antenna spec settings
     antennaSpec: {
       title: 'Antenna Specification Settings',
       trueNorthOffset: 'True North Offset (degrees)',
@@ -562,7 +566,7 @@ export default {
       tiltAngleRange: 'Tilt Angle must be between -90° and 90°',
     },
 
-    // 각도 제한 설정
+    // Angle limits settings
     angleLimits: {
       title: 'Angle Limits Settings',
       azimuthMin: 'Azimuth Min Angle (degrees)',
@@ -585,7 +589,7 @@ export default {
       trainRange: 'Train must be between -180° and 180°',
     },
 
-    // 속도 제한 설정
+    // Speed limits settings
     speedLimits: {
       title: 'Speed Limits Settings',
       azimuthMax: 'Azimuth Max Speed (deg/sec)',
@@ -598,7 +602,7 @@ export default {
       speedMin: 'Speed must be 0.1 deg/sec or higher',
     },
 
-    // 오프셋 제한 설정
+    // Offset limits settings
     offsetLimits: {
       title: 'Offset Limits Settings',
       angleOffset: 'Angle Offset (degrees)',
@@ -611,7 +615,7 @@ export default {
       timeOffsetRange: 'Time offset must be between -3600 and 3600 seconds',
     },
 
-    // 알고리즘 설정
+    // Algorithm settings
     algorithm: {
       title: 'Algorithm Settings',
       geoMinMotion: 'Geo Min Motion (degrees)',
@@ -628,7 +632,7 @@ export default {
       predictionTimeRange: 'Prediction time must be between 1 and 3600 seconds',
     },
 
-    // 스텝 사이즈 제한 설정
+    // Step size limits settings
     stepSize: {
       title: 'Step Size Limits Settings',
       minStepSize: 'Minimum Step Size (degrees)',
@@ -654,4 +658,4 @@ export default {
       recommendedRange: 'Recommended range: 0.1° to 180°',
     },
   },
-}
+} as const

@@ -1,16 +1,16 @@
 <template>
   <div>
-    <h5 class="q-mt-none q-mb-md">{{ $t('settings.admin.mcOnOff') }}</h5>
+    <h5 class="q-mt-none q-mb-md">{{ T.settings.admin.mcOnOff }}</h5>
 
     <q-card class="command-card">
       <q-card-section>
-        <div class="text-h6">{{ $t('settings.admin.mcOnOffDetails.title') }}</div>
-        <div class="text-caption text-grey-6 q-mb-md">{{ $t('settings.admin.mcOnOffDetails.description') }}</div>
+        <div class="text-h6">{{ T.settings.admin.mcOnOffDetails.title }}</div>
+        <div class="text-caption text-grey-6 q-mb-md">{{ T.settings.admin.mcOnOffDetails.description }}</div>
 
         <div class="q-mt-md">
           <q-btn-toggle v-model="mcState" :options="[
-            { label: $t('settings.admin.states.off'), value: false },
-            { label: $t('settings.admin.states.on'), value: true }
+            { label: T.settings.admin.states.off, value: false },
+            { label: T.settings.admin.states.on, value: true }
           ]" color="primary" class="full-width" :loading="isLoading" @click="handleToggle" />
         </div>
       </q-card-section>
@@ -20,13 +20,12 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { T } from '@/texts'
 import { useICDStore } from '@/stores/icd/icdStore'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 
-const { t } = useI18n()
 const icdStore = useICDStore()
 const { success } = useNotification()
 const { confirm } = useDialog()
@@ -36,13 +35,13 @@ const isLoading = ref(false)
 const mcState = ref(false)
 
 const handleToggle = async () => {
-  const stateText = t(`settings.admin.states.${mcState.value ? 'on' : 'off'}`)
-  const message = t('settings.admin.mcOnOffDetails.confirmMessage', { state: stateText })
+  const stateText = mcState.value ? T.value.settings.admin.states.on : T.value.settings.admin.states.off
+  const message = T.value.settings.admin.mcOnOffDetails.confirmMessage(stateText)
 
   const confirmed = await confirm(message, {
-    title: t('settings.admin.mcOnOffDetails.confirmTitle'),
-    ok: { label: t('buttons.yes'), color: 'positive' },
-    cancel: { label: t('buttons.no'), color: 'negative' },
+    title: T.value.settings.admin.mcOnOffDetails.confirmTitle,
+    ok: { label: T.value.buttons.yes, color: 'positive' },
+    cancel: { label: T.value.buttons.no, color: 'negative' },
   })
 
   if (!confirmed) return
@@ -50,7 +49,7 @@ const handleToggle = async () => {
   isLoading.value = true
   try {
     await icdStore.sendMCOnOffCommand(mcState.value)
-    success(t('settings.admin.success'))
+    success(T.value.settings.admin.success)
   } catch (error) {
     handleApiError(error, 'M/C On/Off')
   } finally {

@@ -1,4 +1,4 @@
-export default {
+export const ko = {
   // 공통
   common: {
     save: '저장',
@@ -69,9 +69,11 @@ export default {
     lightMode: '라이트 모드',
 
     // 언어 설정
-    'language.current': '현재 언어',
-    'language.changed': '{language}로 변경되었습니다',
-    'language.select': '언어를 선택하세요',
+    language: {
+      current: '현재 언어',
+      changed: (language: string) => `${language}로 변경되었습니다`,
+      select: '언어를 선택하세요',
+    },
 
     // 버전 정보
     version: {
@@ -112,7 +114,7 @@ export default {
         elevationButton: 'Elevation Preset',
         tiltButton: 'Tilt Preset',
         confirmTitle: '서보 프리셋 확인',
-        confirmMessage: '{axis} 축 서보 프리셋을 실행하시겠습니까?',
+        confirmMessage: (axis: string) => `${axis} 축 서보 프리셋을 실행하시겠습니까?`,
       },
       servoAlarmReset: '서보 알람 리셋',
       mcOnOff: 'M/C On/Off',
@@ -138,7 +140,7 @@ export default {
         elevationButton: 'Elevation Preset',
         tiltButton: 'Tilt Preset',
         confirmTitle: '서보 프리셋 확인',
-        confirmMessage: '{axis} 축 서보 프리셋을 실행하시겠습니까?',
+        confirmMessage: (axis: string) => `${axis} 축 서보 프리셋을 실행하시겠습니까?`,
       },
 
       // 서보 알람 리셋 상세
@@ -150,7 +152,7 @@ export default {
         elevationButton: 'Elevation Reset',
         tiltButton: 'Tilt Reset',
         confirmTitle: '서보 알람 리셋 확인',
-        confirmMessage: '{axis} 축 서보 알람을 리셋하시겠습니까?',
+        confirmMessage: (axis: string) => `${axis} 축 서보 알람을 리셋하시겠습니까?`,
       },
 
       // M/C On/Off 상세
@@ -158,7 +160,7 @@ export default {
         title: 'M/C 상태 제어',
         description: 'M/C On/Off 명령 실행',
         confirmTitle: 'M/C On/Off 확인',
-        confirmMessage: 'M/C {state} 명령을 실행하시겠습니까?',
+        confirmMessage: (state: string) => `M/C ${state} 명령을 실행하시겠습니까?`,
       },
     },
 
@@ -207,10 +209,10 @@ export default {
     userError: '사용자 오류가 발생했습니다.',
     requiredField: '이 필드는 필수입니다.',
     invalidFormat: '잘못된 형식입니다.',
-    minLength: '최소 {min}자 이상 입력해주세요.',
-    maxLength: '최대 {max}자까지 입력 가능합니다.',
-    minValue: '최소값은 {min}입니다.',
-    maxValue: '최대값은 {max}입니다.',
+    minLength: (min: number) => `최소 ${min}자 이상 입력해주세요.`,
+    maxLength: (max: number) => `최대 ${max}자까지 입력 가능합니다.`,
+    minValue: (min: number) => `최소값은 ${min}입니다.`,
+    maxValue: (max: number) => `최대값은 ${max}입니다.`,
     emailFormat: '잘못된 이메일 형식입니다.',
     numericOnly: '숫자만 입력 가능합니다.',
   },
@@ -417,9 +419,9 @@ export default {
     updating: '업데이트 중...',
     loadMoreLogs: '더 많은 로그 로드',
     loadingMoreLogs: '더 많은 로그 로딩 중...',
-    showingLogs: '{current}개 중 {total}개 로그 표시 중',
+    showingLogs: (current: number, total: number) => `${current}개 중 ${total}개 로그 표시 중`,
     scrollHint: '또는 스크롤하여 더 로드',
-    allLogsLoaded: '모든 {total}개 로그 로드 완료',
+    allLogsLoaded: (total: number) => `모든 ${total}개 로그 로드 완료`,
     noLogsToDisplay: '표시할 에러 로그가 없습니다.',
     resolved: '해결됨',
     active: '활성',
@@ -653,4 +655,15 @@ export default {
       recommendedRange: '권장 범위: 0.1도 ~ 180도',
     },
   },
-}
+} as const
+
+// 문자열 리터럴을 string으로 변환하는 유틸리티 타입
+type DeepStringify<T> = T extends string
+  ? string
+  : T extends (...args: infer A) => infer R
+  ? (...args: A) => R extends string ? string : DeepStringify<R>
+  : T extends object
+  ? { [K in keyof T]: DeepStringify<T[K]> }
+  : T
+
+export type TextsType = DeepStringify<typeof ko>

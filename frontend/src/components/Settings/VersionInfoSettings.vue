@@ -1,10 +1,10 @@
 <template>
   <div class="version-info-settings">
-    <h5 class="q-mt-none q-mb-sm">{{ $t('settings.version.title') }}</h5>
+    <h5 class="q-mt-none q-mb-sm">{{ T.settings.version.title }}</h5>
 
     <!-- 새로고침 버튼 -->
     <div class="q-mb-sm">
-      <q-btn color="primary" icon="refresh" :label="$t('settings.version.refresh')" :loading="loading"
+      <q-btn color="primary" icon="refresh" :label="T.settings.version.refresh" :loading="loading"
         @click="loadVersionInfo" size="sm" />
     </div>
 
@@ -26,7 +26,7 @@
           <div class="row q-col-gutter-sm">
             <!-- 펌웨어 버전 -->
             <div class="col-12 col-md-6">
-              <div class="text-weight-bold text-grey-8 q-mb-xs">{{ $t('settings.version.firmware') }}</div>
+              <div class="text-weight-bold text-grey-8 q-mb-xs">{{ T.settings.version.firmware }}</div>
               <q-chip :color="board.firmwareVersion && board.firmwareVersion !== 'N/A' ? 'primary' : 'grey-5'"
                 text-color="white" size="md">
                 {{ board.firmwareVersion || 'N/A' }}
@@ -35,7 +35,7 @@
 
             <!-- 제품번호 -->
             <div class="col-12 col-md-6">
-              <div class="text-weight-bold text-grey-8 q-mb-xs">{{ $t('settings.version.serial') }}</div>
+              <div class="text-weight-bold text-grey-8 q-mb-xs">{{ T.settings.version.serial }}</div>
               <q-chip :color="board.serialNumber && board.serialNumber !== 'N/A' ? 'secondary' : 'grey-5'"
                 text-color="white" size="md">
                 {{ board.serialNumber || 'N/A' }}
@@ -49,27 +49,27 @@
     <!-- 로딩 상태 -->
     <div v-else-if="loading" class="text-center q-pa-md">
       <q-spinner size="32px" color="primary" />
-      <div class="q-mt-sm">{{ $t('settings.version.loading') }}</div>
+      <div class="q-mt-sm">{{ T.settings.version.loading }}</div>
     </div>
 
     <!-- 에러 상태 -->
     <div v-else-if="error" class="text-center q-pa-md">
       <q-icon name="error" size="32px" color="negative" />
       <div class="q-mt-sm text-negative">{{ error }}</div>
-      <q-btn color="primary" :label="$t('settings.version.retry')" class="q-mt-sm" size="sm" @click="loadVersionInfo" />
+      <q-btn color="primary" :label="T.settings.version.retry" class="q-mt-sm" size="sm" @click="loadVersionInfo" />
     </div>
 
     <!-- 데이터 없음 -->
     <div v-else class="text-center q-pa-md">
       <q-icon name="info" size="32px" color="grey-5" />
-      <div class="q-mt-sm text-grey-6">{{ $t('settings.version.noData') }}</div>
+      <div class="q-mt-sm text-grey-6">{{ T.settings.version.noData }}</div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { T } from '@/texts'
 import { useICDStore } from '@/stores/icd/icdStore'
 import { useNotification } from '@/composables/useNotification'
 
@@ -81,7 +81,6 @@ interface VersionBoard {
   serialNumber: string
 }
 
-const { t } = useI18n()
 const icdStore = useICDStore()
 const { success, error: showError } = useNotification()
 
@@ -128,8 +127,8 @@ const loadVersionInfo = async () => {
       // 펌웨어 버전 및 제품번호 데이터 파싱
       versionData.value = {
         mainboard: {
-          name: t('settings.version.boards.mainboard'),
-          description: t('settings.version.boards.mainboardDesc'),
+          name: T.value.settings.version.boards.mainboard,
+          description: T.value.settings.version.boards.mainboardDesc,
           firmwareVersion: formatVersion(
             firmwareData.mainFwVerOne,
             firmwareData.mainFwVerTwo,
@@ -142,8 +141,8 @@ const loadVersionInfo = async () => {
           )
         },
         azimuth: {
-          name: t('settings.version.boards.azimuth'),
-          description: t('settings.version.boards.azimuthDesc'),
+          name: T.value.settings.version.boards.azimuth,
+          description: T.value.settings.version.boards.azimuthDesc,
           firmwareVersion: formatVersion(
             firmwareData.azimuthFwVerOne,
             firmwareData.azimuthFwVerTwo,
@@ -156,8 +155,8 @@ const loadVersionInfo = async () => {
           )
         },
         elevation: {
-          name: t('settings.version.boards.elevation'),
-          description: t('settings.version.boards.elevationDesc'),
+          name: T.value.settings.version.boards.elevation,
+          description: T.value.settings.version.boards.elevationDesc,
           firmwareVersion: formatVersion(
             firmwareData.elevationFwVerOne,
             firmwareData.elevationFwVerTwo,
@@ -170,8 +169,8 @@ const loadVersionInfo = async () => {
           )
         },
         tilt: {
-          name: t('settings.version.boards.tilt'),
-          description: t('settings.version.boards.tiltDesc'),
+          name: T.value.settings.version.boards.tilt,
+          description: T.value.settings.version.boards.tiltDesc,
           firmwareVersion: formatVersion(
             firmwareData.trainFwVerOne,
             firmwareData.trainFwVerTwo,
@@ -184,8 +183,8 @@ const loadVersionInfo = async () => {
           )
         },
         feed: {
-          name: t('settings.version.boards.feed'),
-          description: t('settings.version.boards.feedDesc'),
+          name: T.value.settings.version.boards.feed,
+          description: T.value.settings.version.boards.feedDesc,
           firmwareVersion: formatVersion(
             firmwareData.feedFwVerOne,
             firmwareData.feedFwVerTwo,
@@ -200,7 +199,7 @@ const loadVersionInfo = async () => {
       }
 
       console.log('📡 파싱된 버전 데이터:', versionData.value)
-      success(t('settings.version.success'))
+      success(T.value.settings.version.success)
     } else {
       throw new Error('Invalid response format')
     }
@@ -208,7 +207,7 @@ const loadVersionInfo = async () => {
     console.error('❌ 버전 정보 로드 실패:', err)
     const errorMessage = err instanceof Error ? err.message : 'Unknown error'
     error.value = errorMessage
-    showError(t('settings.version.error'))
+    showError(T.value.settings.version.error)
   } finally {
     loading.value = false
   }

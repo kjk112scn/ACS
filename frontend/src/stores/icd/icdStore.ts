@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, shallowRef, computed, onScopeDispose, readonly } from 'vue'
 import { icdService, type MessageData, type MultiControlCommand } from '@/services'
 import type { HardwareErrorLog } from '@/types/hardwareError'
-import { useI18n } from 'vue-i18n'
+import { T } from '@/texts'
 import { getWebSocketUrl } from '@/utils/api-config'
 
 // Composables - 순수 파싱 함수들
@@ -75,9 +75,6 @@ export const useICDStore = defineStore('icd', () => {
   const isConnected = ref(false)
   const messageDelay = ref(0)
 
-  // i18n 인스턴스 가져오기
-  const { t } = useI18n()
-
   /**
    * 하드웨어 에러 키를 다국어 메시지로 변환하는 함수
    * @param errorKey - 에러 키 (예: 'ELEVATION_SERVO_ALARM')
@@ -89,18 +86,14 @@ export const useICDStore = defineStore('icd', () => {
       // 해결된 에러인 경우 _RESOLVED 접미사 추가
       const key = isResolved ? `${errorKey}_RESOLVED` : errorKey
 
-      // i18n 키 생성
-      const i18nKey = `hardwareErrors.${key}`
+      // T.value.hardwareErrors에서 동적으로 키 조회
+      const hardwareErrors = T.value.hardwareErrors as Record<string, string>
+      const translatedMessage = hardwareErrors[key]
 
-      // 번역 시도
-      const translatedMessage = t(i18nKey)
-
-      // 로그 제거 (상태 변경 시에만 로그가 출력되도록)
-
-      // 번역이 실패한 경우 (키가 없으면 키 자체를 반환)
-      if (translatedMessage === i18nKey) {
-        console.warn(`🚨 하드웨어 에러 메시지 번역 실패: ${i18nKey}`)
-        return errorKey // 원본 키 반환
+      // 번역이 없는 경우 원본 키 반환
+      if (!translatedMessage) {
+        console.warn(`🚨 하드웨어 에러 메시지 번역 실패: hardwareErrors.${key}`)
+        return errorKey
       }
 
       return translatedMessage

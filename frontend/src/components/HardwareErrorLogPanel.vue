@@ -14,7 +14,7 @@
         <!-- 수동 실시간 업데이트 버튼 -->
         <q-chip :color="isManualRealtimeUpdate ? 'orange' : 'blue'" text-color="white"
           :icon="isManualRealtimeUpdate ? 'stop' : 'sync'"
-          :label="isManualRealtimeUpdate ? t('hardwareErrorLog.updating') : t('hardwareErrorLog.realtimeUpdate')"
+          :label="isManualRealtimeUpdate ? T.hardwareErrorLog.updating : T.hardwareErrorLog.realtimeUpdate"
           clickable @click="toggleRealtimeUpdate" />
 
         <!-- 초기 로딩 상태 표시 -->
@@ -26,30 +26,30 @@
     <!-- 필터 섹션 -->
     <div class="filter-section">
       <!-- 카테고리 필터 -->
-      <q-select v-model="selectedCategory" :options="categoryOptions" :label="t('hardwareErrorLog.category')" dense
+      <q-select v-model="selectedCategory" :options="categoryOptions" :label="T.hardwareErrorLog.category" dense
         outlined style="min-width: 150px" clearable emit-value map-options />
 
       <!-- 심각도 필터 -->
-      <q-select v-model="selectedSeverity" :options="severityOptions" :label="t('hardwareErrorLog.severity')" dense
+      <q-select v-model="selectedSeverity" :options="severityOptions" :label="T.hardwareErrorLog.severity" dense
         outlined style="min-width: 120px" clearable emit-value map-options />
 
       <!-- 날짜 범위 필터 -->
-      <q-input v-model="startDate" :label="t('hardwareErrorLog.startDate')" type="date" dense outlined
+      <q-input v-model="startDate" :label="T.hardwareErrorLog.startDate" type="date" dense outlined
         style="min-width: 150px" class="date-input" />
 
-      <q-input v-model="endDate" :label="t('hardwareErrorLog.endDate')" type="date" dense outlined
+      <q-input v-model="endDate" :label="T.hardwareErrorLog.endDate" type="date" dense outlined
         style="min-width: 150px" class="date-input" />
 
       <!-- 해결 상태 필터 -->
       <q-select v-model="selectedResolvedStatus" :options="resolvedStatusOptions"
-        :label="t('hardwareErrorLog.resolutionStatus')" dense outlined style="min-width: 150px" clearable emit-value
+        :label="T.hardwareErrorLog.resolutionStatus" dense outlined style="min-width: 150px" clearable emit-value
         map-options />
 
       <!-- 조회 버튼 -->
-      <q-btn color="primary" :label="t('hardwareErrorLog.search')" @click="manualSearch" />
+      <q-btn color="primary" :label="T.hardwareErrorLog.search" @click="manualSearch" />
 
       <!-- 필터 초기화 -->
-      <q-btn color="grey" :label="t('hardwareErrorLog.reset')" @click="resetFilters" />
+      <q-btn color="grey" :label="T.hardwareErrorLog.reset" @click="resetFilters" />
     </div>
 
     <!-- 스크롤 가능한 에러 로그 목록 -->
@@ -77,20 +77,20 @@
       <!-- 로딩 상태 표시 -->
       <div v-if="isLoadingMore" class="loading-more">
         <q-spinner color="primary" size="20px" />
-        <span class="q-ml-sm">{{ t('hardwareErrorLog.loadingMoreLogs') }}</span>
+        <span class="q-ml-sm">{{ T.hardwareErrorLog.loadingMoreLogs }}</span>
       </div>
 
       <!-- 더 보기 버튼 (스크롤과 버튼 모두 지원) -->
       <div v-else-if="hasMorePages && !isLoadingMore" class="load-more-section">
-        <q-btn color="primary" outline :label="t('hardwareErrorLog.loadMoreLogs')" icon="expand_more"
+        <q-btn color="primary" outline :label="T.hardwareErrorLog.loadMoreLogs" icon="expand_more"
           @click="loadMoreLogs" class="load-more-btn" />
         <div class="load-more-info">
           <span class="text-caption text-grey-6">
-            {{ t('hardwareErrorLog.showingLogs', { current: allLoadedLogs.length, total: totalLogCount }) }}
+            {{ T.hardwareErrorLog.showingLogs(allLoadedLogs.length, totalLogCount) }}
           </span>
           <div class="scroll-hint">
             <q-icon name="mouse" size="18px" class="q-mr-sm" />
-            <span>{{ t('hardwareErrorLog.scrollHint') }}</span>
+            <span>{{ T.hardwareErrorLog.scrollHint }}</span>
           </div>
         </div>
       </div>
@@ -98,13 +98,13 @@
       <!-- 더 이상 로드할 데이터가 없을 때 -->
       <div v-else-if="!hasMorePages && allLoadedLogs.length > 0" class="no-more-data">
         <q-icon name="check_circle" size="20px" color="green" />
-        <span class="q-ml-sm text-grey-6">{{ t('hardwareErrorLog.allLogsLoaded', { total: totalLogCount }) }}</span>
+        <span class="q-ml-sm text-grey-6">{{ T.hardwareErrorLog.allLogsLoaded(totalLogCount) }}</span>
       </div>
 
       <!-- 로그가 없을 때 -->
       <div v-else-if="allLoadedLogs.length === 0" class="no-logs">
         <q-icon name="info" size="48px" color="grey" />
-        <p>{{ t('hardwareErrorLog.noLogsToDisplay') }}</p>
+        <p>{{ T.hardwareErrorLog.noLogsToDisplay }}</p>
       </div>
     </div>
   </div>
@@ -114,14 +114,13 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useHardwareErrorLogStore } from '@/stores/hardwareErrorLogStore'
 import { useTheme } from '@/composables/useTheme'
-import { useI18n } from 'vue-i18n'
+import { T } from '@/texts'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 import type { HardwareErrorLog } from '@/types/hardwareError'
 import { getApiBaseUrl } from '@/utils/api-config'
 
 const hardwareErrorLogStore = useHardwareErrorLogStore()
 const { initializeTheme } = useTheme()
-const { t } = useI18n()
 const { handleApiError } = useErrorHandler()
 
 // 직접 번역 함수 테스트 (사용하지 않으므로 제거)
@@ -616,7 +615,7 @@ const getStatusChipTextColor = (severity: string, isResolved: boolean) => {
 // ✅ 상태 칩 라벨 (심각도 + 해결상태) - 다국어 지원
 const getStatusChipLabel = (severity: string, isResolved: boolean) => {
   const severityText = getSeverityName(severity)
-  const statusText = isResolved ? t('hardwareErrorLog.resolved') : t('hardwareErrorLog.active')
+  const statusText = isResolved ? T.value.hardwareErrorLog.resolved : T.value.hardwareErrorLog.active
   return `${severityText} ${statusText}`
 }
 

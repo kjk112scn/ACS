@@ -1,11 +1,11 @@
 <template>
   <div class="language-settings">
-    <h5 class="q-mt-none q-mb-md">{{ $t('settings.language') }}</h5>
+    <h5 class="q-mt-none q-mb-md">{{ T.settings.general.language }}</h5>
 
     <div class="language-options">
       <q-card v-for="lang in availableLanguages" :key="lang.code" class="q-mb-md language-card"
         :class="{ 'selected': selectedLanguage === lang.code }" flat bordered clickable
-        @click="selectLanguage(lang.code)">
+        @click="selectLanguageHandler(lang.code)">
         <q-card-section class="q-pa-md">
           <div class="row items-center">
             <div class="col">
@@ -26,7 +26,7 @@
         <template v-slot:avatar>
           <q-icon name="info" color="primary" />
         </template>
-        {{ $t('settings.language.current') }}: <strong>{{ currentLanguageName }}</strong>
+        {{ T.settings.language.current }}: <strong>{{ currentLanguageName }}</strong>
       </q-banner>
     </div>
   </div>
@@ -34,29 +34,28 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { T, setLanguage, getCurrentLanguage, type Language } from '@/texts'
 import { useNotification } from '@/composables/useNotification'
 
-const { locale, t } = useI18n()
 const { success } = useNotification()
 
 // 사용 가능한 언어 목록
 const availableLanguages = ref([
   {
-    code: 'ko-KR',
+    code: 'ko',
     name: '한국어',
     description: 'Korean',
     flag: '🇰🇷'
   },
   {
-    code: 'en-US',
+    code: 'en',
     name: 'English',
     description: 'English (US)',
     flag: '🇺🇸'
   }
 ])
 
-const selectedLanguage = ref(locale.value)
+const selectedLanguage = ref<Language>(getCurrentLanguage())
 
 // 현재 선택된 언어의 이름
 const currentLanguageName = computed(() => {
@@ -65,25 +64,19 @@ const currentLanguageName = computed(() => {
 })
 
 // 언어 선택
-const selectLanguage = (langCode: string) => {
-  selectedLanguage.value = langCode
-  locale.value = langCode
-
-  // 로컬 스토리지에 저장
-  localStorage.setItem('preferred-language', langCode)
+const selectLanguageHandler = (langCode: string) => {
+  const lang = langCode as Language
+  selectedLanguage.value = lang
+  setLanguage(lang)
 
   // 성공 메시지 (선택된 언어로)
   const langName = availableLanguages.value.find(l => l.code === langCode)?.name || langCode
-  success(t('settings.language.changed', { language: langName }))
+  success(T.value.settings.language.changed(langName))
 }
 
 // 컴포넌트 마운트 시 저장된 언어 불러오기
 onMounted(() => {
-  const savedLanguage = localStorage.getItem('preferred-language')
-  if (savedLanguage && availableLanguages.value.some(lang => lang.code === savedLanguage)) {
-    selectedLanguage.value = savedLanguage
-    locale.value = savedLanguage
-  }
+  selectedLanguage.value = getCurrentLanguage()
 })
 </script>
 

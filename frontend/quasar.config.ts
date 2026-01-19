@@ -1,7 +1,6 @@
 ﻿// Configuration for your app
 // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file
 
-import { fileURLToPath } from 'node:url'
 import path from 'path'
 
 export default function (ctx) {
@@ -12,7 +11,7 @@ export default function (ctx) {
     // app boot file (/src/boot)
     // --> boot files are part of "main.js"
     // https://v2.quasar.dev/quasar-cli-vite/boot-files
-    boot: ['i18n', 'axios', 'dark-mode'],
+    boot: ['axios', 'dark-mode'],
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#css
     css: ['app.scss', 'theme-variables.scss', 'calendar-icons.scss'],
@@ -71,7 +70,6 @@ export default function (ctx) {
           '@/stores': path.resolve(__dirname, './src/stores'),
           '@/components': path.resolve(__dirname, './src/components'),
           '@/composables': path.resolve(__dirname, './src/composables'),
-          '@/i18n': path.resolve(__dirname, './src/i18n'),
         }
 
         // Production 빌드에서 console.log, console.debug 자동 제거
@@ -83,23 +81,6 @@ export default function (ctx) {
       // viteVuePluginOptions: {},
 
       vitePlugins: [
-        [
-          '@intlify/unplugin-vue-i18n/vite',
-          {
-            // if you want to use Vue I18n Legacy API, you need to set `compositionOnly: false`
-            // compositionOnly: false,
-
-            // if you want to use named tokens in your Vue I18n messages, such as 'Hello {name}',
-            // you need to set `runtimeOnly: false`
-            // runtimeOnly: false,
-
-            ssr: ctx.modeName === 'ssr',
-
-            // you need to set i18n resource including paths !
-            include: [fileURLToPath(new URL('./src/i18n', import.meta.url))],
-          },
-        ],
-
         [
           'vite-plugin-checker',
           {

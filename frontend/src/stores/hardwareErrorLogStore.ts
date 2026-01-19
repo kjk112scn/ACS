@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import type { HardwareErrorLog } from '@/types/hardwareError'
-import { useI18n } from 'vue-i18n'
+import { T, currentLanguage } from '@/texts'
 import { getApiBaseUrl } from '@/utils/api-config'
 
 export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
@@ -10,9 +10,6 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
   const isLogPanelOpen = ref(false)
   const isPopupOpen = ref(false)
   const isInitialLoad = ref(false)
-
-  // i18n 인스턴스
-  const { t, locale } = useI18n()
 
   /**
    * 에러 키를 현재 언어로 변환하는 함수
@@ -23,13 +20,11 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
   const translateErrorKey = (errorKey: string, isResolved: boolean): string => {
     try {
       const key = isResolved ? `${errorKey}_RESOLVED` : errorKey
-      const i18nKey = `hardwareErrors.${key}`
-      const translatedMessage = t(i18nKey)
+      const hardwareErrors = T.value.hardwareErrors as Record<string, string>
+      const translatedMessage = hardwareErrors[key]
 
-      // 로그 제거 (상태 변경 시에만 로그가 출력되도록)
-
-      if (translatedMessage === i18nKey) {
-        console.warn(`🚨 에러 메시지 번역 실패: ${i18nKey}`)
+      if (!translatedMessage) {
+        console.warn(`🚨 에러 메시지 번역 실패: hardwareErrors.${key}`)
         return errorKey
       }
 
@@ -53,8 +48,8 @@ export const useHardwareErrorLogStore = defineStore('hardwareErrorLog', () => {
   }
 
   // 언어 변경 감지
-  watch(locale, () => {
-    console.log('🌐 언어 변경 감지:', locale.value)
+  watch(currentLanguage, () => {
+    console.log('🌐 언어 변경 감지:', currentLanguage.value)
     updateErrorMessages()
   })
 
