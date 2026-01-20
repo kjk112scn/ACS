@@ -345,16 +345,21 @@ class PassScheduleDataRepository(
         // MST 데이터 → TrackingSession 저장
         mstData.forEach { mst ->
             try {
-                val session = mapMstToSession(satelliteId, mst)
+                // ✅ DTL 카운트 미리 계산 (total_points용)
+                val mstId = (mst["MstId"] as? Number)?.toLong()
+                val dataType = mst["DataType"] as? String
+                val sessionDtlData = dtlData.filter { dtl ->
+                    val dtlMstId = (dtl["MstId"] as? Number)?.toLong()
+                    val dtlDataType = dtl["DataType"] as? String
+                    dtlMstId == mstId && dtlDataType == dataType
+                }
+
+                // ✅ DTL 카운트 전달
+                val session = mapMstToSession(satelliteId, mst, sessionDtlData.size)
                 sessionRepository.save(session)
                     .doOnSuccess { saved: TrackingSessionEntity ->
                         logger.debug("📝 [DB #$opId] Session 저장: id=${saved.id}, satelliteId=$satelliteId, mstId=${saved.mstId}")
                         // 해당 세션의 DTL 데이터 저장
-                        val sessionDtlData = dtlData.filter { dtl ->
-                            val dtlMstId = (dtl["MstId"] as? Number)?.toLong()
-                            val dtlDataType = dtl["DataType"] as? String
-                            dtlMstId == saved.mstId && dtlDataType == saved.dataType
-                        }
                         if (sessionDtlData.isNotEmpty() && saved.id != null) {
                             saveTrajectories(saved.id, sessionDtlData, opId)
                         }
@@ -400,8 +405,12 @@ class PassScheduleDataRepository(
 
     /**
      * MST Map을 TrackingSessionEntity로 변환합니다.
+     *
+     * @param satelliteId 위성 ID
+     * @param mst MST 데이터
+     * @param dtlCount DTL 데이터 개수 (totalPoints 폴백용)
      */
-    private fun mapMstToSession(satelliteId: String, mst: Map<String, Any?>): TrackingSessionEntity {
+    private fun mapMstToSession(satelliteId: String, mst: Map<String, Any?>, dtlCount: Int = 0): TrackingSessionEntity {
         val mstId = (mst["MstId"] as? Number)?.toLong() ?: 0L
         val detailId = (mst["DetailId"] as? Number)?.toInt() ?: 0
         val satelliteName = mst["SatelliteName"] as? String
@@ -411,15 +420,24 @@ class PassScheduleDataRepository(
         val now = OffsetDateTime.now(ZoneOffset.UTC)
         val startTime = parseTime(mst["StartTime"]) ?: now
         val endTime = parseTime(mst["EndTime"]) ?: now
-        val duration = (mst["Duration"] as? Number)?.toInt()
+        // ✅ Duration: ISO String 파싱 또는 시간 차이 계산
+        val duration = parseDurationToSeconds(mst["Duration"], startTime, endTime)
 
         // 각도 정보
         val maxElevation = (mst["MaxElevation"] as? Number)?.toDouble()
-        val maxAzimuthRate = (mst["MaxAzimuthRate"] as? Number)?.toDouble()
-        val maxElevationRate = (mst["MaxElevationRate"] as? Number)?.toDouble()
-        val keyholeDetected = mst["KeyholeDetected"] as? Boolean ?: false
+        // ✅ MaxAzRate 우선, 없으면 MaxAzimuthRate 시도
+        val maxAzimuthRate = (mst["MaxAzRate"] as? Number)?.toDouble()
+            ?: (mst["MaxAzimuthRate"] as? Number)?.toDouble()
+        // ✅ MaxElRate 우선, 없으면 MaxElevationRate 시도
+        val maxElevationRate = (mst["MaxElRate"] as? Number)?.toDouble()
+            ?: (mst["MaxElevationRate"] as? Number)?.toDouble()
+        // ✅ IsKeyhole 우선, 없으면 KeyholeDetected 시도
+        val keyholeDetected = mst["IsKeyhole"] as? Boolean
+            ?: mst["KeyholeDetected"] as? Boolean ?: false
         val recommendedTrainAngle = (mst["RecommendedTrainAngle"] as? Number)?.toDouble()
+        // ✅ TotalPoints: MST에서 읽거나 DTL 카운트 사용
         val totalPoints = (mst["TotalPoints"] as? Number)?.toInt()
+            ?: if (dtlCount > 0) dtlCount else null
 
         return TrackingSessionEntity(
             mstId = mstId,
@@ -438,6 +456,30 @@ class PassScheduleDataRepository(
             recommendedTrainAngle = recommendedTrainAngle,
             totalPoints = totalPoints
         )
+    }
+
+    /**
+     * Duration 값을 초 단위로 파싱합니다.
+     * ISO 8601 Duration 문자열 또는 숫자를 지원합니다.
+     */
+    private fun parseDurationToSeconds(
+        durationValue: Any?,
+        startTime: OffsetDateTime,
+        endTime: OffsetDateTime
+    ): Int? {
+        return when (durationValue) {
+            is Number -> durationValue.toInt()
+            is String -> {
+                try {
+                    java.time.Duration.parse(durationValue).seconds.toInt()
+                } catch (e: Exception) {
+                    java.time.Duration.between(startTime, endTime).seconds.toInt()
+                }
+            }
+            else -> {
+                java.time.Duration.between(startTime, endTime).seconds.toInt()
+            }
+        }
     }
 
     /**

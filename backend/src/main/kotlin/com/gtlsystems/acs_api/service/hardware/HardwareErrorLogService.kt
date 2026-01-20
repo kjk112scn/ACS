@@ -2,6 +2,8 @@ package com.gtlsystems.acs_api.service.hardware
 
 import com.gtlsystems.acs_api.tracking.entity.HardwareErrorLogEntity
 import com.gtlsystems.acs_api.tracking.repository.HardwareErrorLogRepository
+import com.gtlsystems.acs_api.service.datastore.DataStoreService
+import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.annotation.PostConstruct
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -22,9 +24,11 @@ import com.gtlsystems.acs_api.model.PushData
  */
 @Service
 class HardwareErrorLogService(
-    private val hardwareErrorLogRepository: HardwareErrorLogRepository?
+    private val hardwareErrorLogRepository: HardwareErrorLogRepository?,
+    private val dataStoreService: DataStoreService  // ✅ 시스템 연계용
 ) {
     private val logger: Logger = LoggerFactory.getLogger(HardwareErrorLogService::class.java)
+    private val objectMapper = ObjectMapper()  // ✅ raw_data JSON 직렬화용
 
     /**
      * 서버 시작 시 DB에서 최근 에러 로그를 로드합니다
@@ -63,27 +67,48 @@ class HardwareErrorLogService(
     
     /**
      * 안테나 데이터를 처리하여 에러 변화를 감지합니다
+     *
+     * UDP로 수신된 ICD 데이터의 에러 비트들을 분석하여:
+     * 1. BE 시작 직후 첫 수신 → 기존 에러 상태 감지 (isInitialError = true)
+     * 2. 이후 비트 변화 → 새 에러 발생/해결 감지 (isInitialError = false)
+     *
+     * @param data UDP로 수신된 ICD 데이터 (각종 비트 상태 포함)
+     * @return ErrorUpdateResult 에러 변화 결과 (새 에러 목록, 상태 변화 여부)
      */
     fun processAntennaData(data: PushData.ReadData): ErrorUpdateResult {
         val newErrors = mutableListOf<HardwareErrorLog>()
         var hasStateChanged = false
-        
+
+        // ========================================
+        // 시스템 연계 정보 수집
+        // ========================================
+        // correlationId: 동일 UDP 패킷에서 발생한 에러들을 그룹화
+        //   - 예: 서보 알람 발생 시 여러 비트가 동시에 변경될 수 있음
+        //   - 2개 이상 에러 발생 시에만 의미 있음 (단독 에러는 null로 설정)
+        val correlationId = UUID.randomUUID()
+
+        // trackingMode: 에러 발생 시점의 추적 모드
+        //   - "ephemeris": 위성 궤도 추적 중
+        //   - "passSchedule": 패스 스케줄 실행 중
+        //   - "sunTrack": 태양 추적 중
+        //   - null: 대기 상태 (Standby)
+        val trackingMode = dataStoreService.getActiveTrackingMode()
+
         try {
-            // 🔍 디버깅: Elevation 관련 비트 값 상세 로그
-            // logger.info("🔍 [DEBUG] elevationBoardServoStatusBits: '{}' (길이: {})", 
-            //     data.elevationBoardServoStatusBits, data.elevationBoardServoStatusBits?.length ?: 0)
-            // logger.info("🔍 [DEBUG] elevationBoardStatusBits: '{}' (길이: {})", 
-            //     data.elevationBoardStatusBits, data.elevationBoardStatusBits?.length ?: 0)
-            
-            // 비트 타입들 정의
+            // ========================================
+            // ICD 에러 비트 타입 목록
+            // ========================================
+            // 각 보드(Main, Azimuth, Elevation, Train, Feed)의 상태 비트들
+            // 각 비트는 8비트 문자열 (예: "00100000")로 표현되며,
+            // 각 위치의 비트가 특정 에러/상태를 나타냄
             val bitTypes = listOf(
                 "mainBoardProtocolStatusBits",
-                "mainBoardStatusBits", 
+                "mainBoardStatusBits",
                 "mainBoardMCOnOffBits",
                 "mainBoardReserveBits",
                 "azimuthBoardServoStatusBits",
                 "azimuthBoardStatusBits",
-                "elevationBoardServoStatusBits", 
+                "elevationBoardServoStatusBits",
                 "elevationBoardStatusBits",
                 "trainBoardServoStatusBits",
                 "trainBoardStatusBits",
@@ -92,7 +117,7 @@ class HardwareErrorLogService(
                 "feedXBoardStatusBits",
                 "feedKaBoardStatusBits"
             )
-            
+
             // 각 비트 타입별로 처리
             bitTypes.forEach { bitType ->
                 val currentBits = getBitString(data, bitType)
@@ -105,7 +130,9 @@ class HardwareErrorLogService(
                         previousBitStates[bitType] = currentBits
 
                         // 초기 상태에서 에러 비트가 활성화되어 있는지 확인
-                        val initialErrors = analyzeInitialErrors(currentBits, bitType)
+                        val initialErrors = analyzeInitialErrors(
+                            currentBits, bitType, data, correlationId, trackingMode
+                        )
                         if (initialErrors.isNotEmpty()) {
                             newErrors.addAll(initialErrors)
                             hasStateChanged = true
@@ -116,21 +143,28 @@ class HardwareErrorLogService(
                         // 기존 로직: 비트 변화 감지
                         logger.info("🔍 비트 변화 감지: {} - 이전: {}, 현재: {}", bitType, previousBits, currentBits)
 
-                        val errors = analyzeBitChanges(currentBits, previousBits, bitType)
+                        val errors = analyzeBitChanges(
+                            currentBits, previousBits, bitType, data, correlationId, trackingMode
+                        )
                         newErrors.addAll(errors)
                         hasStateChanged = true
                         previousBitStates[bitType] = currentBits
                     }
                 }
             }
-            
+
         } catch (e: Exception) {
             logger.error("❌ 에러 처리 중 오류 발생: {}", e.message, e)
         }
-        
+
+        // ✅ 단독 에러는 correlation_id null (2개 이상일 때만 의미 있음)
+        if (newErrors.size < 2) {
+            newErrors.forEach { it.correlationId = null }
+        }
+
         // 에러 로그 추가
         newErrors.forEach { addErrorLog(it) }
-        
+
         return ErrorUpdateResult(
             hasStateChanged = hasStateChanged,
             newErrors = newErrors,
@@ -164,41 +198,57 @@ class HardwareErrorLogService(
     /**
      * 비트 변화를 분석하여 에러 로그를 생성합니다
      */
-    private fun analyzeBitChanges(currentBits: String, previousBits: String, bitType: String): List<HardwareErrorLog> {
+    private fun analyzeBitChanges(
+        currentBits: String,
+        previousBits: String,
+        bitType: String,
+        fullData: PushData.ReadData,
+        correlationId: UUID,
+        trackingMode: String?
+    ): List<HardwareErrorLog> {
         val errors = mutableListOf<HardwareErrorLog>()
         val errorMappings = getErrorMappings(bitType)
-        
+
         // ✅ 비트 문자열을 뒤집어서 icdStore.ts와 동일한 방식으로 처리
         val reversedCurrentBits = currentBits.padStart(8, '0').reversed()
         val reversedPreviousBits = previousBits.padStart(8, '0').reversed()
-        
+
         for (bitPosition in 0 until minOf(reversedCurrentBits.length, reversedPreviousBits.length, 8)) {
             val currentBit = reversedCurrentBits.getOrNull(bitPosition)?.toString() ?: "0"
             val previousBit = reversedPreviousBits.getOrNull(bitPosition)?.toString() ?: "0"
-            
+
             logger.info("🔍 비트 {}: 현재={}, 이전={}, 변화={}", bitPosition, currentBit, previousBit, currentBit != previousBit)
-            
+
             // 비트 변화 감지
             if (currentBit != previousBit) {
                 val errorConfig = errorMappings[bitPosition]
                 if (errorConfig != null) {
-                val error = HardwareErrorLog(
-                    id = "${bitType}-${bitPosition}-${System.currentTimeMillis()}",
-                    timestamp = LocalDateTime.now().toString(),
-                    category = errorConfig.category,
-                    severity = if (currentBit == "1") errorConfig.severity else "INFO",
-                    errorKey = errorConfig.errorKey,  // ✅ 에러 키만 저장
-                    component = errorConfig.component,
-                    isResolved = currentBit == "0",
-                    resolvedAt = if (currentBit == "0") LocalDateTime.now().toString() else null
-                    // message, resolvedMessage 제거 - 프론트엔드에서 처리
-                )
-                errors.add(error)
-                logger.info("📝 에러 생성: {} - {}", errorConfig.component, errorConfig.errorKey)
+                    // ✅ raw_data JSON 생성
+                    val rawData = buildRawDataJson(
+                        bitType, currentBits, previousBits, bitPosition,
+                        previousBit, currentBit, fullData
+                    )
+
+                    val error = HardwareErrorLog(
+                        id = "${bitType}-${bitPosition}-${System.currentTimeMillis()}",
+                        timestamp = LocalDateTime.now().toString(),
+                        category = errorConfig.category,
+                        severity = if (currentBit == "1") errorConfig.severity else "INFO",
+                        errorKey = errorConfig.errorKey,
+                        component = errorConfig.component,
+                        isResolved = currentBit == "0",
+                        resolvedAt = if (currentBit == "0") LocalDateTime.now().toString() else null,
+                        isInitialError = false,
+                        rawData = rawData,
+                        correlationId = correlationId,
+                        trackingMode = trackingMode
+                    )
+                    errors.add(error)
+                    logger.info("📝 에러 생성: {} - {}", errorConfig.component, errorConfig.errorKey)
                 }
             }
         }
-        
+
         logger.info("🔍 총 에러 개수: {}", errors.size)
         return errors
     }
@@ -208,7 +258,13 @@ class HardwareErrorLogService(
      * - 첫 번째 UDP 수신 시 에러 비트가 1인 경우 감지
      * - isInitialError = true로 마킹
      */
-    private fun analyzeInitialErrors(currentBits: String, bitType: String): List<HardwareErrorLog> {
+    private fun analyzeInitialErrors(
+        currentBits: String,
+        bitType: String,
+        fullData: PushData.ReadData,
+        correlationId: UUID,
+        trackingMode: String?
+    ): List<HardwareErrorLog> {
         val errors = mutableListOf<HardwareErrorLog>()
         val errorMappings = getErrorMappings(bitType)
 
@@ -222,6 +278,12 @@ class HardwareErrorLogService(
             if (bitValue == "1") {
                 val errorConfig = errorMappings[bitPosition]
                 if (errorConfig != null) {
+                    // ✅ raw_data JSON 생성 (초기 에러는 previousBits가 없음)
+                    val rawData = buildRawDataJson(
+                        bitType, currentBits, null, bitPosition,
+                        null, bitValue, fullData
+                    )
+
                     val error = HardwareErrorLog(
                         id = "initial-${bitType}-${bitPosition}-${System.currentTimeMillis()}",
                         timestamp = LocalDateTime.now().toString(),
@@ -231,7 +293,10 @@ class HardwareErrorLogService(
                         component = errorConfig.component,
                         isResolved = false,
                         resolvedAt = null,
-                        isInitialError = true  // ✅ 초기 에러 마킹
+                        isInitialError = true,
+                        rawData = rawData,
+                        correlationId = correlationId,
+                        trackingMode = trackingMode
                     )
                     errors.add(error)
                     logger.info("📍 초기 에러 감지: {} - {} (bit {})", errorConfig.component, errorConfig.errorKey, bitPosition)
@@ -240,6 +305,40 @@ class HardwareErrorLogService(
         }
 
         return errors
+    }
+
+    /**
+     * ✅ raw_data JSON 생성
+     * 에러 발생 시점의 비트 데이터와 안테나 상태를 JSON으로 저장
+     */
+    private fun buildRawDataJson(
+        bitType: String,
+        currentBits: String,
+        previousBits: String?,
+        changedPosition: Int,
+        previousBit: String?,
+        currentBit: String,
+        fullData: PushData.ReadData
+    ): String? {
+        return try {
+            val rawDataMap = mapOf(
+                "version" to "1.0",
+                "bitType" to bitType,
+                "currentBits" to currentBits,
+                "previousBits" to previousBits,
+                "changedPosition" to changedPosition,
+                "changeType" to "${previousBit ?: "?"}→$currentBit",
+                "antennaState" to mapOf(
+                    "azimuth" to fullData.azimuthAngle,
+                    "elevation" to fullData.elevationAngle,
+                    "train" to fullData.trainAngle
+                )
+            )
+            objectMapper.writeValueAsString(rawDataMap)
+        } catch (e: Exception) {
+            logger.error("❌ raw_data JSON 생성 실패: ${e.message}", e)
+            null
+        }
     }
 
     /**
@@ -447,10 +546,11 @@ class HardwareErrorLogService(
             source = source,
             axis = axis,
             severity = error.severity,
-            trackingMode = null,  // 추적 모드 정보 없음
-            sessionId = null,
-            rawData = null,
-            correlationId = null,
+            // ✅ 시스템 연계 필드 매핑
+            trackingMode = error.trackingMode,
+            sessionId = null,  // 보류: 복잡도 높음
+            rawData = error.rawData,
+            correlationId = error.correlationId,
             occurrenceCount = 1,
             resolved = error.isResolved,
             resolvedAt = resolvedAt,
@@ -487,7 +587,12 @@ class HardwareErrorLogService(
             errorKey = entity.errorCode,
             component = entity.source,
             isResolved = entity.resolved,
-            resolvedAt = entity.resolvedAt?.toLocalDateTime()?.toString()
+            resolvedAt = entity.resolvedAt?.toLocalDateTime()?.toString(),
+            isInitialError = entity.isInitialError,
+            // ✅ 시스템 연계 필드 로드
+            rawData = entity.rawData,
+            correlationId = entity.correlationId,
+            trackingMode = entity.trackingMode
         )
     }
 
@@ -786,7 +891,11 @@ data class HardwareErrorLog(
     val component: String,
     val isResolved: Boolean,
     val resolvedAt: String?,
-    val isInitialError: Boolean = false  // ✅ 초기 에러 구분 (BE 시작 시 감지된 에러)
+    val isInitialError: Boolean = false,  // ✅ 초기 에러 구분 (BE 시작 시 감지된 에러)
+    // ✅ 시스템 연계 필드
+    val rawData: String? = null,           // 에러 발생 시 비트 데이터 JSON
+    var correlationId: UUID? = null,       // 동시 발생 에러 그룹 (var: 단독 에러 시 null로 변경)
+    val trackingMode: String? = null       // 에러 발생 시 추적 모드
 )
 
 /**

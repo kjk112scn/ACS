@@ -28,12 +28,14 @@ class HardwareErrorLogRepository(
                 timestamp, error_code, error_type, error_message,
                 source, axis, severity, tracking_mode, session_id,
                 raw_data, correlation_id, occurrence_count,
-                resolved, resolved_at, resolved_by, resolution_note
+                resolved, resolved_at, resolved_by, resolution_note,
+                is_initial_error
             ) VALUES (
                 :timestamp, :errorCode, :errorType, :errorMessage,
                 :source, :axis, :severity, :trackingMode, :sessionId,
                 :rawData::jsonb, :correlationId, :occurrenceCount,
-                :resolved, :resolvedAt, :resolvedBy, :resolutionNote
+                :resolved, :resolvedAt, :resolvedBy, :resolutionNote,
+                :isInitialError
             )
         """.trimIndent())
             .bind("timestamp", entity.timestamp)
@@ -52,6 +54,7 @@ class HardwareErrorLogRepository(
             .bindNullable("resolvedAt", entity.resolvedAt)
             .bindNullable("resolvedBy", entity.resolvedBy)
             .bindNullable("resolutionNote", entity.resolutionNote)
+            .bind("isInitialError", entity.isInitialError)
             .then()
     }
 
@@ -237,6 +240,13 @@ class HardwareErrorLogRepository(
     // ==================== 매핑 ====================
 
     private fun mapRowToEntity(row: io.r2dbc.spi.Row): HardwareErrorLogEntity {
+        // ✅ session_id null 안전 처리 (R2DBC Long::class.java는 primitive로 처리되어 null 불가)
+        val sessionIdValue: Long? = try {
+            row.get("session_id", java.lang.Long::class.java)?.toLong()
+        } catch (e: Exception) {
+            null
+        }
+
         return HardwareErrorLogEntity(
             timestamp = row.get("timestamp", OffsetDateTime::class.java)!!,
             errorCode = row.get("error_code", String::class.java)!!,
@@ -246,14 +256,15 @@ class HardwareErrorLogRepository(
             axis = row.get("axis", String::class.java),
             severity = row.get("severity", String::class.java)!!,
             trackingMode = row.get("tracking_mode", String::class.java),
-            sessionId = row.get("session_id", Long::class.java),
+            sessionId = sessionIdValue,
             rawData = row.get("raw_data", String::class.java),
             correlationId = row.get("correlation_id", UUID::class.java),
             occurrenceCount = row.get("occurrence_count", Int::class.java) ?: 1,
             resolved = row.get("resolved", Boolean::class.java) ?: false,
             resolvedAt = row.get("resolved_at", OffsetDateTime::class.java),
             resolvedBy = row.get("resolved_by", String::class.java),
-            resolutionNote = row.get("resolution_note", String::class.java)
+            resolutionNote = row.get("resolution_note", String::class.java),
+            isInitialError = row.get("is_initial_error", Boolean::class.java) ?: false
         )
     }
 

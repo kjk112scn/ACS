@@ -6,6 +6,26 @@
 
 ---
 
+## [2026-01-20] - DB 데이터 품질 개선
+
+### Fixed
+- tracking_session 테이블 빈 컬럼 문제 해결 (키 이름 불일치)
+- HW 에러 로깅에 컨텍스트 정보 추가 (tracking_mode, correlation_id, raw_data)
+
+### Added
+- V003 DB 코멘트 마이그레이션 (테이블/컬럼 설명)
+- FlywayConfig 컴포넌트 분리
+
+### Why
+- MST 데이터 키 이름(SatelliteID)과 Repository 매핑(SatelliteId) 불일치로 null 저장됨
+- HW 에러 발생 시 어떤 모드에서 발생했는지 추적 불가
+
+### Details
+- [Tracking_Session_Data_Enrichment](docs/work/active/Tracking_Session_Data_Enrichment/README.md)
+- [HW_Error_System_Integration](docs/work/active/HW_Error_System_Integration/README.md)
+
+---
+
 ## [2026-01-20] - DB 스키마 재설계 + ICD 저장 로직
 
 ### Changed

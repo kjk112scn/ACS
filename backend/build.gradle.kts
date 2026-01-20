@@ -87,6 +87,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-r2dbc")
     implementation("org.postgresql:r2dbc-postgresql:1.0.7.RELEASE")
 
+    // Flyway (스키마 마이그레이션 - 서버 시작 시 1회)
+    implementation("org.flywaydb:flyway-core")
+    implementation("org.flywaydb:flyway-database-postgresql")
+
 }
 
 kotlin {
