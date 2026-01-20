@@ -118,6 +118,7 @@ import { T } from '@/texts'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 import type { HardwareErrorLog } from '@/types/hardwareError'
 import { getApiBaseUrl } from '@/utils/api-config'
+import { formatToUserTimezone } from '@/utils/times'
 
 const hardwareErrorLogStore = useHardwareErrorLogStore()
 const { initializeTheme } = useTheme()
@@ -619,17 +620,9 @@ const getStatusChipLabel = (severity: string, isResolved: boolean) => {
   return `${severityText} ${statusText}`
 }
 
-// ✅ 시간 포맷팅
+// ✅ 시간 포맷팅 (사용자 timezone 사용)
 const formatTimestamp = (timestamp: string) => {
-  return new Date(timestamp).toLocaleString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true
-  })
+  return formatToUserTimezone(timestamp)
 }
 
 // 컴포넌트 마운트 시 기본 필터 설정

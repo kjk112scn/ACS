@@ -92,10 +92,12 @@ import { useQuasar } from 'quasar'
 import { useICDStore } from '@/stores/icd/icdStore' // ICD Store import 추가
 //import HardwareErrorLogPanel from '@/components/HardwareErrorLogPanel.vue'
 import { useHardwareErrorLogStore } from '@/stores/hardwareErrorLogStore'
+import { useTimezoneStore } from '@/stores/common/timezoneStore'
 
 const $q = useQuasar()
 const icdStore = useICDStore() // Store 사용
 const hardwareErrorLogStore = useHardwareErrorLogStore()
+const timezoneStore = useTimezoneStore()
 
 // UTC 시간 표시용 computed (24시간 형식) - Local 시간 기준으로 실시간 업데이트
 const displayUTCTime = computed(() => {
@@ -116,23 +118,48 @@ const displayUTCTime = computed(() => {
   return `${year}. ${month}. ${day}. ${hours}:${minutes}:${seconds}.${milliseconds} UTC`
 })
 
-// 로컬 시간 표시용 computed (24시간 형식, ms 포함) - ICD Store 서버 시간 사용
+// 로컬 시간 표시용 computed (24시간 형식, ms 포함) - 사용자 timezone 사용
 const displayLocalTime = computed(() => {
   if (!icdStore.serverTime) {
     return '서버 시간 대기 중...'
   }
 
-  // ICD Store에서 가져온 서버 시간을 로컬 시간으로 변환
+  // ICD Store에서 가져온 서버 시간을 사용자 timezone으로 변환
   const serverTime = new Date(icdStore.serverTime)
-  const year = serverTime.getFullYear()
-  const month = String(serverTime.getMonth() + 1).padStart(2, '0')
-  const day = String(serverTime.getDate()).padStart(2, '0')
-  const hours = String(serverTime.getHours()).padStart(2, '0')
-  const minutes = String(serverTime.getMinutes()).padStart(2, '0')
-  const seconds = String(serverTime.getSeconds()).padStart(2, '0')
-  const milliseconds = String(serverTime.getMilliseconds()).padStart(3, '0')
+  const tz = timezoneStore.currentTimezone
 
-  return `${year}. ${month}. ${day}. ${hours}:${minutes}:${seconds}.${milliseconds} KST`
+  try {
+    const options: Intl.DateTimeFormatOptions = {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }
+    const parts = new Intl.DateTimeFormat('en-CA', options).formatToParts(serverTime)
+    const get = (type: string) => parts.find(p => p.type === type)?.value || '00'
+
+    // 밀리초는 원본 Date에서 추출
+    const milliseconds = String(serverTime.getMilliseconds()).padStart(3, '0')
+
+    // timezone 약어 가져오기
+    const tzAbbr = timezoneStore.currentOffset
+
+    return `${get('year')}. ${get('month')}. ${get('day')}. ${get('hour')}:${get('minute')}:${get('second')}.${milliseconds} ${tzAbbr}`
+  } catch {
+    // 폴백: 기본 로컬 시간
+    const year = serverTime.getFullYear()
+    const month = String(serverTime.getMonth() + 1).padStart(2, '0')
+    const day = String(serverTime.getDate()).padStart(2, '0')
+    const hours = String(serverTime.getHours()).padStart(2, '0')
+    const minutes = String(serverTime.getMinutes()).padStart(2, '0')
+    const seconds = String(serverTime.getSeconds()).padStart(2, '0')
+    const ms = String(serverTime.getMilliseconds()).padStart(3, '0')
+    return `${year}. ${month}. ${day}. ${hours}:${minutes}:${seconds}.${ms}`
+  }
 })
 
 // 에러 상태 관련 computed 속성들

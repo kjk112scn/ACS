@@ -1,9 +1,71 @@
 /**
  * 날짜/시간 관련 유틸리티 함수들
+ *
+ * Timezone 정책 (ADR-006):
+ * - 내부 처리: UTC
+ * - 사용자 표시: timezoneStore의 currentTimezone 사용
+ * - 폴백: 브라우저 감지 timezone
  */
 
 /**
+ * 현재 설정된 timezone 가져오기
+ * 주의: Pinia store 외부에서 사용 시 폴백 적용
+ */
+export const getCurrentTimezone = (): string => {
+  try {
+    // localStorage에서 직접 읽기 (store 순환 참조 방지)
+    const autoDetect = localStorage.getItem('timezoneAutoDetect')
+    if (autoDetect !== 'false') {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone
+    }
+    return localStorage.getItem('userTimezone') || Intl.DateTimeFormat().resolvedOptions().timeZone
+  } catch {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone
+  }
+}
+
+/**
+ * 사용자 timezone으로 포맷팅
+ */
+export const formatToUserTimezone = (dateString: string, includeMs = false): string => {
+  try {
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) {
+      return `원시 데이터: ${dateString}`
+    }
+
+    const tz = getCurrentTimezone()
+    const options: Intl.DateTimeFormatOptions = {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }
+
+    // ISO 형식으로 정리 (YYYY-MM-DD HH:mm:ss)
+    const parts = new Intl.DateTimeFormat('en-CA', options).formatToParts(date)
+    const get = (type: string) => parts.find(p => p.type === type)?.value || '00'
+
+    let result = `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`
+    if (includeMs) {
+      // 밀리초는 원본 Date에서 추출
+      const ms = String(date.getMilliseconds()).padStart(3, '0')
+      result += `.${ms}`
+    }
+    return result
+  } catch (error) {
+    console.error('사용자 timezone 포맷팅 오류:', error)
+    return dateString
+  }
+}
+
+/**
  * 로컬 시간으로 포맷팅 (밀리초 포함)
+ * @deprecated formatToUserTimezone 사용 권장
  */
 export const formatToLocalTime = (dateString: string): string => {
   try {
@@ -93,14 +155,15 @@ export const formatToUTC = (dateString: string): string => {
 }
 
 /**
- * 시간대 정보와 함께 포맷팅
+ * 시간대 정보와 함께 포맷팅 (사용자 설정 timezone 사용)
  */
 export const formatWithTimezone = (dateString: string): string => {
   try {
     const date = new Date(dateString)
+    const tz = getCurrentTimezone()
 
     return new Intl.DateTimeFormat('ko-KR', {
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timeZone: tz,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',

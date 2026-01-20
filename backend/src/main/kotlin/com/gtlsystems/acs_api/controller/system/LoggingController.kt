@@ -105,7 +105,7 @@ class LoggingController(
                                 fileSize = file.length(),
                                 lastModified = LocalDateTime.ofInstant(
                                     Files.getLastModifiedTime(path).toInstant(),
-                                    java.time.ZoneId.systemDefault()
+                                    java.time.ZoneOffset.UTC
                                 ),
                                 fileType = "MAIN"
                             )
@@ -126,7 +126,7 @@ class LoggingController(
                                 fileSize = file.length(),
                                 lastModified = LocalDateTime.ofInstant(
                                     Files.getLastModifiedTime(path).toInstant(),
-                                    java.time.ZoneId.systemDefault()
+                                    java.time.ZoneOffset.UTC
                                 ),
                                 fileType = "ARCHIVE"
                             )

@@ -18,15 +18,34 @@ object GlobalData {
      * resultServerTime: 최종 서버 시간 (UTC)
      */
     object Time {
+        /**
+         * 현재 UTC 시간 - 알고리즘 계산용 (필수 UTC)
+         */
         val utcNow: ZonedDateTime
             get() = ZonedDateTime.now(ZoneOffset.UTC)
 
+        /**
+         * 현재 로컬 시간 - 서버 로그/디버깅용
+         * 주의: 알고리즘 계산에는 utcNow 사용
+         */
         val localNow: LocalDateTime
             get() = LocalDateTime.now()
+
+        /**
+         * 시스템 기본 timezone (서버 설치 환경)
+         * 주의: 사용자 표시용은 Frontend에서 처리
+         */
         val systemTimeZone: ZoneId = ZoneId.systemDefault()
 
-        @Volatile var serverTimeZone: ZoneId  = systemTimeZone
+        /**
+         * 서버 표시용 timezone (로그, 관리 콘솔)
+         * TODO: 향후 설정에서 로드하도록 개선 가능
+         */
+        @Volatile var serverTimeZone: ZoneId = systemTimeZone
 
+        /**
+         * @deprecated 사용자 timezone은 Frontend에서 관리
+         */
         @Volatile var clientTimeZone: ZoneId = systemTimeZone
         /**
          * 현재 로컬 시간을 출력함.

@@ -264,12 +264,11 @@ class SunTrackService(
             val sunriseTime = sunriseInfo["time"] as String
             val sunsetTime = sunsetInfo["time"] as String
             
-            // ✅ UTC → KST 변환 함수
-            fun utcToKst(utcTimeStr: String): String {
+            // ✅ UTC 시간 포맷 함수 (Frontend에서 사용자 timezone으로 변환)
+            fun formatUtcTime(utcTimeStr: String): String {
                 val utcDateTime = LocalDateTime.parse(utcTimeStr)
-                val kstDateTime = utcDateTime.atZone(ZoneOffset.UTC)
-                    .withZoneSameInstant(java.time.ZoneId.of("Asia/Seoul"))
-                return kstDateTime.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                return utcDateTime.atZone(ZoneOffset.UTC)
+                    .format(java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME)
             }
             
             // ✅ 실제 정오 시간 계산 (현지 12:00 기준)
@@ -297,18 +296,15 @@ class SunTrackService(
             }
             
             logger.info("🌅 단순화된 Train 각도 계산 완료:")
-            logger.info("  📍 일출: {}° (UTC: {} | KST: {})", 
-                String.format("%.3f", sunriseAzimuth), 
-                sunriseTime, 
-                utcToKst(sunriseTime))
-            logger.info("  📍 일몰: {}° (UTC: {} | KST: {})", 
-                String.format("%.3f", sunsetAzimuth), 
-                sunsetTime, 
-                utcToKst(sunsetTime))
-            logger.info("  📍 정오: {}° (UTC: {} | KST: {})", 
-                String.format("%.3f", noonAzimuth), 
-                utcNoon.toString(), 
-                utcToKst(utcNoon.toString()))
+            logger.info("  📍 일출: {}° (UTC: {})",
+                String.format("%.3f", sunriseAzimuth),
+                formatUtcTime(sunriseTime))
+            logger.info("  📍 일몰: {}° (UTC: {})",
+                String.format("%.3f", sunsetAzimuth),
+                formatUtcTime(sunsetTime))
+            logger.info("  📍 정오: {}° (UTC: {})",
+                String.format("%.3f", noonAzimuth),
+                formatUtcTime(utcNoon.toString()))
             logger.info("  🎯 경로: {} → Train 각도: {}°", pathType, String.format("%.3f", trainAngle))
             
             return TrainAngleResult(trainAngle, "단순화 로직 ($pathType)")
@@ -597,7 +593,7 @@ class SunTrackService(
 
             // 5단계: 명령 전송
             val commandStart = System.currentTimeMillis()
-            // 🔧 FIX: multiManualCommand에서 Offset을 적용하므로 원본값 전달
+            // 🔧 FIX: multiManualCommand���서 Offset을 적용하므로 원본값 전달
             // multiManualCommand가 CMD.cmdTrainAngle = trainAngle + Offset 으로 설정함
             sendAzimuthAndElevationAxisCommand(
                 pathAdjustedAzimuth.toFloat(),

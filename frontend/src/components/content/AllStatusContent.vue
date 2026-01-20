@@ -1092,6 +1092,7 @@ import { storeToRefs } from 'pinia'
 import { useSharedICDStore } from '../../composables/useSharedStore'
 import { closeWindow } from '../../utils/windowUtils'
 import { useFeedSettingsStore } from '@/stores/ui/feedSettingsStore'
+import { formatToUserTimezone } from '@/utils/times'
 
 const icdStore = useSharedICDStore()
 const feedSettingsStore = useFeedSettingsStore()
@@ -1479,8 +1480,8 @@ const isPopupWindow = computed(() => window.opener !== null)
 // 표시 모드
 const displayMode = computed(() => (isPopupWindow.value ? '팝업 창 모드' : '모달 모드'))
 
-// 마지막 업데이트 시간
-const lastUpdateTime = ref(new Date().toLocaleTimeString())
+// 마지막 업데이트 시간 (사용자 timezone 적용)
+const lastUpdateTime = ref(formatToUserTimezone(new Date().toISOString()).split(' ')[1] || '')
 
 // 🚪 범용 닫기 함수
 const handleClose = () => {
@@ -1570,7 +1571,7 @@ const handleKeydown = (event: KeyboardEvent) => {
 // 🔄 새로고침 함수
 const refreshStatus = () => {
   console.log('🔄 상태 새로고침')
-  lastUpdateTime.value = new Date().toLocaleTimeString()
+  lastUpdateTime.value = formatToUserTimezone(new Date().toISOString()).split(' ')[1] || ''
 
   // 팝업 창인 경우 제목 업데이트
   if (isPopupWindow.value) {

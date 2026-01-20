@@ -8,7 +8,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.server.ServerWebExchange
 import reactor.core.publisher.Mono
-import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 
 @ControllerAdvice
 class GlobalExceptionHandler {
@@ -20,7 +21,7 @@ class GlobalExceptionHandler {
         logger.error("요청 처리 중 오류 발생: ${ex.message}", ex)
 
         val errorDetails = mapOf(
-            "timestamp" to LocalDateTime.now().toString(),
+            "timestamp" to OffsetDateTime.now(ZoneOffset.UTC).toString(),
             "path" to exchange.request.path.value(),
             "status" to HttpStatus.INTERNAL_SERVER_ERROR.value(),
             "error" to HttpStatus.INTERNAL_SERVER_ERROR.reasonPhrase,
@@ -40,7 +41,7 @@ class GlobalExceptionHandler {
 
         // Spring Boot 3.x 버전용 코드
         val errorDetails = mapOf(
-            "timestamp" to LocalDateTime.now().toString(),
+            "timestamp" to OffsetDateTime.now(ZoneOffset.UTC).toString(),
             "path" to exchange.request.path.value(),
             "status" to ex.statusCode.value(),
             "error" to ex.statusCode.toString(),
@@ -61,7 +62,7 @@ class GlobalExceptionHandler {
         logger.error("HTTP 상태 오류: ${ex.status} - ${ex.reason}", ex)
 
         val errorDetails = mapOf(
-            "timestamp" to LocalDateTime.now().toString(),
+            "timestamp" to OffsetDateTime.now(ZoneOffset.UTC).toString(),
             "path" to exchange.request.path.value(),
             "status" to ex.status.value(),
             "error" to ex.status.reasonPhrase,

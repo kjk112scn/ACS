@@ -8,7 +8,61 @@
 
 ## 🚧 진행 중 작업
 
-### 1. Architecture Refactoring (70%)
+### 1. Timezone_Handling_Standardization (95%) ⭐ 오늘 작업
+- **상태:** 구현 완료, 수동 테스트 대기
+- **문서:** `docs/work/active/Timezone_Handling_Standardization/`
+- **ADR:** ADR-006-timezone-handling-architecture.md
+- **내일 할 일:** 다양한 timezone 선택 후 시간 표시 확인
+
+| 영역 | 상태 | 변경 내용 |
+|------|:----:|----------|
+| BE 하드코딩 제거 | ✅ | SunTrackService, GlobalExceptionHandler 등 5개 파일 |
+| FE 인프라 | ✅ | timezoneStore, useTimezone composable 신규 |
+| FE 하드코딩 수정 | ✅ | MainLayout, HardwareErrorLogPanel 등 4개 파일 |
+| 설정 UI | ✅ | GeneralSettings에 timezone 설정 추가 |
+| 빌드 검증 | ✅ | FE/BE 모두 성공 |
+| 수동 테스트 | ⏳ | 다양한 timezone 선택 테스트 필요 |
+
+**핵심 변경:**
+- 사용자가 설정 > 일반 설정에서 timezone 선택 가능
+- 자동 감지 (브라우저) / 수동 선택 (IANA timezone) 지원
+- 폐쇄망 환경에서도 동작 (브라우저 내장 Intl API)
+
+---
+
+### 2. HW_Error_System_Integration (90%)
+- **상태:** 구현 완료, DB 테스트 대기
+- **문서:** `docs/work/active/HW_Error_System_Integration/`
+- **내일 할 일:** BE 재시작 → 에러 발생 → DB 저장 검증
+
+| 컬럼 | 상태 | 설명 |
+|------|:----:|------|
+| tracking_mode | ✅ | 에러 발생 시 추적 모드 저장 |
+| correlation_id | ✅ | 동시 에러 그룹화 UUID |
+| raw_data | ✅ | 비트 데이터 JSON |
+| session_id | ⏸️ | 보류 (복잡도 높음) |
+
+### 3. Tracking_Session_Data_Enrichment (90%) ✅
+- **상태:** 구현 완료, BE 재시작 후 DB 검증 필요
+- **문서:** `docs/work/active/Tracking_Session_Data_Enrichment/`
+- **근본 원인:** 키 이름 불일치 (SatelliteID vs SatelliteId 등)
+
+| 컬럼 | 수정 내용 |
+|------|----------|
+| satellite_id | ✅ SatelliteID/SatelliteId 양쪽 지원 |
+| duration | ✅ ISO String 파싱 + 시간차 계산 |
+| max_azimuth_rate | ✅ MaxAzRate/MaxAzimuthRate 양쪽 지원 |
+| max_elevation_rate | ✅ MaxElRate/MaxElevationRate 양쪽 지원 |
+| total_points | ✅ DTL 개수 폴백 추가 |
+
+### 4. V003 DB 코멘트 마이그레이션
+- **상태:** 파일 생성 완료, Flyway 적용 대기
+- **파일:** `V003__Add_table_column_comments.sql`
+- **내일 할 일:** BE 재시작 시 자동 적용 확인
+
+---
+
+### 5. Architecture Refactoring (70%)
 - **상태:** BE/FE/CSS 완료, PassSchedule 88%, DB 테스트 대기
 - **문서:** `docs/work/active/Architecture_Refactoring/`
 
@@ -21,7 +75,7 @@
 | PassSchedule 상태머신 | 88% | ⏳ 수동 테스트 대기 |
 | UI/UX 리팩토링 | 10% | 계획만 완료 |
 
-### 2. i18n 다국어 지원 (시스템 완료, 적용 대기)
+### 6. i18n 다국어 지원 (시스템 완료, 적용 대기)
 - **상태:** 시스템 구축 완료 (ko.ts/en.ts), 하드코딩 정리 필요
 - **남은 작업:** ~1,770개 하드코딩 → `T.xxx` 교체 (Phase 3)
 - **중요:** 교체해야 언어 전환 시 영어로 표시됨
@@ -33,6 +87,10 @@
 
 | 날짜 | 작업 | 커밋 |
 |------|------|------|
+| 2026-01-20 | Tracking_Session 키 매핑 수정 | 미커밋 |
+| 2026-01-20 | Timezone 처리 표준화 (ADR-006) | 미커밋 |
+| 2026-01-20 | HW_Error_System_Integration 구현 | 미커밋 |
+| 2026-01-20 | V003 DB 코멘트 마이그레이션 작성 | 미커밋 |
 | 2026-01-20 | DB 스키마 재설계 + ICD 저장 | 이번 커밋 |
 | 2026-01-20 | DB 테스트 성공 + i18n 3페이지 | `docs: DB 테스트 완료 및 UX 개선 계획 수립` |
 | 2026-01-20 | PassSchedule Phase A-D 구현 | `refactor(passschedule): Phase D 완료` |
