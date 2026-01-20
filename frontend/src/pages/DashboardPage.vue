@@ -737,6 +737,18 @@ onMounted(async () => {
     console.error('❌ 시스템 초기화 실패:', error)
   }
 
+  // 모드 페이지 prefetch (탭 전환 속도 개선)
+  void Promise.all([
+    import('@/pages/mode/StandbyPage.vue'),
+    import('@/pages/mode/StepPage.vue'),
+    import('@/pages/mode/SlewPage.vue'),
+    import('@/pages/mode/PedestalPositionPage.vue'),
+    import('@/pages/mode/EphemerisDesignationPage.vue'),
+    import('@/pages/mode/PassSchedulePage.vue'),
+    import('@/pages/mode/SunTrackPage.vue'),
+    import('@/pages/mode/FeedPage.vue'),
+  ])
+
   // 4. 차트 초기화 (시스템 초기화 후)
   setTimeout(() => {
     try {

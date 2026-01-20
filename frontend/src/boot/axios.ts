@@ -31,7 +31,8 @@ api.interceptors.request.use(
     config.headers['Accept-Language'] = getCurrentLanguage()
     return config
   },
-  (error) => Promise.reject(error)
+  (error: unknown) =>
+    Promise.reject(error instanceof Error ? error : new Error('Request interceptor error'))
 )
 
 // 응답 인터셉터 - 에러 처리

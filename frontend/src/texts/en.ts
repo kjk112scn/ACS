@@ -658,4 +658,31 @@ export const en: TextsType = {
       recommendedRange: 'Recommended range: 0.1° to 180°',
     },
   },
+
+  // Page-specific messages
+  pages: {
+    // Standby mode page
+    standby: {
+      standbyCommandSent: 'Standby command has been sent.',
+      allStandbyCommandSent: 'All Standby command has been sent.',
+      stowCommandSent: 'Stow command has been sent.',
+      standbyCommand: 'Standby command',
+      allStandbyCommand: 'All Standby command',
+      stowCommand: 'Stow command',
+    },
+    // Sun Track mode page
+    sunTrack: {
+      speedDescription: 'Speed values are applied when the Go button is clicked.',
+      startSuccess: 'Sun Track has been started.',
+      startCommand: 'Sun Track start',
+      stopSuccess: 'Sun Track has been stopped.',
+      stopCommand: 'Sun Track stop',
+      stowCommandSent: 'Stow command has been sent.',
+      stowCommand: 'Stow command',
+    },
+    // Login page
+    login: {
+      invalidCredentials: 'Invalid credentials.',
+    },
+  },
 } as const

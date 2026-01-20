@@ -66,7 +66,7 @@
 
                 <!-- 설명 텍스트 -->
                 <div class="speed-description-text text-caption q-mt-sm">
-                  속도 값은 Go 버튼을 클릭할 때 적용됩니다.
+                  {{ T.pages.sunTrack.speedDescription }}
                 </div>
 
                 <!-- 제어 버튼 섹션 - 공용 컴포넌트 사용 -->
@@ -95,6 +95,7 @@ import { OffsetControls, useOffsetControls } from './shared'
 import { useNotification } from '@/composables/useNotification'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 import { ControlButtonBar } from '@/components/common'
+import { T } from '@/texts'
 
 // ICD 스토어
 const icdStore = useICDStore()
@@ -134,9 +135,9 @@ const handleGoCommand = async () => {
     const interval = 1000 // 1초
 
     await icdStore.startSunTrack(interval, azimuthSpeed, elevationSpeed, trainSpeed)
-    success('Sun Track이 시작되었습니다.')
+    success(T.value.pages.sunTrack.startSuccess)
   } catch (error) {
-    handleApiError(error, 'Sun Track 시작')
+    handleApiError(error, T.value.pages.sunTrack.startCommand)
   } finally {
     isGoLoading.value = false
   }
@@ -147,9 +148,9 @@ const handleStopCommand = async () => {
   try {
     isStopLoading.value = true
     await icdStore.stopCommand(true, true, true)
-    success('Sun Track이 중지되었습니다.')
+    success(T.value.pages.sunTrack.stopSuccess)
   } catch (error) {
-    handleApiError(error, 'Sun Track 중지')
+    handleApiError(error, T.value.pages.sunTrack.stopCommand)
   } finally {
     isStopLoading.value = false
   }
@@ -160,9 +161,9 @@ const handleStowCommand = async () => {
   try {
     isStowLoading.value = true
     await icdStore.stowCommand()
-    success('Stow 명령이 전송되었습니다.')
+    success(T.value.pages.sunTrack.stowCommandSent)
   } catch (error) {
-    handleApiError(error, 'Stow 명령')
+    handleApiError(error, T.value.pages.sunTrack.stowCommand)
   } finally {
     isStowLoading.value = false
   }

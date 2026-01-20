@@ -28,6 +28,7 @@ import { useICDStore } from '../../stores/icd/icdStore'
 import { useStandbyModeStore } from '../../stores/mode/standbyStore'
 import { useNotification } from '@/composables/useNotification'
 import { useErrorHandler } from '@/composables/useErrorHandler'
+import { T } from '@/texts'
 
 // 스토어 인스턴스 생성
 const icdStore = useICDStore()
@@ -56,9 +57,9 @@ const handleStandby = async () => {
   try {
     const axes = standbyStore.selectedAxes
     await icdStore.standbyCommand(axes.azimuth, axes.elevation, axes.train)
-    success('Standby 명령이 전송되었습니다.')
+    success(T.value.pages.standby.standbyCommandSent)
   } catch (error) {
-    handleApiError(error, 'Standby 명령')
+    handleApiError(error, T.value.pages.standby.standbyCommand)
   }
 }
 
@@ -66,9 +67,9 @@ const handleStandby = async () => {
 const handleAllStandby = async () => {
   try {
     await icdStore.standbyCommand(true, true, true)
-    success('All Standby 명령이 전송되었습니다.')
+    success(T.value.pages.standby.allStandbyCommandSent)
   } catch (error) {
-    handleApiError(error, 'All Standby 명령')
+    handleApiError(error, T.value.pages.standby.allStandbyCommand)
   }
 }
 
@@ -76,9 +77,9 @@ const handleAllStandby = async () => {
 const handleStow = async () => {
   try {
     await icdStore.stowCommand()
-    success('Stow 명령이 전송되었습니다.')
+    success(T.value.pages.standby.stowCommandSent)
   } catch (error) {
-    handleApiError(error, 'Stow 명령')
+    handleApiError(error, T.value.pages.standby.stowCommand)
   }
 }
 </script>

@@ -6,6 +6,21 @@
 
 ---
 
+## [2026-01-20] - DB 테스트 및 i18n 진행
+
+### Changed
+- DB 테스트 완료 (Phase 1-2) - TimescaleDB 연결 성공
+- i18n 하드코딩 정리 (LoginPage, StandbyPage, SunTrackPage)
+
+### Why
+- with-db 프로필 실제 연동 검증 필요
+- 언어 전환 시 영어 표시 보장
+
+### Details
+- [일일 로그](docs/logs/2026-01-20.md)
+
+---
+
 ## [2026-01-20] - 작업 추적 시스템 구축
 
 ### Added

@@ -14,6 +14,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores'
+import { T } from '@/texts'
 
 const username = ref('')
 const password = ref('')
@@ -33,7 +34,7 @@ const login = () => {
       console.error('Navigation error:', err)
     })
   } else {
-    alert('Invalid credentials')
+    alert(T.value.pages.login.invalidCredentials)
   }
 }
 

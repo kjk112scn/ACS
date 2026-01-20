@@ -655,6 +655,33 @@ export const ko = {
       recommendedRange: '권장 범위: 0.1도 ~ 180도',
     },
   },
+
+  // 페이지별 메시지
+  pages: {
+    // Standby 모드 페이지
+    standby: {
+      standbyCommandSent: 'Standby 명령이 전송되었습니다.',
+      allStandbyCommandSent: 'All Standby 명령이 전송되었습니다.',
+      stowCommandSent: 'Stow 명령이 전송되었습니다.',
+      standbyCommand: 'Standby 명령',
+      allStandbyCommand: 'All Standby 명령',
+      stowCommand: 'Stow 명령',
+    },
+    // Sun Track 모드 페이지
+    sunTrack: {
+      speedDescription: '속도 값은 Go 버튼을 클릭할 때 적용됩니다.',
+      startSuccess: 'Sun Track이 시작되었습니다.',
+      startCommand: 'Sun Track 시작',
+      stopSuccess: 'Sun Track이 중지되었습니다.',
+      stopCommand: 'Sun Track 중지',
+      stowCommandSent: 'Stow 명령이 전송되었습니다.',
+      stowCommand: 'Stow 명령',
+    },
+    // 로그인 페이지
+    login: {
+      invalidCredentials: '잘못된 인증 정보입니다.',
+    },
+  },
 } as const
 
 // 문자열 리터럴을 string으로 변환하는 유틸리티 타입

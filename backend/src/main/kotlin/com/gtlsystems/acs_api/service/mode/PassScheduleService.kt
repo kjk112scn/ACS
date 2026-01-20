@@ -186,6 +186,9 @@ class PassScheduleService(
     /** 스케줄 큐 (v2.0) */
     private val scheduleContextQueue = mutableListOf<ScheduleTrackingContext>()
 
+    /** 큐 동기화 락 (C3: 동시성 개선) */
+    private val queueLock = Any()
+
     /** 타이머 카운트 (v2.0) */
     private var trackingCheckCount: Long = 0L
 
@@ -2685,37 +2688,51 @@ class PassScheduleService(
     /**
      * V2.0 진행 상태 플래그 업데이트
      *
-     * 매 100ms마다 하드웨어 위치를 확인하고 컨텍스트 플래그를 갱신합니다.
+     * 매 100ms마다 하드웨어 위치를 확인하고 컨텍스트 플래그를 갱신합니���.
      */
     private fun updateProgressFlags(calTime: ZonedDateTime) {
         val ctx = currentScheduleContext ?: return
+        var updatedCtx = ctx  // C2: copy()로 불변성 유지
 
         // Train 이동 완료 체크
-        if (ctx.trainMoveCommandSent && !ctx.trainMoveCompleted) {
-            if (isTrainAtTarget(ctx.trainAngle)) {
-                ctx.trainMoveCompleted = true
-                ctx.trainStabilizationStartTime = calTime  // 안정화 시작
-                logger.info("[V2] ✅ Train 목표 도달, 안정화 시작")
+        if (updatedCtx.trainMoveCommandSent && !updatedCtx.trainMoveCompleted) {
+            if (isTrainAtTarget(updatedCtx.trainAngle)) {
+                updatedCtx = updatedCtx.copy(
+                    trainMoveCompleted = true,
+                    trainStabilizationStartTime = calTime  // 안정화 시작
+                )
+                logger.info("[V2] Train 목표 도달, 안정화 시작")
             }
         }
 
         // Train 안정화 완료 체크 (3초 경과)
-        if (ctx.trainMoveCompleted && !ctx.trainStabilizationCompleted) {
-            val stabilizationStart = ctx.trainStabilizationStartTime
+        if (updatedCtx.trainMoveCompleted && !updatedCtx.trainStabilizationCompleted) {
+            val stabilizationStart = updatedCtx.trainStabilizationStartTime
             if (stabilizationStart != null) {
                 val elapsed = Duration.between(stabilizationStart, calTime)
                 if (elapsed.toMillis() >= TRAIN_STABILIZATION_MS) {
-                    ctx.trainStabilizationCompleted = true
-                    logger.info("[V2] ✅ Train 안정화 완료 (3초 경과)")
+                    updatedCtx = updatedCtx.copy(trainStabilizationCompleted = true)
+                    logger.info("[V2] Train 안정화 완료 (3초 경과)")
                 }
             }
         }
 
         // Az/El 이동 완료 체크
-        if (ctx.azElMoveCommandSent && !ctx.azElMoveCompleted) {
-            if (isAzElAtTarget(ctx.startAzimuth, ctx.startElevation)) {
-                ctx.azElMoveCompleted = true
-                logger.info("[V2] ✅ Az/El 목표 도달")
+        if (updatedCtx.azElMoveCommandSent && !updatedCtx.azElMoveCompleted) {
+            if (isAzElAtTarget(updatedCtx.startAzimuth, updatedCtx.startElevation)) {
+                updatedCtx = updatedCtx.copy(azElMoveCompleted = true)
+                logger.info("[V2] Az/El 목표 도달")
+            }
+        }
+
+        // C2: 변경된 경우 컨텍스트와 큐 업데이트
+        if (updatedCtx !== ctx) {
+            synchronized(queueLock) {
+                currentScheduleContext = updatedCtx
+                val idx = scheduleContextQueue.indexOfFirst { it.mstId == ctx.mstId && it.detailId == ctx.detailId }
+                if (idx >= 0) {
+                    scheduleContextQueue[idx] = updatedCtx
+                }
             }
         }
     }
@@ -3335,28 +3352,32 @@ class PassScheduleService(
 
                 val calTime = GlobalData.Time.calUtcTimeOffsetTime
 
-                // 1. 스케줄 큐 생성
-                scheduleContextQueue.clear()
-                val allContexts = buildScheduleQueue(calTime)
-                scheduleContextQueue.addAll(allContexts)
+                // C3: 동기화 블록으로 큐 조작 보호 (레이스 컨디션 방지)
+                synchronized(queueLock) {
+                    // 1. 스케줄 큐 생성
+                    scheduleContextQueue.clear()
+                    val allContexts = buildScheduleQueue(calTime)
+                    scheduleContextQueue.addAll(allContexts)
 
-                if (scheduleContextQueue.isEmpty()) {
-                    logger.warn("[V2-START] 추적 가능한 스케줄 없음")
-                    return@fromCallable false
+                    if (scheduleContextQueue.isEmpty()) {
+                        logger.warn("[V2-START] 추적 가능한 스케줄 없음")
+                        return@fromCallable false
+                    }
+
+                    logger.info("[V2-START] ${scheduleContextQueue.size}개 스케줄 로드됨")
+                    scheduleContextQueue.forEach { ctx ->
+                        logger.info("  - ${ctx.satelliteName}: ${ctx.startTime} ~ ${ctx.endTime}")
+                    }
+
+                    // 2. 첫 스케줄 선택
+                    val firstSchedule = scheduleContextQueue.first()
+                    currentScheduleContext = firstSchedule
+                    nextScheduleContext = scheduleContextQueue.getOrNull(1)
                 }
-
-                logger.info("[V2-START] ${scheduleContextQueue.size}개 스케줄 로드됨")
-                scheduleContextQueue.forEach { ctx ->
-                    logger.info("  - ${ctx.satelliteName}: ${ctx.startTime} ~ ${ctx.endTime}")
-                }
-
-                // 2. 첫 스케줄 선택
-                val firstSchedule = scheduleContextQueue.first()
-                currentScheduleContext = firstSchedule
-                nextScheduleContext = scheduleContextQueue.getOrNull(1)
 
                 // 3. 초기 상태 결정
-                val timeToStart = Duration.between(calTime, firstSchedule.startTime)
+                val ctx = currentScheduleContext ?: return@fromCallable false
+                val timeToStart = Duration.between(calTime, ctx.startTime)
                 val prepMinutes = settingsService.preparationTimeMinutes
                 val initialState = if (timeToStart.toMinutes() <= prepMinutes) {
                     PassScheduleState.MOVING_TRAIN
@@ -3390,14 +3411,17 @@ class PassScheduleService(
                 // 1. 안전한 일괄 종료
                 safeBatchShutdown()
 
-                // 2. 상태 초기화
-                currentPassScheduleState = PassScheduleState.IDLE
-                previousPassScheduleState = PassScheduleState.IDLE
+                // C3: 동기화 블록으로 큐 및 컨텍스트 초기화 보호
+                synchronized(queueLock) {
+                    // 2. 상태 초기화
+                    currentPassScheduleState = PassScheduleState.IDLE
+                    previousPassScheduleState = PassScheduleState.IDLE
 
-                // 3. 컨텍스트 초기화
-                currentScheduleContext = null
-                nextScheduleContext = null
-                scheduleContextQueue.clear()
+                    // 3. 컨텍스트 초기화
+                    currentScheduleContext = null
+                    nextScheduleContext = null
+                    scheduleContextQueue.clear()
+                }
 
                 // 4. 프론트엔드 알림
                 sendStateToFrontend(PassScheduleState.IDLE, null)
