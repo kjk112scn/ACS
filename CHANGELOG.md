@@ -6,6 +6,23 @@
 
 ---
 
+## [2026-01-20] - DB 스키마 재설계 + ICD 저장 로직
+
+### Changed
+- Flyway 마이그레이션 완전 재구성 (8개 테이블)
+- V001: 모든 테이블 CREATE + TimescaleDB 설정
+- V002: 기본 설정값 63개 INSERT
+- IcdStatusStorageService 추가 (UDP → DB 배치 저장)
+
+### Why
+- 기존 마이그레이션 누락 (8개 중 2개만 존재) → 새 PC 설치 시 실패
+- icd_status 저장 로직 미연결 → DB 저장 안 됨
+
+### Details
+- [DB_Schema_Redesign](docs/work/active/DB_Schema_Redesign/README.md)
+
+---
+
 ## [2026-01-20] - DB 테스트 및 i18n 진행
 
 ### Changed

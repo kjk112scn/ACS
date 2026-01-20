@@ -98,17 +98,29 @@ class HardwareErrorLogService(
                 val currentBits = getBitString(data, bitType)
                 if (currentBits != null) {
                     val previousBits = previousBitStates[bitType]
-                    
-                    if (previousBits != null && previousBits != currentBits) {
+
+                    if (previousBits == null) {
+                        // ✅ 첫 번째 수신: 초기 에러 상태 확인
+                        logger.info("📍 {} 첫 수신 - 초기 에러 상태 확인: {}", bitType, currentBits)
+                        previousBitStates[bitType] = currentBits
+
+                        // 초기 상태에서 에러 비트가 활성화되어 있는지 확인
+                        val initialErrors = analyzeInitialErrors(currentBits, bitType)
+                        if (initialErrors.isNotEmpty()) {
+                            newErrors.addAll(initialErrors)
+                            hasStateChanged = true
+                            logger.info("📍 초기 에러 {} 개 감지: {}", initialErrors.size, bitType)
+                        }
+
+                    } else if (previousBits != currentBits) {
+                        // 기존 로직: 비트 변화 감지
                         logger.info("🔍 비트 변화 감지: {} - 이전: {}, 현재: {}", bitType, previousBits, currentBits)
-                        
+
                         val errors = analyzeBitChanges(currentBits, previousBits, bitType)
                         newErrors.addAll(errors)
                         hasStateChanged = true
+                        previousBitStates[bitType] = currentBits
                     }
-                    
-                    // 현재 상태를 이전 상태로 저장
-                    previousBitStates[bitType] = currentBits
                 }
             }
             
@@ -190,7 +202,46 @@ class HardwareErrorLogService(
         logger.info("🔍 총 에러 개수: {}", errors.size)
         return errors
     }
-    
+
+    /**
+     * ✅ 초기 에러 분석 (BE 시작 시 이미 존재하는 에러 감지)
+     * - 첫 번째 UDP 수신 시 에러 비트가 1인 경우 감지
+     * - isInitialError = true로 마킹
+     */
+    private fun analyzeInitialErrors(currentBits: String, bitType: String): List<HardwareErrorLog> {
+        val errors = mutableListOf<HardwareErrorLog>()
+        val errorMappings = getErrorMappings(bitType)
+
+        // 비트 문자열을 뒤집어서 처리 (icdStore.ts와 동일한 방식)
+        val reversedBits = currentBits.padStart(8, '0').reversed()
+
+        for (bitPosition in 0 until minOf(reversedBits.length, 8)) {
+            val bitValue = reversedBits.getOrNull(bitPosition)?.toString() ?: "0"
+
+            // 에러 비트가 1인 경우만 감지
+            if (bitValue == "1") {
+                val errorConfig = errorMappings[bitPosition]
+                if (errorConfig != null) {
+                    val error = HardwareErrorLog(
+                        id = "initial-${bitType}-${bitPosition}-${System.currentTimeMillis()}",
+                        timestamp = LocalDateTime.now().toString(),
+                        category = errorConfig.category,
+                        severity = errorConfig.severity,
+                        errorKey = errorConfig.errorKey,
+                        component = errorConfig.component,
+                        isResolved = false,
+                        resolvedAt = null,
+                        isInitialError = true  // ✅ 초기 에러 마킹
+                    )
+                    errors.add(error)
+                    logger.info("📍 초기 에러 감지: {} - {} (bit {})", errorConfig.component, errorConfig.errorKey, bitPosition)
+                }
+            }
+        }
+
+        return errors
+    }
+
     /**
      * 비트 타입별 에러 매핑 정의
      */
@@ -385,11 +436,13 @@ class HardwareErrorLogService(
         val axis = extractAxis(error.component)
         // component에서 source 추출 (예: "Azimuth Servo" → "AZIMUTH")
         val source = extractSource(error.component, error.category)
+        // category를 DB 허용 error_type으로 변환
+        val errorType = mapCategoryToErrorType(error.category)
 
         return HardwareErrorLogEntity(
             timestamp = timestamp,
             errorCode = error.errorKey,
-            errorType = error.category,
+            errorType = errorType,
             errorMessage = null,  // 프론트엔드에서 i18n 처리
             source = source,
             axis = axis,
@@ -402,8 +455,24 @@ class HardwareErrorLogService(
             resolved = error.isResolved,
             resolvedAt = resolvedAt,
             resolvedBy = null,
-            resolutionNote = null
+            resolutionNote = null,
+            isInitialError = error.isInitialError
         )
+    }
+
+    /**
+     * 서비스 category → DB error_type 매핑
+     * DB 제약 조건: ('PROTOCOL', 'SERVO', 'EMERGENCY', 'INTERLOCK', 'SYSTEM')
+     */
+    private fun mapCategoryToErrorType(category: String): String {
+        return when (category) {
+            "PROTOCOL" -> HardwareErrorLogEntity.TYPE_PROTOCOL
+            "SERVO", "SERVO_POWER" -> HardwareErrorLogEntity.TYPE_SERVO
+            "EMERGENCY" -> HardwareErrorLogEntity.TYPE_EMERGENCY
+            "POSITIONER", "STOW" -> HardwareErrorLogEntity.TYPE_INTERLOCK
+            "POWER", "FEED", "SYSTEM" -> HardwareErrorLogEntity.TYPE_SYSTEM
+            else -> HardwareErrorLogEntity.TYPE_SYSTEM  // 기본값
+        }
     }
 
     /**
@@ -689,7 +758,7 @@ class HardwareErrorLogService(
         
         addErrorLog(testResolvedError)
         
-        logger.info("🔍 addErrorLog() 호출 완료")
+        logger.info("🔍 addErrorLog() ��출 완료")
         logger.info("🔍 현재 에러 로그 개수: {}", errorLogs.size)
         logger.info("✅ 테스트 해결 에러 로그 생성됨")
     }
@@ -716,7 +785,8 @@ data class HardwareErrorLog(
     val errorKey: String,        // ✅ 에러 키만 유지
     val component: String,
     val isResolved: Boolean,
-    val resolvedAt: String?
+    val resolvedAt: String?,
+    val isInitialError: Boolean = false  // ✅ 초기 에러 구분 (BE 시작 시 감지된 에러)
 )
 
 /**

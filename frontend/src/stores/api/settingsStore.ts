@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { Notify } from 'quasar'
 import { settingsService } from '@/services'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 import type {
@@ -228,11 +229,11 @@ export const useSettingsStore = defineStore('settings', () => {
       locationSettings.value = settings
 
       // 성공 알림
-      const { addError } = useErrorHandler()
-      addError('user', '위치 설정이 성공적으로 저장되었습니다.', undefined, {
-        showNotification: true,
-        autoResolve: true,
-        resolveTimeout: 3000,
+      Notify.create({
+        type: 'positive',
+        message: '위치 설정이 성공적으로 저장되었습니다.',
+        position: 'top-right',
+        timeout: 3000,
       })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '위치 설정 저장 실패'

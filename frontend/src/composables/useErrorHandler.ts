@@ -65,7 +65,9 @@ export const useErrorHandler = () => {
     }
 
     if (options.logToConsole !== false) {
-      console.error(`[${type.toUpperCase()}] ${message}`, details)
+      const logArgs = [`[${type.toUpperCase()}] ${message}`]
+      if (details) logArgs.push(details)
+      console.error(...logArgs)
     }
 
     // 자동 해결 설정

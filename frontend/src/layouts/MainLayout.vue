@@ -25,11 +25,18 @@
 
           <!-- 설정 버튼들 (2행) -->
           <div class="buttons-row">
-            <!-- 서버 상태 표시 부분 완전 제거 -->
-            <div class="server-status">
-              <span v-if="icdStore.error" class="text-negative">Server : Error: {{ icdStore.error }}</span>
-              <span v-else-if="!icdStore.isConnected" class="text-warning">Server : WebSocket Connecting...</span>
-              <span v-else-if="icdStore.isConnected && !icdStore.error" class="text-positive">Server : Connected</span>
+            <!-- 연결 상태 표시 -->
+            <div class="connection-status">
+              <!-- Server 상태 (FE ↔ BE) -->
+              <div class="status-item">
+                <q-icon :name="serverStatusIcon" :color="serverStatusColor" size="16px" />
+                <span :class="`text-${serverStatusColor}`">{{ serverStatusText }}</span>
+              </div>
+              <!-- HW 상태 (BE ↔ Hardware) -->
+              <div class="status-item">
+                <q-icon :name="hwStatusIcon" :color="hwStatusColor" size="16px" />
+                <span :class="`text-${hwStatusColor}`">{{ hwStatusText }}</span>
+              </div>
             </div>
 
             <!-- 설정 버튼들만 남기기 -->
@@ -146,6 +153,30 @@ const currentErrorMessage = computed(() => {
   }
   return null
 })
+
+// ✅ Server 상태 (FE ↔ BE)
+const serverStatusIcon = computed(() => {
+  if (icdStore.error) return 'cloud_off'
+  if (!icdStore.isConnected) return 'cloud_sync'
+  return 'cloud_done'
+})
+
+const serverStatusColor = computed(() => {
+  if (icdStore.error) return 'negative'
+  if (!icdStore.isConnected) return 'warning'
+  return 'positive'
+})
+
+const serverStatusText = computed(() => {
+  if (icdStore.error) return 'Server: Error'
+  if (!icdStore.isConnected) return 'Server: Connecting...'
+  return 'Server: Connected'
+})
+
+// ✅ HW 상태 (BE ↔ Hardware, 5초 타임아웃)
+const hwStatusIcon = computed(() => icdStore.udpConnected ? 'router' : 'portable_wifi_off')
+const hwStatusColor = computed(() => icdStore.udpConnected ? 'positive' : 'negative')
+const hwStatusText = computed(() => icdStore.udpConnected ? 'HW: Connected' : 'HW: Disconnected')
 
 // ✅ severity에 따른 아이콘 결정
 const getSeverityIcon = () => {
@@ -437,22 +468,31 @@ onBeforeUnmount(() => {
   opacity: 0.9;
 }
 
-/* 서버 상태 스타일 */
-.server-status {
+/* 연결 상태 스타일 */
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-right: 12px;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 12px;
   font-weight: 500;
 }
 
-.server-status .text-positive {
+.status-item .text-positive {
   color: var(--theme-positive) !important;
 }
 
-.server-status .text-warning {
+.status-item .text-warning {
   color: var(--theme-warning) !important;
 }
 
-.server-status .text-negative {
+.status-item .text-negative {
   color: var(--theme-negative) !important;
 }
 

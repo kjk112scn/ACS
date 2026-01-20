@@ -17,9 +17,11 @@ class DataStoreService {
 
     private val trackingStatus = AtomicReference(PushData.TrackingStatus())
 
-    // === UDP 연결 상태 관리 ===
-    private val lastUdpUpdateTime = AtomicReference(Instant.now())
+    // === UDP 연결 상태 관리 (대칭 로직: 연결/해제 모두 3초) ===
+    private val lastUdpUpdateTime = AtomicReference(Instant.EPOCH)  // 마지막 수신 시간
+    private val firstContinuousUdpTime = AtomicReference(Instant.EPOCH)  // 연속 수신 시작 시간
     private val udpConnected = AtomicReference(false)
+    private val connectionTimeoutSeconds = 3L  // 연결/해제 판단 기준 (대칭)
 
     /**
      * ✅ UDP에서 데이터 업데이트
@@ -173,9 +175,15 @@ class DataStoreService {
             latestData.set(mergedData)
             dataVersion.incrementAndGet() // 버전 증가
 
-            // 연결 상태 업데이트
-            lastUdpUpdateTime.set(Instant.now())
-            udpConnected.set(true)
+            // 연결 상태 업데이트 (대칭 로직)
+            val now = Instant.now()
+            val lastUpdate = lastUdpUpdateTime.get()
+
+            // 이전 수신으로부터 3초 이상 지났으면 새로운 연속 수신 시작
+            if (now.minusSeconds(connectionTimeoutSeconds).isAfter(lastUpdate)) {
+                firstContinuousUdpTime.set(now)
+            }
+            lastUdpUpdateTime.set(now)
         //}
     }
     /**
@@ -509,16 +517,30 @@ class DataStoreService {
     }
 
     /**
-     * ✅ UDP 연결 상태 확인
+     * ✅ UDP 연결 상태 확인 (대칭 로직: 연결/해제 모두 3초)
+     * - 연결: 3초 이상 연속 수신 시 connected
+     * - 해제: 3초 이상 미수신 시 disconnected
      */
     fun isUdpConnected(): Boolean {
-        val timeoutSeconds = 5L
         val now = Instant.now()
         val lastUpdate = lastUdpUpdateTime.get()
+        val firstContinuous = firstContinuousUdpTime.get()
 
-        val connected = now.minusSeconds(timeoutSeconds).isBefore(lastUpdate)
-        udpConnected.set(connected)
-        return connected
+        // 1. 해제 판단: 3초 이상 데이터 없음 → disconnected
+        if (now.minusSeconds(connectionTimeoutSeconds).isAfter(lastUpdate)) {
+            udpConnected.set(false)
+            return false
+        }
+
+        // 2. 연결 판단: 3초 이상 연속 수신 → connected
+        if (firstContinuous != Instant.EPOCH &&
+            now.minusSeconds(connectionTimeoutSeconds).isAfter(firstContinuous)) {
+            udpConnected.set(true)
+            return true
+        }
+
+        // 3. 수신 중이지만 아직 3초 미만 → 이전 상태 유지
+        return udpConnected.get()
     }
 
     /**

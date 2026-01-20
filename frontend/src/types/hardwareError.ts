@@ -30,6 +30,8 @@ export interface HardwareErrorLog {
   resolvedAt?: string
   /** 해결 메시지 (다국어 변환된 결과) */
   resolvedMessage?: string
+  /** 초기 에러 여부 (BE 시작 시 감지된 에러) */
+  isInitialError?: boolean
 }
 
 /**

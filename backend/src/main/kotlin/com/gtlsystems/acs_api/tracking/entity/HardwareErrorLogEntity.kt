@@ -66,7 +66,11 @@ data class HardwareErrorLogEntity(
     val resolvedBy: String? = null,
 
     @Column("resolution_note")
-    val resolutionNote: String? = null
+    val resolutionNote: String? = null,
+
+    // ✅ 초기 에러 구분 (BE 시작 시 감지된 에러)
+    @Column("is_initial_error")
+    val isInitialError: Boolean = false
 ) {
     companion object {
         // Error Types

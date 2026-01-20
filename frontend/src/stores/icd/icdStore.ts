@@ -1752,6 +1752,20 @@ export const useICDStore = defineStore('icd', () => {
         communicationStatus.value = safeToString(message.communicationStatus)
       }
 
+      // ✅ UDP 연결 상태 업데이트 (BE ↔ Hardware)
+      if (message.data && typeof message.data === 'object' && 'udpConnected' in message.data) {
+        const dataUdpConnected = (message.data as Record<string, unknown>).udpConnected
+        if (typeof dataUdpConnected === 'boolean') {
+          udpConnected.value = dataUdpConnected
+        }
+      }
+      if (message.data && typeof message.data === 'object' && 'lastUdpUpdateTime' in message.data) {
+        const dataLastUdpUpdateTime = (message.data as Record<string, unknown>).lastUdpUpdateTime
+        if (dataLastUdpUpdateTime !== undefined && dataLastUdpUpdateTime !== null) {
+          lastUdpUpdateTime.value = safeToString(dataLastUdpUpdateTime)
+        }
+      }
+
       // 성능 측정
       const endTime = performance.now()
 
