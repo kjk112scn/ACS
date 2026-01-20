@@ -87,11 +87,11 @@
 
 | 날짜 | 작업 | 커밋 |
 |------|------|------|
-| 2026-01-20 | Tracking_Session 키 매핑 수정 | 미커밋 |
+| 2026-01-20 | Tracking_Session 키 매핑 수정 | `aa0f7cb` |
+| 2026-01-20 | HW_Error 컨텍스트 추가 | `aa0f7cb` |
+| 2026-01-20 | V003 DB 코멘트 마이그레이션 | `aa0f7cb` |
 | 2026-01-20 | Timezone 처리 표준화 (ADR-006) | 미커밋 |
-| 2026-01-20 | HW_Error_System_Integration 구현 | 미커밋 |
-| 2026-01-20 | V003 DB 코멘트 마이그레이션 작성 | 미커밋 |
-| 2026-01-20 | DB 스키마 재설계 + ICD 저장 | 이번 커밋 |
+| 2026-01-20 | DB 스키마 재설계 + ICD 저장 | `a9d7bf1` |
 | 2026-01-20 | DB 테스트 성공 + i18n 3페이지 | `docs: DB 테스트 완료 및 UX 개선 계획 수립` |
 | 2026-01-20 | PassSchedule Phase A-D 구현 | `refactor(passschedule): Phase D 완료` |
 | 2026-01-20 | vue-i18n → TS 상수 객체 | `refactor(i18n): vue-i18n → TypeScript 상수 객체 마이그레이션` |
