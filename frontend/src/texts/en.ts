@@ -106,6 +106,8 @@ export const en: TextsType = {
     admin: {
       title: 'Admin Settings',
       description: 'System administrator settings',
+      warningMessage: 'These functions directly control the hardware.',
+      warningDescription: 'Incorrect operation may cause equipment damage. Please proceed with caution.',
       servoPreset: {
         title: 'Servo Preset',
         description: 'Servo encoder preset settings',

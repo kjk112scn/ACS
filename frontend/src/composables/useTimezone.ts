@@ -109,7 +109,7 @@ export const useTimezone = () => {
       )
       if (zones.length > 0) {
         result.push({ value: '', label: continent, offset: '', header: true })
-        result.push(...zones.slice(0, 50)) // 대륙당 최대 50개
+        result.push(...zones) // 모든 시간대 표시 (위성 안테나는 전 세계 설치 가능)
       }
     }
 

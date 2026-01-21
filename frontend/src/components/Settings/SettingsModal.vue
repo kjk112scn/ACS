@@ -46,15 +46,6 @@
                 <q-item-section>{{ T.settings.languageTab }}</q-item-section>
               </q-item>
 
-              <!-- 관리자 설정 탭 -->
-              <q-item clickable v-ripple :active="activeTab === 'admin'" @click="activeTab = 'admin'"
-                active-class="active-tab">
-                <q-item-section avatar>
-                  <q-icon name="admin_panel_settings" />
-                </q-item-section>
-                <q-item-section>{{ T.settings.adminTab }}</q-item-section>
-              </q-item>
-
               <!-- 버전 정보 탭 -->
               <q-item clickable v-ripple :active="activeTab === 'version'" @click="activeTab = 'version'"
                 active-class="active-tab">
@@ -90,9 +81,6 @@
             <!-- 언어 설정 탭 -->
             <LanguageSettings v-if="activeTab === 'language'" />
 
-            <!-- 관리자 설정 탭 -->
-            <AdminSettings v-if="activeTab === 'admin'" />
-
             <!-- 버전 정보 탭 -->
             <VersionInfoSettings v-if="activeTab === 'version'" />
           </div>
@@ -116,7 +104,6 @@ import { T } from '@/texts'
 
 import GeneralSettings from './GeneralSettings.vue'
 import SystemSettings from './system/SystemSettings.vue'
-import AdminSettings from './admin/AdminSettings.vue'
 import VersionInfoSettings from './VersionInfoSettings.vue'
 import LanguageSettings from './LanguageSettings.vue'
 

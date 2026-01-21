@@ -6,6 +6,30 @@
 
 ---
 
+## [2026-01-21] - Admin Panel 분리 + UX 개선
+
+### Added
+- Admin Panel 분리 (Settings에서 하드웨어 제어 기능 분리)
+- AdminPanel.vue 신규 컴포넌트 (경고 배너 포함)
+- 헤더에 Admin 버튼 추가 (Settings 버튼 우측)
+
+### Fixed
+- useDialog.ts Quasar API 수정 (ok/cancel handler → onOk/onCancel 체이닝)
+- quasar.config.ts Dialog 플러그인 등록
+
+### Changed
+- 시간대 선택 UX 개선 (behavior="menu", clearable 추가)
+- 시간대 목록 50개 제한 제거 (전체 428개 표시)
+
+### Why
+- 일반 설정(다크모드, 언어)과 위험 하드웨어 제어를 분리하여 안전성 향상
+- Quasar Dialog API 비호환으로 확인 다이얼로그 Promise 미resolve 문제
+
+### Details
+- [Admin_Panel_Separation](docs/work/active/Admin_Panel_Separation/README.md)
+
+---
+
 ## [2026-01-20] - DB 데이터 품질 개선
 
 ### Fixed

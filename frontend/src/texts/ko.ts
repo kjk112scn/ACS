@@ -104,6 +104,8 @@ export const ko = {
     admin: {
       title: '관리자 설정',
       description: '시스템 관리자 전용 설정',
+      warningMessage: '이 기능들은 하드웨어를 직접 제어합니다.',
+      warningDescription: '잘못된 조작은 장비 손상을 초래할 수 있습니다. 신중하게 실행하세요.',
       servoPreset: {
         title: '서보 프리셋',
         description: '서보 인코더 프리셋 설정',

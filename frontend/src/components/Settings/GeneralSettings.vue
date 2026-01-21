@@ -43,6 +43,8 @@
             dense
             use-input
             input-debounce="200"
+            behavior="menu"
+            clearable
             @filter="onFilterTimezone"
             @update:model-value="onTimezoneChange"
             class="q-mt-sm"

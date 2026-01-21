@@ -30,21 +30,21 @@ export const useDialog = () => {
         ok: {
           label: options.ok?.label || '확인',
           color: options.ok?.color || 'primary',
-          handler: () => {
-            options.ok?.handler?.()
-            resolve(true)
-          },
         },
         cancel: {
           label: options.cancel?.label || '취소',
           color: options.cancel?.color || 'grey',
-          handler: () => {
-            options.cancel?.handler?.()
-            resolve(false)
-          },
         },
         persistent: options.persistent || false,
       })
+        .onOk(() => {
+          options.ok?.handler?.()
+          resolve(true)
+        })
+        .onCancel(() => {
+          options.cancel?.handler?.()
+          resolve(false)
+        })
     })
   }
 
@@ -57,13 +57,13 @@ export const useDialog = () => {
         ok: {
           label: options.ok?.label || '확인',
           color: options.ok?.color || 'primary',
-          handler: () => {
-            options.ok?.handler?.()
-            resolve()
-          },
         },
         persistent: options.persistent || false,
       })
+        .onOk(() => {
+          options.ok?.handler?.()
+          resolve()
+        })
     })
   }
 
@@ -88,21 +88,21 @@ export const useDialog = () => {
         ok: {
           label: options.ok?.label || '확인',
           color: options.ok?.color || 'primary',
-          handler: (value: string) => {
-            options.ok?.handler?.()
-            resolve(value)
-          },
         },
         cancel: {
           label: options.cancel?.label || '취소',
           color: options.cancel?.color || 'grey',
-          handler: () => {
-            options.cancel?.handler?.()
-            resolve(null)
-          },
         },
         persistent: options.persistent || false,
       })
+        .onOk((value: string) => {
+          options.ok?.handler?.()
+          resolve(value)
+        })
+        .onCancel(() => {
+          options.cancel?.handler?.()
+          resolve(null)
+        })
     })
   }
 
@@ -112,23 +112,27 @@ export const useDialog = () => {
       Dialog.create({
         component,
         ...options,
-        ok: {
-          label: options.ok?.label || '확인',
-          color: options.ok?.color || 'primary',
-          handler: (value: unknown) => {
-            options.ok?.handler?.()
-            resolve(value)
-          },
-        },
-        cancel: {
-          label: options.cancel?.label || '취소',
-          color: options.cancel?.color || 'grey',
-          handler: () => {
-            options.cancel?.handler?.()
-            resolve(null)
-          },
-        },
+        ok: options.ok
+          ? {
+              label: options.ok.label || '확인',
+              color: options.ok.color || 'primary',
+            }
+          : undefined,
+        cancel: options.cancel
+          ? {
+              label: options.cancel.label || '취소',
+              color: options.cancel.color || 'grey',
+            }
+          : undefined,
       })
+        .onOk((value: unknown) => {
+          options.ok?.handler?.()
+          resolve(value)
+        })
+        .onCancel(() => {
+          options.cancel?.handler?.()
+          resolve(null)
+        })
     })
   }
 

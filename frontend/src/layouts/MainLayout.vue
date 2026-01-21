@@ -42,6 +42,8 @@
             <!-- 설정 버튼들만 남기기 -->
             <q-btn flat dense round icon="settings" aria-label="Settings" @click="settingsModal = true"
               class="q-mr-sm" />
+            <q-btn flat dense round icon="admin_panel_settings" aria-label="Admin Panel" @click="adminPanelModal = true"
+              class="q-mr-sm" color="warning" />
             <q-btn flat dense round icon="brightness_4" aria-label="Toggle Dark Mode" @click="toggleDarkMode" />
             <q-btn flat dense round icon="info" aria-label="SystemsInfo" size="md" @click="handleSystemInfo" />
           </div>
@@ -64,6 +66,10 @@
     <!-- 설정 모달 컴포넌트 사용 -->
     <SettingsModal v-model="settingsModal" :dark-mode="isDarkMode" :server-address="serverAddress"
       @save="handleSettingsSave" />
+
+    <!-- 관리자 패널 모달 -->
+    <AdminPanel v-model="adminPanelModal" />
+
     <!-- 하드웨어 에러 로그 패널 (하단 고정) -->
     <!--     <HardwareErrorLogPanel /> -->
 
@@ -87,6 +93,7 @@
 import { ref, onMounted, computed, onBeforeUnmount } from 'vue'
 import EssentialLink, { type EssentialLinkProps } from '@/components/common/EssentialLink.vue'
 import SettingsModal from '@/components/Settings/SettingsModal.vue'
+import AdminPanel from '@/components/Admin/AdminPanel.vue'
 import { openComponent } from '@/utils/windowUtils' // ✅ 기존 함수 사용
 import { useQuasar } from 'quasar'
 import { useICDStore } from '@/stores/icd/icdStore' // ICD Store import 추가
@@ -293,6 +300,9 @@ const leftDrawerOpen = ref(false)
 
 // 설정 모달 상태
 const settingsModal = ref(false)
+
+// 관리자 패널 모달 상태
+const adminPanelModal = ref(false)
 
 // 다크 모드 상태
 const isDarkMode = ref(false)
