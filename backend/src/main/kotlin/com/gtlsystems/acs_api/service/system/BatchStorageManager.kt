@@ -220,6 +220,11 @@ class BatchStorageManager(
 
     /**
      * ✅ Map 데이터를 TrackingResultEntity로 변환
+     *
+     * V006 재설계:
+     * - 이론치 컬럼 제거 (trajectory에서 JOIN 조회)
+     * - ICD 추적 데이터 추가
+     * - 정밀 추적 메타데이터 추가
      */
     private fun mapToTrackingResult(data: Map<String, Any?>): TrackingResultEntity {
         val timestamp = when (val ts = data["timestamp"]) {
@@ -231,27 +236,32 @@ class BatchStorageManager(
         val sessionId = (data["sessionId"] as? Number)?.toLong() ?: 0L
         val index = (data["index"] as? Number)?.toInt() ?: trackingDataIndex
 
+        // 정밀 추적용 theoreticalTimestamp 변환
+        val theoreticalTimestamp = when (val ts = data["theoreticalTimestamp"]) {
+            is ZonedDateTime -> ts.toOffsetDateTime()
+            is OffsetDateTime -> ts
+            else -> null
+        }
+
         return TrackingResultEntity(
             timestamp = timestamp,
             sessionId = sessionId,
             index = index,
             theoreticalIndex = (data["theoreticalIndex"] as? Number)?.toInt(),
 
-            // 원본 각도
-            originalAzimuth = (data["originalAzimuth"] as? Number)?.toDouble(),
-            originalElevation = (data["originalElevation"] as? Number)?.toDouble(),
+            // ===== 정밀 추적 메타데이터 (V006) =====
+            theoreticalTimestamp = theoreticalTimestamp,
+            timeOffsetMs = (data["timeOffsetMs"] as? Number)?.toDouble(),
+            interpolationFraction = (data["interpolationFraction"] as? Number)?.toDouble(),
+            lowerTheoreticalIndex = (data["lowerTheoreticalIndex"] as? Number)?.toInt(),
+            upperTheoreticalIndex = (data["upperTheoreticalIndex"] as? Number)?.toInt(),
 
-            // 변환된 각도
-            transformedAzimuth = (data["transformedAzimuth"] as? Number)?.toDouble(),
-            transformedElevation = (data["transformedElevation"] as? Number)?.toDouble(),
-            transformedTrain = (data["transformedTrain"] as? Number)?.toDouble(),
+            // ===== 명령값 =====
+            cmdAzimuth = (data["cmdAzimuth"] as? Number)?.toDouble(),
+            cmdElevation = (data["cmdElevation"] as? Number)?.toDouble(),
+            cmdTrain = (data["cmdTrain"] as? Number)?.toDouble(),
 
-            // 최종 각도
-            finalAzimuth = (data["finalAzimuth"] as? Number)?.toDouble(),
-            finalElevation = (data["finalElevation"] as? Number)?.toDouble(),
-            finalTrain = (data["finalTrain"] as? Number)?.toDouble(),
-
-            // 실제 측정값 (ICD Position)
+            // ===== 실측값 (ICD Position) =====
             actualAzimuth = (data["actualAzimuth"] as? Number)?.toDouble()
                 ?: (data["positionAzimuth"] as? Number)?.toDouble(),
             actualElevation = (data["actualElevation"] as? Number)?.toDouble()
@@ -259,43 +269,38 @@ class BatchStorageManager(
             actualTrain = (data["actualTrain"] as? Number)?.toDouble()
                 ?: (data["positionTrain"] as? Number)?.toDouble(),
 
-            // 오차
+            // ===== 위치값 =====
+            positionAzimuth = (data["positionAzimuth"] as? Number)?.toDouble(),
+            positionElevation = (data["positionElevation"] as? Number)?.toDouble(),
+            positionTrain = (data["positionTrain"] as? Number)?.toDouble(),
+
+            // ===== ICD 추적 데이터 (V006) =====
+            trackingAzimuthTime = (data["trackingAzimuthTime"] as? Number)?.toFloat(),
+            trackingCmdAzimuth = (data["trackingCmdAzimuth"] as? Number)?.toFloat(),
+            trackingActualAzimuth = (data["trackingActualAzimuth"] as? Number)?.toFloat(),
+            trackingElevationTime = (data["trackingElevationTime"] as? Number)?.toFloat(),
+            trackingCmdElevation = (data["trackingCmdElevation"] as? Number)?.toFloat(),
+            trackingActualElevation = (data["trackingActualElevation"] as? Number)?.toFloat(),
+            trackingTrainTime = (data["trackingTrainTime"] as? Number)?.toFloat(),
+            trackingCmdTrain = (data["trackingCmdTrain"] as? Number)?.toFloat(),
+            trackingActualTrain = (data["trackingActualTrain"] as? Number)?.toFloat(),
+
+            // ===== 오차 =====
             azimuthError = (data["azimuthError"] as? Number)?.toDouble(),
             elevationError = (data["elevationError"] as? Number)?.toDouble(),
             trainError = (data["trainError"] as? Number)?.toDouble(),
             totalError = (data["totalError"] as? Number)?.toDouble(),
 
-            // 속도
-            azimuthRate = (data["azimuthRate"] as? Number)?.toDouble(),
-            elevationRate = (data["elevationRate"] as? Number)?.toDouble(),
-            trainRate = (data["trainRate"] as? Number)?.toDouble(),
-
-            // 가속도
-            azimuthAcceleration = (data["azimuthAcceleration"] as? Number)?.toDouble(),
-            elevationAcceleration = (data["elevationAcceleration"] as? Number)?.toDouble(),
-            trainAcceleration = (data["trainAcceleration"] as? Number)?.toDouble(),
-
-            // 상태
+            // ===== 상태 =====
             keyholeActive = data["keyholeActive"] as? Boolean ?: false,
             keyholeOptimized = data["keyholeOptimized"] as? Boolean ?: false,
             trackingQuality = data["trackingQuality"] as? String,
-
-            // 보간 정보
-            interpolationType = data["interpolationType"] as? String,
             interpolationAccuracy = (data["interpolationAccuracy"] as? Number)?.toDouble(),
 
-            // 위성 정보
-            satelliteRange = (data["satelliteRange"] as? Number)?.toDouble(),
-            satelliteAltitude = (data["satelliteAltitude"] as? Number)?.toDouble(),
-            satelliteVelocity = (data["satelliteVelocity"] as? Number)?.toDouble(),
-
-            // CMD/Position
-            cmdAzimuth = (data["cmdAzimuth"] as? Number)?.toDouble(),
-            cmdElevation = (data["cmdElevation"] as? Number)?.toDouble(),
-            cmdTrain = (data["cmdTrain"] as? Number)?.toDouble(),
-            positionAzimuth = (data["positionAzimuth"] as? Number)?.toDouble(),
-            positionElevation = (data["positionElevation"] as? Number)?.toDouble(),
-            positionTrain = (data["positionTrain"] as? Number)?.toDouble()
+            // ===== 칼만 필터 (V006 - 향후 확장) =====
+            kalmanAzimuth = (data["kalmanAzimuth"] as? Number)?.toDouble(),
+            kalmanElevation = (data["kalmanElevation"] as? Number)?.toDouble(),
+            kalmanGain = (data["kalmanGain"] as? Number)?.toDouble()
         )
     }
     

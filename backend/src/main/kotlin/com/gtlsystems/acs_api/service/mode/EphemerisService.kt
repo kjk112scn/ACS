@@ -425,6 +425,11 @@ class EphemerisService(
         try {
             logger.info("🚀 위성 궤도 추적 시작")
 
+            // 0️⃣ TLE 캐시에 저장 (DB 영속화)
+            val satelliteId = tleLine1.substring(2, 7).trim()
+            addSatelliteTle(satelliteId, tleLine1, tleLine2)
+            logger.info("📦 TLE 캐시 저장: satelliteId=$satelliteId")
+
             // 1️⃣ OrekitCalculator: 순수 2축 각도만 생성
             val today = ZonedDateTime.now().truncatedTo(ChronoUnit.DAYS)
             val sourceMinEl = settingsService.sourceMinElevationAngle.toFloat()

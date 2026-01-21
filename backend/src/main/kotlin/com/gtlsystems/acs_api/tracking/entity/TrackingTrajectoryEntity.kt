@@ -44,6 +44,19 @@ data class TrackingTrajectoryEntity(
     @Column("elevation_rate")
     val elevationRate: Double? = null,
 
+    @Column("train_rate")
+    val trainRate: Double? = null,
+
+    // 위성 정보 (V006)
+    @Column("satellite_range")
+    val satelliteRange: Double? = null,
+
+    @Column("satellite_altitude")
+    val satelliteAltitude: Double? = null,
+
+    @Column("satellite_velocity")
+    val satelliteVelocity: Double? = null,
+
     @Column("created_at")
     val createdAt: OffsetDateTime? = null
 )

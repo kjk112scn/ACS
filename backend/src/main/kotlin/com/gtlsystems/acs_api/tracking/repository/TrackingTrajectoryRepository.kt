@@ -78,6 +78,36 @@ class TrackingTrajectoryRepository(
     }
 
     /**
+     * 세션 ID + Detail ID로 조회
+     */
+    fun findBySessionIdAndDetailId(sessionId: Long, detailId: Int): Flux<TrackingTrajectoryEntity> {
+        return databaseClient.sql("""
+            SELECT * FROM tracking_trajectory
+            WHERE session_id = :sessionId AND detail_id = :detailId
+            ORDER BY timestamp
+        """.trimIndent())
+            .bind("sessionId", sessionId)
+            .bind("detailId", detailId)
+            .map { row, _ -> mapRowToEntity(row) }
+            .all()
+    }
+
+    /**
+     * 세션 ID + Data Type으로 조회
+     */
+    fun findBySessionIdAndDataType(sessionId: Long, dataType: String): Flux<TrackingTrajectoryEntity> {
+        return databaseClient.sql("""
+            SELECT * FROM tracking_trajectory
+            WHERE session_id = :sessionId AND data_type = :dataType
+            ORDER BY timestamp
+        """.trimIndent())
+            .bind("sessionId", sessionId)
+            .bind("dataType", dataType)
+            .map { row, _ -> mapRowToEntity(row) }
+            .all()
+    }
+
+    /**
      * 시간 범위로 조회
      */
     fun findByTimeRange(startTime: OffsetDateTime, endTime: OffsetDateTime): Flux<TrackingTrajectoryEntity> {
@@ -104,6 +134,25 @@ class TrackingTrajectoryRepository(
                 )
             }
             .all()
+    }
+
+    /**
+     * Row → Entity 매핑 헬퍼
+     */
+    private fun mapRowToEntity(row: io.r2dbc.spi.Row): TrackingTrajectoryEntity {
+        return TrackingTrajectoryEntity(
+            timestamp = row.get("timestamp", OffsetDateTime::class.java)!!,
+            sessionId = row.get("session_id", Long::class.java)!!,
+            detailId = row.get("detail_id", Int::class.java)!!,
+            dataType = row.get("data_type", String::class.java)!!,
+            index = row.get("index", Int::class.java)!!,
+            azimuth = row.get("azimuth", Double::class.java)!!,
+            elevation = row.get("elevation", Double::class.java)!!,
+            train = row.get("train", Double::class.java),
+            azimuthRate = row.get("azimuth_rate", Double::class.java),
+            elevationRate = row.get("elevation_rate", Double::class.java),
+            createdAt = row.get("created_at", OffsetDateTime::class.java)
+        )
     }
 
     /**

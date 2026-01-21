@@ -2,13 +2,14 @@
 
 > **새 세션 시작 시:** "CURRENT_STATUS.md 읽고 이어서 진행해줘" 또는 `/status`
 
-**마지막 업데이트:** 2026-01-21
+**마지막 업데이트:** 2026-01-21 (Tracking Schema Redesign BE 완료)
 
 ---
 
 ## 🚧 진행 중 작업
 
-### 1. Timezone_Handling_Standardization (95%) ⭐ 오늘 작업
+### 1. Timezone_Handling_Standardization (95%)
+
 - **상태:** 구현 완료, 수동 테스트 대기
 - **문서:** `docs/work/active/Timezone_Handling_Standardization/`
 - **ADR:** ADR-006-timezone-handling-architecture.md
@@ -42,18 +43,19 @@
 | raw_data | ✅ | 비트 데이터 JSON |
 | session_id | ⏸️ | 보류 (복잡도 높음) |
 
-### 3. Tracking_Session_Data_Enrichment (90%) ✅
+### 3. Tracking_Session_Data_Enrichment (98%) ✅
 - **상태:** 구현 완료, BE 재시작 후 DB 검증 필요
 - **문서:** `docs/work/active/Tracking_Session_Data_Enrichment/`
-- **근본 원인:** 키 이름 불일치 (SatelliteID vs SatelliteId 등)
+- **남은 작업:** Flyway V004/V005 적용 확인, TLE 저장 테스트
 
-| 컬럼 | 수정 내용 |
-|------|----------|
-| satellite_id | ✅ SatelliteID/SatelliteId 양쪽 지원 |
-| duration | ✅ ISO String 파싱 + 시간차 계산 |
-| max_azimuth_rate | ✅ MaxAzRate/MaxAzimuthRate 양쪽 지원 |
-| max_elevation_rate | ✅ MaxElRate/MaxElevationRate 양쪽 지원 |
-| total_points | ✅ DTL 개수 폴백 추가 |
+| Phase | 상태 | 내용 |
+|-------|:----:|------|
+| Phase 1 | ✅ | 빈 컬럼 채우기 (키 이름 불일치 수정) |
+| Phase 2 | ✅ | 37개 메타데이터 컬럼 추가 (V004) |
+| Phase 3 | ✅ | Repository 조회 메서드 추가 |
+| Phase 5 | ✅ | 인덱스 4개 추가 (V005) |
+| Phase 6 | ✅ | TLE 캐시 저장 버그 수정 |
+| 검증 | ⏳ | BE 재시작 후 DB 테스트 필요 |
 
 ### 4. V003 DB 코멘트 마이그레이션
 - **상태:** 파일 생성 완료, Flyway 적용 대기
@@ -87,6 +89,7 @@
 
 | 날짜 | 작업 | 커밋 |
 |------|------|------|
+| 2026-01-21 | Tracking Schema Redesign (V006) | `31c9a1b` |
 | 2026-01-21 | Admin Panel 분리 + UX 개선 | `a9a6af4` |
 | 2026-01-20 | Tracking_Session 키 매핑 수정 | `aa0f7cb` |
 | 2026-01-20 | HW_Error 컨텍스트 추가 | `aa0f7cb` |
@@ -141,6 +144,63 @@
 
 ### 기타 (우선순위 낮음)
 - LoggingService 정리 - 특수 기능 미사용
+
+---
+
+## 📋 향후 예정 작업
+
+### 정밀 추적 DB 확장 (P1) - 시스템 안정화 후
+- **상태:** 📋 계획됨 (전문가 검토 완료)
+- **목적:** 이론치-실측치 매칭 정밀도 향상 (0.05° → 0.01°)
+- **마이그레이션:** V006__Add_precision_tracking_columns.sql (미작성)
+- **선행 작업:** Tracking_Session_Data_Enrichment 완료 + 시스템 안정화
+
+**핵심 변경 (V006):**
+
+| 테이블 | 추가 컬럼 | 용도 |
+|--------|----------|------|
+| tracking_result | theoretical_timestamp | 매칭된 이론치 시간 |
+| tracking_result | time_offset_ms | 이론치-실측치 시간차 |
+| tracking_result | interpolation_fraction | 보간 비율 (0.0~1.0) |
+| tracking_result | lower/upper_theoretical_index | 보간 인덱스 범위 |
+| tracking_result | kalman_azimuth/elevation/gain | 칼만 필터 (향후) |
+| tracking_trajectory | resolution_ms | 데이터 해상도 (기본 1000ms) |
+| tracking_trajectory | satellite_range/altitude | 위성 거리/고도 |
+
+**전문가 검토 결과:**
+- ✅ 기존 데이터 호환 (모든 컬럼 NULL 허용)
+- ✅ V004→V005→V006 순서 안전
+- ⚠️ TimescaleDB 압축 청크 해제 스크립트 필요
+- ✅ Entity는 실제 구현 시점에 추가해도 됨
+
+**구현 순서:**
+1. V006 마이그레이션 작성 + 적용
+2. Entity 필드 추가
+3. createRealtimeTrackingData() 선형 보간 활성화
+4. 시간 기반 이진 검색 함수 추가
+
+---
+
+### FE-BE 데이터 동기화 최적화 (P2)
+- **상태:** 📋 계획됨 (기능 완성 후 최적화)
+- **문서:** `docs/work/active/FE_BE_Data_Sync_Optimization/`
+- **ADR:** ADR-007 (PassSchedule FE-BE 동기화 전략)
+- **예상 소요:** 2~3주
+
+**핵심 아이디어:** Stale-While-Revalidate (SWR) 패턴
+- 2번째 방문부터 즉시 로딩 (캐시 사용 → 백그라운드 검증)
+- 현재: 매번 2-3초 로딩 → 개선 후: 0ms (캐시 히트 시)
+
+**전문가 검토 결과:** ⚠️ 부분 적합
+| 데이터 | SWR 적합? | 전략 |
+|--------|:--------:|------|
+| 스케줄 목록 (MST) | ⚠️ 조건부 | Server-First + 5분 캐시 |
+| 예측 경로 (DTL) | ❌ 부적합 | 캐싱 금지 (15MB+) |
+| 선택된 스케줄 ID | ✅ 적합 | Cache-First |
+
+**선행 작업:**
+- [ ] Tracking_Session_Data_Enrichment 완료
+- [ ] Admin_Panel_Separation 완료 (선택)
 
 ---
 

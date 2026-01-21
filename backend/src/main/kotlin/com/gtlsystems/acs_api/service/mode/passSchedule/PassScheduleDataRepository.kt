@@ -405,6 +405,7 @@ class PassScheduleDataRepository(
 
     /**
      * MST Map을 TrackingSessionEntity로 변환합니다.
+     * Select Schedule에서 표시하는 모든 변환 단계별 메타데이터를 매핑합니다.
      *
      * @param satelliteId 위성 ID
      * @param mst MST 데이터
@@ -416,28 +417,81 @@ class PassScheduleDataRepository(
         val satelliteName = mst["SatelliteName"] as? String
         val dataType = mst["DataType"] as? String ?: "original"
 
-        // 시간 파싱
+        // ===== 시간 파싱 =====
         val now = OffsetDateTime.now(ZoneOffset.UTC)
         val startTime = parseTime(mst["StartTime"]) ?: now
         val endTime = parseTime(mst["EndTime"]) ?: now
-        // ✅ Duration: ISO String 파싱 또는 시간 차이 계산
         val duration = parseDurationToSeconds(mst["Duration"], startTime, endTime)
+        val maxElevationTime = parseTime(mst["MaxElevationTime"])
 
-        // 각도 정보
+        // ===== 기본 각도 정보 (최종 사용값) =====
+        val startAzimuth = (mst["StartAzimuthAngle"] as? Number)?.toDouble()
+            ?: (mst["startAzimuthAngle"] as? Number)?.toDouble()
+        val endAzimuth = (mst["EndAzimuthAngle"] as? Number)?.toDouble()
+            ?: (mst["endAzimuthAngle"] as? Number)?.toDouble()
+        val startElevation = (mst["StartElevationAngle"] as? Number)?.toDouble()
+            ?: (mst["startElevationAngle"] as? Number)?.toDouble()
+        val endElevation = (mst["EndElevationAngle"] as? Number)?.toDouble()
+            ?: (mst["endElevationAngle"] as? Number)?.toDouble()
+        val trainAngle = (mst["Train"] as? Number)?.toDouble()
+            ?: (mst["train"] as? Number)?.toDouble()
+
+        // ===== 기본 Peak 값 =====
         val maxElevation = (mst["MaxElevation"] as? Number)?.toDouble()
-        // ✅ MaxAzRate 우선, 없으면 MaxAzimuthRate 시도
         val maxAzimuthRate = (mst["MaxAzRate"] as? Number)?.toDouble()
             ?: (mst["MaxAzimuthRate"] as? Number)?.toDouble()
-        // ✅ MaxElRate 우선, 없으면 MaxElevationRate 시도
         val maxElevationRate = (mst["MaxElRate"] as? Number)?.toDouble()
             ?: (mst["MaxElevationRate"] as? Number)?.toDouble()
-        // ✅ IsKeyhole 우선, 없으면 KeyholeDetected 시도
+        val maxAzimuthAccel = (mst["MaxAzimuthAccel"] as? Number)?.toDouble()
+            ?: (mst["maxAzimuthAccel"] as? Number)?.toDouble()
+        val maxElevationAccel = (mst["MaxElevationAccel"] as? Number)?.toDouble()
+            ?: (mst["maxElevationAccel"] as? Number)?.toDouble()
+
         val keyholeDetected = mst["IsKeyhole"] as? Boolean
             ?: mst["KeyholeDetected"] as? Boolean ?: false
         val recommendedTrainAngle = (mst["RecommendedTrainAngle"] as? Number)?.toDouble()
-        // ✅ TotalPoints: MST에서 읽거나 DTL 카운트 사용
         val totalPoints = (mst["TotalPoints"] as? Number)?.toInt()
             ?: if (dtlCount > 0) dtlCount else null
+
+        // ===== Original (2축) 메타데이터 =====
+        val originalStartAzimuth = (mst["OriginalStartAzimuth"] as? Number)?.toDouble()
+            ?: (mst["originalStartAzimuth"] as? Number)?.toDouble()
+        val originalEndAzimuth = (mst["OriginalEndAzimuth"] as? Number)?.toDouble()
+            ?: (mst["originalEndAzimuth"] as? Number)?.toDouble()
+        val originalMaxElevation = (mst["OriginalMaxElevation"] as? Number)?.toDouble()
+        val originalMaxAzRate = (mst["OriginalMaxAzRate"] as? Number)?.toDouble()
+        val originalMaxElRate = (mst["OriginalMaxElRate"] as? Number)?.toDouble()
+
+        // ===== FinalTransformed (3축, Train=0, ±270°) =====
+        val finalStartAzimuth = (mst["FinalTransformedStartAzimuth"] as? Number)?.toDouble()
+        val finalEndAzimuth = (mst["FinalTransformedEndAzimuth"] as? Number)?.toDouble()
+        val finalStartElevation = (mst["FinalTransformedStartElevation"] as? Number)?.toDouble()
+        val finalEndElevation = (mst["FinalTransformedEndElevation"] as? Number)?.toDouble()
+        val finalMaxElevation = (mst["FinalTransformedMaxElevation"] as? Number)?.toDouble()
+        val finalMaxAzRate = (mst["FinalTransformedMaxAzRate"] as? Number)?.toDouble()
+        val finalMaxElRate = (mst["FinalTransformedMaxElRate"] as? Number)?.toDouble()
+
+        // ===== KeyholeAxisTransformed (3축, Train≠0, 각도 제한 전) =====
+        val keyholeAxisMaxAzRate = (mst["KeyholeAxisTransformedMaxAzRate"] as? Number)?.toDouble()
+        val keyholeAxisMaxElRate = (mst["KeyholeAxisTransformedMaxElRate"] as? Number)?.toDouble()
+
+        // ===== KeyholeFinalTransformed (3축, Train≠0, ±270°) =====
+        val keyholeFinalStartAzimuth = (mst["KeyholeFinalTransformedStartAzimuth"] as? Number)?.toDouble()
+        val keyholeFinalEndAzimuth = (mst["KeyholeFinalTransformedEndAzimuth"] as? Number)?.toDouble()
+        val keyholeFinalStartElevation = (mst["KeyholeFinalTransformedStartElevation"] as? Number)?.toDouble()
+        val keyholeFinalEndElevation = (mst["KeyholeFinalTransformedEndElevation"] as? Number)?.toDouble()
+        val keyholeFinalMaxElevation = (mst["KeyholeFinalTransformedMaxElevation"] as? Number)?.toDouble()
+        val keyholeFinalMaxAzRate = (mst["KeyholeFinalTransformedMaxAzRate"] as? Number)?.toDouble()
+        val keyholeFinalMaxElRate = (mst["KeyholeFinalTransformedMaxElRate"] as? Number)?.toDouble()
+
+        // ===== KeyholeOptimizedFinalTransformed (최적화 Train, ±270°) =====
+        val keyholeOptStartAzimuth = (mst["KeyholeOptimizedFinalTransformedStartAzimuth"] as? Number)?.toDouble()
+        val keyholeOptEndAzimuth = (mst["KeyholeOptimizedFinalTransformedEndAzimuth"] as? Number)?.toDouble()
+        val keyholeOptStartElevation = (mst["KeyholeOptimizedFinalTransformedStartElevation"] as? Number)?.toDouble()
+        val keyholeOptEndElevation = (mst["KeyholeOptimizedFinalTransformedEndElevation"] as? Number)?.toDouble()
+        val keyholeOptMaxElevation = (mst["KeyholeOptimizedFinalTransformedMaxElevation"] as? Number)?.toDouble()
+        val keyholeOptMaxAzRate = (mst["KeyholeOptimizedFinalTransformedMaxAzRate"] as? Number)?.toDouble()
+        val keyholeOptMaxElRate = (mst["KeyholeOptimizedFinalTransformedMaxElRate"] as? Number)?.toDouble()
 
         return TrackingSessionEntity(
             mstId = mstId,
@@ -446,15 +500,59 @@ class PassScheduleDataRepository(
             satelliteName = satelliteName,
             trackingMode = "PASS_SCHEDULE",
             dataType = dataType,
+            // 시간 정보
             startTime = startTime,
             endTime = endTime,
             duration = duration,
+            maxElevationTime = maxElevationTime,
+            // 기본 각도 정보
+            startAzimuth = startAzimuth,
+            endAzimuth = endAzimuth,
+            startElevation = startElevation,
+            endElevation = endElevation,
+            trainAngle = trainAngle,
+            // 기본 Peak 값
             maxElevation = maxElevation,
             maxAzimuthRate = maxAzimuthRate,
             maxElevationRate = maxElevationRate,
+            maxAzimuthAccel = maxAzimuthAccel,
+            maxElevationAccel = maxElevationAccel,
             keyholeDetected = keyholeDetected,
             recommendedTrainAngle = recommendedTrainAngle,
-            totalPoints = totalPoints
+            totalPoints = totalPoints,
+            // Original (2축)
+            originalStartAzimuth = originalStartAzimuth,
+            originalEndAzimuth = originalEndAzimuth,
+            originalMaxElevation = originalMaxElevation,
+            originalMaxAzRate = originalMaxAzRate,
+            originalMaxElRate = originalMaxElRate,
+            // FinalTransformed (3축, Train=0)
+            finalStartAzimuth = finalStartAzimuth,
+            finalEndAzimuth = finalEndAzimuth,
+            finalStartElevation = finalStartElevation,
+            finalEndElevation = finalEndElevation,
+            finalMaxElevation = finalMaxElevation,
+            finalMaxAzRate = finalMaxAzRate,
+            finalMaxElRate = finalMaxElRate,
+            // KeyholeAxisTransformed
+            keyholeAxisMaxAzRate = keyholeAxisMaxAzRate,
+            keyholeAxisMaxElRate = keyholeAxisMaxElRate,
+            // KeyholeFinalTransformed
+            keyholeFinalStartAzimuth = keyholeFinalStartAzimuth,
+            keyholeFinalEndAzimuth = keyholeFinalEndAzimuth,
+            keyholeFinalStartElevation = keyholeFinalStartElevation,
+            keyholeFinalEndElevation = keyholeFinalEndElevation,
+            keyholeFinalMaxElevation = keyholeFinalMaxElevation,
+            keyholeFinalMaxAzRate = keyholeFinalMaxAzRate,
+            keyholeFinalMaxElRate = keyholeFinalMaxElRate,
+            // KeyholeOptimizedFinalTransformed
+            keyholeOptStartAzimuth = keyholeOptStartAzimuth,
+            keyholeOptEndAzimuth = keyholeOptEndAzimuth,
+            keyholeOptStartElevation = keyholeOptStartElevation,
+            keyholeOptEndElevation = keyholeOptEndElevation,
+            keyholeOptMaxElevation = keyholeOptMaxElevation,
+            keyholeOptMaxAzRate = keyholeOptMaxAzRate,
+            keyholeOptMaxElRate = keyholeOptMaxElRate
         )
     }
 

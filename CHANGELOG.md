@@ -6,6 +6,24 @@
 
 ---
 
+## [2026-01-21] - Tracking Schema Redesign (V006)
+
+### Changed
+- tracking_session: UNIQUE 제약 변경 (data_type → detail_id) + TLE 연동 (FK + 스냅샷)
+- tracking_trajectory: +4컬럼 (train_rate, satellite_range/altitude/velocity)
+- tracking_result: -17컬럼 (이론치 제거), +15컬럼 (ICD 추적 데이터 + 정밀 추적 메타데이터)
+
+### Why
+- 1 Pass = 7 Sessions 문제 해결 → 1 Pass = 1 Session으로 정규화
+- 이론치는 tracking_trajectory에서 JOIN 조회 (중복 제거)
+- TLE 데이터 추적성 확보 (FK로 히스토리, 스냅샷으로 계산 시점 기록)
+
+### Details
+- [Tracking_Schema_Redesign](docs/work/active/Tracking_Schema_Redesign/README.md)
+- [V006 Migration](backend/src/main/resources/db/migration/V006__Schema_redesign_tracking_tables.sql)
+
+---
+
 ## [2026-01-21] - Admin Panel 분리 + UX 개선
 
 ### Added

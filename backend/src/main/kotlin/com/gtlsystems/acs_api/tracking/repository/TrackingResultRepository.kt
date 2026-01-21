@@ -11,6 +11,11 @@ import java.time.OffsetDateTime
 /**
  * 실측 추적 결과 Repository
  * - Hypertable (PRIMARY KEY 없음) → DatabaseClient 사용
+ *
+ * V006 재설계:
+ * - 이론치 컬럼 제거 (trajectory에서 JOIN 조회)
+ * - ICD 추적 데이터 추가
+ * - 정밀 추적 메타데이터 추가
  */
 @Repository
 @ConditionalOnBean(DatabaseClient::class)
@@ -24,72 +29,77 @@ class TrackingResultRepository(
         return databaseClient.sql("""
             INSERT INTO tracking_result
             (timestamp, session_id, index, theoretical_index,
-             original_azimuth, original_elevation,
-             transformed_azimuth, transformed_elevation, transformed_train,
-             final_azimuth, final_elevation, final_train,
-             actual_azimuth, actual_elevation, actual_train,
-             azimuth_error, elevation_error, train_error, total_error,
-             azimuth_rate, elevation_rate, train_rate,
-             azimuth_acceleration, elevation_acceleration, train_acceleration,
-             keyhole_active, keyhole_optimized, tracking_quality,
-             interpolation_type, interpolation_accuracy,
-             satellite_range, satellite_altitude, satellite_velocity,
+             theoretical_timestamp, time_offset_ms, interpolation_fraction,
+             lower_theoretical_index, upper_theoretical_index,
              cmd_azimuth, cmd_elevation, cmd_train,
-             position_azimuth, position_elevation, position_train, created_at)
+             actual_azimuth, actual_elevation, actual_train,
+             position_azimuth, position_elevation, position_train,
+             tracking_azimuth_time, tracking_cmd_azimuth, tracking_actual_azimuth,
+             tracking_elevation_time, tracking_cmd_elevation, tracking_actual_elevation,
+             tracking_train_time, tracking_cmd_train, tracking_actual_train,
+             azimuth_error, elevation_error, train_error, total_error,
+             keyhole_active, keyhole_optimized, tracking_quality, interpolation_accuracy,
+             kalman_azimuth, kalman_elevation, kalman_gain, created_at)
             VALUES
             (:timestamp, :sessionId, :index, :theoreticalIndex,
-             :originalAzimuth, :originalElevation,
-             :transformedAzimuth, :transformedElevation, :transformedTrain,
-             :finalAzimuth, :finalElevation, :finalTrain,
-             :actualAzimuth, :actualElevation, :actualTrain,
-             :azimuthError, :elevationError, :trainError, :totalError,
-             :azimuthRate, :elevationRate, :trainRate,
-             :azimuthAcceleration, :elevationAcceleration, :trainAcceleration,
-             :keyholeActive, :keyholeOptimized, :trackingQuality,
-             :interpolationType, :interpolationAccuracy,
-             :satelliteRange, :satelliteAltitude, :satelliteVelocity,
+             :theoreticalTimestamp, :timeOffsetMs, :interpolationFraction,
+             :lowerTheoreticalIndex, :upperTheoreticalIndex,
              :cmdAzimuth, :cmdElevation, :cmdTrain,
-             :positionAzimuth, :positionElevation, :positionTrain, :createdAt)
+             :actualAzimuth, :actualElevation, :actualTrain,
+             :positionAzimuth, :positionElevation, :positionTrain,
+             :trackingAzimuthTime, :trackingCmdAzimuth, :trackingActualAzimuth,
+             :trackingElevationTime, :trackingCmdElevation, :trackingActualElevation,
+             :trackingTrainTime, :trackingCmdTrain, :trackingActualTrain,
+             :azimuthError, :elevationError, :trainError, :totalError,
+             :keyholeActive, :keyholeOptimized, :trackingQuality, :interpolationAccuracy,
+             :kalmanAzimuth, :kalmanElevation, :kalmanGain, :createdAt)
         """.trimIndent())
             .bind("timestamp", entity.timestamp)
             .bind("sessionId", entity.sessionId)
             .bind("index", entity.index)
             .bindNullable("theoreticalIndex", entity.theoreticalIndex)
-            .bindNullable("originalAzimuth", entity.originalAzimuth)
-            .bindNullable("originalElevation", entity.originalElevation)
-            .bindNullable("transformedAzimuth", entity.transformedAzimuth)
-            .bindNullable("transformedElevation", entity.transformedElevation)
-            .bindNullable("transformedTrain", entity.transformedTrain)
-            .bindNullable("finalAzimuth", entity.finalAzimuth)
-            .bindNullable("finalElevation", entity.finalElevation)
-            .bindNullable("finalTrain", entity.finalTrain)
+            // 정밀 추적 메타데이터 (V006)
+            .bindNullable("theoreticalTimestamp", entity.theoreticalTimestamp)
+            .bindNullable("timeOffsetMs", entity.timeOffsetMs)
+            .bindNullable("interpolationFraction", entity.interpolationFraction)
+            .bindNullable("lowerTheoreticalIndex", entity.lowerTheoreticalIndex)
+            .bindNullable("upperTheoreticalIndex", entity.upperTheoreticalIndex)
+            // 명령값
+            .bindNullable("cmdAzimuth", entity.cmdAzimuth)
+            .bindNullable("cmdElevation", entity.cmdElevation)
+            .bindNullable("cmdTrain", entity.cmdTrain)
+            // 실측값
             .bindNullable("actualAzimuth", entity.actualAzimuth)
             .bindNullable("actualElevation", entity.actualElevation)
             .bindNullable("actualTrain", entity.actualTrain)
+            // 위치값
+            .bindNullable("positionAzimuth", entity.positionAzimuth)
+            .bindNullable("positionElevation", entity.positionElevation)
+            .bindNullable("positionTrain", entity.positionTrain)
+            // ICD 추적 데이터 (V006)
+            .bindNullable("trackingAzimuthTime", entity.trackingAzimuthTime)
+            .bindNullable("trackingCmdAzimuth", entity.trackingCmdAzimuth)
+            .bindNullable("trackingActualAzimuth", entity.trackingActualAzimuth)
+            .bindNullable("trackingElevationTime", entity.trackingElevationTime)
+            .bindNullable("trackingCmdElevation", entity.trackingCmdElevation)
+            .bindNullable("trackingActualElevation", entity.trackingActualElevation)
+            .bindNullable("trackingTrainTime", entity.trackingTrainTime)
+            .bindNullable("trackingCmdTrain", entity.trackingCmdTrain)
+            .bindNullable("trackingActualTrain", entity.trackingActualTrain)
+            // 오차
             .bindNullable("azimuthError", entity.azimuthError)
             .bindNullable("elevationError", entity.elevationError)
             .bindNullable("trainError", entity.trainError)
             .bindNullable("totalError", entity.totalError)
-            .bindNullable("azimuthRate", entity.azimuthRate)
-            .bindNullable("elevationRate", entity.elevationRate)
-            .bindNullable("trainRate", entity.trainRate)
-            .bindNullable("azimuthAcceleration", entity.azimuthAcceleration)
-            .bindNullable("elevationAcceleration", entity.elevationAcceleration)
-            .bindNullable("trainAcceleration", entity.trainAcceleration)
+            // 상태
             .bind("keyholeActive", entity.keyholeActive)
             .bind("keyholeOptimized", entity.keyholeOptimized)
             .bindNullable("trackingQuality", entity.trackingQuality)
-            .bindNullable("interpolationType", entity.interpolationType)
             .bindNullable("interpolationAccuracy", entity.interpolationAccuracy)
-            .bindNullable("satelliteRange", entity.satelliteRange)
-            .bindNullable("satelliteAltitude", entity.satelliteAltitude)
-            .bindNullable("satelliteVelocity", entity.satelliteVelocity)
-            .bindNullable("cmdAzimuth", entity.cmdAzimuth)
-            .bindNullable("cmdElevation", entity.cmdElevation)
-            .bindNullable("cmdTrain", entity.cmdTrain)
-            .bindNullable("positionAzimuth", entity.positionAzimuth)
-            .bindNullable("positionElevation", entity.positionElevation)
-            .bindNullable("positionTrain", entity.positionTrain)
+            // 칼만 필터 (V006)
+            .bindNullable("kalmanAzimuth", entity.kalmanAzimuth)
+            .bindNullable("kalmanElevation", entity.kalmanElevation)
+            .bindNullable("kalmanGain", entity.kalmanGain)
             .bind("createdAt", entity.createdAt ?: OffsetDateTime.now())
             .then()
     }
@@ -138,41 +148,48 @@ class TrackingResultRepository(
             sessionId = row.get("session_id", Long::class.java)!!,
             index = row.get("index", Int::class.java)!!,
             theoreticalIndex = row.get("theoretical_index", Int::class.java),
-            originalAzimuth = row.get("original_azimuth", Double::class.java),
-            originalElevation = row.get("original_elevation", Double::class.java),
-            transformedAzimuth = row.get("transformed_azimuth", Double::class.java),
-            transformedElevation = row.get("transformed_elevation", Double::class.java),
-            transformedTrain = row.get("transformed_train", Double::class.java),
-            finalAzimuth = row.get("final_azimuth", Double::class.java),
-            finalElevation = row.get("final_elevation", Double::class.java),
-            finalTrain = row.get("final_train", Double::class.java),
+            // 정밀 추적 메타데이터 (V006)
+            theoreticalTimestamp = row.get("theoretical_timestamp", OffsetDateTime::class.java),
+            timeOffsetMs = row.get("time_offset_ms", Double::class.java),
+            interpolationFraction = row.get("interpolation_fraction", Double::class.java),
+            lowerTheoreticalIndex = row.get("lower_theoretical_index", Int::class.java),
+            upperTheoreticalIndex = row.get("upper_theoretical_index", Int::class.java),
+            // 명령값
+            cmdAzimuth = row.get("cmd_azimuth", Double::class.java),
+            cmdElevation = row.get("cmd_elevation", Double::class.java),
+            cmdTrain = row.get("cmd_train", Double::class.java),
+            // 실측값
             actualAzimuth = row.get("actual_azimuth", Double::class.java),
             actualElevation = row.get("actual_elevation", Double::class.java),
             actualTrain = row.get("actual_train", Double::class.java),
+            // 위치값
+            positionAzimuth = row.get("position_azimuth", Double::class.java),
+            positionElevation = row.get("position_elevation", Double::class.java),
+            positionTrain = row.get("position_train", Double::class.java),
+            // ICD 추적 데이터 (V006)
+            trackingAzimuthTime = row.get("tracking_azimuth_time", Float::class.java),
+            trackingCmdAzimuth = row.get("tracking_cmd_azimuth", Float::class.java),
+            trackingActualAzimuth = row.get("tracking_actual_azimuth", Float::class.java),
+            trackingElevationTime = row.get("tracking_elevation_time", Float::class.java),
+            trackingCmdElevation = row.get("tracking_cmd_elevation", Float::class.java),
+            trackingActualElevation = row.get("tracking_actual_elevation", Float::class.java),
+            trackingTrainTime = row.get("tracking_train_time", Float::class.java),
+            trackingCmdTrain = row.get("tracking_cmd_train", Float::class.java),
+            trackingActualTrain = row.get("tracking_actual_train", Float::class.java),
+            // 오차
             azimuthError = row.get("azimuth_error", Double::class.java),
             elevationError = row.get("elevation_error", Double::class.java),
             trainError = row.get("train_error", Double::class.java),
             totalError = row.get("total_error", Double::class.java),
-            azimuthRate = row.get("azimuth_rate", Double::class.java),
-            elevationRate = row.get("elevation_rate", Double::class.java),
-            trainRate = row.get("train_rate", Double::class.java),
-            azimuthAcceleration = row.get("azimuth_acceleration", Double::class.java),
-            elevationAcceleration = row.get("elevation_acceleration", Double::class.java),
-            trainAcceleration = row.get("train_acceleration", Double::class.java),
+            // 상태
             keyholeActive = row.get("keyhole_active", Boolean::class.java) ?: false,
             keyholeOptimized = row.get("keyhole_optimized", Boolean::class.java) ?: false,
             trackingQuality = row.get("tracking_quality", String::class.java),
-            interpolationType = row.get("interpolation_type", String::class.java),
             interpolationAccuracy = row.get("interpolation_accuracy", Double::class.java),
-            satelliteRange = row.get("satellite_range", Double::class.java),
-            satelliteAltitude = row.get("satellite_altitude", Double::class.java),
-            satelliteVelocity = row.get("satellite_velocity", Double::class.java),
-            cmdAzimuth = row.get("cmd_azimuth", Double::class.java),
-            cmdElevation = row.get("cmd_elevation", Double::class.java),
-            cmdTrain = row.get("cmd_train", Double::class.java),
-            positionAzimuth = row.get("position_azimuth", Double::class.java),
-            positionElevation = row.get("position_elevation", Double::class.java),
-            positionTrain = row.get("position_train", Double::class.java),
+            // 칼만 필터 (V006)
+            kalmanAzimuth = row.get("kalman_azimuth", Double::class.java),
+            kalmanElevation = row.get("kalman_elevation", Double::class.java),
+            kalmanGain = row.get("kalman_gain", Double::class.java),
             createdAt = row.get("created_at", OffsetDateTime::class.java)
         )
     }
