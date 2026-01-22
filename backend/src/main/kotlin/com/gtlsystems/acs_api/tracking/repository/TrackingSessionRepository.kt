@@ -11,6 +11,7 @@ import java.time.OffsetDateTime
 /**
  * 추적 세션 Repository
  * - ReactiveCrudRepository 기반 (PRIMARY KEY 있음)
+ * - V006: UNIQUE 제약이 (mst_id, detail_id, tracking_mode)로 변경됨
  */
 @Repository
 interface TrackingSessionRepository : ReactiveCrudRepository<TrackingSessionEntity, Long> {
@@ -26,9 +27,24 @@ interface TrackingSessionRepository : ReactiveCrudRepository<TrackingSessionEnti
     fun findByTrackingMode(trackingMode: String): Flux<TrackingSessionEntity>
 
     /**
-     * MST ID와 데이터 타입으로 조회
+     * MST ID와 데이터 타입으로 조회 (V006 이전 호환용)
      */
     fun findByMstIdAndDataType(mstId: Long, dataType: String): Flux<TrackingSessionEntity>
+
+    /**
+     * V006: MST ID, Detail ID, Tracking Mode로 조회 (UNIQUE 키)
+     * 1 Pass = 1 Session을 보장하기 위한 조회
+     */
+    fun findByMstIdAndDetailIdAndTrackingMode(
+        mstId: Long,
+        detailId: Int,
+        trackingMode: String
+    ): Mono<TrackingSessionEntity>
+
+    /**
+     * V006: Detail ID로 조회
+     */
+    fun findByDetailId(detailId: Int): Flux<TrackingSessionEntity>
 
     /**
      * 시간 범위로 조회

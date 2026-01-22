@@ -39,7 +39,7 @@ data class TrackingSessionEntity(
     val trackingMode: String,  // 'EPHEMERIS' | 'PASS_SCHEDULE'
 
     @Column("data_type")
-    val dataType: String,  // 'original', 'axisTransformed', etc.
+    val dataType: String? = null,  // V006: nullable (호환성 유지용)
 
     // ===== 시간 정보 =====
     @Column("start_time")

@@ -212,11 +212,46 @@ Total               4/11 (36%)
 ### Step 6: 완료 (/done)
 
 **자동 수행:**
-- 빌드 검증 (BE + FE)
-- CHANGELOG.md 업데이트
-- 일일 로그 업데이트
-- 작업 폴더 README 업데이트
-- 커밋 생성
+```yaml
+1. 빌드 검증:
+   - BE: ./gradlew clean build -x test
+   - FE: npx vue-tsc --noEmit
+
+2. 문서 업데이트:
+   - CHANGELOG.md 업데이트
+   - docs/logs/YYYY-MM-DD.md 업데이트
+   - CURRENT_STATUS.md 업데이트
+   - 작업 폴더 README/PROGRESS 업데이트
+
+3. 문서 헬스체크 (신규):
+   - 작업 폴더 표준 구조 검증 (README.md, PROGRESS.md 필수)
+   - 깨진 링크 검사 (상대 경로)
+   - 아카이브 후보 탐색 (진행률 100% 또는 30일 미업데이트)
+   - 정리 필요 항목 알림
+
+4. 커밋 생성
+```
+
+**문서 헬스체크 알림 예시:**
+```
+📋 문서 헬스체크 결과
+
+✅ 표준 구조
+   - README.md: 있음
+   - PROGRESS.md: 있음
+
+⚠️ 아카이브 후보 (2개)
+   - Admin_Panel_Separation (진행률 100%)
+   - DB_Schema_Redesign (30일 이상 미업데이트)
+
+💡 정리 제안
+   - Tracking_Schema_Redesign: DESIGN.md 파일명 비표준 → 수정 완료
+```
+
+**아카이브 워크플로우:**
+```
+완료 확인 → 아카이브 여부 질문 → docs/work/archive/로 이동
+```
 
 ---
 

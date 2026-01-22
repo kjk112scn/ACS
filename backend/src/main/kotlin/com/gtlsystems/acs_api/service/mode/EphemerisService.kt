@@ -32,6 +32,7 @@ import java.util.BitSet
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 import com.gtlsystems.acs_api.service.system.BatchStorageManager
 import com.gtlsystems.acs_api.service.system.settings.SettingsService
 import com.gtlsystems.acs_api.service.mode.ephemeris.EphemerisTLECache
@@ -61,6 +62,8 @@ class EphemerisService(
 
     // ✅ Phase 5: TLE 캐시는 ephemerisTLECache로 분리됨
     private val locationData = settingsService.locationData
+    // ✅ P2 Fix: 전역 고유 MstId 생성용 카운터
+    private val mstIdCounter = AtomicLong(0)
 
     // ✅ Phase 5: 데이터 저장소는 ephemerisDataRepository로 분리됨
     // 내부 저장소 접근자 (기존 코드 호환성 유지)
@@ -454,9 +457,15 @@ class EphemerisService(
 
             // 2️⃣ Processor: 모든 변환 및 메타데이터 계산
             logger.info("🔄 SatelliteTrackingProcessor 호출 중...")
+
+            // ✅ P2 Fix: 전역 고유 MstId 생성
+            val passCount = schedule.trackingPasses.size
+            val startMstId = mstIdCounter.getAndAdd(1) + 1  // ✅ 위성당 1씩 증가
+            logger.debug("📊 startMstId: $startMstId (passCount: $passCount)")
             val processedData = satelliteTrackingProcessor.processFullTransformation(
                 schedule,
-                satelliteName
+                satelliteName,
+                startMstId  // ✅ P2 Fix: startMstId 전달
             )
             logger.info("✅ Processor 완료")
 
@@ -1706,6 +1715,8 @@ class EphemerisService(
         startTime: ZonedDateTime
     ): Map<String, Any?> {
         val elapsedTimeSeconds = Duration.between(startTime, currentTime).toMillis() / 1000.0f
+        // ✅ V006 P0 Fix: sessionId 조회 (tracking_result와 trajectory 연계용)
+        val sessionId = ephemerisDataRepository.getSessionIdByMstAndDetail(mstId, detailId)
 
         // logger.info("🔍 [createRealtimeTrackingData] 시작: mstId=$mstId, detailId=$detailId, currentTime=$currentTime, startTime=$startTime, elapsedTimeSeconds=$elapsedTimeSeconds")
 
@@ -1984,6 +1995,7 @@ class EphemerisService(
             "passId" to mstId, // 하위 호환성을 위해 유지
             "mstId" to mstId, // ✅ mstId 추가
             "detailId" to detailId, // ✅ detailId 추가
+            "sessionId" to sessionId, // ✅ V006 P0 Fix: sessionId 추가
 
             // ✅ 변환 오차 계산
             "originalToAxisTransformationError" to (axisTransformedAzimuth - originalAzimuth),

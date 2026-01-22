@@ -81,6 +81,17 @@ println()       → logger.debug()
 | 모드 시스템 | `docs/architecture/context/domain/mode-system.md` |
 | 진행중 작업 | `docs/work/active/` |
 
+## 문서 관리 규칙
+
+| 규칙 | 설명 |
+|------|------|
+| **Single Source** | `CURRENT_STATUS.md`만 현재 상태 관리 |
+| **작업 폴더** | `docs/work/active/{Feature_Name}/` 표준 구조 사용 |
+| **필수 파일** | README.md, PROGRESS.md (DESIGN.md, FIX.md는 필요시) |
+| **완료 시** | `/done` 실행 → CHANGELOG, logs, CURRENT_STATUS 자동 업데이트 |
+
+> **상세:** `docs/guides/documentation-management.md`
+
 ## 효과적인 요청 패턴
 
 **Research → Plan → Implement** 순서로 진행

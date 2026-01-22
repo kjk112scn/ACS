@@ -265,6 +265,29 @@ class PassScheduleDataRepository(
     fun containsSatellite(satelliteId: String): Boolean = mstStorage.containsKey(satelliteId)
 
     /**
+     * V006 P1 Fix: mstId와 detailId로 tracking_session의 id를 조회합니다.
+     *
+     * @param mstId 마스터 ID
+     * @param detailId 패스 구분자
+     * @param trackingMode 추적 모드 (기본값: PASS_SCHEDULE)
+     * @return 세션 ID (없으면 null)
+     */
+    fun getSessionIdByMstAndDetail(
+        mstId: Long,
+        detailId: Int,
+        trackingMode: String = "PASS_SCHEDULE"  // ✅ mapMstToSession과 일치
+    ): Long? {
+        return try {
+            sessionRepository?.findByMstIdAndDetailIdAndTrackingMode(mstId, detailId, trackingMode)
+                ?.block()
+                ?.id
+        } catch (e: Exception) {
+            logger.warn("⚠️ SessionId 조회 실패: mstId=$mstId, detailId=$detailId, error=${e.message}")
+            null
+        }
+    }
+
+    /**
      * 저장소 상태 요약을 반환합니다.
      */
     fun getStorageSummary(): Map<String, Any> {
@@ -342,38 +365,76 @@ class PassScheduleDataRepository(
             return
         }
 
-        // MST 데이터 → TrackingSession 저장
-        mstData.forEach { mst ->
+        // ✅ V006 P1 Fix: (mstId, detailId) 기준으로 그룹화하여 1 Pass = 1 Session 보장
+        val groupedMst = mstData.groupBy { mst ->
+            val mstId = (mst["MstId"] as? Number)?.toLong() ?: 0L
+            val detailId = (mst["DetailId"] as? Number)?.toInt() ?: 0
+            Pair(mstId, detailId)
+        }
+
+        logger.info("📝 [DB #$opId] MST ${mstData.size}개 → ${groupedMst.size}개 세션으로 그룹화 (V006 정책)")
+
+        // 각 그룹에서 대표 세션 1개만 저장
+        groupedMst.forEach { (key, mstGroup) ->
+            val (mstId, detailId) = key
             try {
-                // ✅ DTL 카운트 미리 계산 (total_points용)
-                val mstId = (mst["MstId"] as? Number)?.toLong()
-                val dataType = mst["DataType"] as? String
-                val sessionDtlData = dtlData.filter { dtl ->
+                // 대표 MST 선택: 'original' 우선, 없으면 첫 번째
+                val representativeMst = mstGroup.find { it["DataType"] == "original" }
+                    ?: mstGroup.firstOrNull()
+                    ?: return@forEach
+
+                // 모든 data_type의 DTL 데이터 합산 (total_points용)
+                val allDtlForSession = dtlData.filter { dtl ->
                     val dtlMstId = (dtl["MstId"] as? Number)?.toLong()
-                    val dtlDataType = dtl["DataType"] as? String
-                    dtlMstId == mstId && dtlDataType == dataType
+                    val dtlDetailId = (dtl["DetailId"] as? Number)?.toInt() ?: 0
+                    dtlMstId == mstId && dtlDetailId == detailId
                 }
 
-                // ✅ DTL 카운트 전달
-                val session = mapMstToSession(satelliteId, mst, sessionDtlData.size)
-                sessionRepository.save(session)
-                    .doOnSuccess { saved: TrackingSessionEntity ->
-                        logger.debug("📝 [DB #$opId] Session 저장: id=${saved.id}, satelliteId=$satelliteId, mstId=${saved.mstId}")
-                        // 해당 세션의 DTL 데이터 저장
-                        if (sessionDtlData.isNotEmpty() && saved.id != null) {
-                            saveTrajectories(saved.id, sessionDtlData, opId)
-                        }
-                    }
-                    .doOnError { e: Throwable ->
-                        logger.error("❌ [DB #$opId] Session 저장 실패: ${e.message}")
-                    }
-                    .subscribe()
-            } catch (e: Exception) {
-                logger.error("❌ [DB #$opId] MST → Session 변환 실패: ${e.message}")
+                // 세션 저장 (중복 체크 후 UPSERT)
+                val session = mapMstToSession(satelliteId, representativeMst, allDtlForSession.size)
+                saveOrUpdateSession(session, allDtlForSession, opId)
+            } catch (e: RuntimeException) {
+                logger.error("❌ [DB #$opId] MST($mstId, $detailId) 저장 실패: ${e.message}")
             }
         }
 
-        logger.info("📝 [DB #$opId] PassSchedule 스케줄 DB 저장 요청 완료 (위성: $satelliteId, MST: ${mstData.size}개)")
+        logger.info("📝 [DB #$opId] PassSchedule 스케줄 DB 저장 요청 완료 (위성: $satelliteId, ${groupedMst.size}개 세션)")
+    }
+
+    /**
+     * V006 P1 Fix: 세션 UPSERT (존재하면 스킵, 없으면 INSERT)
+     */
+    private fun saveOrUpdateSession(
+        session: TrackingSessionEntity,
+        dtlData: List<Map<String, Any?>>,
+        opId: Long
+    ) {
+        sessionRepository?.findByMstIdAndDetailIdAndTrackingMode(
+            session.mstId,
+            session.detailId,
+            session.trackingMode
+        )?.hasElement()
+            ?.flatMap { exists ->
+                if (exists) {
+                    logger.debug("📝 [DB #$opId] Session 이미 존재: mstId=${session.mstId}, detailId=${session.detailId} (스킵)")
+                    reactor.core.publisher.Mono.empty()
+                } else {
+                    sessionRepository.save(session)
+                }
+            }
+            ?.doOnSuccess { saved: TrackingSessionEntity? ->
+                if (saved != null) {
+                    logger.debug("📝 [DB #$opId] Session 저장: id=${saved.id}, mstId=${saved.mstId}, detailId=${saved.detailId}")
+                    // Trajectory 저장
+                    if (dtlData.isNotEmpty() && saved.id != null) {
+                        saveTrajectories(saved.id, dtlData, opId)
+                    }
+                }
+            }
+            ?.doOnError { e: Throwable ->
+                logger.error("❌ [DB #$opId] Session 저장 실패: ${e.message}")
+            }
+            ?.subscribe()
     }
 
     /**

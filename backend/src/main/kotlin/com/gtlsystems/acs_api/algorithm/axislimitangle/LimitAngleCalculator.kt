@@ -64,12 +64,17 @@ class LimitAngleCalculator {
 
         val convertedData = mutableListOf<Map<String, Any?>>()
 
-        // MstId별로 그룹화하여 처리
-        // ✅ PassSchedule 데이터 구조 리팩토링: UInt → Long
-        val groupedByMstId = ephemerisTrackDtl.groupBy { (it["MstId"] as? Number)?.toLong() ?: 0L }
+        // V006: (MstId, DetailId) 쌍으로 그룹화하여 패스별로 개별 처리
+        // P2-1 수정 후 동일 위성의 모든 패스가 같은 MstId를 가지므로, DetailId로 패스 구분 필요
+        val groupedByMstIdAndDetailId = ephemerisTrackDtl.groupBy { dtl ->
+            val mstId = (dtl["MstId"] as? Number)?.toLong() ?: 0L
+            val detailId = (dtl["DetailId"] as? Number)?.toInt() ?: 0
+            Pair(mstId, detailId)
+        }
 
-        groupedByMstId.forEach { (mstId, dtlList) ->
-            logger.debug("MstId $mstId 처리 중 - ${dtlList.size}개 데이터 포인트")
+        groupedByMstIdAndDetailId.forEach { (key, dtlList) ->
+            val (mstId, detailId) = key
+            logger.debug("MstId=$mstId, DetailId=$detailId 처리 중 - ${dtlList.size}개 데이터 포인트")
 
             val convertedGroup = convertAzimuthPath(dtlList)
             convertedData.addAll(convertedGroup)
@@ -458,8 +463,9 @@ class LimitAngleCalculator {
             val mstId = mstRecord["No"] as UInt
 
             // 해당 MstId의 세부 데이터 찾기
+            // ✅ "No" → "Index" 변경 (V006 리팩토링)
             val relatedDtlData = convertedDtlData.filter { it["MstId"] == mstId }
-                .sortedBy { it["No"] as UInt }
+                .sortedBy { (it["Index"] as? Number)?.toInt() ?: 0 }
 
             if (relatedDtlData.isNotEmpty()) {
                 // 첫 번째와 마지막 방위각 추출
@@ -502,8 +508,14 @@ class LimitAngleCalculator {
         var totalBoundaryCrossings = 0
 
         // 세부 데이터 검증
-        convertedDtl.groupBy { it["MstId"] as UInt }.forEach { (mstId, dtlList) ->
-            val sortedList = dtlList.sortedBy { it["No"] as UInt }
+        // ✅ V006: (MstId, DetailId) 쌍으로 그룹화하여 패스별 개별 검증
+        convertedDtl.groupBy { dtl ->
+            val mstId = (dtl["MstId"] as? Number)?.toLong() ?: 0L
+            val detailId = (dtl["DetailId"] as? Number)?.toInt() ?: 0
+            Pair(mstId, detailId)
+        }.forEach { (key, dtlList) ->
+            val (mstId, detailId) = key
+            val sortedList = dtlList.sortedBy { (it["Index"] as? Number)?.toInt() ?: 0 }
 
             sortedList.forEach { point ->
                 val azimuth = point["Azimuth"] as Double
@@ -511,8 +523,8 @@ class LimitAngleCalculator {
                 // ✅ 강화된 범위 체크
                 if (azimuth < -270.0 || azimuth > 270.0) {
                     outOfRangeCount++
-                    issues.add("MstId $mstId: 방위각 범위 초과 ${String.format("%.2f", azimuth)}°")
-                    logger.error("범위 초과 감지: MstId $mstId, 방위각 ${String.format("%.2f", azimuth)}°")
+                    issues.add("MstId=$mstId, DetailId=$detailId: 방위각 범위 초과 ${String.format("%.2f", azimuth)}°")
+                    logger.error("범위 초과 감지: MstId=$mstId, DetailId=$detailId, 방위각 ${String.format("%.2f", azimuth)}°")
                 }
             }
 
@@ -531,9 +543,9 @@ class LimitAngleCalculator {
 
                     if (isBoundary) {
                         totalBoundaryCrossings++
-                        logger.debug("MstId $mstId: 경계 통과 - ${String.format("%.2f", prevAz)}° → ${String.format("%.2f", currentAz)}°")
+                        logger.debug("MstId=$mstId, DetailId=$detailId: 경계 통과 - ${String.format("%.2f", prevAz)}° → ${String.format("%.2f", currentAz)}°")
                     } else {
-                        issues.add("MstId $mstId: 비정상적인 각도 점프 ${String.format("%.2f", jump)}° (${String.format("%.2f", prevAz)}° → ${String.format("%.2f", currentAz)}°)")
+                        issues.add("MstId=$mstId, DetailId=$detailId: 비정상적인 각도 점프 ${String.format("%.2f", jump)}° (${String.format("%.2f", prevAz)}° → ${String.format("%.2f", currentAz)}°)")
                     }
                 }
             }
@@ -697,8 +709,9 @@ class LimitAngleCalculator {
         mstId: UInt,
         maxPoints: Int = 10
     ) {
+        // ✅ "No" → "Index" 변경 (V006 리팩토링)
         val passDetails = convertedDtl.filter { it["MstId"] == mstId }
-            .sortedBy { it["No"] as UInt }
+            .sortedBy { (it["Index"] as? Number)?.toInt() ?: 0 }
 
         if (passDetails.isEmpty()) {
             logger.warn("MstId $mstId 에 해당하는 데이터가 없습니다.")

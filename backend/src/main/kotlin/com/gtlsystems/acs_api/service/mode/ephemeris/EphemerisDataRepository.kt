@@ -270,6 +270,29 @@ class EphemerisDataRepository(
     fun getDtlSize(): Int = synchronized(dtlStorage) { dtlStorage.size }
 
     /**
+     * V006 P0 Fix: mstId와 detailId로 tracking_session의 id를 조회합니다.
+     *
+     * @param mstId 마스터 ID
+     * @param detailId 패스 구분자
+     * @param trackingMode 추적 모드 (기본값: ephemeris_designation)
+     * @return 세션 ID (없으면 null)
+     */
+    fun getSessionIdByMstAndDetail(
+        mstId: Long,
+        detailId: Int,
+        trackingMode: String = "EPHEMERIS"  // ✅ P0 Fix: DB 저장값과 일치 (mapMstToSession 참조)
+    ): Long? {
+        return try {
+            sessionRepository?.findByMstIdAndDetailIdAndTrackingMode(mstId, detailId, trackingMode)
+                ?.block()
+                ?.id
+        } catch (e: Exception) {
+            logger.warn("⚠️ SessionId 조회 실패: mstId=$mstId, detailId=$detailId, error=${e.message}")
+            null
+        }
+    }
+
+    /**
      * 저장소 상태 요약을 반환합니다.
      */
     fun getStorageSummary(): Map<String, Any> {
@@ -344,6 +367,11 @@ class EphemerisDataRepository(
     /**
      * DB에 스케줄 데이터를 저장합니다.
      * MST → tracking_session, DTL → tracking_trajectory
+     *
+     * V006: 1 Pass = 1 Session 정책
+     * - (mst_id, detail_id, tracking_mode)가 UNIQUE 키
+     * - data_type별로 7개 세션 생성하지 않음
+     * - 같은 (mstId, detailId) 그룹에서 대표 세션 1개만 저장
      */
     private fun saveToDatabase(mstData: List<Map<String, Any?>>, dtlData: List<Map<String, Any?>>, opId: Long) {
         if (sessionRepository == null || trajectoryRepository == null) {
@@ -351,38 +379,76 @@ class EphemerisDataRepository(
             return
         }
 
-        // MST 데이터 → TrackingSession 저장
-        mstData.forEach { mst ->
+        // V006: (mstId, detailId) 기준으로 그룹화하여 1 Pass = 1 Session 보장
+        val groupedMst = mstData.groupBy { mst ->
+            val mstId = (mst["MstId"] as? Number)?.toLong() ?: 0L
+            val detailId = (mst["DetailId"] as? Number)?.toInt() ?: 0
+            Pair(mstId, detailId)
+        }
+
+        logger.info("📝 [DB #$opId] MST ${mstData.size}개 → ${groupedMst.size}개 세션으로 그룹화")
+
+        // 각 그룹에서 대표 세션 1개만 저장
+        groupedMst.forEach { (key, mstGroup) ->
+            val (mstId, detailId) = key
             try {
-                // ✅ DTL 카운트 미리 계산 (total_points용)
-                val mstId = (mst["MstId"] as? Number)?.toLong()
-                val dataType = mst["DataType"] as? String
-                val sessionDtlData = dtlData.filter { dtl ->
+                // 대표 MST 선택: 'original' 우선, 없으면 첫 번째
+                val representativeMst = mstGroup.find { it["DataType"] == "original" }
+                    ?: mstGroup.firstOrNull()
+                    ?: return@forEach
+
+                // 모든 data_type의 DTL 데이터 합산 (total_points용)
+                val allDtlForSession = dtlData.filter { dtl ->
                     val dtlMstId = (dtl["MstId"] as? Number)?.toLong()
-                    val dtlDataType = dtl["DataType"] as? String
-                    dtlMstId == mstId && dtlDataType == dataType
+                    val dtlDetailId = (dtl["DetailId"] as? Number)?.toInt() ?: 0
+                    dtlMstId == mstId && dtlDetailId == detailId
                 }
 
-                // ✅ DTL 카운트 전달
-                val session = mapMstToSession(mst, sessionDtlData.size)
-                sessionRepository.save(session)
-                    .doOnSuccess { saved: TrackingSessionEntity ->
-                        logger.debug("📝 [DB #$opId] Session 저장: id=${saved.id}, mstId=${saved.mstId}, totalPoints=${saved.totalPoints}")
-                        // 해당 세션의 DTL 데이터 저장
-                        if (sessionDtlData.isNotEmpty() && saved.id != null) {
-                            saveTrajectories(saved.id, sessionDtlData, opId)
-                        }
-                    }
-                    .doOnError { e: Throwable ->
-                        logger.error("❌ [DB #$opId] Session 저장 실패: ${e.message}")
-                    }
-                    .subscribe()
-            } catch (e: Exception) {
-                logger.error("❌ [DB #$opId] MST → Session 변환 실패: ${e.message}")
+                // 세션 저장 (중복 체크 후 UPSERT)
+                val session = mapMstToSession(representativeMst, allDtlForSession.size)
+                saveOrUpdateSession(session, allDtlForSession, opId)
+            } catch (e: RuntimeException) {
+                logger.error("❌ [DB #$opId] MST($mstId, $detailId) 저장 실패: ${e.message}")
             }
         }
 
-        logger.info("📝 [DB #$opId] Ephemeris 스케줄 DB 저장 요청 완료 (MST: ${mstData.size}개)")
+        logger.info("📝 [DB #$opId] Ephemeris 스케줄 DB 저장 요청 완료 (${groupedMst.size}개 세션)")
+    }
+
+    /**
+     * V006: 세션 UPSERT (존재하면 스킵, 없으면 INSERT)
+     */
+    private fun saveOrUpdateSession(
+        session: TrackingSessionEntity,
+        dtlData: List<Map<String, Any?>>,
+        opId: Long
+    ) {
+        sessionRepository?.findByMstIdAndDetailIdAndTrackingMode(
+            session.mstId,
+            session.detailId,
+            session.trackingMode
+        )?.hasElement()
+            ?.flatMap { exists ->
+                if (exists) {
+                    logger.debug("📝 [DB #$opId] Session 이미 존재: mstId=${session.mstId}, detailId=${session.detailId} (스킵)")
+                    reactor.core.publisher.Mono.empty()
+                } else {
+                    sessionRepository.save(session)
+                }
+            }
+            ?.doOnSuccess { saved: TrackingSessionEntity? ->
+                if (saved != null) {
+                    logger.debug("📝 [DB #$opId] Session 저장: id=${saved.id}, mstId=${saved.mstId}, detailId=${saved.detailId}")
+                    // Trajectory 저장
+                    if (dtlData.isNotEmpty() && saved.id != null) {
+                        saveTrajectories(saved.id, dtlData, opId)
+                    }
+                }
+            }
+            ?.doOnError { e: Throwable ->
+                logger.error("❌ [DB #$opId] Session 저장 실패: ${e.message}")
+            }
+            ?.subscribe()
     }
 
     /**
@@ -422,6 +488,10 @@ class EphemerisDataRepository(
      * - IsKeyhole → keyhole_detected
      * - Duration (ISO String) → duration (초)
      *
+     * V006 추가:
+     * - TLE 연동 (tleCacheId, tleLine1, tleLine2, tleEpoch)
+     * - data_type은 호환성 유지 (nullable)
+     *
      * @param dtlCount DTL 데이터 개수 (total_points 계산용)
      */
     private fun mapMstToSession(mst: Map<String, Any?>, dtlCount: Int = 0): TrackingSessionEntity {
@@ -431,7 +501,8 @@ class EphemerisDataRepository(
         val satelliteId = mst["SatelliteID"] as? String
             ?: mst["SatelliteId"] as? String ?: ""
         val satelliteName = mst["SatelliteName"] as? String
-        val dataType = mst["DataType"] as? String ?: "original"
+        // V006: data_type은 호환성 유지 (nullable)
+        val dataType = mst["DataType"] as? String
 
         // 시간 파싱
         val now = OffsetDateTime.now(ZoneOffset.UTC)
@@ -456,6 +527,19 @@ class EphemerisDataRepository(
         val totalPoints = (mst["TotalPoints"] as? Number)?.toInt()
             ?: if (dtlCount > 0) dtlCount else null
 
+        // V006: TLE 연동 (FK + 스냅샷)
+        val tleCacheId = (mst["TleCacheId"] as? Number)?.toLong()
+            ?: (mst["tleCacheId"] as? Number)?.toLong()
+        val tleLine1 = mst["TleLine1"] as? String
+            ?: mst["tleLine1"] as? String
+            ?: mst["tle_line_1"] as? String
+        val tleLine2 = mst["TleLine2"] as? String
+            ?: mst["tleLine2"] as? String
+            ?: mst["tle_line_2"] as? String
+        val tleEpoch = parseTime(mst["TleEpoch"])
+            ?: parseTime(mst["tleEpoch"])
+            ?: parseTime(mst["tle_epoch"])
+
         return TrackingSessionEntity(
             mstId = mstId,
             detailId = detailId,
@@ -471,7 +555,12 @@ class EphemerisDataRepository(
             maxElevationRate = maxElevationRate,
             keyholeDetected = keyholeDetected,
             recommendedTrainAngle = recommendedTrainAngle,
-            totalPoints = totalPoints
+            totalPoints = totalPoints,
+            // V006: TLE 연동
+            tleCacheId = tleCacheId,
+            tleLine1 = tleLine1,
+            tleLine2 = tleLine2,
+            tleEpoch = tleEpoch
         )
     }
 

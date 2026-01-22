@@ -1443,7 +1443,7 @@ class PassScheduleService(
                 val passCount = schedule.trackingPasses.size
 
                 // ✅ 원자적으로 범위 할당 (동시성 문제 해결)
-                val startMstId = mstIdCounter.getAndAdd(passCount.toLong()) + 1
+                val startMstId = mstIdCounter.getAndAdd(1) + 1  // ✅ 위성당 1씩 증가
                 logger.debug("📊 위성 $satelliteId($satelliteName) 할당된 MstId 범위: $startMstId ~ ${startMstId + passCount - 1} (${passCount}개 패스)")
                 
                 // ✅ 계산된 schedule을 재사용하여 실제 데이터 생성 (중복 계산 없음)
@@ -1602,7 +1602,7 @@ class PassScheduleService(
             // ✅ 2. startMstId가 null이거나 0이면 자동으로 전역 카운터에서 할당
             val actualStartMstId = if (startMstId == null || startMstId == 0L) {
                 // ✅ 동시성 문제 해결: 원자적으로 범위 할당
-                val allocatedStartMstId = mstIdCounter.getAndAdd(passCount.toLong()) + 1
+                val allocatedStartMstId = mstIdCounter.getAndAdd(1) + 1  // ✅ 위성당 1씩 증가
                 logger.debug("📊 위성 $satelliteId($actualSatelliteName) 자동 할당된 MstId 범위: $allocatedStartMstId ~ ${allocatedStartMstId + passCount - 1} (${passCount}개 패스)")
                 allocatedStartMstId
             } else {

@@ -147,6 +147,6 @@ ALTER COLUMN data_type SET NOT NULL;
 
 ## 관련 문서
 
-- [DESIGN.md](DESIGN.md) - 설계 문서
 - [PROGRESS.md](PROGRESS.md) - 진행 상황
-- [V006 마이그레이션](../../../backend/src/main/resources/db/migration/V006__Schema_redesign_tracking_tables.sql)
+- [DESIGN.md](DESIGN.md) - 설계 문서 (7가지 DataType, 테이블 연계 분석)
+- [V006 마이그레이션](../../../../backend/src/main/resources/db/migration/V006__Schema_redesign_tracking_tables.sql)

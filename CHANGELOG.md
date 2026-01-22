@@ -6,6 +6,28 @@
 
 ---
 
+## [2026-01-22] - 문서 관리 체계 표준화
+
+### Added
+- 문서 관리 가이드 신규 (docs/guides/documentation-management.md)
+- 작업 폴더 템플릿 4개 (README, PROGRESS, DESIGN, FIX)
+- docs/work/archive/ 폴더 생성
+
+### Changed
+- CLAUDE.md에 문서 관리 규칙 4줄 추가
+- /done 스킬에 문서 헬스체크 단계 추가 (아카이브 후보 탐색)
+- DEEP_REVIEW_V007.md → DESIGN.md 이름 표준화
+
+### Why
+- 작업 폴더 구조 표준화로 일관된 문서 관리
+- 완료된 작업 자동 감지 + 아카이브 제안
+- 세션 간 컨텍스트 유지 강화
+
+### Details
+- [documentation-management.md](docs/guides/documentation-management.md)
+
+---
+
 ## [2026-01-21] - Tracking Schema Redesign (V006)
 
 ### Changed

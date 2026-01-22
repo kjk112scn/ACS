@@ -397,7 +397,7 @@ class SatelliteTrackingProcessor(
 
         schedule.trackingPasses.forEachIndexed { index, pass ->
             // ✅ 전역 고유 MstId 생성 (startMstId는 이미 getAndAdd() + 1로 계산되어 있으므로 index만 더함)
-            val mstId = startMstId + index  // Long 타입 (startMstId는 이미 1부터 시작)
+            val mstId = startMstId  // ✅ 동일 위성 = 동일 mstId  // Long 타입 (startMstId는 이미 1부터 시작)
             // ✅ DetailId는 패스 인덱스로 설정 (각 패스마다 고유한 detailId 부여)
             val detailId = index
 
@@ -513,6 +513,8 @@ class SatelliteTrackingProcessor(
                     "RecommendedTrainAngle" to recommendedTrainAngle,
                     "CreationDate" to ZonedDateTime.now(),
                     "Creator" to "System",
+                    "TleLine1" to schedule.satelliteTle1,  // ✅ P3 Fix: TLE Line 1
+                    "TleLine2" to schedule.satelliteTle2,  // ✅ P3 Fix: TLE Line 2
                     "DataType" to "original"
                 )
             )
@@ -1055,16 +1057,18 @@ class SatelliteTrackingProcessor(
         }
         
         // 2. ±270도 제한 적용
-        // ✅ LimitAngleCalculator 요구사항: MstId, No, Time, Azimuth, Elevation 필수
+        // ✅ LimitAngleCalculator 요구사항: MstId, DetailId, Index, Time, Azimuth, Elevation 필수
+        // ✅ V006: (MstId, DetailId) 쌍으로 그룹화하므로 DetailId 필수
         val (_, limitedDtl) = limitAngleCalculator.convertTrackingData(
             emptyList(),  // MST는 필요 없음
             transformedDtl.map { dtl ->
                 mapOf(
-                    "MstId" to dtl["MstId"],      // ✅ 그룹화용 (convertDetailData Line 66)
-                    "No" to dtl["No"],            // ✅ 정렬용 (convertAzimuthPath Line 87)
-                    "Time" to dtl["Time"],        // ✅ 시간 정보
-                    "Azimuth" to dtl["Azimuth"],  // ✅ 변환 대상 (convertAzimuthPath Line 88)
-                    "Elevation" to dtl["Elevation"] // ✅ 고도 정보
+                    "MstId" to dtl["MstId"],          // ✅ 그룹화용 (V006: MstId + DetailId)
+                    "DetailId" to dtl["DetailId"],   // ✅ 그룹화용 (V006: 패스 구분자)
+                    "Index" to dtl["Index"],          // ✅ 정렬용 (convertAzimuthPath Line 98)
+                    "Time" to dtl["Time"],            // ✅ 시간 정보
+                    "Azimuth" to dtl["Azimuth"],      // ✅ 변환 대상
+                    "Elevation" to dtl["Elevation"]  // ✅ 고도 정보
                 )
             }
         )
