@@ -250,8 +250,75 @@ Total               4/11 (36%)
 
 **아카이브 워크플로우:**
 ```
-완료 확인 → 아카이브 여부 질문 → docs/work/archive/로 이동
+완료 감지 → 아카이브 여부 질문 → 승인 시 자동 이동
 ```
+
+**자동 아카이브 조건 (하나라도 만족 시):**
+```yaml
+조건 1: PROGRESS.md에 "진행률: 100%" 또는 "100%" 포함
+조건 2: README.md에 "상태: ✅ 완료" 또는 "Status: Completed"
+조건 3: README.md에 "Status: ✅" 포함
+```
+
+**아카이브 실행 (승인 시):**
+```bash
+# 폴더 이동
+git mv docs/work/active/{Feature} docs/work/archive/{Feature}
+
+# 커밋에 포함
+git add -A
+```
+
+**아카이브 후 처리:**
+- CURRENT_STATUS.md에서 해당 작업 제거 또는 "완료" 섹션으로 이동
+- 일일 로그에 아카이브 기록
+
+---
+
+## 문서 재활성화 (Archive → Active)
+
+**시나리오:** 완료된 기능에 버그 발생 또는 기능 추가 필요
+
+**트리거:**
+- `/bugfix Admin Panel에서 버그 발생`
+- `/feature Admin Panel에 기능 추가`
+
+**자동 워크플로우:**
+```yaml
+1. 키워드 매칭:
+   - 요청에서 키워드 추출 (예: "Admin Panel", "Timezone")
+   - archive/ 폴더에서 README.md 검색
+   - 매칭되는 폴더 찾기
+
+2. 재활성화 질문:
+   "📦 archive/Admin_Panel_Separation 발견
+    이전 문서를 재활성화할까요? [예/아니오]"
+
+3. 승인 시 실행:
+   git mv docs/work/archive/{Feature} docs/work/active/{Feature}
+
+4. 문서 업데이트:
+   - FIX.md: 새 버그 항목 추가 (없으면 생성)
+   - PROGRESS.md: 버그 수정 Phase 추가
+   - README.md: 상태를 "🚧 진행 중"으로 변경
+
+5. CURRENT_STATUS.md:
+   - "진행 중 작업" 섹션에 추가
+```
+
+**FIX.md 자동 업데이트 예시:**
+```markdown
+### FIX-002: {새 버그 제목}
+
+**발견일**: 2026-01-22
+**상태**: 진행 중
+
+**증상**: {버그 설명}
+```
+
+**재활성화 없이 새로 시작:**
+- 매칭되는 archive 문서가 없으면 새 폴더 생성
+- 템플릿 기반 README.md, PROGRESS.md 자동 생성
 
 ---
 

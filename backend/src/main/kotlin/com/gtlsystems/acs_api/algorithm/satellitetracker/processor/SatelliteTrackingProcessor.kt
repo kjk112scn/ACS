@@ -98,6 +98,8 @@ class SatelliteTrackingProcessor(
             // ✅ "No" → "MstId" 변경, UInt → Long 변경
             val mstId = (mstData["MstId"] as? Number)?.toLong()
                 ?: throw IllegalStateException("MstId 필드가 없거나 유효하지 않습니다: $mstData")
+            // ✅ V006 Fix: DetailId 추출 (패스 구분용)
+            val detailId = (mstData["DetailId"] as? Number)?.toInt() ?: 0
 
             /**
              * Keyhole 판단 및 Train≠0 재계산
@@ -137,7 +139,12 @@ class SatelliteTrackingProcessor(
                 logger.info("🔄 Train=${String.format("%.6f", recommendedTrainAngle)}°로 재변환 시작...")
 
                 // 해당 패스의 Original DTL 추출
-                val passOriginalDtl = originalDtl.filter { it["MstId"] == mstId }
+                // ✅ V006 Fix: MstId만으로 필터링하면 동일 위성의 모든 패스가 섞임
+                // DetailId도 함께 필터링하여 정확히 해당 패스의 데이터만 추출
+                val passOriginalDtl = originalDtl.filter { dtl ->
+                    (dtl["MstId"] as? Number)?.toLong() == mstId &&
+                    (dtl["DetailId"] as? Number)?.toInt() == detailId
+                }
 
                 /**
                  * Original MST를 Train≠0으로 업데이트
@@ -420,8 +427,11 @@ class SatelliteTrackingProcessor(
             }
 
             // ✅ 상세 데이터에서 메타데이터 계산
-            // ✅ MstId 비교 시 Long 타입으로 변환
-            val passDtl = originalDtl.filter { (it["MstId"] as? Number)?.toLong() == mstId }
+            // ✅ V006 Fix: MstId + DetailId로 필터링 (동일 위성의 패스 구분)
+            val passDtl = originalDtl.filter { dtl ->
+                (dtl["MstId"] as? Number)?.toLong() == mstId &&
+                (dtl["DetailId"] as? Number)?.toInt() == detailId
+            }
             val metrics = calculateMetrics(passDtl)
 
             // Keyhole 분석
@@ -563,9 +573,12 @@ class SatelliteTrackingProcessor(
 
             logger.debug("패스 #$mstId 3축 변환 중 (Train: ${trainAngleForTransformation}°${if (forcedTrainAngle != null) " [강제 적용]" else " [MST에서 읽음]"})")
 
-            // 해당 패스의 상세 데이터 조회 (MstId로 필터링!)
-            // ✅ Long 타입으로 비교
-            val passDtl = originalDtl.filter { (it["MstId"] as? Number)?.toLong() == mstId }
+            // 해당 패스의 상세 데이터 조회
+            // ✅ V006 Fix: MstId + DetailId로 필터링 (동일 위성의 패스 구분)
+            val passDtl = originalDtl.filter { dtl ->
+                (dtl["MstId"] as? Number)?.toLong() == mstId &&
+                (dtl["DetailId"] as? Number)?.toInt() == detailId
+            }
 
             // 각 좌표에 3축 변환 적용
             passDtl.forEachIndexed { index, point ->
@@ -598,8 +611,11 @@ class SatelliteTrackingProcessor(
             }
 
             // ✅ 변환 후 메타데이터 재계산
-            // ✅ Long 타입으로 비교
-            val transformedPassDtl = axisTransformedDtl.filter { (it["MstId"] as? Number)?.toLong() == mstId }
+            // ✅ V006 Fix: MstId + DetailId로 필터링 (동일 위성의 패스 구분)
+            val transformedPassDtl = axisTransformedDtl.filter { dtl ->
+                (dtl["MstId"] as? Number)?.toLong() == mstId &&
+                (dtl["DetailId"] as? Number)?.toInt() == detailId
+            }
             val metrics = calculateMetrics(transformedPassDtl)
 
             // Keyhole 재분석 (본인 기준)
@@ -703,8 +719,11 @@ class SatelliteTrackingProcessor(
             logger.debug("패스 #$mstId 각도제한 변환 중")
 
             // 해당 패스의 상세 데이터 조회
-            // ✅ Long 타입으로 비교
-            val passDtl = axisTransformedDtl.filter { (it["MstId"] as? Number)?.toLong() == mstId }
+            // ✅ V006 Fix: MstId + DetailId로 필터링 (동일 위성의 패스 구분)
+            val passDtl = axisTransformedDtl.filter { dtl ->
+                (dtl["MstId"] as? Number)?.toLong() == mstId &&
+                (dtl["DetailId"] as? Number)?.toInt() == detailId
+            }
 
             // LimitAngleCalculator로 각도 제한 적용
             val (_, convertedDtl) = limitAngleCalculator.convertTrackingData(
@@ -742,8 +761,11 @@ class SatelliteTrackingProcessor(
             }
 
             // ✅ 변환 후 메타데이터 재계산
-            // ✅ Long 타입으로 비교
-            val finalPassDtl = finalTransformedDtl.filter { (it["MstId"] as? Number)?.toLong() == mstId }
+            // ✅ V006 Fix: MstId + DetailId로 필터링 (동일 위성의 패스 구분)
+            val finalPassDtl = finalTransformedDtl.filter { dtl ->
+                (dtl["MstId"] as? Number)?.toLong() == mstId &&
+                (dtl["DetailId"] as? Number)?.toInt() == detailId
+            }
             val metrics = calculateMetrics(finalPassDtl)
 
             // Keyhole 재분석 (본인 기준)

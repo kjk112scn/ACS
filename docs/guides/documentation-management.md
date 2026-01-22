@@ -219,15 +219,60 @@ docs/
 | **30일 미업데이트** | 마지막 수정일 기준 |
 | **명시적 완료** | README.md 상태가 "✅ 완료" |
 
+**자동 감지 조건 (하나라도 만족 시):**
+```yaml
+조건 1: PROGRESS.md에 "진행률: 100%" 포함
+조건 2: README.md에 "상태: ✅ 완료" 포함
+조건 3: README.md에 "Status: Completed" 포함
+```
+
 **아카이브 시점:**
 - `/done` 실행 시 자동 감지
-- 아카이브 여부 질문
-- 승인 시 `archive/`로 이동
+- 아카이브 여부 질문 (예: "Admin_Panel_Separation 완료됨. 아카이브할까요?")
+- 승인 시 `git mv`로 `archive/`로 자동 이동
+- 커밋에 포함
 
 **아카이브 후:**
 - `archive/` 폴더에서 참조 가능
-- 검색/참조용으로 유지
-- 삭제하지 않음
+- CURRENT_STATUS.md에서 해당 작업 제거
+- 검색/참조용으로 유지 (삭제 안 함)
+
+---
+
+## 문서 재활성화 (Archive → Active)
+
+완료된 기능에 버그 발생 또는 추가 작업 시 이전 문서를 재활성화합니다.
+
+**사용 방법:**
+```
+/bugfix "Admin Panel에서 다이얼로그 안 열림"
+/feature "Admin Panel에 로그아웃 버튼 추가"
+```
+
+**자동 동작:**
+1. 키워드로 `archive/` 폴더 검색
+2. 매칭되는 문서 발견 시 재활성화 질문
+3. 승인 시 `archive/` → `active/`로 이동
+4. FIX.md 또는 PROGRESS.md 자동 업데이트
+
+**재활성화 후 문서 상태:**
+```
+docs/work/active/Admin_Panel_Separation/
+├── README.md      ← 상태: "🚧 진행 중"으로 변경
+├── PROGRESS.md    ← 새 Phase 추가
+├── DESIGN.md      ← 기존 유지
+└── FIX.md         ← 새 버그 항목 추가
+```
+
+**FIX.md 자동 추가 형식:**
+```markdown
+### FIX-002: {버그 제목}
+
+**발견일**: YYYY-MM-DD
+**상태**: 진행 중
+
+**증상**: {버그 설명}
+```
 
 ---
 
@@ -301,6 +346,8 @@ docs/work/templates/
 | CLAUDE.md 규칙 추가 | ✅ | 4줄 문서 관리 규칙 |
 | /done 헬스체크 | ✅ | 아카이브 후보 + 링크 검사 |
 | 템플릿 폴더 | ✅ | docs/work/templates/ |
+| 자동 아카이브 | ✅ | 완료 감지 → 질문 → 승인 시 이동 |
+| 문서 재활성화 | ✅ | /bugfix 시 archive → active 이동 |
 | /sync → /health 통합 | ⏳ | 문서 동기화를 health에 포함 |
 | legacy/ 정리 | ⏳ | archive/historical/로 이동 |
 
