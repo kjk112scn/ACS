@@ -6,6 +6,25 @@
 
 ---
 
+## [2026-01-23] - PassSchedule P6 동기화 (P7 Fix)
+
+### Fixed
+- PassScheduleDataRepository: @PostConstruct initFromDatabase() 추가 (서버 재시작 시 DB→메모리 로드)
+- PassScheduleDataRepository: CreatedAt 기반 최신 등록 건 필터링 (9개 조회 함수)
+- PassScheduleDataRepository: 이력 보존 로직 (덮어쓰기 → 누적 저장)
+
+### Changed
+- EphemerisDataRepository: P6-2 CSV 다운로드 시 최신 등록 건만 반환 수정
+
+### Why
+- Ephemeris에 적용된 P6 (initFromDatabase, CreatedAt 필터링, 이력 보존) 패턴이 PassSchedule에는 미적용
+- 서버 재시작 시 PassSchedule 스케줄 목록이 0개로 표시되는 문제
+
+### Details
+- [Tracking_Schema_Redesign/FIX.md](docs/work/active/Tracking_Schema_Redesign/FIX.md)
+
+---
+
 ## [2026-01-22] - V006 MstId/DetailId 버그픽스
 
 ### Fixed

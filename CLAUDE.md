@@ -209,6 +209,7 @@ handbook/
 |------|------|
 | `/api-sync` | FE-BE 타입 동기화 |
 | `/migrate` | 마이그레이션 관리 |
+| `/publish` | 스킬을 claude-dev-kit 레포에 동기화 |
 
 ### 도움말
 

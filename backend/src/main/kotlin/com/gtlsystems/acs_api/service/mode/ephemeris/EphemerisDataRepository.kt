@@ -36,8 +36,9 @@ class EphemerisDataRepository(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     /**
-     * ✅ V006 Fix: 서버 시작 시 DB에서 기존 세션을 메모리로 로드
+     * ✅ V006 Fix: 서버 시작 시 DB에서 기존 세션 + 궤적을 메모리로 로드
      * TLE 등록 후 서버 재시작해도 스케줄 목록이 유지됨
+     * ✅ P6 Fix: DTL(trajectory)도 함께 로드
      */
     @PostConstruct
     fun initFromDatabase() {
@@ -67,6 +68,11 @@ class EphemerisDataRepository(
                     // ✅ 'final_transformed' 타입의 MST 생성 (getAllEphemerisTrackMstMerged에서 필요)
                     val finalMst = mapSessionToMst(session, "final_transformed")
                     mstData.add(finalMst)
+
+                    // ✅ P6 Fix: 해당 세션의 DTL(trajectory)도 로드
+                    if (trajectoryRepository != null && session.id != null) {
+                        loadTrajectoryForSession(session)
+                    }
                 }
 
                 synchronized(mstStorage) {
@@ -82,17 +88,77 @@ class EphemerisDataRepository(
     }
 
     /**
+     * ✅ P6 Fix: 세션별 trajectory를 DB에서 로드하여 dtlStorage에 추가
+     */
+    private fun loadTrajectoryForSession(session: TrackingSessionEntity) {
+        if (trajectoryRepository == null || session.id == null) return
+
+        trajectoryRepository.findBySessionId(session.id)
+            .collectList()
+            .doOnSuccess { trajectories ->
+                if (trajectories.isEmpty()) {
+                    logger.debug("📥 [DB→메모리] 세션 ${session.id} (mstId=${session.mstId}, detailId=${session.detailId})의 trajectory 없음")
+                    return@doOnSuccess
+                }
+
+                // Trajectory → DTL Map 형식으로 변환
+                val dtlData = trajectories.map { traj ->
+                    mapTrajectoryToDtl(session, traj)
+                }
+
+                synchronized(dtlStorage) {
+                    dtlStorage.addAll(dtlData)
+                }
+
+                logger.debug("📥 [DB→메모리] 세션 ${session.id} → ${dtlData.size}개 DTL 로드")
+            }
+            .doOnError { e ->
+                logger.error("❌ [DB→메모리] 세션 ${session.id} trajectory 로딩 실패: ${e.message}")
+            }
+            .subscribe()
+    }
+
+    /**
+     * TrackingTrajectoryEntity → DTL Map 변환
+     * ✅ P6-2 Fix: OffsetDateTime → ZonedDateTime 변환 (이전 RAM 형식과 동일하게)
+     */
+    private fun mapTrajectoryToDtl(session: TrackingSessionEntity, traj: TrackingTrajectoryEntity): Map<String, Any?> {
+        // OffsetDateTime → ZonedDateTime (UTC) 변환 (이전 RAM 형식과 동일)
+        val zonedTime = traj.timestamp.atZoneSameInstant(ZoneOffset.UTC)
+
+        return mutableMapOf<String, Any?>(
+            "MstId" to session.mstId,
+            "DetailId" to traj.detailId,
+            "DataType" to traj.dataType,
+            "Index" to traj.index,
+            "Time" to zonedTime,
+            "Timestamp" to zonedTime,
+            "Azimuth" to traj.azimuth,
+            "Elevation" to traj.elevation,
+            "Train" to traj.train,
+            "AzimuthRate" to traj.azimuthRate,
+            "ElevationRate" to traj.elevationRate,
+            "CreatedAt" to traj.createdAt  // ✅ P6: CreatedAt 유지
+        )
+    }
+
+    /**
      * TrackingSessionEntity를 MST Map으로 변환
+     * ✅ P6-2 Fix: OffsetDateTime → ZonedDateTime 변환 (이전 RAM 형식과 동일하게)
      */
     private fun mapSessionToMst(session: TrackingSessionEntity, dataType: String): Map<String, Any?> {
+        // OffsetDateTime → ZonedDateTime (UTC) 변환 (이전 RAM 형식과 동일)
+        val startTimeZoned = session.startTime.atZoneSameInstant(ZoneOffset.UTC)
+        val endTimeZoned = session.endTime.atZoneSameInstant(ZoneOffset.UTC)
+
         return mutableMapOf<String, Any?>(
             "MstId" to session.mstId,
             "DetailId" to session.detailId,
             "DataType" to dataType,
             "SatelliteID" to session.satelliteId,
             "SatelliteName" to session.satelliteName,
-            "StartTime" to session.startTime,
-            "EndTime" to session.endTime,
+            "StartTime" to startTimeZoned,
+            "EndTime" to endTimeZoned,
             "Duration" to session.duration,
             "MaxElevation" to session.maxElevation,
             "MaxAzRate" to session.maxAzimuthRate,
@@ -156,10 +222,16 @@ class EphemerisDataRepository(
      */
     fun replaceAll(mstData: List<Map<String, Any?>>, dtlData: List<Map<String, Any?>>) {
         val opId = writeCounter.incrementAndGet()
-        logger.info("📝 [WRITE #$opId] replaceAll 시작 - MST: ${mstData.size}개, DTL: ${dtlData.size}개")
+        // ✅ P6: 등록 건 그룹핑을 위한 동일 timestamp 생성
+        val registrationTime = OffsetDateTime.now(ZoneOffset.UTC)
+        logger.info("📝 [WRITE #$opId] replaceAll 시작 - MST: ${mstData.size}개, DTL: ${dtlData.size}개, registrationTime: $registrationTime")
+
+        // ✅ P6: 모든 데이터에 동일한 CreatedAt 추가 (그룹핑용)
+        val mstWithCreatedAt = mstData.map { it + ("CreatedAt" to registrationTime) }
+        val dtlWithCreatedAt = dtlData.map { it + ("CreatedAt" to registrationTime) }
 
         // ✅ V006 디버깅: final_transformed MST의 DetailId 검증
-        val finalTransformedMst = mstData.filter { it["DataType"] == "final_transformed" }
+        val finalTransformedMst = mstWithCreatedAt.filter { it["DataType"] == "final_transformed" }
         logger.info("🔍 [WRITE #$opId] final_transformed MST 검증:")
         finalTransformedMst.forEach { mst ->
             val mstId = mst["MstId"]
@@ -168,24 +240,23 @@ class EphemerisDataRepository(
             logger.info("   - MstId=$mstId, DetailId=$detailId (타입: $detailIdType)")
         }
 
+        // ✅ P6: clear() 제거 → 이력 보존 (누적 저장)
         synchronized(mstStorage) {
-            val oldMstSize = mstStorage.size
-            mstStorage.clear()
-            mstStorage.addAll(mstData)
-            logger.info("📝 [WRITE #$opId] MST 교체 완료: $oldMstSize → ${mstStorage.size}")
+            val beforeSize = mstStorage.size
+            mstStorage.addAll(mstWithCreatedAt)
+            logger.info("📝 [WRITE #$opId] MST 추가 완료: $beforeSize → ${mstStorage.size} (이력 보존)")
         }
 
         synchronized(dtlStorage) {
-            val oldDtlSize = dtlStorage.size
-            dtlStorage.clear()
-            dtlStorage.addAll(dtlData)
-            logger.info("📝 [WRITE #$opId] DTL 교체 완료: $oldDtlSize → ${dtlStorage.size}")
+            val beforeSize = dtlStorage.size
+            dtlStorage.addAll(dtlWithCreatedAt)
+            logger.info("📝 [WRITE #$opId] DTL 추가 완료: $beforeSize → ${dtlStorage.size} (이력 보존)")
         }
 
         logStorageSummary(opId)
 
-        // DB 저장 (Write-through)
-        saveToDatabase(mstData, dtlData, opId)
+        // DB 저장 (Write-through) - ✅ P6: registrationTime 전달
+        saveToDatabase(mstWithCreatedAt, dtlWithCreatedAt, opId, registrationTime)
     }
 
     /**
@@ -237,54 +308,105 @@ class EphemerisDataRepository(
 
     /**
      * 모든 마스터 데이터를 반환합니다.
+     * ✅ P6: 가장 최근 등록 건(CreatedAt)만 반환 (이력 보존 + 최신 조회)
      */
     fun getAllMst(): List<Map<String, Any?>> {
         val opId = readCounter.incrementAndGet()
-        val result = synchronized(mstStorage) { mstStorage.toList() }
-        logger.debug("📖 [READ #$opId] getAllMst() → ${result.size}개")
+        val result = synchronized(mstStorage) {
+            // 가장 최근 CreatedAt 찾기
+            val latestCreatedAt = mstStorage
+                .mapNotNull { it["CreatedAt"] as? OffsetDateTime }
+                .maxOrNull()
+
+            if (latestCreatedAt == null) {
+                mstStorage.toList()
+            } else {
+                mstStorage.filter { (it["CreatedAt"] as? OffsetDateTime) == latestCreatedAt }
+            }
+        }
+        logger.debug("📖 [READ #$opId] getAllMst() → ${result.size}개 (최근 등록 건만)")
         return result
     }
 
     /**
      * 모든 세부 데이터를 반환합니다.
+     * ✅ P6: 가장 최근 등록 건(CreatedAt)만 반환 (이력 보존 + 최신 조회)
      */
     fun getAllDtl(): List<Map<String, Any?>> {
         val opId = readCounter.incrementAndGet()
-        val result = synchronized(dtlStorage) { dtlStorage.toList() }
-        logger.debug("📖 [READ #$opId] getAllDtl() → ${result.size}개")
+        val result = synchronized(dtlStorage) {
+            // 가장 최근 CreatedAt 찾기
+            val latestCreatedAt = dtlStorage
+                .mapNotNull { it["CreatedAt"] as? OffsetDateTime }
+                .maxOrNull()
+
+            if (latestCreatedAt == null) {
+                dtlStorage.toList()
+            } else {
+                dtlStorage.filter { (it["CreatedAt"] as? OffsetDateTime) == latestCreatedAt }
+            }
+        }
+        logger.debug("📖 [READ #$opId] getAllDtl() → ${result.size}개 (최근 등록 건만)")
         return result
     }
 
     /**
      * 데이터 타입별 마스터 데이터를 반환합니다.
+     * ✅ P6: 가장 최근 등록 건(CreatedAt)만 반환
      *
      * @param dataType 데이터 타입 (original, axis_transformed, final_transformed 등)
      */
     fun getMstByDataType(dataType: String): List<Map<String, Any?>> {
         val opId = readCounter.incrementAndGet()
         val result = synchronized(mstStorage) {
-            mstStorage.filter { it["DataType"] == dataType }
+            // 가장 최근 CreatedAt 찾기
+            val latestCreatedAt = mstStorage
+                .mapNotNull { it["CreatedAt"] as? OffsetDateTime }
+                .maxOrNull()
+
+            val filtered = if (latestCreatedAt == null) {
+                mstStorage.filter { it["DataType"] == dataType }
+            } else {
+                mstStorage.filter {
+                    it["DataType"] == dataType && (it["CreatedAt"] as? OffsetDateTime) == latestCreatedAt
+                }
+            }
+            filtered
         }
-        logger.debug("📖 [READ #$opId] getMstByDataType($dataType) → ${result.size}개")
+        logger.debug("📖 [READ #$opId] getMstByDataType($dataType) → ${result.size}개 (최근 등록 건만)")
         return result
     }
 
     /**
      * 데이터 타입별 세부 데이터를 반환합니다.
+     * ✅ P6: 가장 최근 등록 건(CreatedAt)만 반환
      *
      * @param dataType 데이터 타입
      */
     fun getDtlByDataType(dataType: String): List<Map<String, Any?>> {
         val opId = readCounter.incrementAndGet()
         val result = synchronized(dtlStorage) {
-            dtlStorage.filter { it["DataType"] == dataType }
+            // 가장 최근 CreatedAt 찾기
+            val latestCreatedAt = dtlStorage
+                .mapNotNull { it["CreatedAt"] as? OffsetDateTime }
+                .maxOrNull()
+
+            val filtered = if (latestCreatedAt == null) {
+                dtlStorage.filter { it["DataType"] == dataType }
+            } else {
+                dtlStorage.filter {
+                    it["DataType"] == dataType && (it["CreatedAt"] as? OffsetDateTime) == latestCreatedAt
+                }
+            }
+            filtered
         }
-        logger.debug("📖 [READ #$opId] getDtlByDataType($dataType) → ${result.size}개")
+        logger.debug("📖 [READ #$opId] getDtlByDataType($dataType) → ${result.size}개 (최근 등록 건만)")
         return result
     }
 
     /**
      * MstId로 마스터 데이터를 검색합니다.
+     * ✅ P6: 가장 최근 등록 건(CreatedAt)만 검색
      *
      * @param mstId 마스터 ID
      * @param dataType 데이터 타입 (선택적)
@@ -292,9 +414,16 @@ class EphemerisDataRepository(
     fun findMstById(mstId: Long, dataType: String? = null): Map<String, Any?>? {
         val opId = readCounter.incrementAndGet()
         val result = synchronized(mstStorage) {
+            // ✅ P6: 가장 최근 CreatedAt 찾기
+            val latestCreatedAt = mstStorage
+                .mapNotNull { it["CreatedAt"] as? OffsetDateTime }
+                .maxOrNull()
+
             mstStorage.find {
                 val dataMstId = (it["MstId"] as? Number)?.toLong()
-                val matches = dataMstId == mstId
+                val createdAt = it["CreatedAt"] as? OffsetDateTime
+                val matchesCreatedAt = latestCreatedAt == null || createdAt == latestCreatedAt
+                val matches = dataMstId == mstId && matchesCreatedAt
                 if (dataType != null) {
                     matches && it["DataType"] == dataType
                 } else {
@@ -302,12 +431,13 @@ class EphemerisDataRepository(
                 }
             }
         }
-        logger.debug("📖 [READ #$opId] findMstById($mstId, $dataType) → ${if (result != null) "found" else "null"}")
+        logger.debug("📖 [READ #$opId] findMstById($mstId, $dataType) → ${if (result != null) "found" else "null"} (최근 등록 건만)")
         return result
     }
 
     /**
      * MstId와 데이터 타입으로 세부 데이터를 검색합니다.
+     * ✅ P6: 가장 최근 등록 건(CreatedAt)만 검색
      *
      * @param mstId 마스터 ID
      * @param dataType 데이터 타입
@@ -316,29 +446,41 @@ class EphemerisDataRepository(
     fun findDtlByMstIdAndDataType(mstId: Long, dataType: String, detailId: Int = 0): List<Map<String, Any?>> {
         val opId = readCounter.incrementAndGet()
         val result = synchronized(dtlStorage) {
+            // ✅ P6: 가장 최근 CreatedAt 찾기
+            val latestCreatedAt = dtlStorage
+                .mapNotNull { it["CreatedAt"] as? OffsetDateTime }
+                .maxOrNull()
+
             dtlStorage.filter {
                 val dataMstId = (it["MstId"] as? Number)?.toLong()
                 val dataDetailId = (it["DetailId"] as? Number)?.toInt() ?: 0
                 val itDataType = it["DataType"] as? String
-                dataMstId == mstId && dataDetailId == detailId && itDataType == dataType
+                val createdAt = it["CreatedAt"] as? OffsetDateTime
+                val matchesCreatedAt = latestCreatedAt == null || createdAt == latestCreatedAt
+                dataMstId == mstId && dataDetailId == detailId && itDataType == dataType && matchesCreatedAt
             }
         }
 
         if (result.isEmpty()) {
-            logger.warn("⚠️ [READ #$opId] findDtlByMstIdAndDataType($mstId, $dataType, $detailId) → 0개 (데이터 없음)")
-            // 디버깅용: 해당 MstId와 DataType으로 존재하는 DetailId 목록
+            logger.warn("⚠️ [READ #$opId] findDtlByMstIdAndDataType($mstId, $dataType, $detailId) → 0개 (최근 등록 건에 없음)")
+            // 디버깅용: 해당 MstId와 DataType으로 존재하는 DetailId 목록 (최근 등록 건에서)
             val availableDetailIds = synchronized(dtlStorage) {
+                val latestCreatedAt = dtlStorage
+                    .mapNotNull { it["CreatedAt"] as? OffsetDateTime }
+                    .maxOrNull()
                 dtlStorage.filter {
                     val dataMstId = (it["MstId"] as? Number)?.toLong()
                     val itDataType = it["DataType"] as? String
-                    dataMstId == mstId && itDataType == dataType
+                    val createdAt = it["CreatedAt"] as? OffsetDateTime
+                    val matchesCreatedAt = latestCreatedAt == null || createdAt == latestCreatedAt
+                    dataMstId == mstId && itDataType == dataType && matchesCreatedAt
                 }.mapNotNull { (it["DetailId"] as? Number)?.toInt() ?: 0 }.distinct()
             }
             if (availableDetailIds.isNotEmpty()) {
                 logger.warn("⚠️ [READ #$opId] 사용 가능한 DetailId: $availableDetailIds")
             }
         } else {
-            logger.debug("📖 [READ #$opId] findDtlByMstIdAndDataType($mstId, $dataType, $detailId) → ${result.size}개")
+            logger.debug("📖 [READ #$opId] findDtlByMstIdAndDataType($mstId, $dataType, $detailId) → ${result.size}개 (최근 등록 건만)")
         }
 
         return result
@@ -346,6 +488,7 @@ class EphemerisDataRepository(
 
     /**
      * MstId로 모든 데이터 타입의 세부 데이터를 검색합니다.
+     * ✅ P6: 가장 최근 등록 건(CreatedAt)만 검색
      *
      * @param mstId 마스터 ID
      * @param detailId 세부 ID (기본값: 0)
@@ -353,13 +496,20 @@ class EphemerisDataRepository(
     fun findAllDtlByMstId(mstId: Long, detailId: Int = 0): List<Map<String, Any?>> {
         val opId = readCounter.incrementAndGet()
         val result = synchronized(dtlStorage) {
+            // ✅ P6: 가장 최근 CreatedAt 찾기
+            val latestCreatedAt = dtlStorage
+                .mapNotNull { it["CreatedAt"] as? OffsetDateTime }
+                .maxOrNull()
+
             dtlStorage.filter {
                 val dataMstId = (it["MstId"] as? Number)?.toLong()
                 val dataDetailId = (it["DetailId"] as? Number)?.toInt() ?: 0
-                dataMstId == mstId && dataDetailId == detailId
+                val createdAt = it["CreatedAt"] as? OffsetDateTime
+                val matchesCreatedAt = latestCreatedAt == null || createdAt == latestCreatedAt
+                dataMstId == mstId && dataDetailId == detailId && matchesCreatedAt
             }
         }
-        logger.debug("📖 [READ #$opId] findAllDtlByMstId($mstId, $detailId) → ${result.size}개")
+        logger.debug("📖 [READ #$opId] findAllDtlByMstId($mstId, $detailId) → ${result.size}개 (최근 등록 건만)")
         return result
     }
 
@@ -476,8 +626,16 @@ class EphemerisDataRepository(
      * - (mst_id, detail_id, tracking_mode)가 UNIQUE 키
      * - data_type별로 7개 세션 생성하지 않음
      * - 같은 (mstId, detailId) 그룹에서 대표 세션 1개만 저장
+     *
+     * P6: registrationTime으로 등록 건 그룹핑
+     * - 한 번의 등록 작업에서 모든 row가 동일한 created_at을 가짐
      */
-    private fun saveToDatabase(mstData: List<Map<String, Any?>>, dtlData: List<Map<String, Any?>>, opId: Long) {
+    private fun saveToDatabase(
+        mstData: List<Map<String, Any?>>,
+        dtlData: List<Map<String, Any?>>,
+        opId: Long,
+        registrationTime: OffsetDateTime
+    ) {
         if (sessionRepository == null || trajectoryRepository == null) {
             logger.warn("DB Repository가 없습니다. 메모리 전용 모드로 동작합니다.")
             return
@@ -508,9 +666,9 @@ class EphemerisDataRepository(
                     dtlMstId == mstId && dtlDetailId == detailId
                 }
 
-                // 세션 저장 (중복 체크 후 UPSERT)
-                val session = mapMstToSession(representativeMst, allDtlForSession.size)
-                saveOrUpdateSession(session, allDtlForSession, opId)
+                // 세션 저장 (중복 체크 후 UPSERT) - ✅ P6: registrationTime 전달
+                val session = mapMstToSession(representativeMst, allDtlForSession.size, registrationTime)
+                saveOrUpdateSession(session, allDtlForSession, opId, registrationTime)
             } catch (e: RuntimeException) {
                 logger.error("❌ [DB #$opId] MST($mstId, $detailId) 저장 실패: ${e.message}")
             }
@@ -521,11 +679,13 @@ class EphemerisDataRepository(
 
     /**
      * V006: 세션 UPSERT (존재하면 스킵, 없으면 INSERT)
+     * P6: registrationTime 추가
      */
     private fun saveOrUpdateSession(
         session: TrackingSessionEntity,
         dtlData: List<Map<String, Any?>>,
-        opId: Long
+        opId: Long,
+        registrationTime: OffsetDateTime
     ) {
         sessionRepository?.findByMstIdAndDetailIdAndTrackingMode(
             session.mstId,
@@ -543,9 +703,9 @@ class EphemerisDataRepository(
             ?.doOnSuccess { saved: TrackingSessionEntity? ->
                 if (saved != null) {
                     logger.debug("📝 [DB #$opId] Session 저장: id=${saved.id}, mstId=${saved.mstId}, detailId=${saved.detailId}")
-                    // Trajectory 저장
+                    // Trajectory 저장 - ✅ P6: registrationTime 전달
                     if (dtlData.isNotEmpty() && saved.id != null) {
-                        saveTrajectories(saved.id, dtlData, opId)
+                        saveTrajectories(saved.id, dtlData, opId, registrationTime)
                     }
                 }
             }
@@ -557,13 +717,19 @@ class EphemerisDataRepository(
 
     /**
      * DTL 데이터를 trajectory로 저장합니다.
+     * P6: registrationTime 추가
      */
-    private fun saveTrajectories(sessionId: Long, dtlData: List<Map<String, Any?>>, opId: Long) {
+    private fun saveTrajectories(
+        sessionId: Long,
+        dtlData: List<Map<String, Any?>>,
+        opId: Long,
+        registrationTime: OffsetDateTime
+    ) {
         if (trajectoryRepository == null) return
 
         val trajectories = dtlData.mapNotNull { dtl ->
             try {
-                mapDtlToTrajectory(sessionId, dtl)
+                mapDtlToTrajectory(sessionId, dtl, registrationTime)
             } catch (e: Exception) {
                 logger.error("❌ [DB #$opId] DTL → Trajectory 변환 실패: ${e.message}")
                 null
@@ -598,7 +764,11 @@ class EphemerisDataRepository(
      *
      * @param dtlCount DTL 데이터 개수 (total_points 계산용)
      */
-    private fun mapMstToSession(mst: Map<String, Any?>, dtlCount: Int = 0): TrackingSessionEntity {
+    private fun mapMstToSession(
+        mst: Map<String, Any?>,
+        dtlCount: Int = 0,
+        registrationTime: OffsetDateTime? = null  // P6: 등록 건 그룹핑용 통일 시간
+    ): TrackingSessionEntity {
         val mstId = (mst["MstId"] as? Number)?.toLong() ?: 0L
         val detailId = (mst["DetailId"] as? Number)?.toInt() ?: 0
         // ✅ SatelliteID (대문자) 우선, 없으면 SatelliteId 시도
@@ -759,14 +929,22 @@ class EphemerisDataRepository(
             tleCacheId = tleCacheId,
             tleLine1 = tleLine1,
             tleLine2 = tleLine2,
-            tleEpoch = tleEpoch
+            tleEpoch = tleEpoch,
+            // P6: 등록 건 그룹핑용 통일 시간
+            createdAt = registrationTime
         )
     }
 
     /**
      * DTL Map을 TrackingTrajectoryEntity로 변환합니다.
+     *
+     * @param registrationTime P6: 등록 건 그룹핑용 통일 시간
      */
-    private fun mapDtlToTrajectory(sessionId: Long, dtl: Map<String, Any?>): TrackingTrajectoryEntity {
+    private fun mapDtlToTrajectory(
+        sessionId: Long,
+        dtl: Map<String, Any?>,
+        registrationTime: OffsetDateTime? = null  // P6: 등록 건 그룹핑용 통일 시간
+    ): TrackingTrajectoryEntity {
         val detailId = (dtl["DetailId"] as? Number)?.toInt() ?: 0
         val dataType = dtl["DataType"] as? String ?: "original"
         val index = (dtl["Index"] as? Number)?.toInt() ?: 0
@@ -794,7 +972,9 @@ class EphemerisDataRepository(
             elevation = elevation,
             train = train,
             azimuthRate = azimuthRate,
-            elevationRate = elevationRate
+            elevationRate = elevationRate,
+            // P6: 등록 건 그룹핑용 통일 시간
+            createdAt = registrationTime
         )
     }
 

@@ -286,6 +286,423 @@ put("TleCacheId", original?.get("TleCacheId"))
 
 ---
 
+## 2026-01-23: P6 created_at 등록 건 그룹핑
+
+| 항목 | 내용 |
+|------|------|
+| **심각도** | 🟡 MEDIUM |
+| **상태** | ✅ 수정 완료 |
+
+### 증상
+
+TLE 등록 후 Select Schedule에서 "해당 TLE 정보만" 표시되는 것처럼 보임.
+실제로는 `replaceAll()`이 이전 데이터를 삭제하는 **부작용**으로 동작하는 것.
+
+**문제점**:
+- 여러 위성을 한 번에 등록해도 그룹핑 기준 없음
+- `created_at`이 각 INSERT마다 밀리초 차이 → 정확한 그룹핑 불가
+- 이력 보존 시 "같은 등록 건"을 식별할 방법 없음
+
+### 원인
+
+| 항목 | 현재 상태 | 문제 |
+|------|----------|------|
+| **created_at 설정** | DB `DEFAULT NOW()` | 각 row마다 다른 시간 |
+| **등록 건 식별** | 없음 | 그룹핑 불가 |
+| **mstId** | 위성별 고유 ID | 등록 건 그룹이 아님 |
+
+```
+현재 동작:
+  ISS        → created_at = 14:30:05.123
+  Starlink   → created_at = 14:30:05.456  ← 밀리초 차이
+  Hubble     → created_at = 14:30:05.789
+
+→ "이 3개가 같은 등록 건"이라는 기준 없음
+```
+
+### 수정 방안
+
+**선택한 방안**: 이력 보존 + created_at 기준 최신 조회
+
+#### 대안 비교
+
+| 방안 | 장점 | 단점 | 선택 |
+|------|------|------|:----:|
+| A. replaceAll 유지 (삭제) | 간단 | 이력 없음 | ❌ |
+| **B. 이력 보존 + 날짜 필터** | 이력 조회 가능, 그룹핑 명확 | 조회 로직 추가 | ✅ |
+
+### 변경 내용
+
+#### 1. EphemerisDataRepository.kt - 저장 (이력 보존)
+
+```kotlin
+// replaceAll() → clear() 제거, 누적 저장으로 변경
+fun replaceAll(mstData: List<Map<String, Any?>>, dtlData: List<Map<String, Any?>>) {
+    val registrationTime = OffsetDateTime.now(ZoneOffset.UTC)  // 한 번만 생성
+
+    // ❌ 삭제: mstStorage.clear(), dtlStorage.clear()
+    // ✅ 누적: mstStorage.addAll(), dtlStorage.addAll()
+
+    saveToDatabase(mstData, dtlData, opId, registrationTime)
+}
+```
+
+```kotlin
+// mapMstToSession() - registrationTime 추가
+private fun mapMstToSession(
+    mst: Map<String, Any?>,
+    dtlCount: Int = 0,
+    registrationTime: OffsetDateTime? = null
+): TrackingSessionEntity {
+    return TrackingSessionEntity(
+        // ...
+        createdAt = registrationTime  // 명시적 지정
+    )
+}
+```
+
+#### 2. 조회 로직 - 최신 등록 건만
+
+```kotlin
+// getAllMst() 수정 - 최신 created_at만 반환
+fun getAllMst(): List<Map<String, Any?>> {
+    val latestCreatedAt = mstStorage.maxOfOrNull {
+        it["CreatedAt"] as? OffsetDateTime
+    }
+    return mstStorage.filter {
+        it["CreatedAt"] == latestCreatedAt
+    }
+}
+```
+
+또는 DB 조회 시:
+```sql
+SELECT * FROM tracking_session
+WHERE created_at = (SELECT MAX(created_at) FROM tracking_session WHERE tracking_mode = 'EPHEMERIS')
+```
+
+#### 3. PassScheduleDataRepository.kt
+
+동일한 패턴으로 수정
+
+### 테스트 계획
+
+#### 수정 확인
+- [x] 한 번 등록 시 모든 row의 created_at 동일 확인
+- [x] 이전 등록 건 DB에 유지 확인
+- [x] 조회 시 최신 등록 건만 반환 확인
+- [ ] 이력 조회 (기간 확장) 가능 확인
+
+#### 회귀 테스트
+- [x] Ephemeris 모드 TLE 등록 정상
+- [ ] PassSchedule 모드 등록 정상
+- [x] Select Schedule 표시 정상 (최신만)
+- [x] 빌드 성공
+
+---
+
+## 2026-01-23: P6-1 조회 로직 필터링 추가
+
+| 항목 | 내용 |
+|------|------|
+| **심각도** | 🔴 CRITICAL |
+| **상태** | ✅ 수정 완료 |
+
+### 증상
+
+"이론치 다운로드" 버튼 클릭 시 데이터가 표시되지 않음
+
+### 원인
+
+P6에서 `clear()` 제거 후 `getAllMst()`, `getAllDtl()` 등이 **모든 누적 데이터**를 반환.
+Frontend에서 데이터가 중복/혼란되어 제대로 표시되지 않음.
+
+### 수정 내용
+
+| 파일 | 함수 | 변경 내용 |
+|------|------|----------|
+| `EphemerisDataRepository.kt` | `getAllMst()` | 가장 최근 CreatedAt 필터링 추가 |
+| `EphemerisDataRepository.kt` | `getAllDtl()` | 가장 최근 CreatedAt 필터링 추가 |
+| `EphemerisDataRepository.kt` | `getMstByDataType()` | 가장 최근 CreatedAt 필터링 추가 |
+| `EphemerisDataRepository.kt` | `getDtlByDataType()` | 가장 최근 CreatedAt 필터링 추가 |
+| `EphemerisDataRepository.kt` | `findMstById()` | 가장 최근 CreatedAt 필터링 추가 |
+| `EphemerisDataRepository.kt` | `findDtlByMstIdAndDataType()` | 가장 최근 CreatedAt 필터링 추가 |
+| `EphemerisDataRepository.kt` | `findAllDtlByMstId()` | 가장 최근 CreatedAt 필터링 추가 |
+
+```kotlin
+// getAllMst() - 가장 최근 등록 건만 반환
+fun getAllMst(): List<Map<String, Any?>> {
+    synchronized(mstStorage) {
+        val latestCreatedAt = mstStorage
+            .mapNotNull { it["CreatedAt"] as? OffsetDateTime }
+            .maxOrNull()
+
+        if (latestCreatedAt == null) {
+            mstStorage.toList()
+        } else {
+            mstStorage.filter { (it["CreatedAt"] as? OffsetDateTime) == latestCreatedAt }
+        }
+    }
+}
+```
+
+### 재발 방지
+
+| 대책 | 적용 |
+|------|:----:|
+| DB DEFAULT NOW() 의존 금지 | ✅ |
+| 그룹 작업 시 명시적 timestamp 사용 패턴 | ✅ |
+| 조회 시 created_at 필터 패턴 | ✅ |
+
+---
+
+## 2026-01-23: P6-2 서버 재시작 시 DTL 로드 누락
+
+| 항목 | 내용 |
+|------|------|
+| **심각도** | 🔴 CRITICAL |
+| **상태** | ✅ 수정 완료 |
+
+### 증상
+
+서버 재시작 후 스케줄 선택 시 DTL 데이터가 없음:
+```
+MST ID 2 의 원본 DTL 데이터를 찾을 수 없습니다 (DetailId=4)
+```
+
+### 원인
+
+`initFromDatabase()`가 **MST만 로드하고 DTL(trajectory)을 로드하지 않음**
+
+```kotlin
+// 기존 코드 (문제)
+@PostConstruct
+fun initFromDatabase() {
+    sessionRepository.findByTrackingMode("EPHEMERIS")
+        .collectList()
+        .doOnSuccess { sessions ->
+            // MST만 로드 ❌
+            sessions.forEach { session ->
+                mstStorage.add(mapSessionToMst(session))
+            }
+            // DTL 로드 없음! ❌
+        }
+}
+```
+
+### 수정 내용
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `EphemerisDataRepository.kt` | `initFromDatabase()` - DTL 로드 추가 |
+| `EphemerisDataRepository.kt` | `loadTrajectoryForSession()` - 세션별 trajectory 로드 함수 추가 |
+| `EphemerisDataRepository.kt` | `mapTrajectoryToDtl()` - Entity → Map 변환 함수 추가 |
+
+```kotlin
+// 수정 후
+@PostConstruct
+fun initFromDatabase() {
+    sessionRepository.findByTrackingMode("EPHEMERIS")
+        .collectList()
+        .doOnSuccess { sessions ->
+            sessions.forEach { session ->
+                // MST 로드
+                mstStorage.add(mapSessionToMst(session))
+
+                // ✅ P6-2 Fix: DTL도 로드
+                if (session.id != null) {
+                    loadTrajectoryForSession(session)
+                }
+            }
+        }
+}
+
+private fun loadTrajectoryForSession(session: TrackingSessionEntity) {
+    trajectoryRepository.findBySessionId(session.id)
+        .collectList()
+        .doOnSuccess { trajectories ->
+            val dtlData = trajectories.map { traj ->
+                mapTrajectoryToDtl(session, traj)
+            }
+            dtlStorage.addAll(dtlData)
+        }
+        .subscribe()
+}
+```
+
+### 테스트 계획
+
+- [ ] 서버 재시작 후 DTL 조회 정상 확인
+- [ ] 스케줄 선택 → 이론치 다운로드 정상 확인
+- [x] 빌드 성공
+
+---
+
+---
+
+## 2026-01-23: P7 PassSchedule Backend P6 미적용
+
+| 항목 | 내용 |
+|------|------|
+| **심각도** | 🔴 CRITICAL |
+| **상태** | ✅ **수정 완료** |
+
+### 증상
+
+PassSchedule 모드에서 서버 재시작 시 스케줄 데이터 손실:
+- DB에 저장된 데이터가 메모리로 로드되지 않음
+- `initFromDatabase()` 미구현
+
+### 원인
+
+Ephemeris에 적용된 P6, P6-1, P6-2 수정이 PassSchedule에 미적용:
+
+| 기능 | EphemerisDataRepository | PassScheduleDataRepository |
+|------|:------------------------:|:----------------------------:|
+| `@PostConstruct initFromDatabase()` | ✅ 구현됨 | ✅ **구현 완료** |
+| `loadTrajectoryForSession()` | ✅ 구현됨 | ✅ **구현 완료** |
+| `mapSessionToMstForLoad()` | ✅ 구현됨 | ✅ **구현 완료** |
+| `mapTrajectoryToDtlForLoad()` | ✅ 구현됨 | ✅ **구현 완료** |
+| CreatedAt 필터링 (getAllMst 등) | ✅ 7개 함수 | ✅ **9개 함수 적용** |
+| OffsetDateTime→ZonedDateTime 변환 | ✅ 적용됨 | ✅ **적용 완료** |
+| 이력 보존 (saveSatelliteData 누적) | ✅ 적용됨 | ✅ **적용 완료** |
+
+### 수정 방안
+
+EphemerisDataRepository.kt의 P6 수정사항을 PassScheduleDataRepository.kt에 동일하게 적용
+
+#### P7-1: initFromDatabase() 추가
+
+```kotlin
+@PostConstruct
+fun initFromDatabase() {
+    sessionRepository.findByTrackingMode("PASS_SCHEDULE")
+        .collectList()
+        .doOnSuccess { sessions ->
+            sessions.forEach { session ->
+                // 위성별로 그룹화하여 mstStorage에 추가
+                val satelliteId = session.satelliteId
+                val mst = mapSessionToMst(session)
+
+                val existing = mstStorage[satelliteId] ?: emptyList()
+                mstStorage[satelliteId] = existing + mst
+
+                // ✅ DTL도 로드
+                if (session.id != null) {
+                    loadTrajectoryForSession(session)
+                }
+            }
+        }
+        .subscribe()
+}
+```
+
+#### P7-2: loadTrajectoryForSession() 추가
+
+```kotlin
+private fun loadTrajectoryForSession(session: TrackingSessionEntity) {
+    trajectoryRepository.findBySessionId(session.id)
+        .collectList()
+        .doOnSuccess { trajectories ->
+            val dtlData = trajectories.map { traj ->
+                mapTrajectoryToDtl(session, traj)
+            }
+            val satelliteId = session.satelliteId
+            val existing = dtlStorage[satelliteId] ?: emptyList()
+            dtlStorage[satelliteId] = existing + dtlData
+        }
+        .subscribe()
+}
+```
+
+#### P7-3: mapSessionToMst() 추가
+
+```kotlin
+private fun mapSessionToMst(session: TrackingSessionEntity): Map<String, Any?> {
+    val startTimeZoned = session.startTime.atZoneSameInstant(ZoneOffset.UTC)
+    val endTimeZoned = session.endTime.atZoneSameInstant(ZoneOffset.UTC)
+
+    return mutableMapOf<String, Any?>(
+        "MstId" to session.mstId,
+        "DetailId" to session.detailId,
+        "DataType" to session.dataType,
+        "SatelliteID" to session.satelliteId,
+        "SatelliteName" to session.satelliteName,
+        "StartTime" to startTimeZoned,
+        "EndTime" to endTimeZoned,
+        // ... 나머지 필드 매핑
+        "CreatedAt" to session.createdAt
+    )
+}
+```
+
+#### P7-4: mapTrajectoryToDtl() 추가
+
+```kotlin
+private fun mapTrajectoryToDtl(session: TrackingSessionEntity, traj: TrackingTrajectoryEntity): Map<String, Any?> {
+    val zonedTime = traj.timestamp.atZoneSameInstant(ZoneOffset.UTC)
+
+    return mutableMapOf<String, Any?>(
+        "MstId" to session.mstId,
+        "DetailId" to traj.detailId,
+        "DataType" to traj.dataType,
+        "Time" to zonedTime,
+        // ... 나머지 필드 매핑
+        "CreatedAt" to traj.createdAt
+    )
+}
+```
+
+#### P7-5: CreatedAt 필터링 추가
+
+다음 함수들에 최신 CreatedAt 필터링 로직 추가:
+- `getMstBySatelliteId()`
+- `getDtlBySatelliteId()`
+- `getAllMst()`
+- `getAllDtl()`
+- `getAllMstFlattened()`
+- `getAllDtlFlattened()`
+- `findMstById()`
+- `findDtlByMstIdAndDataType()`
+- `findDtlBySatelliteAndMstId()`
+
+#### P7-6: 이력 보존
+
+`saveSatelliteData()`에서:
+- ❌ 삭제: `mstStorage[satelliteId] = ...` (덮어쓰기)
+- ✅ 변경: 기존 데이터 유지하면서 추가
+
+### 영향 범위
+
+| 영역 | 영향 | 설명 |
+|------|:----:|------|
+| Backend | ✅ | PassScheduleDataRepository.kt 수정 |
+| Frontend | ❌ | 변경 없음 |
+| DB | ❌ | 스키마 변경 없음 |
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `PassScheduleDataRepository.kt` | initFromDatabase, loadTrajectoryForSession, mapSessionToMst, mapTrajectoryToDtl 추가 |
+| `PassScheduleDataRepository.kt` | 조회 함수 CreatedAt 필터링 추가 (9개 함수) |
+| `PassScheduleDataRepository.kt` | 저장 로직 이력 보존으로 변경 |
+
+### 테스트 계획
+
+#### 수정 확인
+- [ ] 서버 재시작 후 PassSchedule MST 로드 확인
+- [ ] 서버 재시작 후 PassSchedule DTL 로드 확인
+- [ ] 조회 시 최신 CreatedAt만 반환 확인
+
+#### 회귀 테스트
+- [ ] PassSchedule 등록 정상
+- [ ] Select Schedule 표시 정상
+- [ ] 이론치 다운로드 정상
+- [ ] 빌드 성공
+
+---
+
 ## 참조 문서
 
 - [PROGRESS.md](PROGRESS.md) - 전체 진행 상황
