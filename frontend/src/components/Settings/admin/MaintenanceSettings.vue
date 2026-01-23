@@ -125,13 +125,12 @@
                 <q-btn color="negative" icon="remove" size="md" class="full-width"
                   @mousedown="startMovement('azimuth', -1)" @mouseup="stopMovement('azimuth')"
                   @mouseleave="stopMovement('azimuth')" @touchstart="startMovement('azimuth', -1)"
-                  @touchend="stopMovement('azimuth')" :disable="azimuthLimitStatus.negativeLimit" />
+                  @touchend="stopMovement('azimuth')" />
               </div>
               <div class="col-6">
                 <q-btn color="positive" icon="add" size="md" class="full-width" @mousedown="startMovement('azimuth', 1)"
                   @mouseup="stopMovement('azimuth')" @mouseleave="stopMovement('azimuth')"
-                  @touchstart="startMovement('azimuth', 1)" @touchend="stopMovement('azimuth')"
-                  :disable="azimuthLimitStatus.positiveLimit" />
+                  @touchstart="startMovement('azimuth', 1)" @touchend="stopMovement('azimuth')" />
               </div>
             </div>
           </div>
@@ -200,13 +199,13 @@
                 <q-btn color="negative" icon="remove" size="md" class="full-width"
                   @mousedown="startMovement('elevation', -1)" @mouseup="stopMovement('elevation')"
                   @mouseleave="stopMovement('elevation')" @touchstart="startMovement('elevation', -1)"
-                  @touchend="stopMovement('elevation')" :disable="elevationLimitStatus.negativeLimit" />
+                  @touchend="stopMovement('elevation')" />
               </div>
               <div class="col-6">
                 <q-btn color="positive" icon="add" size="md" class="full-width"
                   @mousedown="startMovement('elevation', 1)" @mouseup="stopMovement('elevation')"
                   @mouseleave="stopMovement('elevation')" @touchstart="startMovement('elevation', 1)"
-                  @touchend="stopMovement('elevation')" :disable="elevationLimitStatus.positiveLimit" />
+                  @touchend="stopMovement('elevation')" />
               </div>
             </div>
           </div>
@@ -275,13 +274,12 @@
                 <q-btn color="negative" icon="remove" size="md" class="full-width"
                   @mousedown="startMovement('train', -1)" @mouseup="stopMovement('train')"
                   @mouseleave="stopMovement('train')" @touchstart="startMovement('train', -1)"
-                  @touchend="stopMovement('train')" :disable="trainLimitStatus.negativeLimit" />
+                  @touchend="stopMovement('train')" />
               </div>
               <div class="col-6">
                 <q-btn color="positive" icon="add" size="md" class="full-width" @mousedown="startMovement('train', 1)"
                   @mouseup="stopMovement('train')" @mouseleave="stopMovement('train')"
-                  @touchstart="startMovement('train', 1)" @touchend="stopMovement('train')"
-                  :disable="trainLimitStatus.positiveLimit" />
+                  @touchstart="startMovement('train', 1)" @touchend="stopMovement('train')" />
               </div>
             </div>
           </div>
@@ -378,55 +376,71 @@ const trainLimitStatus = computed(() => {
 
 // Azimuth 리미트 스위치 상태 변화 감지 및 자동 정지 명령
 watch(azimuthLimitStatus, (newStatus, oldStatus) => {
-  // 테스트 모드가 아닐 때만 실제 정지 명령 전송
-  if (!useTestMode.value) {
-    // +275도 리미트 스위치가 새로 활성화된 경우
-    if (!oldStatus.positiveLimit && newStatus.positiveLimit) {
-      console.warn('🚨 +275도 리미트 스위치 활성화 감지! Azimuth 축 자동 정지 명령 전송')
-      void sendStopCommand('azimuth', '+275도 리미트 스위치')
+  // 테스트 모드이거나 메인터넌스 이동 중일 때는 자동 정지 안함
+  // (메인터넌스 = 리미트 복귀용이므로 버튼 누르는 동안 계속 이동해야 함)
+  if (useTestMode.value || movingAxes.value.azimuth) {
+    if (movingAxes.value.azimuth) {
+      console.log('🔧 메인터넌스 이동 중 - 리미트 스위치 자동 정지 무시')
     }
+    return
+  }
 
-    // -275도 리미트 스위치가 새로 활성화된 경우
-    if (!oldStatus.negativeLimit && newStatus.negativeLimit) {
-      console.warn('🚨 -275도 리미트 스위치 활성화 감지! Azimuth 축 자동 정지 명령 전송')
-      void sendStopCommand('azimuth', '-275도 리미트 스위치')
-    }
+  // +275도 리미트 스위치가 새로 활성화된 경우
+  if (!oldStatus.positiveLimit && newStatus.positiveLimit) {
+    console.warn('🚨 +275도 리미트 스위치 활성화 감지! Azimuth 축 자동 정지 명령 전송')
+    void sendStopCommand('azimuth', '+275도 리미트 스위치')
+  }
+
+  // -275도 리미트 스위치가 새로 활성화된 경우
+  if (!oldStatus.negativeLimit && newStatus.negativeLimit) {
+    console.warn('🚨 -275도 리미트 스위치 활성화 감지! Azimuth 축 자동 정지 명령 전송')
+    void sendStopCommand('azimuth', '-275도 리미트 스위치')
   }
 }, { deep: true })
 
 // Elevation 리미트 스위치 상태 변화 감지 및 자동 정지 명령
 watch(elevationLimitStatus, (newStatus, oldStatus) => {
-  // 테스트 모드가 아닐 때만 실제 정지 명령 전송
-  if (!useTestMode.value) {
-    // +185도 리미트 스위치가 새로 활성화된 경우
-    if (!oldStatus.positiveLimit && newStatus.positiveLimit) {
-      console.warn('🚨 +185도 리미트 스위치 활성화 감지! Elevation 축 자동 정지 명령 전송')
-      void sendStopCommand('elevation', '+185도 리미트 스위치')
+  // 테스트 모드이거나 메인터넌스 이동 중일 때는 자동 정지 안함
+  if (useTestMode.value || movingAxes.value.elevation) {
+    if (movingAxes.value.elevation) {
+      console.log('🔧 메인터넌스 이동 중 - 리미트 스위치 자동 정지 무시')
     }
+    return
+  }
 
-    // -5도 리미트 스위치가 새로 활성화된 경우
-    if (!oldStatus.negativeLimit && newStatus.negativeLimit) {
-      console.warn('🚨 -5도 리미트 스위치 활성화 감지! Elevation 축 자동 정지 명령 전송')
-      void sendStopCommand('elevation', '-5도 리미트 스위치')
-    }
+  // +185도 리미트 스위치가 새로 활성화된 경우
+  if (!oldStatus.positiveLimit && newStatus.positiveLimit) {
+    console.warn('🚨 +185도 리미트 스위치 활성화 감지! Elevation 축 자동 정지 명령 전송')
+    void sendStopCommand('elevation', '+185도 리미트 스위치')
+  }
+
+  // -5도 리미트 스위치가 새로 활성화된 경우
+  if (!oldStatus.negativeLimit && newStatus.negativeLimit) {
+    console.warn('🚨 -5도 리미트 스위치 활성화 감지! Elevation 축 자동 정지 명령 전송')
+    void sendStopCommand('elevation', '-5도 리미트 스위치')
   }
 }, { deep: true })
 
 // Train 리미트 스위치 상태 변화 감지 및 자동 정지 명령
 watch(trainLimitStatus, (newStatus, oldStatus) => {
-  // 테스트 모드가 아닐 때만 실제 정지 명령 전송
-  if (!useTestMode.value) {
-    // +275도 리미트 스위치가 새로 활성화된 경우
-    if (!oldStatus.positiveLimit && newStatus.positiveLimit) {
-      console.warn('🚨 +275도 리미트 스위치 활성화 감지! Train 축 자동 정지 명령 전송')
-      void sendStopCommand('train', '+275도 리미트 스위치')
+  // 테스트 모드이거나 메인터넌스 이동 중일 때는 자동 정지 안함
+  if (useTestMode.value || movingAxes.value.train) {
+    if (movingAxes.value.train) {
+      console.log('🔧 메인터넌스 이동 중 - 리미트 스위치 자동 정지 무시')
     }
+    return
+  }
 
-    // -275도 리미트 스위치가 새로 활성화된 경우
-    if (!oldStatus.negativeLimit && newStatus.negativeLimit) {
-      console.warn('🚨 -275도 리미트 스위치 활성화 감지! Train 축 자동 정지 명령 전송')
-      void sendStopCommand('train', '-275도 리미트 스위치')
-    }
+  // +275도 리미트 스위치가 새로 활성화된 경우
+  if (!oldStatus.positiveLimit && newStatus.positiveLimit) {
+    console.warn('🚨 +275도 리미트 스위치 활성화 감지! Train 축 자동 정지 명령 전송')
+    void sendStopCommand('train', '+275도 리미트 스위치')
+  }
+
+  // -275도 리미트 스위치가 새로 활성화된 경우
+  if (!oldStatus.negativeLimit && newStatus.negativeLimit) {
+    console.warn('🚨 -275도 리미트 스위치 활성화 감지! Train 축 자동 정지 명령 전송')
+    void sendStopCommand('train', '-275도 리미트 스위치')
   }
 }, { deep: true })
 
@@ -474,32 +488,13 @@ const speedAdjustmentIntervals = ref<{
   train: null
 })
 
-// 각도 범위별 속도 계산 함수 (축별로 다른 범위 적용)
-const calculateSpeed = (currentAngle: number, axis: 'azimuth' | 'elevation' | 'train'): number => {
-  if (axis === 'azimuth' || axis === 'train') {
-    // Azimuth와 Train: ±275도 기준
-    const absAngle = Math.abs(currentAngle)
-    if (absAngle >= 270 && absAngle <= 275) {
-      return 0.1 // 270°~275° 구간: 0.1°/s
-    } else if (absAngle >= 0 && absAngle < 270) {
-      return 1.0 // 0°~270° 구간: 1.0°/s
-    } else {
-      return 1.0 // 범위 밖: 기본 속도
-    }
-  } else if (axis === 'elevation') {
-    // Elevation: ±185도 기준
-    if (currentAngle >= 180 && currentAngle <= 185) {
-      return 0.1 // 180°~185° 구간: 0.1°/s
-    } else if (currentAngle >= -5 && currentAngle < 0) {
-      return 0.1 // -5°~0° 구간: 0.1°/s
-    } else if (currentAngle >= 0 && currentAngle < 180) {
-      return 1.0 // 0°~180° 구간: 1.0°/s
-    } else {
-      return 1.0 // 범위 밖: 기본 속도
-    }
-  }
-  
-  return 1.0 // 기본값
+// 메인터넌스 모드 속도 (안전 저속 고정)
+const MAINTENANCE_SPEED = 0.1 // 0.1°/s 고정
+
+// 속도 계산 함수 - 메인터넌스는 항상 안전 저속
+const calculateSpeed = (): number => {
+  // 메인터넌스 기능: 리미트 복귀용이므로 항상 안전 저속 사용
+  return MAINTENANCE_SPEED
 }
 
 // 속도 범위 정보 반환 (디버깅용)
@@ -548,7 +543,7 @@ const adjustSpeedInRealTime = (axis: 'azimuth' | 'elevation' | 'train') => {
   }
 
   const currentAngle = currentAngles.value[axis]
-  const newSpeed = calculateSpeed(currentAngle, axis)
+  const newSpeed = calculateSpeed()
   const currentSpeed = currentSpeeds.value[axis]
 
   // 속도가 변경되었을 때만 새로운 명령 전송
@@ -697,35 +692,9 @@ const startMovement = async (axis: 'azimuth' | 'elevation' | 'train', direction:
     return
   }
 
-  // 각 축별 리미트 스위치 체크
-  if (axis === 'azimuth') {
-    if (direction > 0 && azimuthLimitStatus.value.positiveLimit) {
-      console.warn('⚠️ +275도 리미트 스위치가 활성화되어 있어 + 방향 이동 불가')
-      return
-    }
-    if (direction < 0 && azimuthLimitStatus.value.negativeLimit) {
-      console.warn('⚠️ -275도 리미트 스위치가 활성화되어 있어 - 방향 이동 불가')
-      return
-    }
-  } else if (axis === 'elevation') {
-    if (direction > 0 && elevationLimitStatus.value.positiveLimit) {
-      console.warn('⚠️ +185도 리미트 스위치가 활성화되어 있어 + 방향 이동 불가')
-      return
-    }
-    if (direction < 0 && elevationLimitStatus.value.negativeLimit) {
-      console.warn('⚠️ -5도 리미트 스위치가 활성화되어 있어 - 방향 이동 불가')
-      return
-    }
-  } else if (axis === 'train') {
-    if (direction > 0 && trainLimitStatus.value.positiveLimit) {
-      console.warn('⚠️ +275도 리미트 스위치가 활성화되어 있어 + 방향 이동 불가')
-      return
-    }
-    if (direction < 0 && trainLimitStatus.value.negativeLimit) {
-      console.warn('⚠️ -275도 리미트 스위치가 활성화되어 있어 - 방향 이동 불가')
-      return
-    }
-  }
+  // 메인터넌스 모드: 리미트 스위치 체크 비활성화 (양방향 허용)
+  // 리미트를 넘어선 상태에서 복귀하기 위해 모든 방향 이동 허용
+  console.log(`🔧 메인터넌스 모드: ${axis} 축 ${direction > 0 ? '+' : '-'} 방향 이동 (리미트 체크 무시)`)
 
   try {
     const currentAngle = currentAngles.value[axis]
@@ -748,7 +717,7 @@ const startMovement = async (axis: 'azimuth' | 'elevation' | 'train', direction:
     }
 
     // 초기 속도 계산
-    const initialSpeed = calculateSpeed(currentAngle, axis)
+    const initialSpeed = calculateSpeed()
 
     // 목표 각도 저장
     targetAngles.value[axis] = targetAngle

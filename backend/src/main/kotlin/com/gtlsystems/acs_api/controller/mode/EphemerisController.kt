@@ -128,24 +128,30 @@ class EphemerisController(
 
     @PostMapping("/set-current-tracking-pass-id")
     @Operation(
-        operationId = "setcurrenttrackingpassid", 
+        operationId = "setcurrenttrackingpassid",
         tags = ["Mode - Ephemeris"]
     )
     fun setCurrentTrackingPassId(
         @Parameter(
-            description = "추적할 위성의 Pass ID", 
-            example = "1", 
+            description = "추적할 위성의 Pass ID (MstId)",
+            example = "1",
             required = true
-        ) @RequestParam passId: Long?  // ✅ UInt → Long 변경 (PassSchedule과 동일)
+        ) @RequestParam passId: Long?,
+        @Parameter(
+            description = "패스 인덱스 (DetailId) - V006: 동일 위성의 여러 패스 구분",
+            example = "0",
+            required = false
+        ) @RequestParam(required = false, defaultValue = "0") detailId: Int = 0  // ✅ V006 Fix: detailId 추가
     ): ResponseEntity<Map<String, String>> {
         return try {
-            ephemerisService.setCurrentTrackingPassId(passId)
+            ephemerisService.setCurrentTrackingPassId(passId, detailId)
             ResponseEntity.ok(
                 mapOf(
                     "status" to "success",
                     "message" to "현재 추적 ID가 성공적으로 설정되었습니다.",
                     "command" to "setCurrentTrackingPassId",
-                    "passId" to passId.toString()
+                    "passId" to passId.toString(),
+                    "detailId" to detailId.toString()  // ✅ V006 Fix: detailId 응답에 추가
                 )
             )
         } catch (e: IllegalArgumentException) {

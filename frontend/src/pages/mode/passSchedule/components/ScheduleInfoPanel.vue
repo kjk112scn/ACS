@@ -112,12 +112,26 @@ const formatRemainingTime = (ms: number): string => {
   return formatTimeRemaining(ms)
 }
 
-const formatDurationValue = (duration: string): string => {
-  if (!duration) return '0분 0초'
+// V006 Fix: 숫자(초) 또는 ISO 8601 Duration 문자열 모두 처리
+const formatDurationValue = (duration: string | number | null | undefined): string => {
+  if (duration === null || duration === undefined) return '0분 0초'
+
+  // ✅ 숫자(초 단위)인 경우 직접 변환
+  if (typeof duration === 'number') {
+    const totalSeconds = Math.round(duration)
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
+    const parts: string[] = []
+    if (hours > 0) parts.push(`${hours}시간`)
+    if (minutes > 0) parts.push(`${minutes}분`)
+    if (seconds > 0 || parts.length === 0) parts.push(`${seconds}초`)
+    return parts.join(' ')
+  }
 
   // ISO 8601 Duration 형식 (PT13M43.6S) 파싱
   const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/)
-  if (!match) return duration
+  if (!match) return String(duration)
 
   const hours = parseInt(match[1] || '0', 10)
   const minutes = parseInt(match[2] || '0', 10)

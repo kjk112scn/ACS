@@ -1,7 +1,7 @@
 ---
 name: health
 description: 프로젝트 건강 상태 원클릭 체크. 빌드, 타입체크, 문서 일치율, 기술 부채 종합 점검. "건강", "health", "체크", "점검", "상태 확인" 키워드에 반응.
-model: opus
+model: sonnet
 ---
 
 # Health - 프로젝트 건강 상태 체크 스킬

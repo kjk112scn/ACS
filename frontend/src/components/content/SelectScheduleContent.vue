@@ -17,8 +17,8 @@
 
     <div class="content-body">
       <!-- 스케줄 테이블 -->
-      <!-- ✅ PassSchedule 데이터 구조 리팩토링: row-key를 mstId와 detailId 조합으로 변경 -->
-      <q-table flat bordered dark :rows="scheduleData" :columns="scheduleColumns" :row-key="(row) => `${row.mstId}-${row.detailId}`" :loading="loading"
+      <!-- ✅ FIX: row-key를 uid 문자열로 변경 (함수 형태 → 문자열) - 단일 선택 문제 해결 -->
+      <q-table flat bordered dark :rows="scheduleData" :columns="scheduleColumns" row-key="uid" :loading="loading"
         :selected="selectedRows" @update:selected="handleSelectionUpdate" selection="multiple" class="schedule-table"
         style="height: 500px; background-color: var(--theme-card-background);" virtual-scroll
         :virtual-scroll-sticky-size-start="48" hide-pagination :rows-per-page-options="[0]" :row-class="getRowClass"
@@ -348,6 +348,8 @@ const scheduleData = computed(() => {
 
     return {
       ...itemWithoutIndex,
+      // ✅ FIX: row-key용 고유 ID (순차 생성)
+      uid: String(sortedIndex + 1),
       // ✅ 전역 고유 ID (필수) - index 필드를 대체
       mstId: item.mstId ?? item.no,
       // ✅ Detail 구분자 (필수) - mstId와 함께 고유 식별
@@ -1038,13 +1040,26 @@ const safeToFixed = (value: unknown, decimals: number = 6): string => {
   return '-'
 }
 
-// ✅ Duration 포맷 함수 추가 (ISO 8601 Duration 형식 파싱)
-const formatDuration = (duration: string): string => {
-  if (!duration) return '0분 0초'
+// ✅ Duration 포맷 함수 추가 (V006 Fix: 숫자/ISO 8601 모두 처리)
+const formatDuration = (duration: string | number | null | undefined): string => {
+  if (duration === null || duration === undefined) return '0분 0초'
+
+  // ✅ 숫자(초 단위)인 경우 직접 변환
+  if (typeof duration === 'number') {
+    const totalSeconds = Math.round(duration)
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
+    const parts: string[] = []
+    if (hours > 0) parts.push(`${hours}시간`)
+    if (minutes > 0) parts.push(`${minutes}분`)
+    if (seconds > 0 || parts.length === 0) parts.push(`${seconds}초`)
+    return parts.join(' ')
+  }
 
   // ISO 8601 Duration 형식 (PT13M43.6S) 파싱
   const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/)
-  if (!match) return duration // 파싱 실패 시 원본 반환
+  if (!match) return String(duration) // 파싱 실패 시 원본 반환
 
   const hours = parseInt(match[1] || '0')
   const minutes = parseInt(match[2] || '0')

@@ -36,6 +36,9 @@ Architecture Decision Record는 아키텍처 결정의 컨텍스트, 결정 내�
 | ADR-002 | [Orekit 라이브러리 선택](ADR-002-orekit-selection.md) | 승인됨 | - |
 | ADR-003 | [Performance Analyzer 에이전트 도입](ADR-003-performance-analyzer-agent.md) | 승인됨 | 2026-01-07 |
 | ADR-004 | [Claude Code 최적화 문서 구조](ADR-004-claude-code-optimized-doc-structure.md) | 제안됨 | 2026-01-17 |
+| ADR-005 | [i18n TypeScript 상수 마이그레이션](ADR-005-i18n-typescript-constant-migration.md) | 승인됨 | 2026-01-20 |
+| ADR-006 | [Timezone 처리 아키텍처](ADR-006-timezone-handling-architecture.md) | 승인됨 | 2026-01-20 |
+| ADR-007 | [Tracking Session 키 설계](ADR-007-tracking-session-key-design.md) | 승인됨 | 2026-01-23 |
 
 ## 새 ADR 작성
 

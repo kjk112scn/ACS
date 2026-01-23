@@ -406,12 +406,22 @@ const { handleApiError } = useErrorHandler()
 const { colors: chartColors } = useChartTheme()
 
 // ✅ Duration 포맷 함수 추가 - 시:분:초 형식
-const formatDuration = (duration: string): string => {
-  if (!duration) return '00:00:00'
+// V006 Fix: 숫자(초) 또는 ISO 8601 Duration 문자열 모두 처리
+const formatDuration = (duration: string | number | null | undefined): string => {
+  if (duration === null || duration === undefined) return '00:00:00'
 
-  // ISO 8601 Duration 형식 (PT13M43.6S) 파싱
+  // ✅ 숫자(초 단위)인 경우 직접 변환
+  if (typeof duration === 'number') {
+    const totalSeconds = Math.round(duration)
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  }
+
+  // ✅ 문자열인 경우 ISO 8601 Duration 형식 (PT13M43.6S) 파싱
   const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/)
-  if (!match) return duration // 파싱 실패 시 원본 반환
+  if (!match) return String(duration) // 파싱 실패 시 원본 반환
 
   const hours = parseInt(match[1] || '0')
   const minutes = parseInt(match[2] || '0')
@@ -480,16 +490,6 @@ const currentPosition = ref({
 // ✅ 스토어 상태 연동 - 탭 이동 시에도 데이터 유지
 const showScheduleModal = ref(false)
 
-// ✅ scheduleData는 더 이상 사용하지 않음 (comparisonData로 대체)
-// const scheduleData = computed(() => {
-//   const data = ephemerisStore.masterData
-//   // 안전한 렌더링을 위해 기본값 보장
-//   if (!Array.isArray(data)) {
-//     console.warn('⚠️ masterData가 배열이 아닙니다:', data)
-//     return []
-//   }
-//   return data
-// })
 const selectedSchedule = ref<ScheduleItem[]>([])
 
 // TLE 모달 관련 상태
@@ -2182,7 +2182,7 @@ const handleEphemerisCommand = async () => {
         })
       } else {
         // selectedSchedule이 없으면 경고
-        warning('스케줄 정보가 없습니다. 다시 스케줄을 선택해주세요.')
+        warning('스케줄 정보가 없습니���. 다시 스케줄을 선택해주세요.')
         return
       }
     }

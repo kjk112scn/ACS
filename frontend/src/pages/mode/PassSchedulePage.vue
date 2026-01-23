@@ -1251,13 +1251,26 @@ const scheduleColumns: QTableColumn[] = [
 
 // NOTE: formatDateTime, formatAngle 함수는 ScheduleTable 컴포넌트로 이동됨
 
-// ✅ Duration 포맷 함수 추가 (ISO 8601 Duration 형식 파싱)
-const formatDuration = (duration: string): string => {
-  if (!duration) return '0분 0초'
+// ✅ Duration 포맷 함수 추가 (V006 Fix: 숫자/ISO 8601 모두 처리)
+const formatDuration = (duration: string | number | null | undefined): string => {
+  if (duration === null || duration === undefined) return '0분 0초'
+
+  // ✅ 숫자(초 단위)인 경우 직접 변환
+  if (typeof duration === 'number') {
+    const totalSeconds = Math.round(duration)
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
+    const parts: string[] = []
+    if (hours > 0) parts.push(`${hours}시간`)
+    if (minutes > 0) parts.push(`${minutes}분`)
+    if (seconds > 0 || parts.length === 0) parts.push(`${seconds}초`)
+    return parts.join(' ')
+  }
 
   // ISO 8601 Duration 형식 (PT13M43.6S) 파싱
   const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/)
-  if (!match) return duration // 파싱 실패 시 원본 반환
+  if (!match) return String(duration) // 파싱 실패 시 원본 반환
 
   const hours = parseInt(match[1] || '0', 10)
   const minutes = parseInt(match[2] || '0', 10)

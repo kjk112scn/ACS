@@ -157,10 +157,21 @@ interface Props {
 
 defineProps<Props>()
 
-const formatDuration = (duration?: string): string => {
-  if (!duration) return '00:00:00'
+// V006 Fix: 숫자(초) 또는 ISO 8601 Duration 문자열 모두 처리
+const formatDuration = (duration?: string | number | null): string => {
+  if (duration === null || duration === undefined) return '00:00:00'
+
+  // ✅ 숫자(초 단위)인 경우 직접 변환
+  if (typeof duration === 'number') {
+    const totalSeconds = Math.round(duration)
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  }
+
   const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/)
-  if (!match) return duration
+  if (!match) return String(duration)
   const hours = parseInt(match[1] || '0')
   const minutes = parseInt(match[2] || '0')
   const seconds = Math.round(parseFloat(match[3] || '0'))

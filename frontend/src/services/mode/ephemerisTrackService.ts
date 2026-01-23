@@ -468,8 +468,8 @@ class EphemerisTrackService {
       // 백엔드가 병합 데이터를 반환하므로 매핑 처리
       if (Array.isArray(mergedData) && mergedData.length > 0) {
         const mappedData = mergedData.map((item: Record<string, unknown>) => ({
-          // ✅ 하위 호환성을 위해 No 필드 유지하되 MstId 값 사용
-          No: (item.MstId ?? item.No) as number,
+          // ✅ 백엔드에서 제공하는 순차 번호 그대로 사용 (row-key용)
+          No: item.No as number,
           // ✅ mstId와 detailId 매핑 추가 (PassSchedule과 동일한 구조)
           // ✅ No 필드 제거, MstId만 사용
           mstId: item.MstId as number,

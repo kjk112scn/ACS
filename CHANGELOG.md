@@ -6,6 +6,27 @@
 
 ---
 
+## [2026-01-22] - V006 MstId/DetailId 버그픽스
+
+### Fixed
+- EphemerisService: currentTrackingDetailId 변수 추가 (MstId만으로는 패스 구분 불가)
+- EphemerisDataRepository: 서버 재시작 시 DB→메모리 로딩 추가 (@PostConstruct)
+- FE formatDuration: 숫자(초)/ISO 8601 문자열 모두 처리 (5개 파일)
+
+### Changed
+- EphemerisController: setCurrentTrackingPassId API에 detailId 파라미터 추가
+- getTrackingPassMst(): (MstId, DetailId) 복합키로 검색
+
+### Why
+- V006 스키마 변경 후 동일 위성의 여러 패스가 같은 MstId 공유
+- DetailId 없이는 패스 구분 불가 → 스케줄 선택 시 전체 선택되는 버그
+- 서버 재시작 후 스케줄 목록 0개 반환 문제
+
+### Details
+- [Tracking_Schema_Redesign](docs/work/active/Tracking_Schema_Redesign/README.md)
+
+---
+
 ## [2026-01-22] - 문서 관리 체계 표준화
 
 ### Added

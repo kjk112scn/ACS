@@ -23,6 +23,9 @@ import { useICDStore } from '../icd/icdStore'
  * ✅ index 필드 제거: mstId로 통일
  */
 export interface ScheduleItem {
+  // ✅ Quasar row-key용 고유 ID (필수) - mstId_detailId 형태
+  uid: string
+
   // ✅ 전역 고유 ID (필수) - index 필드를 대체
   mstId: number // Long 타입 (백엔드) → number 타입 (프론트엔드)
 
@@ -1305,6 +1308,9 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
               const detailId = pass.DetailId ?? 0 // ✅ Detail 구분자 (기본값 0)
 
               const scheduleItem: ScheduleItem = {
+                // ✅ Quasar row-key용 고유 ID (필수)
+                uid: `${mstId}_${detailId}`,
+
                 // ✅ 전역 고유 ID (필수) - index 필드를 대체
                 mstId: mstId,
 

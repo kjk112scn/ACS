@@ -22,6 +22,8 @@ import java.util.concurrent.atomic.AtomicLong
  * - 메모리 캐시: 빠른 조회
  * - DB 저장: 영속성 보장 (tracking_session, tracking_trajectory)
  *
+ * V006 Fix: 서버 재시작 시 DB에서 메모리로 로딩 추가
+ *
  * @since Phase 5 - BE 서비스 분리
  * @since Phase 6 - DB 연동 추가
  */
@@ -32,6 +34,98 @@ class EphemerisDataRepository(
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
+
+    /**
+     * ✅ V006 Fix: 서버 시작 시 DB에서 기존 세션을 메모리로 로드
+     * TLE 등록 후 서버 재시작해도 스케줄 목록이 유지됨
+     */
+    @PostConstruct
+    fun initFromDatabase() {
+        if (sessionRepository == null) {
+            logger.warn("SessionRepository가 없습니다. 메모리 전용 모드로 동작합니다.")
+            return
+        }
+
+        sessionRepository.findByTrackingMode("EPHEMERIS")
+            .collectList()
+            .doOnSuccess { sessions: List<TrackingSessionEntity> ->
+                if (sessions.isEmpty()) {
+                    logger.info("📥 [DB→메모리] Ephemeris 세션 없음")
+                    return@doOnSuccess
+                }
+
+                logger.info("📥 [DB→메모리] ${sessions.size}개 Ephemeris 세션 로딩 시작")
+
+                // 세션을 MST 형식으로 변환하여 메모리에 저장
+                val mstData = mutableListOf<Map<String, Any?>>()
+
+                sessions.forEach { session ->
+                    // ✅ 'original' 타입의 MST 생성
+                    val originalMst = mapSessionToMst(session, "original")
+                    mstData.add(originalMst)
+
+                    // ✅ 'final_transformed' 타입의 MST 생성 (getAllEphemerisTrackMstMerged에서 필요)
+                    val finalMst = mapSessionToMst(session, "final_transformed")
+                    mstData.add(finalMst)
+                }
+
+                synchronized(mstStorage) {
+                    mstStorage.addAll(mstData)
+                }
+
+                logger.info("📥 [DB→메모리] ${sessions.size}개 세션 → ${mstData.size}개 MST 로드 완료")
+            }
+            .doOnError { e ->
+                logger.error("❌ [DB→메모리] Ephemeris 세션 로딩 실패: ${e.message}")
+            }
+            .subscribe()
+    }
+
+    /**
+     * TrackingSessionEntity를 MST Map으로 변환
+     */
+    private fun mapSessionToMst(session: TrackingSessionEntity, dataType: String): Map<String, Any?> {
+        return mutableMapOf<String, Any?>(
+            "MstId" to session.mstId,
+            "DetailId" to session.detailId,
+            "DataType" to dataType,
+            "SatelliteID" to session.satelliteId,
+            "SatelliteName" to session.satelliteName,
+            "StartTime" to session.startTime,
+            "EndTime" to session.endTime,
+            "Duration" to session.duration,
+            "MaxElevation" to session.maxElevation,
+            "MaxAzRate" to session.maxAzimuthRate,
+            "MaxElRate" to session.maxElevationRate,
+            "IsKeyhole" to session.keyholeDetected,
+            "RecommendedTrainAngle" to session.recommendedTrainAngle,
+            "TotalPoints" to session.totalPoints,
+            // TLE 정보
+            "TleCacheId" to session.tleCacheId,
+            "TleLine1" to session.tleLine1,
+            "TleLine2" to session.tleLine2,
+            "TleEpoch" to session.tleEpoch,
+            // DataType별 메타데이터
+            "StartAzimuth" to when (dataType) {
+                "original" -> session.originalStartAzimuth ?: session.startAzimuth
+                "final_transformed" -> session.finalStartAzimuth ?: session.startAzimuth
+                else -> session.startAzimuth
+            },
+            "EndAzimuth" to when (dataType) {
+                "original" -> session.originalEndAzimuth ?: session.endAzimuth
+                "final_transformed" -> session.finalEndAzimuth ?: session.endAzimuth
+                else -> session.endAzimuth
+            },
+            "StartElevation" to when (dataType) {
+                "final_transformed" -> session.finalStartElevation ?: session.startElevation
+                else -> session.startElevation
+            },
+            "EndElevation" to when (dataType) {
+                "final_transformed" -> session.finalEndElevation ?: session.endElevation
+                else -> session.endElevation
+            }
+        )
+    }
 
     /**
      * 위성 추적 마스터 데이터 저장소
@@ -63,6 +157,16 @@ class EphemerisDataRepository(
     fun replaceAll(mstData: List<Map<String, Any?>>, dtlData: List<Map<String, Any?>>) {
         val opId = writeCounter.incrementAndGet()
         logger.info("📝 [WRITE #$opId] replaceAll 시작 - MST: ${mstData.size}개, DTL: ${dtlData.size}개")
+
+        // ✅ V006 디버깅: final_transformed MST의 DetailId 검증
+        val finalTransformedMst = mstData.filter { it["DataType"] == "final_transformed" }
+        logger.info("🔍 [WRITE #$opId] final_transformed MST 검증:")
+        finalTransformedMst.forEach { mst ->
+            val mstId = mst["MstId"]
+            val detailId = mst["DetailId"]
+            val detailIdType = detailId?.let { it::class.simpleName } ?: "null"
+            logger.info("   - MstId=$mstId, DetailId=$detailId (타입: $detailIdType)")
+        }
 
         synchronized(mstStorage) {
             val oldMstSize = mstStorage.size
@@ -504,28 +608,79 @@ class EphemerisDataRepository(
         // V006: data_type은 호환성 유지 (nullable)
         val dataType = mst["DataType"] as? String
 
-        // 시간 파싱
+        // ===== 시간 파싱 =====
         val now = OffsetDateTime.now(ZoneOffset.UTC)
         val startTime = parseTime(mst["StartTime"]) ?: now
         val endTime = parseTime(mst["EndTime"]) ?: now
-        // ✅ Duration: ISO String 파싱 또는 시간 차이 계산
         val duration = parseDurationToSeconds(mst["Duration"], startTime, endTime)
+        val maxElevationTime = parseTime(mst["MaxElevationTime"])
 
-        // 각도 정보
+        // ===== 기본 각도 정보 (P5 수정: 누락 필드 추가) =====
+        val startAzimuth = (mst["StartAzimuth"] as? Number)?.toDouble()
+            ?: (mst["StartAzimuthAngle"] as? Number)?.toDouble()
+        val endAzimuth = (mst["EndAzimuth"] as? Number)?.toDouble()
+            ?: (mst["EndAzimuthAngle"] as? Number)?.toDouble()
+        val startElevation = (mst["StartElevation"] as? Number)?.toDouble()
+            ?: (mst["StartElevationAngle"] as? Number)?.toDouble()
+        val endElevation = (mst["EndElevation"] as? Number)?.toDouble()
+            ?: (mst["EndElevationAngle"] as? Number)?.toDouble()
+        val trainAngle = (mst["Train"] as? Number)?.toDouble()
+            ?: (mst["TrainAngle"] as? Number)?.toDouble()
+
+        // ===== 기본 Peak 값 =====
         val maxElevation = (mst["MaxElevation"] as? Number)?.toDouble()
-        // ✅ MaxAzRate 우선, 없으면 MaxAzimuthRate 시도
         val maxAzimuthRate = (mst["MaxAzRate"] as? Number)?.toDouble()
             ?: (mst["MaxAzimuthRate"] as? Number)?.toDouble()
-        // ✅ MaxElRate 우선, 없으면 MaxElevationRate 시도
         val maxElevationRate = (mst["MaxElRate"] as? Number)?.toDouble()
             ?: (mst["MaxElevationRate"] as? Number)?.toDouble()
-        // ✅ IsKeyhole 우선, 없으면 KeyholeDetected 시도
+        val maxAzimuthAccel = (mst["MaxAzAccel"] as? Number)?.toDouble()
+            ?: (mst["MaxAzimuthAccel"] as? Number)?.toDouble()
+        val maxElevationAccel = (mst["MaxElAccel"] as? Number)?.toDouble()
+            ?: (mst["MaxElevationAccel"] as? Number)?.toDouble()
+
         val keyholeDetected = mst["IsKeyhole"] as? Boolean
             ?: mst["KeyholeDetected"] as? Boolean ?: false
         val recommendedTrainAngle = (mst["RecommendedTrainAngle"] as? Number)?.toDouble()
-        // ✅ TotalPoints: MST에서 읽거나 DTL 카운트 사용
         val totalPoints = (mst["TotalPoints"] as? Number)?.toInt()
             ?: if (dtlCount > 0) dtlCount else null
+
+        // ===== Original (2축) 메타데이터 =====
+        val originalStartAzimuth = (mst["OriginalStartAzimuth"] as? Number)?.toDouble()
+        val originalEndAzimuth = (mst["OriginalEndAzimuth"] as? Number)?.toDouble()
+        val originalMaxElevation = (mst["OriginalMaxElevation"] as? Number)?.toDouble()
+        val originalMaxAzRate = (mst["OriginalMaxAzRate"] as? Number)?.toDouble()
+        val originalMaxElRate = (mst["OriginalMaxElRate"] as? Number)?.toDouble()
+
+        // ===== FinalTransformed (3축, Train=0, ±270°) =====
+        val finalStartAzimuth = (mst["FinalTransformedStartAzimuth"] as? Number)?.toDouble()
+        val finalEndAzimuth = (mst["FinalTransformedEndAzimuth"] as? Number)?.toDouble()
+        val finalStartElevation = (mst["FinalTransformedStartElevation"] as? Number)?.toDouble()
+        val finalEndElevation = (mst["FinalTransformedEndElevation"] as? Number)?.toDouble()
+        val finalMaxElevation = (mst["FinalTransformedMaxElevation"] as? Number)?.toDouble()
+        val finalMaxAzRate = (mst["FinalTransformedMaxAzRate"] as? Number)?.toDouble()
+        val finalMaxElRate = (mst["FinalTransformedMaxElRate"] as? Number)?.toDouble()
+
+        // ===== KeyholeAxisTransformed (3축, Train≠0, 각도 제한 전) =====
+        val keyholeAxisMaxAzRate = (mst["KeyholeAxisTransformedMaxAzRate"] as? Number)?.toDouble()
+        val keyholeAxisMaxElRate = (mst["KeyholeAxisTransformedMaxElRate"] as? Number)?.toDouble()
+
+        // ===== KeyholeFinalTransformed (3축, Train≠0, ±270°) =====
+        val keyholeFinalStartAzimuth = (mst["KeyholeFinalTransformedStartAzimuth"] as? Number)?.toDouble()
+        val keyholeFinalEndAzimuth = (mst["KeyholeFinalTransformedEndAzimuth"] as? Number)?.toDouble()
+        val keyholeFinalStartElevation = (mst["KeyholeFinalTransformedStartElevation"] as? Number)?.toDouble()
+        val keyholeFinalEndElevation = (mst["KeyholeFinalTransformedEndElevation"] as? Number)?.toDouble()
+        val keyholeFinalMaxElevation = (mst["KeyholeFinalTransformedMaxElevation"] as? Number)?.toDouble()
+        val keyholeFinalMaxAzRate = (mst["KeyholeFinalTransformedMaxAzRate"] as? Number)?.toDouble()
+        val keyholeFinalMaxElRate = (mst["KeyholeFinalTransformedMaxElRate"] as? Number)?.toDouble()
+
+        // ===== KeyholeOptimizedFinalTransformed (최적화 Train, ±270°) =====
+        val keyholeOptStartAzimuth = (mst["KeyholeOptimizedFinalTransformedStartAzimuth"] as? Number)?.toDouble()
+        val keyholeOptEndAzimuth = (mst["KeyholeOptimizedFinalTransformedEndAzimuth"] as? Number)?.toDouble()
+        val keyholeOptStartElevation = (mst["KeyholeOptimizedFinalTransformedStartElevation"] as? Number)?.toDouble()
+        val keyholeOptEndElevation = (mst["KeyholeOptimizedFinalTransformedEndElevation"] as? Number)?.toDouble()
+        val keyholeOptMaxElevation = (mst["KeyholeOptimizedFinalTransformedMaxElevation"] as? Number)?.toDouble()
+        val keyholeOptMaxAzRate = (mst["KeyholeOptimizedFinalTransformedMaxAzRate"] as? Number)?.toDouble()
+        val keyholeOptMaxElRate = (mst["KeyholeOptimizedFinalTransformedMaxElRate"] as? Number)?.toDouble()
 
         // V006: TLE 연동 (FK + 스냅샷)
         val tleCacheId = (mst["TleCacheId"] as? Number)?.toLong()
@@ -547,15 +702,59 @@ class EphemerisDataRepository(
             satelliteName = satelliteName,
             trackingMode = "EPHEMERIS",
             dataType = dataType,
+            // 시간 정보
             startTime = startTime,
             endTime = endTime,
             duration = duration,
+            maxElevationTime = maxElevationTime,
+            // 기본 각도 정보
+            startAzimuth = startAzimuth,
+            endAzimuth = endAzimuth,
+            startElevation = startElevation,
+            endElevation = endElevation,
+            trainAngle = trainAngle,
+            // 기본 Peak 값
             maxElevation = maxElevation,
             maxAzimuthRate = maxAzimuthRate,
             maxElevationRate = maxElevationRate,
+            maxAzimuthAccel = maxAzimuthAccel,
+            maxElevationAccel = maxElevationAccel,
             keyholeDetected = keyholeDetected,
             recommendedTrainAngle = recommendedTrainAngle,
             totalPoints = totalPoints,
+            // Original (2축)
+            originalStartAzimuth = originalStartAzimuth,
+            originalEndAzimuth = originalEndAzimuth,
+            originalMaxElevation = originalMaxElevation,
+            originalMaxAzRate = originalMaxAzRate,
+            originalMaxElRate = originalMaxElRate,
+            // FinalTransformed (3축, Train=0)
+            finalStartAzimuth = finalStartAzimuth,
+            finalEndAzimuth = finalEndAzimuth,
+            finalStartElevation = finalStartElevation,
+            finalEndElevation = finalEndElevation,
+            finalMaxElevation = finalMaxElevation,
+            finalMaxAzRate = finalMaxAzRate,
+            finalMaxElRate = finalMaxElRate,
+            // KeyholeAxisTransformed
+            keyholeAxisMaxAzRate = keyholeAxisMaxAzRate,
+            keyholeAxisMaxElRate = keyholeAxisMaxElRate,
+            // KeyholeFinalTransformed
+            keyholeFinalStartAzimuth = keyholeFinalStartAzimuth,
+            keyholeFinalEndAzimuth = keyholeFinalEndAzimuth,
+            keyholeFinalStartElevation = keyholeFinalStartElevation,
+            keyholeFinalEndElevation = keyholeFinalEndElevation,
+            keyholeFinalMaxElevation = keyholeFinalMaxElevation,
+            keyholeFinalMaxAzRate = keyholeFinalMaxAzRate,
+            keyholeFinalMaxElRate = keyholeFinalMaxElRate,
+            // KeyholeOptimizedFinalTransformed
+            keyholeOptStartAzimuth = keyholeOptStartAzimuth,
+            keyholeOptEndAzimuth = keyholeOptEndAzimuth,
+            keyholeOptStartElevation = keyholeOptStartElevation,
+            keyholeOptEndElevation = keyholeOptEndElevation,
+            keyholeOptMaxElevation = keyholeOptMaxElevation,
+            keyholeOptMaxAzRate = keyholeOptMaxAzRate,
+            keyholeOptMaxElRate = keyholeOptMaxElRate,
             // V006: TLE 연동
             tleCacheId = tleCacheId,
             tleLine1 = tleLine1,

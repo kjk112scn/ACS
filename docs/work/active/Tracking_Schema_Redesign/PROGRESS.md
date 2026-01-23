@@ -1,6 +1,11 @@
 # Tracking Schema Redesign 진행 상황
 
-## 진행률: 90% (V006 완료, P2+P3 수정 완료, 검증 대기)
+## 진행률: 98% (V006 완료, P5 버그픽스 완료, V007 구현 대기)
+
+## 관련 문서
+
+- **[ADR-007](../../../decisions/ADR-007-tracking-session-key-design.md)**: mst_id + detail_id 구조 유지 결정
+- **[PLAN_V007.md](PLAN_V007.md)**: V007 마이그레이션 상세 계획
 
 ## ✅ 수정 완료된 이슈
 
@@ -10,6 +15,14 @@
 | **trackingMode 불일치** - "ephemeris_designation" vs "EPHEMERIS" | 🔴 CRITICAL | ✅ 수정 완료 |
 | **PassSchedule V006 미반영** - 1 Pass = 7 Sessions | 🟡 HIGH | ✅ 수정 완료 |
 | **PassSchedule sessionId 조회** - 메서드 누락 | 🟡 HIGH | ✅ 수정 완료 |
+
+## ✅ 2026-01-22 저녁 버그픽스
+
+| 이슈 | 심각도 | 수정 내용 |
+|------|--------|----------|
+| **currentTrackingDetailId 누락** | 🔴 CRITICAL | EphemerisService에 변수 추가 |
+| **서버 재시작 시 스케줄 0개** | 🔴 CRITICAL | EphemerisDataRepository @PostConstruct 추가 |
+| **FE formatDuration 에러** | 🟡 HIGH | 숫자/문자열 모두 처리 (5개 파일) |
 
 ## ✅ 신규 발견 이슈 수정 완료 (2026-01-22 오후)
 
@@ -27,6 +40,40 @@
 상세: [FIX.md](FIX.md) §P2-P4
 
 상세: [FIX.md](FIX.md), [DEEP_REVIEW_V007.md §11](DEEP_REVIEW_V007.md#11-발견된-이슈-critical)
+
+## ✅ 2026-01-23 버그픽스
+
+| 이슈 | 심각도 | 수정 내용 |
+|------|--------|----------|
+| **Select Schedule 단일 선택 시 전체 선택 (PassSchedule)** | 🟡 HIGH | ✅ uid 필드 추가 + row-key 변경 |
+| **Select Schedule 단일 선택 시 전체 선택 (Ephemeris)** | 🟡 HIGH | ✅ BE No 순차 생성으로 수정 |
+
+상세: [FIX.md](FIX.md) §2026-01-23
+
+**PassSchedule 수정 파일:**
+- `stores/mode/passScheduleStore.ts`: ScheduleItem에 uid 필드 추가
+- `components/content/SelectScheduleContent.vue`: row-key 함수 → 문자열 "uid"
+
+**Ephemeris 수정 파일:**
+- `EphemerisService.kt` L3025: `mapNotNull` → `withIndex().mapNotNull`
+- `EphemerisService.kt` L3133: `put("No", mstId)` → `put("No", index + 1)`
+- `ephemerisTrackService.ts` L472: `(item.MstId ?? item.No)` → `item.No` (FE 덮어쓰기 제거)
+
+## ✅ 2026-01-23 BE 버그픽스 (완료)
+
+| 이슈 | 심각도 | 상태 |
+|------|--------|------|
+| **P5: tracking_session 매핑 누락** - Ephemeris mapMstToSession() 36개 필드 미매핑 | 🟡 HIGH | ✅ 수정 완료 |
+| **P5-1: PassSchedule 키 이름 불일치** - StartAzimuthAngle vs StartAzimuth | 🟡 MEDIUM | ✅ 해결 (양쪽 키 지원) |
+| **P5-2: DataType 필드 누락** - mergedData에 DataType 미설정 | 🟡 HIGH | ✅ 수정 완료 |
+| **P5-3: TLE 필드 누락** - mergedData에 TLE 정보 미복사 | 🟡 HIGH | ✅ 수정 완료 |
+
+상세: [FIX.md](FIX.md) §2026-01-23
+
+**수정 내용:**
+- EphemerisDataRepository.kt: mapMstToSession() 확장 (35개 필드 추가)
+- EphemerisService.kt: mergedData에 DataType 동적 설정 추가
+- EphemerisService.kt: mergedData에 TLE 필드 (TleLine1, TleLine2, TleEpoch, TleCacheId) 추가
 
 ## 작업 체크리스트
 
