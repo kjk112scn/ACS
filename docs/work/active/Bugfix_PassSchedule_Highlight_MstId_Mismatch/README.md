@@ -1,6 +1,6 @@
 # PassSchedule 하이라이트 MstId 불일치 버그
 
-## 현재 상태: ✅ 수정 완료
+## 현재 상태: ✅ Phase 1+2 수정 완료
 
 ## 개요
 
@@ -19,12 +19,23 @@
 
 ## 원인
 
+### Phase 1
+
 | # | 위치 | 문제 |
 |:-:|------|------|
 | 1 | SelectScheduleContent.vue:352 | uid를 순차 숫자로 덮어씀 |
 | 2 | SelectScheduleContent.vue:354 | `mstId ?? no` fallback |
 | 3 | ScheduleTable.vue:129,175 | `mstId ?? no` fallback |
 | 4 | ScheduleTable.vue:141-146 | detailId null이면 매칭 실패 |
+
+### Phase 2 (Start 버튼 후 하이라이트 안 됨)
+
+| # | 위치 | 문제 |
+|:-:|------|------|
+| 5 | passScheduleStore.ts:1511 | BE 전송 시 `mstId ?? no` |
+| 6 | PassSchedulePage.vue:614 | 하이라이트 매칭 `mstId ?? no` |
+| 7 | PassSchedulePage.vue:1021 | 상태 표시 `mstId ?? no` |
+| 8 | SelectScheduleContent.vue:1426 | 복원 시 `mstId ?? no` |
 
 ## 수정 내용
 
@@ -56,10 +67,20 @@
 
 ## 수정 파일
 
+### Phase 1
+
 | 파일 | 변경 |
 |------|------|
 | `SelectScheduleContent.vue` | uid 원본 유지, mstId fallback 제거 |
 | `ScheduleTable.vue` | fallback 제거, detailId 매칭 로직 수정 |
+
+### Phase 2
+
+| 파일 | 변경 |
+|------|------|
+| `passScheduleStore.ts` | setTrackingTargets fallback 제거 |
+| `PassSchedulePage.vue` | 하이라이트/상태 매칭 fallback 제거, AND→OR 로직 |
+| `SelectScheduleContent.vue` | 복원 로직 fallback 제거 |
 
 ## 테스트
 

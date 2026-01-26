@@ -228,13 +228,14 @@ class PassScheduleService(
     }
 
     // ===== B4 버그 수정: 유효한 상태 전환 맵 (순서 위반 시 ERROR) =====
+    // ✅ FIX #R004-C2: 시간 점프(Time Offset) 시 TRACKING 직접 전환 허용
     private val validTransitions = mapOf(
         PassScheduleState.IDLE to setOf(PassScheduleState.STOWING, PassScheduleState.MOVING_TRAIN),
-        PassScheduleState.STOWING to setOf(PassScheduleState.STOWED),
-        PassScheduleState.STOWED to setOf(PassScheduleState.MOVING_TRAIN),
-        PassScheduleState.MOVING_TRAIN to setOf(PassScheduleState.TRAIN_STABILIZING),
-        PassScheduleState.TRAIN_STABILIZING to setOf(PassScheduleState.MOVING_TO_START),
-        PassScheduleState.MOVING_TO_START to setOf(PassScheduleState.READY),
+        PassScheduleState.STOWING to setOf(PassScheduleState.STOWED, PassScheduleState.TRACKING),
+        PassScheduleState.STOWED to setOf(PassScheduleState.MOVING_TRAIN, PassScheduleState.TRACKING),
+        PassScheduleState.MOVING_TRAIN to setOf(PassScheduleState.TRAIN_STABILIZING, PassScheduleState.TRACKING),
+        PassScheduleState.TRAIN_STABILIZING to setOf(PassScheduleState.MOVING_TO_START, PassScheduleState.TRACKING),
+        PassScheduleState.MOVING_TO_START to setOf(PassScheduleState.READY, PassScheduleState.TRACKING),
         PassScheduleState.READY to setOf(PassScheduleState.TRACKING),
         PassScheduleState.TRACKING to setOf(PassScheduleState.POST_TRACKING),
         PassScheduleState.POST_TRACKING to setOf(PassScheduleState.STOWING, PassScheduleState.MOVING_TRAIN, PassScheduleState.COMPLETED),
@@ -341,6 +342,8 @@ class PassScheduleService(
     fun init() {
         logger.info("PassScheduleService 초기화 완료 (상태 머신 패턴 적용)")
         setupEventSubscriptions()
+        // ✅ FIX #B001: PassScheduleDataRepository가 DB에서 자동 로드 (@PostConstruct initFromDatabase)
+        // 별도 재생성 불필요 - DB 테이블 조회로 충분
     }
 
     /**
@@ -684,6 +687,10 @@ class PassScheduleService(
         Mono.fromCallable {
             GlobalData.Offset.TimeOffset = inputTimeOffset
             udpFwICDService.writeNTPCommand()
+
+            // ✅ FIX #R004-C1: Time Offset 변경 시 스케줄 큐 재평가 및 mstId 갱신
+            handleTimeOffsetChange()
+
             // 현재 추적 중인 패스가 있을 때만 초기 데이터 전송
             dataStoreService.getCurrentTrackingMstId()?.let { mstId ->
                 logger.info("추적 중인 패스 발견, 초기 데이터 전송 시작: mstId={}", mstId)
@@ -1195,11 +1202,12 @@ class PassScheduleService(
             allSchedules.addAll(mstDataList)
         }
         
-        // ✅ final_transformed 또는 keyhole_final_transformed만 사용하여 중복 제거
+        // ✅ FIX: original도 포함 - final_transformed가 없을 경우 fallback
+        // 우선순위: final_transformed > keyhole_final_transformed > original
         val uniqueSchedules = allSchedules
             .filter { schedule ->
                 val dataType = schedule["DataType"] as? String
-                dataType == "final_transformed" || dataType == "keyhole_final_transformed"
+                dataType == "final_transformed" || dataType == "keyhole_final_transformed" || dataType == "original"
             }
             .distinctBy { schedule ->
                 // MstId와 DetailId 조합으로 고유성 보장
@@ -1241,12 +1249,12 @@ class PassScheduleService(
             logger.info("   - allSchedules (selectedTrackMstStorage): ${allSchedules.size}개")
         }
 
-        // ✅ DataType별로 중복 제거: final_transformed 또는 keyhole_final_transformed만 사용
+        // ✅ FIX: original도 포함 - final_transformed가 없을 경우 fallback
         // 같은 MstId와 DetailId 조합에 대해 하나만 선택
         val uniqueSchedules = allSchedules
             .filter { schedule ->
                 val dataType = schedule["DataType"] as? String
-                dataType == "final_transformed" || dataType == "keyhole_final_transformed"
+                dataType == "final_transformed" || dataType == "keyhole_final_transformed" || dataType == "original"
             }
             .distinctBy { schedule ->
                 // MstId와 DetailId 조합으로 고유성 보장
@@ -1704,9 +1712,11 @@ class PassScheduleService(
     fun getAllPassScheduleTrackMstMerged(): List<Map<String, Any?>> {
         try {
             logger.info("📊 Original, FinalTransformed, KeyholeAxisTransformed, KeyholeFinalTransformed 데이터 병합 시작")
-            
-            // 6가지 DataType 모두 조회 (위성별 그룹화된 구조에서 flatten)
-            val allMstData = passScheduleTrackMstStorage.values.flatten()
+
+            // ✅ FIX #B001: PassScheduleDataRepository에서 DB 영속 데이터 조회
+            // - 서버 재시작 시 initFromDatabase()로 DB에서 자동 로드됨
+            // - 기존 passScheduleTrackMstStorage (메모리 only) 대신 사용
+            val allMstData = passScheduleDataRepository.getAllMstFlattened()
             val originalMst = allMstData.filter { it["DataType"] == "original" }
             val finalMst = allMstData.filter { it["DataType"] == "final_transformed" }
             val keyholeAxisMst = allMstData.filter { it["DataType"] == "keyhole_axis_transformed" }
@@ -3206,11 +3216,27 @@ class PassScheduleService(
      * Time Offset이 변경되면 스케줄 큐 재평가 및 상태 재결정
      */
     fun handleTimeOffsetChange() {
-        if (currentPassScheduleState == PassScheduleState.IDLE) {
-            return
-        }
-
         val calTime = GlobalData.Time.calUtcTimeOffsetTime
+
+        // ✅ FIX #R005-C1: IDLE 상태에서도 스케줄 큐 재평가 및 DataStore 업데이트
+        if (currentPassScheduleState == PassScheduleState.IDLE) {
+            logger.info("[V2-TIME_OFFSET] IDLE 상태에서 Time Offset 변경 - DataStore만 업데이트")
+            reevaluateScheduleQueue(calTime)
+
+            // DataStore 업데이트 (FE WebSocket 전송용)
+            currentScheduleContext?.let { ctx ->
+                dataStoreService.setCurrentTrackingMstId(ctx.mstId, ctx.detailId)
+            } ?: dataStoreService.setCurrentTrackingMstId(null, null)
+
+            nextScheduleContext?.let { next ->
+                dataStoreService.setNextTrackingMstId(next.mstId, next.detailId)
+            } ?: dataStoreService.setNextTrackingMstId(null, null)
+
+            logger.info("[V2-TIME_OFFSET] IDLE DataStore 업데이트: current={}/{}, next={}/{}",
+                currentScheduleContext?.mstId, currentScheduleContext?.detailId,
+                nextScheduleContext?.mstId, nextScheduleContext?.detailId)
+            return  // 상태 전환은 하지 않음
+        }
 
         logger.info("═══════════════════════════════════════════════")
         logger.info("[V2-TIME_OFFSET] Time Offset 변경 감지!")
@@ -3220,6 +3246,19 @@ class PassScheduleService(
 
         // 스케줄 큐 재평가
         reevaluateScheduleQueue(calTime)
+
+        // ✅ FIX #R004-C3: DataStore에 mstId/detailId 업데이트 (WebSocket 전송용)
+        currentScheduleContext?.let { ctx ->
+            dataStoreService.setCurrentTrackingMstId(ctx.mstId, ctx.detailId)
+        } ?: dataStoreService.setCurrentTrackingMstId(null, null)
+
+        nextScheduleContext?.let { next ->
+            dataStoreService.setNextTrackingMstId(next.mstId, next.detailId)
+        } ?: dataStoreService.setNextTrackingMstId(null, null)
+
+        logger.info("[V2-TIME_OFFSET] mstId/detailId 업데이트 완료: current={}/{}, next={}/{}",
+            currentScheduleContext?.mstId, currentScheduleContext?.detailId,
+            nextScheduleContext?.mstId, nextScheduleContext?.detailId)
 
         // 현재 상태 재결정 (시간 기반)
         val newState = determineStateByTime(calTime)
@@ -3247,8 +3286,11 @@ class PassScheduleService(
                 .filter { it.startTime.isBefore(calTime) || Duration.between(calTime, it.startTime).toMinutes() <= prepMinutes }
                 .minByOrNull { it.startTime }
 
-            if (currentSchedule != null && currentSchedule.mstId != currentScheduleContext?.mstId) {
-                logger.info("[V2-TIME_OFFSET] 현재 스케줄 변경: ${currentScheduleContext?.satelliteName} → ${currentSchedule.satelliteName}")
+            // ✅ FIX #R005-C2: mstId와 detailId 모두 비교
+            if (currentSchedule != null &&
+                (currentSchedule.mstId != currentScheduleContext?.mstId ||
+                 currentSchedule.detailId != currentScheduleContext?.detailId)) {
+                logger.info("[V2-TIME_OFFSET] 현재 스케줄 변경: ${currentScheduleContext?.satelliteName}(${currentScheduleContext?.detailId}) → ${currentSchedule.satelliteName}(${currentSchedule.detailId})")
                 // B3 버그 수정: 큐 원본도 업데이트
                 val idx = scheduleContextQueue.indexOf(currentSchedule)
                 val resetContext = currentSchedule.resetFlags()
@@ -3256,6 +3298,22 @@ class PassScheduleService(
                     scheduleContextQueue[idx] = resetContext
                 }
                 currentScheduleContext = resetContext
+            }
+
+            // ✅ FIX #R004-C3: 다음 스케줄 컨텍스트도 재설정
+            val nextSchedule = activeSchedules
+                .filter { it.startTime.isAfter(currentSchedule?.endTime ?: calTime) }
+                .minByOrNull { it.startTime }
+
+            // ✅ FIX #R005-C2: mstId와 detailId 모두 비교
+            if (nextSchedule != null &&
+                (nextSchedule.mstId != nextScheduleContext?.mstId ||
+                 nextSchedule.detailId != nextScheduleContext?.detailId)) {
+                logger.info("[V2-TIME_OFFSET] 다음 스케줄 변경: ${nextScheduleContext?.satelliteName}(${nextScheduleContext?.detailId}) → ${nextSchedule.satelliteName}(${nextSchedule.detailId})")
+                nextScheduleContext = nextSchedule
+            } else if (nextSchedule == null && nextScheduleContext != null) {
+                logger.info("[V2-TIME_OFFSET] 다음 스케줄 없음 (이전: ${nextScheduleContext?.satelliteName})")
+                nextScheduleContext = null
             }
         }
     }

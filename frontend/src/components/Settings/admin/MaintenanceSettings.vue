@@ -521,7 +521,7 @@ const getSpeedRange = (currentAngle: number, axis: 'azimuth' | 'elevation' | 'tr
       return '범위 밖 (1.0°/s)'
     }
   }
-  
+
   return '알 수 없음'
 }
 

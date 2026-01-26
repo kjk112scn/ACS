@@ -3,9 +3,15 @@
  *
  * SunTrack, EphemerisDesignation, PassSchedule 3개 페이지에서 공통으로 사용
  * offset input/output 값이 모든 페이지에서 동기화됨
+ *
+ * ✅ FIX #R005-C4: PassSchedule 모드에서는 전용 API 호출
+ *    - PassSchedule: passScheduleStore.sendTimeOffset() → handleTimeOffsetChange() 포함
+ *    - 그 외: icdStore.sendTimeOffsetCommand() (기존)
  */
 import { ref, computed, readonly } from 'vue'
+import { useRoute } from 'vue-router'
 import { useICDStore } from '../../../../stores/icd/icdStore'
+import { usePassScheduleModeStore } from '../../../../stores/mode/passScheduleStore'
 
 // 싱글톤 상태 (모든 페이지에서 공유)
 const inputs = ref<string[]>(['0.00', '0.00', '0.00', '0.00'])
@@ -14,6 +20,24 @@ const offsetCals = ref<string[]>(['0.00', '0.00', '0.00', '0.00'])
 
 export function useOffsetControls() {
   const icdStore = useICDStore()
+  const passScheduleStore = usePassScheduleModeStore()
+  const route = useRoute()
+
+  // ✅ FIX #R005-C4: PassSchedule 모드 여부 확인
+  const isPassScheduleMode = computed(() => {
+    return route.path.includes('pass-schedule')
+  })
+
+  // ✅ FIX #R005-C4: 모드별 Time Offset 명령 전송
+  const sendTimeOffsetByMode = async (timeOffset: number) => {
+    if (isPassScheduleMode.value) {
+      // PassSchedule 모드: 전용 API (handleTimeOffsetChange 포함)
+      return await passScheduleStore.sendTimeOffset(timeOffset)
+    } else {
+      // 그 외 모드: 기존 ICD API
+      return await icdStore.sendTimeOffsetCommand(timeOffset)
+    }
+  }
 
   // Cal Time (computed from icdStore)
   const formattedCalTime = computed(() => {
@@ -88,7 +112,8 @@ export function useOffsetControls() {
         }
 
         const timeOffset = parseFloat(offsetCals.value[3] || '0')
-        const response = await icdStore.sendTimeOffsetCommand(timeOffset)
+        // ✅ FIX #R005-C4: 모드별 API 호출
+        const response = await sendTimeOffsetByMode(timeOffset)
 
         if (response && typeof response === 'object' && typeof response.inputTimeoffset === 'number') {
           outputs.value[3] = String(response.inputTimeoffset.toFixed(2) || offsetCals.value[3] || '0.00')
@@ -149,7 +174,8 @@ export function useOffsetControls() {
         }
 
         const timeOffset = parseFloat(offsetCals.value[3] || '0')
-        const response = await icdStore.sendTimeOffsetCommand(timeOffset)
+        // ✅ FIX #R005-C4: 모드별 API 호출
+        const response = await sendTimeOffsetByMode(timeOffset)
 
         if (response && typeof response === 'object' && typeof response.inputTimeoffset === 'number') {
           outputs.value[3] = String(response.inputTimeoffset.toFixed(2) || offsetCals.value[3] || '0.00')
@@ -182,7 +208,8 @@ export function useOffsetControls() {
         outputs.value[2] = response.trainOffset?.toFixed(2) || '0.00'
         offsetCals.value[2] = outputs.value[2]
       } else if (index === 3) {
-        const response = await icdStore.sendTimeOffsetCommand(0)
+        // ✅ FIX #R005-C4: 모드별 API 호출
+        const response = await sendTimeOffsetByMode(0)
         if (response && response.resultTimeOffset !== undefined) {
           outputs.value[3] = response.resultTimeOffset.toFixed(2)
         } else {

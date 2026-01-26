@@ -5,7 +5,7 @@
 | 항목 | 내용 |
 |------|------|
 | **심각도** | 🔴 Critical |
-| **상태** | ✅ 수정 완료 |
+| **상태** | 🔄 추가 수정 필요 |
 | **Review** | #R002 |
 
 ### 증상
@@ -132,6 +132,94 @@
 | fallback 패턴 코드 리뷰 시 주의 | ✅ |
 | mstId/detailId 타입 강화 | ⏳ |
 | 단위 테스트 추가 | ⏳ |
+
+---
+
+## 2026-01-26: 추가 Fallback 패턴 발견 (Phase 2)
+
+| 항목 | 내용 |
+|------|------|
+| **심각도** | 🔴 Critical |
+| **상태** | ✅ 수정 완료 |
+| **Origin** | #R002-C1 (Phase 2) |
+
+### 증상
+
+- Start 버튼을 눌러도 Schedule Control 테이블에서 하이라이트가 표시되지 않음
+- BE에서 `nextTrackingMstId = null` 전송됨
+
+### 원인
+
+**Phase 1에서 수정하지 못한 추가 Fallback 패턴 4개 발견:**
+
+| # | 위치 | 문제 코드 | 영향 |
+|:-:|------|----------|------|
+| 5 | passScheduleStore.ts:1511 | `schedule.mstId ?? schedule.no` | BE 전송 시 잘못된 mstId |
+| 6 | PassSchedulePage.vue:614 | `schedule.mstId ?? schedule.no` | 매칭 실패 |
+| 7 | PassSchedulePage.vue:1021 | `schedule.mstId ?? schedule.no` | 매칭 실패 |
+| 8 | SelectScheduleContent.vue:1426 | `storeSchedule.mstId ?? storeSchedule.no` | 복원 시 잘못된 ID |
+
+### 데이터 흐름 분석
+
+```
+FE: setTrackingTargets(schedules)
+    ↓ mstId = schedule.mstId ?? schedule.no  ← ❌ #5 (핵심 문제)
+    ↓ API 호출 (mstId=1 instead of 4)
+BE: setTrackingTargetList()
+    ↓ generateSelectedTrackingData() - targetMstIds=[1]
+    ↓ passScheduleTrackMstStorage 검색 - mstId=1 없음!
+    ↓ selectedTrackMstStorage = 빈 배열
+    ↓ updateTrackingMstIdsAfterTargetSet()
+    ↓ getNextSelectedTrackingPassWithTime() → null
+    ↓ setNextTrackingMstId(null)
+WebSocket: nextTrackingMstId=null
+FE: 하이라이트 안 됨
+```
+
+### 변경 내용
+
+#### 5. passScheduleStore.ts - setTrackingTargets (1511줄)
+
+```diff
+- const mstId = schedule.mstId ?? schedule.no
++ const mstId = schedule.mstId
++ if (!mstId) {
++   console.error('❌ mstId가 없는 스케줄:', schedule)
++   return null
++ }
+```
+
+#### 6. PassSchedulePage.vue - getScheduleRowStyle (614줄)
+
+```diff
+- const scheduleMstId = schedule.mstId ?? schedule.no
++ const scheduleMstId = schedule.mstId
+```
+
+#### 7. PassSchedulePage.vue - updateRowColors (1021줄)
+
+```diff
+- const scheduleMstId = Number(schedule.mstId ?? schedule.no)
++ const scheduleMstId = schedule.mstId ? Number(schedule.mstId) : null
+```
+
+#### 8. SelectScheduleContent.vue - 복원 로직 (1426줄)
+
+```diff
+- const savedMstId = storeSchedule.mstId ?? storeSchedule.no
++ const savedMstId = storeSchedule.mstId
+```
+
+### 테스트 계획 (Phase 2)
+
+#### 수정 확인
+- [ ] Start 버튼 후 다음 스케줄 파란색 하이라이트
+- [ ] Start 버튼 후 현재 스케줄 녹색 하이라이트
+- [ ] BE 로그에서 mstId 값 확인
+
+#### 회귀 테스트
+- [ ] 스케줄 선택 기능 정상
+- [x] 빌드 성공
 
 ---
 

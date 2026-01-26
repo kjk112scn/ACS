@@ -1205,14 +1205,10 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
 
   const fetchScheduleDataFromServer = async (forceRefresh = false): Promise<boolean> => {
     try {
-      // ✅ 캐시 우선 확인 (강제 새로고침이 아닐 때만)
-      if (!forceRefresh) {
-        const cached = loadScheduleDataFromLocalStorage()
-        if (cached) {
-          console.log('✅ 캐시된 스케줄 데이터 사용 (API 호출 생략)')
-          return true
-        }
-      }
+      // ✅ FIX #B001: localStorage 캐시 우선 로직 제거
+      // - 항상 BE API 호출하여 최신 데이터 가져옴
+      // - 나중에 SWR 패턴 적용 시 캐싱 전략 재설계
+      // - forceRefresh 파라미터는 하위 호환성을 위해 유지 (사용하지 않음)
 
       loading.value = true
       error.value = null
@@ -1506,11 +1502,16 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
       loading.value = true
       console.log('🚀 추적 대상 설정 시작:', schedules.length, '개')
 
-      const trackingTargets: TrackingTarget[] = schedules.map((schedule, arrayIndex) => {
-        // ✅ 전역 고유 ID 사용 (mstId 필수) - index 필드 제거
-        const mstId = schedule.mstId ?? schedule.no
+      const trackingTargets: TrackingTarget[] = schedules
+        .map((schedule, arrayIndex) => {
+          // ✅ FIX: fallback 제거 - mstId는 필수, null이면 오류
+          const mstId = schedule.mstId
+          if (!mstId) {
+            console.error('❌ mstId가 없는 스케줄:', schedule)
+            return null
+          }
 
-        console.log(`🔍 스케줄 ${arrayIndex}: mstId=${mstId} (no=${schedule.no})`)
+          console.log(`🔍 스케줄 ${arrayIndex}: mstId=${mstId} (no=${schedule.no})`)
 
         return {
           mstId: Number(mstId), // ✅ 전역 고유 ID (필수)
@@ -1521,7 +1522,8 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
           endTime: schedule.endTime,
           maxElevation: schedule.maxElevation || 0,
         }
-      })
+        })
+        .filter((t): t is TrackingTarget => t !== null)
 
       console.log(
         '🔄 변환된 추적 대상:',
@@ -2094,10 +2096,11 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
 
   /**
    * 시간 오프셋 명령 전송
+   * ✅ FIX #R005-C4: PassSchedule 전용 API 호출 (handleTimeOffsetChange 포함)
    */
   const sendTimeOffset = async (timeOffset: number) => {
     try {
-      return await useICDStore().sendTimeOffsetCommand(timeOffset)
+      return await passScheduleService.sendTimeOffsetCommand(timeOffset)
     } catch (err) {
       error.value = 'Failed to send time offset'
       throw err
