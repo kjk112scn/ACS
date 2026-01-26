@@ -291,7 +291,56 @@ A: DESIGN.md의 "변경 이력" 섹션에 기록하고 Why 업데이트.
 
 ---
 
-**스킬 버전:** 2.0.0
-**작성일:** 2026-01-20
-**변경:** 통합 워크플로우 적용, Phase 분류 + PROGRESS.md 추가
+## Task System 연동 (v2.1)
+
+> **참조:** `.claude/rules/task-system.md`, `.claude/rules/task-parser.md`
+
+### 활성화
+
+PROGRESS.md 상단에 태그 자동 삽입:
+
+```markdown
+<!-- @task-system: enabled -->
+<!-- @auto-sync: true -->
+```
+
+### Task ID 자동 부여
+
+```markdown
+### Phase 1: 준비 [parallel: false]
+- [ ] #T001 요구사항 분석
+- [ ] #T002 설계 문서 작성 [depends: T001]
+
+### Phase 2: 구현 [parallel: true]
+- [ ] #T003 Backend 구현 [depends: T002] @be-expert
+- [ ] #T004 Frontend 구현 [depends: T002] @fe-expert
+
+### Phase 3: 검증 [parallel: false]
+- [ ] #T005 테스트 실행 [depends: T003, T004] @test-expert
+```
+
+### TodoWrite 동기화
+
+| 문서 상태 | TodoWrite status |
+|----------|------------------|
+| `- [ ] #T001` | `pending` |
+| `- [x] #T001` | `completed` |
+| 현재 실행 중 | `in_progress` |
+
+### 병렬 실행
+
+`[parallel: true]` Phase에서:
+- 의존성 충족된 Task 동시 실행
+- 에이전트 태그로 전문가 자동 배정
+- 백그라운드 실행 (`run_in_background: true`)
+
+### 템플릿
+
+`.claude/templates/PROGRESS_TASK_SYSTEM.md` 사용
+
+---
+
+**스킬 버전:** 2.1.0
+**작성일:** 2026-01-26
+**변경:** Task System 연동 추가, 의존성/병렬 실행 지원
 **호환:** ACS 프로젝트 전용

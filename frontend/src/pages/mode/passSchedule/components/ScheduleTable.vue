@@ -126,23 +126,28 @@ const highlightedRows = computed(() => {
 const getRowStyleDirect = (rowProps: { row: ScheduleItem }) => {
   try {
     const schedule = rowProps.row
-    const scheduleMstId = schedule.mstId ?? schedule.no
-    const scheduleDetailId = schedule.detailId ?? null
+    // ✅ FIX: fallback 제거 - mstId는 필수, null이면 매칭 안 함
+    const scheduleMstId = schedule.mstId
+    const scheduleDetailId = schedule.detailId ?? 0
     const { current, currentDetailId, next, nextDetailId } = highlightedRows.value
 
+    // mstId가 없으면 하이라이트 불가
+    if (scheduleMstId === null || scheduleMstId === undefined) {
+      return {}
+    }
+
     if (current !== null || next !== null) {
+      // ✅ FIX: detailId 매칭 로직 수정 - 둘 다 있을 때만 비교, 아니면 mstId만으로 매칭
       const currentMatch =
         current !== null &&
         Number(scheduleMstId) === Number(current) &&
-        (currentDetailId !== null &&
-          scheduleDetailId !== null &&
+        (currentDetailId === null ||
           Number(scheduleDetailId) === Number(currentDetailId))
 
       const nextMatch =
         next !== null &&
         Number(scheduleMstId) === Number(next) &&
-        (nextDetailId !== null &&
-          scheduleDetailId !== null &&
+        (nextDetailId === null ||
           Number(scheduleDetailId) === Number(nextDetailId))
 
       if (currentMatch) {
@@ -172,23 +177,28 @@ const getRowStyleDirect = (rowProps: { row: ScheduleItem }) => {
 const getRowClass = (rowProps: { row: ScheduleItem }) => {
   try {
     const schedule = rowProps.row
-    const scheduleMstId = schedule.mstId ?? schedule.no
-    const scheduleDetailId = schedule.detailId ?? null
+    // ✅ FIX: fallback 제거 - mstId는 필수, null이면 매칭 안 함
+    const scheduleMstId = schedule.mstId
+    const scheduleDetailId = schedule.detailId ?? 0
     const { current, currentDetailId, next, nextDetailId } = highlightedRows.value
 
+    // mstId가 없으면 하이라이트 불가
+    if (scheduleMstId === null || scheduleMstId === undefined) {
+      return ''
+    }
+
     if (current !== null || next !== null) {
+      // ✅ FIX: detailId 매칭 로직 수정 - 둘 다 있을 때만 비교, 아니면 mstId만으로 매칭
       const currentMatch =
         current !== null &&
         Number(scheduleMstId) === Number(current) &&
-        (currentDetailId !== null &&
-          scheduleDetailId !== null &&
+        (currentDetailId === null ||
           Number(scheduleDetailId) === Number(currentDetailId))
 
       const nextMatch =
         next !== null &&
         Number(scheduleMstId) === Number(next) &&
-        (nextDetailId !== null &&
-          scheduleDetailId !== null &&
+        (nextDetailId === null ||
           Number(scheduleDetailId) === Number(nextDetailId))
 
       if (currentMatch) {

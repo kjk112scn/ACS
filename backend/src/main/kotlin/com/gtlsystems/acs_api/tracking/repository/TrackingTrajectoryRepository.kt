@@ -68,9 +68,10 @@ class TrackingTrajectoryRepository(
                     index = row.get("index", Int::class.java)!!,
                     azimuth = row.get("azimuth", Double::class.java)!!,
                     elevation = row.get("elevation", Double::class.java)!!,
-                    train = row.get("train", Double::class.java),
-                    azimuthRate = row.get("azimuth_rate", Double::class.java),
-                    elevationRate = row.get("elevation_rate", Double::class.java),
+                    // ✅ FIX: javaObjectType 사용 - primitive double은 null 불가
+                    train = row.get("train", Double::class.javaObjectType),
+                    azimuthRate = row.get("azimuth_rate", Double::class.javaObjectType),
+                    elevationRate = row.get("elevation_rate", Double::class.javaObjectType),
                     createdAt = row.get("created_at", OffsetDateTime::class.java)
                 )
             }
@@ -127,9 +128,10 @@ class TrackingTrajectoryRepository(
                     index = row.get("index", Int::class.java)!!,
                     azimuth = row.get("azimuth", Double::class.java)!!,
                     elevation = row.get("elevation", Double::class.java)!!,
-                    train = row.get("train", Double::class.java),
-                    azimuthRate = row.get("azimuth_rate", Double::class.java),
-                    elevationRate = row.get("elevation_rate", Double::class.java),
+                    // ✅ FIX: javaObjectType 사용 - primitive double은 null 불가
+                    train = row.get("train", Double::class.javaObjectType),
+                    azimuthRate = row.get("azimuth_rate", Double::class.javaObjectType),
+                    elevationRate = row.get("elevation_rate", Double::class.javaObjectType),
                     createdAt = row.get("created_at", OffsetDateTime::class.java)
                 )
             }
@@ -148,9 +150,10 @@ class TrackingTrajectoryRepository(
             index = row.get("index", Int::class.java)!!,
             azimuth = row.get("azimuth", Double::class.java)!!,
             elevation = row.get("elevation", Double::class.java)!!,
-            train = row.get("train", Double::class.java),
-            azimuthRate = row.get("azimuth_rate", Double::class.java),
-            elevationRate = row.get("elevation_rate", Double::class.java),
+            // ✅ FIX: javaObjectType 사용 - primitive double은 null 불가
+            train = row.get("train", Double::class.javaObjectType),
+            azimuthRate = row.get("azimuth_rate", Double::class.javaObjectType),
+            elevationRate = row.get("elevation_rate", Double::class.javaObjectType),
             createdAt = row.get("created_at", OffsetDateTime::class.java)
         )
     }

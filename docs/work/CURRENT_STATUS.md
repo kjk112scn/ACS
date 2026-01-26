@@ -111,7 +111,7 @@
 
 | 날짜 | 작업 | 커밋 |
 |------|------|------|
-| 2026-01-26 | PassSchedule 상태머신 Critical/High 버그픽스 | (대기) |
+| 2026-01-26 | PassSchedule 상태머신 Critical/High 버그픽스 | `e14e3aa` |
 | 2026-01-23 | PassSchedule P7 Fix (P6 동기화) | `d9ddafa` |
 | 2026-01-23 | V006 버그픽스 + 스킬 시스템 확장 | `38e5bd5` |
 | 2026-01-21 | Tracking Schema Redesign (V006) | `31c9a1b` |

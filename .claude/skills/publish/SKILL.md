@@ -15,6 +15,7 @@ ACS 프로젝트의 스킬/템플릿을 `claude-dev-kit` GitHub 레포에 동기
 ```
 /publish bugfix       # 특정 스킬만
 /publish --all        # 모든 스킬
+/publish --common     # CLAUDE.md 공통 규칙만
 ```
 
 ## 워크플로우
@@ -27,9 +28,17 @@ ACS 프로젝트의 스킬/템플릿을 `claude-dev-kit` GitHub 레포에 동기
 
 ### Step 1: 파일 복사
 
+**스킬 동기화:**
 | 소스 | 대상 |
 |------|------|
 | `ACS/.claude/skills/{name}/` | `claude-dev-kit/.claude/skills/{name}/` |
+
+**--common 옵션 (공통 규칙):**
+| 소스 | 대상 |
+|------|------|
+| `ACS/CLAUDE.md` 내 `@common-rules` 섹션 | `claude-dev-kit/.claude/rules/common-rules.md` |
+
+> **마커 형식:** `<!-- @common-rules: start -->` ~ `<!-- @common-rules: end -->`
 
 ### Step 2: Git 커밋 & 푸시
 
@@ -42,10 +51,19 @@ git push origin main
 
 ### Step 3: 결과 보고
 
+**스킬 동기화:**
 ```
 ✅ bugfix 스킬 동기화 완료
    커밋: abc1234
    URL: https://github.com/kjk112scn/claude-dev-kit
+```
+
+**--common 옵션:**
+```
+✅ 공통 규칙 동기화 완료
+   추출: CLAUDE.md → @common-rules 섹션
+   대상: .claude/rules/common-rules.md
+   커밋: def5678
 ```
 
 ## 경로
@@ -57,4 +75,4 @@ git push origin main
 
 ---
 
-**스킬 버전:** 1.0.0
+**스킬 버전:** 1.1.0

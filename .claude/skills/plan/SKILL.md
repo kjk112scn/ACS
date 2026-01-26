@@ -319,7 +319,64 @@ A: 계획 업데이트하고 Why 기록 (왜 변경했는지)
 
 ---
 
-**스킬 버전:** 2.0.0
-**작성일:** 2026-01-20
-**변경:** 통합 워크플로우 적용, Phase 분류 추가
+## Task System 연동 (v2.1)
+
+> **참조:** `.claude/rules/task-system.md`, `.claude/rules/task-parser.md`
+
+### 활성화
+
+계획 문서에 태그 자동 삽입:
+
+```markdown
+<!-- @task-system: enabled -->
+<!-- @auto-sync: true -->
+```
+
+### WBS → Task 변환
+
+기존 WBS 형식:
+```markdown
+### Phase 2: Backend 구현
+- [ ] 2.1 Model/DTO 정의
+- [ ] 2.2 Service 구현
+```
+
+Task System 형식으로 자동 변환:
+```markdown
+### Phase 2: Backend 구현 [parallel: true]
+- [ ] #T004 Model/DTO 정의 [depends: T003]
+- [ ] #T005 Service 구현 [depends: T004] @be-expert
+```
+
+### 의존성 그래프 자동 생성
+
+```yaml
+WBS 분석 시:
+  - 같은 Phase 내 순차 항목 → depends 자동 설정
+  - Phase 간 연결 → 이전 Phase 완료 의존
+  - 병렬 가능 → [parallel: true] 자동 추가
+```
+
+### 에이전트 자동 배정
+
+| 작업 유형 | 자동 배정 |
+|----------|----------|
+| Backend | `@be-expert` |
+| Frontend | `@fe-expert` |
+| 테스트 | `@test-expert` |
+| 문서 | `@doc-syncer` |
+| 설계 | `@architect` |
+
+### 계획 실행 연계
+
+계획 승인 후 `/feature` 또는 `/bugfix` 호출 시:
+- Task ID 그대로 유지
+- 의존성 정보 전달
+- 진행 상황 연속 추적
+
+---
+
+**스킬 버전:** 2.1.0
+**작성일:** 2026-01-26
+**변경:** Task System 연동 추가, WBS 자동 변환, 에이전트 자동 배정
 **호환:** ACS 프로젝트 전용
