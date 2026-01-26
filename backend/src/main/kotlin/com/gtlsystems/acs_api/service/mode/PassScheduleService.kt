@@ -35,6 +35,7 @@ import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicLong
 import com.gtlsystems.acs_api.service.mode.passSchedule.PassScheduleTLECache
@@ -171,11 +172,24 @@ class PassScheduleService(
 
     // ===== 신규 상태 머신 변수 (v2.0) =====
 
-    /** 현재 상태 (v2.0) */
-    private var currentPassScheduleState: PassScheduleState = PassScheduleState.IDLE
+    /** 현재 상태 (v2.0) - AtomicReference로 스레드 안전 보장 (#R001-C1) */
+    private val currentPassScheduleStateRef = AtomicReference(PassScheduleState.IDLE)
 
-    /** 이전 상태 (v2.0) */
-    private var previousPassScheduleState: PassScheduleState = PassScheduleState.IDLE
+    /** 이전 상태 (v2.0) - AtomicReference로 스레드 안전 보장 (#R001-C1) */
+    private val previousPassScheduleStateRef = AtomicReference(PassScheduleState.IDLE)
+
+    /** 상태 전이 락 - 전체 전이 과정의 원자성 보장 (#R001-C1) */
+    private val stateLock = Any()
+
+    /** 현재 상태 accessor (기존 코드 호환성 유지) */
+    private var currentPassScheduleState: PassScheduleState
+        get() = currentPassScheduleStateRef.get()
+        set(value) = currentPassScheduleStateRef.set(value)
+
+    /** 이전 상태 accessor (기존 코드 호환성 유지) */
+    private var previousPassScheduleState: PassScheduleState
+        get() = previousPassScheduleStateRef.get()
+        set(value) = previousPassScheduleStateRef.set(value)
 
     /** 현재 스케줄 컨텍스트 (v2.0) */
     private var currentScheduleContext: ScheduleTrackingContext? = null
@@ -475,16 +489,21 @@ class PassScheduleService(
      * 새로운 추적 모니터링 시작 시 호출됩니다.
      */
     private fun resetTrackingState() {
-        currentPassScheduleState = PassScheduleState.IDLE
-        previousPassScheduleState = PassScheduleState.IDLE
-        currentScheduleContext = null
-        nextScheduleContext = null
-        scheduleContextQueue.clear()
-        trackingCheckCount = 0
-        isShuttingDown.set(false)
-        // ✅ PushData에 passScheduleTrackingState 초기화
-        PushData.TRACKING_STATUS.passScheduleTrackingState = PassScheduleState.IDLE.name
-        logger.debug("[V2-STATE] 상태 머신 초기화 완료 (passScheduleTrackingState=IDLE)")
+        // #R001-C1: 상태 초기화도 원자적으로 처리
+        synchronized(stateLock) {
+            currentPassScheduleState = PassScheduleState.IDLE
+            previousPassScheduleState = PassScheduleState.IDLE
+            currentScheduleContext = null
+            nextScheduleContext = null
+            synchronized(queueLock) {
+                scheduleContextQueue.clear()
+            }
+            trackingCheckCount = 0
+            isShuttingDown.set(false)
+            // ✅ PushData에 passScheduleTrackingState 초기화
+            PushData.TRACKING_STATUS.passScheduleTrackingState = PassScheduleState.IDLE.name
+            logger.debug("[V2-STATE] 상태 머신 초기화 완료 (passScheduleTrackingState=IDLE)")
+        }
     }
 
     /**
@@ -2857,14 +2876,17 @@ class PassScheduleService(
         }
 
         // ⚠️ 플래그 리셋하여 새 컨텍스트로 전환 (A3 버그 수정: 큐 원본도 업데이트)
-        val currentIdx = scheduleContextQueue.indexOf(nextSchedule)
+        // #R001-H1: 모든 큐 접근에 동기화 적용
         val resetContext = nextSchedule.resetFlags()
-        if (currentIdx >= 0) {
-            scheduleContextQueue[currentIdx] = resetContext  // 큐 원본 업데이트
+        synchronized(queueLock) {
+            val currentIdx = scheduleContextQueue.indexOf(nextSchedule)
+            if (currentIdx >= 0) {
+                scheduleContextQueue[currentIdx] = resetContext  // 큐 원본 업데이트
+            }
+            currentScheduleContext = resetContext
+            val nextIdx = currentIdx + 1
+            nextScheduleContext = if (nextIdx < scheduleContextQueue.size) scheduleContextQueue[nextIdx] else null
         }
-        currentScheduleContext = resetContext
-        val nextIdx = currentIdx + 1
-        nextScheduleContext = if (nextIdx < scheduleContextQueue.size) scheduleContextQueue[nextIdx] else null
 
         val timeToStart = Duration.between(calTime, nextSchedule.startTime)
         val prepMinutes = settingsService.preparationTimeMinutes
@@ -2887,28 +2909,32 @@ class PassScheduleService(
      * @param reason 오류 원인
      */
     private fun transitionToError(reason: String) {
-        val ctx = currentScheduleContext
-        val calTime = GlobalData.Time.calUtcTimeOffsetTime
+        // #R001-C1: ERROR 전환도 원자적으로 처리
+        synchronized(stateLock) {
+            val ctx = currentScheduleContext
+            val calTime = GlobalData.Time.calUtcTimeOffsetTime
+            val currentState = currentPassScheduleState
 
-        logger.error("═══════════════════════════════════════════════")
-        logger.error("[V2-ERROR] $currentPassScheduleState → ERROR")
-        logger.error("  - 원인: $reason")
-        logger.error("  - 스케줄: ${ctx?.satelliteName} (mstId: ${ctx?.mstId})")
-        logger.error("═══════════════════════════════════════════════")
+            logger.error("═══════════════════════════════════════════════")
+            logger.error("[V2-ERROR] $currentState → ERROR")
+            logger.error("  - 원인: $reason")
+            logger.error("  - 스케줄: ${ctx?.satelliteName} (mstId: ${ctx?.mstId})")
+            logger.error("═══════════════════════════════════════════════")
 
-        // 이전 상태 저장
-        previousPassScheduleState = currentPassScheduleState
-        currentPassScheduleState = PassScheduleState.ERROR
+            // 이전 상태 저장 및 ERROR 전환
+            previousPassScheduleState = currentState
+            currentPassScheduleState = PassScheduleState.ERROR
 
-        // 프론트엔드 상태 전송
-        sendStateToFrontend(PassScheduleState.ERROR, ctx)
+            // 프론트엔드 상태 전송
+            sendStateToFrontend(PassScheduleState.ERROR, ctx)
 
-        // 현재 스케줄 스킵하고 다음으로
-        val nextState = evaluateNextSchedule(calTime)
-        if (nextState != PassScheduleState.COMPLETED) {
-            // 다음 스케줄이 있으면 IDLE로 복귀 후 재시작
-            currentPassScheduleState = PassScheduleState.IDLE
-            sendStateToFrontend(PassScheduleState.IDLE, null)
+            // 현재 스케줄 스킵하고 다음으로
+            val nextState = evaluateNextSchedule(calTime)
+            if (nextState != PassScheduleState.COMPLETED) {
+                // 다음 스케줄이 있으면 IDLE로 복귀 후 재시작
+                currentPassScheduleState = PassScheduleState.IDLE
+                sendStateToFrontend(PassScheduleState.IDLE, null)
+            }
         }
     }
 
@@ -2919,43 +2945,47 @@ class PassScheduleService(
      * @param calTime 현재 calTime (ZonedDateTime)
      */
     private fun transitionTo(newState: PassScheduleState, calTime: ZonedDateTime) {
-        val ctx = currentScheduleContext
+        // #R001-C1: 전체 상태 전환 과정을 원자적으로 처리
+        synchronized(stateLock) {
+            val ctx = currentScheduleContext
 
-        // B4: ERROR로 가는 전환은 항상 허용 (transitionToError 사용 권장)
-        if (newState == PassScheduleState.ERROR) {
-            transitionToError("Direct ERROR transition")
-            return
+            // B4: ERROR로 가는 전환은 항상 허용 (transitionToError 사용 권장)
+            if (newState == PassScheduleState.ERROR) {
+                transitionToError("Direct ERROR transition")
+                return
+            }
+
+            // B4: 상태 전환 유효성 검사
+            val currentState = currentPassScheduleState
+            val allowed = validTransitions[currentState] ?: emptySet()
+            if (newState !in allowed) {
+                logger.error("[V2-INVALID] $currentState → $newState 잘못된 전환")
+                transitionToError("Invalid transition: $currentState → $newState")
+                return
+            }
+
+            logger.info("═══════════════════════════════════════════════")
+            logger.info("[V2-TRANSITION] $currentState → $newState")
+            logger.info("  - 스케줄: ${ctx?.satelliteName} (mstId: ${ctx?.mstId})")
+            logger.info("  - calTime: $calTime")
+            logger.info("═══════════════════════════════════════════════")
+
+            // B1: 퇴장 액션 실행 (상태 변경 전)
+            executeExitAction(currentState, ctx, calTime)
+
+            // #R001-C1: 원자적 상태 갱신 (이전 상태 → 새 상태)
+            previousPassScheduleState = currentState
+            currentPassScheduleState = newState
+
+            // 진입 시간 기록 (calTime 기준)
+            ctx?.stateEntryTime = calTime
+
+            // 진입 액션 실행
+            executeEnterAction(newState, ctx, calTime)
+
+            // 프론트엔드 상태 전송
+            sendStateToFrontend(newState, ctx)
         }
-
-        // B4: 상태 전환 유효성 검사
-        val allowed = validTransitions[currentPassScheduleState] ?: emptySet()
-        if (newState !in allowed) {
-            logger.error("[V2-INVALID] $currentPassScheduleState → $newState 잘못된 전환")
-            transitionToError("Invalid transition: $currentPassScheduleState → $newState")
-            return
-        }
-
-        logger.info("═══════════════════════════════════════════════")
-        logger.info("[V2-TRANSITION] $currentPassScheduleState → $newState")
-        logger.info("  - 스케줄: ${ctx?.satelliteName} (mstId: ${ctx?.mstId})")
-        logger.info("  - calTime: $calTime")
-        logger.info("═══════════════════════════════════════════════")
-
-        // B1: 퇴장 액션 실행 (상태 변경 전)
-        executeExitAction(currentPassScheduleState, ctx, calTime)
-
-        // 이전 상태 저장
-        previousPassScheduleState = currentPassScheduleState
-        currentPassScheduleState = newState
-
-        // 진입 시간 기록 (calTime 기준)
-        ctx?.stateEntryTime = calTime
-
-        // 진입 액션 실행
-        executeEnterAction(newState, ctx, calTime)
-
-        // 프론트엔드 상태 전송
-        sendStateToFrontend(newState, ctx)
     }
 
     /**
@@ -3203,27 +3233,30 @@ class PassScheduleService(
      * V2.0 스케줄 큐 재평가
      */
     private fun reevaluateScheduleQueue(calTime: ZonedDateTime) {
-        val activeSchedules = scheduleContextQueue.filter { it.endTime.isAfter(calTime) }
+        // #R001-H1: 모든 큐 접근에 동기화 적용
+        synchronized(queueLock) {
+            val activeSchedules = scheduleContextQueue.filter { it.endTime.isAfter(calTime) }
 
-        if (activeSchedules.isEmpty() && scheduleContextQueue.isNotEmpty()) {
-            logger.warn("[V2-TIME_OFFSET] 모든 스케줄이 과거로 이동함")
-        }
-
-        // 현재/다음 컨텍스트 재설정
-        val prepMinutes = settingsService.preparationTimeMinutes
-        val currentSchedule = activeSchedules
-            .filter { it.startTime.isBefore(calTime) || Duration.between(calTime, it.startTime).toMinutes() <= prepMinutes }
-            .minByOrNull { it.startTime }
-
-        if (currentSchedule != null && currentSchedule.mstId != currentScheduleContext?.mstId) {
-            logger.info("[V2-TIME_OFFSET] 현재 스케줄 변경: ${currentScheduleContext?.satelliteName} → ${currentSchedule.satelliteName}")
-            // B3 버그 수정: 큐 원본도 업데이트
-            val idx = scheduleContextQueue.indexOf(currentSchedule)
-            val resetContext = currentSchedule.resetFlags()
-            if (idx >= 0) {
-                scheduleContextQueue[idx] = resetContext
+            if (activeSchedules.isEmpty() && scheduleContextQueue.isNotEmpty()) {
+                logger.warn("[V2-TIME_OFFSET] 모든 스케줄이 과거로 이동함")
             }
-            currentScheduleContext = resetContext
+
+            // 현재/다음 컨텍스트 재설정
+            val prepMinutes = settingsService.preparationTimeMinutes
+            val currentSchedule = activeSchedules
+                .filter { it.startTime.isBefore(calTime) || Duration.between(calTime, it.startTime).toMinutes() <= prepMinutes }
+                .minByOrNull { it.startTime }
+
+            if (currentSchedule != null && currentSchedule.mstId != currentScheduleContext?.mstId) {
+                logger.info("[V2-TIME_OFFSET] 현재 스케줄 변경: ${currentScheduleContext?.satelliteName} → ${currentSchedule.satelliteName}")
+                // B3 버그 수정: 큐 원본도 업데이트
+                val idx = scheduleContextQueue.indexOf(currentSchedule)
+                val resetContext = currentSchedule.resetFlags()
+                if (idx >= 0) {
+                    scheduleContextQueue[idx] = resetContext
+                }
+                currentScheduleContext = resetContext
+            }
         }
     }
 
@@ -3411,8 +3444,8 @@ class PassScheduleService(
                 // 1. 안전한 일괄 종료
                 safeBatchShutdown()
 
-                // C3: 동기화 블록으로 큐 및 컨텍스트 초기화 보호
-                synchronized(queueLock) {
+                // #R001-C1: stateLock → queueLock 순서로 락 획득 (데드락 방지)
+                synchronized(stateLock) {
                     // 2. 상태 초기화
                     currentPassScheduleState = PassScheduleState.IDLE
                     previousPassScheduleState = PassScheduleState.IDLE
@@ -3420,7 +3453,9 @@ class PassScheduleService(
                     // 3. 컨텍스트 초기화
                     currentScheduleContext = null
                     nextScheduleContext = null
-                    scheduleContextQueue.clear()
+                    synchronized(queueLock) {
+                        scheduleContextQueue.clear()
+                    }
                 }
 
                 // 4. 프론트엔드 알림

@@ -2,7 +2,7 @@
 
 > **새 세션 시작 시:** "CURRENT_STATUS.md 읽고 이어서 진행해줘" 또는 `/status`
 
-**마지막 업데이트:** 2026-01-23 (PassSchedule P7 Fix 완료)
+**마지막 업데이트:** 2026-01-26 (PassSchedule 상태머신 버그픽스 완료)
 
 ---
 
@@ -80,8 +80,8 @@
 
 ---
 
-### 5. Architecture Refactoring (70%)
-- **상태:** BE/FE/CSS 완료, PassSchedule 88%, DB 테스트 대기
+### 5. Architecture Refactoring (75%)
+- **상태:** BE/FE/CSS 완료, PassSchedule 93%, DB 테스트 대기
 - **문서:** `docs/work/active/Architecture_Refactoring/`
 
 | 영역 | 완료율 | 상태 |
@@ -90,8 +90,14 @@
 | DB Integration 코드 | 100% | ✅ 코드완료 |
 | DB 스키마 재설계 | 100% | ✅ 8개 테이블 + ICD 저장 |
 | DB 테스트 | 100% | ✅ 연결 성공 |
-| PassSchedule 상태머신 | 88% | ⏳ 수동 테스트 대기 |
+| PassSchedule 상태머신 | 93% | ✅ Critical/High 버그픽스 완료 |
 | UI/UX 리팩토링 | 10% | 계획만 완료 |
+
+**상태머신 버그픽스 완료 (2026-01-26):**
+- #R001-C1: 상태 전이 원자성 - AtomicReference + stateLock 적용
+- #R001-H1: 큐 동기화 - synchronized(queueLock) 적용
+- #R001-H2/H3: C1 수정으로 함께 해결
+- 남은 이슈: Medium 6개 (console.log, catch(Exception) 등)
 
 ### 6. 다국어 지원 경량화 (시스템 완료, 적용 대기)
 - **상태:** vue-i18n → TS 상수 전환 완료, 하드코딩 정리 필요
@@ -105,6 +111,7 @@
 
 | 날짜 | 작업 | 커밋 |
 |------|------|------|
+| 2026-01-26 | PassSchedule 상태머신 Critical/High 버그픽스 | (대기) |
 | 2026-01-23 | PassSchedule P7 Fix (P6 동기화) | `d9ddafa` |
 | 2026-01-23 | V006 버그픽스 + 스킬 시스템 확장 | `38e5bd5` |
 | 2026-01-21 | Tracking Schema Redesign (V006) | `31c9a1b` |
