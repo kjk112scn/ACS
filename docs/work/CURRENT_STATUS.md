@@ -111,6 +111,7 @@
 
 | 날짜 | 작업 | 커밋 |
 |------|------|------|
+| 2026-01-26 | PassSchedule 하이라이트 MstId 불일치 버그 수정 | `37a140b` |
 | 2026-01-26 | PassSchedule 상태머신 Critical/High 버그픽스 | `e14e3aa` |
 | 2026-01-23 | PassSchedule P7 Fix (P6 동기화) | `d9ddafa` |
 | 2026-01-23 | V006 버그픽스 + 스킬 시스템 확장 | `38e5bd5` |
@@ -239,6 +240,43 @@
 **선행 작업:**
 - [ ] Tracking_Session_Data_Enrichment 완료
 - [ ] Admin_Panel_Separation 완료 (선택)
+
+---
+
+### UDP 패킷 지연 개선 (P3) - 기능 안정화 후
+- **상태:** 📋 분석/계획 완료, 실행 대기
+- **Review ID:** #R001
+- **문서:** `docs/work/active/Review_UDP_PacketDelay/`
+- **예상 소요:** Phase A+B (4일) / 전체 (2주+)
+
+**문제:** UDP 패킷 수신 간격 90~150ms (예상 30ms)
+
+**발견된 이슈 (10개):**
+
+| ID | 심각도 | 설명 | 확실도 |
+|----|:------:|------|:------:|
+| #R001-C1 | Critical | receiveBuffer 공유 자원 경쟁 | ✅ 확실 |
+| #R001-H1 | High | scheduleAtFixedRate 실행 밀림 | ⚡ 추정 |
+| #R001-H2 | High | Send/Receive executor 경쟁 | ⚡ 추정 |
+| #R001-H3 | High | Windows 타이머 해상도 15.625ms | ✅ 확실 |
+| #R001-H4 | High | PushData.ReadData GC 압박 | ⚡ 추정 |
+| #R001-M1 | Medium | lastPacketTime 비원자적 접근 | ✅ 확실 |
+| #R001-M2 | Medium | DataStoreService 복합 연산 | ⚡ 추정 |
+| #R001-M3 | Medium | 논블로킹 폴링 비효율 | ⚡ 추정 |
+| #R001-L1 | Low | UdpFwICDService 역할 비대화 | - |
+| #R001-L2 | Low | ICDService.Classify if/else 체인 | - |
+
+**실행 계획 (PLAN.md 참조):**
+
+| Phase | 작업 | 예상 효과 |
+|:-----:|------|----------|
+| A | #T001 receiveBuffer ThreadLocal화 | 데이터 손상 방지 |
+| B | #T002~T004 Windows 타이머 + executor 분리 + 객체 풀링 | 40~60ms로 개선 |
+| C | #T005~T007 AtomicLong + DataStore + Selector | 30~50ms 목표 |
+| D | #T008~T010 리팩토링 (선택) | 유지보수성 |
+
+**실행 조건:** 핵심 기능 안정화 후 수행
+**실행 방법:** `/bugfix #R001-C1` → Phase A부터 순차 실행
 
 ---
 

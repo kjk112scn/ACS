@@ -6,6 +6,27 @@
 
 ---
 
+## [2026-01-26] - PassSchedule 하이라이트 MstId 불일치 버그 수정
+
+### Fixed
+- SelectScheduleContent.vue: uid 원본 유지 (`mstId_detailId` 형식), mstId fallback 제거
+- PassSchedulePage.vue: 하이라이트/상태 매칭 fallback 제거, AND→OR 로직 수정
+- passScheduleStore.ts: setTrackingTargets fallback 제거
+- useOffsetControls.ts: reset 로직 개선
+
+### Changed
+- MaintenanceSettings.vue: 파일 참조 주석 수정
+
+### Why
+- BE에서 `nextTrackingMstId = 4` 전송 시 FE 테이블에서 `mstId = 1` (fallback으로 no 사용) 표시
+- mstId → no fallback 로직이 원본 식별자를 덮어써서 하이라이트 매칭 실패
+- Phase 1: 테이블 표시 수정 / Phase 2: Start 버튼 후 하이라이트 수정
+
+### Details
+- [Bugfix_PassSchedule_Highlight_MstId_Mismatch](docs/work/active/Bugfix_PassSchedule_Highlight_MstId_Mismatch/README.md)
+
+---
+
 ## [2026-01-23] - PassSchedule P6 동기화 (P7 Fix)
 
 ### Fixed

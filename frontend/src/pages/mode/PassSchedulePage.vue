@@ -610,17 +610,22 @@ const applyRowColors = () => {
 
         if (!schedule) return
 
-        // ✅ mstId와 detailId 모두 비교
-        const scheduleMstId = schedule.mstId ?? schedule.no
-        const scheduleDetailId = schedule.detailId ?? null
+        // ✅ FIX: fallback 제거 - mstId는 필수
+        const scheduleMstId = schedule.mstId
+        const scheduleDetailId = schedule.detailId ?? 0
 
-        // ✅ mstId와 detailId 모두 비교 (detailId가 항상 존재한다고 가정)
+        // mstId가 없으면 하이라이트 불가
+        if (scheduleMstId === null || scheduleMstId === undefined) {
+          return
+        }
+
+        // ✅ FIX: detailId 매칭 로직 수정 - detailId가 null이면 mstId만으로 매칭
         const currentMatch = current !== null &&
           Number(scheduleMstId) === Number(current) &&
-          (currentDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(currentDetailId))
+          (currentDetailId === null || Number(scheduleDetailId) === Number(currentDetailId))
         const nextMatch = next !== null &&
           Number(scheduleMstId) === Number(next) &&
-          (nextDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(nextDetailId))
+          (nextDetailId === null || Number(scheduleDetailId) === Number(nextDetailId))
 
         // 기존 스타일 제거
         htmlRow.classList.remove('highlight-current-schedule', 'highlight-next-schedule')
@@ -1017,24 +1022,29 @@ const currentScheduleStatus = computed(() => {
     const currentDetailId = icdStore.currentTrackingDetailId // ✅ detailId 추가
     const next = icdStore.nextTrackingMstId
     const nextDetailId = icdStore.nextTrackingDetailId // ✅ detailId 추가
-    // ✅ mstId와 detailId 기준으로 매칭 (전역 고유 ID + 패스 인덱스)
-    const scheduleMstId = Number(schedule.mstId ?? schedule.no)
-    const scheduleDetailId = schedule.detailId ?? null
+    // ✅ FIX: fallback 제거 - mstId는 필수, null이면 매칭 안 함
+    const scheduleMstId = schedule.mstId ? Number(schedule.mstId) : null
+    const scheduleDetailId = schedule.detailId ?? 0
 
-    // 현재 추적 중인 스케줄인지 확인 (mstId와 detailId 모두 비교, detailId가 항상 존재한다고 가정)
+    // mstId가 없으면 상태 없음
+    if (scheduleMstId === null) {
+      return null
+    }
+
+    // ✅ FIX: detailId 매칭 로직 수정 - detailId가 null이면 mstId만으로 매칭
     if (current !== null &&
         scheduleMstId === Number(current) &&
-        (currentDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(currentDetailId))) {
+        (currentDetailId === null || Number(scheduleDetailId) === Number(currentDetailId))) {
       return {
         color: 'positive',
         label: '추적중'
       }
     }
 
-    // 다음 예정 스케줄인지 확인 (mstId와 detailId 모두 비교, detailId가 항상 존재한다고 가정)
+    // ✅ FIX: detailId 매칭 로직 수정 - detailId가 null이면 mstId만으로 매칭
     if (next !== null &&
         scheduleMstId === Number(next) &&
-        (nextDetailId !== null && scheduleDetailId !== null && Number(scheduleDetailId) === Number(nextDetailId))) {
+        (nextDetailId === null || Number(scheduleDetailId) === Number(nextDetailId))) {
       return {
         color: 'primary',
         label: '대기중'

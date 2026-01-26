@@ -1422,9 +1422,15 @@ onMounted(async () => {
         const restoredSchedules: ScheduleItem[] = []
 
         sortedStoreList.forEach((storeSchedule) => {
-          // ✅ mstId와 detailId 조합으로 매칭 (전역 고유 ID)
-          const savedMstId = storeSchedule.mstId ?? storeSchedule.no
+          // ✅ FIX: fallback 제거 - mstId는 필수
+          const savedMstId = storeSchedule.mstId
           const savedDetailId = storeSchedule.detailId ?? 0
+
+          // mstId가 없으면 복원 불가
+          if (!savedMstId) {
+            console.error('❌ mstId가 없는 저장된 스케줄:', storeSchedule)
+            return
+          }
 
           // scheduleData에서 같은 mstId와 detailId를 가진 스케줄 찾기
           const matchedSchedule = scheduleData.value.find(s =>
