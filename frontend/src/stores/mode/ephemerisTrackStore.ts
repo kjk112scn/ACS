@@ -9,6 +9,7 @@ import {
   type GeostationaryTrackingResponse,
 } from '../../services/mode/ephemerisTrackService'
 import { useICDStore } from '../icd/icdStore'
+import { IncrementalLTTB, DEFAULT_TARGET_SIZE } from '../../utils/sampling'
 
 // ✅ 기본값 상수 정의 (파일 상단에 추가)
 const DEFAULT_WORKER_STATS = {
@@ -106,6 +107,9 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
   let workerInitialized = false
   let pendingUpdates = 0
   const _maxPendingUpdates = 5
+
+  // ✅ LTTB 샘플러 인스턴스 (성능 최적화)
+  const trackingSampler = new IncrementalLTTB(DEFAULT_TARGET_SIZE, 50)
 
   // ✅ 마지막 유효 포인트 저장
   const lastValidPoint = ref<{ azimuth: number; elevation: number } | null>(null)
@@ -362,8 +366,9 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
   }
 
   /**
-   * ✅ 추적 경로 업데이트 (최적화 버전 - Worker 제거, O(1) 연산)
-   * Worker 통신 오버헤드 제거로 성능 99% 개선
+   * ✅ 추적 경로 업데이트 (최적화 버전 - LTTB 샘플링 적용)
+   * - rawPath: 전체 원본 데이터 보관
+   * - sampledPath: LTTB 다운샘플링된 렌더링용 데이터 (1,500개)
    */
   const updateTrackingPath = (azimuth: number, elevation: number): void => {
     // ✅ 입력 검증
@@ -386,9 +391,9 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     const normalizedEl = Math.max(0, Math.min(90, elevation))
 
     // ✅ 중복 데이터 필터링 (O(1) - 마지막 포인트만 비교)
-    const currentPath = trackingPath.value.rawPath
-    if (currentPath.length > 0) {
-      const lastPoint = currentPath[currentPath.length - 1]
+    const rawPath = trackingSampler.getRawPath()
+    if (rawPath.length > 0) {
+      const lastPoint = rawPath[rawPath.length - 1]
       if (lastPoint) {
         const azDiff = Math.abs(lastPoint[1] - normalizedAz)
         const elDiff = Math.abs(lastPoint[0] - normalizedEl)
@@ -403,16 +408,19 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     // ✅ 유효한 값으로 업데이트
     lastValidPoint.value = { azimuth, elevation }
 
-    // ✅ 직접 배열에 추가 (O(1) - Worker 통신 오버헤드 제거)
+    // ✅ LTTB 샘플러에 포인트 추가 (자동 다운샘플링)
     const newPoint: [number, number] = [normalizedEl, normalizedAz]
-    trackingPath.value.rawPath.push(newPoint)
-    trackingPath.value.sampledPath = trackingPath.value.rawPath
+    const sampledPath = trackingSampler.addPoint(newPoint)
+
+    // ✅ Store 상태 업데이트
+    trackingPath.value.rawPath = trackingSampler.getRawPath()
+    trackingPath.value.sampledPath = sampledPath
     trackingPath.value.lastUpdateTime = Date.now()
 
-    // ✅ Worker 통계 업데이트 (호환성 유지)
+    // ✅ 통계 업데이트 (호환성 유지)
     workerStats.value.totalUpdates++
     workerStats.value.pointsAdded++
-    workerStats.value.currentPathPoints = trackingPath.value.rawPath.length
+    workerStats.value.currentPathPoints = trackingSampler.length
     workerStats.value.lastUpdateTime = Date.now()
   }
 
@@ -495,6 +503,9 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     const azimuth = currentAzimuth ?? 0
     const elevation = currentElevation ?? 0
 
+    // ✅ LTTB 샘플러 초기화
+    trackingSampler.clear()
+
     // ✅ (0,0)이면 빈 배열로 초기화 (잘못된 시작점 방지)
     if (azimuth === 0 && elevation === 0) {
       console.warn('⚠️ clearTrackingPath: (0,0) 감지 - 빈 배열로 초기화')
@@ -519,6 +530,9 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     const normalizedEl = Math.max(0, Math.min(90, elevation))
 
     const initialPoint: [number, number] = [normalizedEl, normalizedAz]
+
+    // ✅ 샘플러에 초기 데이터 설정
+    trackingSampler.setInitialData([initialPoint])
 
     trackingPath.value.rawPath = [initialPoint]
     trackingPath.value.sampledPath = [initialPoint]
@@ -911,6 +925,7 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     }
 
     // ✅ 추적 경로 초기화
+    trackingSampler.clear()
     trackingPath.value = {
       rawPath: [],
       sampledPath: [],
@@ -1082,8 +1097,11 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
             return [safeEl, safeAz] as [number, number]
           })
 
-        trackingPath.value.sampledPath = safeTrackingPath
-        trackingPath.value.rawPath = safeTrackingPath
+        // ✅ LTTB 샘플러에 복원 데이터 설정
+        trackingSampler.setInitialData(safeTrackingPath)
+
+        trackingPath.value.rawPath = trackingSampler.getRawPath()
+        trackingPath.value.sampledPath = trackingSampler.getSampledPath()
         trackingPath.value.lastUpdateTime = parsed.savedAt || Date.now()
         // ✅ 디버깅 로그 비활성화
         // console.log('✅ 추적 경로 복원:', safeTrackingPath.length, '개 포인트')

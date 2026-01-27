@@ -1258,19 +1258,14 @@ class ChartUpdatePool {
     const newLength = newPath.length
 
     // ✅ 변경 없으면 스킵 (성능 최적화)
-    if (newLength === this.lastTrackingLength) {
+    if (newLength === this.lastTrackingLength && newLength === this.trackingData.length) {
       return this.updateOption
     }
 
-    // ✅ 증분 업데이트: 새로 추가된 포인트만 push
-    if (newLength > this.lastTrackingLength) {
-      const newPoints = newPath.slice(this.lastTrackingLength)
-      this.trackingData.push(...newPoints)
-    } else {
-      // ✅ 배열이 리셋된 경우 (새 추적 시작)
-      this.trackingData.length = 0
-      this.trackingData.push(...newPath)
-    }
+    // ✅ LTTB 샘플링된 데이터 전체 교체
+    // Store에서 이미 1500개 제한되어 있으므로 그대로 사용
+    this.trackingData.length = 0
+    this.trackingData.push(...newPath)
 
     this.lastTrackingLength = newLength
     return this.updateOption
@@ -1664,7 +1659,7 @@ const initChart = () => {
         animation: false, // ✅ 애니메이션 완전 비활성화
         large: true, // ✅ 대량 데이터 최적화 렌더링
         largeThreshold: 2000, // ✅ 2000개 이상일 때 large 모드 활성화
-        sampling: 'lttb', // ✅ 다운샘플링 (Largest-Triangle-Three-Buckets 알고리즘)
+        // ✅ sampling 제거 - polar 좌표계에서 미작동, Store에서 LTTB 수동 적용
         lineStyle: {
           color: chartColors.value.text,
           width: 2,

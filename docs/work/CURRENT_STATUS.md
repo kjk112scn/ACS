@@ -2,7 +2,79 @@
 
 > **새 세션 시작 시:** "CURRENT_STATUS.md 읽고 이어서 진행해줘" 또는 `/status`
 
-**마지막 업데이트:** 2026-01-27 (Settings 리팩토링 + Ephemeris 개선 + 시스템 리뷰 완료)
+**마지막 업데이트:** 2026-01-27 (EphemerisTracking LTTB 커밋 완료)
+
+---
+
+## ⭐ 내일 할 일 (우선순위순)
+
+### 0. EphemerisTracking Position View 성능 테스트 ✅ 코드 완료 (테스트 필요)
+
+**상태:** LTTB 다운샘플링 구현 완료, 실 환경 테스트 필요
+
+**테스트 방법:**
+1. 위성 추적 시작
+2. F12 콘솔에서 로그 확인:
+   ```
+   📊 LTTB: raw=1500 → sampled=1500 (2.3ms)
+   ```
+3. 끊김 현상 확인
+
+**적용된 최적화:**
+- ✅ LTTB 다운샘플링 (1,500개 제한)
+- ✅ ChartUpdatePool 전체 교체 방식
+- ✅ Worker 제거 → O(1) push
+
+**문서:** `docs/work/active/Review_EphemerisTracking_Performance/README.md`
+
+---
+
+### 1. Ephemeris DB 로드 타이밍 문제 수정 (#R001-C1) 🔴 Critical
+
+**증상:** 서버 재시작 후 Select Schedule에서 최근 등록한 위성이 아닌 예전 것 표시
+
+**원인:** `initFromDatabase()`가 `.subscribe()`로 비동기 실행 → 서버 Ready 전에 DB 로드 미완료
+
+**수정 방법:** 1줄 수정
+```kotlin
+// backend/.../ephemeris/EphemerisDataRepository.kt:87
+.subscribe()  →  .block(Duration.ofSeconds(30))
+```
+
+**문서:** `docs/work/active/Ephemeris_DB_Load_Timing/README.md`
+
+---
+
+### 2. PassSchedule Select Schedule 캐시 수정 테스트 ✅ 코드 완료
+
+**수정 내용:** 캐시 우선 로직 제거 → Store 동기화 방식 (#R001-C1 완료)
+
+**테스트:**
+1. TLE 입력 → 연산 완료
+2. "Select Schedule" 클릭
+3. **방금 입력한 위성이 목록에 표시되는지 확인**
+
+**문서:** `docs/work/active/Review_PassSchedule_SelectSchedule/REVIEW.md`
+
+---
+
+### 3. SWR 패턴 적용 (조사 완료) 📋
+
+**상태:** 조사 완료, 구현 대기
+
+**예상 효과:** 네트워크 트래픽 40~60% 감소
+
+**구현 범위:**
+| Phase | 작업 | 파일 수 | 난도 |
+|:-----:|------|:------:|:----:|
+| 1 | HTTP 캐시 헤더 (BE) | 8개 | 🟢 |
+| 2 | SWRv 라이브러리 (FE) | 7개 | 🟡 |
+| 3 | @Cacheable (BE) | 3개 | 🟡 |
+| 4 | 캐시 무효화 전략 | 5개 | 🟠 |
+
+**문서:** `docs/work/active/SWR_Implementation/`
+- README.md - 개요 및 범위
+- DESIGN.md - 상세 구현 가이드 (코드 예시 포함)
 
 ---
 

@@ -6,6 +6,24 @@
 
 ---
 
+## [2026-01-27] - EphemerisTracking 차트 성능 최적화 (LTTB)
+
+### Added
+- `utils/sampling.ts`: LTTB 다운샘플링 알고리즘 + IncrementalLTTB 클래스
+
+### Changed
+- ephemerisTrackStore: LTTB 샘플러 적용으로 차트 데이터 1,500개 제한
+- EphemerisDesignationPage: ChartUpdatePool 전체 교체 방식 적용
+
+### Why
+- 위성 추적 장시간 시 포인트 무한 증가로 프론트엔드 끊김 발생
+- ECharts polar 좌표계에서 sampling 옵션 미작동 → 수동 LTTB 구현
+
+### Details
+- [Review_EphemerisTracking_Performance](docs/work/active/Review_EphemerisTracking_Performance/README.md)
+
+---
+
 ## [2026-01-27] - Settings 시스템 리팩토링 + Ephemeris 성능 개선
 
 ### Refactored
