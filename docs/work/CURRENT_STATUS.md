@@ -111,6 +111,7 @@
 
 | 날짜 | 작업 | 커밋 |
 |------|------|------|
+| 2026-01-27 | Settings 리팩토링 + Ephemeris 개선 + 시스템 리뷰 | `f2ba67f` |
 | 2026-01-26 | PassSchedule 하이라이트 MstId 불일치 버그 수정 | `06e6b18` |
 | 2026-01-26 | PassSchedule 상태머신 Critical/High 버그픽스 | `e14e3aa` |
 | 2026-01-23 | PassSchedule P7 Fix (P6 동기화) | `d9ddafa` |
