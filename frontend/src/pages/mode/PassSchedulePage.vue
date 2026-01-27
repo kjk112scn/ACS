@@ -2070,14 +2070,10 @@ const selectScheduleData = async () => {
   try {
     console.log('스케줄 선택 모달 열기')
 
-    // ✅ 1순위: localStorage에서 스케줄 데이터 로드 (빠름)
-    const cached = passScheduleStore.loadScheduleDataFromLocalStorage()
-
-    if (cached && passScheduleStore.scheduleData.length > 0) {
-      console.log('✅ 캐시된 스케줄 데이터 사용 (API 호출 생략):', passScheduleStore.scheduleData.length, '개')
-    } else {
-      // ✅ 2순위: API 호출 (캐시가 없을 때만)
-      console.log('📡 스케줄 데이터 API 호출 시작 (캐시 없음)')
+    // ✅ FIX #R001-C1: 캐시 제거, Store 동기화 방식 사용 (나중에 SWR 패턴 적용 예정)
+    // Store에 데이터가 없으면 API 호출, 있으면 그대로 사용
+    if (passScheduleStore.scheduleData.length === 0) {
+      console.log('📡 스케줄 데이터 API 호출 (Store 비어있음)')
       try {
         await passScheduleStore.fetchScheduleDataFromServer()
         console.log('✅ 스케줄 데이터 로드 완료:', passScheduleStore.scheduleData.length, '개')
@@ -2085,6 +2081,8 @@ const selectScheduleData = async () => {
         handleApiError(err, '스케줄 데이터 로드')
         return
       }
+    } else {
+      console.log('✅ Store의 현재 스케줄 데이터 사용:', passScheduleStore.scheduleData.length, '개')
     }
 
     const modal = await openModal('select-schedule', {

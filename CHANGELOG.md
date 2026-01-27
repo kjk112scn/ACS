@@ -6,6 +6,25 @@
 
 ---
 
+## [2026-01-27] - PassSchedule 캐시 수정 + 리뷰/조사 문서
+
+### Fixed
+- PassSchedulePage: Select Schedule 캐시 우선 로직 제거 (#R001-C1)
+
+### Added (Docs)
+- Review_PassSchedule_SelectSchedule: 데이터 불일치 원인 분석
+- Ephemeris_DB_Load_Timing: 서버 재시작 후 데이터 미표시 문제 문서화
+- SWR_Implementation: SWR 패턴 적용 조사 결과 및 구현 가이드
+
+### Why
+- 캐시 우선 로직으로 인해 새로 등록한 위성이 Select Schedule에 표시되지 않는 문제 해결
+- 향후 수정할 이슈들을 체계적으로 문서화
+
+### Details
+- [Review_PassSchedule_SelectSchedule](docs/work/active/Review_PassSchedule_SelectSchedule/REVIEW.md)
+
+---
+
 ## [2026-01-27] - EphemerisTracking 차트 성능 최적화 (LTTB)
 
 ### Added

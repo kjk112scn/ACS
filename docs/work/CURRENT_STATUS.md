@@ -2,7 +2,7 @@
 
 > **새 세션 시작 시:** "CURRENT_STATUS.md 읽고 이어서 진행해줘" 또는 `/status`
 
-**마지막 업데이트:** 2026-01-27 (EphemerisTracking LTTB 커밋 완료)
+**마지막 업데이트:** 2026-01-27 (PassSchedule 캐시 수정 + 문서 커밋 완료)
 
 ---
 
@@ -45,9 +45,9 @@
 
 ---
 
-### 2. PassSchedule Select Schedule 캐시 수정 테스트 ✅ 코드 완료
+### 2. PassSchedule Select Schedule 캐시 수정 테스트 ✅ 커밋 완료 (테스트 필요)
 
-**수정 내용:** 캐시 우선 로직 제거 → Store 동기화 방식 (#R001-C1 완료)
+**수정 내용:** 캐시 우선 로직 제거 → Store 동기화 방식 (#R001-C1 커밋 완료)
 
 **테스트:**
 1. TLE 입력 → 연산 완료
