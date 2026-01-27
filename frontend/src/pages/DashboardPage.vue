@@ -562,10 +562,17 @@ const errorPowerActive = computed(() => icdStore.powerStatus === 'active')
 const stowActive = computed(() => icdStore.stowStatus === 'active')
 const stowPinActive = computed(() => icdStore.stowPinStatus === 'active')
  */
-// ✅ 30ms UI 업데이트 타이머
-let uiUpdateTimer: number | null = null
+// ✅ [FIX #R001-H2] requestAnimationFrame 기반 차트 업데이트 (타이머 충돌 해결)
+let rafId: number | null = null
+let lastFrameTime = 0
+const CHART_UPDATE_INTERVAL = 30 // 30ms 간격 유지
 const uiUpdateCount = ref(0)
-///computed
+
+// ✅ [FIX #R001-M1] 미리 생성된 차트 옵션 객체 (GC 감소)
+const chartUpdateOption = { animation: false, silent: true, lazyUpdate: true }
+const azimuthSeriesData: [number, number][] = [[1, 0]]
+const elevationSeriesData: [number, number][] = [[0, 0]]
+const trainSeriesData: [number, number][] = [[1, 0]]
 
 // ✅ 값 표시 헬퍼 함수
 const displayValue = (value: string | number | null | undefined) => {
@@ -581,118 +588,109 @@ const displayValue = (value: string | number | null | undefined) => {
   return value
 }
 
-// ✅ 30ms마다 차트만 업데이트 (데이터는 icdStore에서 자동 업데이트)
-const updateCharts = () => {
+// ✅ [FIX #R001-H2, M1] requestAnimationFrame 기반 차트 업데이트
+// - 브라우저 렌더링 사이클에 맞춤 (타이머 충돌 해결)
+// - 미리 생성된 배열 재사용 (GC 감소)
+const updateCharts = (timestamp: number) => {
+  // 30ms 간격 체크
+  if (timestamp - lastFrameTime < CHART_UPDATE_INTERVAL) {
+    rafId = requestAnimationFrame(updateCharts)
+    return
+  }
+  lastFrameTime = timestamp
+
   if (!chartsInitialized.value || !icdStore.isConnected) {
+    rafId = requestAnimationFrame(updateCharts)
     return
   }
 
   try {
-    const updateOption = {
-      animation: false,
-      silent: true,
-    }
-
-    // 1. Azimuth 차트 업데이트
+    // 1. Azimuth 차트 업데이트 (배열 재사용)
     if (azimuthChart && icdStore.azimuthAngle !== undefined) {
       const azimuth = Number(icdStore.azimuthAngle)
       if (!isNaN(azimuth)) {
         const normalizedAzimuth = azimuth < 0 ? azimuth + 360 : azimuth
+        azimuthSeriesData[0][1] = normalizedAzimuth
         azimuthChart.setOption(
           {
             series: [
               {
-                data: [[1, normalizedAzimuth]],
-                label: {
-                  formatter: () => `${azimuth.toFixed(2)}°`,
-                },
+                data: azimuthSeriesData,
+                label: { formatter: () => `${azimuth.toFixed(2)}°` },
               },
             ],
           },
-          updateOption,
+          chartUpdateOption,
         )
       }
     }
 
-    // 2. Elevation 차트 업데이트
+    // 2. Elevation 차트 업데이트 (배열 재사용)
     if (elevationChart && icdStore.elevationAngle !== undefined) {
       const elevation = Number(icdStore.elevationAngle)
       if (!isNaN(elevation)) {
         const normalizedElevation = elevation < 0 ? elevation + 360 : elevation % 360
+        elevationSeriesData[0][1] = normalizedElevation
         elevationChart.setOption(
           {
             series: [
               {
-                data: [[0, normalizedElevation]],
-                label: {
-                  formatter: () => `${elevation.toFixed(2)}°`,
-                },
+                data: elevationSeriesData,
+                label: { formatter: () => `${elevation.toFixed(2)}°` },
               },
             ],
           },
-          updateOption,
+          chartUpdateOption,
         )
       }
     }
 
-    // 3. Train 차트 업데이트
+    // 3. Train 차트 업데이트 (배열 재사용)
     if (trainChart && icdStore.trainAngle !== undefined) {
       const train = Number(icdStore.trainAngle)
       if (!isNaN(train)) {
         const normalizedTrain = train < 0 ? train + 360 : train
+        trainSeriesData[0][1] = normalizedTrain
         trainChart.setOption(
           {
             series: [
               {
-                data: [[1, normalizedTrain]],
-                label: {
-                  formatter: () => `${train.toFixed(2)}°`,
-                },
+                data: trainSeriesData,
+                label: { formatter: () => `${train.toFixed(2)}°` },
               },
             ],
           },
-          updateOption,
+          chartUpdateOption,
         )
       }
     }
 
     uiUpdateCount.value++
-
-    // 100번마다 로그
-    /*  if (uiUpdateCount.value % 100 === 0) {
-      console.log(`🔄 [${uiUpdateCount.value}] 차트 업데이트:`, {
-        azimuth: icdStore.azimuthAngle,
-        elevation: icdStore.elevationAngle,
-        train: icdStore.trainAngle,
-        serverTime: icdStore.serverTime,
-        storeUpdateCount: icdStore.updateCount,
-      })
-    } */
   } catch (error) {
     console.error('❌ 차트 업데이트 오류:', error)
   }
+
+  // 다음 프레임 예약
+  rafId = requestAnimationFrame(updateCharts)
 }
 
-// ✅ 30ms 차트 업데이트 타이머 시작
+// ✅ 차트 업데이트 시작 (requestAnimationFrame 기반)
 const startChartUpdates = () => {
-  if (uiUpdateTimer) {
-    clearInterval(uiUpdateTimer)
+  if (rafId) {
+    cancelAnimationFrame(rafId)
   }
 
-  console.log('🚀 차트 업데이트 타이머 시작 (30ms)')
-
-  uiUpdateTimer = window.setInterval(() => {
-    updateCharts()
-  }, 30)
+  console.log('🚀 차트 업데이트 시작 (rAF + 30ms 간격)')
+  lastFrameTime = 0
+  rafId = requestAnimationFrame(updateCharts)
 }
 
-// ✅ 차트 업데이트 타이머 중지
+// ✅ 차트 업데이트 중지
 const stopChartUpdates = () => {
-  if (uiUpdateTimer) {
-    clearInterval(uiUpdateTimer)
-    uiUpdateTimer = null
-
-    console.log('⏹️ 차트 업데이트 타이머 중지')
+  if (rafId) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+    console.log('⏹️ 차트 업데이트 중지')
   }
 }
 

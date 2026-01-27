@@ -35,6 +35,25 @@
 
 ---
 
+## [2026-01-27] - Dashboard 차트/시간 표시 성능 개선 (#R001)
+
+### Fixed
+- DashboardPage.vue: setInterval → requestAnimationFrame 전환 (#R001-H2)
+- icdStore.ts: serverTime 업데이트 순서 변경 - 스킵 로직 전에 처리 (#R001-H1)
+
+### Changed
+- 차트 옵션 객체 미리 생성하여 재사용 (#R001-M1) - GC 압박 감소
+
+### Why
+- 타이머 충돌로 인한 차트 업데이트 불규칙 현상 해결
+- 시간 표시 끊김 현상 해결 (serverTime이 스킵되는 문제)
+- requestAnimationFrame은 브라우저 렌더링 사이클에 맞춰 최적화됨
+
+### Details
+- [Review_UDP_PacketDelay](docs/work/active/Review_UDP_PacketDelay/README.md)
+
+---
+
 ## [2026-01-26] - PassSchedule 하이라이트 MstId 불일치 버그 수정
 
 ### Fixed

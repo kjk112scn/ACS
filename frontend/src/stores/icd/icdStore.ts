@@ -1570,7 +1570,16 @@ export const useICDStore = defineStore('icd', () => {
   const updateUIFromBuffer = () => {
     try {
       const startTime = performance.now()
-      // const currentTime = Date.now() // 디버깅 로그용 (비활성화)
+
+      // ✅ [FIX #R001-H1] serverTime은 항상 업데이트 (스킵 로직 전에!)
+      // 시간 표시 끊김 방지를 위해 가장 먼저 처리
+      const message = latestDataBuffer.value
+      if (message?.data && typeof message.data === 'object' && 'serverTime' in message.data) {
+        const dataServerTime = (message.data as Record<string, unknown>).serverTime
+        if (dataServerTime !== undefined && dataServerTime !== null) {
+          serverTime.value = safeToString(dataServerTime)
+        }
+      }
 
       // 업데이트 간격 측정 (더 정확하게)
       if (lastUpdateTimestamp.value > 0) {
@@ -1583,9 +1592,8 @@ export const useICDStore = defineStore('icd', () => {
           performanceHistory.value.shift()
         }
 
-        // 간격이 너무 불규칙하면 건너뛰기
+        // 간격이 너무 불규칙하면 나머지 데이터만 건너뛰기 (serverTime은 이미 업데이트됨)
         if (currentInterval < UPDATE_INTERVAL * 0.5) {
-          //console.warn(`⚠️ 너무 빠른 업데이트 건너뛰기: ${currentInterval.toFixed(2)}ms`)
           return
         }
 
@@ -1600,35 +1608,15 @@ export const useICDStore = defineStore('icd', () => {
       }
       lastUpdateTimestamp.value = startTime
 
-      // 버퍼에 새 데이터가 있는지 확인
-      if (!latestDataBuffer.value) {
+      // 버퍼에 새 데이터가 있는지 확인 (serverTime 외 나머지 데이터용)
+      if (!message) {
         return
       }
 
-      const message = latestDataBuffer.value
       updateCount.value++
       lastUpdateTime.value = Date.now()
 
-      // serverTime 업데이트 (최우선)
-      if (message.data && typeof message.data === 'object' && 'serverTime' in message.data) {
-        const dataServerTime = (message.data as Record<string, unknown>).serverTime
-        if (dataServerTime !== undefined && dataServerTime !== null) {
-          // ✅ 디버깅 로그 비활성화
-          // const oldTime = serverTime.value
-          serverTime.value = safeToString(dataServerTime)
-          // if (updateCount.value % 100 === 0) {
-          //   console.log(`🕐 [${updateCount.value}] serverTime: ${oldTime} → ${serverTime.value}`)
-          // }
-        }
-      } else {
-        // ✅ 디버깅 로그 비활성화
-        // console.log('❌ [Frontend] serverTime을 찾을 수 없습니다:', {
-        //   messageServerTime: message.serverTime,
-        //   messageData: message.data,
-        //   hasData: !!message.data,
-        //   dataKeys: message.data ? Object.keys(message.data) : 'no data',
-        // })
-      }
+      // serverTime은 위에서 이미 처리됨
 
       // resultTimeOffsetCalTime 업데이트 - data 객체 안에서 찾기
       if (
