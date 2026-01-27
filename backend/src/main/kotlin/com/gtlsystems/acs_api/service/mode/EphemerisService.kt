@@ -134,6 +134,16 @@ class EphemerisService(
     private var trackingDataIndex = 0
     private val limitAngleCalculator = LimitAngleCalculator()
 
+    // ✅ 궤적 데이터 캐싱 (createRealtimeTrackingData 성능 최적화)
+    // 추적 시작 시 1회만 DB 조회, 이후 캐시 사용
+    private var cachedSessionId: Long? = null
+    private var cachedOriginalPassDetails: List<Map<String, Any?>> = emptyList()
+    private var cachedAxisTransformedPassDetails: List<Map<String, Any?>> = emptyList()
+    private var cachedFinalPassDetails: List<Map<String, Any?>> = emptyList()
+    private var cachedFinalMst: Map<String, Any?>? = null
+    private var cachedIsKeyhole: Boolean = false
+    private var trajectoryDataCached: Boolean = false
+
     @PostConstruct
     fun init() {
         eventBus()
@@ -1352,6 +1362,11 @@ class EphemerisService(
             timeDifference > 0 && calTime.isBefore(endTime) -> {
                 // ✅ TRACKING 전환 전에 먼저 첫 번째 CMD 값 설정 (0으로 점프 방지)
                 val firstTrackingData = createRealtimeTrackingData(mstId, detailId, calTime, startTime)
+
+                // ✅ FIX: 데이터 유무와 관계없이 trackingCMD를 먼저 현재 위치로 초기화 (0,0 점프 방지)
+                val currentData = dataStoreService.getLatestData()
+                val cmdTrain = PushData.CMD.cmdTrainAngle ?: 0f
+
                 if (firstTrackingData.isNotEmpty()) {
                     // ✅ Keyhole 여부 확인
                     val isKeyhole = currentTrackingPass?.get("IsKeyhole") as? Boolean ?: false
@@ -1375,9 +1390,6 @@ class EphemerisService(
                             ?: (firstTrackingData["finalTransformedElevation"] as? Number)?.toFloat()
                     }
 
-                    // ✅ Train CMD는 moveTrainToZero()에서 이미 설정됨 - 덮어쓰지 않음
-                    val cmdTrain = PushData.CMD.cmdTrainAngle ?: 0f
-
                     if (cmdAz != null && cmdEl != null) {
                         PushData.CMD.cmdAzimuthAngle = cmdAz
                         PushData.CMD.cmdElevationAngle = cmdEl
@@ -1385,7 +1397,6 @@ class EphemerisService(
                         logger.info("📡 TRACKING 전환 - 첫 CMD 설정 (Keyhole=${isKeyhole}): Az=${cmdAz}°, El=${cmdEl}°, Train=${cmdTrain}° (유지)")
 
                         // ✅ DataStore의 trackingCMD 값도 즉시 설정 (0,0 점프 방지)
-                        val currentData = dataStoreService.getLatestData()
                         val initialTrackingData = currentData.copy(
                             trackingCMDAzimuthAngle = cmdAz,
                             trackingCMDElevationAngle = cmdEl,
@@ -1394,6 +1405,19 @@ class EphemerisService(
                         dataStoreService.updateDataFromUdp(initialTrackingData)
                         logger.info("📡 TRACKING 전환 - trackingCMD 값 DataStore에 설정 완료")
                     }
+                } else {
+                    // ✅ FIX: 데이터가 없어도 현재 안테나 위치로 trackingCMD 초기화 (0,0 점프 방지)
+                    val fallbackAz = currentData.azimuthAngle ?: 0f
+                    val fallbackEl = currentData.elevationAngle ?: 0f
+
+                    logger.warn("⚠️ TRACKING 전환 - 추적 데이터 없음, 현재 위치로 trackingCMD 초기화: Az=${fallbackAz}°, El=${fallbackEl}°, Train=${cmdTrain}°")
+
+                    val fallbackTrackingData = currentData.copy(
+                        trackingCMDAzimuthAngle = fallbackAz,
+                        trackingCMDElevationAngle = fallbackEl,
+                        trackingCMDTrainAngle = cmdTrain
+                    )
+                    dataStoreService.updateDataFromUdp(fallbackTrackingData)
                 }
 
                 currentTrackingState = TrackingState.TRACKING
@@ -1465,6 +1489,12 @@ class EphemerisService(
             return
         }
         val detailId = currentTrackingDetailId ?: (currentTrackingPass?.get("DetailId") as? Number)?.toInt() ?: 0  // ✅ V006 Fix: currentTrackingDetailId 우선
+
+        // ✅ 궤적 데이터 캐시 초기화 (최초 1회만)
+        if (!trajectoryDataCached) {
+            initializeTrajectoryCache(mstId, detailId)
+        }
+
         val (startTime, endTime) = getCurrentTrackingPassTimes()
         val calTime = GlobalData.Time.calUtcTimeOffsetTime
 
@@ -1560,7 +1590,68 @@ class EphemerisService(
         targetElevation = 0f
         trainMoveCommandTime = 0  // ✅ 명령 전송 시간 초기화
         azElMoveCommandTime = 0  // ✅ 명령 전송 시간 초기화
+        clearTrajectoryCache()  // ✅ 궤적 캐시 정리
         logger.info("🔄 공통 추적 상태 초기화 완료")
+    }
+
+    /**
+     * ✅ 궤적 데이터 캐시 초기화 (TRACKING 진입 시 호출)
+     * 추적 시작 시 1회만 DB 조회하여 캐싱
+     */
+    private fun initializeTrajectoryCache(mstId: Long, detailId: Int) {
+        if (trajectoryDataCached) {
+            logger.debug("궤적 캐시 이미 초기화됨, 스킵")
+            return
+        }
+
+        val startTime = System.currentTimeMillis()
+        try {
+            // sessionId 캐싱
+            cachedSessionId = ephemerisDataRepository.getSessionIdByMstAndDetail(mstId, detailId)
+
+            // original 궤적 데이터 캐싱
+            cachedOriginalPassDetails = getEphemerisTrackDtlByMstIdAndDataType(mstId, "original", detailId)
+
+            // axis_transformed 궤적 데이터 캐싱
+            cachedAxisTransformedPassDetails = getEphemerisTrackDtlByMstIdAndDataType(mstId, "axis_transformed", detailId)
+
+            // final_transformed 궤적 데이터 캐싱
+            cachedFinalPassDetails = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId)
+
+            // MST 메타데이터 캐싱 (Keyhole 여부 확인용)
+            cachedFinalMst = ephemerisTrackMstStorage.find {
+                val dataMstId = (it["MstId"] as? Number)?.toLong()
+                dataMstId == mstId && it["DataType"] == "final_transformed"
+            }
+            cachedIsKeyhole = cachedFinalMst?.get("IsKeyhole") as? Boolean ?: false
+
+            trajectoryDataCached = true
+
+            val elapsedTime = System.currentTimeMillis() - startTime
+            logger.info("✅ 궤적 데이터 캐시 초기화 완료: mstId={}, detailId={}, original={}개, axis={}개, final={}개, 소요시간={}ms",
+                mstId, detailId,
+                cachedOriginalPassDetails.size,
+                cachedAxisTransformedPassDetails.size,
+                cachedFinalPassDetails.size,
+                elapsedTime)
+        } catch (e: Exception) {
+            logger.error("❌ 궤적 데이터 캐시 초기화 실패: ${e.message}", e)
+            trajectoryDataCached = false
+        }
+    }
+
+    /**
+     * ✅ 궤적 데이터 캐시 정리 (추적 종료 시 호출)
+     */
+    private fun clearTrajectoryCache() {
+        cachedSessionId = null
+        cachedOriginalPassDetails = emptyList()
+        cachedAxisTransformedPassDetails = emptyList()
+        cachedFinalPassDetails = emptyList()
+        cachedFinalMst = null
+        cachedIsKeyhole = false
+        trajectoryDataCached = false
+        logger.debug("궤적 데이터 캐시 정리 완료")
     }
 
     /**
@@ -1718,64 +1809,64 @@ class EphemerisService(
         startTime: ZonedDateTime
     ): Map<String, Any?> {
         val elapsedTimeSeconds = Duration.between(startTime, currentTime).toMillis() / 1000.0f
-        // ✅ V006 P0 Fix: sessionId 조회 (tracking_result와 trajectory 연계용)
-        val sessionId = ephemerisDataRepository.getSessionIdByMstAndDetail(mstId, detailId)
 
-        // logger.info("🔍 [createRealtimeTrackingData] 시작: mstId=$mstId, detailId=$detailId, currentTime=$currentTime, startTime=$startTime, elapsedTimeSeconds=$elapsedTimeSeconds")
+        // ✅ 캐시된 데이터 사용 (DB 조회 제거)
+        // 캐시가 초기화되지 않은 경우 (비정상 상태) 폴백 처리
+        val sessionId = cachedSessionId ?: run {
+            logger.warn("⚠️ 캐시 미초기화 상태, 직접 조회: sessionId")
+            ephemerisDataRepository.getSessionIdByMstAndDetail(mstId, detailId)
+        }
 
-        // ✅ original과 axis_transformed 데이터는 별도로 조회해야 함
-        // getEphemerisTrackDtlByMstIdAndDetailId는 final_transformed만 반환하므로
-        val originalPassDetails = getEphemerisTrackDtlByMstIdAndDataType(mstId, "original", detailId)
-        val axisTransformedPassDetails = getEphemerisTrackDtlByMstIdAndDataType(mstId, "axis_transformed", detailId)
-        
-        // ✅ final_transformed 데이터는 getEphemerisTrackDtlByMstIdAndDetailId 사용 (하드웨어 제한 각도 필터링 포함)
-        val allPassDetails = getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId)
-        
-        // logger.info("🔍 [createRealtimeTrackingData] originalPassDetails 크기: ${originalPassDetails.size}, axisTransformedPassDetails 크기: ${axisTransformedPassDetails.size}, allPassDetails 크기: ${allPassDetails.size}")
+        // ✅ 캐시된 궤적 데이터 사용
+        val originalPassDetails = if (trajectoryDataCached) cachedOriginalPassDetails else {
+            logger.warn("⚠️ 캐시 미초기화 상태, 직접 조회: original")
+            getEphemerisTrackDtlByMstIdAndDataType(mstId, "original", detailId)
+        }
+        val axisTransformedPassDetails = if (trajectoryDataCached) cachedAxisTransformedPassDetails else {
+            logger.warn("⚠️ 캐시 미초기화 상태, 직접 조회: axis_transformed")
+            getEphemerisTrackDtlByMstIdAndDataType(mstId, "axis_transformed", detailId)
+        }
+        val allPassDetails = if (trajectoryDataCached) cachedFinalPassDetails else {
+            logger.warn("⚠️ 캐시 미초기화 상태, 직접 조회: final_transformed")
+            getEphemerisTrackDtlByMstIdAndDetailId(mstId, detailId)
+        }
 
         // ✅ original 데이터가 없으면 에러 (모든 변환을 거쳐야 하므로 original은 반드시 있어야 함)
         if (originalPassDetails.isEmpty()) {
             logger.error("❌ [createRealtimeTrackingData] 원본 이론치 데이터가 없습니다. mstId=$mstId, detailId=$detailId - 데이터 저장 과정에 문제가 있을 수 있습니다.")
             return emptyMap()
         }
-        
+
         // ✅ final_transformed 데이터도 없으면 에러
         if (allPassDetails.isEmpty()) {
             logger.error("❌ [createRealtimeTrackingData] 최종 변환 데이터가 없습니다. mstId=$mstId, detailId=$detailId - 데이터 저장 과정에 문제가 있을 수 있습니다.")
             return emptyMap()
         }
-        
-        // ✅ Keyhole 여부 확인 (final_transformed MST에서)
-        // ✅ MstId 필드만 사용 (No 필드 제거)
-        // logger.info("🔍 [createRealtimeTrackingData] MST 저장소 크기: ${ephemerisTrackMstStorage.size}")
-        val finalMst = ephemerisTrackMstStorage.find { 
-            val dataMstId = (it["MstId"] as? Number)?.toLong()
-            dataMstId == mstId && it["DataType"] == "final_transformed" 
+
+        // ✅ 캐시된 Keyhole 정보 사용
+        val finalMst = if (trajectoryDataCached) cachedFinalMst else {
+            ephemerisTrackMstStorage.find {
+                val dataMstId = (it["MstId"] as? Number)?.toLong()
+                dataMstId == mstId && it["DataType"] == "final_transformed"
+            }
         }
-        
+
         if (finalMst == null) {
-            logger.warn("⚠️ [createRealtimeTrackingData] MstId(${mstId})에 해당하는 final_transformed MST 데이터를 찾을 수 없습니다. 저장소 크기: ${ephemerisTrackMstStorage.size}")
-            val availableMstIds =    ephemerisTrackMstStorage.mapNotNull { (it["MstId"] as? Number)?.toLong() }.distinct()
-            logger.warn("⚠️ [createRealtimeTrackingData] 사용 가능한 MstId 목록: $availableMstIds")
+            logger.warn("⚠️ [createRealtimeTrackingData] MstId(${mstId})에 해당하는 final_transformed MST 데이터를 찾을 수 없습니다.")
             return emptyMap()
         }
-        
-        // logger.info("🔍 [createRealtimeTrackingData] finalMst 찾음: MstId=$mstId, IsKeyhole=${finalMst["IsKeyhole"]}")
-        
-        val isKeyhole = finalMst["IsKeyhole"] as? Boolean ?: false
-        
+
+        val isKeyhole = if (trajectoryDataCached) cachedIsKeyhole else (finalMst["IsKeyhole"] as? Boolean ?: false)
+
         // ✅ Keyhole 여부에 따라 DataType 선택
         val finalDataType = if (isKeyhole) {
-            logger.debug("🔑 실시간 추적: MstId(${mstId}) Keyhole 발생 → keyhole_optimized_final_transformed 사용")
             "keyhole_optimized_final_transformed"  // Keyhole이면 최적화 데이터 사용
         } else {
-            logger.debug("✅ 실시간 추적: MstId(${mstId}) Keyhole 미발생 → final_transformed 사용")
             "final_transformed"  // Keyhole 아니면 기본 데이터 사용
         }
-        
-        // ✅ allPassDetails는 이미 getEphemerisTrackDtlByMstIdAndDetailId에서 반환된 데이터로
+
+        // ✅ allPassDetails는 이미 캐시된 데이터로
         // Keyhole 여부에 따라 final_transformed 또는 keyhole_optimized_final_transformed만 포함됨
-        // 그리고 하드웨어 제한 각도 기준으로 이미 필터링되어 있음
         val filteredFinalTransformed = allPassDetails
         
         // logger.info("🔍 [createRealtimeTrackingData] filteredFinalTransformed 크기: ${filteredFinalTransformed.size}")

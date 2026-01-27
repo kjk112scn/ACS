@@ -343,7 +343,6 @@ const scheduleData = computed(() => {
     }
 
     // ✅ index 필드 제거, mstId만 사용
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { index: _index, ...itemWithoutIndex } = item as ScheduleItem & { index?: number } // index 필드 제거 (타입 안전)
 
     return {
@@ -1928,7 +1927,7 @@ onUnmounted(async () => {
   padding: 10px 8px !important;
 }
 
-/* ✅ 지속시간 셀 내용 폰트 크기 증가 */
+/* ✅ 지속시간 셀 내��� 폰트 크기 증가 */
 .schedule-table :deep(.q-table tbody td[data-col="duration"]) {
   font-size: 14px !important;
   font-weight: 600 !important;

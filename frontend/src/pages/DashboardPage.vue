@@ -321,7 +321,6 @@ const { initializeTheme } = useTheme()
 const { colors: chartColors } = useChartTheme()
 
 // Dashboard 페이지용 WebSocket 메시지 핸들러
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const handleDashboardMessage = (_message: MessageData) => {
   // console.log('📊 Dashboard 메시지 수신:', _message)
   // 필요시 추가 처리 로직 (예: 특정 데이터 변경 감지, 알림 등)

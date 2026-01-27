@@ -5,9 +5,6 @@
       <q-badge v-if="hasUnsavedChanges" color="orange" class="q-ml-sm">
         변경됨
       </q-badge>
-      <q-badge v-else-if="isSaved" color="green" class="q-ml-sm">
-        저장됨
-      </q-badge>
     </h5>
 
     <q-tabs v-model="activeTab" class="text-primary">
@@ -18,7 +15,7 @@
     <q-tab-panels v-model="activeTab" animated>
       <!-- 스토우 각도 설정 -->
       <q-tab-panel name="angle">
-        <q-form @submit="onSaveAngle" class="q-gutter-md">
+        <q-form class="q-gutter-md">
           <div class="row q-gutter-md">
             <div class="col">
               <q-input v-model.number="localAngleSettings.azimuth" label="Azimuth 스토우 각도 (도)" type="number"
@@ -36,8 +33,6 @@
           </div>
 
           <div class="row q-gutter-sm q-mt-md">
-            <q-btn type="submit" color="primary" label="각도 저장" :loading="loadingStates.stowAngle"
-              :disable="!isAngleFormValid" icon="save" />
             <q-btn color="secondary" label="각도 초기화" @click="onResetAngle" :disable="loadingStates.stowAngle"
               icon="refresh" />
           </div>
@@ -46,7 +41,7 @@
 
       <!-- 스토우 속도 설정 -->
       <q-tab-panel name="speed">
-        <q-form @submit="onSaveSpeed" class="q-gutter-md">
+        <q-form class="q-gutter-md">
           <div class="row q-gutter-md">
             <div class="col">
               <q-input v-model.number="localSpeedSettings.azimuth" label="Azimuth 스토우 속도 (도/초)" type="number"
@@ -66,8 +61,6 @@
           </div>
 
           <div class="row q-gutter-sm q-mt-md">
-            <q-btn type="submit" color="primary" label="속도 저장" :loading="loadingStates.stowSpeed"
-              :disable="!isSpeedFormValid" icon="save" />
             <q-btn color="secondary" label="속도 초기화" @click="onResetSpeed" :disable="loadingStates.stowSpeed"
               icon="refresh" />
           </div>
@@ -75,13 +68,6 @@
       </q-tab-panel>
     </q-tab-panels>
 
-    <!-- 성공 메시지 -->
-    <q-banner v-if="successMessage" class="bg-positive text-white q-mt-md" rounded>
-      <template v-slot:avatar>
-        <q-icon name="check_circle" />
-      </template>
-      {{ successMessage }}
-    </q-banner>
   </div>
 </template>
 
@@ -130,8 +116,6 @@ const getInitialSpeedSettings = (): StowSpeedSettings => {
 const localSpeedSettings = ref<StowSpeedSettings>(getInitialSpeedSettings())
 const originalSpeedSettings = ref<StowSpeedSettings>({ ...localSpeedSettings.value })
 
-const successMessage = ref<string>('')
-
 // 변경사항 감지 - Store 상태와 로컬 상태를 모두 고려
 const hasUnsavedChanges = computed(() => {
   // Store에 변경사항이 있으면 true
@@ -143,9 +127,6 @@ const hasUnsavedChanges = computed(() => {
   const speedChanged = JSON.stringify(localSpeedSettings.value) !== JSON.stringify(originalSpeedSettings.value)
   return angleChanged || speedChanged
 })
-
-// 저장 상태
-const isSaved = ref<boolean>(true)
 
 // 유효성 검사 규칙
 const azimuthRules = [
@@ -177,19 +158,6 @@ const trainSpeedRules = [
   (val: number) => val !== null && val !== undefined || 'Train 스토우 속도는 필수입니다',
   (val: number) => val > 0 || 'Train 스토우 속도는 0보다 커야 합니다'
 ]
-
-// 폼 유효성 검사
-const isAngleFormValid = computed(() => {
-  return localAngleSettings.value.azimuth !== null && localAngleSettings.value.azimuth !== undefined &&
-    localAngleSettings.value.elevation !== null && localAngleSettings.value.elevation !== undefined &&
-    localAngleSettings.value.train !== null && localAngleSettings.value.train !== undefined
-})
-
-const isSpeedFormValid = computed(() => {
-  return localSpeedSettings.value.azimuth !== null && localSpeedSettings.value.azimuth !== undefined &&
-    localSpeedSettings.value.elevation !== null && localSpeedSettings.value.elevation !== undefined &&
-    localSpeedSettings.value.train !== null && localSpeedSettings.value.train !== undefined
-})
 
 // 변경사항 감지 watch - Store 상태 업데이트
 watch(
@@ -266,62 +234,6 @@ watch(
   { deep: true }
 )
 
-// 각도 저장 함수
-const onSaveAngle = async () => {
-  try {
-    await stowSettingsStore.saveStowAngleSettings(localAngleSettings.value)
-    originalAngleSettings.value = { ...localAngleSettings.value }
-    updateChangeStatus('angle', false)
-    isSaved.value = true
-
-    successMessage.value = '스토우 각도 설정이 저장되었습니다'
-    setTimeout(() => { successMessage.value = '' }, 3000)
-
-    $q.notify({
-      color: 'positive',
-      message: '스토우 각도 설정이 저장되었습니다',
-      icon: 'check_circle',
-      position: 'top'
-    })
-  } catch (error) {
-    console.error('스토우 각도 설정 저장 실패:', error)
-    $q.notify({
-      color: 'negative',
-      message: '스토우 각도 설정 저장에 실패했습니다',
-      icon: 'error',
-      position: 'top'
-    })
-  }
-}
-
-// 속도 저장 함수
-const onSaveSpeed = async () => {
-  try {
-    await stowSettingsStore.saveStowSpeedSettings(localSpeedSettings.value)
-    originalSpeedSettings.value = { ...localSpeedSettings.value }
-    updateChangeStatus('speed', false)
-    isSaved.value = true
-
-    successMessage.value = '스토우 속도 설정이 저장되었습니다'
-    setTimeout(() => { successMessage.value = '' }, 3000)
-
-    $q.notify({
-      color: 'positive',
-      message: '스토우 속도 설정이 저장되었습니다',
-      icon: 'check_circle',
-      position: 'top'
-    })
-  } catch (error) {
-    console.error('스토우 속도 설정 저장 실패:', error)
-    $q.notify({
-      color: 'negative',
-      message: '스토우 속도 설정 저장에 실패했습니다',
-      icon: 'error',
-      position: 'top'
-    })
-  }
-}
-
 // 각도 초기화 함수
 const onResetAngle = async () => {
   try {
@@ -329,7 +241,6 @@ const onResetAngle = async () => {
     localAngleSettings.value = { ...stowSettingsStore.stowAngleSettings }
     originalAngleSettings.value = { ...stowSettingsStore.stowAngleSettings }
     updateChangeStatus('angle', false)
-    isSaved.value = true
 
     $q.notify({
       color: 'info',
@@ -349,7 +260,6 @@ const onResetSpeed = async () => {
     localSpeedSettings.value = { ...stowSettingsStore.stowSpeedSettings }
     originalSpeedSettings.value = { ...stowSettingsStore.stowSpeedSettings }
     updateChangeStatus('speed', false)
-    isSaved.value = true
 
     $q.notify({
       color: 'info',

@@ -6,6 +6,35 @@
 
 ---
 
+## [2026-01-27] - Settings 시스템 리팩토링 + Ephemeris 성능 개선
+
+### Refactored
+- Settings 컴포넌트 10개 단순화 (-567줄): 중복 로직 제거, 부모 컴포넌트 위임
+- EphemerisService: 추적 로직 개선 (+129줄)
+- BatchStorageManager: 저장 주기 설정 지원 (+81줄)
+- ephemerisTrackStore: 구조 개선
+
+### Added
+- StorageSettings.vue: 저장 주기 설정 컴포넌트
+- V007__Update_batch_save_interval.sql: DB 마이그레이션
+- Review 문서 7개: Settings, Ephemeris, PassSchedule, Theme 등 시스템 분석
+
+### Changed
+- SettingsController: 저장 주기 API 추가
+- settingsService.ts: 저장 설정 API 추가
+- PassScheduleStore: 상태 관리 개선
+
+### Why
+- Settings 컴포넌트 간 중복 코드(로딩/에러/저장 로직) 567줄 제거
+- Ephemeris 추적 성능 및 안정성 향상
+- 시스템 전체 리뷰를 통한 이슈 발굴 (Settings #R003, Theme #R002)
+
+### Details
+- [Review_Settings_Full](docs/work/active/Review_Settings_Full/REVIEW.md)
+- [Settings_Validation](docs/work/active/Settings_Validation/UNIFIED_REVIEW.md)
+
+---
+
 ## [2026-01-26] - PassSchedule 하이라이트 MstId 불일치 버그 수정
 
 ### Fixed

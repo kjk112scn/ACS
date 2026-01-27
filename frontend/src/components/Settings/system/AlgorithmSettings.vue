@@ -5,20 +5,15 @@
       <q-badge v-if="hasUnsavedChanges" color="orange" class="q-ml-sm">
         변경됨
       </q-badge>
-      <q-badge v-else-if="isSaved" color="green" class="q-ml-sm">
-        저장됨
-      </q-badge>
     </h5>
 
-    <q-form @submit="onSave" class="q-gutter-md">
+    <q-form class="q-gutter-md">
       <!-- GeoMinMotion 입력 -->
       <q-input v-model.number="localSettings.geoMinMotion" label="GeoMinMotion" type="number" :rules="geoMinMotionRules"
         outlined :loading="loadingStates.algorithm" hint="GeoMinMotion 값" />
 
       <!-- 버튼들 -->
       <div class="row q-gutter-sm q-mt-md">
-        <q-btn type="submit" color="primary" label="저장" :loading="loadingStates.algorithm"
-          :disable="!isFormValid || !hasUnsavedChanges" icon="save" />
         <q-btn color="secondary" label="초기화" @click="onReset" :disable="loadingStates.algorithm" icon="refresh" />
       </div>
     </q-form>
@@ -31,13 +26,6 @@
       {{ errorStates.algorithm }}
     </q-banner>
 
-    <!-- 성공 메시지 -->
-    <q-banner v-if="successMessage" class="bg-positive text-white q-mt-md">
-      <template v-slot:avatar>
-        <q-icon name="check_circle" />
-      </template>
-      {{ successMessage }}
-    </q-banner>
   </div>
 </template>
 
@@ -75,22 +63,12 @@ const hasUnsavedChanges = computed(() => {
   return JSON.stringify(localSettings.value) !== JSON.stringify(originalSettings.value)
 })
 
-// 저장 상태
-const isSaved = ref(true)
-
-const successMessage = ref<string>('')
-
 // 유효성 검사 규칙
 const geoMinMotionRules = [
   (val: number) => val !== null && val !== undefined || 'GeoMinMotion은 필수입니다',
   (val: number) => val > 0 || 'GeoMinMotion은 0보다 커야 합니다',
   (val: number) => val <= 10 || 'GeoMinMotion은 10 이하여야 합니다'
 ]
-
-// 폼 유효성 검사
-const isFormValid = computed(() => {
-  return localSettings.value.geoMinMotion > 0 && localSettings.value.geoMinMotion <= 10
-})
 
 // 변경사항 감지 watch - Store 상태 업데이트
 watch(
@@ -148,34 +126,6 @@ onMounted(async () => {
   }
 })
 
-// 저장 함수
-const onSave = async () => {
-  try {
-    await algorithmSettingsStore.saveAlgorithmSettings(localSettings.value)
-
-    // 저장 성공 시 변경사항 상태 업데이트
-    updateChangeStatus(false)
-    originalSettings.value = { ...localSettings.value }
-    isSaved.value = true
-
-    successMessage.value = '알고리즘 설정이 성공적으로 저장되었습니다'
-
-    // 3초 후 성공 메시지 숨기기
-    setTimeout(() => {
-      successMessage.value = ''
-    }, 3000)
-
-    $q.notify({
-      color: 'positive',
-      message: '알고리즘 설정이 저장되었습니다',
-      icon: 'check',
-      position: 'top'
-    })
-  } catch (error) {
-    console.error('알고리즘 설정 저장 실패:', error)
-  }
-}
-
 // 초기화 함수 - 서버에서 로드된 값으로 초기화
 const onReset = async () => {
   try {
@@ -183,7 +133,6 @@ const onReset = async () => {
     localSettings.value = { ...algorithmSettingsStore.algorithmSettings }
     originalSettings.value = { ...algorithmSettingsStore.algorithmSettings }
     updateChangeStatus(false)
-    isSaved.value = true
 
     $q.notify({
       color: 'info',

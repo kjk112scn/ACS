@@ -5,12 +5,9 @@
       <q-badge v-if="hasUnsavedChanges" color="orange" class="q-ml-sm">
         변경됨
       </q-badge>
-      <q-badge v-else-if="isSaved" color="green" class="q-ml-sm">
-        저장됨
-      </q-badge>
     </h5>
 
-    <q-form @submit="onSave" class="q-gutter-md">
+    <q-form class="q-gutter-md">
       <!-- 추적 간격 입력 -->
       <q-input v-model.number="localSettings.msInterval" label="추적 간격 (밀리초)" type="number" :rules="intervalRules"
         outlined :loading="loadingStates.tracking" hint="추적 계산 주기 (밀리초)" suffix="ms" />
@@ -29,19 +26,10 @@
 
       <!-- 버튼들 -->
       <div class="row q-gutter-sm q-mt-md">
-        <q-btn type="submit" color="primary" label="저장" :loading="loadingStates.tracking" :disable="!isFormValid"
-          icon="save" />
         <q-btn color="secondary" label="초기화" @click="onReset" :disable="loadingStates.tracking" icon="refresh" />
       </div>
     </q-form>
 
-    <!-- 성공 메시지 -->
-    <q-banner v-if="successMessage" class="bg-positive text-white q-mt-md" rounded>
-      <template v-slot:avatar>
-        <q-icon name="check_circle" />
-      </template>
-      {{ successMessage }}
-    </q-banner>
   </div>
 </template>
 
@@ -73,8 +61,6 @@ const getInitialLocalSettings = (): TrackingSettings => {
 const localSettings = ref<TrackingSettings>(getInitialLocalSettings())
 const originalSettings = ref<TrackingSettings>({ ...localSettings.value })
 
-const successMessage = ref<string>('')
-
 // 변경사항 감지 - Store 상태와 로컬 상태를 모두 고려
 const hasUnsavedChanges = computed(() => {
   // Store에 변경사항이 있으면 true
@@ -84,9 +70,6 @@ const hasUnsavedChanges = computed(() => {
   // 로컬 상태와 원본 상태를 비교
   return JSON.stringify(localSettings.value) !== JSON.stringify(originalSettings.value)
 })
-
-// 저장 상태
-const isSaved = ref<boolean>(true)
 
 // 유효성 검사 규칙
 const intervalRules = [
@@ -112,14 +95,6 @@ const preparationTimeRules = [
   (val: number) => val >= 1 || '추적 준비 시간은 1분 이상이어야 합니다',
   (val: number) => val <= 10 || '추적 준비 시간은 10분 이하여야 합니다'
 ]
-
-// 폼 유효성 검사
-const isFormValid = computed(() => {
-  return localSettings.value.msInterval !== null && localSettings.value.msInterval !== undefined &&
-    localSettings.value.durationDays !== null && localSettings.value.durationDays !== undefined &&
-    localSettings.value.minElevationAngle !== null && localSettings.value.minElevationAngle !== undefined &&
-    localSettings.value.preparationTimeMinutes !== null && localSettings.value.preparationTimeMinutes !== undefined
-})
 
 // 변경사항 감지 watch - Store 상태 업데이트
 watch(
@@ -164,34 +139,6 @@ watch(
   { deep: true }
 )
 
-// 저장 함수
-const onSave = async () => {
-  try {
-    await trackingSettingsStore.saveTrackingSettings(localSettings.value)
-    originalSettings.value = { ...localSettings.value }
-    updateChangeStatus(false)
-    isSaved.value = true
-
-    successMessage.value = '추적 설정이 저장되었습니다'
-    setTimeout(() => { successMessage.value = '' }, 3000)
-
-    $q.notify({
-      color: 'positive',
-      message: '추적 설정이 저장되었습니다',
-      icon: 'check_circle',
-      position: 'top'
-    })
-  } catch (error) {
-    console.error('추적 설정 저장 실패:', error)
-    $q.notify({
-      color: 'negative',
-      message: '추적 설정 저장에 실패했습니다',
-      icon: 'error',
-      position: 'top'
-    })
-  }
-}
-
 // 초기화 함수 - 서버에서 로드된 값으로 초기화
 const onReset = async () => {
   try {
@@ -199,7 +146,6 @@ const onReset = async () => {
     localSettings.value = { ...trackingSettingsStore.trackingSettings }
     originalSettings.value = { ...trackingSettingsStore.trackingSettings }
     updateChangeStatus(false)
-    isSaved.value = true
 
     $q.notify({
       color: 'info',

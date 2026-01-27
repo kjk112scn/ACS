@@ -50,6 +50,9 @@
 
           <!-- 피드 설정 -->
           <FeedSettings v-if="activeCategory === 'feed'" />
+
+          <!-- 저장 설정 -->
+          <StorageSettings v-if="activeCategory === 'storage'" />
         </div>
       </div>
     </div>
@@ -71,6 +74,7 @@ import OffsetLimitsSettings from './OffsetLimitsSettings.vue'
 import AlgorithmSettings from './AlgorithmSettings.vue'
 import StepSizeLimitSettings from './StepSizeLimitSettings.vue'
 import FeedSettings from './FeedSettings.vue'
+import StorageSettings from './StorageSettings.vue'
 
 const settingsStore = useSettingsStore()
 
@@ -107,7 +111,7 @@ const settingsCategories = [
     id: 'angle-limits',
     name: '각도 제한',
     description: 'Azimuth, Elevation, Train 제한',
-    icon: 'rotate_3d'
+    icon: 'rotate_right'
   },
   {
     id: 'speed-limits',
@@ -138,6 +142,12 @@ const settingsCategories = [
     name: '피드 설정',
     description: 'S-Band, X-Band, Ka-Band 표시 설정',
     icon: 'tune'
+  },
+  {
+    id: 'storage',
+    name: '저장 설정',
+    description: '배치 저장 간격 설정',
+    icon: 'storage'
   }
 ]
 

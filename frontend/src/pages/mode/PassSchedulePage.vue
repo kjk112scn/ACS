@@ -252,6 +252,11 @@ class PassChartUpdatePool {
 // 🆕 PassChartUpdatePool 인스턴스 생성
 const passChartPool = new PassChartUpdatePool()
 
+// ✅ 하드웨어 초기값 튀는 현상 방지: 추적 시작 시 초기 프레임 스킵
+const INITIAL_FRAMES_TO_SKIP = 5  // 처음 5프레임 스킵 (하드웨어 초기값 안정화)
+let trackingFrameCount = 0
+let isTrackingInitPhase = false  // 추적 초기 단계 플래그
+
 // 🔧 모든 computed를 먼저 정의
 // ✅ PassSchedule 데이터 구조 리팩토링: 선택된 스케줄만 표시 (selectedScheduleList 사용)
 const scheduleData = computed(() => {
@@ -377,10 +382,10 @@ watch([() => icdStore.currentTrackingMstId, () => icdStore.currentTrackingDetail
     })
 
   } else if (oldMstId === null && newMstId !== null) {
-    // 추적 시작 시 빈 경로에서 시작
-    console.log('🚀 추적 시작 - 모든 경로 초기화 (빈 경로에서 시작)')
-    passScheduleStore.clearTrackingPaths()
-    // ✅ 차트 풀의 경로도 초기화
+    // 추적 시작 시 - 경로 초기화는 passScheduleTrackingState watch에서 처리
+    console.log('🚀 추적 시작 - passScheduleTrackingState watch에서 경로 초기화 예정')
+    // ✅ clearTrackingPaths() 제거 - TRACKING 전환 시 fallback 체인으로 초기화
+    // ✅ 차트 풀의 경로만 초기화
     passChartPool.updateTrackingPath([])
     passChartPool.updatePredictedPath([])
     // ✅ 경로 길이 추적 변수 초기화
@@ -450,6 +455,67 @@ watch([() => icdStore.currentTrackingMstId, () => icdStore.currentTrackingDetail
     }
   }
 }, { immediate: true })
+
+// ✅ PassSchedule 추적 상태 변경 감지 (Ephemeris 패턴 적용 - (0,0) 점프 방지)
+watch(() => icdStore.passScheduleTrackingState, (newState, oldState) => {
+  console.log('🔄 PassSchedule 추적 상태 변경:', oldState, '→', newState)
+
+  // ✅ TRACKING으로 전환될 때만 경로 초기화 (fallback 체인 적용)
+  if (newState === 'TRACKING' && oldState !== 'TRACKING') {
+    // ✅ 하드웨어 초기값 튀는 현상 방지: 프레임 카운터 리셋
+    trackingFrameCount = 0
+    isTrackingInitPhase = true
+    console.log('🚀 PassSchedule 추적 시작 - 초기 프레임 스킵 활성화 (5프레임)')
+
+    // ✅ FIX: fallback 체인 - (0,0) 점프 방지
+    const normalAz = parseFloat(icdStore.azimuthAngle)
+    const normalEl = parseFloat(icdStore.elevationAngle)
+    const trackingActualAz = parseFloat(icdStore.trackingActualAzimuthAngle)
+    const trackingActualEl = parseFloat(icdStore.trackingActualElevationAngle)
+    const trackingCmdAz = parseFloat(icdStore.trackingCMDAzimuthAngle)
+    const trackingCmdEl = parseFloat(icdStore.trackingCMDElevationAngle)
+
+    // ✅ 유효한 값 판별 함수 (0이 아니고 NaN이 아닌 값)
+    const isValidAngle = (val: number) => !isNaN(val) && val !== 0
+
+    // ✅ Azimuth fallback 체인: actualAngle > trackingActual > trackingCMD
+    let currentAzimuth = 0
+    if (isValidAngle(normalAz)) {
+      currentAzimuth = normalAz
+    } else if (isValidAngle(trackingActualAz)) {
+      currentAzimuth = trackingActualAz
+    } else if (isValidAngle(trackingCmdAz)) {
+      currentAzimuth = trackingCmdAz
+    }
+
+    // ✅ Elevation fallback 체인
+    let currentElevation = 0
+    if (isValidAngle(normalEl)) {
+      currentElevation = normalEl
+    } else if (isValidAngle(trackingActualEl)) {
+      currentElevation = trackingActualEl
+    } else if (isValidAngle(trackingCmdEl)) {
+      currentElevation = trackingCmdEl
+    }
+
+    // ✅ (0,0)이 아닌 경우에만 경로 초기화
+    if (currentAzimuth !== 0 || currentElevation !== 0) {
+      passScheduleStore.clearTrackingPathsWithPosition(currentAzimuth, currentElevation)
+      console.log('🧹 PassSchedule 추적 시작 - 경로 초기화 완료:', {
+        azimuth: currentAzimuth,
+        elevation: currentElevation,
+      })
+    } else {
+      console.warn('⚠️ PassSchedule 추적 시작 - 유효한 초기 위치 없음, 빈 경로로 시작')
+      passScheduleStore.clearTrackingPathsWithPosition(0, 0)
+    }
+  }
+
+  // ✅ IDLE 전환 시 경로 초기화 (추적 종료)
+  if (newState === 'IDLE' && oldState !== null && oldState !== 'IDLE') {
+    console.log('🧹 PassSchedule IDLE 상태 전환 - 경로 유지')
+  }
+})
 
 watch([() => icdStore.nextTrackingMstId, () => icdStore.nextTrackingDetailId], ([newMstId, newDetailId], [oldMstId, oldDetailId]) => {
   console.log(`🔄 nextTrackingMstId/detailId 변경 감지: ${oldMstId}/${oldDetailId} → ${newMstId}/${newDetailId}`)
@@ -1728,6 +1794,19 @@ const updateChartWithPerformanceMonitoring = () => {
     // COMPLETED, IDLE, WAITING, PREPARING 상태에서는 일반 각도 값 사용
     const trackingState = icdStore.passScheduleTrackingState
     const isActuallyTracking = trackingState === 'TRACKING'
+
+    // ✅ 하드웨어 초기값 튀는 현상 방지: 추적 시작 시 초기 프레임 스킵
+    if (isTrackingInitPhase && isActuallyTracking) {
+      trackingFrameCount++
+      if (trackingFrameCount <= INITIAL_FRAMES_TO_SKIP) {
+        console.log(`⏭️ PassSchedule 초기 프레임 스킵 중... (${trackingFrameCount}/${INITIAL_FRAMES_TO_SKIP})`)
+        return  // 차트 업데이트 스킵
+      } else {
+        // 초기 단계 종료
+        isTrackingInitPhase = false
+        console.log('✅ PassSchedule 초기 프레임 스킵 완료 - 정상 추적 시작')
+      }
+    }
 
     // ✅ 기본값: 일반 각도 값 (안테나 실제 위치)
     let azimuth = parseFloat(icdStore.azimuthAngle) || 0

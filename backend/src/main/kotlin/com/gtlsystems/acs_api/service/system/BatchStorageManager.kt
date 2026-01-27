@@ -36,18 +36,22 @@ class BatchStorageManager(
 ) {
     private val logger = LoggerFactory.getLogger(BatchStorageManager::class.java)
     
-    // ✅ 배치 설정 (SettingsService에서 로드)
-    private val batchSize: Int get() = settingsService.systemStorageBatchSize
-    private val batchTimeoutMs: Long get() = settingsService.systemStorageSaveInterval
-    private val maxBatchSize: Int get() = settingsService.systemStorageBatchSize
-    
+    // ✅ 배치 설정 (SettingsService에서 동적으로 읽음)
+    private val batchSize: Int = 50  // 50개 모이면 저장
+    private val maxBatchSize: Int = 100  // 최대 100개
+
+    // ✅ 동적 설정값 (재설정 가능)
+    @Volatile
+    private var currentSaveInterval: Long = 5000L  // 기본값 5초
+
     // ✅ 배치 데이터 관리
     private val batchBuffer = mutableListOf<Map<String, Any?>>()
     private var batchExecutor: ExecutorService? = null
     private var lastBatchTime = System.currentTimeMillis()
-    
+
     // ✅ 배치 저장 스케줄러
     private var batchScheduler: java.util.concurrent.ScheduledExecutorService? = null
+    private var currentScheduledTask: java.util.concurrent.ScheduledFuture<*>? = null
     
     // ✅ 실시간 추적 데이터 리스트 (기존과 동일)
     private val realtimeTrackingDataList = mutableListOf<Map<String, Any?>>()
@@ -56,18 +60,59 @@ class BatchStorageManager(
     @PostConstruct
     fun init() {
         loggingService.logSystemStart("BatchStorageManager", "1.0.0")
-        
+
         // ✅ 지연 초기화로 의존성 주입 문제 해결
         batchExecutor = threadManager.getBatchExecutor()
         batchScheduler = threadManager.getRealtimeExecutor()
-        
-        // ✅ 주기적 배치 저장 스케줄링 (SettingsService에서 간격 로드)
-        val saveInterval = settingsService.systemStorageSaveInterval
-        batchScheduler?.scheduleAtFixedRate({
+
+        // ✅ SettingsService에서 저장 간격 읽기 (기본값 5000ms)
+        currentSaveInterval = settingsService.systemStorageSaveInterval.coerceIn(1000L, 30000L)
+
+        // ✅ 주기적 배치 저장 스케줄링
+        schedulePeriodicBatch(currentSaveInterval)
+
+        logger.info("✅ 배치 저장 관리자 초기화 완료 - 배치 크기: {}, 스케줄러 간격: {}ms", batchSize, currentSaveInterval)
+    }
+
+    /**
+     * ✅ 배치 저장 간격 동적 변경
+     * 프론트엔드에서 설정 변경 시 호출
+     *
+     * @param newIntervalMs 새로운 저장 간격 (1000ms ~ 30000ms)
+     */
+    fun updateSaveInterval(newIntervalMs: Long) {
+        val validatedInterval = newIntervalMs.coerceIn(1000L, 30000L)
+
+        if (validatedInterval == currentSaveInterval) {
+            logger.info("📋 배치 저장 간격 변경 없음: {}ms", validatedInterval)
+            return
+        }
+
+        val oldInterval = currentSaveInterval
+        currentSaveInterval = validatedInterval
+
+        // 기존 스케줄 취소 및 새 스케줄 등록
+        schedulePeriodicBatch(validatedInterval)
+
+        logger.info("✅ 배치 저장 간격 변경: {}ms → {}ms", oldInterval, validatedInterval)
+    }
+
+    /**
+     * ✅ 현재 배치 저장 간격 조회
+     */
+    fun getCurrentSaveInterval(): Long = currentSaveInterval
+
+    /**
+     * ✅ 주기적 배치 저장 스케줄링
+     */
+    private fun schedulePeriodicBatch(intervalMs: Long) {
+        // 기존 스케줄 취소
+        currentScheduledTask?.cancel(false)
+
+        // 새 스케줄 등록
+        currentScheduledTask = batchScheduler?.scheduleAtFixedRate({
             processBatch()
-        }, saveInterval, saveInterval, TimeUnit.MILLISECONDS)
-        
-        logger.info("✅ 배치 저장 관리자 초기화 완료 - 배치 크기: {}, 타임아웃: {}ms", batchSize, batchTimeoutMs)
+        }, intervalMs, intervalMs, TimeUnit.MILLISECONDS)
     }
     
     /**
@@ -80,8 +125,8 @@ class BatchStorageManager(
             batchBuffer.add(data)
             
             // ✅ 배치 크기 또는 시간 조건 확인
-            if (batchBuffer.size >= batchSize || 
-                (System.currentTimeMillis() - lastBatchTime) >= batchTimeoutMs) {
+            if (batchBuffer.size >= batchSize ||
+                (System.currentTimeMillis() - lastBatchTime) >= currentSaveInterval) {
                 processBatch()
             }
         }
@@ -99,8 +144,8 @@ class BatchStorageManager(
             val timeElapsed = currentTime - lastBatchTime
             
             // ✅ 배치 조건 확인
-            val shouldProcess = batchBuffer.size >= batchSize || 
-                              timeElapsed >= batchTimeoutMs ||
+            val shouldProcess = batchBuffer.size >= batchSize ||
+                              timeElapsed >= currentSaveInterval ||
                               batchBuffer.size >= maxBatchSize
             
             if (!shouldProcess) return

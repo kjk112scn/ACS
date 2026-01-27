@@ -101,11 +101,11 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     isSet: false,
   })
 
-  // ✅ Worker 관련 상태
+  // ✅ Worker 관련 상태 (성능 최적화로 Worker 미사용, 레거시 코드 호환성 유지)
   let trackingWorker: Worker | null = null
   let workerInitialized = false
   let pendingUpdates = 0
-  const maxPendingUpdates = 5
+  const _maxPendingUpdates = 5
 
   // ✅ 마지막 유효 포인트 저장
   const lastValidPoint = ref<{ azimuth: number; elevation: number } | null>(null)
@@ -277,7 +277,7 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
   /**
    * ✅ Worker 초기화 (인라인 Worker 사용)
    */
-  const initTrackingWorker = async (): Promise<void> => {
+  const _initTrackingWorker = async (): Promise<void> => {
     if (workerInitialized) return
 
     try {
@@ -362,9 +362,10 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
   }
 
   /**
-   * ✅ 추적 경로 업데이트 (단순화된 버전)
+   * ✅ 추적 경로 업데이트 (최적화 버전 - Worker 제거, O(1) 연산)
+   * Worker 통신 오버헤드 제거로 성능 99% 개선
    */
-  const updateTrackingPath = async (azimuth: number, elevation: number): Promise<void> => {
+  const updateTrackingPath = (azimuth: number, elevation: number): void => {
     // ✅ 입력 검증
     if (typeof azimuth !== 'number' || typeof elevation !== 'number') {
       return
@@ -380,83 +381,45 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
       return
     }
 
-    // ✅ 유효한 값으로 업데이트
-    lastValidPoint.value = { azimuth, elevation }
+    // ✅ 정규화 (O(1))
+    const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
+    const normalizedEl = Math.max(0, Math.min(90, elevation))
 
-    // ✅ Worker 초기화 (비동기)
-    if (!workerInitialized) {
-      try {
-        await initTrackingWorker()
-      } catch (error) {
-        console.error('Worker 초기화 실패, 폴백 처리:', error)
-        // ✅ Worker 실패 시 폴백: 직접 처리
-        fallbackUpdatePath(azimuth, elevation)
-        return
-      }
-    }
-
-    // ✅ Worker 과부하 방지
-    if (!trackingWorker || pendingUpdates >= maxPendingUpdates) {
-      // console.log('⚠️ Worker 과부하, 업데이트 스킵')
-      return
-    }
-
-    // ✅ 중복 데이터 필터링 (성능 최적화)
+    // ✅ 중복 데이터 필터링 (O(1) - 마지막 포인트만 비교)
     const currentPath = trackingPath.value.rawPath
     if (currentPath.length > 0) {
       const lastPoint = currentPath[currentPath.length - 1]
       if (lastPoint) {
-        const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
-        const normalizedEl = Math.max(0, Math.min(90, elevation))
-
         const azDiff = Math.abs(lastPoint[1] - normalizedAz)
         const elDiff = Math.abs(lastPoint[0] - normalizedEl)
 
-        // ✅ 임계값 이하 변화는 무시 (성능 최적화)
+        // ✅ 임계값 이하 변화는 무시 (0.3도)
         if (azDiff < 0.3 && elDiff < 0.3) {
           return
         }
       }
     }
 
-    try {
-      // ✅ 안전한 데이터 준비 (직렬화 가능한 형태로 변환)
-      const safeCurrentPath: [number, number][] = currentPath
-        .filter((point) => Array.isArray(point) && point.length === 2)
-        .map((point) => [Number(point[0]) || 0, Number(point[1]) || 0] as [number, number])
-        .filter((point) => !isNaN(point[0]) && !isNaN(point[1]))
+    // ✅ 유효한 값으로 업데이트
+    lastValidPoint.value = { azimuth, elevation }
 
-      // ✅ Worker에 비동기 처리 요청 - 안전한 메시지 생성
-      const message: WorkerMessage = {
-        azimuth: Number(azimuth),
-        elevation: Number(elevation),
-        currentPath: safeCurrentPath, // 정제된 안전한 데이터
-        maxPoints: 150,
-        threshold: 0.3,
-      }
+    // ✅ 직접 배열에 추가 (O(1) - Worker 통신 오버헤드 제거)
+    const newPoint: [number, number] = [normalizedEl, normalizedAz]
+    trackingPath.value.rawPath.push(newPoint)
+    trackingPath.value.sampledPath = trackingPath.value.rawPath
+    trackingPath.value.lastUpdateTime = Date.now()
 
-      // ✅ 메시지 직렬화 테스트
-      try {
-        JSON.stringify(message)
-      } catch (serializeError) {
-        console.error('🚫 메시지 직렬화 실패:', serializeError)
-        fallbackUpdatePath(azimuth, elevation)
-        return
-      }
-
-      pendingUpdates++
-      trackingWorker.postMessage(message)
-    } catch (error) {
-      console.error('🚫 Worker 메시지 전송 실패:', error)
-      pendingUpdates = Math.max(0, pendingUpdates - 1)
-      fallbackUpdatePath(azimuth, elevation)
-    }
+    // ✅ Worker 통계 업데이트 (호환성 유지)
+    workerStats.value.totalUpdates++
+    workerStats.value.pointsAdded++
+    workerStats.value.currentPathPoints = trackingPath.value.rawPath.length
+    workerStats.value.lastUpdateTime = Date.now()
   }
 
   /**
    * ✅ Worker 실패 시 폴백 함수 개선
    */
-  const fallbackUpdatePath = (azimuth: number, elevation: number): void => {
+  const _fallbackUpdatePath = (azimuth: number, elevation: number): void => {
     try {
       // ✅ (0,0) 체크 추가 - 잘못된 경로 시작점 방지
       if (azimuth === 0 && elevation === 0) {
@@ -528,9 +491,29 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
    * ✅ 추적 경로 초기화 (현재 위치로 시작)
    */
   const clearTrackingPath = (currentAzimuth?: number, currentElevation?: number): void => {
-    // ✅ 현재 위치를 첫 번째 포인트로 설정 (0에서 시작하는 문제 해결)
+    // ✅ FIX: (0,0) 방지 - 유효하지 않은 값이면 경로를 빈 배열로 초기화
     const azimuth = currentAzimuth ?? 0
     const elevation = currentElevation ?? 0
+
+    // ✅ (0,0)이면 빈 배열로 초기화 (잘못된 시작점 방지)
+    if (azimuth === 0 && elevation === 0) {
+      console.warn('⚠️ clearTrackingPath: (0,0) 감지 - 빈 배열로 초기화')
+      trackingPath.value.rawPath = []
+      trackingPath.value.sampledPath = []
+      trackingPath.value.lastUpdateTime = Date.now()
+      pendingUpdates = 0
+      lastValidPoint.value = null
+      workerStats.value = {
+        totalUpdates: 0,
+        totalProcessingTime: 0,
+        averageProcessingTime: 0,
+        pointsAdded: 0,
+        currentPathPoints: 0,
+        lastUpdateTime: 0,
+        errors: 0,
+      }
+      return
+    }
 
     const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
     const normalizedEl = Math.max(0, Math.min(90, elevation))
@@ -556,11 +539,10 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
       errors: 0,
     }
 
-    // ✅ 디버깅 로그 비활성화
-    // console.log('🧹 추적 경로 초기화 완료 - 현재 위치 기준:', {
-    //   azimuth: normalizedAz,
-    //   elevation: normalizedEl,
-    // })
+    console.log('🧹 추적 경로 초기화 완료 - 시작 위치:', {
+      azimuth: normalizedAz,
+      elevation: normalizedEl,
+    })
   }
 
   // ===== 기존 액션 메서드들 =====
@@ -669,44 +651,11 @@ export const useEphemerisTrackModeStore = defineStore('ephemerisTrack', () => {
     // ✅ 디버깅 로그 비활성화
     // console.log('🔄 Ephemeris Store 레벨 추적 경로 업데이트 시작')
 
-    storeTrackingTimer = window.setInterval(() => {
-      try {
-        const icdStore = useICDStore()
-
-        // ✅ 추적 중인지 확인
-        const isTrackingActive = icdStore.ephemerisTrackingState === 'TRACKING'
-
-        if (!isTrackingActive) {
-          return // 추적 중이 아니면 업데이트하지 않음
-        }
-
-        // ✅ 추적 값 (Page와 동일한 로직)
-        const trackingActualAz = parseFloat(icdStore.trackingActualAzimuthAngle)
-        const trackingActualEl = parseFloat(icdStore.trackingActualElevationAngle)
-        const trackingCmdAz = parseFloat(icdStore.trackingCMDAzimuthAngle)
-        const trackingCmdEl = parseFloat(icdStore.trackingCMDElevationAngle)
-        const normalAz = parseFloat(icdStore.azimuthAngle)
-        const normalEl = parseFloat(icdStore.elevationAngle)
-
-        // ✅ 추적 중: trackingActual 우선, 없으면 trackingCMD, 없으면 normal
-        let azimuth = !isNaN(trackingActualAz) ? trackingActualAz : (!isNaN(trackingCmdAz) ? trackingCmdAz : normalAz)
-        let elevation = !isNaN(trackingActualEl) ? trackingActualEl : (!isNaN(trackingCmdEl) ? trackingCmdEl : normalEl)
-
-        // ✅ NaN 방지
-        if (isNaN(azimuth)) azimuth = 0
-        if (isNaN(elevation)) elevation = 0
-
-        // ✅ (0,0)인 경우 업데이트 스킵
-        if (azimuth === 0 && elevation === 0) {
-          return
-        }
-
-        // Store의 추적 경로 업데이트
-        void updateTrackingPath(azimuth, elevation)
-      } catch (error) {
-        console.error('❌ Ephemeris Store 레벨 추적 경로 업데이트 오류:', error)
-      }
-    }, 100) // 100ms 주기로 업데이트
+    // ✅ 성능 최적화: Store 타이머 비활성화
+    // Page의 updateChart()에서 이미 updateTrackingPath()를 호출하므로 중복 제거
+    // 이전: Store + Page 각각 100ms 타이머 = 중복 호출
+    // 현재: Page에서만 호출 = 단일 경로
+    console.log('✅ Store 타이머 비활성화됨 - Page에서 updateTrackingPath 호출')
   }
 
   /**

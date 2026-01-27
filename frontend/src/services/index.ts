@@ -18,4 +18,5 @@ export type {
   TimeOffsetLimitsSettings,
   AngleOffsetLimitsSettings,
   AlgorithmSettings,
+  StorageSettings,
 } from './api/settingsService'

@@ -1203,7 +1203,7 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
     }
   }
 
-  const fetchScheduleDataFromServer = async (forceRefresh = false): Promise<boolean> => {
+  const fetchScheduleDataFromServer = async (_forceRefresh = false): Promise<boolean> => {
     try {
       // ✅ FIX #B001: localStorage 캐시 우선 로직 제거
       // - 항상 BE API 호출하여 최신 데이터 가져옴
@@ -1753,6 +1753,42 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
     // ✅ 점프 방지용 이전 값 초기화
     lastValidPoint.value = null
     console.log('✅ 실시간 추적 경로만 초기화 완료')
+  }
+
+  /**
+   * ✅ 추적 경로 초기화 (현재 위치로 시작) - Ephemeris 패턴 적용
+   * (0,0) 점프 방지를 위해 유효한 시작 위치 설정
+   */
+  const clearTrackingPathsWithPosition = (
+    currentAzimuth?: number,
+    currentElevation?: number,
+  ): void => {
+    const azimuth = currentAzimuth ?? 0
+    const elevation = currentElevation ?? 0
+
+    // ✅ (0,0)이면 빈 배열로 초기화 (잘못된 시작점 방지)
+    if (azimuth === 0 && elevation === 0) {
+      console.warn('⚠️ clearTrackingPathsWithPosition: (0,0) 감지 - 빈 배열로 초기화')
+      actualTrackingPath.value = []
+      lastValidPoint.value = null
+      currentTrackingPosition.value = { azimuth: 0, elevation: 0 }
+      return
+    }
+
+    // ✅ 유효한 시작 위치로 초기화
+    const normalizedAz = azimuth < 0 ? azimuth + 360 : azimuth
+    const normalizedEl = Math.max(0, Math.min(90, elevation))
+
+    // ✅ 시작점 설정 (Ephemeris와 동일한 [el, az] 순서)
+    const initialPoint: [number, number] = [normalizedEl, normalizedAz]
+    actualTrackingPath.value = [initialPoint]
+    lastValidPoint.value = { azimuth: normalizedAz, elevation: normalizedEl }
+    currentTrackingPosition.value = { azimuth: normalizedAz, elevation: normalizedEl }
+
+    console.log('🧹 PassSchedule 추적 경로 초기화 완료 - 시작 위치:', {
+      azimuth: normalizedAz,
+      elevation: normalizedEl,
+    })
   }
 
   // 🆕 현재 위치 업데이트
@@ -2436,6 +2472,7 @@ export const usePassScheduleModeStore = defineStore('passSchedule', () => {
     setPredictedTrackingPath,
     updateActualTrackingPath,
     clearTrackingPaths,
+    clearTrackingPathsWithPosition, // ✅ (0,0) 점프 방지 + 시작 위치 설정
     clearActualTrackingPath, // ✅ 실시간 추적 경로만 초기화
     updateCurrentPosition,
     updateOffsetValues,

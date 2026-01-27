@@ -21,7 +21,7 @@
 
                   <div class="text-subtitle2">Target Position</div>
                   <q-input v-model="pedestalStore.targetPositions.azimuth" outlined dense type="number" suffix="°"
-                    :disable="!pedestalStore.selectedAxes.azimuth" min="-360" max="360" step="0.01"
+                    :disable="!pedestalStore.selectedAxes.azimuth" :min="angleLimits.azimuthMin" :max="angleLimits.azimuthMax" step="0.01"
                     @update:model-value="formatTargetPosition('azimuth')" class="q-mb-sm" />
 
                   <div class="text-subtitle2">Target Speed</div>
@@ -49,7 +49,7 @@
 
                   <div class="text-subtitle2">Target Position</div>
                   <q-input v-model="pedestalStore.targetPositions.elevation" outlined dense type="number" suffix="°"
-                    :disable="!pedestalStore.selectedAxes.elevation" min="-360" max="360" step="0.01"
+                    :disable="!pedestalStore.selectedAxes.elevation" :min="angleLimits.elevationMin" :max="angleLimits.elevationMax" step="0.01"
                     @update:model-value="formatTargetPosition('elevation')" class="q-mb-sm" />
 
                   <div class="text-subtitle2">Target Speed</div>
@@ -76,7 +76,7 @@
 
                   <div class="text-subtitle2">Target Position</div>
                   <q-input v-model="pedestalStore.targetPositions.train" outlined dense type="number" suffix="°"
-                    :disable="!pedestalStore.selectedAxes.train" min="-360" max="360" step="0.01"
+                    :disable="!pedestalStore.selectedAxes.train" :min="angleLimits.trainMin" :max="angleLimits.trainMax" step="0.01"
                     @update:model-value="formatTargetPosition('train')" class="q-mb-sm" />
 
                   <div class="text-subtitle2">Target Speed</div>
@@ -112,15 +112,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { useICDStore } from '../../stores/icd/icdStore'
-import { usePedestalPositionModeStore } from '@/stores'
+import { usePedestalPositionModeStore, useAngleLimitsSettingsStore } from '@/stores'
 import { useNotification } from '@/composables/useNotification'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 import { ControlButtonBar } from '@/components/common'
 
 const icdStore = useICDStore()
 const pedestalStore = usePedestalPositionModeStore()
+const angleLimitsStore = useAngleLimitsSettingsStore()
+
+// 각도 제한 설정 (설정과 연동)
+const angleLimits = computed(() => angleLimitsStore.angleLimitsSettings)
 const { success } = useNotification()
 const { handleApiError } = useErrorHandler()
 
@@ -144,9 +148,13 @@ const formatTargetPosition = (axis: 'azimuth' | 'elevation' | 'train') => {
     value = 0
   }
 
-  if (axis === 'elevation' && value < 0) {
-    value = 0
+  // 설정의 각도 제한값으로 클램핑
+  const limits = {
+    azimuth: { min: angleLimits.value.azimuthMin, max: angleLimits.value.azimuthMax },
+    elevation: { min: angleLimits.value.elevationMin, max: angleLimits.value.elevationMax },
+    train: { min: angleLimits.value.trainMin, max: angleLimits.value.trainMax },
   }
+  value = Math.max(limits[axis].min, Math.min(limits[axis].max, value))
 
   pedestalStore.updateTargetPosition(axis, value.toFixed(2))
 }
@@ -186,7 +194,12 @@ watch(
   },
 )
 
-onMounted(() => {
+onMounted(async () => {
+  // 각도 제한 설정 로드 (항상 최신 값 확인)
+  if (!angleLimitsStore.isLoading) {
+    await angleLimitsStore.loadAngleLimitsSettings()
+  }
+
   if (icdStore.azimuthAngle) {
     currentPositions.value.azimuth = parseFloat(icdStore.azimuthAngle).toFixed(2)
   }

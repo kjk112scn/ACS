@@ -2,7 +2,7 @@
 
 > **새 세션 시작 시:** "CURRENT_STATUS.md 읽고 이어서 진행해줘" 또는 `/status`
 
-**마지막 업데이트:** 2026-01-26 (PassSchedule 상태머신 버그픽스 완료)
+**마지막 업데이트:** 2026-01-27 (Settings 리팩토링 + Ephemeris 개선 + 시스템 리뷰 완료)
 
 ---
 
@@ -243,7 +243,7 @@
 
 ---
 
-### UDP 패킷 지연 개선 (P3) - 기능 안정화 후
+### UDP 패킷 지연 개선 (P6) - 기능 안정화 후
 - **상태:** 📋 분석/계획 완료, 실행 대기
 - **Review ID:** #R001
 - **문서:** `docs/work/active/Review_UDP_PacketDelay/`
@@ -277,6 +277,76 @@
 
 **실행 조건:** 핵심 기능 안정화 후 수행
 **실행 방법:** `/bugfix #R001-C1` → Phase A부터 순차 실행
+
+---
+
+### Settings 시스템 정리 (P4) - #R-SETTINGS ⭐ NEW
+- **상태:** 📋 리뷰 완료, 수정 대기
+- **Review ID:** #R-SETTINGS (R002 + R003 통합)
+- **문서:** `docs/work/active/Settings_Validation/UNIFIED_REVIEW.md`
+- **발견 이슈:** 24건 (Critical 6, High 7, Medium 11)
+- **종합 점수:** 66/100
+
+**핵심 문제:** 67개 설정 중 37개(56%) 미사용, Store 이중화, 검증 누락
+
+| Issue ID | 심각도 | 문제 | 수정 파일 |
+|----------|:------:|------|----------|
+| **C-01** | 🔴 | Store 이중화 (2개 존재) | `api/settingsStore.ts` (삭제) |
+| **C-02** | 🔴 | Feed JSON 직렬화 불일치 | `SettingsService.kt`, `settingsService.ts:410` |
+| **C-03** | 🔴 | preparationTimeMinutes DTO 누락 | `TrackingRequest.kt` |
+| **C-04** | 🔴 | 명령 검증 로직 없음 | `TrackingService.kt` |
+| **C-05** | 🔴 | 연결 설정 저장 없음 | `SettingsModal.vue:193` |
+| **C-06** | 🔴 | 37개 설정 미사용 | `SettingsService.kt` |
+| **H-03** | 🟠 | console.log 351개 | `stores/*.ts` |
+
+**수정 파일 (급한 순서):**
+1. `frontend/src/stores/api/settingsStore.ts` - **삭제** (C-01)
+2. `backend/.../dto/TrackingRequest.kt` - 필드 추가 (C-03)
+3. `backend/.../service/SettingsService.kt` - Feed 직렬화 수정 (C-02)
+4. `backend/.../service/TrackingService.kt` - validateCommand 추가 (C-04)
+5. `frontend/.../SettingsModal.vue:193` - 저장 로직 추가 (C-05)
+
+**실행 방법:**
+```bash
+/refactor C-01   # Store 이중화 제거
+/bugfix C-02     # Feed JSON 직렬화
+/bugfix C-03     # preparationTimeMinutes DTO
+```
+
+---
+
+### Theme Light/Dark Mode 개선 (P5) - #R002
+- **상태:** 📋 리뷰 완료, 수정 대기
+- **Review ID:** #R002
+- **문서:** `docs/work/active/Review_Theme_LightDark/REVIEW.md`
+- **발견 이슈:** 267건 (Critical 2, High 12, Medium 35+)
+
+**핵심 문제:** 라이트모드에서 모드 탭 텍스트 안 보임
+
+| Issue ID | 심각도 | 문제 | 파일:라인 |
+|----------|:------:|------|----------|
+| **#R002-C1** | 🔴 | `active-color="white"` 하드코딩 | `DashboardPage.vue:265` |
+| **#R002-C2** | 🔴 | 라이트모드 변수 35개 누락 | `theme-variables.scss` |
+| #R002-H1 | 🟠 | hover 배경 `rgba(255,255,255,0.04)` | `DashboardPage.vue:2529-2532` |
+| #R002-H2~H12 | 🟠 | 하드코딩 색상 267건 | 10개 파일 |
+
+**수정 필요 파일 (우선순위순):**
+
+| 순위 | 파일 | 위반 | 주요 문제 |
+|:----:|------|:----:|----------|
+| 1 | `frontend/src/pages/DashboardPage.vue` | 28+ | **모드 탭 + 텍스트** |
+| 2 | `frontend/src/css/theme-variables.scss` | - | 누락 변수 추가 |
+| 3 | `frontend/src/components/content/SelectScheduleContent.vue` | 45 | 테이블/탭 텍스트 |
+| 4 | `frontend/src/pages/mode/PassSchedulePage.vue` | 55 | 차트 + 상태 색상 |
+| 5 | `frontend/src/components/content/SystemInfoContent.vue` | 25 | LED + 헤더 |
+| 6 | `frontend/src/components/content/TLEUploadContent.vue` | 33 | 테이블 헤더 |
+| 7 | `frontend/src/components/content/AllStatusContent.vue` | 8 | LED 색상 |
+
+**실행 방법:**
+```bash
+/bugfix #R002-C1   # Critical 모드 탭 문제 즉시 수정
+/cleanup           # 하드코딩 색상 일괄 정리
+```
 
 ---
 

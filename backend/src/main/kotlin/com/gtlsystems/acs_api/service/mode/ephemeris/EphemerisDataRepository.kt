@@ -189,7 +189,9 @@ class EphemerisDataRepository(
             "EndElevation" to when (dataType) {
                 "final_transformed" -> session.finalEndElevation ?: session.endElevation
                 else -> session.endElevation
-            }
+            },
+            // ✅ P6 Fix: DB에서 로드 시 CreatedAt 필드 추가 (필터링 정상화)
+            "CreatedAt" to session.createdAt
         )
     }
 

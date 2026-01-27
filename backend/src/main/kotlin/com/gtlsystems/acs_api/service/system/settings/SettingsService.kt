@@ -131,7 +131,7 @@ class SettingsService(
 
         // 데이터 저장 설정
         "system.storage.batchSize" to SettingDefinition("system.storage.batchSize", 1000, SettingType.INTEGER, "배치 크기"),
-        "system.storage.saveInterval" to SettingDefinition("system.storage.saveInterval", 100L, SettingType.LONG, "저장 간격"),
+        "system.storage.saveInterval" to SettingDefinition("system.storage.saveInterval", 5000L, SettingType.LONG, "배치 저장 간격 (ms)"),
         "system.storage.progressLogInterval" to SettingDefinition("system.storage.progressLogInterval", 1000, SettingType.INTEGER, "진행률 로깅 간격"),
 
         // === 태양 추적 정확도 임계값 설정 ===

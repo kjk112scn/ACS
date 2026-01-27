@@ -724,6 +724,58 @@ class SettingsController(
     }
 
     /**
+     * Storage 설정 조회
+     */
+    @GetMapping("/storage")
+    @Operation(
+        operationId = "getStorage",
+        tags = ["System - Settings"]
+    )
+    fun getStorage(): Map<String, Any> {
+        return mapOf(
+            "system.storage.saveInterval" to settingsService.systemStorageSaveInterval
+        )
+    }
+
+    /**
+     * Storage 설정 변경
+     */
+    @PostMapping("/storage")
+    @Operation(
+        operationId = "setStorage",
+        tags = ["System - Settings"]
+    )
+    fun setStorage(
+        @Valid @RequestBody request: StorageRequest
+    ): ResponseEntity<Map<String, Any>> {
+        return try {
+            // 유효성 검사 (1초 ~ 30초)
+            val validatedInterval = request.saveInterval.coerceIn(1000L, 30000L)
+            settingsService.systemStorageSaveInterval = validatedInterval
+
+            logger.info("✅ Storage 설정 변경 완료: saveInterval = ${validatedInterval}ms")
+            ResponseEntity.ok(mapOf(
+                "status" to "success",
+                "message" to "Storage 설정이 성공적으로 변경되었습니다.",
+                "data" to mapOf(
+                    "saveInterval" to settingsService.systemStorageSaveInterval
+                )
+            ))
+        } catch (e: IllegalArgumentException) {
+            ResponseEntity.badRequest().body(mapOf(
+                "status" to "error",
+                "message" to "Storage 설정 변경 실패: ${e.message}"
+            ))
+        } catch (e: Exception) {
+            logger.error("Storage 설정 변경 중 오류 발생", e)
+            ResponseEntity.internalServerError().body(mapOf(
+                "status" to "error",
+                "message" to "Storage 설정 변경 중 서버 오류가 발생했습니다."
+            ))
+        }
+    }
+
+    /**
      * 전체 설정 조회
      */
     @GetMapping
@@ -863,4 +915,13 @@ data class StepSizeLimitRequest(
  */
 data class FeedRequest(
     val enabledBands: List<String>
+)
+
+/**
+ * Storage 설정 요청 데이터
+ */
+data class StorageRequest(
+    @field:DecimalMin(value = "1000", message = "저장 간격은 1000ms 이상이어야 합니다")
+    @field:DecimalMax(value = "30000", message = "저장 간격은 30000ms 이하여야 합니다")
+    val saveInterval: Long
 )

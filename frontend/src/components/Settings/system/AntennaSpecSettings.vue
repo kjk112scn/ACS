@@ -5,12 +5,9 @@
       <q-badge v-if="hasUnsavedChanges" color="orange" class="q-ml-sm">
         변경됨
       </q-badge>
-      <q-badge v-else-if="isSaved" color="green" class="q-ml-sm">
-        저장됨
-      </q-badge>
     </h5>
 
-    <q-form @submit="onSave" class="q-gutter-md">
+    <q-form class="q-gutter-md">
       <!-- True North Offset Angle 입력 -->
       <q-input v-model.number="localSettings.trueNorthOffsetAngle" label="True North Offset Angle (도)" type="number"
         :rules="offsetRules" outlined :loading="loadingStates.antennaSpec" hint="True North 기준 오프셋 각도" suffix="°" />
@@ -21,8 +18,6 @@
 
       <!-- 버튼들 -->
       <div class="row q-gutter-sm q-mt-md">
-        <q-btn type="submit" color="primary" label="저장" :loading="loadingStates.antennaSpec"
-          :disable="!isFormValid || !hasUnsavedChanges" icon="save" />
         <q-btn color="secondary" label="초기화" @click="onReset" :disable="loadingStates.antennaSpec" icon="refresh" />
       </div>
     </q-form>
@@ -35,13 +30,6 @@
       {{ errorStates.antennaSpec }}
     </q-banner>
 
-    <!-- 성공 메시지 -->
-    <q-banner v-if="successMessage" class="bg-positive text-white q-mt-md">
-      <template v-slot:avatar>
-        <q-icon name="check_circle" />
-      </template>
-      {{ successMessage }}
-    </q-banner>
   </div>
 </template>
 
@@ -81,11 +69,6 @@ const hasUnsavedChanges = computed(() => {
   return JSON.stringify(localSettings.value) !== JSON.stringify(originalSettings.value)
 })
 
-// 저장 상태
-const isSaved = ref(true)
-
-const successMessage = ref<string>('')
-
 // 유효성 검사 규칙
 const offsetRules = [
   (val: number) => val !== null && val !== undefined || 'True North Offset Angle은 필수입니다',
@@ -96,12 +79,6 @@ const tiltRules = [
   (val: number) => val !== null && val !== undefined || 'Tilt Angle은 필수입니다',
   (val: number) => val >= -90 && val <= 90 || 'Tilt Angle은 -90도 ~ 90도 범위여야 합니다'
 ]
-
-// 폼 유효성 검사
-const isFormValid = computed(() => {
-  return localSettings.value.trueNorthOffsetAngle >= -360 && localSettings.value.trueNorthOffsetAngle <= 360 &&
-    localSettings.value.tiltAngle >= -90 && localSettings.value.tiltAngle <= 90
-})
 
 // 변경사항 감지 watch - Store 상태 업데이트
 watch(
@@ -160,34 +137,6 @@ onMounted(async () => {
   }
 })
 
-// 저장 함수
-const onSave = async () => {
-  try {
-    await antennaSpecSettingsStore.saveAntennaSpecSettings(localSettings.value)
-
-    // 저장 성공 시 변경사항 상태 업데이트
-    updateChangeStatus(false)
-    originalSettings.value = { ...localSettings.value }
-    isSaved.value = true
-
-    successMessage.value = '안테나 사양 설정이 성공적으로 저장되었습니다'
-
-    // 3초 후 성공 메시지 숨기기
-    setTimeout(() => {
-      successMessage.value = ''
-    }, 3000)
-
-    $q.notify({
-      color: 'positive',
-      message: '안테나 사양 설정이 저장되었습니다',
-      icon: 'check',
-      position: 'top'
-    })
-  } catch (error) {
-    console.error('안테나 사양 설정 저장 실패:', error)
-  }
-}
-
 // 초기화 함수 - 서버에서 로드된 값으로 초기화
 const onReset = async () => {
   try {
@@ -195,7 +144,6 @@ const onReset = async () => {
     localSettings.value = { ...antennaSpecSettingsStore.antennaSpecSettings }
     originalSettings.value = { ...antennaSpecSettingsStore.antennaSpecSettings }
     updateChangeStatus(false)
-    isSaved.value = true
 
     $q.notify({
       color: 'info',

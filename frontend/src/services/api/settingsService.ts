@@ -76,6 +76,10 @@ export interface FeedSettings {
   enabledBands: string[]
 }
 
+export interface StorageSettings {
+  saveInterval: number  // 배치 저장 간격 (ms) - 1000 ~ 30000
+}
+
 class SettingsService {
   // 위치 설정
   async getLocationSettings(): Promise<LocationSettings> {
@@ -456,6 +460,29 @@ class SettingsService {
       } else {
         console.error('❌ Feed 설정 저장 실패:', error)
       }
+      throw error
+    }
+  }
+
+  // Storage 설정 (배치 저장 간격)
+  async getStorageSettings(): Promise<StorageSettings> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/settings/storage`)
+      const data = response.data
+      return {
+        saveInterval: data['system.storage.saveInterval'] || 5000,
+      }
+    } catch (error) {
+      console.error('Storage 설정 조회 실패:', error)
+      throw error
+    }
+  }
+
+  async setStorageSettings(settings: StorageSettings): Promise<void> {
+    try {
+      await axios.post(`${API_BASE_URL}/settings/storage`, settings)
+    } catch (error) {
+      console.error('Storage 설정 저장 실패:', error)
       throw error
     }
   }

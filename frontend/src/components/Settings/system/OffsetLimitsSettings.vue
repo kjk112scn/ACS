@@ -5,9 +5,6 @@
       <q-badge v-if="hasUnsavedChanges" color="orange" class="q-ml-sm">
         변경됨
       </q-badge>
-      <q-badge v-else-if="isSaved" color="green" class="q-ml-sm">
-        저장됨
-      </q-badge>
     </h5>
 
     <q-tabs v-model="activeTab" class="text-primary">
@@ -18,7 +15,7 @@
     <q-tab-panels v-model="activeTab" animated>
       <!-- 각도 오프셋 설정 -->
       <q-tab-panel name="angle">
-        <q-form @submit="onSaveAngleOffset" class="q-gutter-md">
+        <q-form class="q-gutter-md">
           <q-input v-model.number="localAngleOffsetSettings.azimuth" label="Azimuth 오프셋 제한 (도)" type="number"
             :rules="angleOffsetRules" outlined :loading="loadingStates.offsetLimits" hint="방위각 오프셋의 최대 제한값"
             suffix="°" />
@@ -32,8 +29,6 @@
             suffix="°" />
 
           <div class="row q-gutter-sm q-mt-md">
-            <q-btn type="submit" color="primary" label="각도 오프셋 저장" :loading="loadingStates.offsetLimits"
-              :disable="!isAngleOffsetFormValid || !hasUnsavedChangesAngle" icon="save" />
             <q-btn color="secondary" label="각도 오프셋 초기화" @click="onResetAngleOffset"
               :disable="loadingStates.offsetLimits" icon="refresh" />
           </div>
@@ -42,7 +37,7 @@
 
       <!-- 시간 오프셋 설정 -->
       <q-tab-panel name="time">
-        <q-form @submit="onSaveTimeOffset" class="q-gutter-md">
+        <q-form class="q-gutter-md">
           <q-input v-model.number="localTimeOffsetSettings.min" label="시간 오프셋 최소값 (초)" type="number"
             :rules="timeOffsetMinRules" outlined :loading="loadingStates.offsetLimits" hint="시간 오프셋의 최소 제한값"
             suffix="초" />
@@ -52,8 +47,6 @@
             suffix="초" />
 
           <div class="row q-gutter-sm q-mt-md">
-            <q-btn type="submit" color="primary" label="시간 오프셋 저장" :loading="loadingStates.offsetLimits"
-              :disable="!isTimeOffsetFormValid || !hasUnsavedChangesTime" icon="save" />
             <q-btn color="secondary" label="시간 오프셋 초기화" @click="onResetTimeOffset" :disable="loadingStates.offsetLimits"
               icon="refresh" />
           </div>
@@ -69,13 +62,6 @@
       {{ errorStates.offsetLimits }}
     </q-banner>
 
-    <!-- 성공 메시지 -->
-    <q-banner v-if="successMessage" class="bg-positive text-white q-mt-md">
-      <template v-slot:avatar>
-        <q-icon name="check_circle" />
-      </template>
-      {{ successMessage }}
-    </q-banner>
   </div>
 </template>
 
@@ -146,11 +132,6 @@ const hasUnsavedChanges = computed(() => {
   return hasUnsavedChangesAngle.value || hasUnsavedChangesTime.value
 })
 
-// 저장 상태
-const isSaved = ref(true)
-
-const successMessage = ref<string>('')
-
 // 유효성 검사 규칙
 const angleOffsetRules = [
   (val: number) => val !== null && val !== undefined || '오프셋 제한값은 필수입니다',
@@ -170,19 +151,6 @@ const timeOffsetMaxRules = [
   (val: number) => val <= 100000 || '시간 오프셋 최대값은 100000초 이하여야 합니다',
   (val: number) => val >= localTimeOffsetSettings.value.min || '시간 오프셋 최대값은 최소값보다 크거나 같아야 합니다'
 ]
-
-// 폼 유효성 검사
-const isAngleOffsetFormValid = computed(() => {
-  return localAngleOffsetSettings.value.azimuth > 0 && localAngleOffsetSettings.value.azimuth <= 360 &&
-    localAngleOffsetSettings.value.elevation > 0 && localAngleOffsetSettings.value.elevation <= 360 &&
-    localAngleOffsetSettings.value.train > 0 && localAngleOffsetSettings.value.train <= 360
-})
-
-const isTimeOffsetFormValid = computed(() => {
-  return localTimeOffsetSettings.value.min >= 0 && localTimeOffsetSettings.value.min <= 100000 &&
-    localTimeOffsetSettings.value.max > 0 && localTimeOffsetSettings.value.max <= 100000 &&
-    localTimeOffsetSettings.value.max >= localTimeOffsetSettings.value.min
-})
 
 // 변경사항 감지 watch - Store 상태 업데이트
 watch(
@@ -267,56 +235,6 @@ onMounted(async () => {
   }
 })
 
-// 각도 오프셋 저장 함수
-const onSaveAngleOffset = async () => {
-  try {
-    await offsetLimitsSettingsStore.saveAngleOffsetLimitsSettings(localAngleOffsetSettings.value)
-    updateChangeStatus('angle', false)
-    originalAngleOffsetSettings.value = { ...localAngleOffsetSettings.value }
-    isSaved.value = true
-
-    successMessage.value = '각도 오프셋 제한 설정이 성공적으로 저장되었습니다'
-
-    setTimeout(() => {
-      successMessage.value = ''
-    }, 3000)
-
-    $q.notify({
-      color: 'positive',
-      message: '각도 오프셋 제한 설정이 저장되었습니다',
-      icon: 'check',
-      position: 'top'
-    })
-  } catch (error) {
-    console.error('각도 오프셋 제한 설정 저장 실패:', error)
-  }
-}
-
-// 시간 오프셋 저장 함수
-const onSaveTimeOffset = async () => {
-  try {
-    await offsetLimitsSettingsStore.saveTimeOffsetLimitsSettings(localTimeOffsetSettings.value)
-    updateChangeStatus('time', false)
-    originalTimeOffsetSettings.value = { ...localTimeOffsetSettings.value }
-    isSaved.value = true
-
-    successMessage.value = '시간 오프셋 제한 설정이 성공적으로 저장되었습니다'
-
-    setTimeout(() => {
-      successMessage.value = ''
-    }, 3000)
-
-    $q.notify({
-      color: 'positive',
-      message: '시간 오프셋 제한 설정이 저장되었습니다',
-      icon: 'check',
-      position: 'top'
-    })
-  } catch (error) {
-    console.error('시간 오프셋 제한 설정 저장 실패:', error)
-  }
-}
-
 // 각도 오프셋 초기화 함수
 const onResetAngleOffset = async () => {
   try {
@@ -324,7 +242,6 @@ const onResetAngleOffset = async () => {
     localAngleOffsetSettings.value = { ...offsetLimitsSettingsStore.angleOffsetLimitsSettings }
     originalAngleOffsetSettings.value = { ...offsetLimitsSettingsStore.angleOffsetLimitsSettings }
     updateChangeStatus('angle', false)
-    isSaved.value = true
 
     $q.notify({
       color: 'info',
@@ -344,7 +261,6 @@ const onResetTimeOffset = async () => {
     localTimeOffsetSettings.value = { ...offsetLimitsSettingsStore.timeOffsetLimitsSettings }
     originalTimeOffsetSettings.value = { ...offsetLimitsSettingsStore.timeOffsetLimitsSettings }
     updateChangeStatus('time', false)
-    isSaved.value = true
 
     $q.notify({
       color: 'info',
